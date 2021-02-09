@@ -18,6 +18,7 @@
     $(document).ready(function() {
 
         $('.js-example-basic-single').select2();
+
     });
     $('.addRow').on('click',function(e){
         e.preventDefault();
@@ -48,22 +49,45 @@
 
     });
 
-    $('.addRowTecnico').on('click',function(e){
+    $('.addRowTecnicoL').on('click',function(e){
         e.preventDefault();
-        addRowTecnico();
+        addRowTecnicoL();
     });
-    function addRowTecnico()
+    function addRowTecnicoL()
     {
         var tr='<tr>'+
-            '<td></td><td>'+'{{ Form::select('tecnico[]',$tecnicos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+            '<td></td><td>'+'{{ Form::select('tecnicoL[]',$tecnicos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
 
 
-            '<td><a href="#" class="btn btn-danger removeTecnico"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '<td><a href="#" class="btn btn-danger removeTecnicoL"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
-        $('#cuerpoTecnico').append(tr);
+        $('#cuerpoTecnicoL').append(tr);
         $('.js-example-basic-single').select2();
     };
-    $('body').on('click', '.removeTecnico', function(e){
+    $('body').on('click', '.removeTecnicoL', function(e){
+        e.preventDefault();
+
+        $(this).parent().parent().remove();
+
+
+    });
+
+    $('.addRowTecnicoV').on('click',function(e){
+        e.preventDefault();
+        addRowTecnicoV();
+    });
+    function addRowTecnicoV()
+    {
+        var tr='<tr>'+
+            '<td></td><td>'+'{{ Form::select('tecnicoV[]',$tecnicos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+
+
+            '<td><a href="#" class="btn btn-danger removeTecnicoV"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpoTecnicoV').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removeTecnicoV', function(e){
         e.preventDefault();
 
         $(this).parent().parent().remove();
@@ -133,7 +157,7 @@
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('arbitro[]',$arbitros ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
 
-            '<td>'+'{{ Form::select('tipo[]',['Principal'=>'Principal','Linea 1'=>'Linea 1','Linea 2'=>'Linea 2','Cuarto'=>'Cuarto','VAR'=>'VAR']) }}'+'</td>'+
+            '<td>'+'{{ Form::select('tipo[]',['Principal'=>'Principal','Linea 1'=>'Linea 1','Linea 2'=>'Linea 2','Cuarto'=>'Cuarto','VAR'=>'VAR'], '',['class' => 'form-control']) }}'+'</td>'+
             '<td><a href="#" class="btn btn-danger removearbitro"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
         $('#cuerpoarbitro').append(tr);
@@ -295,6 +319,29 @@
         else{
             $(this).parent().parent().remove();
         }
+
+    });
+
+    $('.addRowTorneo').on('click',function(e){
+        e.preventDefault();
+        addRowTorneo();
+    });
+    function addRowTorneo()
+    {
+        var tr='<tr>'+
+            '<td></td><td>'+'{{ Form::select('torneoAnterior[]',$torneosAnteriores ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+
+
+            '<td><a href="#" class="btn btn-danger removeTorneo"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpoTorneo').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removeTorneo', function(e){
+        e.preventDefault();
+
+        $(this).parent().parent().remove();
+
 
     });
 

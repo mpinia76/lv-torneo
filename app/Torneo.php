@@ -12,4 +12,10 @@ class Torneo extends Model
         return $this->hasMany('App\Grupo');
     }
 
+
+    public function getFullNameAttribute()
+    {
+        return $this->nombre . ' ' . $this->year;
+    }
+
 }

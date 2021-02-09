@@ -6,8 +6,10 @@ use App\Alineacion;
 use App\Cambio;
 use App\Jugador;
 use App\Partido;
+use App\PartidoTecnico;
 use App\Plantilla;
 use App\PlantillaJugador;
+use App\Tecnico;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
@@ -50,9 +52,18 @@ class AlineacionController extends Controller
 
         $jugadorsV = $jugadorsV->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');
 
+        $tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');
+
+        $partidoTecnicosL = PartidoTecnico::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->get();
+
+        $partidoTecnicosV = PartidoTecnico::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipov->id)->get();
+
+
+
 
         //dd($partido->fecha->grupo->torneo->nombre);
-        return view('alineaciones.index', compact('titularesL','suplentesL', 'titularesV','suplentesV','partido','jugadorsL', 'jugadorsV'));
+        return view('alineaciones.index', compact('titularesL','suplentesL', 'titularesV','suplentesV','partido','jugadorsL', 'jugadorsV','tecnicos','partidoTecnicosL','partidoTecnicosV'));
     }
 
     /**
@@ -111,6 +122,7 @@ class AlineacionController extends Controller
         DB::beginTransaction();
         $ok=1;
         $noBorrar='';
+        $noBorrarTecnicos='';
         if(!empty($request->titularl))
         {
             if($request->titularl_id){
@@ -222,6 +234,42 @@ class AlineacionController extends Controller
             }
 
         }
+
+        if(!empty($request->tecnicoL))
+            {
+                if($request->partidoTecnicoL_id){
+                    foreach ($request->partidoTecnicoL_id as $id){
+                        $noBorrarTecnicos .=$id.',';
+                    }
+
+                }
+
+                foreach($request->tecnicoL as $item=>$v){
+
+                    $data2=array(
+                        'partido_id'=>$partido_id,
+                        'equipo_id'=>$partido->equipol->id,
+                        'tecnico_id'=>$request->tecnicoL[$item]
+                    );
+                    try {
+                        if (!empty($request->partidoTecnicoL_id[$item])){
+                            $data2['id']=$request->partidoTecnicoL_id[$item];
+                            $partidoTecnico=PartidoTecnico::find($request->partidoTecnicoL_id[$item]);
+                            $partidoTecnico->update($data2);
+                        }
+                        else{
+                            $partidoTecnico=PartidoTecnico::create($data2);
+                        }
+
+                        $noBorrarTecnicos .=$partidoTecnico->id.',';
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+            }
         if(!empty($request->titularv))
         {
             if($request->titularv_id){
@@ -332,8 +380,46 @@ class AlineacionController extends Controller
             }
 
         }
+        if(!empty($request->tecnicoV))
+        {
+            if($request->partidoTecnicoV_id){
+                foreach ($request->partidoTecnicoV_id as $id){
+                    $noBorrarTecnicos .=$id.',';
+                }
+
+            }
+
+            foreach($request->tecnicoV as $item=>$v){
+
+                $data2=array(
+                    'partido_id'=>$partido_id,
+                    'equipo_id'=>$partido->equipov->id,
+                    'tecnico_id'=>$request->tecnicoV[$item]
+                );
+                try {
+                    if (!empty($request->partidoTecnicoV_id[$item])){
+                        $data2['id']=$request->partidoTecnicoV_id[$item];
+                        $partidoTecnico=PartidoTecnico::find($request->partidoTecnicoV_id[$item]);
+                        $partidoTecnico->update($data2);
+                    }
+                    else{
+                        $partidoTecnico=PartidoTecnico::create($data2);
+                    }
+
+                    $noBorrarTecnicos .=$partidoTecnico->id.',';
+
+
+
+                }catch(QueryException $ex){
+                    $error = $ex->getMessage();
+                    $ok=0;
+                    continue;
+                }
+            }
+        }
         try {
             Alineacion::where('partido_id',"$partido_id")->whereNotIn('id', explode(',', $noBorrar))->delete();
+            PartidoTecnico::where('partido_id',"$partido_id")->whereNotIn('id', explode(',', $noBorrarTecnicos))->delete();
         }
         catch(QueryException $ex){
             $error = $ex->getMessage();

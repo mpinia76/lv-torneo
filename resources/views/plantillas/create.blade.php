@@ -61,34 +61,7 @@
 
         </table>
         </div>
-        <div class="form-group col-md-12">
-            <h1 class="display-6">Tecnicos</h1>
-            <a class="btn btn-success m-1" href="{{route('tecnicos.create',  array('torneoId' => $torneo))}}">Nuevo</a>
-            <table class="table" style="width: 50%">
-                <thead>
-                <th></th>
-                <th>Tecnicos</th>
 
-                <th><a href="#" class="addRowTecnico"><i class="glyphicon glyphicon-plus"></i></a></th>
-
-                </thead>
-
-                <tbody id="cuerpoTecnico">
-                <tr>
-                    <td></td>
-                    <td>{{ Form::select('tecnico[]',$tecnicos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
-
-
-                    <td><a href="#" class="btn btn-danger removeTecnico"><i class="glyphicon glyphicon-remove"></i></a></td>
-                </tr>
-
-                </tbody>
-
-
-
-
-            </table>
-        </div>
     </div>
 
     <!-- build the submission button -->

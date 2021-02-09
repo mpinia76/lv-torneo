@@ -9,45 +9,82 @@
     <hr/>
 
 
-        <nav class="navbar navbar-light float-right" style="width: 60%">
+        <nav class="navbar navbar-light float-right" style="width: 100%">
             <form class="form-inline">
                 <input type="hidden" name="grupoId" value="{{ (isset($_GET['grupoId']))?$_GET['grupoId']:'' }}">
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:'' }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
-                <button class="btn btn-success m-1" type="submit">Buscar</button>
+                <select class="orm-control js-example-basic-single" id="fechaId" name="fechaId" onchange="this.form.submit()" style="width: 150px">
+                    @foreach($fechas as $f)
+
+                        <option value="{{$f->id}}" @if($f->id==$fecha->id)
+                            selected
+
+                            @endif >Fecha {{$f->numero}}</option>
+                    @endforeach
+
+                </select>
+
+
+
             </form>
         </nav>
 
-    <table class="table" style="width: 60%">
-        <thead>
-        <th>Numero</th>
+        <div class="row">
 
-        <th>Torneo</th>
+            <div class="form-group col-md-12">
 
-        <th colspan="3"></th>
-        </thead>
+                <table class="table" style="width: 70%">
+                    <thead>
+                    <th>Fecha</th>
+                    <th>Local</th>
+                    <th>GL</th>
+                    <th>GV</th>
+                    <th>Visitante</th>
 
-        @foreach($fechas as $fecha)
-
-            <tr>
-                <td>{{$fecha->numero}}</td>
-
-                <td>{{$fecha->grupo->torneo->nombre}} - {{$fecha->grupo->torneo->year}}</td>
-
-                <td>
-                    <div class="d-flex">
+                    </thead>
 
 
-                        <a href="{{route('fechas.showPublic',array('fechaId' => $fecha->id))}}" class="btn btn-success m-1">Ver</a>
+                    @foreach($fecha->partidos as $partido)
+
+                        @if($partido->dia)
+                            <tr>
+                                <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
+                                <td>
+                                    <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol->id))}}" >
+                                        @if($partido->equipol)
+                                            @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
+                                            @endif
+                                    </a>
+                                    {{$partido->equipol->nombre}}
+                                    @endif
+                                </td>
+                                <td>{{$partido->golesl}}</td>
+                                <td>{{$partido->golesv}}</td>
+                                <td>
+                                    <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}">
+                                        @if($partido->equipov)
+                                            @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
+                                            @endif
+                                    </a>
+                                    {{$partido->equipov->nombre}}
+                                    @endif
+                                </td>
+                                <td>
+                                    <div class="d-flex">
+
+                                        <a href="{{route('fechas.detalle', array('partidoId' => $partido->id))}}" class="btn btn-success m-1">Detalles</a>
 
 
+                                    </div>
 
-                    </div>
+                                </td>
+                            </tr>
+                        @endif
+                    @endforeach
+                </table>
+            </div>
 
-                </td>
-            </tr>
-        @endforeach
-    </table>
+        </div>
         <div class="d-flex">
 
             <a href="{{route('torneos.ver',array('torneoId' => $grupo->torneo->id))}}" class="btn btn-success m-1">Volver</a>

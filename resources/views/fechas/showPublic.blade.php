@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-        <h1 class="display-6">{{$fecha->numero}} </h1>
+        <h1 class="display-6">Fecha {{$fecha->numero}} </h1>
 
         <hr/>
 
@@ -15,7 +15,7 @@
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
+               
                 <table class="table" style="width: 70%">
                     <thead>
                     <th>Fecha</th>
@@ -33,7 +33,7 @@
                     <tr>
                         <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
-                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol->id))}}" class="btn btn-info m-1">
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol->id))}}" >
                                 @if($partido->equipol)
                                     @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
                                     @endif
@@ -44,7 +44,7 @@
                             <td>{{$partido->golesl}}</td>
                             <td>{{$partido->golesv}}</td>
                             <td>
-                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}" class="btn btn-info m-1">
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}">
                                 @if($partido->equipov)
                                     @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                     @endif

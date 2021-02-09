@@ -51,6 +51,39 @@
         </div>
     </div>
 
+        <div class="form-group col-md-12">
+            <h1 class="display-6">Torneos que cuentan para el promedio</h1>
+
+            <table class="table" style="width: 50%">
+                <thead>
+                <th></th>
+                <th>Torneos</th>
+
+                <th><a href="#" class="addRowTorneo"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                </thead>
+
+                <tbody id="cuerpoTorneo">
+                @foreach($promedioTorneos ?? '' as $promedioTorneo)
+
+                    <tr>
+                        <td>
+                            {{Form::hidden('promedioTorneo_id[]',$promedioTorneo->id)}}</td>
+                        <td>{{ Form::select('torneoAnterior[]',$torneosAnteriores, $promedioTorneo->torneoAnterior_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+
+
+                        <td><a href="#" class="btn btn-danger removeTecnico"><i class="glyphicon glyphicon-remove"></i></a></td>
+                    </tr>
+                @endforeach
+
+                </tbody>
+
+
+
+
+            </table>
+        </div>
+
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
         <a href="{{route('torneos.index')}}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}

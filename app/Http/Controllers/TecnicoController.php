@@ -16,7 +16,7 @@ class TecnicoController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth');
+        $this->middleware('auth')->except(['ver']);
     }
 
     /**
@@ -44,9 +44,9 @@ class TecnicoController extends Controller
     public function create(Request $request)
     {
 
-        if ($request->get('plantillaId')){
-            $plantilla_id = $request->get('plantillaId');
-            $vista =view('tecnicos.create', compact('plantilla_id'));
+        if ($request->get('partidoId')){
+            $partido_id = $request->get('partidoId');
+            $vista =view('tecnicos.create', compact('partido_id'));
         }
         elseif($request->get('torneoId')){
             $torneo_id = $request->get('torneoId');
@@ -94,14 +94,12 @@ class TecnicoController extends Controller
 
         $tecnico = Tecnico::create($insert);
 
-        if($request->get('plantilla_id')){
-            $plantilla_id = $request->get('plantilla_id');
-            $redirect = redirect()->route('plantillas.edit',[$plantilla_id])->with('success','Registro creado satisfactoriamente');
+        if($request->get('partido_id')){
+            $partido_id = $request->get('partido_id');
+            $redirect = redirect()->route('alineaciones.index',['partidoId' => $partido_id])->with('success','Registro creado satisfactoriamente');
 
         }
-        elseif($request->get('torneo_id')){
-            $redirect = redirect()->route('plantillas.create', ['torneoId' => $request->get('torneo_id')])->with('success','Registro creado satisfactoriamente');
-        }
+
         else{
             $redirect = redirect()->route('tecnicos.index')->with('success','Registro creado satisfactoriamente');
         }
@@ -189,4 +187,19 @@ class TecnicoController extends Controller
         $tecnico->delete();
         return redirect()->route('tecnicos.index')->with('success','Registro eliminado satisfactoriamente');
     }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function ver(Request $request)
+    {
+        $id= $request->query('tecnicoId');
+        $tecnico=Tecnico::findOrFail($id);
+        return view('tecnicos.ver', compact('tecnico'));
+    }
+
+
 }

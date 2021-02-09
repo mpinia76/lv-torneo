@@ -16,7 +16,7 @@ class ArbitroController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth');
+        $this->middleware('auth')->except(['ver']);
     }
 
     /**
@@ -182,5 +182,18 @@ class ArbitroController extends Controller
 
         $arbitro->delete();
         return redirect()->route('arbitros.index')->with('success','Registro eliminado satisfactoriamente');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function ver(Request $request)
+    {
+        $id= $request->query('arbitroId');
+        $arbitro=Arbitro::findOrFail($id);
+        return view('arbitros.ver', compact('arbitro'));
     }
 }

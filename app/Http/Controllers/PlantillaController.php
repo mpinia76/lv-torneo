@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\PlantillaJugador;
-use App\PlantillaTecnico;
+use App\PartidoTecnico;
 use App\Torneo;
 use App\Plantilla;
 use App\Jugador;
@@ -74,10 +74,10 @@ class PlantillaController extends Controller
         $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
 
 
-        $tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
-        $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');
+        /*$tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');*/
         //
-        return view('plantillas.create', compact('torneo','jugadors','equipos','tecnicos'));
+        return view('plantillas.create', compact('torneo','jugadors','equipos'));
     }
 
     /**
@@ -113,7 +113,7 @@ class PlantillaController extends Controller
                     }
                 }
             }
-            if(count($request->tecnico) > 0)
+            /*if(count($request->tecnico) > 0)
             {
                 foreach($request->tecnico as $item=>$v){
 
@@ -129,7 +129,7 @@ class PlantillaController extends Controller
                         continue;
                     }
                 }
-            }
+            }*/
         }catch(Exception $e){
             //if email or phone exist before in db redirect with error messages
             $ok=0;
@@ -181,13 +181,13 @@ class PlantillaController extends Controller
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
         $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
 
-        $plantillaTecnicos = PlantillaTecnico::where('plantilla_id','=',"$id")->get();
+        /*$plantillaTecnicos = PlantillaTecnico::where('plantilla_id','=',"$id")->get();
 
 
         $tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
-        $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');
+        $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');*/
 
-        return view('plantillas.edit', compact('jugadors','torneo','equipos','plantilla', 'plantillaJugadors', 'tecnicos', 'plantillaTecnicos'));
+        return view('plantillas.edit', compact('jugadors','torneo','equipos','plantilla', 'plantillaJugadors'));
     }
 
     /**
@@ -209,7 +209,7 @@ class PlantillaController extends Controller
             PlantillaJugador::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillajugador_id)->delete();
         }
         if($request->plantillatecnico_id)  {
-            PlantillaTecnico::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillatecnico_id)->delete();
+            PartidoTecnico::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillatecnico_id)->delete();
         }
         $ok=1;
         $plantilla=plantilla::find($id);
@@ -244,33 +244,7 @@ class PlantillaController extends Controller
                     }
                 }
             }
-            if($request->tecnico)
-            {
-                foreach($request->tecnico as $item=>$v){
 
-                    $data2=array(
-                        'plantilla_id'=>$id,
-                        'tecnico_id'=>$request->tecnico[$item]
-                    );
-                    try {
-                        if (!empty($request->plantillatecnico_id[$item])){
-                            $data2['id']=$request->plantillatecnico_id[$item];
-                            $plantillaTecnico=PlantillaTecnico::find($request->plantillatecnico_id[$item]);
-                            $plantillaTecnico->update($data2);
-                        }
-                        else{
-                            PlantillaTecnico::create($data2);
-                        }
-
-
-
-                    }catch(QueryException $ex){
-                        $error = $ex->getMessage();
-                        $ok=0;
-                        continue;
-                    }
-                }
-            }
         }catch(Exception $e){
             //if email or phone exist before in db redirect with error messages
             $ok=0;

@@ -24,7 +24,7 @@
 
     <!-- Include the CRSF token -->
     {{Form::token()}}
-    {{Form::hidden('plantilla_id', (isset($plantilla_id))?$plantilla_id:'' )}}
+    {{Form::hidden('partido_id', (isset($partido_id))?$partido_id:'' )}}
     {{Form::hidden('torneo_id', (isset($torneo_id))?$torneo_id:'' )}}
     <!-- build our form inputs -->
     <div class="row">

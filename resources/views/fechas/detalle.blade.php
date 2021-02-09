@@ -25,7 +25,7 @@
                     <tr>
                         <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                         <td>
-                            <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol->id))}}" class="btn btn-info m-1">
+                            <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol->id))}}" >
                             @if($partido->equipol)
                                 @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
                                 @endif
@@ -36,7 +36,7 @@
                         <td>{{$partido->golesl}}</td>
                         <td>{{$partido->golesv}}</td>
                         <td>
-                            <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}" class="btn btn-info m-1">
+                            <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}" >
                             @if($partido->equipov)
                                 @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                 @endif
@@ -46,18 +46,22 @@
                         </td>
 
                     </tr>
-
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td colspan="3" style="font-weight: bold">Titulares</td>
+                    </tr>
 
                     <tr>
                         <td></td>
                         <td>
                             <table class="table">
-                                <tr>  <td style="font-weight: bold">Titulares</td></tr>
+
                                 @foreach($titularesL ?? '' as $titularl)
                                     <tr>
 
                                         <td>
-                                            <a href="{{route('jugadores.ver', array('jugadorId' => $titularl->jugador->id))}}" class="btn btn-info m-1">
+                                            <a href="{{route('jugadores.ver', array('jugadorId' => $titularl->jugador->id))}}" >
                                     <span style="font-weight: bold">{{$titularl->dorsal}}</span>
                                     @if($titularl->jugador->foto)
                                         <img id="original" src="{{ url('images/'.$titularl->jugador->foto) }}" height="50">
@@ -69,33 +73,19 @@
                                         </td>
                                     </tr>
                                 @endforeach
-                                <tr>  <td style="font-weight: bold">Suplentes</td></tr>
-                                    @foreach($suplentesL ?? '' as $suplentel)
-                                        <tr>
 
-                                            <td>
-                                                <a href="{{route('jugadores.ver', array('jugadorId' => $suplentel->jugador->id))}}" class="btn btn-info m-1">
-                                                <span style="font-weight: bold">{{$suplentel->dorsal}}</span>
-                                                @if($suplentel->jugador->foto)
-                                                    <img id="original" src="{{ url('images/'.$suplentel->jugador->foto) }}" height="50">
-                                                @else
-                                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
-                                                    @endif</a>
-                                                <span style="font-weight: bold"> {{ $suplentel->jugador->full_name}}</span>
-                                            </td>
-                                        </tr>
-                                    @endforeach
+
                             </table>
                         </td>
                         <td colspan="2" style="font-weight: bold"></td>
                         <td>
                             <table class="table">
-                                <tr>  <td style="font-weight: bold">Titulares</td></tr>
+
                                 @foreach($titularesV ?? '' as $titularv)
                                     <tr>
 
                                         <td>
-                                            <a href="{{route('jugadores.ver', array('jugadorId' => $titularv->jugador->id))}}" class="btn btn-info m-1">
+                                            <a href="{{route('jugadores.ver', array('jugadorId' => $titularv->jugador->id))}}" >
                                             <span style="font-weight: bold">{{$titularv->dorsal}}</span>
                                             @if($titularv->jugador->foto)
                                                 <img id="original" src="{{ url('images/'.$titularv->jugador->foto) }}" height="50">
@@ -107,27 +97,135 @@
                                         </td>
                                     </tr>
                                 @endforeach
-                                <tr>  <td style="font-weight: bold">Suplentes</td></tr>
+
+
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td colspan="3" style="font-weight: bold">Suplentes</td>
+                    </tr>
+
+                    <tr>
+                        <td></td>
+                        <td>
+                            <table class="table">
+
+
+                                @foreach($suplentesL ?? '' as $suplentel)
+                                    <tr>
+
+                                        <td>
+                                            <a href="{{route('jugadores.ver', array('jugadorId' => $suplentel->jugador->id))}}" >
+                                                <span style="font-weight: bold">{{$suplentel->dorsal}}</span>
+                                                @if($suplentel->jugador->foto)
+                                                    <img id="original" src="{{ url('images/'.$suplentel->jugador->foto) }}" height="50">
+                                                @else
+                                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                                @endif</a>
+                                            <span style="font-weight: bold"> {{ $suplentel->jugador->full_name}}</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+
+                            </table>
+                        </td>
+                        <td colspan="2" style="font-weight: bold"></td>
+                        <td>
+                            <table class="table">
+
+
                                 @foreach($suplentesV ?? '' as $suplentev)
                                     <tr>
 
                                         <td>
-                                            <a href="{{route('jugadores.ver', array('jugadorId' => $suplentev->jugador->id))}}" class="btn btn-info m-1">
-                                            <span style="font-weight: bold">{{$suplentev->dorsal}}</span>
-                                            @if($suplentev->jugador->foto)
-                                                <img id="original" src="{{ url('images/'.$suplentev->jugador->foto) }}" height="50">
-                                            @else
-                                                <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
-                                            @endif
+                                            <a href="{{route('jugadores.ver', array('jugadorId' => $suplentev->jugador->id))}}" >
+                                                <span style="font-weight: bold">{{$suplentev->dorsal}}</span>
+                                                @if($suplentev->jugador->foto)
+                                                    <img id="original" src="{{ url('images/'.$suplentev->jugador->foto) }}" height="50">
+                                                @else
+                                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                                @endif
                                             </a>
                                             <span style="font-weight: bold"> {{ $suplentev->jugador->full_name}}</span>
                                         </td>
                                     </tr>
                                 @endforeach
+
                             </table>
                         </td>
                     </tr>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td colspan="3" style="font-weight: bold">Técnicos</td>
+                    </tr>
+                    <tr>
+                        <td></td>
+                        <td>
+                    <table class="table">
+                        @foreach($tecnicosL ?? '' as $tecnicol)
+                            <tr>
 
+                                <td>
+                                    <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnicol->tecnico->id))}}" >
+
+                                        @if($tecnicol->tecnico->foto)
+                                            <img id="original" src="{{ url('images/'.$tecnicol->tecnico->foto) }}" height="50">
+                                        @else
+                                            <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                        @endif</a>
+                                    <span style="font-weight: bold"> {{ $tecnicol->tecnico->full_name}}</span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </table>
+                        </td>
+                        <td colspan="2" style="font-weight: bold"></td>
+                        <td>
+                    <table class="table">
+                        @foreach($tecnicosV ?? '' as $tecnicov)
+                            <tr>
+
+                                <td>
+                                    <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnicov->tecnico->id))}}" >
+
+                                        @if($tecnicov->tecnico->foto)
+                                            <img id="original" src="{{ url('images/'.$tecnicov->tecnico->foto) }}" height="50">
+                                        @else
+                                            <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                        @endif</a>
+                                    <span style="font-weight: bold"> {{ $tecnicov->tecnico->full_name}}</span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </table>
+                        </td></tr>
+                    <tr>
+                        <td></td>
+                        <td></td>
+                        <td colspan="3" style="font-weight: bold">Jueces</td>
+                    </tr>
+
+                    @foreach($arbitros ?? '' as $arbitro)
+                        <tr>
+                            <td></td>
+                            <td></td>
+                            <td colspan="3" >
+                                <a href="{{route('arbitros.ver', array('arbitroId' => $arbitro->arbitro->id))}}" >
+
+                                    @if($arbitro->arbitro->foto)
+                                        <img id="original" src="{{ url('images/'.$arbitro->arbitro->foto) }}" height="50">
+                                    @else
+                                        <img id="original" src="{{ url('images/sin_foto_arbitro.png') }}" height="50">
+                                    @endif</a>
+                                <span style="font-weight: bold"> {{ $arbitro->arbitro->full_name}}</span> {{ $arbitro->tipo}}
+                            </td>
+                        </tr>
+
+                    @endforeach
                     <tr>
                         <td></td>
                         <td></td>
@@ -315,7 +413,7 @@
 
         <div class="d-flex">
 
-            <a href="{{ route('fechas.showPublic',array('fechaId' => $partido->fecha->id)) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('fechas.ver',array('grupoId' => $partido->fecha->grupo->id, 'fechaId' => $partido->fecha->id)) }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
 @endsection

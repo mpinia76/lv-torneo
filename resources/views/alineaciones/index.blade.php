@@ -63,7 +63,13 @@
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Titulares Local</h1>
+                <h1 class="display-6">
+                    @if($partido->equipol)
+                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50">
+                        @endif
+
+                    @endif
+                    Titulares</h1>
                 <table class="table" style="width: 60%">
                     <thead>
                     <th></th>
@@ -106,7 +112,13 @@
                 </table>
             </div>
             <div class="form-group col-md-12">
-                <h1 class="display-6">Suplentes Local</h1>
+                <h1 class="display-6">
+                    @if($partido->equipol)
+                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50">
+                        @endif
+
+                    @endif
+                    Suplentes</h1>
                 <table class="table" style="width: 60%">
                     <thead>
                     <th></th>
@@ -149,7 +161,51 @@
                 </table>
             </div>
             <div class="form-group col-md-12">
-                <h1 class="display-6">Titulares Visitante</h1>
+                <h1 class="display-6">
+                    @if($partido->equipol)
+                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50">
+                        @endif
+
+                    @endif
+                    Técnico</h1>
+                <a class="btn btn-success m-1" href="{{route('tecnicos.create',  array('partidoId' => $partido->id))}}">Nuevo</a>
+
+                <table class="table" style="width: 50%">
+                    <thead>
+                    <th></th>
+                    <th>Técnico</th>
+
+                    <th><a href="#" class="addRowTecnicoL"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                    </thead>
+                    <tbody id="cuerpoTecnicoL">
+
+                    @foreach($partidoTecnicosL ?? '' as $partidoTecnicoL)
+
+                        <tr>
+                            <td>@if($partidoTecnicoL->tecnico->foto)
+                                    <img id="original" src="{{ url('images/'.$partidoTecnicoL->tecnico->foto) }}" height="50">
+                                @else
+                                    <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                @endif
+                                {{Form::hidden('partidoTecnicoL_id[]',$partidoTecnicoL->id)}}</td>
+                            <td>{{ Form::select('tecnicoL[]',$tecnicos, $partidoTecnicoL->tecnico->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+
+
+                            <td><a href="#" class="btn btn-danger removeTecnicoL"><i class="glyphicon glyphicon-remove"></i></a></td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-group col-md-12">
+                <h1 class="display-6">
+                    @if($partido->equipov)
+                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50">
+                        @endif
+
+                    @endif
+                    Titulares</h1>
                 <table class="table" style="width: 60%">
                     <thead>
                     <th></th>
@@ -192,7 +248,13 @@
                 </table>
             </div>
             <div class="form-group col-md-12">
-                <h1 class="display-6">Suplentes Visitante</h1>
+                <h1 class="display-6">
+                    @if($partido->equipov)
+                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50">
+                        @endif
+
+                    @endif
+                    Suplentes</h1>
                 <table class="table" style="width: 60%">
                     <thead>
                     <th></th>
@@ -234,7 +296,44 @@
 
                 </table>
             </div>
+            <div class="form-group col-md-12">
+                <h1 class="display-6">
+                    @if($partido->equipov)
+                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50">
+                        @endif
 
+                    @endif
+                    Técnico</h1>
+                <a class="btn btn-success m-1" href="{{route('tecnicos.create',  array('partidoId' => $partido->id))}}">Nuevo</a>
+
+                <table class="table" style="width: 50%">
+                    <thead>
+                    <th></th>
+                    <th>Técnico</th>
+
+                    <th><a href="#" class="addRowTecnicoV"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                    </thead>
+                    <tbody id="cuerpoTecnicoV">
+
+                    @foreach($partidoTecnicosV ?? '' as $partidoTecnicoV)
+
+                        <tr>
+                            <td>@if($partidoTecnicoV->tecnico->foto)
+                                    <img id="original" src="{{ url('images/'.$partidoTecnicoV->tecnico->foto) }}" height="50">
+                                @else
+                                    <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                @endif
+                                {{Form::hidden('partidoTecnicoV_id[]',$partidoTecnicoV->id)}}</td>
+                            <td>{{ Form::select('tecnicoV[]',$tecnicos, $partidoTecnicoV->tecnico->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+
+
+                            <td><a href="#" class="btn btn-danger removeTecnicoV"><i class="glyphicon glyphicon-remove"></i></a></td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
         </div>
 
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
