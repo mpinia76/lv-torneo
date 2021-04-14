@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Plantillas de {{$torneo->nombre}} - {{$torneo->year}}</h1>
+    <h1 class="display-6">Plantillas del grupo {{$grupo->nombre}} de {{$grupo->torneo->nombre}} - {{$grupo->torneo->year}}</h1>
 
     <hr/>
 
@@ -22,10 +22,11 @@
                     </ul>
                 </div>
             @endif
-        <a class="btn btn-success m-1" href="{{route('plantillas.create',  array('torneoId' => (isset($_GET['torneoId']))?$_GET['torneoId']:'' ))}}">Nuevo</a>
+        <a class="btn btn-success m-1" href="{{route('plantillas.create',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">Nuevo</a>
+        <a class="btn btn-info m-1" href="{{route('plantillas.import',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">Importar datos</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
-                <input type="hidden" name="torneoId" value="{{ (isset($_GET['torneoId']))?$_GET['torneoId']:'' }}">
+                <input type="hidden" name="grupoId" value="{{ (isset($_GET['grupoId']))?$_GET['grupoId']:'' }}">
                 <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:'' }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
                 <button class="btn btn-success m-1" type="submit">Buscar</button>
@@ -36,7 +37,7 @@
         <thead>
         <th>Equipo</th>
 
-        <th>Torneo</th>
+        <th>Grupo</th>
 
         <th colspan="3"></th>
         </thead>
@@ -48,7 +49,7 @@
                         <img id="original" src="{{ url('images/'.$plantilla->equipo->escudo) }}" height="25">
                     @endif{{$plantilla->equipo->nombre}}</td>
 
-                <td>{{$plantilla->torneo->nombre}} - {{$plantilla->torneo->year}}</td>
+                <td>{{$plantilla->grupo->torneo->nombre}} - {{$plantilla->grupo->torneo->year}}</td>
 
                 <td>
                     <div class="d-flex">
@@ -66,7 +67,7 @@
 
         <div class="d-flex">
 
-            <a href="{{route('torneos.index')}}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('torneos.show',$grupo->torneo->id)}}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
     <script>

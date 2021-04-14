@@ -540,3 +540,26 @@
     border-radius: 0;
     margin-bottom: -1px;
 }
+
+.imgCircle {
+
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+}
+
+.image-cropper {
+    width: 50px;
+    height: 50px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 50%;
+}
+.profile-pic {
+     display: inline;
+     margin: 0 auto;
+     margin-left: -25%;
+     height: 100%;
+     width: auto;
+ }
+

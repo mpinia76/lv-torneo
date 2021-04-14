@@ -15,7 +15,7 @@
         <div class="row">
 
             <div class="form-group col-md-12">
-               
+
                 <table class="table" style="width: 70%">
                     <thead>
                     <th>Fecha</th>
@@ -41,8 +41,16 @@
                                     {{$partido->equipol->nombre}}
                                 @endif
                             </td>
-                            <td>{{$partido->golesl}}</td>
-                            <td>{{$partido->golesv}}</td>
+                            <td>{{$partido->golesl}}
+                                @if($partido->penalesl)
+                                    ({{$partido->penalesl}})
+                                @endif
+                            </td>
+                            <td>{{$partido->golesv}}
+                                @if($partido->penalesv)
+                                    ({{$partido->penalesv}})
+                                @endif
+                            </td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}">
                                 @if($partido->equipov)

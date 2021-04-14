@@ -345,4 +345,34 @@
 
     });
 
+    $('.addRowGrupo').on('click',function(e){
+        e.preventDefault();
+        addRowGrupo();
+    });
+    function addRowGrupo()
+
+    {
+        var $cant =parseInt($('#cantGrupos').val());
+        $cant=$cant+1;
+        $('#cantGrupos').val($cant);
+        var tr='<tr>'+
+            '<td><input type="hidden" name="items[]" value="'+$cant+'"></td><td>'+'{{ Form::text('nombreGrupo[]', '',['class' => 'form-control', 'style' => 'width: 250px']) }}'+'</td>'+
+            '<td>'+'{{ Form::number('equiposGrupo[]', '',['class' => 'form-control', 'style' => 'width: 60px']) }}'+'</td>'+
+            '<td>'+'{{ Form::number('agrupacionGrupo[]', '1',['class' => 'form-control', 'style' => 'width: 50px']) }}'+'</td>'+
+            '<td><input type="checkbox" name="posicionesGrupo[]" value="'+$cant+'"></td>'+
+            '<td><input type="checkbox" name="promediosGrupo[]" value="'+$cant+'"></td>'+
+            '<td><input type="checkbox" name="penalesGrupo[]" value="'+$cant+'"></td>'+
+            '<td><a href="#" class="btn btn-danger removeGrupo"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpoGrupo').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removeGrupo', function(e){
+        e.preventDefault();
+
+        $(this).parent().parent().remove();
+
+
+    });
+
 </script>

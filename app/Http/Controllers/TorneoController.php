@@ -22,7 +22,7 @@ class TorneoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except('ver');
+        $this->middleware('auth')->except('ver','promediosPublic');
     }
 
     /**
@@ -61,7 +61,7 @@ class TorneoController extends Controller
     public function store(Request $request)
     {
      //
-        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'playoffs'=>'required']);
+        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required']);
         DB::beginTransaction();
         $ok=1;
         try {
@@ -93,7 +93,7 @@ class TorneoController extends Controller
 
 
             }
-            if(count($request->torneoAnterior) > 0)
+            if(!empty($request->torneoAnterior))
             {
                 foreach($request->torneoAnterior as $item=>$v){
 
@@ -156,7 +156,9 @@ class TorneoController extends Controller
 
         $promedioTorneos = PromedioTorneo::where('torneo_id','=',"$id")->get();
 
-        return view('torneos.edit', compact('torneo','torneo','torneosAnteriores','promedioTorneos'));
+        $grupos = Grupo::where('torneo_id','=',"$id")->get();
+
+        return view('torneos.edit', compact('torneo','torneosAnteriores','promedioTorneos','grupos'));
     }
 
     /**
@@ -169,10 +171,11 @@ class TorneoController extends Controller
     public function update(Request $request, $id)
     {
         //
-        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'playoffs'=>'required']);
+        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required']);
 
         DB::beginTransaction();
         $noBorrar='';
+        $noBorrarGrupos='';
         if($request->promedioTorneo_id)  {
 
                 foreach ($request->promedioTorneo_id as $anterior_id){
@@ -181,30 +184,70 @@ class TorneoController extends Controller
 
 
         }
+        if($request->grupo_id)  {
+
+            foreach ($request->grupo_id as $grupo_id){
+                $noBorrarGrupos .=$grupo_id.',';
+            }
+
+
+        }
         $ok=1;
 
         $torneo=torneo::find($id);
         try {
             $torneo->update($request->all());
-            $torneo->grupoDetalle()->delete();
-            for ($i = 1; $i <= $torneo->grupos; $i++) {
-                $equipos = $torneo->equipos / $torneo->grupos;
+            if($request->nombreGrupo)
+            {
+                foreach($request->nombreGrupo as $item=>$v){
+                    //print_r($request->posicionesGrupo);
+                    $posiciones=0;
+                    $promedios=0;
+                    $penales=0;
+                    if($request->get('posicionesGrupo')){
+                        if(in_array($request->items[$item], $request->get('posicionesGrupo'))){
+                            $posiciones = 1;
+                        }
+                    }
+
+                    if($request->get('promediosGrupo')) {
+                        if (in_array($request->items[$item], $request->get('promediosGrupo'))) {
+                            $promedios = 1;
+                        }
+                    }
+
+                    if($request->get('penalesGrupo')) {
+                        if (in_array($request->items[$item], $request->get('penalesGrupo'))) {
+                            $penales = 1;
+                        }
+                    }
+
+                    $data1=array(
+                        'torneo_id'=>$id,
+                        'nombre'=>$request->nombreGrupo[$item],
+                        'equipos'=>$request->equiposGrupo[$item],
+                        'posiciones'=>$posiciones,
+                        'promedios'=>$promedios,
+                        'penales'=>$penales,
+                        'agrupacion'=>$request->agrupacionGrupo[$item]
+                    );
+                    try {
+                        if (!empty($request->grupo_id[$item])){
+                            $data1['id']=$request->grupo_id[$item];
+                            $grupo=Grupo::find($request->grupo_id[$item]);
+                            $grupo->update($data1);
+                        }
+                        else{
+                            $grupo = Grupo::create($data1);
+                        }
+                        $noBorrarGrupos .=$grupo->id.',';
 
 
-
-
-                $grupo = new Grupo([
-                    'nombre' => $i,
-                    'torneo_id' => $torneo->id,
-                    'equipos' => $equipos
-                ]);
-
-                try {
-                    $grupo->save();
-                }catch(QueryException $ex){
-                    $error = $ex->getMessage();
-                    $ok=0;
-                    continue;
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
                 }
             }
             if($request->torneoAnterior)
@@ -240,6 +283,7 @@ class TorneoController extends Controller
         }
         try {
             PromedioTorneo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrar))->delete();
+            Grupo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrarGrupos))->delete();
         }
         catch(QueryException $ex){
             $error = $ex->getMessage();
@@ -290,7 +334,170 @@ class TorneoController extends Controller
 
         $torneo=Torneo::findOrFail($torneo_id);
         $request->session()->put('nombreTorneo', $torneo->nombre.' '.$torneo->year);
+        $request->session()->put('codigoTorneo', $torneo_id);
         return view('torneos.ver', compact('torneo','torneo'));
+    }
+
+    public function promedios(Request $request)
+    {
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+
+        $promedioTorneos = PromedioTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','ASC')->get();
+        $promedios = array();
+        if (count($promedioTorneos)>0){
+            $sql='SELECT foto, equipo, (sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       )/count(*)) promedio,
+       count(*) jugados,
+
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje
+from ( ';
+
+            //print_r($promedioTorneos[0]);
+            //echo $promedioTorneos[0]->torneoAnterior_id;
+            //foreach ($promedioTorneos as $promedioTorneo){
+            for ($i=0; $i<count($promedioTorneos); $i++){
+                   $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
+		 WHERE golesl is not null AND golesv is not null ';
+                $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
+     $sql .=' union all
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
+		 WHERE golesl is not null AND golesv is not null';
+                $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
+     $sql .=' union all ';
+            }
+
+            $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$torneo_id.'
+		 WHERE golesl is not null AND golesv is not null
+
+     union all
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$torneo_id.'
+		 WHERE golesl is not null AND golesv is not null) a
+group by equipo, foto
+
+order by promedio desc, puntaje desc, equipo ASC';
+
+
+            //echo $sql;
+            $promedios = DB::select(DB::raw($sql));
+        }
+
+
+        //dd($promedios);
+
+        $i=1;
+        return view('torneos.promedios', compact('torneo','promedios','i'));
+    }
+
+    public function promediosPublic(Request $request)
+    {
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+
+        $promedioTorneos = PromedioTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','ASC')->get();
+        $promedios = array();
+        if (count($promedioTorneos)>0){
+            $sql='SELECT foto, equipo, (sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       )/count(*)) promedio,
+       count(*) jugados,
+
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje
+from ( ';
+
+            //print_r($promedioTorneos[0]);
+            //echo $promedioTorneos[0]->torneoAnterior_id;
+            //foreach ($promedioTorneos as $promedioTorneo){
+            for ($i=0; $i<count($promedioTorneos); $i++){
+                $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
+		 WHERE golesl is not null AND golesv is not null ';
+                $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
+                $sql .=' union all
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
+		 WHERE golesl is not null AND golesv is not null';
+                $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
+                $sql .=' union all ';
+            }
+
+            $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$torneo_id.'
+		 WHERE golesl is not null AND golesv is not null
+
+     union all
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$torneo_id.'
+		 WHERE golesl is not null AND golesv is not null) a
+group by equipo, foto
+
+order by promedio desc, puntaje desc, equipo ASC';
+
+
+            //echo $sql;
+            $promedios = DB::select(DB::raw($sql));
+        }
+
+
+        //dd($promedios);
+
+        $i=1;
+        return view('torneos.promediosPublic', compact('torneo','promedios','i'));
     }
 
 }

@@ -26,21 +26,25 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('numero', 'Número')}}
-                {{Form::number('numero', $fecha->numero, ['class' => 'form-control'])}}
+                {{Form::text('numero', $fecha->numero, ['class' => 'form-control'])}}
                 {{Form::hidden('grupo_id', (isset($_GET['grupoId']))?$_GET['grupoId']:$fecha->grupo->id )}}
             </div>
             <div class="form-group col-md-12">
                 <h1 class="display-6">Partidos</h1>
                 <table class="table">
                     <thead>
-                    <th>Fecha</th>
+                    <th >Fecha</th>
+                    <th >Hora</th>
                     <th></th>
                     <th>Local</th>
                     <th>GL</th>
                     <th>GV</th>
                     <th></th>
                     <th>Visitante</th>
-
+                    @if($grupo->penales)
+                        <th>PL</th>
+                        <th>PV</th>
+                    @endif
                     </thead>
 
 
@@ -48,21 +52,30 @@
 
                         <tr>
                             <td>{{Form::hidden('partido_id[]',$partido->id)}}
-                                {{Form::date('fecha[]', ($partido->dia)?date('Y-m-d', strtotime($partido->dia)):'', ['class' => 'form-control'])}}</td>
+                                {{Form::date('fecha[]', ($partido->dia)?date('Y-m-d', strtotime($partido->dia)):'', ['class' => 'form-control','style' =>'width:155px;'])}}
+                            </td>
+                            <td>
+                                {{Form::time('hora[]', ($partido->dia)?date('H:i', strtotime($partido->dia)):'', ['class' => 'form-control'])}}
+
+                            </td>
                             <td> @if($partido->equipol)
                                     @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
                                     @endif
                                 @endif</td>
                             <td>
-                                {{ Form::select('equipol[]',$equipos, $partido->equipol_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
-                            <td>{{Form::number('golesl[]', $partido->golesl, ['class' => 'form-control', 'size' => '4'])}}</td>
-                            <td>{{Form::number('golesv[]', $partido->golesv, ['class' => 'form-control', 'size' => '4'])}}</td>
+                                {{ Form::select('equipol[]',$equipos, $partido->equipol_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}</td>
+                            <td>{{Form::number('golesl[]', $partido->golesl, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                            <td>{{Form::number('golesv[]', $partido->golesv, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                             <td> @if($partido->equipov)
                                     @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                     @endif
                                 @endif</td>
 
-                            <td>{{ Form::select('equipov[]',$equipos, $partido->equipov_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+                            <td>{{ Form::select('equipov[]',$equipos, $partido->equipov_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}</td>
+                            @if($grupo->penales)
+                                <td>{{Form::number('penalesl[]', $partido->penalesl, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                                <td>{{Form::number('penalesv[]', $partido->penalesv, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                            @endif
                         </tr>
                     @endforeach
                 </table>

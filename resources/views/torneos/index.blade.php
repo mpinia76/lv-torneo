@@ -37,7 +37,7 @@
         <th>Año</th>
         <th>Nro. de equipos</th>
         <th>Nro. de grupos</th>
-        <th>Playoffs</th>
+
         <th colspan="3"></th>
         </thead>
 
@@ -47,7 +47,7 @@
                 <td>{{$torneo->year}}</td>
                 <td>{{$torneo->equipos}}</td>
                 <td>{{$torneo->grupos}}</td>
-                <td>{{$torneo->playoffs}}</td>
+
                 <td>
                     <div class="d-flex">
                         <a href="{{route('torneos.show', $torneo->id)}}" class="btn btn-info m-1">Ver</a>
@@ -58,7 +58,7 @@
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
-                        <a href="{{route('plantillas.index',  array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Plantillas</a>
+
                     </div>
 
                 </td>

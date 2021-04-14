@@ -46,9 +46,9 @@
         @foreach($jugadores as $jugador)
             <tr>
                 <td>@if($jugador->foto)
-                        <img id="original" src="{{ url('images/'.$jugador->foto) }}" height="50">
+                        <img id="original" class="imgCircle" src="{{ url('images/'.$jugador->foto) }}" >
                     @else
-                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                     @endif
                 </td>
                 <td>{{$jugador->tipoJugador}}</td>

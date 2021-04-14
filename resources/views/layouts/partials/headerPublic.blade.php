@@ -23,12 +23,56 @@
 
                     <ul class="dropdown-menu" role="menu">
                         @foreach($torneos as $torneo)
-                        <li><a class="dropdown-item" href="{{route('torneos.ver',  array('torneoId' => $torneo->id))}}">
+                        <li><a class="dropdown-item" href="{{route('fechas.ver',  array('torneoId' => $torneo->id))}}">
                                 {{$torneo->nombre}} - {{$torneo->year}}
                             </a>
                         </li>
 
                         @endforeach
+
+
+                    </ul>
+
+                </li>
+            </ul>
+
+            <ul class="nav navbar-nav navbar-left">
+
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">{{ __('Opciones') }} <span class="caret"></span></a>
+
+                    <ul class="dropdown-menu" role="menu">
+
+                        <li><a class="dropdown-item" href="{{route('fechas.ver',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Fechas
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('grupos.posicionesPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Posiciones
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('grupos.goleadoresPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Goleadores
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('grupos.tarjetasPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Tarjetas
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('torneos.promediosPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Promedios
+                            </a>
+                        </li>
+
+
+
+
+
+
 
 
                     </ul>

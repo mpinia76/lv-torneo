@@ -33,8 +33,16 @@
                                 {{$partido->equipol->nombre}}
                             @endif
                         </td>
-                        <td>{{$partido->golesl}}</td>
-                        <td>{{$partido->golesv}}</td>
+                        <td>{{$partido->golesl}}
+                            @if($partido->penalesl)
+                                ({{$partido->penalesl}})
+                            @endif
+                        </td>
+                        <td>{{$partido->golesv}}
+                            @if($partido->penalesv)
+                                ({{$partido->penalesv}})
+                            @endif
+                        </td>
                         <td>
                             <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}" >
                             @if($partido->equipov)
@@ -64,9 +72,9 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $titularl->jugador->id))}}" >
                                     <span style="font-weight: bold">{{$titularl->dorsal}}</span>
                                     @if($titularl->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$titularl->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$titularl->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                             </a>
                                     <span style="font-weight: bold"> {{ $titularl->jugador->full_name}}</span>
@@ -88,9 +96,9 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $titularv->jugador->id))}}" >
                                             <span style="font-weight: bold">{{$titularv->dorsal}}</span>
                                             @if($titularv->jugador->foto)
-                                                <img id="original" src="{{ url('images/'.$titularv->jugador->foto) }}" height="50">
+                                                <img id="original" class="imgCircle" src="{{ url('images/'.$titularv->jugador->foto) }}" >
                                             @else
-                                                <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                             @endif
                                             </a>
                                             <span style="font-weight: bold"> {{ $titularv->jugador->full_name}}</span>
@@ -121,9 +129,9 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $suplentel->jugador->id))}}" >
                                                 <span style="font-weight: bold">{{$suplentel->dorsal}}</span>
                                                 @if($suplentel->jugador->foto)
-                                                    <img id="original" src="{{ url('images/'.$suplentel->jugador->foto) }}" height="50">
+                                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentel->jugador->foto) }}" >
                                                 @else
-                                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                                 @endif</a>
                                             <span style="font-weight: bold"> {{ $suplentel->jugador->full_name}}</span>
                                         </td>
@@ -144,9 +152,9 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $suplentev->jugador->id))}}" >
                                                 <span style="font-weight: bold">{{$suplentev->dorsal}}</span>
                                                 @if($suplentev->jugador->foto)
-                                                    <img id="original" src="{{ url('images/'.$suplentev->jugador->foto) }}" height="50">
+                                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentev->jugador->foto) }}" >
                                                 @else
-                                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                                 @endif
                                             </a>
                                             <span style="font-weight: bold"> {{ $suplentev->jugador->full_name}}</span>
@@ -173,9 +181,9 @@
                                     <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnicol->tecnico->id))}}" >
 
                                         @if($tecnicol->tecnico->foto)
-                                            <img id="original" src="{{ url('images/'.$tecnicol->tecnico->foto) }}" height="50">
+                                            <img id="original" class="imgCircle" src="{{ url('images/'.$tecnicol->tecnico->foto) }}" >
                                         @else
-                                            <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                         @endif</a>
                                     <span style="font-weight: bold"> {{ $tecnicol->tecnico->full_name}}</span>
                                 </td>
@@ -193,9 +201,9 @@
                                     <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnicov->tecnico->id))}}" >
 
                                         @if($tecnicov->tecnico->foto)
-                                            <img id="original" src="{{ url('images/'.$tecnicov->tecnico->foto) }}" height="50">
+                                            <img id="original" class="imgCircle" src="{{ url('images/'.$tecnicov->tecnico->foto) }}" >
                                         @else
-                                            <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                         @endif</a>
                                     <span style="font-weight: bold"> {{ $tecnicov->tecnico->full_name}}</span>
                                 </td>
@@ -217,9 +225,9 @@
                                 <a href="{{route('arbitros.ver', array('arbitroId' => $arbitro->arbitro->id))}}" >
 
                                     @if($arbitro->arbitro->foto)
-                                        <img id="original" src="{{ url('images/'.$arbitro->arbitro->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$arbitro->arbitro->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto_arbitro.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                                     @endif</a>
                                 <span style="font-weight: bold"> {{ $arbitro->arbitro->full_name}}</span> {{ $arbitro->tipo}}
                             </td>
@@ -238,17 +246,18 @@
                         $esVisitante = array_search($gol->jugador->id, array_column(array_merge($titularesV->toArray(), $suplentesV->toArray()), 'jugador_id'));
 
                         @endphp
-                        @if($esLocal !== false AND $gol->tipo == 'En Contra')
-                            @php
-                                $esVisitante = true;
-                                $esLocal = false;
-                            @endphp
-                        @endif
-                        @if($esVisitante !== false AND $gol->tipo == 'En Contra')
-                            @php
-                                $esLocal = true;
-                                $esVisitante = false;
-                            @endphp
+                        @if($gol->tipo == 'En Contra')
+                            @if($esLocal !== false)
+                                @php
+                                    $esVisitante = true;
+                                    $esLocal = false;
+                                @endphp
+                            @else
+                                @php
+                                    $esLocal = true;
+                                    $esVisitante = false;
+                                @endphp
+                            @endif
                         @endif
                             <tr>
 
@@ -260,9 +269,9 @@
                                 @if($esLocal !== false)
 
                                     @if($gol->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$gol->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$gol->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                         <span style="font-weight: bold"> {{ $gol->jugador->full_name}}</span>  {{$gol->tipo}}
 
@@ -276,9 +285,9 @@
                                 @if($esVisitante !== false)
 
                                     @if($gol->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$gol->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$gol->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                          <span style="font-weight: bold"> {{ $gol->jugador->full_name}}</span>  {{$gol->tipo}}
                                 @endif
@@ -306,7 +315,7 @@
                             <td>
                                 @if($esLocal !== false)
                                     @if($tarjeta->tipo == 'Amarilla')
-                                        <img id="original" src="{{ url('images/amarilla.gif') }}" height="20">
+                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="20">
                                     @endif
                                     @if($tarjeta->tipo == 'Doble Amarilla')
                                         <img id="original" src="{{ url('images/doble_amarilla.gif') }}" height="20">
@@ -315,9 +324,9 @@
                                         <img id="original" src="{{ url('images/roja.gif') }}" height="20">
                                     @endif
                                     @if($tarjeta->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$tarjeta->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                     <span style="font-weight: bold"> {{ $tarjeta->jugador->full_name}}</span>
 
@@ -339,9 +348,9 @@
                                         <img id="original" src="{{ url('images/roja.gif') }}" height="20">
                                     @endif
                                     @if($tarjeta->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$tarjeta->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                     <span style="font-weight: bold"> {{ $tarjeta->jugador->full_name}}</span>
                                 @endif
@@ -375,9 +384,9 @@
                                     @endif
 
                                     @if($cambio->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$cambio->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$cambio->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                     <span style="font-weight: bold"> {{ $cambio->jugador->full_name}}</span>
 
@@ -395,9 +404,9 @@
                                         <img id="original" src="{{ url('images/entra.png') }}" height="20">
                                     @endif
                                     @if($cambio->jugador->foto)
-                                        <img id="original" src="{{ url('images/'.$cambio->jugador->foto) }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/'.$cambio->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                     <span style="font-weight: bold"> {{ $cambio->jugador->full_name}}</span>
                                 @endif
@@ -413,7 +422,7 @@
 
         <div class="d-flex">
 
-            <a href="{{ route('fechas.ver',array('grupoId' => $partido->fecha->grupo->id, 'fechaId' => $partido->fecha->id)) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('fechas.ver',array('torneoId' => $partido->fecha->grupo->torneo->id, 'fechaNumero' => $partido->fecha->numero)) }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
 @endsection

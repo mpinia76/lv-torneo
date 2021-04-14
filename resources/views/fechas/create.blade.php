@@ -30,7 +30,7 @@
     <div class="row">
         <div class="form-group col-xs-12 col-sm-6 col-md-2">
             {{Form::label('numero', 'Número')}}
-            {{Form::number('numero', '', ['class' => 'form-control'])}}
+            {{Form::text('numero', '', ['class' => 'form-control'])}}
             {{Form::hidden('grupo_id', (isset($_GET['grupoId']))?$_GET['grupoId']:'' )}}
         </div>
         <div class="form-group col-md-12">
@@ -38,10 +38,15 @@
         <table class="table">
             <thead>
             <th>Fecha</th>
+            <th >Hora</th>
             <th>Local</th>
             <th>GL</th>
             <th>GV</th>
             <th>Visitante</th>
+            @if($grupo->penales)
+                <th>PL</th>
+                <th>PV</th>
+            @endif
 
             </thead>
 
@@ -49,11 +54,16 @@
             @for ($i =1; $i <= $grupo->equipos/2; $i++)
 
                 <tr>
-                    <td>{{Form::date('fecha[]', '', ['class' => 'form-control'])}}</td>
-                    <td>{{ Form::select('equipol[]',$equipos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
-                    <td>{{Form::number('golesl[]', '', ['class' => 'form-control', 'size' => '4'])}}</td>
-                    <td>{{Form::number('golesv[]', '', ['class' => 'form-control', 'size' => '4'])}}</td>
-                    <td>{{ Form::select('equipov[]',$equipos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+                    <td>{{Form::date('fecha[]', '', ['class' => 'form-control','style' =>'width:155px;'])}}</td>
+                    <td>{{Form::time('hora[]', '', ['class' => 'form-control'])}}</td>
+                    <td>{{ Form::select('equipol[]',$equipos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}</td>
+                    <td>{{Form::number('golesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                    <td>{{Form::number('golesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                    <td>{{ Form::select('equipov[]',$equipos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}</td>
+                    @if($grupo->penales)
+                        <td>{{Form::number('penalesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                        <td>{{Form::number('penalesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+                    @endif
                 </tr>
             @endfor
         </table>

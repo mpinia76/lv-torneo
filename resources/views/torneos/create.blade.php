@@ -49,10 +49,7 @@
             {{Form::number('grupos', '', ['class' => 'form-control'])}}
         </div>
 
-        <div class="form-group col-xs-12 col-sm-6 col-md-3">
-            {{Form::label('playoffs', 'Playoffs')}}
-            {{Form::number('playoffs', '', ['class' => 'form-control'])}}
-        </div>
+
     </div>
 
         <div class="form-group col-md-12">

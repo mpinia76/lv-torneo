@@ -61,8 +61,16 @@
                                     {{$partido->equipol->nombre}}
                                 @endif
                             </td>
-                            <td>{{$partido->golesl}}</td>
-                            <td>{{$partido->golesv}}</td>
+                            <td>{{$partido->golesl}}
+                                @if($partido->penalesl)
+                                    ({{$partido->penalesl}})
+                                @endif
+                            </td>
+                            <td>{{$partido->golesv}}
+                                @if($partido->penalesv)
+                                    ({{$partido->penalesv}})
+                                @endif
+                            </td>
                             <td>@if($partido->equipov)
                                     @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                     @endif
@@ -78,7 +86,7 @@
                                 <a href="{{route('tarjetas.index', array('partidoId' => $partido->id))}}" class="btn btn-primary m-1">Tarjetas</a>
                                 <a href="{{route('partidos.arbitros', array('partidoId' => $partido->id))}}" class="btn btn-success m-1">Jueces</a>
                                 <a href="{{route('cambios.index', array('partidoId' => $partido->id))}}" class="btn btn-primary m-1">Sustituciones</a>
-
+                                <a href="{{route('fechas.importarPartido', array('partidoId' => $partido->id))}}" class="btn btn-info m-1">Importar</a>
                             </div>
 
                         </td>

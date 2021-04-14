@@ -16,7 +16,9 @@
         "laravel/tinker": "^2.0",
         "laravel/ui": "^2.1",
         "laravelcollective/html": "^6.1",
+        "nao-pon/flysystem-google-drive": "~1.1",
         "nesbot/carbon": "^2.39",
+        "phpmailer/phpmailer": "^6.4",
         "sunra/php-simple-html-dom-parser": "^1.5"
     },
     "require-dev": {

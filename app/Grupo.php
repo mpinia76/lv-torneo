@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Grupo extends Model
 {
-    protected $fillable = ['nombre', 'torneo_id', 'equipos'];
+    protected $fillable = ['nombre', 'torneo_id', 'equipos','posiciones','promedios','agrupacion','penales'];
 
 
 	public function torneo() {

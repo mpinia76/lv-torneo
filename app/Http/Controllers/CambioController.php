@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Cambio;
+use App\Grupo;
 use App\Partido;
 use App\Plantilla;
 use App\PlantillaJugador;
 use Illuminate\Http\Request;
+use DB;
 
 class CambioController extends Controller
 {
@@ -25,7 +27,12 @@ class CambioController extends Controller
 
 
         $torneo_id = $partido->fecha->grupo->torneo->id;
-        $plantillas = Plantilla::where('torneo_id','=',"$torneo_id")->wherein('equipo_id',[$partido->equipol->id,$partido->equipov->id])->get();
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+        $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->wherein('equipo_id',[$partido->equipol->id,$partido->equipov->id])->get();
         $arrPlantillas='';
         foreach ($plantillas as $plantilla){
             $arrPlantillas .=$plantilla->id.',';
@@ -93,10 +100,16 @@ class CambioController extends Controller
     public function update(Request $request, $partido_id)
     {
         $partido=Partido::findOrFail($partido_id);
-        if(count($request->jugador) > 0)
+        DB::beginTransaction();
+        $noBorrar='';
+        $ok=1;
+        if(!empty($request->jugador) )
         {
             if($request->cambio_id){
-                Cambio::where('partido_id',"$partido_id")->whereNotIn('id', $request->cambio_id)->delete();
+
+                foreach ($request->cambio_id as $id){
+                    $noBorrar .=$id.',';
+                }
             }
 
             foreach($request->jugador as $item=>$v){
@@ -107,18 +120,46 @@ class CambioController extends Controller
                     'minuto'=>$request->minuto[$item],
                     'tipo'=>$request->tipo[$item]
                 );
-                if (!empty($request->cambio_id[$item])){
-                    $data2['id']=$request->cambio_id[$item];
-                    $cambio=Cambio::find($request->cambio_id[$item]);
-                    $cambio->update($data2);
-                }
-                else{
-                    $cambio=Cambio::create($data2);
-                }
 
+
+                try {
+                    if (!empty($request->cambio_id[$item])){
+                        $data2['id']=$request->cambio_id[$item];
+                        $cambio=Cambio::find($request->cambio_id[$item]);
+                        $cambio->update($data2);
+                    }
+                    else{
+                        $cambio=Cambio::create($data2);
+                    }
+                    $noBorrar .=$cambio->id.',';
+                }catch(QueryException $ex){
+                    $error = $ex->getMessage();
+                    $ok=0;
+                    continue;
+                }
             }
+
+        }
+
+        try {
+            Cambio::where('partido_id',"$partido_id")->whereNotIn('id', explode(',', $noBorrar))->delete();
+
+
+        }
+        catch(QueryException $ex){
+            $error = $ex->getMessage();
+            $ok=0;
+
+        }
+        if ($ok){
+            DB::commit();
             $respuestaID='success';
             $respuestaMSJ='Registro creado satisfactoriamente';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
         }
 
         return redirect()->route('fechas.show', $partido->fecha->id)->with($respuestaID,$respuestaMSJ);

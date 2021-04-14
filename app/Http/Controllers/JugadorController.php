@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Jugador;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
@@ -105,18 +106,33 @@ class JugadorController extends Controller
         $insert['documento'] = $request->get('documento');
         $insert['nacimiento'] = $request->get('nacimiento');
 
-        $jugador = Jugador::create($insert);
+
+
+
+
+
+
+        try {
+            $jugador = Jugador::create($insert);
+            $respuestaID='success';
+            $respuestaMSJ='Registro creado satisfactoriamente';
+        }catch(QueryException $ex){
+
+            $respuestaID='error';
+            $respuestaMSJ=$ex->getMessage();
+
+        }
 
         if($request->get('plantilla_id')){
             $plantilla_id = $request->get('plantilla_id');
-            $redirect = redirect()->route('plantillas.edit',[$plantilla_id])->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('plantillas.edit',[$plantilla_id])->with($respuestaID,$respuestaMSJ);
 
         }
         elseif($request->get('torneo_id')){
-            $redirect = redirect()->route('plantillas.create', ['torneoId' => $request->get('torneo_id')])->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('plantillas.create', ['grupoId' => $request->get('grupo_id')])->with($respuestaID,$respuestaMSJ);
         }
         else{
-            $redirect = redirect()->route('jugadores.index')->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('jugadores.index')->with($respuestaID,$respuestaMSJ);
         }
 
         return $redirect;

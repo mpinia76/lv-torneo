@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Grupo;
 use App\PlantillaJugador;
 use App\PartidoTecnico;
 use App\Torneo;
@@ -35,12 +36,12 @@ class PlantillaController extends Controller
      */
     public function index(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $grupo_id= $request->query('grupoId');
         $nombre = $request->get('buscarpor');
-        $torneo=Torneo::findOrFail($torneo_id);
+        $grupo=Grupo::findOrFail($grupo_id);
 
 
-        $plantillas=Plantilla::with('equipo')->where('torneo_id','=',"$torneo_id")->whereHas('equipo', function($query) use ($nombre){
+        $plantillas=Plantilla::with('equipo')->where('grupo_id','=',"$grupo_id")->whereHas('equipo', function($query) use ($nombre){
             if($nombre){
                 $query->where('nombre', 'LIKE', "%$nombre%");
             }
@@ -54,7 +55,7 @@ class PlantillaController extends Controller
 
         //dd($plantillas);
 
-        return view('plantillas.index', compact('plantillas','torneo'));
+        return view('plantillas.index', compact('plantillas','grupo'));
     }
 
     /**
@@ -64,8 +65,8 @@ class PlantillaController extends Controller
      */
     public function create(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
-        $torneo=Torneo::findOrFail($torneo_id);
+        $grupo_id= $request->query('grupoId');
+        $grupo=Grupo::findOrFail($grupo_id);
 
         $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
         $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');
@@ -77,7 +78,7 @@ class PlantillaController extends Controller
         /*$tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
         $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');*/
         //
-        return view('plantillas.create', compact('torneo','jugadors','equipos'));
+        return view('plantillas.create', compact('grupo','jugadors','equipos'));
     }
 
     /**
@@ -88,7 +89,7 @@ class PlantillaController extends Controller
      */
     public function store(Request $request)
     {
-        $this->validate($request,[ 'equipo_id'=>'required',  'torneo_id'=>'required']);
+        $this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
         DB::beginTransaction();
         $ok=1;
         try {
@@ -145,7 +146,7 @@ class PlantillaController extends Controller
             $respuestaMSJ=$error;
         }
 
-        return redirect()->route('plantillas.index', array('torneoId' => $plantilla->torneo->id))->with($respuestaID,$respuestaMSJ);
+        return redirect()->route('plantillas.index', array('grupoId' => $plantilla->grupo->id))->with($respuestaID,$respuestaMSJ);
     }
 
     /**
@@ -169,7 +170,7 @@ class PlantillaController extends Controller
     {
         $plantilla=Plantilla::findOrFail($id);
 
-        $torneo=Torneo::findOrFail($plantilla->torneo->id);
+        $grupo=Grupo::findOrFail($plantilla->grupo->id);
 
         $plantillaJugadors = PlantillaJugador::where('plantilla_id','=',"$id")->orderBy('dorsal','asc')->get();
 
@@ -187,7 +188,7 @@ class PlantillaController extends Controller
         $tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
         $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');*/
 
-        return view('plantillas.edit', compact('jugadors','torneo','equipos','plantilla', 'plantillaJugadors'));
+        return view('plantillas.edit', compact('jugadors','grupo','equipos','plantilla', 'plantillaJugadors'));
     }
 
     /**
@@ -203,7 +204,7 @@ class PlantillaController extends Controller
 
 
         //dd($request->plantillajugador_id);
-        $this->validate($request,[ 'equipo_id'=>'required',  'torneo_id'=>'required']);
+        $this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
         DB::beginTransaction();
         if($request->plantillajugador_id){
             PlantillaJugador::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillajugador_id)->delete();
@@ -264,7 +265,7 @@ class PlantillaController extends Controller
         }
 
 
-        return redirect()->route('plantillas.index', array('torneoId' => $plantilla->torneo->id))->with($respuestaID,$respuestaMSJ);
+        return redirect()->route('plantillas.index', array('grupoId' => $plantilla->grupo->id))->with($respuestaID,$respuestaMSJ);
     }
 
     /**
@@ -276,5 +277,107 @@ class PlantillaController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    public function import(Request $request)
+    {
+        $grupo_id= $request->query('grupoId');
+        $grupo=Grupo::findOrFail($grupo_id);
+
+        $equipos = Equipo::orderBy('nombre', 'asc')->get();
+        $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
+
+
+        $torneos=Torneo:: orderBy('year','DESC')->get();
+        $torneosAnteriores = $torneos->pluck('full_name', 'id')->prepend('','');
+
+        //
+        return view('plantillas.import', compact('grupo','equipos','torneosAnteriores'));
+    }
+
+    public function importprocess(Request $request)
+    {
+
+        set_time_limit(0);
+
+        $this->validate($request,[ 'equipo_id'=>'required',  'torneo_id'=>'required']);
+
+        $grupo_id = $request->get('grupo_id');
+        $equipo_id = $request->get('equipo_id');
+        $torneo_id = $request->get('torneo_id');
+
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+
+
+
+
+        $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->wherein('equipo_id',[$equipo_id])->get();
+        $arrPlantillas='';
+        foreach ($plantillas as $plantilla){
+            $arrPlantillas .=$plantilla->id.',';
+        }
+
+        $plantillaJugadors = PlantillaJugador::wherein('plantilla_id',explode(',', $arrPlantillas))->get();
+
+        DB::beginTransaction();
+        $ok=1;
+        try {
+            $data1=array(
+                'equipo_id'=>$equipo_id,
+                'grupo_id'=>$grupo_id
+            );
+            $plantilla = plantilla::create($data1);
+
+            $lastid=$plantilla->id;
+
+            foreach ($plantillaJugadors as $plantillaJugador){
+
+                    $data2=array(
+                        'plantilla_id'=>$lastid,
+                        'jugador_id'=>$plantillaJugador->jugador->id,
+                        'dorsal'=>$plantillaJugador->dorsal
+                    );
+                    try {
+                        PlantillaJugador::create($data2);
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+
+
+        }catch(Exception $e){
+            $error =  $ex->getMessage();
+            $ok=0;
+        }
+
+
+
+
+
+
+
+
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ='Importación exitosa. (ver log)';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('plantillas.index', array('grupoId' => $grupo_id))->with($respuestaID,$respuestaMSJ);
     }
 }

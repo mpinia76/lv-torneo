@@ -21,8 +21,7 @@
         <dt>Nro. de grupos</dt>
         <dd>{{$torneo->grupos}}</dd>
 
-        <dt>Playoffs</dt>
-        <dd>{{$torneo->playoffs}}</dd>
+
     </dl>
         <h1 class="display-6">Grupos</h1>
 

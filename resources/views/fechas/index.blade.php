@@ -54,7 +54,7 @@
 
                         <a href="{{route('fechas.edit', $fecha->id)}}" class="btn btn-primary m-1">Editar</a>
                         <a href="{{route('fechas.show', $fecha->id)}}" class="btn btn-success m-1">Datos complementarios</a>
-                        <a href="{{route('fechas.importincidenciasfecha', array('fechaId' =>$fecha->id))}}" class="btn btn-primary m-1">Importar incidencias</a>
+                        <a href="{{route('fechas.importincidenciasfecha', array('fechaId' =>$fecha->id))}}" class="btn btn-info m-1">Importar incidencias</a>
 
 
                     </div>

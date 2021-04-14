@@ -45,11 +45,60 @@
             {{Form::number('grupos', $torneo->grupos, ['class' => 'form-control'])}}
         </div>
 
-        <div class="form-group col-xs-12 col-sm-6 col-md-3">
-            {{Form::label('playoffs', 'Playoffs')}}
-            {{Form::number('playoffs', $torneo->playoffs, ['class' => 'form-control'])}}
-        </div>
+
     </div>
+
+        <div class="form-group col-md-12">
+            <h1 class="display-6">Grupos</h1>
+
+            <table class="table" style="width: 50%">
+                <thead>
+                <th></th>
+                <th>Grupos</th>
+                <th>Equipos</th>
+                <th>Agrupacion</th>
+                <th>Posiciones</th>
+                <th>Promedios</th>
+                <th>Penales</th>
+
+                <th><a href="#" class="addRowGrupo"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                </thead>
+
+                <tbody id="cuerpoGrupo">
+                @php
+                    $i = 0;
+                @endphp
+                @foreach($grupos ?? '' as $grupo)
+                    @php
+                        $i++;
+                    @endphp
+                    <tr>
+                        <td>
+                            {{Form::hidden('grupo_id[]',$grupo->id)}}
+                            {{Form::hidden('items[]',$i)}}
+                        </td>
+                        <td>{{ Form::text('nombreGrupo[]', $grupo->nombre,['class' => 'form-control', 'style' => 'width: 250px']) }}</td>
+                        <td>{{ Form::number('equiposGrupo[]', $grupo->equipos,['class' => 'form-control', 'style' => 'width: 60px']) }}</td>
+                        <td>{{ Form::number('agrupacionGrupo[]', $grupo->agrupacion,['class' => 'form-control', 'style' => 'width: 50px']) }}</td>
+                        <td>{{ Form::checkbox('posicionesGrupo[]', $i,$grupo->posiciones) }}</td>
+                        <td>{{ Form::checkbox('promediosGrupo[]', $i,$grupo->promedios) }}</td>
+                        <td>{{ Form::checkbox('penalesGrupo[]', $i,$grupo->penales) }}</td>
+
+
+                        <td><a href="#" class="btn btn-danger removeGrupo"><i class="glyphicon glyphicon-remove"></i></a></td>
+                    </tr>
+                @endforeach
+
+                <input type="hidden" name="cantGrupos" id="cantGrupos" value="{{$i}}">
+                </tbody>
+
+
+
+
+            </table>
+        </div>
+
 
         <div class="form-group col-md-12">
             <h1 class="display-6">Torneos que cuentan para el promedio</h1>
@@ -72,7 +121,7 @@
                         <td>{{ Form::select('torneoAnterior[]',$torneosAnteriores, $promedioTorneo->torneoAnterior_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
 
 
-                        <td><a href="#" class="btn btn-danger removeTecnico"><i class="glyphicon glyphicon-remove"></i></a></td>
+                        <td><a href="#" class="btn btn-danger removeTorneo"><i class="glyphicon glyphicon-remove"></i></a></td>
                     </tr>
                 @endforeach
 

@@ -11,15 +11,15 @@
 
         <nav class="navbar navbar-light float-right" style="width: 100%">
             <form class="form-inline">
-                <input type="hidden" name="grupoId" value="{{ (isset($_GET['grupoId']))?$_GET['grupoId']:'' }}">
+                <input type="hidden" name="torneoId" value="{{ (isset($_GET['torneoId']))?$_GET['torneoId']:'' }}">
 
-                <select class="orm-control js-example-basic-single" id="fechaId" name="fechaId" onchange="this.form.submit()" style="width: 150px">
+                <select class="orm-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
                     @foreach($fechas as $f)
 
-                        <option value="{{$f->id}}" @if($f->id==$fecha->id)
-                            selected
+                        <option value="{{$f->numero}}" @if($f->numero==$fecha->numero)
+                        selected
 
-                            @endif >Fecha {{$f->numero}}</option>
+                            @endif />Fecha {{$f->numero}}</option>
                     @endforeach
 
                 </select>
@@ -44,7 +44,7 @@
                     </thead>
 
 
-                    @foreach($fecha->partidos as $partido)
+                    @foreach($partidos as $partido)
 
                         @if($partido->dia)
                             <tr>
@@ -58,8 +58,16 @@
                                     {{$partido->equipol->nombre}}
                                     @endif
                                 </td>
-                                <td>{{$partido->golesl}}</td>
-                                <td>{{$partido->golesv}}</td>
+                                <td>{{$partido->golesl}}
+                                    @if($partido->penalesl)
+                                        ({{$partido->penalesl}})
+                                    @endif
+                                </td>
+                                <td>{{$partido->golesv}}
+                                    @if($partido->penalesv)
+                                        ({{$partido->penalesv}})
+                                    @endif
+                                </td>
                                 <td>
                                     <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}">
                                         @if($partido->equipov)
@@ -87,7 +95,7 @@
         </div>
         <div class="d-flex">
 
-            <a href="{{route('torneos.ver',array('torneoId' => $grupo->torneo->id))}}" class="btn btn-success m-1">Volver</a>
+            <a href="{{route('torneos.ver',array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Alineacion;
 use App\Cambio;
+use App\Grupo;
 use App\Jugador;
 use App\Partido;
 use App\PartidoTecnico;
@@ -39,16 +40,37 @@ class AlineacionController extends Controller
 
         $torneo_id = $partido->fecha->grupo->torneo->id;
 
-        $plantillaL = Plantilla::where('torneo_id','=',$torneo_id)->where('equipo_id','=',$partido->equipol->id)->first();
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
 
-        $jugadorsL = PlantillaJugador::where('plantilla_id','=',$plantillaL->id)->with('jugador')->get();
+        $plantillasL = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$partido->equipol->id)->get();
+
+
+
+        $arrplantillals='';
+        foreach ($plantillasL as $plantillal){
+            $arrplantillals .=$plantillal->id.',';
+        }
+
+
+
+        $jugadorsL = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->with('jugador')->get();
 
         $jugadorsL = $jugadorsL->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');
 
-        $plantillaV = Plantilla::where('torneo_id','=',$torneo_id)->where('equipo_id','=',$partido->equipov->id)->first();
+        $plantillasV = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$partido->equipov->id)->get();
+
+        $arrplantillavs='';
+        foreach ($plantillasV as $plantillav){
+            $arrplantillavs .=$plantillav->id.',';
+        }
 
 
-        $jugadorsV = PlantillaJugador::where('plantilla_id','=',$plantillaV->id)->with('jugador')->get();
+
+        $jugadorsV = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillavs))->distinct()->with('jugador')->get();
 
         $jugadorsV = $jugadorsV->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');
 

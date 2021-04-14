@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-        <h1 class="display-6">Plantilla de {{$plantilla->equipo->nombre}} en {{$torneo->nombre}} {{$torneo->year}}</h1>
+        <h1 class="display-6">Plantilla de {{$plantilla->equipo->nombre}} en {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
         <br>
         @if($plantilla->equipo->escudo)
             <img id="original" src="{{ url('images/'.$plantilla->equipo->escudo) }}" height="50">
@@ -20,7 +20,20 @@
             </ul>
         </div>
     @endif
-
+        @if (\Session::has('error'))
+            <div class="alert alert-danger">
+                <ul>
+                    <li>{!! \Session::get('error') !!}</li>
+                </ul>
+            </div>
+        @endif
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <ul>
+                    <li>{!! \Session::get('success') !!}</li>
+                </ul>
+            </div>
+        @endif
     <!-- Open the form with the store function route. -->
     {{ Form::open(['action' => ['PlantillaController@update', $plantilla->id], 'method' => 'put']) }}
     <!-- Include the CRSF token -->
@@ -31,8 +44,9 @@
                 {{Form::label('equipo', 'Equipo')}}
                 {{Form::select('equipo_id',$equipos, $plantilla->equipo->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px'])}}
 
-                {{Form::hidden('torneo_id', (isset($_GET['torneoId']))?$_GET['torneoId']:$plantilla->torneo->id )}}
+                {{Form::hidden('grupo_id', (isset($_GET['grupoId']))?$_GET['grupoId']:$plantilla->grupo->id )}}
             </div>
+
             <div class="form-group col-md-12">
                 <h1 class="display-6">Jugadores</h1>
                 <a class="btn btn-success m-1" href="{{route('jugadores.create',  array('plantillaId' => $plantilla->id))}}">Nuevo</a>
@@ -55,9 +69,9 @@
                             <td>
                                 {{$i++}}
                                 @if($plantillaJugador->jugador->foto)
-                                    <img id="original" src="{{ url('images/'.$plantillaJugador->jugador->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$plantillaJugador->jugador->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
                                 {{Form::hidden('plantillajugador_id[]',$plantillaJugador->id)}}
                             </td>
@@ -76,7 +90,7 @@
 
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
 
-        <a href="{{ route('plantillas.index',array('torneoId'=>$torneo->id))  }}" class="btn btn-success m-1">Volver</a>
+        <a href="{{ route('plantillas.index',array('grupoId'=>$grupo->id))  }}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}
 
 

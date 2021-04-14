@@ -39,8 +39,12 @@ Route::group(['prefix' => 'admin'], function()
     Route::resource('partidoarbitros', 'PartidoArbitroController');
     Route::resource('alineaciones', 'AlineacionController');
     Route::resource('cambios', 'CambioController');
+    Route::get('importarPartido', 'FechaController@importarPartido')->name('fechas.importarPartido');
+    Route::post('importarPartidoProcess', 'FechaController@importarPartidoProcess');
     Route::get('importfechas', 'FechaController@import')->name('fechas.import');
     Route::post('importprocess', 'FechaController@importprocess');
+    Route::get('importplantillas', 'PlantillaController@import')->name('plantillas.import');
+    Route::post('importplantillaprocess', 'PlantillaController@importprocess');
 
     Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');
@@ -52,12 +56,13 @@ Route::group(['prefix' => 'admin'], function()
 Route::get('/', function () {
     return view('/portada');
 });
-
+Route::get('portada', 'PortadaController@index')->name('portada');
 
 Route::get('posiciones', 'GrupoController@posiciones')->name('grupos.posiciones');
 Route::get('tablaGoles', 'GrupoController@goleadores')->name('grupos.goleadores');
 Route::get('tablaTrajetas', 'GrupoController@tarjetas')->name('grupos.tarjetas');
 Route::get('jueces', 'PartidoController@arbitros')->name('partidos.arbitros');
+Route::get('promedios', 'TorneoController@promedios')->name('torneos.promedios');
 
 Route::get('verTorneo', 'TorneoController@ver')->name('torneos.ver');
 Route::get('tabla', 'GrupoController@posicionesPublic')->name('grupos.posicionesPublic');
@@ -70,6 +75,7 @@ Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');
 Route::get('verEquipo', 'EquipoController@ver')->name('equipos.ver');
 Route::get('verTecnico', 'TecnicoController@ver')->name('tecnicos.ver');
 Route::get('verArbitro', 'ArbitroController@ver')->name('arbitros.ver');
+Route::get('descensos', 'TorneoController@promediosPublic')->name('torneos.promediosPublic');
 
 
 Route::get('logout', 'Auth\LoginController@logout');

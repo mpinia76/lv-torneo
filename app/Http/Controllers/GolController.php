@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Gol;
+use App\Grupo;
 use App\Partido;
 use App\Plantilla;
 use App\PlantillaJugador;
 use Illuminate\Http\Request;
+use DB;
 
 class GolController extends Controller
 {
@@ -25,7 +27,16 @@ class GolController extends Controller
 
 
         $torneo_id = $partido->fecha->grupo->torneo->id;
-        $plantillas = Plantilla::where('torneo_id','=',"$torneo_id")->wherein('equipo_id',[$partido->equipol->id,$partido->equipov->id])->get();
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+
+
+
+
+        $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->wherein('equipo_id',[$partido->equipol->id,$partido->equipov->id])->get();
         $arrPlantillas='';
         foreach ($plantillas as $plantilla){
             $arrPlantillas .=$plantilla->id.',';
@@ -96,18 +107,22 @@ class GolController extends Controller
 
         $golesTotales= intval($request->totalGoles);
         $partido=Partido::findOrFail($partido_id);
-        $respuestaID='';
-        $respuestaMSJ='';
-        if ($request->jugador){
+        DB::beginTransaction();
+        $noBorrar='';
+        $ok=1;
+        if (!empty($request->jugador)){
 
             if (count($request->jugador) > $golesTotales){
-                $respuestaID='error';
-                $respuestaMSJ='No se pueden cargar más goles que los del resultado';
+                $ok=0;
+                $error='No se pueden cargar más goles que los del resultado';
             }
             elseif(count($request->jugador) > 0)
             {
                 if ($request->gol_id){
-                    Gol::where('partido_id',"$partido_id")->whereNotIn('id', $request->gol_id)->delete();
+                    foreach ($request->gol_id as $id){
+                        $noBorrar .=$id.',';
+                    }
+
                 }
 
                 foreach($request->jugador as $item=>$v){
@@ -118,21 +133,48 @@ class GolController extends Controller
                         'minuto'=>$request->minuto[$item],
                         'tipo'=>$request->tipo[$item]
                     );
-                    if (!empty($request->gol_id[$item])){
-                        $data2['id']=$request->gol_id[$item];
-                        $gol=Gol::find($request->gol_id[$item]);
-                        $gol->update($data2);
-                    }
-                    else{
-                        $gol=Gol::create($data2);
+
+                    try {
+                        if (!empty($request->gol_id[$item])){
+                            $data2['id']=$request->gol_id[$item];
+                            $gol=Gol::find($request->gol_id[$item]);
+                            $gol->update($data2);
+                        }
+                        else{
+                            $gol=Gol::create($data2);
+                        }
+                        $noBorrar .=$gol->id.',';
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
                     }
 
                 }
-                $respuestaID='success';
-                $respuestaMSJ='Registro creado satisfactoriamente';
+
             }
         }
 
+        try {
+            Gol::where('partido_id',"$partido_id")->whereNotIn('id', explode(',', $noBorrar))->delete();
+
+
+        }
+        catch(QueryException $ex){
+            $error = $ex->getMessage();
+            $ok=0;
+
+        }
+        if ($ok){
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ='Registro creado satisfactoriamente';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
 
         return redirect()->route('fechas.show', $partido->fecha->id)->with($respuestaID,$respuestaMSJ);
     }

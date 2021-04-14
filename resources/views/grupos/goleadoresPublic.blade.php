@@ -4,9 +4,7 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Goleadores de {{$torneo->nombre}} {{$torneo->year}}</h1>
 
-    <hr/>
 
 
 
@@ -26,7 +24,14 @@
             <tr>
                 <td>{{$i++}}</td>
                 <td>@if($jugador->foto)
-                        <img id="original" src="{{ url('images/'.$jugador->foto) }}" height="25">
+                        @php
+                        $fotos = explode(',',$jugador->foto);
+                        @endphp
+                        @foreach($fotos as $foto)
+                            @if($foto!='')
+                                <img id="original" src="{{ url('images/'.$foto) }}" height="25">
+                            @endif
+                        @endforeach
                     @endif
 
                 {{$jugador->jugador}}</td>

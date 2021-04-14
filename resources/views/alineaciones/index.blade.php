@@ -45,8 +45,17 @@
                                 {{$partido->equipol->nombre}}
                             @endif
                         </td>
-                        <td>{{$partido->golesl}}</td>
-                        <td>{{$partido->golesv}}</td>
+                        <td>{{$partido->golesl}}
+                            @if($partido->penalesl)
+                                ({{$partido->penalesl}})
+                            @endif
+
+                        </td>
+                        <td>{{$partido->golesv}}
+                            @if($partido->penalesv)
+                                ({{$partido->penalesv}})
+                            @endif
+                        </td>
                         <td>@if($partido->equipov)
                                 @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                 @endif
@@ -65,7 +74,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">
                     @if($partido->equipol)
-                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50">
+                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50" >
                         @endif
 
                     @endif
@@ -92,9 +101,9 @@
                             <td>
                                 {{$i++}}
                                 @if($titularl->jugador->foto)
-                                    <img id="original" src="{{ url('images/'.$titularl->jugador->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$titularl->jugador->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
                                 {{Form::hidden('titularl_id[]',$titularl->id)}}
                             </td>
@@ -114,7 +123,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">
                     @if($partido->equipol)
-                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50">
+                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50" >
                         @endif
 
                     @endif
@@ -141,9 +150,9 @@
                             <td>
                                 {{$i++}}
                                 @if($suplentel->jugador->foto)
-                                    <img id="original" src="{{ url('images/'.$suplentel->jugador->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentel->jugador->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
                                 {{Form::hidden('suplentel_id[]',$suplentel->id)}}
                             </td>
@@ -163,7 +172,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">
                     @if($partido->equipol)
-                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50">
+                        @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="50" >
                         @endif
 
                     @endif
@@ -184,9 +193,9 @@
 
                         <tr>
                             <td>@if($partidoTecnicoL->tecnico->foto)
-                                    <img id="original" src="{{ url('images/'.$partidoTecnicoL->tecnico->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$partidoTecnicoL->tecnico->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                 @endif
                                 {{Form::hidden('partidoTecnicoL_id[]',$partidoTecnicoL->id)}}</td>
                             <td>{{ Form::select('tecnicoL[]',$tecnicos, $partidoTecnicoL->tecnico->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
@@ -201,7 +210,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">
                     @if($partido->equipov)
-                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50">
+                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50" >
                         @endif
 
                     @endif
@@ -228,9 +237,9 @@
                             <td>
                                 {{$i++}}
                                 @if($titularv->jugador->foto)
-                                    <img id="original" src="{{ url('images/'.$titularv->jugador->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$titularv->jugador->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
                                 {{Form::hidden('titularv_id[]',$titularv->id)}}
                             </td>
@@ -250,7 +259,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">
                     @if($partido->equipov)
-                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50">
+                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50" >
                         @endif
 
                     @endif
@@ -277,9 +286,9 @@
                             <td>
                                 {{$i++}}
                                 @if($suplentev->jugador->foto)
-                                    <img id="original" src="{{ url('images/'.$suplentev->jugador->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentev->jugador->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
                                 {{Form::hidden('suplentev_id[]',$suplentev->id)}}
                             </td>
@@ -299,7 +308,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">
                     @if($partido->equipov)
-                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50">
+                        @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="50" >
                         @endif
 
                     @endif
@@ -320,9 +329,9 @@
 
                         <tr>
                             <td>@if($partidoTecnicoV->tecnico->foto)
-                                    <img id="original" src="{{ url('images/'.$partidoTecnicoV->tecnico->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$partidoTecnicoV->tecnico->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                 @endif
                                 {{Form::hidden('partidoTecnicoV_id[]',$partidoTecnicoV->id)}}</td>
                             <td>{{ Form::select('tecnicoV[]',$tecnicos, $partidoTecnicoV->tecnico->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>

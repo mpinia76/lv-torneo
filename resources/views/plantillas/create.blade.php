@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Nueva plantilla para el torneo {{$torneo->nombre}} {{$torneo->year}}</h1>
+    <h1 class="display-6">Nueva plantilla para el torneo {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
 
     <hr/>
 
@@ -28,14 +28,15 @@
 
     <!-- build our form inputs -->
     <div class="row">
-        <div class="form-group col-xs-12 col-sm-6 col-md-2">
+        <div class="form-group col-xs-12 col-sm-6">
             {{Form::label('equipo', 'Equipo')}}
             {{Form::select('equipo_id',$equipos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px'])}}
-            {{Form::hidden('torneo_id', (isset($_GET['torneoId']))?$_GET['torneoId']:'' )}}
+            {{Form::hidden('grupo_id', (isset($_GET['grupoId']))?$_GET['grupoId']:'' )}}
+
         </div>
         <div class="form-group col-md-12">
         <h1 class="display-6">Jugadores</h1>
-            <a class="btn btn-success m-1" href="{{route('jugadores.create',  array('torneoId' => $torneo))}}">Nuevo</a>
+            <a class="btn btn-success m-1" href="{{route('jugadores.create',  array('grupoId' => $grupo->id))}}">Nuevo</a>
         <table class="table" style="width: 50%">
             <thead>
             <th></th>
@@ -66,7 +67,7 @@
 
     <!-- build the submission button -->
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
-        <a href="{{ route('plantillas.index',array('torneoId'=>$torneo->id)) }}" class="btn btn-success m-1">Volver</a>
+        <a href="{{ route('plantillas.index',array('grupoId'=>$grupo->id))  }}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}
     </div>
 

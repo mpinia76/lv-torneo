@@ -45,8 +45,16 @@
                                 {{$partido->equipol->nombre}}
                             @endif
                         </td>
-                        <td>{{$partido->golesl}}</td>
-                        <td>{{$partido->golesv}}</td>
+                        <td>{{$partido->golesl}}
+                            @if($partido->penalesl)
+                                ({{$partido->penalesl}})
+                            @endif
+                        </td>
+                        <td>{{$partido->golesv}}
+                            @if($partido->penalesv)
+                                ({{$partido->penalesv}})
+                            @endif
+                        </td>
                         <td>@if($partido->equipov)
                                 @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                 @endif
@@ -82,9 +90,9 @@
 
                             <td>
                                 @if($tarjeta->jugador->foto)
-                                    <img id="original" src="{{ url('images/'.$tarjeta->jugador->foto) }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->foto) }}" >
                                 @else
-                                    <img id="original" src="{{ url('images/sin_foto.png') }}" height="50">
+                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
                                 {{Form::hidden('tarjeta_id[]',$tarjeta->id)}}
                             </td>

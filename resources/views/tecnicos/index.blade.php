@@ -45,9 +45,9 @@
         @foreach($tecnicos as $tecnico)
             <tr>
                 <td>@if($tecnico->foto)
-                        <img id="original" src="{{ url('images/'.$tecnico->foto) }}" height="50">
+                        <img id="original" class="imgCircle" src="{{ url('images/'.$tecnico->foto) }}" >
                     @else
-                        <img id="original" src="{{ url('images/sin_foto_tecnico.png') }}" height="50">
+                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                     @endif
                 </td>
                 <td>{{$tecnico->apellido}}</td>
