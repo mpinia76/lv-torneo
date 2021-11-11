@@ -29,6 +29,8 @@ class JugadorController extends Controller
     public function index(Request $request)
     {
 
+
+        $data = $request->all();
         $nombre = $request->get('buscarpor');
 
         $jugadores=Jugador::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
@@ -38,7 +40,7 @@ class JugadorController extends Controller
         //$jugadores=Jugador::orderBy('apellido','ASC')->paginate(2);
         //return view('Jugador.index',compact('jugadores'));
         //$jugadores = Jugador::all();
-        return view('jugadores.index', compact('jugadores','jugadores'));
+        return view('jugadores.index', compact('jugadores','jugadores', 'data'));
     }
 
     /**
@@ -105,6 +107,7 @@ class JugadorController extends Controller
         $insert['tipoDocumento'] = $request->get('tipoDocumento');
         $insert['documento'] = $request->get('documento');
         $insert['nacimiento'] = $request->get('nacimiento');
+        $insert['fallecimiento'] = $request->get('fallecimiento');
 
 
 
@@ -204,6 +207,7 @@ class JugadorController extends Controller
         $update['tipoDocumento'] = $request->get('tipoDocumento');
         $update['documento'] = $request->get('documento');
         $update['nacimiento'] = $request->get('nacimiento');
+        $update['fallecimiento'] = $request->get('fallecimiento');
 
 
 

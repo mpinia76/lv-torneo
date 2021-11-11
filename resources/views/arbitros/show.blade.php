@@ -43,8 +43,8 @@
         <div class="row">
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Nacimiento</dt>
-                <dd>{{date('Y-m-d', strtotime($arbitro->nacimiento))}}</dd>
+                <dt>Edad</dt>
+                <dd>{{($arbitro->nacimiento)?$arbitro->getAgeAttribute():''}}</dd>
 
             </div>
 

@@ -88,6 +88,7 @@ class ArbitroController extends Controller
         $insert['tipoDocumento'] = $request->get('tipoDocumento');
         $insert['documento'] = $request->get('documento');
         $insert['nacimiento'] = $request->get('nacimiento');
+        $insert['fallecimiento'] = $request->get('fallecimiento');
 
         $arbitro = Arbitro::create($insert);
 
@@ -161,6 +162,7 @@ class ArbitroController extends Controller
         $update['tipoDocumento'] = $request->get('tipoDocumento');
         $update['documento'] = $request->get('documento');
         $update['nacimiento'] = $request->get('nacimiento');
+        $update['fallecimiento'] = $request->get('fallecimiento');
 
 
 

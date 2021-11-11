@@ -72,7 +72,7 @@ class DatabaseBackUp extends Command
 
         $data=array(
 
-            'email'=>'marcos.pinero1976@gmail.com',
+            'email'=>'crones.codnet@gmail.com',
             'subject'=>'BackUp lv-torneo',
             'body'=>'En el archivo adjunto se encuentra el BackUp de la BBDD lv-torneo realizado el '.$fecha,
             'attachs'=>$attach

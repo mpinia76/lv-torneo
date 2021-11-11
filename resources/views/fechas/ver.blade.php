@@ -9,7 +9,7 @@
     <hr/>
 
 
-        <nav class="navbar navbar-light float-right" style="width: 100%">
+
             <form class="form-inline">
                 <input type="hidden" name="torneoId" value="{{ (isset($_GET['torneoId']))?$_GET['torneoId']:'' }}">
 
@@ -27,7 +27,7 @@
 
 
             </form>
-        </nav>
+        <br>
 
         <div class="row">
 

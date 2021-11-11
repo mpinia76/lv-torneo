@@ -51,18 +51,22 @@
                 {{Form::email('email', $arbitro->email, ['class' => 'form-control'])}}
 
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
                 {{Form::text('telefono', $arbitro->telefono, ['class' => 'form-control'])}}
             </div>
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('ciudad', 'Ciudad Nacimiento')}}
                 {{Form::text('ciudad', $arbitro->ciudad, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}
-                {{Form::date('nacimiento', date('Y-m-d', strtotime($arbitro->nacimiento)), ['class' => 'form-control'])}}
+                {{Form::date('nacimiento', ($arbitro->nacimiento)?date('Y-m-d', strtotime($arbitro->nacimiento)):'', ['class' => 'form-control'])}}
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('fallecimiento', 'Fallecimiento')}}
+                {{Form::date('fallecimiento', ($arbitro->fallecimiento)?date('Y-m-d', strtotime($arbitro->fallecimiento)):'', ['class' => 'form-control'])}}
             </div>
         </div>
 

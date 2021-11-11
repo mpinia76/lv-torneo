@@ -43,13 +43,13 @@
 
                     <ul class="dropdown-menu" role="menu">
 
-                        <li><a class="dropdown-item" href="{{route('fechas.ver',  array('torneoId' => Session::get('codigoTorneo')))}}">
-                                Fechas
+                        <li><a class="dropdown-item" href="{{route('torneos.estadisticasTorneo',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Estadísticas
                             </a>
                         </li>
 
-                        <li><a class="dropdown-item" href="{{route('grupos.posicionesPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
-                                Posiciones
+                        <li><a class="dropdown-item" href="{{route('fechas.ver',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Fechas
                             </a>
                         </li>
 
@@ -58,8 +58,10 @@
                             </a>
                         </li>
 
-                        <li><a class="dropdown-item" href="{{route('grupos.tarjetasPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
-                                Tarjetas
+
+
+                        <li><a class="dropdown-item" href="{{route('grupos.posicionesPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Posiciones
                             </a>
                         </li>
 
@@ -68,7 +70,61 @@
                             </a>
                         </li>
 
+                        <li><a class="dropdown-item" href="{{route('grupos.tarjetasPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Tarjetas
+                            </a>
 
+                        </li>
+
+
+
+
+
+
+
+
+
+
+                    </ul>
+
+                </li>
+            </ul>
+            <ul class="nav navbar-nav navbar-left">
+
+                <li class="dropdown">
+                    <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">{{ __('Estadísticas') }} <span class="caret"></span></a>
+
+                    <ul class="dropdown-menu" role="menu">
+
+                        <li><a class="dropdown-item" href="{{route('torneos.goleadores')}}">
+                                Goleadores
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('torneos.historiales')}}">
+                                Historiales
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('torneos.estadisticasOtras')}}">
+                                Otras
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('torneos.posiciones')}}">
+                                Tabla Histórica
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('torneos.tarjetas')}}">
+                                Tarjetas
+                            </a>
+                        </li>
+
+                        <li><a class="dropdown-item" href="{{route('torneos.tecnicos')}}">
+                                Técnicos
+                            </a>
+                        </li>
 
 
 

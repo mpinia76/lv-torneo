@@ -12,6 +12,7 @@
         <thead>
         <th>#</th>
         <th>Jugador</th>
+        <th>Equipos</th>
         <th>Goles</th>
         <th>Jugada</th>
         <th>Cabeza</th>
@@ -23,18 +24,33 @@
         @foreach($goleadores as $jugador)
             <tr>
                 <td>{{$i++}}</td>
-                <td>@if($jugador->foto)
+                <td>
+                    <a href="{{route('jugadores.ver', array('jugadorId' => $jugador->id))}}" >
+                        @if($jugador->foto)
+                            <img id="original" class="imgCircle" src="{{ url('images/'.$jugador->foto) }}" >
+                        @else
+                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                        @endif
+                    </a>
+                    {{$jugador->jugador}}</td>
+                <td>@if($jugador->escudo)
                         @php
-                        $fotos = explode(',',$jugador->foto);
+                            $escudos = explode(',',$jugador->escudo);
                         @endphp
-                        @foreach($fotos as $foto)
-                            @if($foto!='')
-                                <img id="original" src="{{ url('images/'.$foto) }}" height="25">
+                        @foreach($escudos as $escudo)
+
+                            @if($escudo!='')
+                                @php
+                                    $escudoArr = explode('_',$escudo);
+                                @endphp
+                                <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
+                                    <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                </a>
                             @endif
                         @endforeach
                     @endif
 
-                {{$jugador->jugador}}</td>
+                    </td>
                 <td>{{$jugador->goles}}</td>
                 <td>{{$jugador->Jugada}}</td>
                 <td>{{$jugador->Cabeza}}</td>

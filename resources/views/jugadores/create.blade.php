@@ -51,29 +51,33 @@
         </div>
     </div>
         <div class="row">
-            <div class="form-group col-xs-12 col-sm-6 col-md-5">
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('email', 'E-mail')}}
                 {{Form::email('email', '', ['class' => 'form-control'])}}
 
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
                 {{Form::text('telefono', '', ['class' => 'form-control'])}}
             </div>
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('ciudad', 'Ciudad Nacimiento')}}
                 {{Form::text('ciudad', '', ['class' => 'form-control'])}}
             </div>
-
-
-
-        </div>
-        <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}
                 {{Form::date('nacimiento', '', ['class' => 'form-control'])}}
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('fallecimiento', 'Fallecimiento')}}
+                {{Form::date('fallecimiento', '', ['class' => 'form-control'])}}
+            </div>
+
+
+        </div>
+        <div class="row">
+
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('tipoJugador', 'Posición')}}
                 {{ Form::select('tipoJugador',[''=>'Seleccionar...','Arquero'=>'Arquero','Defensor'=>'Defensor','Medio'=>'Medio','Delantero'=>'Delantero'],'', ['class' => 'form-control']) }}

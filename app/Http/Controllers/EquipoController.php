@@ -144,7 +144,7 @@ class EquipoController extends Controller
             $profileImage = date('YmdHis') . "." . $files->getClientOriginalExtension();
             Log::info($profileImage);
             $files->move($destinationPath, $profileImage);*/
-            $insert['escudo'] = "$name";
+            $update['escudo'] = "$name";
         }
 
 

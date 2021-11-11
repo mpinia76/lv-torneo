@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Plantilla;
 use App\Torneo;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use App\Grupo;
 use App\PromedioTorneo;
+use App\Equipo;
+
 use function GuzzleHttp\Promise\iter_for;
 
 use DB;
@@ -22,7 +25,7 @@ class TorneoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except('ver','promediosPublic');
+        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos');
     }
 
     /**
@@ -425,7 +428,22 @@ order by promedio desc, puntaje desc, equipo ASC';
         $torneo=Torneo::findOrFail($torneo_id);
 
 
-        $promedioTorneos = PromedioTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','ASC')->get();
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+        $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+
+
+        $equipos = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id');
+
+
+        //print_r($equipos);
+
+
+        $promedioTorneos = PromedioTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','DESC')->get();
         $promedios = array();
         if (count($promedioTorneos)>0){
             $sql='SELECT foto, equipo, (sum(
@@ -437,36 +455,70 @@ order by promedio desc, puntaje desc, equipo ASC';
        sum(
              case when golesl > golesv then 3 else 0 end
            + case when golesl = golesv then 1 else 0 end
-       ) puntaje
+       ) puntaje, equipo_id
 from ( ';
 
             //print_r($promedioTorneos[0]);
             //echo $promedioTorneos[0]->torneoAnterior_id;
-            //foreach ($promedioTorneos as $promedioTorneo){
-            for ($i=0; $i<count($promedioTorneos); $i++){
-                $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+            foreach ($promedioTorneos as $promedioTorneo){
+                $grupos = Grupo::where('torneo_id', '=',$promedioTorneo->torneoAnterior_id)->get();
+                $arrgrupos='';
+                foreach ($grupos as $grupo){
+                    $arrgrupos .=$grupo->id.',';
+                }
+                $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+
+
+                $equiposAux = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id');
+
+
+
+                $borrar = array();
+                foreach ($equipos as $key => $value){
+
+                    if (!$equiposAux->contains($value) ){
+                        $borrar[]=$key;
+                    }
+                }
+
+                foreach ($borrar as $key){
+                    $equipos->forget($key);
+                }
+
+                $arrequipos='';
+                foreach ($equipos as $key => $value){
+                    $arrequipos .=$key.',';
+                }
+                $arrequipos = substr($arrequipos, 0, -1);//quito última coma
+
+
+
+
+
+                $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto, equipos.id equipo_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
 		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
-		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneo->torneoAnterior_id.'
 		 WHERE golesl is not null AND golesv is not null ';
-                $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
+                $sql .=' AND equipos.id IN ('.$arrequipos.')';
                 $sql .=' union all
-       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto, equipos.id equipo_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
 		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
-		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneo->torneoAnterior_id.'
 		 WHERE golesl is not null AND golesv is not null';
-                $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
+                $sql .=' AND equipos.id IN ('.$arrequipos.')';
                 $sql .=' union all ';
             }
 
-            $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+            $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto, equipos.id equipo_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
@@ -476,7 +528,7 @@ from ( ';
 		 WHERE golesl is not null AND golesv is not null
 
      union all
-       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto, equipos.id equipo_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
@@ -484,7 +536,7 @@ from ( ';
 		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = '.$torneo_id.'
 		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$torneo_id.'
 		 WHERE golesl is not null AND golesv is not null) a
-group by equipo, foto
+group by equipo, foto, equipo_id
 
 order by promedio desc, puntaje desc, equipo ASC';
 
@@ -498,6 +550,777 @@ order by promedio desc, puntaje desc, equipo ASC';
 
         $i=1;
         return view('torneos.promediosPublic', compact('torneo','promedios','i'));
+    }
+
+    public function historiales(Request $request)
+    {
+        $equipo1= $request->query('equipo1');
+
+        if (!empty($equipo1)){
+            $e1=Equipo::findOrFail($equipo1);
+        }
+        else{
+            $e1 = new Equipo();
+        }
+
+        $equipo2= $request->query('equipo2');
+
+        if (!empty($equipo2)){
+            $e2=Equipo::findOrFail($equipo2);
+        }
+        else{
+            $e2 = new Equipo();
+        }
+
+
+        $equipos = Equipo::orderBy('nombre', 'asc')->get();
+
+        $partidos=array();
+        $posiciones=array();
+
+        if ($equipo1 && $equipo2){
+            $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE (e1.id = '.$equipo1.' and e2.id = '.$equipo2.')  OR (e1.id = '.$equipo2.' and e2.id = '.$equipo1.')
+ORDER BY partidos.dia ASC';
+
+
+            //echo $sql;
+            $partidos = DB::select(DB::raw($sql));
+
+            $sql='SELECT foto, equipo,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, equipo_id
+from (
+       select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 WHERE golesl is not null AND golesv is not null AND (partidos.equipol_id = '.$equipo1.' and partidos.equipov_id = '.$equipo2.')  OR (partidos.equipov_id = '.$equipo1.' and partidos.equipol_id = '.$equipo2.')
+     union all
+       select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 WHERE golesl is not null AND golesv is not NULL AND (partidos.equipol_id = '.$equipo1.' and partidos.equipov_id = '.$equipo2.')  OR (partidos.equipov_id = '.$equipo1.' and partidos.equipol_id = '.$equipo2.')
+) a
+group by equipo, foto, equipo_id
+
+order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
+
+
+            //echo $sql;
+            $posiciones = DB::select(DB::raw($sql));
+        }
+
+
+
+
+
+        return view('torneos.historiales', compact('equipos','e1','e2', 'partidos','posiciones'));
+    }
+
+    public function goleadores(Request $request)
+    {
+
+
+        $sql = 'SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, jugadors.foto, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo
+, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
+FROM gols
+INNER JOIN jugadors ON gols.jugador_id = jugadors.id
+INNER JOIN partidos ON gols.partido_id = partidos.id
+
+
+WHERE gols.tipo <> \'En contra\'
+GROUP BY jugadors.id,jugador, foto
+ORDER BY goles DESC, jugador ASC';
+
+
+
+
+        $goleadores = DB::select(DB::raw($sql));
+
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($goleadores, $offSet, $paginate, true);
+
+
+
+        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($goleadores), $paginate, $page);
+
+
+        foreach ($goleadores as $goleador){
+
+            $sql2='SELECT escudo, equipo_id, COUNT(gols.id) goles
+FROM equipos
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
+WHERE alineacions.jugador_id = '.$goleador->id.' AND gols.tipo <> \'En contra\'
+GROUP BY escudo, equipo_id
+            ORDER BY partidos.dia ASC';
+
+
+
+            $escudos = DB::select(DB::raw($sql2));
+
+
+            foreach ($escudos as $escudo){
+
+                $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->goles.',';
+
+            }
+
+        }
+
+        $goleadores->setPath(route('torneos.goleadores'));
+
+
+
+        $i=$offSet+1;
+
+
+        return view('torneos.goleadores', compact('goleadores','i'));
+    }
+
+    public function tarjetas(Request $request)
+    {
+
+
+        $tarjetas = DB::select(DB::raw('SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, jugadors.foto,count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo
+FROM tarjetas
+INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
+INNER JOIN partidos ON tarjetas.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+GROUP BY jugadors.id, jugador, foto
+ORDER BY rojas DESC, amarillas DESC, jugador ASC'));
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($tarjetas, $offSet, $paginate, true);
+
+        $tarjetas = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($tarjetas), $paginate, $page);
+
+
+        foreach ($tarjetas as $tarjeta){
+
+            $sql2='SELECT escudo, equipo_id, count( case when tarjetas.tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+, count( case when tarjetas.tipo=\'Roja\' or tarjetas.tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas
+FROM equipos
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+INNER JOIN tarjetas ON tarjetas.partido_id = partidos.id AND tarjetas.jugador_id = alineacions.jugador_id
+WHERE alineacions.jugador_id = '.$tarjeta->id.'
+GROUP BY escudo, equipo_id
+ORDER BY partidos.dia ASC';
+
+
+
+            $escudos = DB::select(DB::raw($sql2));
+
+
+            foreach ($escudos as $escudo){
+
+                $tarjeta->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->rojas.'_'.$escudo->amarillas.',';
+
+            }
+
+        }
+
+        $tarjetas->setPath(route('torneos.tarjetas'));
+
+        //dd($tarjetas);
+
+        $i=$offSet+1;
+        return view('torneos.tarjetas', compact('tarjetas','i'));
+    }
+
+    public function posiciones(Request $request)
+    {
+
+
+
+                $sql='SELECT foto, equipo,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, (sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       )/count(*)) promedio, equipo_id
+from (
+       select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 WHERE golesl is not null AND golesv is not null
+     union all
+       select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 WHERE golesl is not null AND golesv is not null
+) a
+group by equipo, foto, equipo_id
+
+order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
+
+                $posiciones = DB::select(DB::raw($sql));
+
+
+
+
+
+
+
+
+
+
+        return view('torneos.posiciones', compact('posiciones'));
+    }
+
+    public function estadisticasTorneo(Request $request)
+    {
+        $torneo_id= $request->query('torneoId');
+        //$torneo=Torneo::findOrFail($torneo_id);
+
+
+
+        $estadisticas=array();
+
+
+
+        $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.' and partidos.golesl+partidos.golesv = (
+select MAX(p1.golesl+p1.golesv)
+from partidos p1
+INNER JOIN fechas f1 ON p1.fecha_id = f1.id
+INNER JOIN grupos g1 ON f1.grupo_id = g1.id
+INNER JOIN torneos t1 ON g1.torneo_id = t1.id
+WHERE t1.id='.$torneo_id.'
+
+
+)
+
+ORDER BY partidos.dia ASC';
+
+
+        //echo $sql;
+        $maxGoles = DB::select(DB::raw($sql));
+
+        $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.' and partidos.golesl = (
+select MAX(p1.golesl)
+from partidos p1
+INNER JOIN fechas f1 ON p1.fecha_id = f1.id
+INNER JOIN grupos g1 ON f1.grupo_id = g1.id
+INNER JOIN torneos t1 ON g1.torneo_id = t1.id
+WHERE t1.id='.$torneo_id.'
+
+
+)
+
+ORDER BY partidos.dia ASC';
+
+
+        //echo $sql;
+        $maxGolesLocales = DB::select(DB::raw($sql));
+
+        $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.' and partidos.golesv = (
+select MAX(p1.golesv)
+from partidos p1
+INNER JOIN fechas f1 ON p1.fecha_id = f1.id
+INNER JOIN grupos g1 ON f1.grupo_id = g1.id
+INNER JOIN torneos t1 ON g1.torneo_id = t1.id
+WHERE t1.id='.$torneo_id.'
+
+
+)
+
+ORDER BY partidos.dia ASC';
+
+
+        //echo $sql;
+        $maxGolesVisitantes = DB::select(DB::raw($sql));
+
+
+        $sql='SELECT t.nombreTorneo, t.year, t.numero,t.partidos,t.goles, t.promedio
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl+partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesl+partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.'
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t
+WHERE t.goles = (SELECT max(t.goles)
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl+partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesl+partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.'
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
+
+
+        //echo $sql;
+        $fechaMasGoles = DB::select(DB::raw($sql));
+
+        $sql='SELECT t.nombreTorneo, t.year, t.numero,t.partidos,t.goles, t.promedio
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl) goles, COUNT(*) partidos, (SUM(partidos.golesl)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.'
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t
+WHERE t.goles = (SELECT max(t.goles)
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl) goles, COUNT(*) partidos, (SUM(partidos.golesl)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.'
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
+
+
+        //echo $sql;
+        $fechaMasGolesLocales = DB::select(DB::raw($sql));
+
+
+        $sql='SELECT t.nombreTorneo, t.year, t.numero,t.partidos,t.goles, t.promedio
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.'
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t
+WHERE t.goles = (SELECT max(t.goles)
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE torneos.id='.$torneo_id.'
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
+
+
+        //echo $sql;
+        $fechaMasGolesVisitantes = DB::select(DB::raw($sql));
+
+
+        $estadisticas['maxGoles']=$maxGoles;
+        $estadisticas['maxGolesLocales']=$maxGolesLocales;
+        $estadisticas['maxGolesVisitantes']=$maxGolesVisitantes;
+        $estadisticas['fechaMasGoles']=$fechaMasGoles;
+        $estadisticas['fechaMasGolesLocales']=$fechaMasGolesLocales;
+        $estadisticas['fechaMasGolesVisitantes']=$fechaMasGolesVisitantes;
+
+
+        return view('torneos.estadisticasTorneo', compact('estadisticas'));
+    }
+
+
+    public function estadisticasOtras(Request $request)
+    {
+        //$torneo= $request->query('torneo');
+
+
+
+        $estadisticas=array();
+
+
+
+            $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE partidos.golesl+partidos.golesv = (
+select MAX(p1.golesl+p1.golesv)
+from partidos p1)
+
+ORDER BY partidos.dia ASC';
+
+
+            //echo $sql;
+            $maxGoles = DB::select(DB::raw($sql));
+
+        $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE partidos.golesl = (
+select MAX(p1.golesl)
+from partidos p1)
+
+ORDER BY partidos.dia ASC';
+
+
+        //echo $sql;
+        $maxGolesLocales = DB::select(DB::raw($sql));
+
+        $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE partidos.golesv = (
+select MAX(p1.golesv)
+from partidos p1)
+
+ORDER BY partidos.dia ASC';
+
+
+        //echo $sql;
+        $maxGolesVisitantes = DB::select(DB::raw($sql));
+
+
+        $sql='SELECT t.nombreTorneo, t.year, t.numero,t.partidos,t.goles, t.promedio
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl+partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesl+partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t
+WHERE t.goles = (SELECT max(t.goles)
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl+partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesl+partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
+
+
+        //echo $sql;
+        $fechaMasGoles = DB::select(DB::raw($sql));
+
+        $sql='SELECT t.nombreTorneo, t.year, t.numero,t.partidos,t.goles, t.promedio
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl) goles, COUNT(*) partidos, (SUM(partidos.golesl)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t
+WHERE t.goles = (SELECT max(t.goles)
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesl) goles, COUNT(*) partidos, (SUM(partidos.golesl)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
+
+
+        //echo $sql;
+        $fechaMasGolesLocales = DB::select(DB::raw($sql));
+
+
+        $sql='SELECT t.nombreTorneo, t.year, t.numero,t.partidos,t.goles, t.promedio
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t
+WHERE t.goles = (SELECT max(t.goles)
+FROM
+
+(SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, SUM(partidos.golesv) goles, COUNT(*) partidos, (SUM(partidos.golesv)/COUNT(*)) promedio
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+
+GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
+
+
+        //echo $sql;
+        $fechaMasGolesVisitantes = DB::select(DB::raw($sql));
+
+
+        $estadisticas['maxGoles']=$maxGoles;
+        $estadisticas['maxGolesLocales']=$maxGolesLocales;
+        $estadisticas['maxGolesVisitantes']=$maxGolesVisitantes;
+        $estadisticas['fechaMasGoles']=$fechaMasGoles;
+        $estadisticas['fechaMasGolesLocales']=$fechaMasGolesLocales;
+        $estadisticas['fechaMasGolesVisitantes']=$fechaMasGolesVisitantes;
+
+
+        return view('torneos.estadisticasOtras', compact('estadisticas'));
+    }
+
+
+    public function tecnicos(Request $request)
+    {
+
+
+
+        $sql = 'SELECT tecnico, fotoTecnico, tecnico_id,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), \'%\') porcentaje, "" escudo
+from (
+       select  DISTINCT CONCAT (tecnicos.apellido,\', \', tecnicos.nombre) tecnico, tecnicos.foto fotoTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not null
+     union all
+       select DISTINCT CONCAT (tecnicos.apellido,\', \', tecnicos.nombre) tecnico, tecnicos.foto fotoTecnico, tecnicos.id tecnico_id, golesv, golesl, equipos.escudo foto, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not null
+) a
+group by tecnico, fotoTecnico, tecnico_id
+
+order by puntaje desc, diferencia DESC, golesl DESC';
+
+
+
+
+        $goleadores = DB::select(DB::raw($sql));
+
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($goleadores, $offSet, $paginate, true);
+
+
+
+        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($goleadores), $paginate, $page);
+
+
+        foreach ($goleadores as $goleador){
+
+            $sql2='SELECT equipo, escudo, equipo_id,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), \'%\') porcentaje
+from (
+       select   equipos.nombre equipo, equipos.id equipo_id, golesl, golesv, equipos.escudo
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not NULL AND tecnicos.id = '.$goleador->tecnico_id.'
+     union all
+       select equipos.nombre equipo, equipos.id equipo_id, golesv, golesl, equipos.escudo
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not NULL AND tecnicos.id = '.$goleador->tecnico_id.'
+) a
+group by equipo, escudo, equipo_id
+
+order by puntaje desc, diferencia DESC, golesl DESC';
+
+
+
+            $escudos = DB::select(DB::raw($sql2));
+
+
+            foreach ($escudos as $escudo){
+
+                $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.',';
+
+            }
+
+        }
+
+        $goleadores->setPath(route('torneos.tecnicos'));
+
+
+
+        $i=$offSet+1;
+
+
+        return view('torneos.tecnicos', compact('goleadores','i'));
     }
 
 }

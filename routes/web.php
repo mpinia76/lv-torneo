@@ -77,6 +77,14 @@ Route::get('verTecnico', 'TecnicoController@ver')->name('tecnicos.ver');
 Route::get('verArbitro', 'ArbitroController@ver')->name('arbitros.ver');
 Route::get('descensos', 'TorneoController@promediosPublic')->name('torneos.promediosPublic');
 
+Route::get('historiales', 'TorneoController@historiales')->name('torneos.historiales');
+Route::get('goleadoresHistorico', 'TorneoController@goleadores')->name('torneos.goleadores');
+Route::get('tarjetasHistorico', 'TorneoController@tarjetas')->name('torneos.tarjetas');
+Route::get('posicionesHistorico', 'TorneoController@posiciones')->name('torneos.posiciones');
+Route::get('otrasEstadisticas', 'TorneoController@estadisticasOtras')->name('torneos.estadisticasOtras');
+Route::get('estadisticasTorneo', 'TorneoController@estadisticasTorneo')->name('torneos.estadisticasTorneo');
+Route::get('tecnicos', 'TorneoController@tecnicos')->name('torneos.tecnicos');
+
 
 Route::get('logout', 'Auth\LoginController@logout');
 

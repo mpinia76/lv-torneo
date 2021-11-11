@@ -28,7 +28,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Edad</dt>
-                <dd>{{Carbon::parse($arbitro->nacimiento)->age}} años ({{date('d/m/Y', strtotime($arbitro->nacimiento))}})</dd>
+                <dd>{{($arbitro->nacimiento)?$arbitro->getAgeAttribute():''}}</dd>
 
             </div>
 

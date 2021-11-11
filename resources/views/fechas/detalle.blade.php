@@ -422,7 +422,7 @@
 
         <div class="d-flex">
 
-            <a href="{{ route('fechas.ver',array('torneoId' => $partido->fecha->grupo->torneo->id, 'fechaNumero' => $partido->fecha->numero)) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
 @endsection

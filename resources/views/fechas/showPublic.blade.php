@@ -78,7 +78,7 @@
         </div>
 
 
-        <a href="{{ route('fechas.ver',array('grupoId'=>$grupo->id)) }}" class="btn btn-success m-1">Volver</a>
+        <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
 
     </div>
 @endsection

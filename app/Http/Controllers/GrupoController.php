@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Equipo;
+use App\Fecha;
+use App\Partido;
 use App\PlantillaJugador;
 use App\Plantilla;
 use App\Torneo;
@@ -162,9 +164,9 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
        sum(
              case when golesl > golesv then 3 else 0 end
            + case when golesl = golesv then 1 else 0 end
-       ) puntaje
+       ) puntaje, equipo_id
 from (
-       select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id
+       select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
@@ -172,7 +174,7 @@ from (
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = '.$grupo->torneo->id.' AND grupos.agrupacion = '.$grupo->agrupacion.'
 		 WHERE golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
      union all
-       select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id
+       select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
@@ -180,7 +182,7 @@ from (
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = '.$grupo->torneo->id.' AND grupos.agrupacion = '.$grupo->agrupacion.'
 		 WHERE golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
 ) a
-group by equipo, foto
+group by equipo, foto, equipo_id
 
 order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
@@ -211,6 +213,22 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $arrgrupos .=$grupo->id.',';
         }
         $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+        $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+        $arrfechas='';
+        foreach ($fechas as $fecha){
+            $arrfechas .=$fecha->id.',';
+        }
+        $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+        $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+        $arrpartidos='';
+        foreach ($partidos as $partido){
+            $arrpartidos .=$partido->id.',';
+        }
+        $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
 
         $sql = 'SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as foto
 , count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
@@ -248,9 +266,10 @@ ORDER BY goles DESC, jugador ASC';
 
             $sql2='SELECT DISTINCT escudo
 FROM equipos
-INNER JOIN plantillas ON equipos.id = plantillas.equipo_id
-INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
-WHERE plantilla_jugadors.jugador_id = '.$goleador->id.' AND plantillas.grupo_id IN ('.$arrgrupos.')';
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN ('.$arrpartidos.')
+ ORDER BY partidos.dia ASC';
 
 
 
@@ -286,7 +305,23 @@ WHERE plantilla_jugadors.jugador_id = '.$goleador->id.' AND plantillas.grupo_id 
         }
         $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
 
-        $sql = 'SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as foto
+        $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+        $arrfechas='';
+        foreach ($fechas as $fecha){
+            $arrfechas .=$fecha->id.',';
+        }
+        $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+        $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+        $arrpartidos='';
+        foreach ($partidos as $partido){
+            $arrpartidos .=$partido->id.',';
+        }
+        $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+        $sql = 'SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo, jugadors.foto
 , count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
@@ -295,7 +330,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
-GROUP BY jugadors.id,jugador
+GROUP BY jugadors.id,jugador, foto
 ORDER BY goles DESC, jugador ASC';
 
 
@@ -320,11 +355,11 @@ ORDER BY goles DESC, jugador ASC';
 
         foreach ($goleadores as $goleador){
 
-            $sql2='SELECT DISTINCT escudo
+            $sql2='SELECT DISTINCT escudo, equipo_id
 FROM equipos
-INNER JOIN plantillas ON equipos.id = plantillas.equipo_id
-INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
-WHERE plantilla_jugadors.jugador_id = '.$goleador->id.' AND plantillas.grupo_id IN ('.$arrgrupos.')';
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
 
 
 
@@ -333,7 +368,7 @@ WHERE plantilla_jugadors.jugador_id = '.$goleador->id.' AND plantillas.grupo_id 
 
             foreach ($escudos as $escudo){
 
-                $goleador->foto .= $escudo->escudo.',';
+                $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
             }
 
         }
@@ -359,6 +394,22 @@ WHERE plantilla_jugadors.jugador_id = '.$goleador->id.' AND plantillas.grupo_id 
             $arrgrupos .=$grupo->id.',';
         }
         $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+        $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+        $arrfechas='';
+        foreach ($fechas as $fecha){
+            $arrfechas .=$fecha->id.',';
+        }
+        $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+        $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+        $arrpartidos='';
+        foreach ($partidos as $partido){
+            $arrpartidos .=$partido->id.',';
+        }
+        $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
 
         $tarjetas = DB::select(DB::raw('SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
 , count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" foto
@@ -388,9 +439,9 @@ ORDER BY rojas DESC, amarillas DESC, jugador ASC'));
 
             $sql2='SELECT DISTINCT escudo
 FROM equipos
-INNER JOIN plantillas ON equipos.id = plantillas.equipo_id
-INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
-WHERE plantilla_jugadors.jugador_id = '.$tarjeta->id.' AND plantillas.grupo_id IN ('.$arrgrupos.')';
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
 
 
 
@@ -424,8 +475,25 @@ WHERE plantilla_jugadors.jugador_id = '.$tarjeta->id.' AND plantillas.grupo_id I
         }
         $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
 
+        $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+        $arrfechas='';
+        foreach ($fechas as $fecha){
+            $arrfechas .=$fecha->id.',';
+        }
+        $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+        $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+        $arrpartidos='';
+        foreach ($partidos as $partido){
+            $arrpartidos .=$partido->id.',';
+        }
+        $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+
         $tarjetas = DB::select(DB::raw('SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" foto
+, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo, jugadors.foto
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
 INNER JOIN partidos ON tarjetas.partido_id = partidos.id
@@ -433,7 +501,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE  grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
-GROUP BY jugadors.id, jugador
+GROUP BY jugadors.id, jugador, foto
 ORDER BY rojas DESC, amarillas DESC, jugador ASC'));
 
 
@@ -450,11 +518,11 @@ ORDER BY rojas DESC, amarillas DESC, jugador ASC'));
 
         foreach ($tarjetas as $tarjeta){
 
-            $sql2='SELECT DISTINCT escudo
+            $sql2='SELECT DISTINCT escudo, equipo_id
 FROM equipos
-INNER JOIN plantillas ON equipos.id = plantillas.equipo_id
-INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
-WHERE plantilla_jugadors.jugador_id = '.$tarjeta->id.' AND plantillas.grupo_id IN ('.$arrgrupos.')';
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
 
 
 
@@ -463,12 +531,12 @@ WHERE plantilla_jugadors.jugador_id = '.$tarjeta->id.' AND plantillas.grupo_id I
 
             foreach ($escudos as $escudo){
 
-                $tarjeta->foto .= $escudo->escudo.',';
+                $tarjeta->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
             }
 
         }
 
-        $tarjetas->setPath(route('grupos.tarjetas',  array('torneoId' => $torneo->id)));
+        $tarjetas->setPath(route('grupos.tarjetasPublic',  array('torneoId' => $torneo->id)));
 
         //dd($tarjetas);
 

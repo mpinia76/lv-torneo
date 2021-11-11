@@ -34,8 +34,8 @@
     <table class="table">
         <thead>
         <th></th>
-        <th>Nombre</th>
         <th>Apellido</th>
+        <th>Nombre</th>
         <th>E-mail</th>
         <th>Edad</th>
 
@@ -54,7 +54,7 @@
                 <td>{{$tecnico->nombre}}</td>
 
                 <td>{{$tecnico->email}}</td>
-                <td>{{Carbon::parse($tecnico->nacimiento)->age}}</td>
+                <td>{{($tecnico->nacimiento)?$tecnico->getAgeAttribute():''}}</td>
 
                 <td>
                     <div class="d-flex">

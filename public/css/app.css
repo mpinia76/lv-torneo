@@ -501,6 +501,8 @@
     margin-bottom: 0.75rem;
 }
 
+
+
 @media (min-width: 576px) {
     .card-columns {
         -moz-column-count: 3;

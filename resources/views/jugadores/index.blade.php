@@ -35,8 +35,8 @@
         <thead>
         <th></th>
         <th>Posición</th>
-        <th>Nombre</th>
         <th>Apellido</th>
+        <th>Nombre</th>
         <th>E-mail</th>
         <th>Edad</th>
 
@@ -56,7 +56,7 @@
                 <td>{{$jugador->nombre}}</td>
 
                 <td>{{$jugador->email}}</td>
-                <td>{{Carbon::parse($jugador->nacimiento)->age}}</td>
+                <td>{{($jugador->nacimiento)?$jugador->getAgeAttribute():''}}</td>
 
                 <td>
                     <div class="d-flex">
@@ -74,7 +74,7 @@
             </tr>
         @endforeach
     </table>
-        <?php echo $jugadores->links(); ?>
+        <?php echo $jugadores->appends($data)->links(); ?>
     </div>
 
     <script>

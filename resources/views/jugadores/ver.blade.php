@@ -26,9 +26,13 @@
 
         <div class="row">
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Edad</dt>
-                <dd>{{Carbon::parse($jugador->nacimiento)->age}} años ({{date('d/m/Y', strtotime($jugador->nacimiento))}})</dd>
+            <div class="row">
+
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Edad</dt>
+                    <dd>{{($jugador->nacimiento)?$jugador->getAgeAttribute():''}}</dd>
+
+                </div>
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">

@@ -12,10 +12,10 @@
         <thead>
         <th>#</th>
         <th>Jugador</th>
-        <th>Equipos</th>
+
         <th>Amarillas</th>
         <th>Rojas</th>
-
+        <th>Equipos</th>
         </thead>
         <tbody>
 
@@ -31,6 +31,9 @@
                         @endif
                     </a>
                     {{$jugador->jugador}}</td>
+
+                <td>{{$jugador->amarillas}}</td>
+                <td>{{$jugador->rojas}}</td>
                 <td>@if($jugador->escudo)
                         @php
                             $escudos = explode(',',$jugador->escudo);
@@ -44,14 +47,13 @@
                                 <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
                                     <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
                                 </a>
+                                Amarillas {{$escudoArr[3]}}
+                                Rojas {{$escudoArr[2]}} <br>
                             @endif
                         @endforeach
                     @endif
 
                 </td>
-                <td>{{$jugador->amarillas}}</td>
-                <td>{{$jugador->rojas}}</td>
-
 
 
             </tr>
@@ -61,7 +63,7 @@
         {{$tarjetas->links()}}
         <div class="d-flex">
 
-            <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id)) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
 

@@ -23,10 +23,12 @@
         @foreach($promedios as $equipo)
             <tr>
                 <td>{{$i++}}</td>
-                <td>@if($equipo->foto)
+                <td>
+                    <a href="{{route('equipos.ver', array('equipoId' => $equipo->equipo_id))}}" >
+                    @if($equipo->foto)
                         <img id="original" src="{{ url('images/'.$equipo->foto) }}" height="25">
                     @endif
-
+                    </a>
                 {{$equipo->equipo}}</td>
                 <td>{{$equipo->promedio}}</td>
                 <td>{{$equipo->jugados}}</td>
