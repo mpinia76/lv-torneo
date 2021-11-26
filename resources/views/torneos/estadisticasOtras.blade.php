@@ -16,6 +16,99 @@
         <div class="row">
 
             <div class="form-group col-md-12">
+                <h1>Torneos con más goles</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>Torneo</th>
+
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+
+                    </thead>
+                    <tbody>
+
+                    @foreach($estadisticas['torneoMasGoles'] as $partido)
+                        <tr>
+                            <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+                            <td>{{$partido->partidos}}</td>
+
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+                <h1>Torneos con más goles locales</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>Torneo</th>
+
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+
+                    </thead>
+                    <tbody>
+
+                    @foreach($estadisticas['torneoMasGolesLocales'] as $partido)
+                        <tr>
+                            <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+                            <td>{{$partido->partidos}}</td>
+
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+                <h1>Torneos con más goles visitantes</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>Torneo</th>
+
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+
+                    </thead>
+                    <tbody>
+
+                    @foreach($estadisticas['torneoMasGolesVisitantes'] as $partido)
+                        <tr>
+                            <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+                            <td>{{$partido->partidos}}</td>
+
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
                 <h1>Fechas con más goles</h1>
                 <table class="table" style="width: 100%">
                     <thead>

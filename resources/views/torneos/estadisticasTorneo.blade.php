@@ -16,6 +16,40 @@
         <div class="row">
 
             <div class="form-group col-md-12">
+                <h1>Goles</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>Partidos</th>
+                    <th>Total</th>
+
+                    <th>Promedio</th>
+                    <th>Locales</th>
+                    <th>Promedio</th>
+                    <th>Visitante</th>
+                    <th>Promedio</th>
+
+                    </thead>
+                    <tbody>
+
+                    @foreach($estadisticas['goles'] as $partido)
+                        <tr>
+
+                            <td>{{$partido->partidos}}</td>
+
+                            <td>{{$partido->total}}</td>
+                            <td>{{$partido->promedio}}</td>
+
+                            <td>{{$partido->local}}</td>
+                            <td>{{$partido->promediolocal}}</td>
+                            <td>{{$partido->visitante}}</td>
+                            <td>{{$partido->promediovisitante}}</td>
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
                 <h1>Fechas con más goles</h1>
                 <table class="table" style="width: 100%">
                     <thead>
