@@ -18,6 +18,8 @@
         <th>Cabeza</th>
         <th>Penal</th>
         <th>Tiro Libre</th>
+        <th>Jugados</th>
+        <th>Prom.</th>
         </thead>
         <tbody>
 
@@ -56,8 +58,8 @@
                 <td>{{$jugador->Cabeza}}</td>
                 <td>{{$jugador->Penal}}</td>
                 <td>{{$jugador->Tiro_Libre}}</td>
-
-
+                <td>{{$jugador->jugados}}</td>
+                <td>{{round($jugador->goles / $jugador->jugados,2)}}</td>
             </tr>
         @endforeach
         </tbody>

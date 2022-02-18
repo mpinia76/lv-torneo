@@ -380,4 +380,34 @@ class PlantillaController extends Controller
         //
         return redirect()->route('plantillas.index', array('grupoId' => $grupo_id))->with($respuestaID,$respuestaMSJ);
     }
+
+    /*
+  AJAX request
+  */
+    public function getJugadors(Request $request){
+
+        $search = $request->search;
+
+
+
+
+
+        $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');
+        if($search == ''){
+            $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->limit(5)->get();
+        }else{
+            $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->where('name', 'like', '%' .$search . '%')->limit(5)->get();
+        }
+
+        $response = array();
+        foreach($jugadors as $jugador){
+            $response[] = array(
+                "id"=>$jugador->id,
+                "text"=>$jugador->name
+            );
+        }
+
+        return response()->json($response);
+    }
 }

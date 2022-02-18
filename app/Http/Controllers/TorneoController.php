@@ -643,7 +643,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     {
 
 
-        $sql = 'SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, jugadors.foto, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo
+        $sql = 'SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, jugadors.foto, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo, "0" as jugados
 , count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
@@ -695,6 +695,43 @@ GROUP BY escudo, equipo_id
                 $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->goles.',';
 
             }
+
+            $sql3="SELECT alineacions.jugador_id, COUNT(alineacions.jugador_id) as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE alineacions.tipo = 'Titular' AND alineacions.jugador_id = ".$goleador->id. " GROUP BY alineacions.jugador_id";
+
+            //echo $sql3;
+
+            $jugados = DB::select(DB::raw($sql3));
+
+
+            foreach ($jugados as $jugado){
+
+                $goleador->jugados += $jugado->jugados;
+            }
+
+            $sql4="SELECT cambios.jugador_id, COUNT(cambios.jugador_id)  as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN cambios ON cambios.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$goleador->id. " GROUP BY cambios.jugador_id";
+
+
+
+            $jugados = DB::select(DB::raw($sql4));
+
+
+            foreach ($jugados as $jugado){
+
+                $goleador->jugados += $jugado->jugados;
+            }
+
 
         }
 

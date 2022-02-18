@@ -1,3 +1,4 @@
+
 <nav class="navbar navbar-default navbar-static-top">
     <div class="container">
         <div class="navbar-header">
@@ -21,7 +22,8 @@
                 <li class="dropdown">
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">{{ __('Torneos') }} <span class="caret"></span></a>
 
-                    <ul class="dropdown-menu" role="menu">
+                    <ul id="myDropdown" class="dropdown-menu" role="menu">
+                        <input type="text" placeholder="Buscar.." class="searchField">
                         @foreach($torneos as $torneo)
                         <li><a class="dropdown-item" href="{{route('fechas.ver',  array('torneoId' => $torneo->id))}}">
                                 {{$torneo->nombre}} - {{$torneo->year}}
@@ -146,4 +148,23 @@
 
         </div>
     </div>
+    <script>
+
+        document.querySelector('.searchField').addEventListener('keyup',filterDropdown);
+        function filterDropdown() {
+            var inputSearch, filterText, ul, li, links, i,div;
+            inputSearch = document.querySelector(".searchField");
+            filterText = inputSearch.value.toUpperCase();
+            div = document.getElementById("myDropdown");
+            links = div.getElementsByTagName("a");
+            for (i = 0; i < links.length; i++) {
+                txtValue = links[i].textContent || links[i].innerText;
+                if (txtValue.toUpperCase().indexOf(filterText) > -1) {
+                    links[i].style.display = "";
+                } else {
+                    links[i].style.display = "none";
+                }
+            }
+        }
+    </script>
 </nav>
