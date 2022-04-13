@@ -14,6 +14,11 @@ class Jugador extends Model
         return $this->apellido . ', ' . $this->nombre;
     }
 
+    public function getFullNameAgeAttribute()
+    {
+        return $this->apellido . ', ' . $this->nombre.' ('.$this->getAgeAttribute().')';
+    }
+
     public function getAgeAttribute()
     {
         if (!is_null($this->fallecimiento))

@@ -13,8 +13,13 @@
         <th>#</th>
         <th>Jugador</th>
 
+
         <th>Amarillas</th>
+
         <th>Rojas</th>
+        <th>Jugados</th>
+        <th>Prom. A</th>
+        <th>Prom. R</th>
         <th>Equipos</th>
         </thead>
         <tbody>
@@ -32,8 +37,14 @@
                     </a>
                     {{$jugador->jugador}}</td>
 
+
+
                 <td>{{$jugador->amarillas}}</td>
+
                 <td>{{$jugador->rojas}}</td>
+                <td>{{$jugador->jugados}}</td>
+                <td>{{round($jugador->amarillas / $jugador->jugados,2)}}</td>
+                <td>{{round($jugador->rojas / $jugador->jugados,2)}}</td>
                 <td>@if($jugador->escudo)
                         @php
                             $escudos = explode(',',$jugador->escudo);

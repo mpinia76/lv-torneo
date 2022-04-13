@@ -999,6 +999,12 @@ class FechaController extends Controller
             case 'Huracán':
                 $strEquipoURL='Ca-Huracan';
                 break;
+            case 'Huracán (Tres Arroyos)':
+                $strEquipoURL='Huracan-Tres-A';
+                break;
+            case 'Instituto de Córdoba':
+                $strEquipoURL='Instituto';
+                break;
             case 'Lanús':
                 $strEquipoURL='Ca-Lanus';
                 break;
@@ -1032,6 +1038,9 @@ class FechaController extends Controller
             case 'Tigre':
                 $strEquipoURL='Ca-Tigre';
                 break;
+            case 'Tiro Federal de Rosario':
+                $strEquipoURL='Tiro-Federal';
+                break;
             case 'Unión de Santa Fe':
                 $strEquipoURL='Union-Santa-Fe';
                 break;
@@ -1047,17 +1056,22 @@ class FechaController extends Controller
     {
         $strEquipoURL=strtr($strEquipo, " ", "-");
         switch (trim($strEquipo)) {
-            case 'Atlético de Rafaela':
-                $strEquipoURL='atletico-rafaela';
-                break;
-            case 'Atlético Tucumán':
-                $strEquipoURL='atletico-tucuman';
+            case 'Almagro':
+
+                $strEquipoURL='club-almagro';
                 break;
             case 'Arsenal':
                 //$strEquipoURL='arsenal-sarandi';//viejo
                 //$strEquipoURL='arsenal-de-sarandi';//ultimo
                 $strEquipoURL='arsenal-fc';
                 break;
+            case 'Atlético de Rafaela':
+                $strEquipoURL='atletico-rafaela';
+                break;
+            case 'Atlético Tucumán':
+                $strEquipoURL='atletico-tucuman';
+                break;
+
             case 'Banfield':
                 //$strEquipoURL='banfield';//ultimo
                 $strEquipoURL='ca-banfield';//viejo
@@ -1107,6 +1121,14 @@ class FechaController extends Controller
             case 'Huracán':
                 $strEquipoURL='huracan';
                 //$strEquipoURL='ca-huracan';
+                break;
+            case 'Huracán (Tres Arroyos)':
+                $strEquipoURL='huracan-de-tres-arroyos';
+
+                break;
+            case 'Instituto de Córdoba':
+                $strEquipoURL='instituto-cordoba';
+
                 break;
             case 'Independiente':
                 //$strEquipoURL='ca-independiente';
@@ -1163,8 +1185,8 @@ class FechaController extends Controller
                 $strEquipoURL='sarmiento-de-junin';
                 break;
             case 'Talleres (Cba.)':
-                $strEquipoURL='talleres-de-cordoba';
-                //$strEquipoURL='talleres-cordoba';
+                $strEquipoURL='talleres-de-cordoba';//nuevo
+                //$strEquipoURL='talleres-cordoba';//viejo
                 break;
             case 'Temperley':
                 $strEquipoURL='ca-temperley';
@@ -1173,6 +1195,9 @@ class FechaController extends Controller
             case 'Tigre':
                 $strEquipoURL='tigre';
                 //$strEquipoURL='ca-tigre';
+                break;
+            case 'Tiro Federal de Rosario':
+                $strEquipoURL='tiro-federal-rosario';
                 break;
             case 'Unión de Santa Fe':
                 $strEquipoURL='union-de-santa-fe';
@@ -1212,6 +1237,9 @@ class FechaController extends Controller
             case 'CA Huracán':
                 $strEquipoDB='Huracán';
                 break;
+            case 'Huracán Tres Arroyos':
+                $strEquipoDB='Huracán (Tres Arroyos)';
+                break;
             case 'Gimnasia Jujuy':
                 $strEquipoDB='Gimnasia (J)';
                 break;
@@ -1220,6 +1248,9 @@ class FechaController extends Controller
                 break;
             case 'Talleres Córdoba':
                 $strEquipoDB='Talleres (Cba.)';
+                break;
+            case 'Tiro Federal Rosario':
+                $strEquipoDB='Tiro Federal de Rosario';
                 break;
             case 'San Martín Tucumán':
                 $strEquipoDB='San Martín (Tuc.)';
@@ -2146,14 +2177,18 @@ class FechaController extends Controller
                 $entrenadoresArray = array();
                 $nombreArbitro ='';
                 if (!$html2) {
-                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
-                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
+                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
+                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+
+                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
+
                 }
                 if (!$html2) {
-                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/'.strtr($nombreTorneo, " ", "-").'-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
-                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/'.strtr($nombreTorneo, " ", "-").$years.'-'.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
+                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
                 }
 
             }
@@ -3340,6 +3375,134 @@ class FechaController extends Controller
         return redirect()->route('fechas.show', $partido->fecha->id)->with($respuestaID,$respuestaMSJ);
 
         //return view('fechas.index', compact('grupo'));
+    }
+
+
+    public function importPoll(Request $request)
+    {
+
+
+        //
+        return view('fechas.importPoll');
+    }
+
+    public function importpollprocess(Request $request)
+    {
+
+        set_time_limit(0);
+
+
+
+        $file = $request->file('archivoCSV');
+
+        // File Details
+        $filename = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+        $tempPath = $file->getRealPath();
+        $fileSize = $file->getSize();
+        $mimeType = $file->getMimeType();
+
+
+        // Valid File Extensions
+        $valid_extension = array("csv");
+
+        // 2MB in Bytes
+        $maxFileSize = 2097152;
+
+        // Check file extension
+        if(in_array(strtolower($extension),$valid_extension)){
+
+            // Check file size
+            if($fileSize <= $maxFileSize){
+
+                // File upload location
+                $location = 'uploads';
+
+                // Upload file
+                $file->move($location,$filename);
+
+                // Import CSV to Database
+                $filepath = public_path($location."/".$filename);
+
+                // Reading file
+                $file = fopen($filepath,"r");
+
+                $importData_arr = array();
+                $i = 0;
+
+                while (($filedata = fgetcsv($file, 1000, ",")) !== FALSE) {
+                    $num = count($filedata );
+
+                    // Skip first row (Remove below comment if you want to skip the first row)
+                    /*if($i == 0){
+                       $i++;
+                       continue;
+                    }*/
+                    for ($c=0; $c < $num; $c++) {
+                        $importData_arr[$i][] = $filedata [$c];
+                    }
+                    $i++;
+                }
+                fclose($file);
+                foreach($importData_arr as $importData) {
+                    Log::info('Poll name: ' . $importData[0]);
+                    Log::info('Username: ' . $importData[1]);
+                    Log::info('Email: ' . $importData[2]);
+                    Log::info('User Type: ' . $importData[3]);
+                    Log::info('IP: ' . $importData[4]);
+                    Log::info('Date: ' . $importData[5]);
+                    Log::info('Message: ' . $importData[6]);
+                    Log::info('Vote data: ' . $importData[7]);
+
+                    if ($importData[6]=='success'){
+                        $arrayVotacion = explode(';',$importData[7]);
+                        foreach ($arrayVotacion as $voto){
+                            $arrayVoto = explode(':',$voto);
+                            if ($arrayVoto[0]=='Answer'){
+                                Log::info('voto: ' . $arrayVoto[1]);
+                            }
+
+                        }
+                    }
+
+
+                }
+                //print_r($importData_arr);
+                // Insert to MySQL database
+
+                $ok=1;
+
+            }else{
+
+
+                $error='Archivo demasiado grande. El archivo debe ser menor que 2MB.';
+                $ok=0;
+
+            }
+
+        }else{
+
+            $error='Extensión de archivo no válida.';
+            $ok=0;
+
+        }
+
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ='Importación exitosa. (ver log)';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('torneos.index')->with($respuestaID,$respuestaMSJ);
     }
 
 }

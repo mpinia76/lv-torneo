@@ -176,7 +176,7 @@ class PlantillaController extends Controller
 
         $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
 
-        $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');
+        $jugadors = $jugadors->pluck('full_name_age', 'id')->prepend('','');
 
 
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
