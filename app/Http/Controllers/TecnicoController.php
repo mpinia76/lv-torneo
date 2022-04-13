@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Fecha;
+use App\Grupo;
+use App\Partido;
 use App\Tecnico;
 use Illuminate\Http\Request;
 use DB;
@@ -199,7 +202,122 @@ class TecnicoController extends Controller
     {
         $id= $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
-        return view('tecnicos.ver', compact('tecnico'));
+
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje
+FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
+INNER JOIN fechas ON grupos.id = fechas.grupo_id
+INNER JOIN partidos ON fechas.id = partidos.fecha_id
+INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
+WHERE partido_tecnicos.tecnico_id = '.$id.'
+GROUP BY torneos.id, torneos.nombre,torneos.year
+ORDER BY torneos.year DESC';
+
+
+
+
+        $torneosTecnico = DB::select(DB::raw($sql));
+
+        foreach ($torneosTecnico as $torneo){
+            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
+            $arrgrupos='';
+            foreach ($grupos as $grupo){
+                $arrgrupos .=$grupo->id.',';
+            }
+            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+            $arrfechas='';
+            foreach ($fechas as $fecha){
+                $arrfechas .=$fecha->id.',';
+            }
+            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+            $arrpartidos='';
+            foreach ($partidos as $partido){
+                $arrpartidos .=$partido->id.',';
+            }
+            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+            $sqlEscudos='SELECT DISTINCT escudo, equipo_id
+FROM equipos
+INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
+INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
+WHERE partido_tecnicos.tecnico_id = '.$id.' AND partido_tecnicos.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
+
+
+
+            $escudos = DB::select(DB::raw($sqlEscudos));
+
+
+            foreach ($escudos as $escudo){
+
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
+            }
+
+            $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), '%') porcentaje
+    from (
+       select  DISTINCT tecnicos.id tecnico_id, golesl, golesv, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
+     union all
+       select DISTINCT tecnicos.id tecnico_id, golesv, golesl, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
+) a
+group by tecnico_id
+";
+
+            //echo $sql3;
+
+            $jugados = DB::select(DB::raw($sqlJugados));
+
+
+            foreach ($jugados as $jugado){
+
+                $torneo->jugados = $jugado->jugados;
+                $torneo->ganados = $jugado->ganados;
+                $torneo->empatados = $jugado->empatados;
+                $torneo->perdidos = $jugado->perdidos;
+                $torneo->favor = $jugado->golesl;
+                $torneo->contra = $jugado->golesv;
+                $torneo->puntaje = $jugado->puntaje;
+                $torneo->porcentaje = $jugado->porcentaje;
+            }
+        }
+
+
+        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico'));
     }
 
 

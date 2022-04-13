@@ -489,6 +489,7 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
                 $tarjeta->foto .= $escudo->escudo.',';
             }
 
+
         }
 
         $tarjetas->setPath(route('grupos.tarjetas',  array('torneoId' => $torneo->id)));
@@ -529,7 +530,7 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
 
 
         $tarjetas = DB::select(DB::raw('SELECT jugadors.id, CONCAT(jugadors.apellido,\', \',jugadors.nombre) jugador, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo, jugadors.foto
+, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo, jugadors.foto, "0" as jugados
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
 INNER JOIN partidos ON tarjetas.partido_id = partidos.id
@@ -569,7 +570,41 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
 
                 $tarjeta->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
             }
+            $sql3="SELECT alineacions.jugador_id, COUNT(alineacions.jugador_id) as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo_id." AND grupos.id IN (".$arrgrupos.") AND alineacions.jugador_id = ".$tarjeta->id. " GROUP BY alineacions.jugador_id";
 
+            //echo $sql3;
+
+            $jugados = DB::select(DB::raw($sql3));
+
+
+            foreach ($jugados as $jugado){
+
+                $tarjeta->jugados += $jugado->jugados;
+            }
+
+            $sql4="SELECT cambios.jugador_id, COUNT(cambios.jugador_id)  as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN cambios ON cambios.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id IN (".$arrgrupos.") AND cambios.jugador_id = ".$tarjeta->id. " GROUP BY cambios.jugador_id";
+
+
+
+            $jugados = DB::select(DB::raw($sql4));
+
+
+            foreach ($jugados as $jugado){
+
+                $tarjeta->jugados += $jugado->jugados;
+            }
         }
 
         $tarjetas->setPath(route('grupos.tarjetasPublic',  array('torneoId' => $torneo->id)));

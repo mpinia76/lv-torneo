@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Fecha;
+use App\Grupo;
 use App\Jugador;
+use App\Partido;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -242,7 +245,140 @@ class JugadorController extends Controller
     {
         $id= $request->query('jugadorId');
         $jugador=Jugador::findOrFail($id);
-        return view('jugadores.ver', compact('jugador','jugador'));
+
+
+
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas
+FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
+INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
+INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
+WHERE plantilla_jugadors.jugador_id = '.$id.'
+GROUP BY torneos.id, torneos.nombre,torneos.year
+ORDER BY torneos.year DESC';
+
+
+
+
+        $torneosJugador = DB::select(DB::raw($sql));
+
+        foreach ($torneosJugador as $torneo){
+            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
+            $arrgrupos='';
+            foreach ($grupos as $grupo){
+                $arrgrupos .=$grupo->id.',';
+            }
+            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+            $arrfechas='';
+            foreach ($fechas as $fecha){
+                $arrfechas .=$fecha->id.',';
+            }
+            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+            $arrpartidos='';
+            foreach ($partidos as $partido){
+                $arrpartidos .=$partido->id.',';
+            }
+            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+            $sqlEscudos='SELECT DISTINCT escudo, equipo_id
+FROM equipos
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+WHERE alineacions.jugador_id = '.$id.' AND alineacions.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
+
+
+
+            $escudos = DB::select(DB::raw($sqlEscudos));
+
+
+            foreach ($escudos as $escudo){
+
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
+            }
+
+            $sqlTitular="SELECT alineacions.jugador_id, COUNT(alineacions.jugador_id) as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND alineacions.jugador_id = ".$id. " GROUP BY alineacions.jugador_id";
+
+            //echo $sql3;
+
+            $jugados = DB::select(DB::raw($sqlTitular));
+
+
+            foreach ($jugados as $jugado){
+
+                $torneo->jugados += $jugado->jugados;
+            }
+
+            $sql4="SELECT cambios.jugador_id, COUNT(cambios.jugador_id)  as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN cambios ON cambios.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND cambios.jugador_id = ".$id. " GROUP BY cambios.jugador_id";
+
+
+
+            $jugados = DB::select(DB::raw($sql4));
+
+
+            foreach ($jugados as $jugado){
+
+                $torneo->jugados += $jugado->jugados;
+            }
+
+            $sqlGoles = 'SELECT COUNT(gols.id) goles
+FROM gols
+INNER JOIN partidos ON gols.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND gols.jugador_id = '.$id;
+
+
+
+
+            $goleadores = DB::select(DB::raw($sqlGoles));
+
+            foreach ($goleadores as $gol){
+
+                $torneo->goles += $gol->goles;
+            }
+
+            $sqlTarjetas = 'SELECT count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas
+FROM tarjetas
+
+INNER JOIN partidos ON tarjetas.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND tarjetas.jugador_id = '.$id;
+
+
+            $tarjetas = DB::select(DB::raw($sqlTarjetas));
+
+            foreach ($tarjetas as $tarjeta){
+                //Log::info('Tarjetas: '.$torneo->amarillas.' -> '.$tarjeta->amarillas);
+                $torneo->amarillas += $tarjeta->amarillas;
+                $torneo->rojas += $tarjeta->rojas;
+            }
+
+        }
+
+
+
+        return view('jugadores.ver', compact('jugador','torneosJugador'));
     }
 
 }

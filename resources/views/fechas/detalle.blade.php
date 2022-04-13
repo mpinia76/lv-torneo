@@ -287,7 +287,7 @@
                                     @if($gol->jugador->foto)
                                         <img id="original" class="imgCircle" src="{{ url('images/'.$gol->jugador->foto) }}" >
                                     @else
-                                        <img id="original" src="{{ url('images/sin_foto.png') }}" >
+                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                          <span style="font-weight: bold"> {{ $gol->jugador->full_name}}</span>  {{$gol->tipo}}
                                 @endif

@@ -41,11 +41,15 @@
 
         <th colspan="3"></th>
         </thead>
-
+        @php
+            $i = 1;
+        @endphp
         @foreach($plantillas as $plantilla)
 
             <tr>
-                <td>@if($plantilla->equipo->escudo)
+                <td>
+                    {{$i++}}
+                    @if($plantilla->equipo->escudo)
                         <img id="original" src="{{ url('images/'.$plantilla->equipo->escudo) }}" height="25">
                     @endif{{$plantilla->equipo->nombre}}</td>
 
