@@ -176,6 +176,7 @@ return [
         App\Providers\RouteServiceProvider::class,
         App\Providers\ComposerServiceProvider::class,
         App\Providers\GoogleDriveServiceProvider::class,
+        Maatwebsite\Excel\ExcelServiceProvider::class,
 
 
     ],
@@ -230,6 +231,7 @@ return [
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
         'Carbon' => 'Carbon\Carbon',
+        'Excel' => Maatwebsite\Excel\Facades\Excel::class,
 
     ],
 
