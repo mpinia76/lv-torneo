@@ -83,6 +83,13 @@
                         </tr>
                     @endforeach
                     </tbody>
+                    <thead>
+                    <th></th>
+                    <th>Jugador</th>
+                    <th>Dorsal</th>
+                    <th><a href="#" class="addRow"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                    </thead>
                 </table>
             </div>
 

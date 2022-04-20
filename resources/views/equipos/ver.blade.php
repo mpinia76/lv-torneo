@@ -55,7 +55,80 @@
         </div>
 
 
+		<table class="table">
+            <thead>
+            <th>#</th>
+            <th>Torneo</th>
+            <th>J</th>
+            <th>G</th>
+            <th>E</th>
+            <th>P</th>
+            <th>GF</th>
+            <th>GC</th>
+            <th>Dif.</th>
+            <th>Punt.</th>
+            <th>Prom.</th>
 
+            </thead>
+            <tbody>
+            @php
+				$i = 1;
+                $totalJugados = 0;
+                $totalGanados = 0;
+                $totalEmpatados = 0;
+                $totalPerdidos = 0;
+                $totalFavor = 0;
+                $totalContra = 0;
+                $totalPuntaje = 0;
+            @endphp
+            @foreach($torneosEquipo as $torneo)
+                @php
+                    $totalJugados += $torneo->jugados;
+                    $totalGanados += $torneo->ganados;
+                    $totalEmpatados += $torneo->empatados;
+                    $totalPerdidos += $torneo->perdidos;
+                    $totalFavor += $torneo->favor;
+                    $totalContra += $torneo->contra;
+                    $totalPuntaje += $torneo->puntaje;
+                @endphp
+                <tr>
+                    <td>{{$i++}}</td>
+                    <td>{{$torneo->nombreTorneo}}</td>
+                    <td>{{$torneo->jugados}}</td>
+                    <td>{{$torneo->ganados}}</td>
+                    <td>{{$torneo->empatados}}</td>
+                    <td>{{$torneo->perdidos}}</td>
+                    <td>{{$torneo->favor}}</td>
+                    <td>{{$torneo->contra}}</td>
+                    <td>{{$torneo->favor - $torneo->contra}}</td>
+                    <td>{{$torneo->puntaje}}</td>
+                    <td>{{$torneo->porcentaje}}</td>
+
+
+                </tr>
+            @endforeach
+			<tr>
+                <td></td>
+               
+                <td><strong>Totales</strong></td>
+                <td><strong>{{ $totalJugados}}</strong></td>
+                <td><strong>{{ $totalGanados}}</strong></td>
+                <td><strong>{{ $totalEmpatados}}</strong></td>
+                <td><strong>{{ $totalPerdidos}}</strong></td>
+                <td><strong>{{ $totalFavor}}</strong></td>
+                <td><strong>{{ $totalContra}}</strong></td>
+                <td><strong>{{ $totalFavor-$totalContra}}</strong></td>
+                <td><strong>{{ $totalPuntaje}}</strong></td>
+                <td><strong>{{ ROUND(
+                (
+                $totalPuntaje
+                * 100/($totalJugados*3) ),
+                2
+                )}}%</strong></td>
+
+            </tr>
+            </tbody>
+        </table>
 
 
 

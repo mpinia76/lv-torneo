@@ -45,8 +45,13 @@
                     <td>{{$equipo->golesv}}</td>
                     <td>{{$equipo->diferencia}}</td>
                     <td>{{$equipo->puntaje}}</td>
-                    <td>{{$equipo->promedio}}</td>
-
+                    <td>{{ ROUND(
+                (
+                $equipo->puntaje
+                * 100/($equipo->jugados*3) ),
+                2
+                )}}%</td>
+					
 
                 </tr>
             @endforeach

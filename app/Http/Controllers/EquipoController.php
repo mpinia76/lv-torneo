@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Equipo;
+use App\Fecha;
+use App\Grupo;
+use App\Partido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
@@ -200,7 +203,107 @@ class EquipoController extends Controller
     {
         $id= $request->query('equipoId');
         $equipo=Equipo::findOrFail($id);
-        return view('equipos.ver', compact('equipo','equipo'));
+
+
+		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje
+FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
+INNER JOIN fechas ON grupos.id = fechas.grupo_id
+INNER JOIN partidos ON fechas.id = partidos.fecha_id
+
+WHERE partidos.equipol_id = '.$id.' OR partidos.equipov_id = '.$id.'
+GROUP BY torneos.id, torneos.nombre,torneos.year
+ORDER BY torneos.year DESC';
+
+
+
+
+        $torneosEquipo = DB::select(DB::raw($sql));
+
+        foreach ($torneosEquipo as $torneo){
+            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
+            $arrgrupos='';
+            foreach ($grupos as $grupo){
+                $arrgrupos .=$grupo->id.',';
+            }
+            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+            $arrfechas='';
+            foreach ($fechas as $fecha){
+                $arrfechas .=$fecha->id.',';
+            }
+            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+            $arrpartidos='';
+            foreach ($partidos as $partido){
+                $arrpartidos .=$partido->id.',';
+            }
+            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+           
+
+            $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), '%') porcentaje
+    from (
+       select  DISTINCT partidos.equipol_id equipo_id, golesl, golesv, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
+     union all
+       select DISTINCT partidos.equipov_id equipo_id, golesv, golesl, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
+) a
+group by equipo_id
+";
+
+            //echo $sql3;
+
+            $jugados = DB::select(DB::raw($sqlJugados));
+
+
+            foreach ($jugados as $jugado){
+
+                $torneo->jugados = $jugado->jugados;
+                $torneo->ganados = $jugado->ganados;
+                $torneo->empatados = $jugado->empatados;
+                $torneo->perdidos = $jugado->perdidos;
+                $torneo->favor = $jugado->golesl;
+                $torneo->contra = $jugado->golesv;
+                $torneo->puntaje = $jugado->puntaje;
+                $torneo->porcentaje = $jugado->porcentaje;
+            }
+        }
+
+
+        return view('equipos.ver', compact('equipo', 'torneosEquipo'));
     }
 
 }

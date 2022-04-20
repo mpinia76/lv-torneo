@@ -108,6 +108,12 @@
                     $totalGoles += $torneo->goles;
                     $totalAmarillas += $torneo->amarillas;
                     $totalRojas += $torneo->rojas;
+                    $jugo = 0;
+                    if($torneo->jugados>0){
+                        $jugo=1;
+                    }
+
+
                 @endphp
                 <tr>
                     <td>{{$i++}}</td>
@@ -131,9 +137,28 @@
 
                     </td>
                     <td>{{$torneo->jugados}}</td>
-                    <td>{{$torneo->goles}} ({{round($torneo->goles / $torneo->jugados,2)}})</td>
-                    <td>{{$torneo->amarillas}} ({{round($torneo->amarillas / $torneo->jugados,2)}})</td>
-                    <td>{{$torneo->rojas}} ({{round($torneo->rojas / $torneo->jugados,2)}})</td>
+                    <td>{{$torneo->goles}}
+                        @if($jugo)
+                            ({{round($torneo->goles / $torneo->jugados,2)}})
+                        @else
+                            ({{round(0,2)}})
+                        @endif
+                    </td>
+                    <td>{{$torneo->amarillas}}
+                        @if($jugo)
+                            ({{round($torneo->amarillas / $torneo->jugados,2)}})
+                        @else
+                            ({{round(0,2)}})
+                        @endif
+
+                    </td>
+                    <td>{{$torneo->rojas}}
+                        @if($jugo)
+                            ({{round($torneo->rojas / $torneo->jugados,2)}})
+                        @else
+                            ({{round(0,2)}})
+                        @endif
+                    </td>
                 </tr>
 
             @endforeach
