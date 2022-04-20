@@ -50,7 +50,7 @@
             <tr>
                 <td></td>
                 <td>{{ Form::select('jugador[]',$jugadors, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
-                <td>{{Form::number('dorsal[]', '', ['class' => 'form-control', 'size' => '4'])}}</td>
+                <td>{{Form::number('dorsal[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}</td>
 
                 <td><a href="#" class="btn btn-danger remove"><i class="glyphicon glyphicon-remove"></i></a></td>
             </tr>

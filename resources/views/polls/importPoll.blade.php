@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'FechaController@importpollprocess', 'enctype' => 'multipart/form-data']) }}
+    {{ Form::open(['action' => 'PollController@importpollprocess', 'enctype' => 'multipart/form-data']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}
