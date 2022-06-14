@@ -9,16 +9,16 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Nombre</dt>
-                <dd>{{$tecnico->nombre}}</dd>
+                <dd>{{$tecnico->persona->nombre}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Apellido</dt>
-                <dd>{{$tecnico->apellido}}</dd>
+                <dd>{{$tecnico->persona->apellido}}</dd>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Documento</dt>
-                <dd>{{$tecnico->tipoDocumento}} {{$tecnico->documento}}</dd>
+                <dd>{{$tecnico->persona->tipoDocumento}} {{$tecnico->persona->documento}}</dd>
             </div>
 
         </div>
@@ -26,17 +26,17 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>E-mail</dt>
-                <dd>{{$tecnico->email}}</dd>
+                <dd>{{$tecnico->persona->email}}</dd>
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Teléfono</dt>
-                <dd>{{$tecnico->telefono}}</dd>
+                <dd>{{$tecnico->persona->telefono}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Ciudad Nacimiento</dt>
-                <dd>{{$tecnico->ciudad}}</dd>
+                <dd>{{$tecnico->persona->ciudad}}</dd>
 
             </div>
         </div>
@@ -44,7 +44,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Edad</dt>
-                <dd>{{($tecnico->nacimiento)?$tecnico->getAgeAttribute():''}}</dd>
+                <dd>{{($tecnico->persona->nacimiento)?$tecnico->persona->getAgeAttribute():''}}</dd>
 
             </div>
 
@@ -54,8 +54,8 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
 
-                    @if($tecnico->foto)
-                        <img id="original" src="{{ url('images/'.$tecnico->foto) }}" height="200">
+                    @if($tecnico->persona->foto)
+                        <img id="original" src="{{ url('images/'.$tecnico->persona->foto) }}" height="200">
                     @endif
 
 
@@ -63,7 +63,7 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
                 <dt>Observaciones</dt>
-                <dd>{{$tecnico->observaciones}}</dd>
+                <dd>{{$tecnico->persona->observaciones}}</dd>
 
             </div>
 

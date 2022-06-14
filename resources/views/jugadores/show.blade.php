@@ -9,16 +9,16 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Nombre</dt>
-                <dd>{{$jugador->nombre}}</dd>
+                <dd>{{$jugador->persona->nombre}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Apellido</dt>
-                <dd>{{$jugador->apellido}}</dd>
+                <dd>{{$jugador->persona->apellido}}</dd>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Documento</dt>
-                <dd>{{$jugador->tipoDocumento}} {{$jugador->documento}}</dd>
+                <dd>{{$jugador->persona->tipoDocumento}} {{$jugador->persona->documento}}</dd>
             </div>
 
         </div>
@@ -26,17 +26,17 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>E-mail</dt>
-                <dd>{{$jugador->email}}</dd>
+                <dd>{{$jugador->persona->email}}</dd>
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Teléfono</dt>
-                <dd>{{$jugador->telefono}}</dd>
+                <dd>{{$jugador->persona->telefono}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Ciudad Nacimiento</dt>
-                <dd>{{$jugador->ciudad}}</dd>
+                <dd>{{$jugador->persona->ciudad}}</dd>
 
             </div>
         </div>
@@ -44,7 +44,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Edad</dt>
-                <dd>{{($jugador->nacimiento)?$jugador->getAgeAttribute():''}}</dd>
+                <dd>{{($jugador->persona->nacimiento)?$jugador->persona->getAgeAttribute():''}}</dd>
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
@@ -55,12 +55,12 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Altura</dt>
-                <dd>{{$jugador->altura}} m.</dd>
+                <dd>{{$jugador->persona->altura}} m.</dd>
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Peso</dt>
-                <dd>{{$jugador->peso}} kg.</dd>
+                <dd>{{$jugador->persona->peso}} kg.</dd>
 
             </div>
         </div>
@@ -69,8 +69,8 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
 
-                    @if($jugador->foto)
-                        <img id="original" src="{{ url('images/'.$jugador->foto) }}" height="200">
+                    @if($jugador->persona->foto)
+                        <img id="original" src="{{ url('images/'.$jugador->persona->foto) }}" height="200">
                     @endif
 
 
@@ -78,7 +78,7 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
                 <dt>Observaciones</dt>
-                <dd>{{$jugador->observaciones}}</dd>
+                <dd>{{$jugador->persona->observaciones}}</dd>
 
             </div>
 

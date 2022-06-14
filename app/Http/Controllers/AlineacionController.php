@@ -29,7 +29,6 @@ class AlineacionController extends Controller
         $partido=Partido::findOrFail($partido_id);
 
 
-
         $titularesL=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('tipo','=',"Titular")->orderBy('orden', 'asc')->get();
 
         $suplentesL=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('tipo','=',"Suplente")->orderBy('orden', 'asc')->get();
@@ -57,9 +56,15 @@ class AlineacionController extends Controller
 
 
 
-        $jugadorsL = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->with('jugador')->get();
+        //$jugadorsL = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->with('jugador')->get();
 
-        $jugadorsL = $jugadorsL->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');
+        //$jugadorsL = PlantillaJugador::SELECT('jugadors.id','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+
+        $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+
+
+        //dd($jugadorsL);
+            $jugadorsL = $jugadorsL->pluck('nombre_dorsal','id')->sortBy('apellido')->prepend('','');
 
         $plantillasV = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$partido->equipov->id)->get();
 
@@ -70,12 +75,17 @@ class AlineacionController extends Controller
 
 
 
-        $jugadorsV = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillavs))->distinct()->with('jugador')->get();
+        /*$jugadorsV = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillavs))->distinct()->with('jugador')->get();
 
-        $jugadorsV = $jugadorsV->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');
+        $jugadorsV = $jugadorsV->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');*/
 
-        $tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
-        $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');
+        $jugadorsV = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillavs))->distinct()->get();
+
+        $jugadorsV = $jugadorsV->pluck('nombre_dorsal','id')->sortBy('apellido')->prepend('','');
+
+        $tecnicos = Tecnico::SELECT('tecnicos.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->JOIN('personas','personas.id','=','tecnicos.persona_id')->orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        //dd($tecnicos);
+        $tecnicos = $tecnicos->pluck('persona.full_name', 'id')->prepend('','');
 
         $partidoTecnicosL = PartidoTecnico::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->get();
 

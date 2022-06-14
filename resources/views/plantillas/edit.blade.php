@@ -68,8 +68,8 @@
                         <tr>
                             <td>
                                 {{$i++}}
-                                @if($plantillaJugador->jugador->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$plantillaJugador->jugador->foto) }}" >
+                                @if($plantillaJugador->jugador->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$plantillaJugador->jugador->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
@@ -91,6 +91,7 @@
 
                     </thead>
                 </table>
+                <a class="btn btn-success m-1" href="{{route('jugadores.create',  array('plantillaId' => $plantilla->id))}}">Nuevo</a>
             </div>
 
         </div>

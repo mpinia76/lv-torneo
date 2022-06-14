@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Fecha;
 use App\Grupo;
 use App\Partido;
+use App\Persona;
 use App\Tecnico;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
 
@@ -32,9 +34,10 @@ class TecnicoController extends Controller
 
         $nombre = $request->get('buscarpor');
 
-        $tecnicos=Tecnico::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
+        //$tecnicos=Tecnico::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
 
+        $tecnicos=Tecnico::SELECT('tecnicos.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
         return view('tecnicos.index', compact('tecnicos','tecnicos'));
     }
@@ -96,16 +99,43 @@ class TecnicoController extends Controller
         $insert['nacimiento'] = $request->get('nacimiento');
         $insert['fallecimiento'] = $request->get('fallecimiento');
 
-        $tecnico = Tecnico::create($insert);
+
+
+        //$tecnico = Tecnico::create($insert);
+
+        try {
+            $persona = Persona::create($insert);
+            $persona->tecnico()->create($insert);
+
+            $respuestaID='success';
+            $respuestaMSJ='Registro creado satisfactoriamente';
+        }catch(QueryException $ex){
+
+            try {
+                $persona = Persona::where('nombre','=',$insert['nombre'])->Where('apellido','=',$insert['apellido'])->Where('nacimiento','=',$insert['nacimiento'])->first();
+                if (!empty($persona)){
+                    $persona->tecnico()->create($insert);
+                    $respuestaID='success';
+                    $respuestaMSJ='Registro creado satisfactoriamente';
+                }
+            }catch(QueryException $ex){
+
+                $respuestaID='error';
+                $respuestaMSJ=$ex->getMessage();
+
+            }
+
+
+        }
 
         if($request->get('partido_id')){
             $partido_id = $request->get('partido_id');
-            $redirect = redirect()->route('alineaciones.index',['partidoId' => $partido_id])->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('alineaciones.index',['partidoId' => $partido_id])->with($respuestaID,$respuestaMSJ);
 
         }
 
         else{
-            $redirect = redirect()->route('tecnicos.index')->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('tecnicos.index')->with($respuestaID,$respuestaMSJ);
         }
 
         return $redirect;
@@ -173,7 +203,8 @@ class TecnicoController extends Controller
 
 
         $tecnico=tecnico::find($id);
-        $tecnico->update($update);
+        //$tecnico->update($update);
+        $tecnico->persona()->update($update);
 
         return redirect()->route('tecnicos.index')->with('success','Registro actualizado satisfactoriamente');
     }
@@ -316,8 +347,160 @@ group by tecnico_id
             }
         }
 
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas
+FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
+INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
+INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
+INNER JOIN jugadors ON jugadors.id = plantilla_jugadors.jugador_id
+WHERE jugadors.persona_id = '.$tecnico->persona_id.'
+GROUP BY torneos.id, torneos.nombre,torneos.year
+ORDER BY torneos.year DESC';
 
-        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico'));
+
+
+
+        $torneosJugador = DB::select(DB::raw($sql));
+
+        foreach ($torneosJugador as $torneo){
+            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
+            $arrgrupos='';
+            foreach ($grupos as $grupo){
+                $arrgrupos .=$grupo->id.',';
+            }
+            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+            $arrfechas='';
+            foreach ($fechas as $fecha){
+                $arrfechas .=$fecha->id.',';
+            }
+            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+            $arrpartidos='';
+            foreach ($partidos as $partido){
+                $arrpartidos .=$partido->id.',';
+            }
+            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+            $sqlEscudos='SELECT DISTINCT escudo, equipo_id
+FROM equipos
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+INNER JOIN partidos ON partidos.id = alineacions.partido_id
+INNER JOIN jugadors ON jugadors.id = alineacions.jugador_id
+WHERE jugadors.persona_id = '.$tecnico->persona_id.' AND alineacions.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
+
+
+
+            $escudos = DB::select(DB::raw($sqlEscudos));
+
+
+            foreach ($escudos as $escudo){
+
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
+            }
+
+            $sqlTitular="SELECT alineacions.jugador_id, COUNT(alineacions.jugador_id) as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN jugadors ON jugadors.id = alineacions.jugador_id
+WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND jugadors.persona_id = ".$tecnico->persona_id. " GROUP BY alineacions.jugador_id";
+
+            //echo $sql3;
+
+            $jugados = DB::select(DB::raw($sqlTitular));
+
+
+            foreach ($jugados as $jugado){
+
+                $torneo->jugados += $jugado->jugados;
+            }
+
+            $sql4="SELECT cambios.jugador_id, COUNT(cambios.jugador_id)  as jugados
+FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
+INNER JOIN fechas ON fechas.grupo_id = g2.id
+INNER JOIN partidos ON partidos.fecha_id = fechas.id
+INNER JOIN cambios ON cambios.partido_id = partidos.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN jugadors ON jugadors.id = cambios.jugador_id
+WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND jugadors.persona_id = ".$tecnico->persona_id. " GROUP BY cambios.jugador_id";
+
+
+
+            $jugados = DB::select(DB::raw($sql4));
+
+
+            foreach ($jugados as $jugado){
+
+                $torneo->jugados += $jugado->jugados;
+            }
+
+            $sqlGoles = 'SELECT COUNT(gols.id) goles
+FROM gols
+INNER JOIN partidos ON gols.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN jugadors ON jugadors.id = gols.jugador_id
+WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND jugadors.persona_id = '.$tecnico->persona_id;
+
+
+
+
+            $goleadores = DB::select(DB::raw($sqlGoles));
+
+            foreach ($goleadores as $gol){
+
+                $torneo->goles += $gol->goles;
+            }
+
+            $sqlTarjetas = 'SELECT count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas
+FROM tarjetas
+
+INNER JOIN partidos ON tarjetas.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN jugadors ON jugadors.id = tarjetas.jugador_id
+WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND jugadors.persona_id = '.$tecnico->persona_id;
+
+
+            $tarjetas = DB::select(DB::raw($sqlTarjetas));
+
+            foreach ($tarjetas as $tarjeta){
+                //Log::info('Tarjetas: '.$torneo->amarillas.' -> '.$tarjeta->amarillas);
+                $torneo->amarillas += $tarjeta->amarillas;
+                $torneo->rojas += $tarjeta->rojas;
+            }
+
+            $sqlArqueros = 'SELECT case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END AS recibidos,
+case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END AS invictas, personas.foto, "" escudo
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND jugadors.persona_id = '.$tecnico->persona_id;
+
+
+            $arqueros = DB::select(DB::raw($sqlArqueros));
+
+            foreach ($arqueros as $arquero){
+
+                $torneo->recibidos += $arquero->recibidos;
+                $torneo->invictas += $arquero->invictas;
+            }
+
+        }
+
+
+        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador'));
     }
 
 

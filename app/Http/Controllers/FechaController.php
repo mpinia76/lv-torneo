@@ -763,7 +763,8 @@ class FechaController extends Controller
                                     if (trim($equipos[$i - 1]['entrenador'])){
                                         $strEntrenador=trim($equipos[$i - 1]['entrenador']);
                                         $arrEntrenador = explode(' ', $strEntrenador);
-                                        $entrenadorL=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                                        //$entrenadorL=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                                        $entrenadorL=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                                         if (!empty($entrenadorL)){
                                             $plantillaTecnico = PartidoTecnico::where('plantilla_id','=',$plantilla->id)->where('tecnico_id','=',$entrenadorL->id)->first();
                                             if (empty($plantillaTecnico)){
@@ -891,7 +892,8 @@ class FechaController extends Controller
                                     if (trim($equipos[$i]['entrenador'])){
                                         $strEntrenador=trim($equipos[$i]['entrenador']);
                                         $arrEntrenador = explode(' ', $strEntrenador);
-                                        $entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                                        //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                                        $entrenadorV=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                                         if (!empty($entrenadorV)){
                                             $plantillaTecnico = PartidoTecnico::where('plantilla_id','=',$plantilla->id)->where('tecnico_id','=',$entrenadorV->id)->first();
                                             if (empty($plantillaTecnico)){
@@ -1057,8 +1059,8 @@ class FechaController extends Controller
         $strEquipoURL=strtr($strEquipo, " ", "-");
         switch (trim($strEquipo)) {
             case 'Almagro':
-
-                $strEquipoURL='club-almagro';
+                $strEquipoURL='almagro';
+                //$strEquipoURL='club-almagro';
                 break;
             case 'Arsenal':
                 //$strEquipoURL='arsenal-sarandi';//viejo
@@ -1081,8 +1083,8 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-boca-juniors';
                 break;
             case 'Belgrano':
-                //$strEquipoURL='belgrano-de-cordoba';
-                $strEquipoURL='belgrano-cordoba';
+                $strEquipoURL='belgrano-de-cordoba';
+                //$strEquipoURL='belgrano-cordoba';
                 break;
             case 'Central Córdoba (SdE)':
                 $strEquipoURL='central-cordoba-sde';
@@ -1092,8 +1094,8 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-chacarita-juniors';
                 break;
             case 'Colón de Santa Fe':
-                //$strEquipoURL='colon-de-santa-fe';//ultimo
-                $strEquipoURL='ca-colon';//viejo
+                $strEquipoURL='colon-de-santa-fe';//ultimo
+                //$strEquipoURL='ca-colon';//viejo
                 break;
             case 'Crucero del Norte':
                 $strEquipoURL='crucero-del-norte';
@@ -1106,8 +1108,8 @@ class FechaController extends Controller
                 $strEquipoURL='gye-jujuy';
                 break;
             case 'Gimnasia (LP)':
-                //$strEquipoURL='gimnasia-de-la-plata';//ultimo
-                $strEquipoURL='gye-la-plata';//viejo
+                $strEquipoURL='gimnasia-de-la-plata';//ultimo
+                //$strEquipoURL='gye-la-plata';//viejo
                 //$strEquipoURL='gimnasia-y-esgrima-de-la-plata';
                 break;
             case 'Godoy Cruz':
@@ -1135,8 +1137,11 @@ class FechaController extends Controller
                 $strEquipoURL='independiente';
                 break;
             case 'Lanús':
-                //$strEquipoURL='lanus';//ultimo
-                $strEquipoURL='ca-lanus';//viejo
+                $strEquipoURL='lanus';//ultimo
+                //$strEquipoURL='ca-lanus';//viejo
+                break;
+            case 'Los Andes':
+                $strEquipoURL='los-andes-de-lomas-de-zamora';
                 break;
             case 'Newell\'s Old Boys':
                 $strEquipoURL='newells-old-boys';
@@ -1263,7 +1268,7 @@ class FechaController extends Controller
         return $strEquipoDB;
     }
 
-    public function importincidenciasfecha(Request $request)
+    public function importincidenciasfecha_old(Request $request)
     {
         set_time_limit(0);
         //Log::info('Entraaaaaa', []);
@@ -1966,7 +1971,7 @@ class FechaController extends Controller
                                     $arrApellido = explode(' ', $jugador['nombre']);
                                     $mismoDorsal = 0;
                                     foreach ($arrApellido as $apellido) {
-                                        $consultarJugador = Jugador::where('id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
+                                        $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
                                         if (!empty($consultarJugador)) {
                                             $mismoDorsal = 1;
                                             continue;
@@ -2198,10 +2203,298 @@ class FechaController extends Controller
             $dtLocal ='';
             $dtVisitante ='';
             if ($html2){
+                $tabla = 0;
                 foreach ($html2->find('table[class=standard_tabelle]') as $element) {
 
-                    //Log::info($element, []);
+                    if ($tabla==1){
+                        foreach ($element->find('td') as $td) {
+                            $jugadorGol='';
+                            $lineaGol='';
+                            $minutoGol='';
+                            $incidenciaGol='';
+                            if($td->find('a')){
+                                $jugadorGol = $td->find('a')[0]->title;
+                                Log::info('OJO!! gol: '.$jugadorGol,[]);
+                                $lineaGol = $td->plaintext;
+                                if (str_contains($lineaGol, $jugadorGol)) {
+                                    $minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
+                                    Log::info('OJO!! min: '.$minutoGol,[]);
+                                }
+
+                                $incidenciaArray = explode('/', $lineaGol);
+                                if (count($incidenciaArray)>1){
+                                    $incidenciaGol = $incidenciaArray[1];
+                                    Log::info('OJO!! incidencia: '.$incidenciaGol,[]);
+                                }
+                            }
+
+
+                        }
+                    }
+                    if ($tabla==2){
+                        Log::info('OJO!! locales:',[]);
+                        $suplentes=0;
+                        foreach ($element->find('tr') as $tr) {
+                            $dorsalTitularL = '';
+                            $jugadorTitularL = '';
+                            $saleTitularL = '';
+                            $amarillaTitularL = '';
+                            $dobleamarillaTitularL = '';
+                            $rojaTitularL = '';
+                            $mintutoTarjetaTitularL = '';
+                            $dorsalSuplenteL = '';
+                            $jugadorSuplenteL = '';
+                            $entraSuplenteL = '';
+                            $saleSuplenteL = '';
+                            $amarillaSuplenteL = '';
+                            $dobleamarillaSuplenteL = '';
+                            $rojaSuplenteL = '';
+                            $mintutoTarjetaSuplenteL = '';
+                            foreach ($tr->find('td') as $td) {
+                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                if (trim($td->plaintext)=='Banquillo') {
+                                    $suplentes=1;
+                                }
+                                if ($td->find('span[class=kleine_schrift]')) {
+                                    if ($td->find('span[style=font-weight: bold; color: #646464]')) {
+                                        if ($suplentes){
+                                            $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                        }
+                                        else{
+                                            $dorsalTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=rottext]')) {
+                                        if ($suplentes){
+                                            $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                        }
+                                        else{
+                                            $saleTitularL = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale titular: ' . $saleTitularL, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=gruentext]')) {
+                                        if ($suplentes){
+                                            $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                        }
+
+
+                                    }
+                                    else{
+                                        if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
+                                            if ($suplentes){
+                                                $mintutoTarjetaSuplenteL = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+                                            else{
+                                                $mintutoTarjetaTitularL = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+
+
+
+
+                                        }
+
+                                    }
+                                }
+
+                                if ($td->find('img')) {
+                                    if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
+                                        if ($suplentes){
+                                            $amarillaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaSuplenteL, []);
+                                        }
+                                        else{
+                                            $amarillaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Roja directa') {
+                                        if ($suplentes){
+                                            $rojaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaSuplenteL, []);
+                                        }
+                                        else{
+                                            $rojaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaTitularL, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Doble amarilla') {
+                                        if ($suplentes){
+                                            $dobleamarillaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteL, []);
+                                        }
+                                        else{
+                                            $dobleamarillaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
+                                        }
+
+                                    }
+
+                                }
+
+                                if ($td->find('a')) {
+                                    if ($suplentes){
+                                        $jugadorSuplenteL = $td->find('a')[0]->title;
+                                        Log::info('OJO!! suplente: ' . $jugadorSuplenteL, []);
+                                    }
+                                    else{
+                                        $jugadorTitularL = $td->find('a')[0]->title;
+                                        Log::info('OJO!! titular: ' . $jugadorTitularL, []);
+                                    }
+
+
+                                }
+
+
+                            }
+                        }
+                    }
+                    if ($tabla==3){
+                        Log::info('OJO!! visitante:',[]);
+                        $suplentes=0;
+                        foreach ($element->find('tr') as $tr) {
+                            $dorsalTitularV = '';
+                            $jugadorTitularV = '';
+                            $saleTitularV = '';
+                            $amarillaTitularV = '';
+                            $dobleamarillaTitularV = '';
+                            $rojaTitularV = '';
+                            $mintutoTarjetaTitularV = '';
+                            $dorsalSuplenteV = '';
+                            $jugadorSuplenteV = '';
+                            $entraSuplenteV = '';
+                            $saleSuplenteV = '';
+                            $amarillaSuplenteV = '';
+                            $dobleamarillaSuplenteV = '';
+                            $rojaSuplenteV = '';
+                            $mintutoTarjetaSuplenteV = '';
+                            foreach ($tr->find('td') as $td) {
+                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                if (trim($td->plaintext)=='Banquillo') {
+                                    $suplentes=1;
+                                }
+                                if ($td->find('span[class=kleine_schrift]')) {
+                                    if ($td->find('span[style=font-weight: bold; color: #646464]')) {
+                                        if ($suplentes){
+                                            $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                        }
+                                        else{
+                                            $dorsalTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=rottext]')) {
+                                        if ($suplentes){
+                                            $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                        }
+                                        else{
+                                            $saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale titular: ' . $saleTitularV, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=gruentext]')) {
+                                        if ($suplentes){
+                                            $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                        }
+
+
+                                    }
+                                    else{
+                                        if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
+                                            if ($suplentes){
+                                                $mintutoTarjetaSuplenteV = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+                                            else{
+                                                $mintutoTarjetaTitularV = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+
+
+
+
+                                        }
+
+                                    }
+                                }
+
+                                if ($td->find('img')) {
+                                    if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
+                                        if ($suplentes){
+                                            $amarillaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaSuplenteV, []);
+                                        }
+                                        else{
+                                            $amarillaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Roja directa') {
+                                        if ($suplentes){
+                                            $rojaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaSuplenteV, []);
+                                        }
+                                        else{
+                                            $rojaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaTitularV, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Doble amarilla') {
+                                        if ($suplentes){
+                                            $dobleamarillaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
+                                        }
+                                        else{
+                                            $dobleamarillaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
+                                        }
+
+                                    }
+
+                                }
+
+                                if ($td->find('a')) {
+                                    if ($suplentes){
+                                        $jugadorSuplenteV = $td->find('a')[0]->title;
+                                        Log::info('OJO!! suplente: ' . $jugadorSuplenteV, []);
+                                    }
+                                    else{
+                                        $jugadorTitularV = $td->find('a')[0]->title;
+                                        Log::info('OJO!! titular: ' . $jugadorTitularV, []);
+                                    }
+
+
+                                }
+
+
+                            }
+                        }
+                    }
+
+
+
+                    $tabla ++;
+
+
+
+
                     $entrenadoresArray = explode('Entrenador:', $element->plaintext);
+                    if (count($entrenadoresArray)>3){
+                        Log::info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    }
                     if(count($entrenadoresArray)>1){
                         $dtLocal = $entrenadoresArray[1];
                         //Log::info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
@@ -2266,7 +2559,8 @@ class FechaController extends Controller
                 $arrArbitro = explode(' ', $nombreArbitro);
                 $arbitro=0;
                 if(count($arrArbitro)>1) {
-                    $arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    //$arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    $arbitro=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                 }
 
                 if (!$arbitro){
@@ -2297,7 +2591,8 @@ class FechaController extends Controller
                 $arrArbitroA1 = explode(' ', $asistente1);
                 $arbitro1=0;
                 if(count($arrArbitroA1)>1) {
-                    $arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
+                    //$arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
+                    $arbitro1=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
                 }
 
                 if (!$arbitro1){
@@ -2328,7 +2623,8 @@ class FechaController extends Controller
                 $arrArbitroA2 = explode(' ', $asistente2);
                 $arbitro2=0;
                 if(count($arrArbitroA2)>1) {
-                    $arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
+                    //$arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
+                    $arbitro2=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
                 }
 
                 if (!$arbitro2){
@@ -2360,7 +2656,8 @@ class FechaController extends Controller
                 $arrEntrenador = explode(' ', $strEntrenador);
                 $entrenadorL='';
                 if(count($arrEntrenador)>1){
-                    $entrenadorL=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                    //$entrenadorL=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                    $entrenadorL=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                 }
 
                 if (!empty($entrenadorL)){
@@ -2392,7 +2689,678 @@ class FechaController extends Controller
                 $arrEntrenador = explode(' ', $strEntrenador);
                 $entrenadorV='';
                 if(count($arrEntrenador)>1){
-                    $entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                    //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                    $entrenadorV=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                }
+
+                if (!empty($entrenadorV)){
+                    $data3=array(
+                        'partido_id'=>$partido->id,
+                        'equipo_id'=>$partido->equipov->id,
+                        'tecnico_id'=>$entrenadorV->id
+                    );
+                    $partido_tecnico=PartidoTecnico::where('partido_id','=',"$partido->id")->where('equipo_id','=',$partido->equipov->id)->where('tecnico_id','=',"$entrenadorV->id")->first();
+                    try {
+                        if (!empty($partido_tecnico)){
+
+                            $partido_tecnico->update($data3);
+                        }
+                        else{
+                            $partido_tecnico=PartidoTecnico::create($data3);
+                        }
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+                else{
+                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
+                }
+
+            }
+            else{
+                Log::info('OJO!!! No se econtró la URL2 ' , []);
+                /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
+                $ok=0;
+                continue;*/
+            }
+
+
+
+        }
+
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ='Importación exitosa. (ver log)';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('fechas.index', array('grupoId' => $fecha->grupo->id))->with($respuestaID,$respuestaMSJ);
+
+        //return view('fechas.index', compact('grupo'));
+    }
+    public function importincidenciasfecha(Request $request)
+    {
+        set_time_limit(0);
+        //Log::info('Entraaaaaa', []);
+        $id = $request->get('fechaId');
+        $fecha=Fecha::findOrFail($id);
+
+        $grupo=Grupo::findOrFail($fecha->grupo->id);
+
+        $arrYear = explode('/', $grupo->torneo->year);
+        $years = str_replace('/', '-', $grupo->torneo->year);
+        $year = (count($arrYear)>1)?$arrYear[1]:$arrYear[0];
+        $partidos=Partido::where('fecha_id','=',"$id")->get();
+        $nombreTorneo=$grupo->torneo->nombre;
+        $ok=1;
+        DB::beginTransaction();
+        foreach ($partidos as $partido){
+            $strLocal = $partido->equipol->nombre;
+            $strVisitante = $partido->equipov->nombre;
+            $golesTotales = $partido->golesl+$partido->golesv;
+            $golesLocales = $partido->golesl;
+            $golesVisitantes = $partido->golesv;
+            Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+
+
+
+
+            try {
+                //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+
+                Log::info('URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', []);
+                $html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', false, null, 0);
+                if (!$html2){
+                    Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    $html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
+                }
+                $linkArray=array();
+                $entrenadoresArray = array();
+                $nombreArbitro ='';
+                if (!$html2) {
+                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+
+                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
+                    /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+
+                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
+
+                }
+                if (!$html2) {
+                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+
+                    $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
+                }
+
+            }
+            catch (Exception $ex) {
+                $html2='';
+            }
+            $dtLocal ='';
+            $dtVisitante ='';
+            if ($html2){
+                $i = 1;
+                $goles=0;
+                $golesL=0;
+                $golesV=0;
+                $j=0;
+                $tabla = 0;
+                $equipos = array();
+                foreach ($html2->find('table[class=standard_tabelle]') as $element) {
+
+
+                    $jugadoresL = array();
+                    $jugadoresV = array();
+                    if ($tabla==1){
+                        $golesArray = array();
+                        foreach ($element->find('td') as $td) {
+                            $jugadorGol='';
+                            $lineaGol='';
+                            $minutoGol='';
+                            $incidenciaGol='';
+                            if($td->find('a')){
+                                $jugadorGol = $td->find('a')[0]->title;
+                                //Log::info('OJO!! gol: '.$jugadorGol,[]);
+                                $lineaGol = $td->plaintext;
+                                if (str_contains($lineaGol, $jugadorGol)) {
+                                    $minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
+                                    //Log::info('OJO!! min: '.$minutoGol,[]);
+                                }
+
+                                $incidenciaArray = explode('/', $lineaGol);
+                                if (count($incidenciaArray)>1){
+                                    $incidenciaGol = $incidenciaArray[1];
+                                    //Log::info('OJO!! incidencia: '.$incidenciaGol,[]);
+                                }
+                                $golesArray[$jugadorGol]=$minutoGol.'-'.$incidenciaGol;
+                            }
+
+
+                        }
+                    }
+                    if ($tabla==2){
+                        Log::info('OJO!! locales:',[]);
+                        $suplentes=0;
+                        foreach ($element->find('tr') as $tr) {
+                            $dorsalTitularL = '';
+                            $jugadorTitularL = '';
+                            $saleTitularL = '';
+                            $amarillaTitularL = '';
+                            $dobleamarillaTitularL = '';
+                            $rojaTitularL = '';
+                            $mintutoTarjetaTitularL = '';
+                            $dorsalSuplenteL = '';
+                            $jugadorSuplenteL = '';
+                            $entraSuplenteL = '';
+                            $saleSuplenteL = '';
+                            $amarillaSuplenteL = '';
+                            $dobleamarillaSuplenteL = '';
+                            $rojaSuplenteL = '';
+                            $mintutoTarjetaSuplenteL = '';
+                            foreach ($tr->find('td') as $td) {
+                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                if (trim($td->plaintext)=='Banquillo') {
+                                    $suplentes=1;
+                                }
+                                if ($td->find('span[class=kleine_schrift]')) {
+                                    if ($td->find('span[style=font-weight: bold; color: #646464]')) {
+                                        if ($suplentes){
+                                            $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                        }
+                                        else{
+                                            $dorsalTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=rottext]')) {
+                                        if ($suplentes){
+                                            $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                        }
+                                        else{
+                                            $saleTitularL = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale titular: ' . $saleTitularL, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=gruentext]')) {
+                                        if ($suplentes){
+                                            $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                        }
+
+
+                                    }
+                                    else{
+                                        if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
+                                            if ($suplentes){
+                                                $mintutoTarjetaSuplenteL = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+                                            else{
+                                                $mintutoTarjetaTitularL = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+
+
+
+
+                                        }
+
+                                    }
+                                }
+
+                                if ($td->find('img')) {
+                                    if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
+                                        if ($suplentes){
+                                            $amarillaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaSuplenteL, []);
+                                        }
+                                        else{
+                                            $amarillaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Roja directa') {
+                                        if ($suplentes){
+                                            $rojaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaSuplenteL, []);
+                                        }
+                                        else{
+                                            $rojaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaTitularL, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Doble amarilla') {
+                                        if ($suplentes){
+                                            $dobleamarillaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteL, []);
+                                        }
+                                        else{
+                                            $dobleamarillaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
+                                        }
+
+                                    }
+
+                                }
+
+                                if ($td->find('a')) {
+                                    if ($suplentes){
+                                        $jugadorSuplenteL = $td->find('a')[0]->title;
+                                        Log::info('OJO!! suplente: ' . $jugadorSuplenteL, []);
+                                    }
+                                    else{
+                                        $jugadorTitularL = $td->find('a')[0]->title;
+                                        Log::info('OJO!! titular: ' . $jugadorTitularL, []);
+                                    }
+
+
+                                }
+
+
+                            }
+                            $incidenciasL = array();
+                            $incidenciasV = array();
+                            if ($saleTitularL){
+                                $incidenciasL[]=array('Sale', $saleTitularL);
+                            }
+                            if ($amarillaTitularL){
+                                $incidenciasL[]=array('Tarjeta amarilla', $amarillaTitularL);
+                            }
+                            if ($dobleamarillaTitularL){
+                                $incidenciasL[]=array('Expulsado por doble amarilla', $dobleamarillaTitularL);
+                            }
+                            if ($rojaTitularL){
+                                $incidenciasL[]=array('Tarjeta roja', $rojaTitularL);
+                            }
+
+                            if ($amarillaSuplenteL){
+                                $incidenciasV[]=array('Tarjeta amarilla', $amarillaSuplenteL);
+                            }
+                            if ($dobleamarillaSuplenteL){
+                                $incidenciasV[]=array('Expulsado por doble amarilla', $dobleamarillaSuplenteL);
+                            }
+                            if ($rojaSuplenteL){
+                                $incidenciasV[]=array('Tarjeta roja', $rojaSuplenteL);
+                            }
+                            if ($saleSuplenteL){
+                                $incidenciasV[]=array('Sale', $saleSuplenteL);
+                            }
+                            if ($entraSuplenteL){
+                                $incidenciasV[]=array('Entra', $entraSuplenteL);
+                            }
+                            if ($suplentes){
+                                $data2 = array(
+                                    'dorsal' => $dorsalSuplenteL,
+                                    'nombre' => $jugadorSuplenteL,
+                                    'tipo' => 'Suplente',
+                                    'incidencias' =>$incidenciasV
+                                );
+                            }
+                            else{
+                                $data2 = array(
+                                    'dorsal' => $dorsalTitularL,
+                                    'nombre' => $jugadorTitularL,
+                                    'tipo' => 'Titular',
+                                    'incidencias' => $incidenciasL
+                                );
+                            }
+                            $jugadores[]=$data2;
+                            //$jugadores[$id[count($id) - 1]] = $data2;
+
+                        }
+                    }
+
+                    if ($tabla==3){
+                        Log::info('OJO!! visitante:',[]);
+                        $suplentes=0;
+                        foreach ($element->find('tr') as $tr) {
+                            $dorsalTitularV = '';
+                            $jugadorTitularV = '';
+                            $saleTitularV = '';
+                            $amarillaTitularV = '';
+                            $dobleamarillaTitularV = '';
+                            $rojaTitularV = '';
+                            $mintutoTarjetaTitularV = '';
+                            $dorsalSuplenteV = '';
+                            $jugadorSuplenteV = '';
+                            $entraSuplenteV = '';
+                            $saleSuplenteV = '';
+                            $amarillaSuplenteV = '';
+                            $dobleamarillaSuplenteV = '';
+                            $rojaSuplenteV = '';
+                            $mintutoTarjetaSuplenteV = '';
+                            foreach ($tr->find('td') as $td) {
+                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                if (trim($td->plaintext)=='Banquillo') {
+                                    $suplentes=1;
+                                }
+                                if ($td->find('span[class=kleine_schrift]')) {
+                                    if ($td->find('span[style=font-weight: bold; color: #646464]')) {
+                                        if ($suplentes){
+                                            $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                        }
+                                        else{
+                                            $dorsalTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                            Log::info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=rottext]')) {
+                                        if ($suplentes){
+                                            $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                        }
+                                        else{
+                                            $saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! sale titular: ' . $saleTitularV, []);
+                                        }
+
+                                    }
+                                    elseif ($td->find('span[class=gruentext]')) {
+                                        if ($suplentes){
+                                            $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                        }
+
+
+                                    }
+                                    else{
+                                        if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
+                                            if ($suplentes){
+                                                $mintutoTarjetaSuplenteV = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+                                            else{
+                                                $mintutoTarjetaTitularV = $td->find('span[class=kleine_schrift]')[0]->title;
+                                            }
+
+
+
+
+                                        }
+
+                                    }
+                                }
+
+                                if ($td->find('img')) {
+                                    if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
+                                        if ($suplentes){
+                                            $amarillaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaSuplenteV, []);
+                                        }
+                                        else{
+                                            $amarillaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Roja directa') {
+                                        if ($suplentes){
+                                            $rojaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaSuplenteV, []);
+                                        }
+                                        else{
+                                            $rojaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! roja titular: ' . $rojaTitularV, []);
+                                        }
+
+                                    }
+                                    if ($td->find('img')[0]->title == 'Doble amarilla') {
+                                        if ($suplentes){
+                                            $dobleamarillaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
+                                        }
+                                        else{
+                                            $dobleamarillaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
+                                        }
+
+                                    }
+
+                                }
+
+                                if ($td->find('a')) {
+                                    if ($suplentes){
+                                        $jugadorSuplenteV = $td->find('a')[0]->title;
+                                        Log::info('OJO!! suplente: ' . $jugadorSuplenteV, []);
+                                    }
+                                    else{
+                                        $jugadorTitularV = $td->find('a')[0]->title;
+                                        Log::info('OJO!! titular: ' . $jugadorTitularV, []);
+                                    }
+
+
+                                }
+
+
+                            }
+
+                        }
+                    }
+
+
+
+                    $tabla ++;
+
+
+
+
+                    $entrenadoresArray = explode('Entrenador:', $element->plaintext);
+                    if (count($entrenadoresArray)>3){
+                        Log::info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    }
+                    if(count($entrenadoresArray)>1){
+                        $dtLocal = $entrenadoresArray[1];
+                        //Log::info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
+                        if (isset($entrenadoresArray[2])){
+                            $dtVisitante = $entrenadoresArray[2];
+                        }
+                        else{
+                            Log::info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                        }
+
+                        //Log::info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
+                    }
+                    else{
+                        $asistente=0;
+                        $asistente1='';
+                        $asistente2='';
+                        $arbitro='';
+                        $arbitro1='';
+                        $arbitro2='';
+                        foreach ($element->find('td[class="dunkel"]') as $element2) {
+
+                            foreach ($element2->find('a') as $link) {
+                                $linkArray = explode(' ', $link->title);
+
+                                if (($linkArray[0])=='Árbitro'){
+                                    if (($linkArray[1])=='asistente'){
+                                        $nombreAsistente = '';
+                                        for ($i = 2; $i < count($linkArray); $i++) {
+                                            $nombreAsistente .= ($linkArray[$i]).' ';
+                                        }
+                                        if ($asistente==0){
+                                            $asistente1= $nombreAsistente;
+                                            Log::info('Asistente 1: '.$nombreAsistente, []);
+                                            $asistente++;
+                                        }
+                                        else{
+                                            $asistente2= $nombreAsistente;
+                                            Log::info('Asistente 2: '.$nombreAsistente, []);
+                                            $asistente++;
+                                        }
+
+                                    }
+                                    else{
+                                        $nombreArbitro = '';
+                                        for ($i = 1; $i < count($linkArray); $i++) {
+                                            $nombreArbitro .= ($linkArray[$i]).' ';
+                                        }
+
+                                        Log::info('Arbitro: '.$nombreArbitro, []);
+
+                                    }
+                                }
+
+
+                            }
+
+                        }
+
+                    }
+
+                }
+                $arrArbitro = explode(' ', $nombreArbitro);
+                $arbitro=0;
+                if(count($arrArbitro)>1) {
+                    //$arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    $arbitro=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                }
+
+                if (!$arbitro){
+                    Log::info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                }
+                else{
+                    $data3=array(
+                        'partido_id'=>$partido->id,
+                        'arbitro_id'=>$arbitro->id,
+                        'tipo'=>'Principal'
+                    );
+                    $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro->id")->first();
+                    try {
+                        if (!empty($partido_arbitro)){
+
+                            $partido_arbitro->update($data3);
+                        }
+                        else{
+                            $partido_arbitro=PartidoArbitro::create($data3);
+                        }
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+                $arrArbitroA1 = explode(' ', $asistente1);
+                $arbitro1=0;
+                if(count($arrArbitroA1)>1) {
+                    //$arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
+                    $arbitro1=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
+                }
+
+                if (!$arbitro1){
+                    Log::info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                }
+                else{
+                    $data3=array(
+                        'partido_id'=>$partido->id,
+                        'arbitro_id'=>$arbitro1->id,
+                        'tipo'=>'Linea 1'
+                    );
+                    $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro1->id")->first();
+                    try {
+                        if (!empty($partido_arbitro)){
+
+                            $partido_arbitro->update($data3);
+                        }
+                        else{
+                            $partido_arbitro=PartidoArbitro::create($data3);
+                        }
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+                $arrArbitroA2 = explode(' ', $asistente2);
+                $arbitro2=0;
+                if(count($arrArbitroA2)>1) {
+                    //$arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
+                    $arbitro2=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
+                }
+
+                if (!$arbitro2){
+                    Log::info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                }
+                else{
+                    $data3=array(
+                        'partido_id'=>$partido->id,
+                        'arbitro_id'=>$arbitro2->id,
+                        'tipo'=>'Linea 2'
+                    );
+                    $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro2->id")->first();
+                    try {
+                        if (!empty($partido_arbitro)){
+
+                            $partido_arbitro->update($data3);
+                        }
+                        else{
+                            $partido_arbitro=PartidoArbitro::create($data3);
+                        }
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+                $strEntrenador=trim($dtLocal);
+                $arrEntrenador = explode(' ', $strEntrenador);
+                $entrenadorL='';
+                if(count($arrEntrenador)>1){
+                    //$entrenadorL=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                    $entrenadorL=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                }
+
+                if (!empty($entrenadorL)){
+                    $data3=array(
+                        'partido_id'=>$partido->id,
+                        'equipo_id'=>$partido->equipol->id,
+                        'tecnico_id'=>$entrenadorL->id
+                    );
+                    $partido_tecnico=PartidoTecnico::where('partido_id','=',"$partido->id")->where('equipo_id','=',$partido->equipol->id)->where('tecnico_id','=',"$entrenadorL->id")->first();
+                    try {
+                        if (!empty($partido_tecnico)){
+
+                            $partido_tecnico->update($data3);
+                        }
+                        else{
+                            $partido_tecnico=PartidoTecnico::create($data3);
+                        }
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+                else{
+                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
+                }
+                $strEntrenador=trim($dtVisitante);
+                $arrEntrenador = explode(' ', $strEntrenador);
+                $entrenadorV='';
+                if(count($arrEntrenador)>1){
+                    //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                    $entrenadorV=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                 }
 
                 if (!empty($entrenadorV)){
@@ -2938,7 +3906,7 @@ class FechaController extends Controller
                                 $arrApellido = explode(' ', $jugador['nombre']);
                                 $mismoDorsal = 0;
                                 foreach ($arrApellido as $apellido) {
-                                    $consultarJugador = Jugador::where('id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
+                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
                                     if (!empty($consultarJugador)) {
                                         $mismoDorsal = 1;
                                         continue;
@@ -3204,7 +4172,8 @@ class FechaController extends Controller
                 }
                 $arrArbitro = explode(' ', $nombreArbitro);
                 if (count($arrArbitro) > 1) {
-                    $arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    //$arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    $arbitro=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                 }
 
                 if (!$arbitro) {
@@ -3232,7 +4201,8 @@ class FechaController extends Controller
                 }
                 $arrArbitro = explode(' ', $asistente1);
                 if (count($arrArbitro) > 1) {
-                    $arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    //$arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    $arbitro1=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                 }
 
                 if (!$arbitro1) {
@@ -3260,7 +4230,8 @@ class FechaController extends Controller
                 }
                 $arrArbitro = explode(' ', $asistente2);
                 if (count($arrArbitro) > 1) {
-                    $arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    //$arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                    $arbitro2=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                 }
 
                 if (!$arbitro2) {
@@ -3290,7 +4261,8 @@ class FechaController extends Controller
                 if (!empty($strEntrenador)) {
 
                     $arrEntrenador = explode(' ', $strEntrenador);
-                    $entrenadorL = Tecnico::where('nombre', 'like', "%$arrEntrenador[0]%")->where('apellido', 'like', "%$arrEntrenador[1]%")->first();
+                    //$entrenadorL = Tecnico::where('nombre', 'like', "%$arrEntrenador[0]%")->where('apellido', 'like', "%$arrEntrenador[1]%")->first();
+                    $entrenadorL=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre', 'like', "%$arrEntrenador[0]%")->where('apellido', 'like', "%$arrEntrenador[1]%")->first();
                 }
                 if (!empty($entrenadorL)){
                     $data3=array(
@@ -3319,7 +4291,8 @@ class FechaController extends Controller
                 }
                 $strEntrenador=trim($dtVisitante);
                 $arrEntrenador = explode(' ', $strEntrenador);
-                $entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                $entrenadorV=Tecnico::SELECT('tecnicos.*')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                 if (!empty($entrenadorV)){
                     $data3=array(
                         'partido_id'=>$partido->id,
@@ -3378,6 +4351,6 @@ class FechaController extends Controller
     }
 
 
-   
+
 
 }

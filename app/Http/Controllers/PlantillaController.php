@@ -68,7 +68,7 @@ class PlantillaController extends Controller
         $grupo_id= $request->query('grupoId');
         $grupo=Grupo::findOrFail($grupo_id);
 
-        $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
         $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');
 
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
@@ -174,9 +174,11 @@ class PlantillaController extends Controller
 
         $plantillaJugadors = PlantillaJugador::where('plantilla_id','=',"$id")->orderBy('dorsal','asc')->get();
 
-        $jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
 
-        $jugadors = $jugadors->pluck('full_name_age', 'id')->prepend('','');
+        //$jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+
+        $jugadors = $jugadors->pluck('persona.full_name_age', 'id')->prepend('','');
 
 
         $equipos = Equipo::orderBy('nombre', 'asc')->get();

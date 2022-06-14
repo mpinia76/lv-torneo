@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Arbitro;
+use App\Persona;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
 
@@ -29,9 +31,9 @@ class ArbitroController extends Controller
 
         $nombre = $request->get('buscarpor');
 
-        $arbitros=Arbitro::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
+        //$arbitros=Arbitro::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
-
+        $arbitros=Arbitro::SELECT('arbitros.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
         return view('arbitros.index', compact('arbitros','arbitros'));
     }
@@ -90,13 +92,38 @@ class ArbitroController extends Controller
         $insert['nacimiento'] = $request->get('nacimiento');
         $insert['fallecimiento'] = $request->get('fallecimiento');
 
-        $arbitro = Arbitro::create($insert);
+        //$arbitro = Arbitro::create($insert);
+
+        try {
+            $persona = Persona::create($insert);
+            $persona->arbitro()->create($insert);
+
+            $respuestaID='success';
+            $respuestaMSJ='Registro creado satisfactoriamente';
+        }catch(QueryException $ex){
+
+            try {
+                $persona = Persona::where('nombre','=',$insert['nombre'])->Where('apellido','=',$insert['apellido'])->Where('nacimiento','=',$insert['nacimiento'])->first();
+                if (!empty($persona)){
+                    $persona->arbitro()->create($insert);
+                    $respuestaID='success';
+                    $respuestaMSJ='Registro creado satisfactoriamente';
+                }
+            }catch(QueryException $ex){
+
+                $respuestaID='error';
+                $respuestaMSJ=$ex->getMessage();
+
+            }
+
+
+        }
 
         if($request->get('partido_id')){
-            $redirect = redirect()->route('partidos.arbitros', ['partidoId' => $request->get('partido_id')])->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('partidos.arbitros', ['partidoId' => $request->get('partido_id')])->with($respuestaID,$respuestaMSJ);
         }
         else{
-            $redirect = redirect()->route('arbitros.index')->with('success','Registro creado satisfactoriamente');
+            $redirect = redirect()->route('arbitros.index')->with($respuestaID,$respuestaMSJ);
         }
 
         return $redirect;
@@ -167,7 +194,8 @@ class ArbitroController extends Controller
 
 
         $arbitro=arbitro::find($id);
-        $arbitro->update($update);
+        //$arbitro->update($update);
+        $arbitro->persona()->update($update);
 
         return redirect()->route('arbitros.index')->with('success','Registro actualizado satisfactoriamente');
     }

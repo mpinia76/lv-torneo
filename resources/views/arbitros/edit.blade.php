@@ -26,21 +26,21 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('nombre', 'Nombre')}}
-                {{Form::text('nombre', $arbitro->nombre, ['class' => 'form-control'])}}
+                {{Form::text('nombre', $arbitro->persona->nombre, ['class' => 'form-control'])}}
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('apellido', 'Apellido')}}
-                {{Form::text('apellido', $arbitro->apellido, ['class' => 'form-control'])}}
+                {{Form::text('apellido', $arbitro->persona->apellido, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('tipoDocumento', 'Tipo')}}
-                {{ Form::select('tipoDocumento',['DNI'=>'DNI','PAS'=>'Pasaporte','CI'=>'Cedula'], $arbitro->tipoDocumento,['class' => 'form-control']) }}
+                {{ Form::select('tipoDocumento',['DNI'=>'DNI','PAS'=>'Pasaporte','CI'=>'Cedula'], $arbitro->persona->tipoDocumento,['class' => 'form-control']) }}
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('documento', 'Documento')}}
-                {{Form::text('documento', $arbitro->documento, ['class' => 'form-control'])}}
+                {{Form::text('documento', $arbitro->persona->documento, ['class' => 'form-control'])}}
             </div>
 
         </div>
@@ -48,25 +48,25 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('email', 'E-mail')}}
-                {{Form::email('email', $arbitro->email, ['class' => 'form-control'])}}
+                {{Form::email('email', $arbitro->persona->email, ['class' => 'form-control'])}}
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
-                {{Form::text('telefono', $arbitro->telefono, ['class' => 'form-control'])}}
+                {{Form::text('telefono', $arbitro->persona->telefono, ['class' => 'form-control'])}}
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('ciudad', 'Ciudad Nacimiento')}}
-                {{Form::text('ciudad', $arbitro->ciudad, ['class' => 'form-control'])}}
+                {{Form::text('ciudad', $arbitro->persona->ciudad, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}
-                {{Form::date('nacimiento', ($arbitro->nacimiento)?date('Y-m-d', strtotime($arbitro->nacimiento)):'', ['class' => 'form-control'])}}
+                {{Form::date('nacimiento', ($arbitro->persona->nacimiento)?date('Y-m-d', strtotime($arbitro->persona->nacimiento)):'', ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('fallecimiento', 'Fallecimiento')}}
-                {{Form::date('fallecimiento', ($arbitro->fallecimiento)?date('Y-m-d', strtotime($arbitro->fallecimiento)):'', ['class' => 'form-control'])}}
+                {{Form::date('fallecimiento', ($arbitro->persona->fallecimiento)?date('Y-m-d', strtotime($arbitro->persona->fallecimiento)):'', ['class' => 'form-control'])}}
             </div>
         </div>
 
@@ -75,8 +75,8 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
                     Foto
-                    @if($arbitro->foto)
-                        <img id="original" src="{{ url('images/'.$arbitro->foto) }}" height="200">
+                    @if($arbitro->persona->foto)
+                        <img id="original" src="{{ url('images/'.$arbitro->persona->foto) }}" height="200">
                     @endif
                     <input type="file" name="foto" class="form-control" placeholder="">
 
@@ -84,7 +84,7 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
                 {{Form::label('observaciones', 'Observaciones')}}
-                {{Form::textarea('observaciones', $arbitro->observaciones, ['class' => 'form-control'])}}
+                {{Form::textarea('observaciones', $arbitro->persona->observaciones, ['class' => 'form-control'])}}
 
             </div>
 

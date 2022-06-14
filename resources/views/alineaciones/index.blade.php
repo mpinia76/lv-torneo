@@ -100,8 +100,8 @@
 
                             <td>
                                 {{$i++}}
-                                @if($titularl->jugador->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$titularl->jugador->foto) }}" >
+                                @if($titularl->jugador->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$titularl->jugador->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
@@ -149,8 +149,8 @@
 
                             <td>
                                 {{$i++}}
-                                @if($suplentel->jugador->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentel->jugador->foto) }}" >
+                                @if($suplentel->jugador->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentel->jugador->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
@@ -236,8 +236,8 @@
 
                             <td>
                                 {{$i++}}
-                                @if($titularv->jugador->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$titularv->jugador->foto) }}" >
+                                @if($titularv->jugador->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$titularv->jugador->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
@@ -285,8 +285,8 @@
 
                             <td>
                                 {{$i++}}
-                                @if($suplentev->jugador->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentev->jugador->foto) }}" >
+                                @if($suplentev->jugador->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentev->jugador->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif
@@ -328,8 +328,8 @@
                     @foreach($partidoTecnicosV ?? '' as $partidoTecnicoV)
 
                         <tr>
-                            <td>@if($partidoTecnicoV->tecnico->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$partidoTecnicoV->tecnico->foto) }}" >
+                            <td>@if($partidoTecnicoV->tecnico->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$partidoTecnicoV->tecnico->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                 @endif

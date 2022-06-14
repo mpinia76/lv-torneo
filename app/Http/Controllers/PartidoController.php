@@ -106,10 +106,13 @@ class PartidoController extends Controller
         $partidoarbitros=PartidoArbitro::where('partido_id','=',"$partido_id")->get();
 
 
-        $arbitros = Arbitro::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        /*$arbitros = Arbitro::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
 
-        $arbitros = $arbitros->pluck('full_name', 'id')->prepend('','');
+        $arbitros = $arbitros->pluck('full_name', 'id')->prepend('','');*/
 
+        $arbitros = Arbitro::SELECT('arbitros.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->JOIN('personas','personas.id','=','arbitros.persona_id')->orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        //dd($arbitros);
+        $arbitros = $arbitros->pluck('persona.full_name', 'id')->prepend('','');
 
         //dd($partido->fecha->grupo->torneo->nombre);
         return view('partidos.arbitros', compact('partidoarbitros','partido','arbitros'));

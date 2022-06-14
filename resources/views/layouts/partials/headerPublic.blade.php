@@ -45,6 +45,11 @@
 
                     <ul class="dropdown-menu" role="menu">
 
+                        <li><a class="dropdown-item" href="{{route('grupos.arqueros',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Arqueros
+                            </a>
+                        </li>
+
                         <li><a class="dropdown-item" href="{{route('torneos.estadisticasTorneo',  array('torneoId' => Session::get('codigoTorneo')))}}">
                                 Estadísticas
                             </a>
@@ -97,6 +102,11 @@
                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">{{ __('Estadísticas') }} <span class="caret"></span></a>
 
                     <ul class="dropdown-menu" role="menu">
+
+                        <li><a class="dropdown-item" href="{{route('torneos.arqueros')}}">
+                                Arqueros
+                            </a>
+                        </li>
 
                         <li><a class="dropdown-item" href="{{route('torneos.goleadores')}}">
                                 Goleadores

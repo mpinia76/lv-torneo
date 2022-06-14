@@ -26,21 +26,21 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('nombre', 'Nombre')}}
-                {{Form::text('nombre', $jugador->nombre, ['class' => 'form-control'])}}
+                {{Form::text('nombre', $jugador->persona->nombre, ['class' => 'form-control'])}}
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('apellido', 'Apellido')}}
-                {{Form::text('apellido', $jugador->apellido, ['class' => 'form-control'])}}
+                {{Form::text('apellido', $jugador->persona->apellido, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('tipoDocumento', 'Tipo')}}
-                {{ Form::select('tipoDocumento',['DNI'=>'DNI','PAS'=>'Pasaporte','CI'=>'Cedula'], $jugador->tipoDocumento,['class' => 'form-control']) }}
+                {{ Form::select('tipoDocumento',['DNI'=>'DNI','PAS'=>'Pasaporte','CI'=>'Cedula'], $jugador->persona->tipoDocumento,['class' => 'form-control']) }}
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('documento', 'Documento')}}
-                {{Form::text('documento', $jugador->documento, ['class' => 'form-control'])}}
+                {{Form::text('documento', $jugador->persona->documento, ['class' => 'form-control'])}}
             </div>
 
         </div>
@@ -48,25 +48,25 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('email', 'E-mail')}}
-                {{Form::email('email', $jugador->email, ['class' => 'form-control'])}}
+                {{Form::email('email', $jugador->persona->email, ['class' => 'form-control'])}}
 
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
-                {{Form::text('telefono', $jugador->telefono, ['class' => 'form-control'])}}
+                {{Form::text('telefono', $jugador->persona->telefono, ['class' => 'form-control'])}}
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('ciudad', 'Ciudad Nacimiento')}}
-                {{Form::text('ciudad', $jugador->ciudad, ['class' => 'form-control'])}}
+                {{Form::text('ciudad', $jugador->persona->ciudad, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}
-                {{Form::date('nacimiento', ($jugador->nacimiento)?date('Y-m-d', strtotime($jugador->nacimiento)):'', ['class' => 'form-control'])}}
+                {{Form::date('nacimiento', ($jugador->persona->nacimiento)?date('Y-m-d', strtotime($jugador->persona->nacimiento)):'', ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('fallecimiento', 'Fallecimiento')}}
-                {{Form::date('fallecimiento', ($jugador->fallecimiento)?date('Y-m-d', strtotime($jugador->fallecimiento)):'', ['class' => 'form-control'])}}
+                {{Form::date('fallecimiento', ($jugador->persona->fallecimiento)?date('Y-m-d', strtotime($jugador->persona->fallecimiento)):'', ['class' => 'form-control'])}}
             </div>
         </div>
         <div class="row">
@@ -84,11 +84,11 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('altura', 'Altura')}}
-                {{Form::number('altura', $jugador->altura, ['class' => 'form-control','step' => '0.01'])}}
+                {{Form::number('altura', $jugador->persona->altura, ['class' => 'form-control','step' => '0.01'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('peso', 'Peso')}}
-                {{Form::number('peso', $jugador->peso, ['class' => 'form-control','step' => '0.01'])}}
+                {{Form::number('peso', $jugador->persona->peso, ['class' => 'form-control','step' => '0.01'])}}
             </div>
         </div>
         <div class="row">
@@ -96,8 +96,8 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
                     Foto
-                    @if($jugador->foto)
-                        <img id="original" src="{{ url('images/'.$jugador->foto) }}" height="200">
+                    @if($jugador->persona->foto)
+                        <img id="original" src="{{ url('images/'.$jugador->persona->foto) }}" height="200">
                     @endif
                     <input type="file" name="foto" class="form-control" placeholder="">
 
@@ -105,7 +105,7 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
                 {{Form::label('observaciones', 'Observaciones')}}
-                {{Form::textarea('observaciones', $jugador->observaciones, ['class' => 'form-control'])}}
+                {{Form::textarea('observaciones', $jugador->persona->observaciones, ['class' => 'form-control'])}}
 
             </div>
 

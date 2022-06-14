@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Grupo;
+use App\Jugador;
 use App\Tarjeta;
 use App\Partido;
 use App\Plantilla;
@@ -39,9 +40,13 @@ class TarjetaController extends Controller
                 $arrPlantillas .=$plantilla->id.',';
             }
 
-            $jugadors = PlantillaJugador::wherein('plantilla_id',explode(',', $arrPlantillas))->with('jugador')->get();
+            /*$jugadors = PlantillaJugador::wherein('plantilla_id',explode(',', $arrPlantillas))->with('jugador')->get();
 
-            $jugadors = $jugadors->pluck('jugador.full_name','jugador_id')->prepend('','');
+            $jugadors = $jugadors->pluck('jugador.full_name','jugador_id')->prepend('','');*/
+
+            $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrPlantillas))->distinct()->get();
+
+            $jugadors = $jugadors->pluck('persona.full_name','id')->sortBy('apellido')->prepend('','');
 
 
             //dd($partido->fecha->grupo->torneo->nombre);

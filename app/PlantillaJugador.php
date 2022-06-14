@@ -16,4 +16,6 @@ class PlantillaJugador extends Model
     public function jugador() {
         return $this->belongsTo('App\Jugador');
     }
+
+
 }

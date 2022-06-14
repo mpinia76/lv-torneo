@@ -89,8 +89,8 @@
                         <tr>
 
                             <td>
-                                @if($tarjeta->jugador->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->foto) }}" >
+                                @if($tarjeta->jugador->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                 @endif

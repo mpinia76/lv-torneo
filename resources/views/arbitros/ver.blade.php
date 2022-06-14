@@ -9,16 +9,16 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Nombre</dt>
-                <dd>{{$arbitro->nombre}}</dd>
+                <dd>{{$arbitro->persona->nombre}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Apellido</dt>
-                <dd>{{$arbitro->apellido}}</dd>
+                <dd>{{$arbitro->persona->apellido}}</dd>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Ciudad Nacimiento</dt>
-                <dd>{{$arbitro->ciudad}}</dd>
+                <dd>{{$arbitro->persona->ciudad}}</dd>
 
             </div>
 
@@ -28,7 +28,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Edad</dt>
-                <dd>{{($arbitro->nacimiento)?$arbitro->getAgeAttribute():''}}</dd>
+                <dd>{{($arbitro->persona->nacimiento)?$arbitro->persona->getAgeAttribute():''}}</dd>
 
             </div>
 
@@ -38,8 +38,10 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
 
-                    @if($arbitro->foto)
-                        <img id="original" src="{{ url('images/'.$arbitro->foto) }}" height="200">
+                    @if($arbitro->persona->foto)
+                        <img id="original" src="{{ url('images/'.$arbitro->persona->foto) }}" height="200">
+                    @else
+                        <img id="original" src="{{ url('images/sin_foto_arbitro.png') }}" height="200">
                     @endif
 
 
@@ -47,7 +49,7 @@
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
 
-                <dd>{{$arbitro->observaciones}}</dd>
+                <dd>{{$arbitro->persona->observaciones}}</dd>
 
             </div>
 

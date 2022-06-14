@@ -44,8 +44,8 @@
 
         @foreach($arbitros as $arbitro)
             <tr>
-                <td>@if($arbitro->foto)
-                        <img id="original" class="imgCircle" src="{{ url('images/'.$arbitro->foto) }}" >
+                <td>@if($arbitro->persona->foto)
+                        <img id="original" class="imgCircle" src="{{ url('images/'.$arbitro->persona->foto) }}" >
                     @else
                         <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                     @endif
@@ -54,7 +54,7 @@
                 <td>{{$arbitro->nombre}}</td>
 
                 <td>{{$arbitro->email}}</td>
-                <td>{{($arbitro->nacimiento)?$arbitro->getAgeAttribute():''}}</td>
+                <td>{{($arbitro->nacimiento)?$arbitro->persona->getAgeAttribute():''}}</td>
 
                 <td>
                     <div class="d-flex">
