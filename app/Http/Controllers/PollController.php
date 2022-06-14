@@ -61,13 +61,16 @@ class PollController extends Controller
 
         //adding the data from the array
         foreach ($resultados as $resultado) {
+            if(count($resultado)==5){
             fputcsv($handle, [
 
                 utf8_decode(trim($resultado[1])),
                 utf8_decode(trim($resultado[2])),
                 utf8_decode(trim($resultado[3])),
-                utf8_decode(trim($resultado[0]))
+                utf8_decode(trim($resultado[0])),
+                utf8_decode(trim($resultado[4]))
             ], "|");
+            }
 
         }
         fclose($handle);
@@ -115,7 +118,7 @@ class PollController extends Controller
         if(in_array(strtolower($extension),$valid_extension)){
 
             // Check file size
-            if($fileSize <= $maxFileSize){
+            //if($fileSize <= $maxFileSize){
 
                 // File upload location
                 $location = 'uploads';
@@ -157,7 +160,7 @@ class PollController extends Controller
                     Log::info('Message: ' . $importData[6]);
                     Log::info('Vote data: ' . $importData[7]);
                     $lineaExcel = array();
-                    if ($importData[6]=='success'){
+                    if ($importData[6]!='success'){
                         $arrayVotacion = explode(';',$importData[7]);
                         foreach ($arrayVotacion as $voto){
                             $arrayVoto = explode(':',$voto);
@@ -166,6 +169,9 @@ class PollController extends Controller
                                 $lineaExcel[] = $arrayVoto[1];
                             }
 
+                        }
+                        if (count($lineaExcel)>0){
+                            $lineaExcel[] = $importData[6];
                         }
                     }
                     if (count($lineaExcel)>0){
@@ -181,13 +187,13 @@ class PollController extends Controller
 
                 $ok=1;
 
-            }else{
+            /*}else{
 
 
                 $error='Archivo demasiado grande. El archivo debe ser menor que 2MB.';
                 $ok=0;
 
-            }
+            }*/
 
         }else{
 
