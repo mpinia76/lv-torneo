@@ -1063,9 +1063,9 @@ class FechaController extends Controller
                 //$strEquipoURL='club-almagro';
                 break;
             case 'Arsenal':
-                //$strEquipoURL='arsenal-sarandi';//viejo
+                $strEquipoURL='arsenal-sarandi';//viejo
                 //$strEquipoURL='arsenal-de-sarandi';//ultimo
-                $strEquipoURL='arsenal-fc';
+                //$strEquipoURL='arsenal-fc';
                 break;
             case 'Atlético de Rafaela':
                 $strEquipoURL='atletico-rafaela';
@@ -1083,8 +1083,8 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-boca-juniors';
                 break;
             case 'Belgrano':
-                $strEquipoURL='belgrano-de-cordoba';
-                //$strEquipoURL='belgrano-cordoba';
+                //$strEquipoURL='belgrano-de-cordoba';
+                $strEquipoURL='belgrano-cordoba';
                 break;
             case 'Central Córdoba (SdE)':
                 $strEquipoURL='central-cordoba-sde';
@@ -1094,8 +1094,8 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-chacarita-juniors';
                 break;
             case 'Colón de Santa Fe':
-                $strEquipoURL='colon-de-santa-fe';//ultimo
-                //$strEquipoURL='ca-colon';//viejo
+                //$strEquipoURL='colon-de-santa-fe';//ultimo
+                $strEquipoURL='ca-colon';//viejo
                 break;
             case 'Crucero del Norte':
                 $strEquipoURL='crucero-del-norte';
@@ -1108,8 +1108,8 @@ class FechaController extends Controller
                 $strEquipoURL='gye-jujuy';
                 break;
             case 'Gimnasia (LP)':
-                $strEquipoURL='gimnasia-de-la-plata';//ultimo
-                //$strEquipoURL='gye-la-plata';//viejo
+                //$strEquipoURL='gimnasia-de-la-plata';//ultimo
+                $strEquipoURL='gye-la-plata';//viejo
                 //$strEquipoURL='gimnasia-y-esgrima-de-la-plata';
                 break;
             case 'Godoy Cruz':
@@ -1137,8 +1137,8 @@ class FechaController extends Controller
                 $strEquipoURL='independiente';
                 break;
             case 'Lanús':
-                $strEquipoURL='lanus';//ultimo
-                //$strEquipoURL='ca-lanus';//viejo
+                //$strEquipoURL='lanus';//ultimo
+                $strEquipoURL='ca-lanus';//viejo
                 break;
             case 'Los Andes':
                 $strEquipoURL='los-andes-de-lomas-de-zamora';
@@ -2281,7 +2281,7 @@ class FechaController extends Controller
                                     elseif ($td->find('span[class=gruentext]')) {
                                         if ($suplentes){
                                             $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                            Log::info('OJO!! entra suplente: ' . $td->find('span[class=gruentext]')[0]->plaintext, []);
                                         }
 
 
@@ -2811,11 +2811,11 @@ class FechaController extends Controller
             $dtLocal ='';
             $dtVisitante ='';
             if ($html2){
-                $i = 1;
+
                 $goles=0;
                 $golesL=0;
                 $golesV=0;
-                $j=0;
+
                 $tabla = 0;
                 $equipos = array();
                 $tablaIncidencias = 0;
@@ -2838,7 +2838,19 @@ class FechaController extends Controller
                                 //Log::info('OJO!! gol: '.$jugadorGol,[]);
                                 $lineaGol = $td->plaintext;
                                 if (str_contains($lineaGol, $jugadorGol)) {
-                                    $minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
+                                    //$minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
+                                    //Log::info('OJO!! gol: '.$lineaGol,[]);
+                                    $arrayGol= explode(".",$lineaGol);
+
+                                    $minutoGol = (int) filter_var($arrayGol[0], FILTER_SANITIZE_NUMBER_INT);
+                                    if (count($arrayGol)>1){
+                                        $adiccion = (int) filter_var($arrayGol[1], FILTER_SANITIZE_NUMBER_INT);
+                                        if ($adiccion>0){
+                                            Log::info('OJO!! gol addicion: ');
+                                            $minutoGol = $minutoGol + $adiccion;
+                                        }
+
+                                    }
                                     //Log::info('OJO!! min: '.$minutoGol,[]);
                                 }
 
@@ -2847,6 +2859,7 @@ class FechaController extends Controller
                                     $incidenciaGol = $incidenciaArray[1];
                                     //Log::info('OJO!! incidencia: '.$incidenciaGol,[]);
                                 }
+                                $goles++;
                                 $golesArray[]=$jugadorGol.'-'.$minutoGol.'-'.$incidenciaGol;
                             }
 
@@ -2882,6 +2895,7 @@ class FechaController extends Controller
                                 if (!$tablaIncidencias) {
                                     if (trim($td->plaintext) == 'Banquillo') {
                                         $suplentes = 1;
+
                                     }
                                     if ($td->find('span[class=kleine_schrift]')) {
                                         if ($td->find('span[style=font-weight: bold; color: #646464]')) {
@@ -2895,16 +2909,45 @@ class FechaController extends Controller
 
                                         } elseif ($td->find('span[class=rottext]')) {
                                             if ($suplentes) {
-                                                $saleSuplenteL = (int)filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                                //$saleSuplenteL = (int)filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                                $arraySale= explode("'",$td->find('span[class=rottext]')[0]->plaintext);
+                                                $saleSuplenteV = (int) $arraySale[0];
+                                                if (count($arraySale)>1){
+                                                    $adiccion = (int) $arraySale[1];
+                                                    if ($adiccion>0){
+                                                        Log::info('OJO!! cambio addicion: ');
+                                                        $saleSuplenteV = $saleSuplenteV + $adiccion;
+                                                    }
+
+                                                }
                                                 //Log::info('OJO!! sale suplente: ' . $saleSuplenteL, []);
                                             } else {
-                                                $saleTitularL = (int)filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                                //$saleTitularL = (int)filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                                $arraySale= explode("'",$td->find('span[class=rottext]')[0]->plaintext);
+                                                $saleTitularL = (int) $arraySale[0];
+                                                if (count($arraySale)>1){
+                                                    $adiccion = (int) $arraySale[1];
+                                                    if ($adiccion>0) {
+                                                        Log::info('OJO!! cambio addicion: ');
+                                                        $saleTitularL = $saleTitularL + $adiccion;
+                                                    }
+                                                }
                                                 //Log::info('OJO!! sale titular: ' . $saleTitularL, []);
                                             }
 
                                         } elseif ($td->find('span[class=gruentext]')) {
                                             if ($suplentes) {
-                                                $entraSuplenteL = (int)filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                                //$entraSuplenteL = (int)filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+
+                                                $arrayEntra= explode("'",$td->find('span[class=gruentext]')[0]->plaintext);
+                                                $entraSuplenteL = (int) $arrayEntra[0];
+                                                if (count($arrayEntra)>1){
+                                                    $adiccion = (int) $arrayEntra[1];
+                                                    if ($adiccion>0) {
+                                                        Log::info('OJO!! cambio addicion: ');
+                                                        $entraSuplenteL = $entraSuplenteL + $adiccion;
+                                                    }
+                                                }
                                                 //Log::info('OJO!! entra suplente: ' . $entraSuplenteL, []);
                                             }
 
@@ -2912,9 +2955,31 @@ class FechaController extends Controller
                                         } else {
                                             if ($td->find('span[class=kleine_schrift]')[0]->title != '') {
                                                 if ($suplentes) {
-                                                    $mintutoTarjetaSuplenteL = $td->find('span[class=kleine_schrift]')[0]->title;
+                                                    //$mintutoTarjetaSuplenteL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                                    //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+
+                                                    $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
+                                                    $mintutoTarjetaSuplenteL = (int) $arrayTarjeta[0];
+                                                    if (count($arrayTarjeta)>1){
+                                                        $adiccion = (int) $arrayTarjeta[1];
+                                                        if ($adiccion>0){
+                                                            Log::info('OJO!! tarjeta addicion: ');
+                                                            $mintutoTarjetaSuplenteL = $mintutoTarjetaSuplenteL + $adiccion;
+                                                        }
+
+                                                    }
                                                 } else {
-                                                    $mintutoTarjetaTitularL = $td->find('span[class=kleine_schrift]')[0]->title;
+                                                    //$mintutoTarjetaTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                                    //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                    $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
+                                                    $mintutoTarjetaTitularL = (int) $arrayTarjeta[0];
+                                                    if (count($arrayTarjeta)>1){
+                                                        $adiccion = (int) $arrayTarjeta[1];
+                                                        if ($adiccion>0) {
+                                                            Log::info('OJO!! tarjeta addicion: ');
+                                                            $mintutoTarjetaTitularL = $mintutoTarjetaTitularL + $adiccion;
+                                                        }
+                                                    }
                                                 }
 
 
@@ -2974,122 +3039,159 @@ class FechaController extends Controller
 
                             }
                             if (!$tablaIncidencias) {
-                                $incidenciasT = array();
-                                $incidenciasS = array();
-                                if ($saleTitularL) {
-                                    $incidenciasT[] = array('Sale', $saleTitularL);
-                                }
-                                if ($amarillaTitularL) {
-                                    $incidenciasT[] = array('Tarjeta amarilla', $amarillaTitularL);
-                                }
-                                if ($dobleamarillaTitularL) {
-                                    $incidenciasT[] = array('Expulsado por doble amarilla', $dobleamarillaTitularL);
-                                }
-                                if ($rojaTitularL) {
-                                    $incidenciasT[] = array('Tarjeta roja', $rojaTitularL);
-                                }
+                                if (($jugadorTitularL) || ($jugadorSuplenteL)) {
+                                    $incidenciasT = array();
+                                    $incidenciasS = array();
+                                    if ($saleTitularL) {
+                                        $incidenciasT[] = array('Sale', $saleTitularL);
+                                    }
+                                    if ($amarillaTitularL) {
+                                        $incidenciasT[] = array('Tarjeta amarilla', $amarillaTitularL);
+                                    }
+                                    if ($dobleamarillaTitularL) {
+                                        $incidenciasT[] = array('Expulsado por doble amarilla', $dobleamarillaTitularL);
+                                    }
+                                    if ($rojaTitularL) {
+                                        $incidenciasT[] = array('Tarjeta roja', $rojaTitularL);
+                                    }
 
-                                if (!empty($golesArray)) {
-                                    foreach ($golesArray as $golmin) {
-                                        //Log::info('OJO!! comparar goles: ' . trim($jugadorTitularL).'=='.trim($jugador).' - '.$golmin, []);
-                                        $incGol = explode('-', $golmin);
-                                        if (trim($jugadorTitularL) == trim($incGol[0])) {
+                                    if (!empty($golesArray)) {
+                                        foreach ($golesArray as $golmin) {
+                                            //Log::info('OJO!! comparar goles: ' . trim($jugadorTitularL).'=='.trim($jugador).' - '.$golmin, []);
+                                            $incGol = explode('-', $golmin);
+                                            if (trim($jugadorTitularL) == trim($incGol[0])) {
 
-                                            $minGol = $incGol[1];
-                                            $incidenciaGol = '';
-                                            if (!empty($incGol[2])) {
-                                                $incidenciaGol = $incGol[2];
+                                                $minGol = $incGol[1];
+                                                $incidenciaGol = '';
+                                                if (!empty($incGol[2])) {
+                                                    $incidenciaGol = $incGol[2];
+                                                }
+                                                if (!$incidenciaGol) {
+                                                    $incidenciasT[] = array('Gol', $minGol);
+                                                    $golesL++;
+                                                } else {
+                                                    if (str_contains($incidenciaGol, 'cabeza')) {
+                                                        $incidenciasT[] = array('Cabeza', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'penalti')) {
+                                                        $incidenciasT[] = array('Penal', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'propia puerta')) {
+                                                        $incidenciasT[] = array('Gol en propia meta', $minGol);
+                                                        $golesV++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'tiro libre')) {
+                                                        $incidenciasT[] = array('Tiro libre', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'derecha')) {
+                                                        $incidenciasT[] = array('Gol', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'izquierda')) {
+                                                        $incidenciasT[] = array('Gol', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                }
+
+
                                             }
-                                            if (!$incidenciaGol) {
-                                                $incidenciasT[] = array('Gol', $minGol);
-                                            } else {
-                                                if (str_contains($incidenciaGol, 'cabeza')) {
-                                                    $incidenciasT[] = array('Cabeza', $minGol);
+                                            if (trim($jugadorSuplenteL) == trim($incGol[0])) {
+
+                                                $minGol = $incGol[1];
+                                                $incidenciaGol = '';
+                                                if (!empty($incGol[2])) {
+                                                    $incidenciaGol = $incGol[2];
                                                 }
-                                                if (str_contains($incidenciaGol, 'penalti')) {
-                                                    $incidenciasT[] = array('Penal', $minGol);
+                                                if (!$incidenciaGol) {
+                                                    $incidenciasS[] = array('Gol', $minGol);
+                                                    $golesL++;
+                                                } else {
+                                                    if (str_contains($incidenciaGol, 'cabeza')) {
+                                                        $incidenciasS[] = array('Cabeza', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'penalti')) {
+                                                        $incidenciasS[] = array('Penal', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'propia puerta')) {
+                                                        $incidenciasS[] = array('Gol en propia meta', $minGol);
+                                                        $golesV++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'tiro libre')) {
+                                                        $incidenciasS[] = array('Tiro libre', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'derecha')) {
+                                                        $incidenciasS[] = array('Gol', $minGol);
+                                                        $golesL++;
+                                                    }
+                                                    if (str_contains($incidenciaGol, 'izquierda')) {
+                                                        $incidenciasS[] = array('Gol', $minGol);
+                                                        $golesL++;
+                                                    }
                                                 }
-                                                if (str_contains($incidenciaGol, 'propia puerta')) {
-                                                    $incidenciasT[] = array('Gol en propia meta', $minGol);
-                                                }
-                                                if (str_contains($incidenciaGol, 'tiro libre')) {
-                                                    $incidenciasT[] = array('Tiro libre', $minGol);
-                                                }
+
                                             }
 
 
                                         }
-                                        if (trim($jugadorSuplenteL) == trim($incGol[0])) {
+                                    }
+                                    if ($amarillaSuplenteL) {
+                                        $incidenciasS[] = array('Tarjeta amarilla', $amarillaSuplenteL);
+                                    }
+                                    if ($dobleamarillaSuplenteL) {
+                                        $incidenciasS[] = array('Expulsado por doble amarilla', $dobleamarillaSuplenteL);
+                                    }
+                                    if ($rojaSuplenteL) {
+                                        $incidenciasS[] = array('Tarjeta roja', $rojaSuplenteL);
+                                    }
+                                    if ($saleSuplenteL) {
+                                        $incidenciasS[] = array('Sale', $saleSuplenteL);
+                                    }
+                                    if ($entraSuplenteL) {
+                                        $incidenciasS[] = array('Entra', $entraSuplenteL);
+                                    }
 
-                                            $minGol = $incGol[1];
-                                            $incidenciaGol = '';
-                                            if (!empty($incGol[2])) {
-                                                $incidenciaGol = $incGol[2];
-                                            }
-                                            if (!$incidenciaGol) {
-                                                $incidenciasS[] = array('Gol', $minGol);
-                                            } else {
-                                                if (str_contains($incidenciaGol, 'cabeza')) {
-                                                    $incidenciasS[] = array('Cabeza', $minGol);
-                                                }
-                                                if (str_contains($incidenciaGol, 'penalti')) {
-                                                    $incidenciasS[] = array('Penal', $minGol);
-                                                }
-                                                if (str_contains($incidenciaGol, 'propia puerta')) {
-                                                    $incidenciasS[] = array('Gol en propia meta', $minGol);
-                                                }
-                                                if (str_contains($incidenciaGol, 'tiro libre')) {
-                                                    $incidenciasS[] = array('Tiro libre', $minGol);
-                                                }
-                                            }
-
-                                        }
-
-
+                                    if ($suplentes) {
+                                        $data2 = array(
+                                            'dorsal' => trim($dorsalSuplenteL),
+                                            'nombre' => trim($jugadorSuplenteL),
+                                            'tipo' => 'Suplente',
+                                            'incidencias' => $incidenciasS
+                                        );
+                                    } else {
+                                        $data2 = array(
+                                            'dorsal' => trim($dorsalTitularL),
+                                            'nombre' => trim($jugadorTitularL),
+                                            'tipo' => 'Titular',
+                                            'incidencias' => $incidenciasT
+                                        );
+                                    }
+                                    if (!empty($data2)) {
+                                        $jugadores[] = $data2;
                                     }
                                 }
-                                if ($amarillaSuplenteL) {
-                                    $incidenciasS[] = array('Tarjeta amarilla', $amarillaSuplenteL);
-                                }
-                                if ($dobleamarillaSuplenteL) {
-                                    $incidenciasS[] = array('Expulsado por doble amarilla', $dobleamarillaSuplenteL);
-                                }
-                                if ($rojaSuplenteL) {
-                                    $incidenciasS[] = array('Tarjeta roja', $rojaSuplenteL);
-                                }
-                                if ($saleSuplenteL) {
-                                    $incidenciasS[] = array('Sale', $saleSuplenteL);
-                                }
-                                if ($entraSuplenteL) {
-                                    $incidenciasS[] = array('Entra', $entraSuplenteL);
-                                }
-
-                                if ($suplentes) {
-                                    $data2 = array(
-                                        'dorsal' => trim($dorsalSuplenteL),
-                                        'nombre' => trim($jugadorSuplenteL),
-                                        'tipo' => 'Suplente',
-                                        'incidencias' => $incidenciasS
-                                    );
-                                } else {
-                                    $data2 = array(
-                                        'dorsal' => trim($dorsalTitularL),
-                                        'nombre' => trim($jugadorTitularL),
-                                        'tipo' => 'Titular',
-                                        'incidencias' => $incidenciasT
-                                    );
-                                }
-                                $jugadores[] = $data2;
 
 
-                                $data = array(
 
-                                    'equipo' => $partido->equipol->nombre,
 
-                                    'jugadores' => $jugadores
-                                );
+                            }
+                        }
+                        $data = array(
+
+                            'equipo' => $partido->equipol->nombre,
+
+                            'jugadores' => $jugadores
+                        );
+                        if (!$tablaIncidencias) {
+                            if (!empty($data)){
                                 $equipos[] = $data;
                             }
+
                         }
                     }
 
@@ -3133,18 +3235,48 @@ class FechaController extends Controller
                                     }
                                     elseif ($td->find('span[class=rottext]')) {
                                         if ($suplentes){
-                                            $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            //$saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            $arraySale= explode("'",$td->find('span[class=rottext]')[0]->plaintext);
+                                            $saleSuplenteV = (int) $arraySale[0];
+                                            if (count($arraySale)>1){
+                                                $adiccion = (int) $arraySale[1];
+                                                if ($adiccion>0) {
+                                                    Log::info('OJO!! cambio addicion: ');
+                                                    $saleSuplenteV = $saleSuplenteV + $adiccion;
+                                                }
+                                            }
                                             //Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
                                         }
                                         else{
-                                            $saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            //$saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+
+
+                                            $arraySale= explode("'",$td->find('span[class=rottext]')[0]->plaintext);
+                                            $saleTitularV = (int) $arraySale[0];
+                                            if (count($arraySale)>1){
+                                                $adiccion = (int) $arraySale[1];
+                                                if ($adiccion>0) {
+                                                    Log::info('OJO!! cambio addicion: ');
+                                                    $saleTitularV = $saleTitularV + $adiccion;
+                                                }
+                                            }
                                             //Log::info('OJO!! sale titular: ' . $saleTitularV, []);
                                         }
 
                                     }
                                     elseif ($td->find('span[class=gruentext]')) {
                                         if ($suplentes){
-                                            $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+                                            //$entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
+
+                                            $arrayEntra= explode("'",$td->find('span[class=gruentext]')[0]->plaintext);
+                                            $entraSuplenteV = (int) $arrayEntra[0];
+                                            if (count($arrayEntra)>1){
+                                                $adiccion = (int) $arrayEntra[1];
+                                                if ($adiccion>0) {
+                                                    Log::info('OJO!! cambio addicion: ');
+                                                    $entraSuplenteV = $entraSuplenteV + $adiccion;
+                                                }
+                                            }
                                             //Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
                                         }
 
@@ -3153,10 +3285,30 @@ class FechaController extends Controller
                                     else{
                                         if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
                                             if ($suplentes){
-                                                $mintutoTarjetaSuplenteV = $td->find('span[class=kleine_schrift]')[0]->title;
+                                                //$mintutoTarjetaSuplenteV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                                //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
+                                                $mintutoTarjetaSuplenteV = (int) $arrayTarjeta[0];
+                                                if (count($arrayTarjeta)>1){
+                                                    $adiccion = (int) $arrayTarjeta[1];
+                                                    if ($adiccion>0) {
+                                                        Log::info('OJO!! tarjeta addicion: ');
+                                                        $mintutoTarjetaSuplenteV = $mintutoTarjetaSuplenteV + $adiccion;
+                                                    }
+                                                }
                                             }
                                             else{
-                                                $mintutoTarjetaTitularV = $td->find('span[class=kleine_schrift]')[0]->title;
+                                                //$mintutoTarjetaTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
+                                                //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
+                                                $mintutoTarjetaTitularV = (int) $arrayTarjeta[0];
+                                                if (count($arrayTarjeta)>1){
+                                                    $adiccion = (int) $arrayTarjeta[1];
+                                                    if ($adiccion>0) {
+                                                        Log::info('OJO!! tarjeta addicion: ');
+                                                        $mintutoTarjetaTitularV = $mintutoTarjetaTitularV + $adiccion;
+                                                    }
+                                                }
                                             }
 
 
@@ -3219,120 +3371,152 @@ class FechaController extends Controller
 
 
                             }
-                            $incidenciasT = array();
-                            $incidenciasS = array();
-                            if ($saleTitularV){
-                                $incidenciasT[]=array('Sale', $saleTitularV);
-                            }
-                            if ($amarillaTitularV){
-                                $incidenciasT[]=array('Tarjeta amarilla', $amarillaTitularV);
-                            }
-                            if ($dobleamarillaTitularV){
-                                $incidenciasT[]=array('Expulsado por doble amarilla', $dobleamarillaTitularV);
-                            }
-                            if ($rojaTitularV){
-                                $incidenciasT[]=array('Tarjeta roja', $rojaTitularV);
-                            }
+                            if ($jugadorTitularV || $jugadorSuplenteV){
+                                $incidenciasT = array();
+                                $incidenciasS = array();
+                                if ($saleTitularV){
+                                    $incidenciasT[]=array('Sale', $saleTitularV);
+                                }
+                                if ($amarillaTitularV){
+                                    $incidenciasT[]=array('Tarjeta amarilla', $amarillaTitularV);
+                                }
+                                if ($dobleamarillaTitularV){
+                                    $incidenciasT[]=array('Expulsado por doble amarilla', $dobleamarillaTitularV);
+                                }
+                                if ($rojaTitularV){
+                                    $incidenciasT[]=array('Tarjeta roja', $rojaTitularV);
+                                }
 
-                            if (!empty($golesArray)){
-                                foreach ($golesArray as $golmin){
-                                    //Log::info('OJO!! comparar goles: ' . trim($jugador).' - '.$golmin, []);
-                                    $incGol = explode('-',$golmin);
-                                    if (trim($jugadorTitularV)==trim($incGol[0])){
+                                if (!empty($golesArray)){
+                                    foreach ($golesArray as $golmin){
+                                        //Log::info('OJO!! comparar goles: ' . trim($jugador).' - '.$golmin, []);
+                                        $incGol = explode('-',$golmin);
+                                        if (trim($jugadorTitularV)==trim($incGol[0])){
 
 
-                                        $minGol = $incGol[1];
-                                        $incidenciaGol='';
-                                        if (!empty($incGol[2])){
-                                            $incidenciaGol = $incGol[2];
+                                            $minGol = $incGol[1];
+                                            $incidenciaGol='';
+                                            if (!empty($incGol[2])){
+                                                $incidenciaGol = $incGol[2];
+                                            }
+
+                                            if (!$incidenciaGol){
+                                                $incidenciasT[]=array('Gol', $minGol);
+                                                $golesV++;
+                                            }
+                                            else{
+                                                if (str_contains($incidenciaGol,'cabeza')) {
+                                                    $incidenciasT[]=array('Cabeza', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol,'penalti')) {
+
+                                                    $incidenciasT[]=array('Penal', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol,'propia puerta')) {
+                                                    $incidenciasT[]=array('Gol en propia meta', $minGol);
+                                                    $golesL++;
+                                                }
+                                                if (str_contains($incidenciaGol,'tiro libre')) {
+                                                    $incidenciasT[]=array('Tiro libre', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol, 'derecha')) {
+                                                    $incidenciasT[] = array('Gol', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol, 'izquierda')) {
+                                                    $incidenciasT[] = array('Gol', $minGol);
+                                                    $golesV++;
+                                                }
+                                            }
+
+
+                                        }
+                                        if (trim($jugadorSuplenteV)==trim($incGol[0])){
+
+                                            $minGol = $incGol[1];
+                                            $incidenciaGol='';
+                                            if (!empty($incGol[2])){
+                                                $incidenciaGol = $incGol[2];
+                                            }
+                                            if (!$incidenciaGol){
+                                                $incidenciasS[]=array('Gol', $minGol);
+                                                $golesV++;
+                                            }
+                                            else{
+                                                if (str_contains($incidenciaGol,'cabeza')) {
+                                                    $incidenciasS[]=array('Cabeza', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol,'penalti')) {
+                                                    $incidenciasS[]=array('Penal', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol,'propia puerta')) {
+                                                    $incidenciasS[]=array('Gol en propia meta', $minGol);
+                                                    $golesL++;
+                                                }
+                                                if (str_contains($incidenciaGol,'tiro libre')) {
+                                                    $incidenciasS[]=array('Tiro libre', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol, 'derecha')) {
+                                                    $incidenciasS[] = array('Gol', $minGol);
+                                                    $golesV++;
+                                                }
+                                                if (str_contains($incidenciaGol, 'izquierda')) {
+                                                    $incidenciasS[] = array('Gol', $minGol);
+                                                    $golesV++;
+                                                }
+                                            }
+
+
                                         }
 
-                                        if (!$incidenciaGol){
-                                            $incidenciasT[]=array('Gol', $minGol);
-                                        }
-                                        else{
-                                            if (str_contains($incidenciaGol,'cabeza')) {
-                                                $incidenciasT[]=array('Cabeza', $minGol);
-                                            }
-                                            if (str_contains($incidenciaGol,'penalti')) {
-
-                                                $incidenciasT[]=array('Penal', $minGol);
-                                            }
-                                            if (str_contains($incidenciaGol,'propia puerta')) {
-                                                $incidenciasT[]=array('Gol en propia meta', $minGol);
-                                            }
-                                            if (str_contains($incidenciaGol,'tiro libre')) {
-                                                $incidenciasT[]=array('Tiro libre', $minGol);
-                                            }
-                                        }
 
 
                                     }
-                                    if (trim($jugadorSuplenteV)==trim($incGol[0])){
+                                }
+                                if ($amarillaSuplenteV){
+                                    $incidenciasS[]=array('Tarjeta amarilla', $amarillaSuplenteV);
+                                }
+                                if ($dobleamarillaSuplenteV){
+                                    $incidenciasS[]=array('Expulsado por doble amarilla', $dobleamarillaSuplenteV);
+                                }
+                                if ($rojaSuplenteV){
+                                    $incidenciasS[]=array('Tarjeta roja', $rojaSuplenteV);
+                                }
+                                if ($saleSuplenteV){
+                                    $incidenciasS[]=array('Sale', $saleSuplenteV);
+                                }
+                                if ($entraSuplenteV){
+                                    $incidenciasS[]=array('Entra', $entraSuplenteV);
+                                }
 
-                                        $minGol = $incGol[1];
-                                        $incidenciaGol='';
-                                        if (!empty($incGol[2])){
-                                            $incidenciaGol = $incGol[2];
-                                        }
-                                        if (!$incidenciaGol){
-                                            $incidenciasS[]=array('Gol', $minGol);
-                                        }
-                                        else{
-                                            if (str_contains($incidenciaGol,'cabeza')) {
-                                                $incidenciasS[]=array('Cabeza', $minGol);
-                                            }
-                                            if (str_contains($incidenciaGol,'penalti')) {
-                                                $incidenciasS[]=array('Penal', $minGol);
-                                            }
-                                            if (str_contains($incidenciaGol,'propia puerta')) {
-                                                $incidenciasS[]=array('Gol en propia meta', $minGol);
-                                            }
-                                            if (str_contains($incidenciaGol,'tiro libre')) {
-                                                $incidenciasS[]=array('Tiro libre', $minGol);
-                                            }
-                                        }
-
-
-                                    }
-
-
-
+                                if ($suplentes){
+                                    $data2 = array(
+                                        'dorsal' => trim($dorsalSuplenteV),
+                                        'nombre' => trim($jugadorSuplenteV),
+                                        'tipo' => 'Suplente',
+                                        'incidencias' =>$incidenciasS
+                                    );
+                                }
+                                else{
+                                    $data2 = array(
+                                        'dorsal' => trim($dorsalTitularV),
+                                        'nombre' => trim($jugadorTitularV),
+                                        'tipo' => 'Titular',
+                                        'incidencias' => $incidenciasT
+                                    );
+                                }
+                                if (!empty($data2)){
+                                    $jugadores[]=$data2;
                                 }
                             }
-                            if ($amarillaSuplenteV){
-                                $incidenciasS[]=array('Tarjeta amarilla', $amarillaSuplenteV);
-                            }
-                            if ($dobleamarillaSuplenteV){
-                                $incidenciasS[]=array('Expulsado por doble amarilla', $dobleamarillaSuplenteV);
-                            }
-                            if ($rojaSuplenteV){
-                                $incidenciasS[]=array('Tarjeta roja', $rojaSuplenteV);
-                            }
-                            if ($saleSuplenteV){
-                                $incidenciasS[]=array('Sale', $saleSuplenteV);
-                            }
-                            if ($entraSuplenteV){
-                                $incidenciasS[]=array('Entra', $entraSuplenteV);
-                            }
 
-                            if ($suplentes){
-                                $data2 = array(
-                                    'dorsal' => trim($dorsalSuplenteV),
-                                    'nombre' => trim($jugadorSuplenteV),
-                                    'tipo' => 'Suplente',
-                                    'incidencias' =>$incidenciasS
-                                );
-                            }
-                            else{
-                                $data2 = array(
-                                    'dorsal' => trim($dorsalTitularV),
-                                    'nombre' => trim($jugadorTitularV),
-                                    'tipo' => 'Titular',
-                                    'incidencias' => $incidenciasT
-                                );
-                            }
-                            $jugadores[]=$data2;
+
 
                         }
                         $data = array(
@@ -3341,7 +3525,10 @@ class FechaController extends Controller
 
                             'jugadores' => $jugadores
                         );
-                        $equipos[] = $data;
+                        if (!empty($data)){
+                            $equipos[] = $data;
+                        }
+
                     }
 
 
@@ -3419,239 +3606,7 @@ class FechaController extends Controller
                     }
 
                 }
-                foreach ($equipos as $eq) {
-                    //Log::info('Equipo  ' . $equipo['equipo'], []);
-                    $strEquipo=trim($eq['equipo']);
-                    $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
-                    if (!empty($equipo)){
-                        foreach ($eq['jugadores'] as $jugador) {
-                            $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
-                            $arrgrupos='';
-                            foreach ($grupos as $grupo){
-                                $arrgrupos .=$grupo->id.',';
-                            }
 
-                            $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipo->id)->get();
-
-                            $arrplantillas='';
-                            foreach ($plantillas as $plantilla){
-                                $arrplantillas .=$plantilla->id.',';
-                            }
-
-
-
-
-                            if (!empty($plantillas)){
-                                if(!empty($jugador['dorsal'])){
-
-                                    $plantillaJugador = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillas))->distinct()->where('dorsal','=',$jugador['dorsal'])->first();
-                                }
-                                else{
-                                    $plantillaJugador='';
-                                    Log::info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
-                                }
-                            }
-                            else{
-                                $plantillaJugador='';
-                                Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
-                            }
-                            if (!empty($plantillaJugador)) {
-                                $arrApellido = explode(' ', $jugador['nombre']);
-                                $mismoDorsal = 0;
-                                foreach ($arrApellido as $apellido) {
-                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
-                                    if (!empty($consultarJugador)) {
-                                        $mismoDorsal = 1;
-                                        continue;
-                                    }
-                                }
-                                if (!$mismoDorsal) {
-                                    Log::info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
-                                }
-                                switch ($plantillaJugador->jugador->tipoJugador) {
-                                    case 'Arquero':
-                                        $orden=0;
-                                        break;
-                                    case 'Defensor':
-                                        $orden=1;
-                                        break;
-                                    case 'Medio':
-                                        $orden=2;
-                                        break;
-                                    case 'Delantero':
-                                        $orden=3;
-                                        break;
-
-                                }
-                                $alineaciondata = array(
-                                    'partido_id' => $partido->id,
-                                    'jugador_id' => $plantillaJugador->jugador->id,
-                                    'equipo_id' => $equipo->id,
-                                    'dorsal' =>  $jugador['dorsal'],
-                                    'tipo' => $jugador['tipo'],
-                                    'orden' => $orden
-                                );
-                                $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->first();
-                                try {
-                                    if (!empty($alineacion)) {
-
-                                        $alineacion->update($alineaciondata);
-                                    } else {
-                                        $alineacion = Alineacion::create($alineaciondata);
-                                    }
-
-
-                                } catch (QueryException $ex) {
-                                    $error = $ex->getMessage();
-                                    $ok = 0;
-                                    continue;
-                                }
-                            }
-                            else{
-                                $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
-                                Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
-                            }
-                            foreach ($jugador['incidencias'] as $incidencia) {
-
-                                if (!empty($incidencia)) {
-                                    //Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
-
-                                    $tipogol='';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Gol':
-                                            $tipogol='Jugada';
-                                            break;
-                                        case 'Penal':
-                                            $tipogol='Penal';
-                                            break;
-                                        case 'Tiro libre':
-                                            $tipogol='Tiro libre';
-                                            break;
-                                        case 'Cabeza':
-                                            $tipogol='Cabeza';
-                                            break;
-                                        case 'Gol en propia meta':
-                                            $tipogol='En Contra';
-                                            break;
-
-                                    }
-                                    if ($tipogol){
-                                        if (!empty($plantillaJugador)) {
-                                            $goldata = array(
-                                                'partido_id' => $partido->id,
-                                                'jugador_id' => $plantillaJugador->jugador->id,
-                                                'minuto' => intval(trim($incidencia[1])),
-                                                'tipo' => $tipogol
-                                            );
-                                            $gol = Gol::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->where('minuto', '=', intval(trim($incidencia[1])))->first();
-                                            try {
-                                                if (!empty($gol)) {
-
-                                                    $gol->update($goldata);
-                                                } else {
-                                                    $gol = Gol::create($goldata);
-                                                }
-
-
-                                            } catch (QueryException $ex) {
-                                                $error = $ex->getMessage();
-                                                $ok = 0;
-                                                continue;
-                                            }
-                                        }
-
-                                    }
-                                    $tipotarjeta='';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Tarjeta amarilla':
-                                            $tipotarjeta='Amarilla';
-                                            break;
-                                        case 'Expulsado por doble amarilla':
-                                            $tipotarjeta='Doble Amarilla';
-                                            break;
-                                        case 'Tarjeta roja':
-                                            $tipotarjeta='Roja';
-                                            break;
-                                    }
-                                    if ($tipotarjeta){
-                                        if (!empty($plantillaJugador)) {
-                                            $tarjeadata=array(
-                                                'partido_id'=>$partido->id,
-                                                'jugador_id'=>$plantillaJugador->jugador->id,
-                                                'minuto'=>intval(trim($incidencia[1])),
-                                                'tipo'=>$tipotarjeta
-                                            );
-                                            $tarjeta=Tarjeta::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
-                                            try {
-                                                if (!empty($tarjeta)){
-
-                                                    $tarjeta->update($tarjeadata);
-                                                }
-                                                else{
-                                                    $tarjeta=Tarjeta::create($tarjeadata);
-                                                }
-
-
-                                            }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
-                                                $ok=0;
-                                                continue;
-                                            }
-                                        }
-
-
-
-
-                                    }
-                                    $tipocambio='';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Sale':
-                                            $tipocambio='Sale';
-                                            break;
-                                        case 'Entra':
-                                            $tipocambio='Entra';
-                                            break;
-
-                                    }
-                                    if ($tipocambio){
-                                        if (!empty($plantillaJugador)) {
-                                            $cambiodata=array(
-                                                'partido_id'=>$partido->id,
-                                                'jugador_id'=>$plantillaJugador->jugador->id,
-                                                'minuto'=>intval(trim($incidencia[1])),
-                                                'tipo'=>$tipocambio
-                                            );
-                                            $cambio=Cambio::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
-                                            try {
-                                                if (!empty($cambio)){
-
-                                                    $cambio->update($cambiodata);
-                                                }
-                                                else{
-                                                    $cambio=Cambio::create($cambiodata);
-                                                }
-
-
-                                            }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
-                                                $ok=0;
-                                                continue;
-                                            }
-                                        }
-
-
-
-
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                    else{
-                        Log::info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
-                    }
-                }
                 $arrArbitro = explode(' ', $nombreArbitro);
                 $arbitro=0;
                 if(count($arrArbitro)>1) {
@@ -3814,7 +3769,246 @@ class FechaController extends Controller
                 else{
                     Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
                 }
+                if (($golesL!=$golesLocales)||($golesV!=$golesVisitantes)) {
+                    Log::info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
+                }
+                foreach ($equipos as $eq) {
+                    Log::info('Equipo  ' . $eq['equipo'], []);
+                    $strEquipo=trim($eq['equipo']);
+                    $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
+                    if (!empty($equipo)){
+                        foreach ($eq['jugadores'] as $jugador) {
+                            Log::info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                            $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
+                            $arrgrupos='';
+                            foreach ($grupos as $grupo){
+                                $arrgrupos .=$grupo->id.',';
+                            }
 
+                            $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipo->id)->get();
+
+                            $arrplantillas='';
+                            foreach ($plantillas as $plantilla){
+                                $arrplantillas .=$plantilla->id.',';
+                            }
+
+
+
+
+                            if (!empty($plantillas)){
+
+                                if(!empty($jugador['dorsal'])){
+
+                                    $plantillaJugador = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillas))->distinct()->where('dorsal','=',$jugador['dorsal'])->first();
+                                }
+                                else{
+                                    //print_r($jugador);
+                                    $plantillaJugador='';
+                                    Log::info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
+                                }
+                            }
+                            else{
+                                $plantillaJugador='';
+                                Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
+                            }
+                            if (!empty($plantillaJugador)) {
+                                $arrApellido = explode(' ', $jugador['nombre']);
+                                $mismoDorsal = 0;
+                                foreach ($arrApellido as $apellido) {
+                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
+                                    if (!empty($consultarJugador)) {
+                                        $mismoDorsal = 1;
+                                        continue;
+                                    }
+                                }
+                                if (!$mismoDorsal) {
+                                    Log::info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                                }
+                                switch ($plantillaJugador->jugador->tipoJugador) {
+                                    case 'Arquero':
+                                        $orden=0;
+                                        break;
+                                    case 'Defensor':
+                                        $orden=1;
+                                        break;
+                                    case 'Medio':
+                                        $orden=2;
+                                        break;
+                                    case 'Delantero':
+                                        $orden=3;
+                                        break;
+
+                                }
+                                $alineaciondata = array(
+                                    'partido_id' => $partido->id,
+                                    'jugador_id' => $plantillaJugador->jugador->id,
+                                    'equipo_id' => $equipo->id,
+                                    'dorsal' =>  $jugador['dorsal'],
+                                    'tipo' => $jugador['tipo'],
+                                    'orden' => $orden
+                                );
+                                $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->first();
+                                try {
+                                    if (!empty($alineacion)) {
+
+                                        $alineacion->update($alineaciondata);
+                                    } else {
+                                        $alineacion = Alineacion::create($alineaciondata);
+                                    }
+
+
+                                } catch (QueryException $ex) {
+                                    $error = $ex->getMessage();
+                                    $ok = 0;
+                                    continue;
+                                }
+                            }
+                            else{
+                                $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
+                                Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+                            }
+
+                            foreach ($jugador['incidencias'] as $incidencia) {
+
+                                if (!empty($incidencia)) {
+                                    //Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    //Log::info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    $tipogol='';
+                                    switch (trim($incidencia[0])) {
+                                        case 'Gol':
+                                            $tipogol='Jugada';
+                                            break;
+                                        case 'Penal':
+                                            $tipogol='Penal';
+                                            break;
+                                        case 'Tiro libre':
+                                            $tipogol='Tiro libre';
+                                            break;
+                                        case 'Cabeza':
+                                            $tipogol='Cabeza';
+                                            break;
+                                        case 'Gol en propia meta':
+                                            $tipogol='En Contra';
+                                            break;
+
+                                    }
+                                    if ($tipogol){
+                                        if (!empty($plantillaJugador)) {
+                                            $goldata = array(
+                                                'partido_id' => $partido->id,
+                                                'jugador_id' => $plantillaJugador->jugador->id,
+                                                'minuto' => intval(trim($incidencia[1])),
+                                                'tipo' => $tipogol
+                                            );
+                                            $gol = Gol::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->where('minuto', '=', intval(trim($incidencia[1])))->first();
+                                            try {
+                                                if (!empty($gol)) {
+
+                                                    $gol->update($goldata);
+                                                } else {
+                                                    $gol = Gol::create($goldata);
+                                                }
+
+
+                                            } catch (QueryException $ex) {
+                                                $error = $ex->getMessage();
+                                                $ok = 0;
+                                                continue;
+                                            }
+                                        }
+
+                                    }
+                                    $tipotarjeta='';
+                                    switch (trim($incidencia[0])) {
+                                        case 'Tarjeta amarilla':
+                                            $tipotarjeta='Amarilla';
+                                            break;
+                                        case 'Expulsado por doble amarilla':
+                                            $tipotarjeta='Doble Amarilla';
+                                            break;
+                                        case 'Tarjeta roja':
+                                            $tipotarjeta='Roja';
+                                            break;
+                                    }
+                                    if ($tipotarjeta){
+                                        if (!empty($plantillaJugador)) {
+                                            $tarjeadata=array(
+                                                'partido_id'=>$partido->id,
+                                                'jugador_id'=>$plantillaJugador->jugador->id,
+                                                'minuto'=>intval(trim($incidencia[1])),
+                                                'tipo'=>$tipotarjeta
+                                            );
+                                            $tarjeta=Tarjeta::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
+                                            try {
+                                                if (!empty($tarjeta)){
+
+                                                    $tarjeta->update($tarjeadata);
+                                                }
+                                                else{
+                                                    $tarjeta=Tarjeta::create($tarjeadata);
+                                                }
+
+
+                                            }catch(QueryException $ex){
+                                                $error = $ex->getMessage();
+                                                $ok=0;
+                                                continue;
+                                            }
+                                        }
+
+
+
+
+                                    }
+                                    $tipocambio='';
+                                    switch (trim($incidencia[0])) {
+                                        case 'Sale':
+                                            $tipocambio='Sale';
+                                            break;
+                                        case 'Entra':
+                                            $tipocambio='Entra';
+                                            break;
+
+                                    }
+                                    if ($tipocambio){
+                                        if (!empty($plantillaJugador)) {
+                                            $cambiodata=array(
+                                                'partido_id'=>$partido->id,
+                                                'jugador_id'=>$plantillaJugador->jugador->id,
+                                                'minuto'=>intval(trim($incidencia[1])),
+                                                'tipo'=>$tipocambio
+                                            );
+                                            $cambio=Cambio::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
+                                            try {
+                                                if (!empty($cambio)){
+
+                                                    $cambio->update($cambiodata);
+                                                }
+                                                else{
+                                                    $cambio=Cambio::create($cambiodata);
+                                                }
+
+
+                                            }catch(QueryException $ex){
+                                                $error = $ex->getMessage();
+                                                $ok=0;
+                                                continue;
+                                            }
+                                        }
+
+
+
+
+                                    }
+                                }
+
+                            }
+                        }
+                    }
+                    else{
+                        Log::info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
+                    }
+                }
             }
             else{
                 Log::info('OJO!!! No se econtró la URL2 ' , []);
@@ -3971,10 +4165,15 @@ class FechaController extends Controller
             $strLocal = $partido->equipol->nombre;
             $strVisitante = $partido->equipov->nombre;
             $golesTotales = $partido->golesl+$partido->golesv;
+            $html='';
             try {
-                Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                Log::info('URL ' .$url, []);
-                $html = HtmlDomParser::file_get_html($url, false, null, 0);
+                if ($url){
+                    Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                    Log::info('URL ' .$url, []);
+                    $html = HtmlDomParser::file_get_html($url, false, null, 0);
+                }
+
+
 
 
             }
@@ -4530,7 +4729,7 @@ class FechaController extends Controller
             }
 
             try {
-                //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
                 $html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
 

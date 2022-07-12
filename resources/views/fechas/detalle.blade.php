@@ -64,7 +64,13 @@
                         <td></td>
                         <td>
                             <table class="table">
+                                @php
 
+                                   $arrayGoles = $goles->toArray();
+                                   $arrayTarjetas = $tarjetas->toArray();
+                                   $arrayCambios = $cambios->toArray();
+
+                                @endphp
                                 @foreach($titularesL ?? '' as $titularl)
                                     <tr>
 
@@ -78,6 +84,72 @@
                                     @endif
                                             </a>
                                     <span style="font-weight: bold"> {{ $titularl->jugador->persona->full_name}}</span>
+                                    @php
+
+
+                                        $goleador=array();
+                                        foreach ($arrayGoles as $arrayGol){
+                                            if ($titularl->jugador->id==$arrayGol['jugador_id']){
+                                                $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                            }
+                                        }
+                                        $tarjetero=array();
+                                        foreach ($arrayTarjetas as $arrayTarjeta){
+                                            if ($titularl->jugador->id==$arrayTarjeta['jugador_id']){
+                                                $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                            }
+                                        }
+                                        $tieneCambio=array();
+                                        foreach ($arrayCambios as $arrayCambio){
+                                            if ($titularl->jugador->id==$arrayCambio['jugador_id']){
+                                                $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                            }
+                                        }
+
+                                    @endphp
+                                            @if (!empty($goleador))
+                                                @foreach($goleador as $g)
+                                                    @if($g[0]=='En Contra')
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                    @elseif($g[0]=='Penal')
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                    @endif
+                                                    {{$g[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tarjetero))
+                                                @foreach($tarjetero as $t)
+                                                    @if($t[0]=='Amarilla')
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Roja')
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Doble Amarilla')
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+
+                                                    @endif
+
+
+                                                {{$t[1]}}'
+                                                @endforeach
+                                            @endif
+                                                @if (!empty($tieneCambio))
+                                                    @foreach($tieneCambio as $t)
+                                                        @if($t[0]=='Sale')
+                                                            <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                        @else
+                                                            <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                        @endif
+                                                        {{$t[1]}}'
+                                                @endforeach
+                                            @endif
+
+
                                         </td>
                                     </tr>
                                 @endforeach
@@ -102,6 +174,68 @@
                                             @endif
                                             </a>
                                             <span style="font-weight: bold"> {{ $titularv->jugador->persona->full_name}}</span>
+                                            @php
+                                                $goleador=array();
+                                                foreach ($arrayGoles as $arrayGol){
+                                                    if ($titularv->jugador->id==$arrayGol['jugador_id']){
+                                                        $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                    }
+                                                }
+                                                $tarjetero=array();
+                                                foreach ($arrayTarjetas as $arrayTarjeta){
+                                                    if ($titularv->jugador->id==$arrayTarjeta['jugador_id']){
+                                                        $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                    }
+                                                }
+                                                $tieneCambio=array();
+                                                foreach ($arrayCambios as $arrayCambio){
+                                                    if ($titularv->jugador->id==$arrayCambio['jugador_id']){
+                                                        $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                    }
+                                                }
+
+                                            @endphp
+                                            @if (!empty($goleador))
+                                                @foreach($goleador as $g)
+                                                    @if($g[0]=='En Contra')
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                    @elseif($g[0]=='Penal')
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                    @endif
+                                                    {{$g[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tarjetero))
+                                                @foreach($tarjetero as $t)
+                                                    @if($t[0]=='Amarilla')
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Roja')
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Doble Amarilla')
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+
+                                                    @endif
+
+
+                                                    {{$t[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tieneCambio))
+                                                @foreach($tieneCambio as $t)
+                                                    @if($t[0]=='Sale')
+                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                    @endif
+                                                    {{$t[1]}}'
+                                                @endforeach
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -134,6 +268,68 @@
                                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                                 @endif</a>
                                             <span style="font-weight: bold"> {{ $suplentel->jugador->persona->full_name}}</span>
+                                            @php
+                                                $goleador=array();
+                                                foreach ($arrayGoles as $arrayGol){
+                                                    if ($suplentel->jugador->id==$arrayGol['jugador_id']){
+                                                        $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                    }
+                                                }
+                                                $tarjetero=array();
+                                                foreach ($arrayTarjetas as $arrayTarjeta){
+                                                    if ($suplentel->jugador->id==$arrayTarjeta['jugador_id']){
+                                                        $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                    }
+                                                }
+                                                $tieneCambio=array();
+                                                foreach ($arrayCambios as $arrayCambio){
+                                                    if ($suplentel->jugador->id==$arrayCambio['jugador_id']){
+                                                        $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                    }
+                                                }
+
+                                            @endphp
+                                            @if (!empty($goleador))
+                                                @foreach($goleador as $g)
+                                                    @if($g[0]=='En Contra')
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                    @elseif($g[0]=='Penal')
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                    @endif
+                                                    {{$g[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tarjetero))
+                                                @foreach($tarjetero as $t)
+                                                    @if($t[0]=='Amarilla')
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Roja')
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Doble Amarilla')
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+
+                                                    @endif
+
+
+                                                    {{$t[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tieneCambio))
+                                                @foreach($tieneCambio as $t)
+                                                    @if($t[0]=='Sale')
+                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                    @endif
+                                                    {{$t[1]}}'
+                                                @endforeach
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -158,6 +354,68 @@
                                                 @endif
                                             </a>
                                             <span style="font-weight: bold"> {{ $suplentev->jugador->persona->full_name}}</span>
+                                            @php
+                                                $goleador=array();
+                                                foreach ($arrayGoles as $arrayGol){
+                                                    if ($suplentev->jugador->id==$arrayGol['jugador_id']){
+                                                        $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                    }
+                                                }
+                                                $tarjetero=array();
+                                                foreach ($arrayTarjetas as $arrayTarjeta){
+                                                    if ($suplentev->jugador->id==$arrayTarjeta['jugador_id']){
+                                                        $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                    }
+                                                }
+                                                $tieneCambio=array();
+                                                foreach ($arrayCambios as $arrayCambio){
+                                                    if ($suplentev->jugador->id==$arrayCambio['jugador_id']){
+                                                        $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                    }
+                                                }
+
+                                            @endphp
+                                            @if (!empty($goleador))
+                                                @foreach($goleador as $g)
+                                                    @if($g[0]=='En Contra')
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                    @elseif($g[0]=='Penal')
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                    @endif
+                                                    {{$g[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tarjetero))
+                                                @foreach($tarjetero as $t)
+                                                    @if($t[0]=='Amarilla')
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Roja')
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+
+                                                    @endif
+                                                    @if($t[0]=='Doble Amarilla')
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+
+                                                    @endif
+
+
+                                                    {{$t[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($tieneCambio))
+                                                @foreach($tieneCambio as $t)
+                                                    @if($t[0]=='Sale')
+                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                    @else
+                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                    @endif
+                                                    {{$t[1]}}'
+                                                @endforeach
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -234,185 +492,11 @@
                         </tr>
 
                     @endforeach
-                    <tr>
-                        <td></td>
-                        <td></td>
-                        <td colspan="3" style="font-weight: bold">Goles</td>
-                    </tr>
-
-                    @foreach($goles ?? '' as $gol)
-                        @php
-                        $esLocal = array_search($gol->jugador->id, array_column(array_merge($titularesL->toArray(), $suplentesL->toArray()), 'jugador_id'));
-                        $esVisitante = array_search($gol->jugador->id, array_column(array_merge($titularesV->toArray(), $suplentesV->toArray()), 'jugador_id'));
-
-                        @endphp
-                        @if($gol->tipo == 'En Contra')
-                            @if($esLocal !== false)
-                                @php
-                                    $esVisitante = true;
-                                    $esLocal = false;
-                                @endphp
-                            @else
-                                @php
-                                    $esLocal = true;
-                                    $esVisitante = false;
-                                @endphp
-                            @endif
-                        @endif
-                            <tr>
-
-                            <td>
 
 
-                            </td>
-                            <td>
-                                @if($esLocal !== false)
-
-                                    @if($gol->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$gol->jugador->persona->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
-                                        <span style="font-weight: bold"> {{ $gol->jugador->persona->full_name}}</span>  {{$gol->tipo}}
-
-                                @endif
-                            </td>
-                            <td colspan="2">
-                                <span style="color: green"> {{$gol->minuto}}'</span>
-                            </td>
-
-                            <td >
-                                @if($esVisitante !== false)
-
-                                    @if($gol->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$gol->jugador->persona->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
-                                         <span style="font-weight: bold"> {{ $gol->jugador->persona->full_name}}</span>  {{$gol->tipo}}
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-
-                    <tr>
-                        <td></td>
-                        <td></td>
-                        <td colspan="3" style="font-weight: bold">Tarjetas</td>
-                    </tr>
-
-                    @foreach($tarjetas ?? '' as $tarjeta)
-                        @php
-                            $esLocal = array_search($tarjeta->jugador->id, array_column(array_merge($titularesL->toArray(), $suplentesL->toArray()), 'jugador_id'));
-                            $esVisitante = array_search($tarjeta->jugador->id, array_column(array_merge($titularesV->toArray(), $suplentesV->toArray()), 'jugador_id'));
-                        @endphp
-                        <tr>
-
-                            <td>
 
 
-                            </td>
-                            <td>
-                                @if($esLocal !== false)
-                                    @if($tarjeta->tipo == 'Amarilla')
-                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="20">
-                                    @endif
-                                    @if($tarjeta->tipo == 'Doble Amarilla')
-                                        <img id="original" src="{{ url('images/doble_amarilla.gif') }}" height="20">
-                                    @endif
-                                    @if($tarjeta->tipo == 'Roja')
-                                        <img id="original" src="{{ url('images/roja.gif') }}" height="20">
-                                    @endif
-                                    @if($tarjeta->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->persona->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
-                                    <span style="font-weight: bold"> {{ $tarjeta->jugador->persona->full_name}}</span>
 
-                                @endif
-                            </td>
-                            <td colspan="2">
-                                <span style="color: green"> {{$tarjeta->minuto}}'</span>
-                            </td>
-
-                            <td >
-                                @if($esVisitante !== false)
-                                    @if($tarjeta->tipo == 'Amarilla')
-                                        <img id="original" src="{{ url('images/amarilla.gif') }}" height="20">
-                                    @endif
-                                    @if($tarjeta->tipo == 'Doble Amarilla')
-                                        <img id="original" src="{{ url('images/doble_amarilla.gif') }}" height="20">
-                                    @endif
-                                    @if($tarjeta->tipo == 'Roja')
-                                        <img id="original" src="{{ url('images/roja.gif') }}" height="20">
-                                    @endif
-                                    @if($tarjeta->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$tarjeta->jugador->persona->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
-                                    <span style="font-weight: bold"> {{ $tarjeta->jugador->persona->full_name}}</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-
-                    <tr>
-                        <td></td>
-                        <td></td>
-                        <td colspan="3" style="font-weight: bold">Cambios</td>
-                    </tr>
-
-                    @foreach($cambios ?? '' as $cambio)
-                        @php
-                            $esLocal = array_search($cambio->jugador->id, array_column(array_merge($titularesL->toArray(), $suplentesL->toArray()), 'jugador_id'));
-                            $esVisitante = array_search($cambio->jugador->id, array_column(array_merge($titularesV->toArray(), $suplentesV->toArray()), 'jugador_id'));
-                        @endphp
-                        <tr>
-
-                            <td>
-
-
-                            </td>
-                            <td>
-                                @if($esLocal !== false)
-                                    @if($cambio->tipo == 'Sale')
-                                        <img id="original" src="{{ url('images/sale.png') }}" height="20">
-                                    @else
-                                        <img id="original" src="{{ url('images/entra.png') }}" height="20">
-                                    @endif
-
-                                    @if($cambio->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$cambio->jugador->persona->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
-                                    <span style="font-weight: bold"> {{ $cambio->jugador->persona->full_name}}</span>
-
-                                @endif
-                            </td>
-                            <td colspan="2">
-                                <span style="color: green"> {{$cambio->minuto}}'</span>
-                            </td>
-
-                            <td >
-                                @if($esVisitante !== false)
-                                    @if($cambio->tipo == 'Sale')
-                                        <img id="original" src="{{ url('images/sale.png') }}" height="20">
-                                    @else
-                                        <img id="original" src="{{ url('images/entra.png') }}" height="20">
-                                    @endif
-                                    @if($cambio->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$cambio->jugador->persona->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
-                                    <span style="font-weight: bold"> {{ $cambio->jugador->persona->full_name}}</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
 
                 </table>
             </div>

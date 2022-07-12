@@ -42,3 +42,39 @@ INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
 INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
 
 WHERE personas.nacimiento IS null
+
+########################## Alineaciones distintas a 11 jugadores ##########################
+SELECT partido_id, equipo_id, COUNT(partido_id)
+FROM alineacions
+WHERE tipo = 'Titular'
+GROUP BY partido_id,equipo_id
+HAVING COUNT(partido_id)!=11
+
+########################## Con tarjetas y no jugaron ##########################
+SELECT *
+FROM tarjetas
+WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = tarjetas.partido_id)
+
+########################## Con goles y no jugaron ##########################
+SELECT *
+FROM gols
+WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = gols.partido_id)
+
+########################## Tarjetas repetidas ##########################
+SELECT partido_id, jugador_id, COUNT(partido_id)
+FROM tarjetas
+GROUP BY partido_id,jugador_id, tipo
+HAVING COUNT(partido_id)>1
+
+########################## Cambios repetidos ##########################
+SELECT partido_id, jugador_id, COUNT(partido_id)
+FROM cambios
+GROUP BY partido_id,jugador_id, tipo
+HAVING COUNT(partido_id)>1
+
+########################## Cambios impares ##########################
+SELECT partido_id, COUNT(partido_id)
+FROM cambios
+GROUP BY partido_id
+HAVING COUNT(partido_id) % 2 != 0
+
