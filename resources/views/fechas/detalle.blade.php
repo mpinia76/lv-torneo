@@ -110,11 +110,11 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -198,11 +198,11 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -292,11 +292,11 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -378,11 +378,11 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach

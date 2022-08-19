@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    @include('layouts.partials.meta')
+        @include('layouts.partials.meta')
 </head>
 
 <body>

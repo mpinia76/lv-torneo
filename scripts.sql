@@ -78,3 +78,9 @@ FROM cambios
 GROUP BY partido_id
 HAVING COUNT(partido_id) % 2 != 0
 
+########################## Diferencia en goles ##########################
+SELECT *
+FROM partidos
+WHERE partidos.golesl + partidos.golesv !=
+(SELECT COUNT(gols.id) FROM gols WHERE partidos.id = gols.partido_id GROUP BY gols.partido_id)
+
