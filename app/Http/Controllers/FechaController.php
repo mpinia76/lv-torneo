@@ -1183,8 +1183,8 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-san-martin';
                 break;
             case 'San Martín (Tuc.)':
-                //$strEquipoURL='san-martin-de-tucuman';//ultimo
-                $strEquipoURL='san-martin-tucuman';//viejo
+                $strEquipoURL='san-martin-de-tucuman';//ultimo
+                //$strEquipoURL='san-martin-tucuman';//viejo
                 break;
             case 'Sarmiento (Junín)':
                 $strEquipoURL='sarmiento-de-junin';
