@@ -11,6 +11,11 @@
 @yield('bottom')
 
 <script>
+    $(window).on('load',function(){
+        console.log('carga');
+        $('.load').hide();
+        $('.wrapper').css('filter','blur(0)');
+    });
     function baseUrl(url) {
         return '{{url('')}}/' + url;
     }

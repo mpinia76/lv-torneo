@@ -5,7 +5,7 @@
 </head>
 
 <body>
-
+<div class="wrapper">
 @include('layouts.partials.headerPublic')
 
 <div class="container">
@@ -15,5 +15,6 @@
 @include('layouts.partials.footer')
 
 @yield('scripts')
+</div>
 </body>
 </html>
