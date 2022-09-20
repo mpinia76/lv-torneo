@@ -7,30 +7,22 @@
 
 
 
-        @foreach($arrPosiciones as $nombre => $posiciones)
+
             @php
                 $i = 1;
             @endphp
-            @if(count($arrPosiciones)>1)
-            Grupo {{$nombre}}
-            @endif
+
             <table class="table">
                 <thead>
                 <th>#</th>
                 <th style="width: 300px;">Equipo</th>
-                <th>J</th>
-                <th>G</th>
-                <th>E</th>
-                <th>P</th>
-                <th>GF</th>
-                <th>GC</th>
-                <th>Dif.</th>
-                <th>Punt.</th>
+
+                <th>Puntos que enfrenta</th>
 
                 </thead>
                 <tbody>
 
-                @foreach($posiciones as $equipo)
+                @foreach($arrPrimeros as $equipo)
                     <tr>
                         <td>{{$i++}}</td>
                         <td>
@@ -40,14 +32,8 @@
                             @endif
                             </a>
                             {{$equipo->equipo}}</td>
-                        <td>{{$equipo->jugados}}</td>
-                        <td>{{$equipo->ganados}}</td>
-                        <td>{{$equipo->empatados}}</td>
-                        <td>{{$equipo->perdidos}}</td>
-                        <td>{{$equipo->golesl}}</td>
-                        <td>{{$equipo->golesv}}</td>
-                        <td>{{$equipo->diferencia}}</td>
-                        <td>{{$equipo->puntaje}}</td>
+
+                        <td>{{$equipo->puntos}}</td>
 
 
 
@@ -55,7 +41,7 @@
                 @endforeach
                 </tbody>
             </table>
-                @endforeach
+
 
 
 

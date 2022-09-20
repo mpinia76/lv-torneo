@@ -713,7 +713,8 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
 
         $arrPosiciones = array();
-
+        $arrFaltantes = array();
+        $arrPrimeros = array();
         foreach ($grupos as $grupo){
             if ($grupo->posiciones){
                 $sql='SELECT foto, equipo,
@@ -727,7 +728,7 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
        sum(
              case when golesl > golesv then 3 else 0 end
            + case when golesl = golesv then 1 else 0 end
-       ) puntaje, equipo_id
+       ) puntaje, equipo_id, "" puntos
 from (
        select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
@@ -750,9 +751,11 @@ group by equipo, foto, equipo_id
 order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
                 $posiciones = DB::select(DB::raw($sql));
-                for ($j = 0; $j <= 5; $j++) {
+                for ($j = 0; $j <= 4; $j++) {
                     //dd($posiciones[$j]);
-                    $sql1 = 'SELECT *
+                    $totalPuntos = 0;
+                    $arrPrimeros[$posiciones[$j]->equipo_id]=$posiciones[$j];
+                    $sql1 = 'SELECT e2.nombre, e2.id
 FROM equipos e2
 LEFT JOIN plantillas ON e2.id = plantillas.equipo_id
 WHERE plantillas.grupo_id = '.$grupo->id.' AND e2.id!='.$posiciones[$j]->equipo_id.' and e2.id NOT IN (
@@ -772,10 +775,27 @@ LEFT JOIN equipos visitantes ON partidos.equipov_id = visitantes.id
 WHERE fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
 AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
                     $faltantes = DB::select(DB::raw($sql1));
-                }
-                dd($faltantes);
+                    foreach ($faltantes as $faltante){
+                        foreach ($posiciones as $equipo){
+                            if($faltante->id == $equipo->equipo_id){
+                                $totalPuntos += $equipo->puntaje;
+                                break;
+                            }
 
-                $arrPosiciones[$grupo->nombre]=$posiciones;
+                        }
+                    }
+
+                    //$arrFaltantes[$posiciones[$j]->equipo_id]=$faltantes;
+                    $arrPrimeros[$posiciones[$j]->equipo_id]->puntos = $totalPuntos;
+                }
+                foreach ($arrPrimeros as $key => $row)
+                {
+                    $count[$key] = $row->puntos;
+                }
+                array_multisort($count, SORT_ASC, $arrPrimeros);
+                //dd($arrPrimeros);
+
+                //$arrPosiciones[$grupo->nombre]=$posiciones;
             }
 
         }
@@ -786,6 +806,6 @@ AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
 
 
 
-        return view('grupos.metodo', compact('torneo','arrPosiciones'));
+        return view('grupos.metodo', compact('torneo','arrPrimeros'));
     }
 }
