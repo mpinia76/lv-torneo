@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use App\Grupo;
 
 use DB;
+use Illuminate\Support\Facades\Log;
 
 
 class GrupoController extends Controller
@@ -778,6 +779,7 @@ AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
                     foreach ($faltantes as $faltante){
                         foreach ($posiciones as $equipo){
                             if($faltante->id == $equipo->equipo_id){
+                                Log::info($posiciones[$j]->equipo.': '.$equipo->equipo.' -> '.$equipo->puntaje);
                                 $totalPuntos += $equipo->puntaje;
                                 break;
                             }
@@ -793,7 +795,7 @@ AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
                     $count[$key] = $row->puntos;
                 }
                 array_multisort($count, SORT_ASC, $arrPrimeros);
-                //dd($arrPrimeros);
+                //dd($arrFaltantes);
 
                 //$arrPosiciones[$grupo->nombre]=$posiciones;
             }
