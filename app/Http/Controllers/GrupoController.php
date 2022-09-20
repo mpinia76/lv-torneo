@@ -716,6 +716,30 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
         $arrPosiciones = array();
         $arrFaltantes = array();
         $arrPrimeros = array();
+
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+
+        $fechaNumero= $request->query('fechaNumero');
+
+        if (empty($fechaNumero)){
+            //$fechaNumero = '01';
+            $ultimaFecha=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->orderBy('numero','desc')->get();
+            $fechaNumero = $ultimaFecha[0]->numero;
+        }
+
+        $fechas=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->where('numero','=',$fechaNumero)->get();
+        $arrfechas='';
+        foreach ($fechas as $fecha){
+            $arrfechas .=$fecha->id.',';
+        }
+
+        $fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('numero','ASC')->get();
+
+
+
         foreach ($grupos as $grupo){
             if ($grupo->posiciones){
                 $sql='SELECT foto, equipo,
@@ -737,7 +761,7 @@ from (
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = '.$grupo->torneo->id.' AND grupos.agrupacion = '.$grupo->agrupacion.'
-		 WHERE golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
+		 WHERE fechas.numero <= '.$fechaNumero.' AND golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
      union all
        select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
@@ -745,7 +769,7 @@ from (
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = '.$grupo->torneo->id.' AND grupos.agrupacion = '.$grupo->agrupacion.'
-		 WHERE golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
+		 WHERE fechas.numero <= '.$fechaNumero.' AND golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
 ) a
 group by equipo, foto, equipo_id
 
@@ -765,7 +789,7 @@ FROM fechas
 LEFT JOIN partidos ON fechas.id = partidos.fecha_id
 LEFT JOIN equipos locales ON partidos.equipol_id = locales.id
 
-WHERE fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
+WHERE fechas.numero <= '.$fechaNumero.' AND fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
 AND partidos.equipov_id = '.$posiciones[$j]->equipo_id.'
 UNION ALL
 SELECT visitantes.id
@@ -773,7 +797,7 @@ FROM fechas
 LEFT JOIN partidos ON fechas.id = partidos.fecha_id
 LEFT JOIN equipos visitantes ON partidos.equipov_id = visitantes.id
 
-WHERE fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
+WHERE fechas.numero <= '.$fechaNumero.' AND fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
 AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
                     $faltantes = DB::select(DB::raw($sql1));
                     foreach ($faltantes as $faltante){
@@ -806,8 +830,6 @@ AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
 
 
 
-
-
-        return view('grupos.metodo', compact('torneo','arrPrimeros'));
+        return view('grupos.metodo', compact('torneo','arrPrimeros','fechas','fecha'));
     }
 }

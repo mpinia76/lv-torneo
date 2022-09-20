@@ -5,7 +5,24 @@
 @section('content')
     <div class="container">
 
+        <form class="form-inline">
+            <input type="hidden" name="torneoId" value="{{ (isset($_GET['torneoId']))?$_GET['torneoId']:'' }}">
 
+            <select class="orm-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
+                @foreach($fechas as $f)
+
+                    <option value="{{$f->numero}}" @if($f->numero==$fecha->numero)
+                        selected
+
+                        @endif />Fecha {{$f->numero}}</option>
+                @endforeach
+
+            </select>
+
+
+
+        </form>
+        <br>
 
 
             @php
