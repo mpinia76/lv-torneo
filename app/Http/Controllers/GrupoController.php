@@ -25,7 +25,7 @@ class GrupoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except(['posicionesPublic','goleadoresPublic','tarjetasPublic', 'arqueros']);
+        $this->middleware('auth')->except(['posicionesPublic','goleadoresPublic','tarjetasPublic', 'arqueros', 'metodo']);
     }
 
     /**
@@ -100,6 +100,7 @@ class GrupoController extends Controller
     {
         $grupo_id= $request->query('grupoId');
         $grupo=Grupo::findOrFail($grupo_id);
+        $arrMetodo = array();
 
         $sql='SELECT foto, equipo,
        count(*) jugados,
@@ -135,6 +136,8 @@ group by equipo, foto
 order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         $posiciones = DB::select(DB::raw($sql));
+
+
 
         //dd($posiciones);
         //echo $sql;
@@ -700,5 +703,89 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
 
         $i=$offSet+1;
         return view('grupos.arqueros', compact('torneo','arqueros','i'));
+    }
+
+    public function metodo(Request $request)
+    {
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+
+        $arrPosiciones = array();
+
+        foreach ($grupos as $grupo){
+            if ($grupo->posiciones){
+                $sql='SELECT foto, equipo,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, equipo_id
+from (
+       select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = '.$grupo->torneo->id.' AND grupos.agrupacion = '.$grupo->agrupacion.'
+		 WHERE golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
+     union all
+       select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = '.$grupo->torneo->id.' AND grupos.agrupacion = '.$grupo->agrupacion.'
+		 WHERE golesl is not null AND golesv is not null AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = '.$grupo->id.')
+) a
+group by equipo, foto, equipo_id
+
+order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
+
+                $posiciones = DB::select(DB::raw($sql));
+                for ($j = 0; $j <= 5; $j++) {
+                    //dd($posiciones[$j]);
+                    $sql1 = 'SELECT *
+FROM equipos e2
+LEFT JOIN plantillas ON e2.id = plantillas.equipo_id
+WHERE plantillas.grupo_id = '.$grupo->id.' AND e2.id!='.$posiciones[$j]->equipo_id.' and e2.id NOT IN (
+SELECT locales.id
+FROM fechas
+LEFT JOIN partidos ON fechas.id = partidos.fecha_id
+LEFT JOIN equipos locales ON partidos.equipol_id = locales.id
+
+WHERE fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
+AND partidos.equipov_id = '.$posiciones[$j]->equipo_id.'
+UNION ALL
+SELECT visitantes.id
+FROM fechas
+LEFT JOIN partidos ON fechas.id = partidos.fecha_id
+LEFT JOIN equipos visitantes ON partidos.equipov_id = visitantes.id
+
+WHERE fechas.grupo_id = '.$grupo->id.' AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
+AND partidos.equipol_id = '.$posiciones[$j]->equipo_id.')';
+                    $faltantes = DB::select(DB::raw($sql1));
+                }
+                dd($faltantes);
+
+                $arrPosiciones[$grupo->nombre]=$posiciones;
+            }
+
+        }
+
+
+
+
+
+
+
+        return view('grupos.metodo', compact('torneo','arrPosiciones'));
     }
 }

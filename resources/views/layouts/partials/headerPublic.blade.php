@@ -65,7 +65,10 @@
                             </a>
                         </li>
 
-
+                        <li><a class="dropdown-item" href="{{route('grupos.metodo',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Método Paenza
+                            </a>
+                        </li>
 
                         <li><a class="dropdown-item" href="{{route('grupos.posicionesPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
                                 Posiciones
