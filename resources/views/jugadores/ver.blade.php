@@ -189,7 +189,7 @@
                 <td></td>
                 <td></td>
                 <td><strong>Totales</strong></td>
-                <td><strong>{{ $totalJugados}}</strong></td>
+                <td><strong><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{ $totalJugados}}</a></strong></td>
                 <td><strong>{{ $totalGoles}} ({{round($totalGoles / $totalJugados,2)}})</strong></td>
                 <td><strong>{{ $totalAmarillas}} ({{round($totalAmarillas / $totalJugados,2)}})</strong></td>
                 <td><strong>{{ $totalRojas}} ({{round($totalRojas / $totalJugados,2)}})</strong></td>
