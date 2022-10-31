@@ -69,41 +69,41 @@
 
                     @foreach($partidos as $partido)
                         <tr>
-                            <td>{{$partido[0]->nombreTorneo}} {{$partido[0]->year}}</td>
-                            <td>Fecha {{$partido[0]->numero}}</td>
-                            <td>{{($partido[0]->dia)?date('d/m/Y H:i', strtotime($partido[0]->dia)):''}}</td>
+                            <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+                            <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
-                                <a href="{{route('equipos.ver', array('equipoId' => $partido[0]->equipol_id))}}" >
-                                    @if($partido[0]->local)
-                                        @if($partido[0]->fotoLocal)<img id="original" src="{{ url('images/'.$partido[0]->fotoLocal) }}" height="20">
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
+                                    @if($partido->local)
+                                        @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido[0]->local}}
+                                {{$partido->local}}
                                 @endif
                             </td>
-                            <td>{{$partido[0]->golesl}}
-                                @if($partido[0]->penalesl)
-                                    ({{$partido[0]->penalesl}})
+                            <td>{{$partido->golesl}}
+                                @if($partido->penalesl)
+                                    ({{$partido->penalesl}})
                                 @endif
                             </td>
-                            <td>{{$partido[0]->golesv}}
-                                @if($partido[0]->penalesv)
-                                    ({{$partido[0]->penalesv}})
+                            <td>{{$partido->golesv}}
+                                @if($partido->penalesv)
+                                    ({{$partido->penalesv}})
                                 @endif
                             </td>
                             <td>
-                                <a href="{{route('equipos.ver', array('equipoId' => $partido[0]->equipov_id))}}">
-                                    @if($partido[0]->visitante)
-                                        @if($partido[0]->fotoVisitante)<img id="original" src="{{ url('images/'.$partido[0]->fotoVisitante) }}" height="20">
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov_id))}}">
+                                    @if($partido->visitante)
+                                        @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido[0]->visitante}}
+                                {{$partido->visitante}}
                                 @endif
                             </td>
                             <td>
                                 <div class="d-flex">
 
-                                    <a href="{{route('fechas.detalle', array('partidoId' => $partido[0]->partido_id))}}" class="btn btn-success m-1">Detalles</a>
+                                    <a href="{{route('fechas.detalle', array('partidoId' => $partido->partido_id))}}" class="btn btn-success m-1">Detalles</a>
 
 
                                 </div>
@@ -117,6 +117,7 @@
 
 
                 </table>
+                {{$partidos->links()}}
             </div>
         </div>
 
