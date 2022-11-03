@@ -39,12 +39,12 @@
                     </a>
                 {{$jugador->jugador}}</td>
 
-                <td>{{$jugador->goles}}</td>
-                <td>{{$jugador->Jugada}}</td>
-                <td>{{$jugador->Cabeza}}</td>
-                <td>{{$jugador->Penal}}</td>
-                <td>{{$jugador->Tiro_Libre}}</td>
-                <td>{{$jugador->jugados}}</td>
+                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id))}}" >{{$jugador->goles}}</a></td>
+                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo'=>'Jugada'))}}" >{{$jugador->Jugada}}</a></td>
+                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo'=>'Cabeza'))}}" >{{$jugador->Cabeza}}</a></td>
+                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo'=>'Penal'))}}" >{{$jugador->Penal}}</a></td>
+                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo'=>'Tiro Libre'))}}" >{{$jugador->Tiro_Libre}}</a></td>
+                <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{$jugador->jugados}}</a></td>
                 <td>{{round($jugador->goles / $jugador->jugados,2)}}</td>
                 <td>@if($jugador->escudo)
                         @php

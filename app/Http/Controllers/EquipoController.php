@@ -6,6 +6,7 @@ use App\Equipo;
 use App\Fecha;
 use App\Grupo;
 use App\Partido;
+use App\Torneo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
@@ -19,7 +20,7 @@ class EquipoController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth')->except(['ver']);
+        $this->middleware('auth')->except(['ver','jugados']);
     }
 
     /**
@@ -243,7 +244,7 @@ ORDER BY torneos.year DESC';
             }
             $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
 
-           
+
 
             $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
        count(case when golesv > golesl then 1 end) perdidos,
@@ -269,7 +270,7 @@ ORDER BY torneos.year DESC';
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
-		
+
 		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
      union all
        select DISTINCT partidos.equipov_id equipo_id, golesv, golesl, fechas.id fecha_id
@@ -278,7 +279,7 @@ ORDER BY torneos.year DESC';
 		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
-		 
+
 		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
 ) a
 group by equipo_id
@@ -304,6 +305,127 @@ group by equipo_id
 
 
         return view('equipos.ver', compact('equipo', 'torneosEquipo'));
+    }
+
+    public function jugados(Request $request)
+    {
+        $id= $request->query('equipoId');
+        $equipo=Equipo::findOrFail($id);
+
+        $idTorneo = ($request->query('torneoId'))?$request->query('torneoId'):'';
+        $torneo='';
+        if ($idTorneo){
+            $torneo=Torneo::findOrFail($idTorneo);
+        }
+        $totalJugados =0;
+        $totalGanados =0;
+        $totalEmpatados =0;
+        $totalPerdidos =0;
+
+        $tipo = ($request->query('tipo'))?$request->query('tipo'):'';
+
+        $sql ="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), '%') porcentaje
+    from (
+       select  DISTINCT equipos.id equipo_id, golesl, golesv, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+
+		 WHERE golesl is not null AND golesv is not null AND (equipos.id = ".$id.") ";
+        $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
+        $sql .=" union all
+        select DISTINCT equipos.id equipo_id, golesv, golesl, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+
+		 WHERE golesl is not null AND golesv is not null AND (equipos.id = ".$id.") ";
+        $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
+        $sql .=" ) a
+group by equipo_id";
+
+        $jugados = DB::select(DB::raw($sql));
+
+        foreach ($jugados as $jugado){
+            $totalJugados =$jugado->jugados;
+            $totalGanados =$jugado->ganados;
+            $totalEmpatados =$jugado->empatados;
+            $totalPerdidos =$jugado->perdidos;
+        }
+
+
+
+        $sql ="SELECT DISTINCT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+
+WHERE golesl is not null AND golesv is not null AND ((e1.id = ".$id.") OR (e2.id = ".$id."))";
+        $sql .=($tipo=='Ganados')?" AND ((e1.id = ".$id." AND partidos.golesl > partidos.golesv) OR (e2.id = ".$id." AND partidos.golesv > partidos.golesl))":"";
+        $sql .=($tipo=='Empatados')?" AND ((partidos.golesl = partidos.golesv))":"";
+        $sql .=($tipo=='Perdidos')?" AND ((e1.id = ".$id." AND partidos.golesl < partidos.golesv) OR (e2.id = ".$id." AND partidos.golesv < partidos.golesl))":"";
+        $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
+        $sql .=" ORDER BY partidos.dia DESC";
+
+
+
+        $partidos = DB::select(DB::raw($sql));
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($partidos, $offSet, $paginate, true);
+
+
+
+        $partidos = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($partidos), $paginate, $page);
+
+        $arrayParam = array('equipoId' => $id);
+
+        if ($idTorneo){
+            $arrayParam['torneoId'] = $idTorneo;
+        }
+        if ($tipo){
+            $arrayParam['tipo'] = $tipo;
+        }
+
+
+        $partidos->setPath(route('equipos.jugados',  $arrayParam));
+
+
+        $i=$offSet+1;
+
+
+
+        return view('equipos.jugados', compact('equipo','torneo','totalJugados','totalGanados','totalEmpatados','totalPerdidos','partidos','tipo'));
     }
 
 }

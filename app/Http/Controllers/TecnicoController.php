@@ -7,6 +7,7 @@ use App\Grupo;
 use App\Partido;
 use App\Persona;
 use App\Tecnico;
+use App\Torneo;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
@@ -21,7 +22,7 @@ class TecnicoController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth')->except(['ver']);
+        $this->middleware('auth')->except(['ver','jugados']);
     }
 
     /**
@@ -347,7 +348,7 @@ group by tecnico_id
             }
         }
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, "" as idJugador
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
@@ -417,7 +418,7 @@ WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo->idTorneo." AN
 
 
             foreach ($jugados as $jugado){
-
+                $torneo->idJugador = $jugado->jugador_id;
                 $torneo->jugados += $jugado->jugados;
             }
 
@@ -436,7 +437,7 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo->idTorneo." AND grup
 
 
             foreach ($jugados as $jugado){
-
+                $torneo->idJugador = $jugado->jugador_id;
                 $torneo->jugados += $jugado->jugados;
             }
 
@@ -501,6 +502,130 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.
 
 
         return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador'));
+    }
+
+    public function jugados(Request $request)
+    {
+        $id= $request->query('tecnicoId');
+        $tecnico=Tecnico::findOrFail($id);
+
+        $idTorneo = ($request->query('torneoId'))?$request->query('torneoId'):'';
+        $torneo='';
+        if ($idTorneo){
+            $torneo=Torneo::findOrFail($idTorneo);
+        }
+        $totalJugados =0;
+        $totalGanados =0;
+        $totalEmpatados =0;
+        $totalPerdidos =0;
+
+        $tipo = ($request->query('tipo'))?$request->query('tipo'):'';
+
+        $sql ="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), '%') porcentaje
+    from (
+       select  DISTINCT tecnicos.id tecnico_id, golesl, golesv, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not null AND (tecnicos.id = ".$id.") ";
+        $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
+        $sql .=" union all
+        select DISTINCT tecnicos.id tecnico_id, golesv, golesl, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not null AND (tecnicos.id = ".$id.") ";
+        $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
+        $sql .=" ) a
+group by tecnico_id";
+
+        $jugados = DB::select(DB::raw($sql));
+
+        foreach ($jugados as $jugado){
+            $totalJugados =$jugado->jugados;
+            $totalGanados =$jugado->ganados;
+            $totalEmpatados =$jugado->empatados;
+            $totalPerdidos =$jugado->perdidos;
+        }
+
+
+
+        $sql ="SELECT DISTINCT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
+FROM partidos
+INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND (e1.id = partido_tecnicos.equipo_id OR e2.id = partido_tecnicos.equipo_id)
+INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+WHERE (tecnicos.id = ".$id.")";
+        $sql .=($tipo=='Ganados')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl > partidos.golesv) OR (partido_tecnicos.equipo_id = e2.id AND partidos.golesv > partidos.golesl))":"";
+        $sql .=($tipo=='Empatados')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl = partidos.golesv))":"";
+        $sql .=($tipo=='Perdidos')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl < partidos.golesv) OR (partido_tecnicos.equipo_id = e2.id AND partidos.golesv < partidos.golesl))":"";
+        $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
+        $sql .=" ORDER BY partidos.dia DESC";
+
+
+
+        $partidos = DB::select(DB::raw($sql));
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($partidos, $offSet, $paginate, true);
+
+
+
+        $partidos = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($partidos), $paginate, $page);
+
+        $arrayParam = array('tecnicoId' => $id);
+
+        if ($idTorneo){
+            $arrayParam['torneoId'] = $idTorneo;
+        }
+        if ($tipo){
+            $arrayParam['tipo'] = $tipo;
+        }
+
+
+        $partidos->setPath(route('tecnicos.jugados',  $arrayParam));
+
+
+        $i=$offSet+1;
+
+
+
+        return view('tecnicos.jugados', compact('tecnico','torneo','totalJugados','totalGanados','totalEmpatados','totalPerdidos','partidos','tipo'));
     }
 
 

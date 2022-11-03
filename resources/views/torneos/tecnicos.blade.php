@@ -41,10 +41,10 @@
                         </a>
                         {{$tecnico->tecnico}}</td>
 
-                    <td>{{$tecnico->jugados}}</td>
-                    <td>{{$tecnico->ganados}}</td>
-                    <td>{{$tecnico->empatados}}</td>
-                    <td>{{$tecnico->perdidos}}</td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id))}}" >{{$tecnico->jugados}}</a></td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Ganados'))}}" >{{$tecnico->ganados}}</a></td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Empatados'))}}" >{{$tecnico->empatados}}</a></td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Perdidos'))}}" >{{$tecnico->perdidos}}</a></td>
                     <td>{{$tecnico->golesl}}</td>
                     <td>{{$tecnico->golesv}}</td>
                     <td>{{$tecnico->diferencia}}</td>

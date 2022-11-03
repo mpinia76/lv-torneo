@@ -53,10 +53,10 @@
                 </td>
 
 
-                <td>{{$jugador->amarillas}}</td>
+                <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Amarillas'))}}" >{{$jugador->amarillas}}</a></td>
 
-                <td>{{$jugador->rojas}}</td>
-                <td>{{$jugador->jugados}}</td>
+                <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Rojas'))}}" >{{$jugador->rojas}}</a></td>
+                <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >{{$jugador->jugados}}</a></td>
                 <td>{{round($jugador->amarillas / $jugador->jugados,2)}}</td>
                 <td>{{round($jugador->rojas / $jugador->jugados,2)}}</td>
 

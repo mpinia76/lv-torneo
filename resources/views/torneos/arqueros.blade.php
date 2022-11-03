@@ -36,7 +36,7 @@
 
 
 
-                <td>{{$jugador->jugados}} </td>
+                <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{$jugador->jugados}}</a> </td>
                 <td>{{$jugador->recibidos}} ({{round($jugador->recibidos / $jugador->jugados,2)}})</td>
                 <td>{{$jugador->invictas}} ({{round($jugador->invictas / $jugador->jugados,2)}})</td>
                 <td>@if($jugador->escudo)

@@ -94,10 +94,10 @@
                 <tr>
                     <td>{{$i++}}</td>
                     <td>{{$torneo->nombreTorneo}}</td>
-                    <td>{{$torneo->jugados}}</td>
-                    <td>{{$torneo->ganados}}</td>
-                    <td>{{$torneo->empatados}}</td>
-                    <td>{{$torneo->perdidos}}</td>
+                    <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
+                    <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados'))}}" >{{$torneo->ganados}}</a></td>
+                    <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados'))}}" >{{$torneo->empatados}}</a></td>
+                    <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Perdidos'))}}" >{{$torneo->perdidos}}</a></td>
                     <td>{{$torneo->favor}}</td>
                     <td>{{$torneo->contra}}</td>
                     <td>{{$torneo->favor - $torneo->contra}}</td>
@@ -109,12 +109,12 @@
             @endforeach
 			<tr>
                 <td></td>
-               
+
                 <td><strong>Totales</strong></td>
-                <td><strong>{{ $totalJugados}}</strong></td>
-                <td><strong>{{ $totalGanados}}</strong></td>
-                <td><strong>{{ $totalEmpatados}}</strong></td>
-                <td><strong>{{ $totalPerdidos}}</strong></td>
+                <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id))}}" >{{ $totalJugados}}</a></strong></td>
+                <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'tipo'=>'Ganados'))}}" >{{ $totalGanados}}</a></strong></td>
+                <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'tipo'=>'Empatados'))}}" >{{ $totalEmpatados}}</a></strong></td>
+                <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'tipo'=>'Perdidos'))}}" >{{ $totalPerdidos}}</a></strong></td>
                 <td><strong>{{ $totalFavor}}</strong></td>
                 <td><strong>{{ $totalContra}}</strong></td>
                 <td><strong>{{ $totalFavor-$totalContra}}</strong></td>

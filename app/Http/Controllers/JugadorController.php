@@ -23,7 +23,7 @@ class JugadorController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth')->except(['ver','jugados','goles']);
+        $this->middleware('auth')->except(['ver','jugados','goles','tarjetas']);
     }
 
     /**
@@ -426,14 +426,14 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.
         }
 
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, tecnicos.id as idTecnico
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 WHERE tecnicos.persona_id = '.$jugador->persona_id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year
+GROUP BY torneos.id, torneos.nombre,torneos.year, tecnicos.id
 ORDER BY torneos.year DESC';
 
 
@@ -725,7 +725,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 INNER JOIN torneos ON grupos.torneo_id = torneos.id
 INNER JOIN alineacions ON alineacions.partido_id = partidos.id
-LEFT JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
+INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
 WHERE (alineacions.jugador_id = ".$id.")";
         $sql .=($tipo=='Jugada')?" AND (gols.tipo = 'Jugada')":"";
         $sql .=($tipo=='Cabeza')?" AND (gols.tipo = 'Cabeza')":"";
@@ -823,14 +823,13 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 INNER JOIN torneos ON grupos.torneo_id = torneos.id
 INNER JOIN alineacions ON alineacions.partido_id = partidos.id
-LEFT JOIN tarjetas ON tarjetas.partido_id = partidos.id AND tarjetas.jugador_id = alineacions.jugador_id
+INNER JOIN tarjetas ON tarjetas.partido_id = partidos.id AND tarjetas.jugador_id = alineacions.jugador_id
 WHERE (alineacions.jugador_id = ".$id.")";
-        $sql .=($tipo=='Roja')?" AND (tarjetas.tipo = 'Roja')":"";
-        $sql .=($tipo=='Amarilla')?" AND (tarjetas.tipo = 'Amarilla')":"";
+        $sql .=($tipo=='Rojas')?" AND (tarjetas.tipo = 'Roja')":"";
+        $sql .=($tipo=='Amarillas')?" AND (tarjetas.tipo = 'Amarilla')":"";
 
         $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
         $sql .=" ORDER BY partidos.dia DESC";
-
 
         $partidos = DB::select(DB::raw($sql));
 
