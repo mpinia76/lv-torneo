@@ -145,13 +145,14 @@
                         @endif
 
                     </td>
-                    <td>{{$torneo->jugados}}</td>
-                    <td>{{$torneo->goles}}
+                    <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
+                    <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->goles}}
                         @if($jugo)
                             ({{round($torneo->goles / $torneo->jugados,2)}})
                         @else
                             ({{round(0,2)}})
                         @endif
+                        </a>
                     </td>
                     <td>{{$torneo->amarillas}}
                         @if($jugo)
@@ -190,7 +191,7 @@
                 <td></td>
                 <td><strong>Totales</strong></td>
                 <td><strong><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{ $totalJugados}}</a></strong></td>
-                <td><strong>{{ $totalGoles}} ({{round($totalGoles / $totalJugados,2)}})</strong></td>
+                <td><strong><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id))}}" >{{ $totalGoles}} ({{round($totalGoles / $totalJugados,2)}})</a></strong></td>
                 <td><strong>{{ $totalAmarillas}} ({{round($totalAmarillas / $totalJugados,2)}})</strong></td>
                 <td><strong>{{ $totalRojas}} ({{round($totalRojas / $totalJugados,2)}})</strong></td>
                 <td><strong>{{ $totalRecibidos}} ({{round($totalRecibidos / $totalJugados,2)}})</strong></td>

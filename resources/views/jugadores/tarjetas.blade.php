@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Partidos jugados')
+@section('pageTitle', 'Tarjetas')
 
 @section('content')
     <script type="text/javascript" src="{{asset('js/echarts.min.js')}}"></script>
@@ -8,7 +8,7 @@
 
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                @if($torneo)
+                @if($torneo!='')
                     <div class="row">
                         <div class="form-group col-xs-12 col-sm-6 col-md-10">
                             <div class="form-group">
@@ -49,46 +49,36 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-8" id="detalle">
 
                 <div class="row">
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                        @if($torneo)
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                        @if($torneo!='')
+                            <a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >
+                                    <a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Jugados</dt>
-                        <dd <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalJugados}}</dd>
+                        <dt <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Todas</dt>
+                        <dd <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalTodos}}</dd>
                                     </a>
                     </div>
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
                         @if($torneo!='')
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Ganados'))}}" >
+                            <a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Rojas'))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'tipo' => 'Ganados'))}}" >
+                                    <a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo' => 'Rojas'))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='Ganados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Ganados</dt>
-                        <dd <?php echo ($tipo=='Ganados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalGanados}}</dd></a>
+                        <dt <?php echo ($tipo=='Rojas')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Rojas</dt>
+                        <dd <?php echo ($tipo=='Rojas')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalRojas}}</dd></a>
                     </div>
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
                         @if($torneo!='')
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Empatados'))}}" >
+                            <a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Amarillas'))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'tipo' => 'Empatados'))}}" >
+                                    <a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo' => 'Amarillas'))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='Empatados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Empatados</dt>
-                        <dd <?php echo ($tipo=='Empatados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalEmpatados}}</dd>
+                        <dt <?php echo ($tipo=='Amarillas')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Amarillas</dt>
+                        <dd <?php echo ($tipo=='Amarillas')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalAmarillas}}</dd>
                                     </a>
                     </div>
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                        @if($torneo!='')
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Perdidos'))}}" >
-                                @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'tipo' => 'Perdidos'))}}" >
-                                        @endif
-                        <dt <?php echo ($tipo=='Perdidos')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Perdidos</dt>
-                        <dd <?php echo ($tipo=='Perdidos')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalPerdidos}}</dd>
-                                    </a>
 
-                    </div>
 
 
                 </div>
@@ -229,7 +219,7 @@
                     orient: 'horizontal',
                     bottom: '0%',
                     left: 'center',
-                    data: ['Ganados', 'Empatados','Perdidos'],
+                    data: ['Rojas', 'Amarillas'],
                     itemHeight: 8,
                     itemWidth: 8
                 },
@@ -246,9 +236,9 @@
                         }
                     },
                     data: [
-                        {value: {{$totalGanados}}, name: 'Ganados'},
-                        {value: {{$totalEmpatados}}, name: 'Empatados'},
-                        {value: {{$totalPerdidos}}, name: 'Perdidos'}
+                        {value: {{$totalRojas}}, name: 'Rojas'},
+                        {value: {{$totalAmarillas}}, name: 'Amarillas'}
+
                     ]
                 }]
             });

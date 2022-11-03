@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Partidos jugados')
+@section('pageTitle', 'Goles')
 
 @section('content')
     <script type="text/javascript" src="{{asset('js/echarts.min.js')}}"></script>
@@ -8,7 +8,7 @@
 
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                @if($torneo)
+                @if($torneo!='')
                     <div class="row">
                         <div class="form-group col-xs-12 col-sm-6 col-md-10">
                             <div class="form-group">
@@ -49,43 +49,54 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-8" id="detalle">
 
                 <div class="row">
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                        @if($torneo)
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                        @if($torneo!='')
+                            <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >
+                                    <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Jugados</dt>
-                        <dd <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalJugados}}</dd>
+                        <dt <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Todos</dt>
+                        <dd <?php echo ($tipo=='')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalTodos}}</dd>
                                     </a>
                     </div>
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
                         @if($torneo!='')
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Ganados'))}}" >
+                            <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Jugada'))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'tipo' => 'Ganados'))}}" >
+                                    <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo' => 'Jugada'))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='Ganados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Ganados</dt>
-                        <dd <?php echo ($tipo=='Ganados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalGanados}}</dd></a>
+                        <dt <?php echo ($tipo=='Jugada')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Jugada</dt>
+                        <dd <?php echo ($tipo=='Jugada')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalJugada}}</dd></a>
                     </div>
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
                         @if($torneo!='')
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Empatados'))}}" >
+                            <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Cabeza'))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'tipo' => 'Empatados'))}}" >
+                                    <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo' => 'Cabeza'))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='Empatados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Empatados</dt>
-                        <dd <?php echo ($tipo=='Empatados')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalEmpatados}}</dd>
+                        <dt <?php echo ($tipo=='Cabeza')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Cabeza</dt>
+                        <dd <?php echo ($tipo=='Cabeza')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalCabeza}}</dd>
                                     </a>
                     </div>
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
                         @if($torneo!='')
-                            <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Perdidos'))}}" >
+                            <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Penal'))}}" >
                                 @else
-                                    <a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'tipo' => 'Perdidos'))}}" >
+                                    <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo' => 'Penal'))}}" >
                                         @endif
-                        <dt <?php echo ($tipo=='Perdidos')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Perdidos</dt>
-                        <dd <?php echo ($tipo=='Perdidos')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalPerdidos}}</dd>
+                        <dt <?php echo ($tipo=='Penal')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Penal</dt>
+                        <dd <?php echo ($tipo=='Penal')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalPenal}}</dd>
+                                    </a>
+
+                    </div>
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                        @if($torneo!='')
+                            <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo' => 'Tiro Libre'))}}" >
+                                @else
+                                    <a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'tipo' => 'Tiro Libre'))}}" >
+                                        @endif
+                                        <dt <?php echo ($tipo=='Tiro Libre')? 'style="background: #4caf50; color: #ffffff"':''; ?>>Tiro Libre</dt>
+                                        <dd <?php echo ($tipo=='Tiro Libre')? 'style="background: #4caf50; color: #ffffff"':''; ?>>{{$totalTiroLibre}}</dd>
                                     </a>
 
                     </div>
@@ -229,7 +240,7 @@
                     orient: 'horizontal',
                     bottom: '0%',
                     left: 'center',
-                    data: ['Ganados', 'Empatados','Perdidos'],
+                    data: ['Jugada', 'Cabeza','Penal', 'Tiro Libre'],
                     itemHeight: 8,
                     itemWidth: 8
                 },
@@ -246,9 +257,10 @@
                         }
                     },
                     data: [
-                        {value: {{$totalGanados}}, name: 'Ganados'},
-                        {value: {{$totalEmpatados}}, name: 'Empatados'},
-                        {value: {{$totalPerdidos}}, name: 'Perdidos'}
+                        {value: {{$totalJugada}}, name: 'Jugada'},
+                        {value: {{$totalCabeza}}, name: 'Cabeza'},
+                        {value: {{$totalPenal}}, name: 'Penal'},
+                        {value: {{$totalTiroLibre}}, name: 'Tiro Libre'}
                     ]
                 }]
             });

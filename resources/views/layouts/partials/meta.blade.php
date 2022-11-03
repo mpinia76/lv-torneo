@@ -15,6 +15,7 @@
 
 {{-- <link href="{{ elixir('css/app.css') }}" rel="stylesheet"> --}}
 <link href="{{ asset('css/app.css') }}" rel="stylesheet">
+<link href="{{asset('css/components.min.css')}}" rel="stylesheet" type="text/css">
 <link rel="shortcut icon" type="image/png" href="{{ url('images/icon_ball.png') }}">
 <style>
     body {

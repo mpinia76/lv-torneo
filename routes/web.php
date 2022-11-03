@@ -77,6 +77,7 @@ Route::get('verFecha', 'FechaController@showPublic')->name('fechas.showPublic');
 Route::get('detalleFecha', 'FechaController@detalle')->name('fechas.detalle');
 Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');
 Route::get('jugadorJugados', 'JugadorController@jugados')->name('jugadores.jugados');
+Route::get('jugadorGoles', 'JugadorController@goles')->name('jugadores.goles');
 Route::get('verEquipo', 'EquipoController@ver')->name('equipos.ver');
 Route::get('verTecnico', 'TecnicoController@ver')->name('tecnicos.ver');
 Route::get('verArbitro', 'ArbitroController@ver')->name('arbitros.ver');
