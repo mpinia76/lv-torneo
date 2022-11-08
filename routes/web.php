@@ -50,6 +50,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');
 
     Route::get('importincidenciasfecha', 'FechaController@importincidenciasfecha')->name('fechas.importincidenciasfecha');
+    Route::get('importgolesfecha', 'FechaController@importgolesfecha')->name('fechas.importgolesfecha');
 
 
     Route::get('importpoll', 'PollController@importPoll')->name('polls.importPoll');
