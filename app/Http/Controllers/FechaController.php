@@ -4315,7 +4315,11 @@ class FechaController extends Controller
                                                 Log::info('OJO!! minuto: ' . $minuto, []);
                                                 $arrJugador = explode(' ', $jugadorGol);
                                                 //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
-                                                $jugador = Jugador::SELECT('jugadors.*')->Join('personas', 'personas.id', '=', 'jugadors.persona_id')->where('nombre', 'like', "%$arrJugador[1]%")->where('apellido', 'like', "%$arrJugador[0]%")->first();
+                                                $jugadors = Jugador::SELECT('jugadors.*')->Join('personas', 'personas.id', '=', 'jugadors.persona_id')->where('nombre', 'like', "%$arrJugador[1]%")->where('apellido', 'like', "%$arrJugador[0]%")->get();
+                                                foreach ($jugadors as $jug){
+
+                                                    $jugador=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$jug->id)->first();
+                                                }
                                                 if (!empty($jugador)) {
                                                     $data3 = array(
                                                         'partido_id' => $partido->id,
