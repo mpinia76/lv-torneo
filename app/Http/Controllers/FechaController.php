@@ -1229,7 +1229,7 @@ class FechaController extends Controller
                 //$strEquipoURL='arsenal-fc';
                 break;
             case 'Atlético de Rafaela':
-                $strEquipoURL='atletico-rafaela';
+                $strEquipoURL='atl-rafaela';
                 break;
             case 'Atlético Tucumán':
                 $strEquipoURL='atletico-tucuman';
@@ -1288,11 +1288,11 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-huracan';
                 break;
             case 'Huracán (Tres Arroyos)':
-                $strEquipoURL='huracan-de-tres-arroyos';
+                $strEquipoURL='huracan-ta';
 
                 break;
             case 'Instituto de Córdoba':
-                $strEquipoURL='instituto-cordoba';
+                $strEquipoURL='instituto';
 
                 break;
             case 'Independiente':
@@ -1342,7 +1342,7 @@ class FechaController extends Controller
                 //$strEquipoURL='san-lorenzo-de-almagro';
                 break;
             case 'San Martín (SJ)':
-                $strEquipoURL='san-martin-de-san-juan';
+                $strEquipoURL='san-martin-sj';
                 //$strEquipoURL='ca-san-martin';
                 break;
             case 'San Martín (Tuc.)':
@@ -1365,7 +1365,7 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-tigre';
                 break;
             case 'Tiro Federal de Rosario':
-                $strEquipoURL='tiro-federal-rosario';
+                $strEquipoURL='tiro-federal';
                 break;
             case 'Unión de Santa Fe':
                 $strEquipoURL='union';
@@ -4212,112 +4212,123 @@ class FechaController extends Controller
     {
         set_time_limit(0);
         //Log::info('Entraaaaaa', []);
-        $id = $request->get('fechaId');
-        $fecha=Fecha::findOrFail($id);
 
-        $grupo=Grupo::findOrFail($fecha->grupo->id);
+        $grupo_id = $request->get('grupoId');
 
-        $arrYear = explode('/', $grupo->torneo->year);
-        $years = str_replace('/', '-', $grupo->torneo->year);
-        $year = (count($arrYear)>1)?$arrYear[1]:$arrYear[0];
-        $partidos=Partido::where('fecha_id','=',"$id")->get();
-        $nombreTorneo=$grupo->torneo->nombre;
-        $ok=1;
+        $grupo=Grupo::findOrFail($grupo_id);
+
+
+        $fechas=Fecha::where('grupo_id','=',"$grupo_id")->orderBy('numero','ASC')->get();
+
+        /*$fecha=Fecha::findOrFail($id);
+
+        $grupo=Grupo::findOrFail($fecha->grupo->id);*/
         DB::beginTransaction();
-        foreach ($partidos as $partido){
-            $strLocal = $partido->equipol->nombre;
-            $strVisitante = $partido->equipov->nombre;
-            $golesTotales = $partido->golesl+$partido->golesv;
-            $golesLocales = $partido->golesl;
-            $golesVisitantes = $partido->golesv;
-            Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+        foreach ($fechas as $fecha){
+            $id=$fecha->id;
+            $arrYear = explode('/', $grupo->torneo->year);
+            $years = str_replace('/', '-', $grupo->torneo->year);
+            $year = (count($arrYear)>1)?$arrYear[1]:$arrYear[0];
+            $partidos=Partido::where('fecha_id','=',"$id")->get();
+            $nombreTorneo=$grupo->torneo->nombre;
+            $ok=1;
+
+            foreach ($partidos as $partido){
+                $strLocal = $partido->equipol->nombre;
+                $strVisitante = $partido->equipov->nombre;
+                $golesTotales = $partido->golesl+$partido->golesv;
+                $golesLocales = $partido->golesl;
+                $golesVisitantes = $partido->golesv;
+                Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
 
 
 
-            try {
-                //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                try {
+                    //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
-                /*Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);*/
-                /*html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
-                Log::info('OJO!!! URL ' .'http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/inc/partido-'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', []);
+                    /*Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);*/
+                    /*html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
+                    Log::info('OJO!!! URL ' .'http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/inc/partido-'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', []);
 
-                $html2 = HtmlDomParser::file_get_html('http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/inc/partido-'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', false, null, 0);
+                    $html2 = HtmlDomParser::file_get_html('http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/inc/partido-'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', false, null, 0);
 
-
-                $linkArray=array();
-
-
-
-            }
-            catch (Exception $ex) {
-                $html2='';
-            }
-            $dtLocal ='';
-            $dtVisitante ='';
-            if ($html2){
-                $golesArray= array();
-                foreach ($html2->find('table[class=matchRecord]') as $element) {
-
-                    foreach ($element->find('tr') as $tr) {
-                        //Log::info('OJO!! gol: '.$tr->plaintext,[]);
-
-                        if (str_contains($tr, 'Gol de penal')) {
-                            $arrTh = array();
-                            foreach ($tr->find('th') as $th) {
+                    //Log::info('OJO!! error: '.$html2,[]);
+                    $linkArray=array();
 
 
-                                $arrTh[] = $th;
 
-                            }
-                            $arrTd = array();
-                            $tdAnt = '';
-                            foreach ($tr->find('td') as $td) {
-                                //$jugadorGol = $td->find('a')[0]->href;
+                }
+                catch (Exception $ex) {
+                    $html2='';
+                }
+                $dtLocal ='';
+                $dtVisitante ='';
+                if ($html2){
+                    $golesArray= array();
+                    foreach ($html2->find('table[class=matchRecord]') as $element) {
 
+                        foreach ($element->find('tr') as $tr) {
+                            //Log::info('OJO!! gol: '.$tr->plaintext,[]);
 
-                                if (str_contains($td, 'Gol de penal')) {
-                                    $jugadorArr = explode('/', $tdAnt->find('a')[0]->href);
-                                    Log::info('OJO!! gol: ' . $jugadorArr[count($jugadorArr) - 2], []);
-                                    $jugadorGol = str_replace('-', ' ', $jugadorArr[count($jugadorArr) - 2]);
-                                    $arrImg = array();
-                                    foreach ($td->find('img') as $img) {
-                                        $arrImg[] = $img->alt;
-
-
-                                    }
-                                    $arrImgText = array();
-                                    foreach ($td->find('img text') as $img) {
-                                        $arrImgText[] = $img->plaintext;
+                            if (str_contains($tr, 'iconMatchPenalty.gif')) {
+                                $arrTh = array();
+                                foreach ($tr->find('th') as $th) {
 
 
-                                    }
-                                    for ($i = 0; $i < count($arrImg); $i++) {
-                                        if ($arrImg[$i] == 'Gol de penal') {
-                                            $minuto = str_replace('&#160', '', $arrImgText[$i]);
-                                            if (str_contains($minuto, 'st')) {
-                                                $minuto = intval($minuto) + 45;
-                                            } else {
-                                                $minuto = intval($minuto);
-                                            }
+                                    $arrTh[] = $th;
 
-                                            Log::info('OJO!! minuto: ' . $minuto, []);
-                                            $arrJugador = explode(' ', $jugadorGol);
-                                            //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
-                                            $jugador = Jugador::SELECT('jugadors.*')->Join('personas', 'personas.id', '=', 'jugadors.persona_id')->where('nombre', 'like', "%$arrJugador[1]%")->where('apellido', 'like', "%$arrJugador[0]%")->first();
-                                            if (!empty($jugador)) {
-                                                $data3 = array(
-                                                    'partido_id' => $partido->id,
-                                                    'jugador_id' => $jugador->id,
-                                                    'minuto' => $minuto,
+                                }
+                                $arrTd = array();
+                                $tdAnt = '';
+                                foreach ($tr->find('td') as $td) {
+                                    //$jugadorGol = $td->find('a')[0]->href;
 
-                                                    'tipo' => 'Penal'
-                                                );
-                                                $golesArray[] = $data3;
+
+                                    if (str_contains($td, 'iconMatchPenalty.gif')) {
+                                        $jugadorArr = explode('/', $tdAnt->find('a')[0]->href);
+                                        Log::info('OJO!! gol: ' . $jugadorArr[count($jugadorArr) - 2], []);
+                                        $jugadorGol = str_replace('-', ' ', $jugadorArr[count($jugadorArr) - 2]);
+                                        $arrImg = array();
+                                        foreach ($td->find('img') as $img) {
+                                            $arrImg[] = $img->src;
+
+
+                                        }
+                                        $arrImgText = array();
+                                        foreach ($td->find('img text') as $img) {
+                                            $arrImgText[] = $img->plaintext;
+
+
+                                        }
+                                        for ($i = 0; $i < count($arrImg); $i++) {
+                                            // Log::info('OJO!! img: ' . $arrImg[$i], []);
+                                            if (str_contains($arrImg[$i], 'iconMatchPenalty.gif')) {
+
+                                                $minuto = str_replace('&#160', '', $arrImgText[$i]);
+                                                if (str_contains($minuto, 'st')) {
+                                                    $minuto = intval($minuto) + 45;
+                                                } else {
+                                                    $minuto = intval($minuto);
+                                                }
+
+                                                Log::info('OJO!! minuto: ' . $minuto, []);
+                                                $arrJugador = explode(' ', $jugadorGol);
+                                                //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
+                                                $jugador = Jugador::SELECT('jugadors.*')->Join('personas', 'personas.id', '=', 'jugadors.persona_id')->where('nombre', 'like', "%$arrJugador[1]%")->where('apellido', 'like', "%$arrJugador[0]%")->first();
+                                                if (!empty($jugador)) {
+                                                    $data3 = array(
+                                                        'partido_id' => $partido->id,
+                                                        'jugador_id' => $jugador->id,
+                                                        'minuto' => $minuto,
+
+                                                        'tipo' => 'Penal'
+                                                    );
+                                                    $golesArray[] = $data3;
+                                                }
                                             }
                                         }
                                     }
-                                }
                                     $tdAnt = $td;
                                     $arrTd[] = $td;
                                     //$lineaGol = $td->plaintext;
@@ -4327,38 +4338,40 @@ class FechaController extends Controller
                         }
 
 
+                    }
+
+                    foreach ($golesArray as $goles){
+                        $gol = Gol::where('partido_id', '=', $goles['partido_id'])->where('jugador_id', '=', $goles['jugador_id'])->where('minuto', '=', $goles['minuto'])->first();
+                        try {
+                            if (!empty($gol)) {
+
+                                $gol->update($goles);
+                            } else {
+                                Log::info('OJO!! no estaba: ' . $goles['partido_id'].' - '.$goles['jugador_id'].' - '.$goles['minuto'], []);
+                                $gol = Gol::create($goles);
+                            }
+
+
+                        } catch (QueryException $ex) {
+                            $error = $ex->getMessage();
+                            $ok = 0;
+                            continue;
+                        }
+                    }
+
+                }
+                else{
+                    Log::info('OJO!!! No se econtró la URL2 ' , []);
+                    /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
+                    $ok=0;
+                    continue;*/
                 }
 
-              foreach ($golesArray as $goles){
-                  $gol = Gol::where('partido_id', '=', $goles['partido_id'])->where('jugador_id', '=', $goles['jugador_id'])->where('minuto', '=', $goles['minuto'])->first();
-                  try {
-                      if (!empty($gol)) {
 
-                          $gol->update($goles);
-                      } else {
-                          Log::info('OJO!! no estaba: ' . $goles['partido_id'].' - '.$goles['jugador_id'].' - '.$goles['minuto'], []);
-                          $gol = Gol::create($goles);
-                      }
-
-
-                  } catch (QueryException $ex) {
-                      $error = $ex->getMessage();
-                      $ok = 0;
-                      continue;
-                  }
-              }
 
             }
-            else{
-                Log::info('OJO!!! No se econtró la URL2 ' , []);
-                /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
-                $ok=0;
-                continue;*/
-            }
-
-
-
         }
+
 
         if ($ok){
 

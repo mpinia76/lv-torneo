@@ -53,12 +53,12 @@ HAVING COUNT(partido_id)!=11
 ########################## Con tarjetas y no jugaron ##########################
 SELECT *
 FROM tarjetas
-WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = tarjetas.partido_id)
+WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = tarjetas.partido_id AND alineacions.jugador_id = gols.jugador_id)
 
 ########################## Con goles y no jugaron ##########################
 SELECT *
 FROM gols
-WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = gols.partido_id)
+WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = gols.partido_id AND alineacions.jugador_id = gols.jugador_id)
 
 ########################## Tarjetas repetidas ##########################
 SELECT partido_id, jugador_id, COUNT(partido_id)
