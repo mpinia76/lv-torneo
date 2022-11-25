@@ -4224,6 +4224,72 @@ class FechaController extends Controller
 
         $grupo=Grupo::findOrFail($fecha->grupo->id);*/
         DB::beginTransaction();
+        foreach ($fechas as $fecha) {
+            $id = $fecha->id;
+            $arrYear = explode('/', $grupo->torneo->year);
+            $years = str_replace('/', '-', $grupo->torneo->year);
+            $year = (count($arrYear) > 1) ? $arrYear[1] : $arrYear[0];
+            $partidos = Partido::where('fecha_id', '=', "$id")->get();
+            $nombreTorneo = $grupo->torneo->nombre;
+            $ok = 1;
+
+            foreach ($partidos as $partido) {
+                $strLocal = $partido->equipol->nombre;
+                $strVisitante = $partido->equipov->nombre;
+                $golesTotales = $partido->golesl + $partido->golesv;
+                $golesLocales = $partido->golesl;
+                $golesVisitantes = $partido->golesv;
+                Log::info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+
+                $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
+                foreach ($goles as $gol) {
+                    Log::info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
+                    if ($gol->tipo=='Jugada'){
+                        $nombre = explode(' ',$gol->jugador->persona->nombre)[0];
+                        $apellido = explode(' ',$gol->jugador->persona->apellido)[0];
+                        Log::info('Url - http://www.futbol360.com.ar/jugadores/argentina/' . $apellido.'-'.$nombre, []);
+                    }
+                }
+            }
+        }
+
+
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ='Importación exitosa. (ver log)';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('fechas.index', array('grupoId' => $fecha->grupo->id))->with($respuestaID,$respuestaMSJ);
+
+        //return view('fechas.index', compact('grupo'));
+    }
+
+    public function importgolesfecha_old(Request $request)
+    {
+        set_time_limit(0);
+        //Log::info('Entraaaaaa', []);
+
+        $grupo_id = $request->get('grupoId');
+
+        $grupo=Grupo::findOrFail($grupo_id);
+
+
+        $fechas=Fecha::where('grupo_id','=',"$grupo_id")->orderBy('numero','ASC')->get();
+
+        /*$fecha=Fecha::findOrFail($id);
+
+        $grupo=Grupo::findOrFail($fecha->grupo->id);*/
+        DB::beginTransaction();
         foreach ($fechas as $fecha){
             $id=$fecha->id;
             $arrYear = explode('/', $grupo->torneo->year);
