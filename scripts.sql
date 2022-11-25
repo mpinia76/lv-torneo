@@ -53,12 +53,17 @@ HAVING COUNT(partido_id)!=11
 ########################## Con tarjetas y no jugaron ##########################
 SELECT *
 FROM tarjetas
-WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = tarjetas.partido_id AND alineacions.jugador_id = gols.jugador_id)
+WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = tarjetas.partido_id AND alineacions.jugador_id = tarjetas.jugador_id)
 
 ########################## Con goles y no jugaron ##########################
 SELECT *
 FROM gols
 WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = gols.partido_id AND alineacions.jugador_id = gols.jugador_id)
+
+########################## Con cambios y no jugaron ##########################
+SELECT *
+FROM cambios
+WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = cambios.partido_id AND alineacions.jugador_id = cambios.jugador_id)
 
 ########################## Tarjetas repetidas ##########################
 SELECT partido_id, jugador_id, COUNT(partido_id)
@@ -71,6 +76,30 @@ SELECT partido_id, jugador_id, COUNT(partido_id)
 FROM cambios
 GROUP BY partido_id,jugador_id, tipo
 HAVING COUNT(partido_id)>1
+
+########################## Eliminar Cambios repetidos ##########################
+DELETE FROM cambios
+
+WHERE id IN
+
+      (
+
+          SELECT
+
+              id
+
+          FROM
+
+              (
+
+                  SELECT id
+                  FROM cambios
+                  GROUP BY partido_id,jugador_id, tipo
+                  HAVING COUNT(partido_id)>1
+
+              ) AS duplicate_ids
+
+      );
 
 ########################## Cambios impares ##########################
 SELECT partido_id, COUNT(partido_id)
@@ -89,4 +118,10 @@ SELECT partido_id, COUNT(partido_id)
 FROM partido_arbitros
 GROUP BY partido_id
 HAVING COUNT(partido_id)>3
+
+########################## tipos de árbitros repetidos ##########################
+SELECT partido_id, COUNT(partido_id)
+FROM partido_arbitros
+GROUP BY partido_id, tipo
+HAVING COUNT(partido_id)>1
 

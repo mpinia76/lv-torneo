@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-
+        <h1 class="display-6">Fecha {{$partido->fecha->numero}} del grupo {{$partido->fecha->grupo->nombre}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
     <!-- if validation in the controller fails, show the errors -->
     @if ($errors->any())
         <div class="alert alert-danger">

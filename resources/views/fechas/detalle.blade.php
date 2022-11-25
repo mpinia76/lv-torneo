@@ -5,7 +5,7 @@
 @section('content')
     <div class="container">
 
-        <h1 class="display-6">Fecha {{$partido->fecha->numero}} </h1>
+        <h1 class="display-6">Fecha {{$partido->fecha->numero}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
 
 
         <div class="row">

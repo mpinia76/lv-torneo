@@ -1232,7 +1232,7 @@ class FechaController extends Controller
                 $strEquipoURL='atl-rafaela';
                 break;
             case 'Atlético Tucumán':
-                $strEquipoURL='atletico-tucuman';
+                $strEquipoURL='atl-tucuman';
                 break;
             case 'Argentinos Juniors':
                 $strEquipoURL='argentinos';
@@ -1346,7 +1346,7 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-san-martin';
                 break;
             case 'San Martín (Tuc.)':
-                $strEquipoURL='san-martin-de-tucuman';//ultimo
+                $strEquipoURL='san-martin-t';//ultimo
                 //$strEquipoURL='san-martin-tucuman';//viejo
                 break;
             case 'Sarmiento (Junín)':
@@ -4287,7 +4287,7 @@ class FechaController extends Controller
 
                                     if (str_contains($td, 'iconMatchPenalty.gif')) {
                                         $jugadorArr = explode('/', $tdAnt->find('a')[0]->href);
-                                        Log::info('OJO!! gol: ' . $jugadorArr[count($jugadorArr) - 2], []);
+                                        Log::info('OJO!! penal: ' . $jugadorArr[count($jugadorArr) - 2], []);
                                         $jugadorGol = str_replace('-', ' ', $jugadorArr[count($jugadorArr) - 2]);
                                         $arrImg = array();
                                         foreach ($td->find('img') as $img) {
@@ -4316,19 +4316,27 @@ class FechaController extends Controller
                                                 $arrJugador = explode(' ', $jugadorGol);
                                                 //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                                                 $jugadors = Jugador::SELECT('jugadors.*')->Join('personas', 'personas.id', '=', 'jugadors.persona_id')->where('nombre', 'like', "%$arrJugador[1]%")->where('apellido', 'like', "%$arrJugador[0]%")->get();
+                                                $alineacion='';
+
                                                 foreach ($jugadors as $jug){
 
-                                                    $jugador=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$jug->id)->first();
+                                                    $alineacion=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$jug->id)->first();
+                                                    if (!empty($alineacion)) {
+                                                        break;
+                                                    }
                                                 }
-                                                if (!empty($jugador)) {
+                                                if (!empty($alineacion)) {
                                                     $data3 = array(
                                                         'partido_id' => $partido->id,
-                                                        'jugador_id' => $jugador->id,
+                                                        'jugador_id' => $alineacion->jugador->id,
                                                         'minuto' => $minuto,
 
                                                         'tipo' => 'Penal'
                                                     );
                                                     $golesArray[] = $data3;
+                                                }
+                                                else{
+                                                    Log::info('OJO!! no se encontro a : ' . $jugadorGol, []);
                                                 }
                                             }
                                         }
