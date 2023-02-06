@@ -7,7 +7,11 @@
     <h1 class="display-6">Histórico de goleadores</h1>
 
     <hr/>
+        @php
+            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
+            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
+        @endphp
 
 
     <table class="table">
@@ -15,11 +19,11 @@
         <th>#</th>
         <th>Jugador</th>
 
-        <th>Goles</th>
-        <th>Jugada</th>
-        <th>Cabeza</th>
-        <th>Penal</th>
-        <th>Tiro Libre</th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Goles','tipoOrder'=>$tipoOrder))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Jugada','tipoOrder'=>$tipoOrder))}}" > Jugada @if($order=='Jugada') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Cabeza','tipoOrder'=>$tipoOrder))}}" >Cabeza @if($order=='Cabeza')<img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Penal','tipoOrder'=>$tipoOrder))}}" > Penal @if($order=='Penal') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Tiro_Libre','tipoOrder'=>$tipoOrder))}}" > Tiro Libre @if($order=='Tiro_Libre') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th>Jugados</th>
         <th>Prom.</th>
         <th>Equipos</th>

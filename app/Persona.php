@@ -7,7 +7,7 @@ use Carbon\Carbon;
 
 class Persona extends Model
 {
-    protected $fillable = ['nombre', 'apellido','email','telefono','ciudad','observaciones','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento'];
+    protected $fillable = ['nombre', 'apellido','email','telefono','ciudad','observaciones','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento','nacionalidad'];
 
     public function jugador()
     {

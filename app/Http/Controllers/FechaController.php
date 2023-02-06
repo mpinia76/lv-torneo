@@ -23,6 +23,10 @@ use Illuminate\Http\Request;
 use DB;
 use Illuminate\Support\Facades\Log;
 use Sunra\PhpSimple\HtmlDomParser;
+use Excel;
+
+use Response;
+use File;
 
 class FechaController extends Controller
 {
@@ -1129,8 +1133,8 @@ class FechaController extends Controller
 
                 break;
             case 'Instituto de Córdoba':
-                $strEquipoURL='instituto-cordoba';
-
+                //$strEquipoURL='instituto-cordoba';
+                $strEquipoURL='instituto-de-cordoba';
                 break;
             case 'Independiente':
                 //$strEquipoURL='ca-independiente';
@@ -1214,7 +1218,176 @@ class FechaController extends Controller
         }
         return $strEquipoURL;
     }
+    public function dameIdEquipoURL($strEquipo)
+    {
+        $strEquipoURL=strtr($strEquipo, " ", "-");
+        switch (trim($strEquipo)) {
+            case 'Aldosivi':
+                $strEquipoURL='158';
 
+                break;
+            case 'All Boys':
+                $strEquipoURL='37';
+
+                break;
+            case 'Almagro':
+                $strEquipoURL='74';
+
+                break;
+            case 'Argentinos Juniors':
+                $strEquipoURL='28';
+                break;
+            case 'Arsenal':
+
+                $strEquipoURL='23';//ultimo
+
+                break;
+            case 'Atlético de Rafaela':
+                $strEquipoURL='26';
+                break;
+            case 'Atlético Tucumán':
+                $strEquipoURL='39';
+                break;
+
+            case 'Banfield':
+                $strEquipoURL='19';//ultimo
+
+                break;
+            case 'Belgrano':
+                $strEquipoURL='12';
+
+                break;
+            case 'Boca Juniors':
+                $strEquipoURL='3';
+
+                break;
+
+            case 'Central Córdoba (SdE)':
+                $strEquipoURL='1883';
+                break;
+            case 'Chacarita Juniors':
+                $strEquipoURL='18';
+
+                break;
+            case 'Colón de Santa Fe':
+                $strEquipoURL='16';//ultimo
+
+                break;
+            case 'Crucero del Norte':
+                $strEquipoURL='1861';
+                break;
+            case 'Defensa y Justicia':
+                $strEquipoURL='152';
+
+                break;
+            case 'Estudiantes (LP)':
+                $strEquipoURL='14';
+
+                break;
+            case 'Gimnasia (J)':
+                $strEquipoURL='34';
+                break;
+            case 'Gimnasia (LP)':
+                $strEquipoURL='15';//ultimo
+
+                break;
+            case 'Godoy Cruz':
+                $strEquipoURL='153';//ultimo
+
+                break;
+            case 'Huracán':
+                $strEquipoURL='8';
+
+                break;
+            case 'Huracán (Tres Arroyos)':
+                $strEquipoURL='75';
+
+                break;
+            case 'Instituto de Córdoba':
+                $strEquipoURL='13';
+
+                break;
+            case 'Independiente':
+
+                $strEquipoURL='5';
+                break;
+            case 'Lanús':
+                $strEquipoURL='20';//ultimo
+
+                break;
+            case 'Los Andes':
+                $strEquipoURL='los-andes-de-lomas-de-zamora';
+                break;
+            case 'Newell\'s Old Boys':
+                $strEquipoURL='10';
+
+                break;
+            case 'Nueva Chicago':
+                $strEquipoURL='25';
+                break;
+            case 'Olimpo':
+                //$strEquipoURL='olimpo';
+                $strEquipoURL='21';
+                break;
+            case 'Patronato':
+                $strEquipoURL='1181';//ultimo
+
+                break;
+            case 'Quilmes':
+                $strEquipoURL='24';
+                break;
+            case 'Racing Club':
+                $strEquipoURL='6';
+
+                break;
+            case 'River Plate':
+                $strEquipoURL='4';
+
+                break;
+            case 'Rosario Central':
+                $strEquipoURL='9';
+
+                break;
+            case 'San Lorenzo':
+                $strEquipoURL='7';
+
+                break;
+            case 'San Martín (SJ)':
+                $strEquipoURL='157';
+
+                break;
+            case 'San Martín (Tuc.)':
+                $strEquipoURL='38';//ultimo
+
+                break;
+            case 'Sarmiento (Junín)':
+                $strEquipoURL='1474';
+                break;
+            case 'Talleres (Cba.)':
+                $strEquipoURL='11';//nuevo
+
+                break;
+            case 'Temperley':
+
+                $strEquipoURL='35';
+                break;
+            case 'Tigre':
+                $strEquipoURL='31';
+
+                break;
+            case 'Tiro Federal de Rosario':
+                $strEquipoURL='149';
+                break;
+            case 'Unión de Santa Fe':
+                $strEquipoURL='17';
+                break;
+            case 'Vélez Sarsfield':
+                $strEquipoURL='22';
+
+                break;
+        }
+        return $strEquipoURL;
+    }
     public function dameNombreEquipoURL3($strEquipo)
     {
         $strEquipoURL=strtr($strEquipo, " ", "-");
@@ -1292,8 +1465,8 @@ class FechaController extends Controller
 
                 break;
             case 'Instituto de Córdoba':
-                $strEquipoURL='instituto';
-
+                //$strEquipoURL='instituto';
+                $strEquipoURL='instituto-de-cordoba';
                 break;
             case 'Independiente':
                 //$strEquipoURL='ca-independiente';
@@ -4207,7 +4380,64 @@ class FechaController extends Controller
 
         //return view('fechas.index', compact('grupo'));
     }
+    function sanear_string($string)
+    {
 
+        $string = trim($string);
+
+$string = str_replace(
+        array('á', 'à', 'ä', 'â', 'ª', 'Á', 'À', 'Â', 'Ä'),
+        array('a', 'a', 'a', 'a', 'a', 'A', 'A', 'A', 'A'),
+        $string
+);
+
+$string = str_replace(
+        array('é', 'è', 'ë', 'ê', 'É', 'È', 'Ê', 'Ë'),
+        array('e', 'e', 'e', 'e', 'E', 'E', 'E', 'E'),
+        $string
+);
+
+$string = str_replace(
+        array('í', 'ì', 'ï', 'î', 'Í', 'Ì', 'Ï', 'Î'),
+        array('i', 'i', 'i', 'i', 'I', 'I', 'I', 'I'),
+        $string
+);
+
+$string = str_replace(
+        array('ó', 'ò', 'ö', 'ô', 'Ó', 'Ò', 'Ö', 'Ô'),
+        array('o', 'o', 'o', 'o', 'O', 'O', 'O', 'O'),
+        $string
+);
+
+$string = str_replace(
+        array('ú', 'ù', 'ü', 'û', 'Ú', 'Ù', 'Û', 'Ü'),
+        array('u', 'u', 'u', 'u', 'U', 'U', 'U', 'U'),
+        $string
+);
+
+$string = str_replace(
+        array('ñ', 'Ñ', 'ç', 'Ç'),
+        array('n', 'N', 'c', 'C',),
+        $string
+);
+
+//Esta parte se encarga de eliminar cualquier caracter extraño
+$string = str_replace(
+        array("\\", "¨", "º", "~",
+             "#", "@", "|", "!", "\"",
+             "·", "$", "%", "&", "/",
+             "(", ")", "?", "'", "¡",
+             "¿", "[", "^", "<code>", "]",
+             "+", "}", "{", "¨", "´",
+             ">", "< ", ";", ",", ":",
+             ".", " "),
+'',
+$string
+);
+
+
+return $string;
+}
     public function importgolesfecha(Request $request)
     {
         set_time_limit(0);
@@ -4219,6 +4449,33 @@ class FechaController extends Controller
 
 
         $fechas=Fecha::where('grupo_id','=',"$grupo_id")->orderBy('numero','ASC')->get();
+
+        // these are the headers for the csv file.
+        $headers = array(
+            'Content-Type' => 'application/vnd.ms-excel; charset=utf-8',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Content-Disposition' => 'attachment; filename='.$grupo->torneo->nombre.'_'.str_replace('/','_',$grupo->torneo->year).'_goles.csv',
+            'Expires' => '0',
+            'Pragma' => 'public',
+        );
+
+
+        //I am storing the csv file in public >> files folder. So that why I am creating files folder
+        if (!File::exists(public_path()."/files")) {
+            File::makeDirectory(public_path() . "/files");
+        }
+
+        //creating the download file
+        $filename =  public_path('files/'.$grupo->torneo->nombre.'_'.str_replace('/','_',$grupo->torneo->year).'_goles.csv');
+        $handle = fopen($filename, 'w');
+
+        //adding the first row
+        fputcsv($handle, [
+            'Torneo', 'fecha','Partido', 'Jugador','Gol','Observaciones','URL'
+        ], "|");
+
+
+
 
         /*$fecha=Fecha::findOrFail($id);
 
@@ -4242,18 +4499,570 @@ class FechaController extends Controller
                 Log::info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
 
                 $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
+                $jugadorGolArray = array();
                 foreach ($goles as $gol) {
                     Log::info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
-                    if ($gol->tipo=='Jugada'){
-                        $nombre = explode(' ',$gol->jugador->persona->nombre)[0];
-                        $apellido = explode(' ',$gol->jugador->persona->apellido)[0];
-                        Log::info('Url - http://www.futbol360.com.ar/jugadores/argentina/' . $apellido.'-'.$nombre, []);
+                    $alineacion=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$gol->jugador->id)->first();
+                    if (!empty($alineacion)) {
+                        Log::info('OJO!!! - juega en: '.$alineacion->equipo->nombre, []);
+                        $juegaEn=$alineacion->equipo->nombre;
                     }
+                    if ($gol->tipo=='Jugada'){
+                        $arrayNombre=explode(' ',$gol->jugador->persona->nombre);
+                        $arrayApellido=explode(' ',$gol->jugador->persona->apellido);
+                        $nombre = $arrayNombre[0];
+                        $apellido = $arrayApellido[0];
+                        $nombre2 = '';
+                        if (count($arrayNombre)>1){
+                            $nombre2 = $arrayNombre[1];
+                        }
+                        $apellido2 = '';
+                        if (count($arrayApellido)>1){
+                            $apellido2 = $arrayApellido[1];
+                        }
+                        try {
+                            $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' . strtolower($this->sanear_string($apellido)).'-'.strtolower($this->sanear_string($nombre));
+                            Log::info('OJO!!! - '.$urlJugador, []);
+
+                            $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+
+
+                        }
+                        catch (Exception $ex) {
+
+                            $html2='';
+                        }
+                        if (!$html2){
+                            try {
+                                if ($nombre2) {
+                                    $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2));
+                                    Log::info('OJO!!! - '.$urlJugador, []);
+
+                                    $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                                }
+
+                            }
+                            catch (Exception $ex) {
+
+                                $html2='';
+                            }
+                        }
+                        if (!$html2){
+                            try {
+                                if ($nombre2) {
+                                    $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2));
+                                    Log::info('OJO!!! - '.$urlJugador, []);
+
+                                    $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                                }
+
+                            }
+                            catch (Exception $ex) {
+
+                                $html2='';
+                            }
+                        }
+                        if (!$html2){
+                            try {
+                                if ($apellido2){
+                                    $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' . strtolower($this->sanear_string($apellido)).'-'. strtolower($this->sanear_string($apellido2)).'-'.strtolower($this->sanear_string($nombre));
+                                    Log::info('OJO!!! - '.$urlJugador, []);
+
+                                    $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+
+                                }
+
+
+
+                            }
+                            catch (Exception $ex) {
+
+                                $html2='';
+                            }
+                        }
+                        if (!$html2){
+                            try {
+                                switch ($gol->jugador->id){
+                                    case '3890':
+                                        $nombre3='diaz-daniel-6231';
+                                        break;
+                                    case '152':
+                                        $nombre3='rodriguez-maxi';
+                                        break;
+                                    case '2255':
+                                        $nombre3='diaz-daniel-848';
+                                        break;
+                                    case '3278':
+                                        $nombre3='barros-schelotto-gmo.';
+                                        break;
+                                    case '4606':
+                                        $nombre3='barros-schelotto-gvo.';
+                                        break;
+                                    case '4673':
+                                        $nombre3='gonzalez-claudio-164';
+                                        break;
+                                    case '1999':
+                                        $nombre3='vuoso-matias';
+                                        break;
+                                    case '660':
+                                        $nombre3='ponzio-leo';
+                                        break;
+                                    case '2732':
+                                        $nombre3='alvarez-cristian-43680';
+                                        break;
+                                    case '2725':
+                                        $nombre3='alvarez-cristian-1390';
+                                        break;
+                                    case '2355':
+                                        $nombre3='alvarez-cristian-3360';
+                                        break;
+                                    case '4463':
+                                        $nombre3='gonzalez-cesar-585';
+                                        break;
+                                    case '4662':
+                                        $nombre3='mas-leo';
+                                        break;
+                                    case '2862':
+                                        $nombre3='morel-rodriguez';
+                                        break;
+                                    case '3084':
+                                        $nombre3='diaz-rodrigo-540';
+                                        break;
+                                    case '3614':
+                                        $nombre3='diaz-rodrigo-26650';
+                                        break;
+                                    case '2664':
+                                        $nombre3='benitez-leandro-705';
+                                        break;
+                                    case '4649':
+                                        $nombre3='iarley';
+                                        break;
+                                    case '4275':
+                                        $nombre3='piriz-alvez-enrique';
+                                        break;
+                                    case '4629':
+                                        $nombre3='ojeda-martin-905';
+                                        break;
+                                    case '4191':
+                                        $nombre3='guglielminpietro';
+                                        break;
+                                    case '4529':
+                                        $nombre3='vannieuwenhoven';
+                                        break;
+                                    case '2060':
+                                        $nombre3='torres-diego-720';
+                                        break;
+                                    case '3303':
+                                        $nombre3='mendoza-franco-689';
+                                        break;
+                                    case '4025':
+                                        $nombre3='fernandes-francou';
+                                        break;
+                                    case '3688':
+                                        $nombre3='diaz-cristian-2825';
+                                        break;
+                                    case '4047':
+                                        $nombre3='garcia-javier-2871';
+                                        break;
+                                    case '2432':
+                                        $nombre3='cabrera-nicolas-733';
+                                        break;
+                                    case '696':
+                                        $nombre3='alvarez-pablo-790';
+                                        break;
+                                    case '3543':
+                                        $nombre3='morales-neuman';
+                                        break;
+                                    case '3496':
+                                        $nombre3='gomez-alejandro-2529';
+                                        break;
+                                    case '3514':
+                                        $nombre3='rios-andres-3629';
+                                        break;
+                                    case '2411':
+                                        $nombre3='manzanelli-cesar';
+                                        break;
+                                    case '4054':
+                                        $nombre3='marioni-bruno';
+                                        break;
+                                    case '936':
+                                        $nombre3='rios-andres-12899';
+                                        break;
+                                    case '1846':
+                                        $nombre3='rios-andres-12899';
+                                        break;
+                                    case '3277':
+                                        $nombre3='gonzalez-cesar-2356';
+                                        break;
+                                    case '2368':
+                                        $nombre3='chavez-cristian-2271';
+                                        break;
+                                    case '2847':
+                                        $nombre3='aguirre-martin-8722';
+                                        break;
+                                    case '1585':
+                                        $nombre3='vega-daniel-6139';
+                                        break;
+                                    case '2914':
+                                        $nombre3='quiroga-facundo-1955';
+                                        break;
+                                    case '633':
+                                        $nombre3='chavez-cristian-20705';
+                                        break;
+                                    case '3411':
+                                        $nombre3='rodriguez-diego-24600';
+                                        break;
+                                    case '546':
+                                        $nombre3='morales-diego-10240';
+                                        break;
+                                    case '3354':
+                                        $nombre3='morales-diego-10240';
+                                        break;
+                                    case '3094':
+                                        $nombre3='roberval-raul';
+                                        break;
+                                    case '2982':
+                                        $nombre3='pio-emanuel';
+                                        break;
+                                    case '2904':
+                                        $nombre3='montoya-munoz';
+                                        break;
+                                    case '2198':
+                                        $nombre3='alvarez-balanta';
+                                        break;
+                                    case '579':
+                                        $nombre3='godoy-fernando-13131';
+                                        break;
+                                    case '2498':
+                                        $nombre3='diaz-cristian-26904';
+                                        break;
+                                    case '182':
+                                        $nombre3='rodriguez-diego-25934';
+                                        break;
+                                    case '560':
+                                        $nombre3='camacho-washington';
+                                        break;
+                                    case '2019':
+                                        $nombre3='montiel-dirego';
+                                        break;
+                                    case '1885':
+                                        $nombre3='gonzalez-leandro-26622';
+                                        break;
+                                    case '2454':
+                                        $nombre3='funes-mori-ramiro';
+                                        break;
+                                    case '1931':
+                                        $nombre3='de-la-fuente-fernando';
+                                        break;
+                                    case '258':
+                                        $nombre3='millo-federico';
+                                        break;
+                                    case '153':
+                                        $nombre3='luis-leal';
+                                        break;
+                                    case '49':
+                                        $nombre3='de-la-cruz-nicolas';
+                                        break;
+                                    case '720':
+                                        $nombre3='de-la-fuente-hernan';
+                                        break;
+                                    case '229':
+                                        $nombre3='de-la-vega-pedro';
+                                        break;
+                                    case '437':
+                                        $nombre3='galvan-brian';
+                                        break;
+                                    case '481':
+                                        $nombre3='/guilherme-parede';
+                                        break;
+                                    case '1772':
+                                        $nombre3='/ulariaga-nahuel';
+                                        break;
+                                    case '513':
+                                        $nombre3='/ortega-francisco-75465';
+                                        break;
+                                    case '473':
+                                        $nombre3='/de-los-santos-matias-44783';
+                                        break;
+                                    case '5412':
+                                        $nombre3='/castrillon-byron';
+                                        break;
+                                    case '1788':
+                                        $nombre3='/puch-ignacio';
+                                        break;
+                                    default:
+                                        $nombre3='';
+                                        break;
+                                }
+                                $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' .$nombre3;
+                                Log::info('OJO!!! - '.$urlJugador, []);
+
+                                $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+
+
+                            }
+                            catch (Exception $ex) {
+
+                                $html2='';
+                            }
+                        }
+                        if ($html2){
+                            $scripts = $html2->find('script');
+                            $id_jugador = '';
+                            foreach($scripts as $s) {
+                                if (strpos($s->innertext, 'id_player:') !== false) {
+                                    $script_array = explode('id_player', $s->innertext);
+                                    $id_jugador = trim(str_replace(':','',explode('}', $script_array[1])[0]));
+                                    Log::info('OJO!! Id jugador: '.$id_jugador,[]);
+
+                                    //$token = $script_array[1];
+                                    break;
+                                }
+                            }
+                            if (!$id_jugador){
+                                foreach ($html2->find('div[class=playerStats]') as $element) {
+                                    if (!$id_jugador) {
+                                        foreach ($element->find('table[class=tableStandard]') as $table) {
+                                            if (!$id_jugador) {
+
+                                                foreach ($table->find('tr') as $tr) {
+
+                                                    if (!$id_jugador) {
+                                                        foreach ($tr->find('td') as $td) {
+                                                            if (!$id_jugador) {
+
+                                                                foreach ($td->find('a') as $a) {
+                                                                    if (str_contains($a->href, 'item=player&id=')) {
+                                                                        $arrIdJugador = explode('item=player&id=', $a->href);
+                                                                        $id_jugador = intval($arrIdJugador[1]);
+                                                                        Log::info('OJO!! ALT Id jugador: ' . $id_jugador, []);
+                                                                        break;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if ($id_jugador){
+                                if ($juegaEn==$strLocal){
+                                    $juegaContra=$strVisitante;
+                                }
+                                if ($juegaEn==$strVisitante){
+                                    $juegaContra=$strLocal;
+                                }
+                                try {
+                                    $urlCabeza ='http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=head';
+                                    Log::info('OJO!!! - '.$urlCabeza, []);
+
+                                    $htmlCabeza = HtmlDomParser::file_get_html($urlCabeza, false, null, 0);
+
+                                    //Log::info('OJO!! URL cabeza: '.$htmlCabeza,[]);
+
+
+
+
+                                }
+                                catch (Exception $ex) {
+                                    $htmlCabeza='';
+                                }
+                                if ($htmlCabeza){
+                                    foreach ($htmlCabeza->find('div[id=matchesTable]') as $element) {
+                                        foreach ($element->find('table[class=tableStandard]') as $table) {
+                                            foreach ($table->find('tr') as $tr) {
+                                                if (trim($tr->plaintext)!='No hay resultados') {
+                                                    foreach ($tr->find('th') as $th) {
+                                                        foreach ($th->find('a') as $a) {
+
+                                                            if ($a->href=='/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/'){
+                                                                Log::info('OJO!! encontro gol cabeza: ' . $a->href, []);
+                                                                $data3 = array(
+                                                                    'partido_id' => $partido->id,
+                                                                    'jugador_id' => $gol->jugador->id,
+                                                                    'minuto' => $gol->minuto,
+
+                                                                    'tipo' => 'Cabeza',
+                                                                    'url' => $urlCabeza,
+                                                                );
+                                                                $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                            }
+
+
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else{
+                                    fputcsv($handle, [
+
+                                        utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                        utf8_decode($fecha->numero),
+                                        utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                        utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                        utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                        utf8_decode('No se econtró la URL de cabezas'),
+                                        $urlCabeza
+                                    ], "|");
+                                    Log::info('OJO!!! No se econtró la URL de cabezas' , []);
+                                }
+                                try {
+                                    $urlLibres = 'http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=free_shot';
+                                    Log::info('OJO!!! - '.$urlLibres, []);
+
+                                    $htmlLibre = HtmlDomParser::file_get_html($urlLibres, false, null, 0);
+
+                                    //Log::info('OJO!! URL Libre: '.$htmlLibre,[]);
+
+
+
+
+                                }
+                                catch (Exception $ex) {
+                                    $htmlLibre='';
+                                }
+                                if ($htmlLibre){
+                                    foreach ($htmlLibre->find('div[id=matchesTable]') as $element) {
+                                        foreach ($element->find('table[class=tableStandard]') as $table) {
+                                            foreach ($table->find('tr') as $tr) {
+                                                if (trim($tr->plaintext)!='No hay resultados') {
+                                                    foreach ($tr->find('th') as $th) {
+                                                        foreach ($th->find('a') as $a) {
+
+                                                            if ($a->href=='/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/'){
+                                                                Log::info('OJO!! encontro gol tiro libre: ' . $a->href, []);
+                                                                $data3 = array(
+                                                                    'partido_id' => $partido->id,
+                                                                    'jugador_id' => $gol->jugador->id,
+                                                                    'minuto' => $gol->minuto,
+
+                                                                    'tipo' => 'Tiro Libre',
+                                                                    'url' => $urlLibres,
+                                                                );
+
+                                                                $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                            }
+
+
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else{
+                                    fputcsv($handle, [
+
+                                        utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                        utf8_decode($fecha->numero),
+                                        utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                        utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                        utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                        utf8_decode('No se econtró la URL de tiros libres'),
+                                        $urlLibres
+                                    ], "|");
+                                    Log::info('OJO!!! No se econtró la URL de tiros libres' , []);
+                                }
+                            }
+
+                        }
+                        else{
+                            fputcsv($handle, [
+
+                                utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                utf8_decode($fecha->numero),
+                                utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                utf8_decode('No se econtró la URL del jugador'),
+                                $urlJugador
+                            ], "|");
+                            Log::info('OJO!!! No se econtró la URL del jugador' , []);
+                        }
+                    }
+                }
+                foreach ($jugadorGolArray as $key => $item){
+
+                    $jugador=Jugador::findOrFail($key);
+                    if (count($item)>1){
+                        Log::info('OJO!!! más de un gol de '.$key , []);
+                        foreach ($item as $value){
+                            fputcsv($handle, [
+
+                                utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                utf8_decode($fecha->numero),
+                                utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                utf8_decode($jugador->persona->nombre.' - '.$jugador->persona->apellido),
+                                utf8_decode($value['tipo'].' - '.$value['minuto']),
+                                utf8_decode('más de un gol'),
+                                $value['url']
+                            ], "|");
+                            Log::info(' => '.$value['tipo'].' - '.$value['minuto'] , []);
+                        }
+
+                    }
+                    else{
+
+                        Log::info('OJO!!! un solo gol de: '.$key.' => '.$item[0]['tipo'].' - '.$item[0]['minuto'] , []);
+                        $golesJugador = Gol::where('partido_id', '=', $item[0]['partido_id'])->where('jugador_id', '=', $key)->get();
+                        if (count($golesJugador)==1) {
+
+
+                                fputcsv($handle, [
+
+                                    utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                    utf8_decode($fecha->numero),
+                                    utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                    utf8_decode($jugador->persona->nombre.' - '.$jugador->persona->apellido),
+                                    utf8_decode($item[0]['tipo'].' - '.$item[0]['minuto']),
+                                    utf8_decode('Gol actualizado'),
+                                    $item[0]['url']
+                                ], "|");
+                                $dataGol = array(
+                                    'partido_id' => $item[0]['partido_id'],
+                                    'jugador_id' => $key,
+                                    'minuto' => $item[0]['minuto'],
+
+                                    'tipo' => $item[0]['tipo']
+                                );
+                                try {
+                                    //$golesJugador[0]->update($dataGol);
+                                } catch (QueryException $ex) {
+                                    $error = $ex->getMessage();
+                                    $ok = 0;
+                                    continue;
+                                }
+                            }
+                        else{
+                            fputcsv($handle, [
+
+                                utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                utf8_decode($fecha->numero),
+                                utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                utf8_decode($jugador->persona->nombre.' - '.$jugador->persona->apellido),
+                                utf8_decode($item[0]['tipo'].' - '.$item[0]['minuto']),
+                                utf8_decode('Tiene goles de otro tipo'),
+                                $item[0]['url']
+                            ], "|");
+                        }
+
+
+
+
+                    }
+
                 }
             }
         }
 
-
+        fclose($handle);
         if ($ok){
 
 

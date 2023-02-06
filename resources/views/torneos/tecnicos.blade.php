@@ -7,7 +7,11 @@
         <h1 class="display-6">Histórico de técnicos</h1>
 
         <hr/>
+        @php
+            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
+            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
+        @endphp
 
 
         <table class="table">
@@ -15,15 +19,15 @@
             <th>#</th>
             <th>Técnico</th>
 
-            <th>J</th>
-            <th>G</th>
-            <th>E</th>
-            <th>P</th>
-            <th>GF</th>
-            <th>GC</th>
-            <th>Dif.</th>
-            <th>Punt.</th>
-            <th>%</th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Jugados','tipoOrder'=>$tipoOrder))}}" > J @if($order=='Jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Ganados','tipoOrder'=>$tipoOrder))}}" > G @if($order=='Ganados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Empatados','tipoOrder'=>$tipoOrder))}}" > E @if($order=='Empatados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Perdidos','tipoOrder'=>$tipoOrder))}}" > P @if($order=='Perdidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'golesl','tipoOrder'=>$tipoOrder))}}" > GF @if($order=='golesl') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'golesv','tipoOrder'=>$tipoOrder))}}" > GC @if($order=='golesv') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'diferencia','tipoOrder'=>$tipoOrder))}}" > Dif. @if($order=='diferencia') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'prom','tipoOrder'=>$tipoOrder))}}" > % @if($order=='prom') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th>Equipos</th>
             </thead>
             <tbody>

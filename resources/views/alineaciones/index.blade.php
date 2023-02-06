@@ -192,8 +192,8 @@
                     @foreach($partidoTecnicosL ?? '' as $partidoTecnicoL)
 
                         <tr>
-                            <td>@if($partidoTecnicoL->tecnico->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$partidoTecnicoL->tecnico->foto) }}" >
+                            <td>@if($partidoTecnicoL->tecnico->persona->foto)
+                                    <img id="original" class="imgCircle" src="{{ url('images/'.$partidoTecnicoL->tecnico->persona->foto) }}" >
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                 @endif

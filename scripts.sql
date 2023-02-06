@@ -65,6 +65,12 @@ SELECT *
 FROM cambios
 WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = cambios.partido_id AND alineacions.jugador_id = cambios.jugador_id)
 
+########################## Goles repetidas ##########################
+SELECT partido_id, jugador_id, COUNT(partido_id)
+FROM goles
+GROUP BY partido_id,jugador_id, minuto
+HAVING COUNT(partido_id)>1
+
 ########################## Tarjetas repetidas ##########################
 SELECT partido_id, jugador_id, COUNT(partido_id)
 FROM tarjetas

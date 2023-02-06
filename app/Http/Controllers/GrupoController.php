@@ -303,6 +303,9 @@ WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN (
         $torneo_id= $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
+        $order= ($request->query('order'))?$request->query('order'):'goles';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
         $arrgrupos='';
         foreach ($grupos as $grupo){
@@ -337,7 +340,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
 GROUP BY jugadors.id,jugador, foto
-ORDER BY goles DESC, jugador ASC';
+ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
 
 
@@ -415,14 +418,14 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
 
         }
 
-        $goleadores->setPath(route('grupos.goleadoresPublic',  array('torneoId' => $torneo->id)));
+        $goleadores->setPath(route('grupos.goleadoresPublic',  array('torneoId' => $torneo->id,'order'=>$order,'tipoOrder'=>$tipoOrder)));
 
 
 
         $i=$offSet+1;
 
 
-        return view('grupos.goleadoresPublic', compact('torneo','goleadores','i'));
+        return view('grupos.goleadoresPublic', compact('torneo','goleadores','i','order','tipoOrder'));
     }
 
     public function tarjetas(Request $request)

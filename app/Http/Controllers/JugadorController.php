@@ -108,6 +108,7 @@ class JugadorController extends Controller
         $insert['email'] = $request->get('email');
         $insert['telefono'] = $request->get('telefono');
         $insert['ciudad'] = $request->get('ciudad');
+        $insert['nacionalidad'] = $request->get('nacionalidad');
         $insert['altura'] = $request->get('altura');
         $insert['peso'] = $request->get('peso');
         $insert['observaciones'] = $request->get('observaciones');
@@ -226,6 +227,7 @@ class JugadorController extends Controller
         $update['email'] = $request->get('email');
         $update['telefono'] = $request->get('telefono');
         $update['ciudad'] = $request->get('ciudad');
+        $update['nacionalidad'] = $request->get('nacionalidad');
         $update['altura'] = $request->get('altura');
         $update['peso'] = $request->get('peso');
         $update['observaciones'] = $request->get('observaciones');

@@ -586,13 +586,13 @@ INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND (e1
 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 WHERE (tecnicos.id = ".$id.")";
         $sql .=($tipo=='Ganados')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl > partidos.golesv) OR (partido_tecnicos.equipo_id = e2.id AND partidos.golesv > partidos.golesl))":"";
-        $sql .=($tipo=='Empatados')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl = partidos.golesv))":"";
+        $sql .=($tipo=='Empatados')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl = partidos.golesv) OR (partido_tecnicos.equipo_id = e2.id AND partidos.golesl = partidos.golesv))":"";
         $sql .=($tipo=='Perdidos')?" AND ((partido_tecnicos.equipo_id = e1.id AND partidos.golesl < partidos.golesv) OR (partido_tecnicos.equipo_id = e2.id AND partidos.golesv < partidos.golesl))":"";
         $sql .=($idTorneo)?" AND grupos.torneo_id = ".$idTorneo:"";
         $sql .=" ORDER BY partidos.dia DESC";
 
 
-
+//echo $sql;
         $partidos = DB::select(DB::raw($sql));
 
 

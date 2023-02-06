@@ -642,7 +642,8 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     public function goleadores(Request $request)
     {
 
-
+        $order= ($request->query('order'))?$request->query('order'):'goles';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
         $sql = 'SELECT jugadors.id, CONCAT(personas.apellido,\', \',personas.nombre) jugador, personas.foto, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo, "0" as jugados
 , count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
 FROM gols
@@ -652,7 +653,7 @@ INNER JOIN personas ON jugadors.persona_id = personas.id
 
 WHERE gols.tipo <> \'En contra\'
 GROUP BY jugadors.id,jugador, foto
-ORDER BY goles DESC, jugador ASC';
+ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
 
 
@@ -735,14 +736,14 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$goleador->id. " GROUP B
 
         }
 
-        $goleadores->setPath(route('torneos.goleadores'));
+        $goleadores->setPath(route('torneos.goleadores',array('order'=>$order,'tipoOrder'=>$tipoOrder)));
 
 
 
         $i=$offSet+1;
 
 
-        return view('torneos.goleadores', compact('goleadores','i'));
+        return view('torneos.goleadores', compact('goleadores','i','order','tipoOrder'));
     }
 
     public function tarjetas(Request $request)
@@ -1376,7 +1377,8 @@ GROUP BY torneos.nombre, torneos.year) AS t )';
     public function tecnicos(Request $request)
     {
 
-
+        $order= ($request->query('order'))?$request->query('order'):'puntaje';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
 
         $sql = 'SELECT tecnico, fotoTecnico, tecnico_id,
        count(*) jugados,
@@ -1396,7 +1398,14 @@ GROUP BY torneos.nombre, torneos.year) AS t )';
            + case when golesl = golesv then 1 else 0 end
        ) * 100/(COUNT(*)*3) ),
       2
-    ), \'%\') porcentaje, "" escudo
+    ), \'%\') porcentaje,
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) /COUNT(*) ),
+      2
+    ) prom, "" escudo
 from (
        select  DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
@@ -1422,10 +1431,11 @@ from (
 ) a
 group by tecnico, fotoTecnico, tecnico_id
 
-order by puntaje desc, diferencia DESC, golesl DESC';
 
 
+        ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, tecnico ASC';
 
+//echo $sql;
 
         $goleadores = DB::select(DB::raw($sql));
 
@@ -1499,14 +1509,13 @@ order by puntaje desc, diferencia DESC, golesl DESC';
 
         }
 
-        $goleadores->setPath(route('torneos.tecnicos'));
-
+        $goleadores->setPath(route('torneos.tecnicos',array('order'=>$order,'tipoOrder'=>$tipoOrder)));
 
 
         $i=$offSet+1;
 
 
-        return view('torneos.tecnicos', compact('goleadores','i'));
+        return view('torneos.tecnicos', compact('goleadores','i','order','tipoOrder'));
     }
 
     public function arqueros(Request $request)
