@@ -53,6 +53,7 @@
                 <h1>Fechas con más goles</h1>
                 <table class="table" style="width: 100%">
                     <thead>
+                    <th>#</th>
                     <th>Fecha</th>
 
                     <th>Goles</th>
@@ -61,10 +62,12 @@
 
                     </thead>
                     <tbody>
-
+                    @php
+                        $i = 1;
+                    @endphp
                     @foreach($estadisticas['fechaMasGoles'] as $partido)
                         <tr>
-
+                            <td>{{$i++}}</td>
                             <td>Fecha {{$partido->numero}}</td>
 
                             <td>{{$partido->goles}}</td>
@@ -79,10 +82,12 @@
 
                 </table>
 
+
+
                 <h1>Fechas con más goles locales</h1>
                 <table class="table" style="width: 100%">
                     <thead>
-
+                    <th>#</th>
                     <th>Fecha</th>
 
                     <th>Goles</th>
@@ -91,10 +96,12 @@
 
                     </thead>
                     <tbody>
-
+                    @php
+                        $i = 1;
+                    @endphp
                     @foreach($estadisticas['fechaMasGolesLocales'] as $partido)
                         <tr>
-
+                            <td>{{$i++}}</td>
                             <td>Fecha {{$partido->numero}}</td>
 
                             <td>{{$partido->goles}}</td>
@@ -112,7 +119,7 @@
                 <h1>Fechas con más goles visitantes</h1>
                 <table class="table" style="width: 100%">
                     <thead>
-
+                    <th>#</th>
                     <th>Fecha</th>
 
                     <th>Goles</th>
@@ -121,10 +128,12 @@
 
                     </thead>
                     <tbody>
-
+                    @php
+                        $i = 1;
+                    @endphp
                     @foreach($estadisticas['fechaMasGolesVisitantes'] as $partido)
                         <tr>
-
+                            <td>{{$i++}}</td>
                             <td>Fecha {{$partido->numero}}</td>
 
                             <td>{{$partido->goles}}</td>
@@ -143,7 +152,7 @@
                 <h1>Partidos con más goles</h1>
                 <table class="table" style="width: 100%">
                     <thead>
-
+                    <th>#</th>
                     <th>Fecha</th>
                     <th>Día</th>
                     <th>Local</th>
@@ -153,10 +162,12 @@
 
                     </thead>
                     <tbody>
-
+                    @php
+                        $i = 1;
+                    @endphp
                     @foreach($estadisticas['maxGoles'] as $partido)
                         <tr>
-
+                            <td>{{$i++}}</td>
                             <td>Fecha {{$partido->numero}}</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
@@ -206,10 +217,12 @@
                 </table>
 
 
+
+
                 <h1>Partidos con más goles locales</h1>
                 <table class="table" style="width: 100%">
                     <thead>
-
+                    <th>#</th>
                     <th>Fecha</th>
                     <th>Día</th>
                     <th>Local</th>
@@ -219,10 +232,12 @@
 
                     </thead>
                     <tbody>
-
+                    @php
+                        $i = 1;
+                    @endphp
                     @foreach($estadisticas['maxGolesLocales'] as $partido)
                         <tr>
-
+                            <td>{{$i++}}</td>
                             <td>Fecha {{$partido->numero}}</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
@@ -273,7 +288,7 @@
                 <h1>Partidos con más goles visitantes</h1>
                 <table class="table" style="width: 100%">
                     <thead>
-
+                    <th>#</th>
                     <th>Fecha</th>
                     <th>Día</th>
                     <th>Local</th>
@@ -283,10 +298,177 @@
 
                     </thead>
                     <tbody>
-
+                    @php
+                        $i = 1;
+                    @endphp
                     @foreach($estadisticas['maxGolesVisitantes'] as $partido)
                         <tr>
+                            <td>{{$i++}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+                            <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
+                            <td>
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
+                                    @if($partido->local)
+                                        @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
+                                        @endif
+                                </a>
+                                {{$partido->local}}
+                                @endif
+                            </td>
+                            <td>{{$partido->golesl}}
+                                @if($partido->penalesl)
+                                    ({{$partido->penalesl}})
+                                @endif
+                            </td>
+                            <td>{{$partido->golesv}}
+                                @if($partido->penalesv)
+                                    ({{$partido->penalesv}})
+                                @endif
+                            </td>
+                            <td>
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov_id))}}">
+                                    @if($partido->visitante)
+                                        @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
+                                        @endif
+                                </a>
+                                {{$partido->visitante}}
+                                @endif
+                            </td>
+                            <td>
+                                <div class="d-flex">
 
+                                    <a href="{{route('fechas.detalle', array('partidoId' => $partido->partido_id))}}" class="btn btn-success m-1">Detalles</a>
+
+
+                                </div>
+
+                            </td>
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+                <h1>Fechas con menos goles</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>#</th>
+                    <th>Fecha</th>
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+                    </thead>
+                    <tbody>
+                    @php
+                        $i = 1;
+                    @endphp
+                    @foreach($estadisticas['fechaMinGoles'] as $partido)
+                        <tr>
+                            <td>{{$i++}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+
+                            <td>{{$partido->partidos}}</td>
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+
+
+
+                <h1>Fechas con menos goles locales</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>#</th>
+                    <th>Fecha</th>
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+                    </thead>
+                    <tbody>
+                    @php
+                        $i = 1;
+                    @endphp
+                    @foreach($estadisticas['fechaMinGolesLocales'] as $partido)
+                        <tr>
+                            <td>{{$i++}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+
+                            <td>{{$partido->partidos}}</td>
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+
+                <h1>Fechas con menos goles visitantes</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>#</th>
+                    <th>Fecha</th>
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+                    </thead>
+                    <tbody>
+                    @php
+                        $i = 1;
+                    @endphp
+                    @foreach($estadisticas['fechaMinGolesVisitantes'] as $partido)
+                        <tr>
+                            <td>{{$i++}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+
+                            <td>{{$partido->partidos}}</td>
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+
+
+                <h1>Partidos con menos goles</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Día</th>
+                    <th>Local</th>
+                    <th>GL</th>
+                    <th>GV</th>
+                    <th>Visitante</th>
+
+                    </thead>
+                    <tbody>
+                    @php
+                        $i = 1;
+                    @endphp
+                    @foreach($estadisticas['minGoles'] as $partido)
+                        <tr>
+                            <td>{{$i++}}</td>
                             <td>Fecha {{$partido->numero}}</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
@@ -336,6 +518,140 @@
                 </table>
 
 
+
+
+                <h1>Partidos con menos goles locales</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Día</th>
+                    <th>Local</th>
+                    <th>GL</th>
+                    <th>GV</th>
+                    <th>Visitante</th>
+
+                    </thead>
+                    <tbody>
+                    @php
+                        $i = 1;
+                    @endphp
+                    @foreach($estadisticas['minGolesLocales'] as $partido)
+                        <tr>
+                            <td>{{$i++}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+                            <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
+                            <td>
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
+                                    @if($partido->local)
+                                        @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
+                                        @endif
+                                </a>
+                                {{$partido->local}}
+                                @endif
+                            </td>
+                            <td>{{$partido->golesl}}
+                                @if($partido->penalesl)
+                                    ({{$partido->penalesl}})
+                                @endif
+                            </td>
+                            <td>{{$partido->golesv}}
+                                @if($partido->penalesv)
+                                    ({{$partido->penalesv}})
+                                @endif
+                            </td>
+                            <td>
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov_id))}}">
+                                    @if($partido->visitante)
+                                        @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
+                                        @endif
+                                </a>
+                                {{$partido->visitante}}
+                                @endif
+                            </td>
+                            <td>
+                                <div class="d-flex">
+
+                                    <a href="{{route('fechas.detalle', array('partidoId' => $partido->partido_id))}}" class="btn btn-success m-1">Detalles</a>
+
+
+                                </div>
+
+                            </td>
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
+                <h1>Partidos con menos goles visitantes</h1>
+                <table class="table" style="width: 100%">
+                    <thead>
+                    <th>#</th>
+                    <th>Fecha</th>
+                    <th>Día</th>
+                    <th>Local</th>
+                    <th>GL</th>
+                    <th>GV</th>
+                    <th>Visitante</th>
+
+                    </thead>
+                    <tbody>
+                    @php
+                        $i = 1;
+                    @endphp
+                    @foreach($estadisticas['minGolesVisitantes'] as $partido)
+                        <tr>
+                            <td>{{$i++}}</td>
+                            <td>Fecha {{$partido->numero}}</td>
+                            <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
+                            <td>
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
+                                    @if($partido->local)
+                                        @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
+                                        @endif
+                                </a>
+                                {{$partido->local}}
+                                @endif
+                            </td>
+                            <td>{{$partido->golesl}}
+                                @if($partido->penalesl)
+                                    ({{$partido->penalesl}})
+                                @endif
+                            </td>
+                            <td>{{$partido->golesv}}
+                                @if($partido->penalesv)
+                                    ({{$partido->penalesv}})
+                                @endif
+                            </td>
+                            <td>
+                                <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov_id))}}">
+                                    @if($partido->visitante)
+                                        @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
+                                        @endif
+                                </a>
+                                {{$partido->visitante}}
+                                @endif
+                            </td>
+                            <td>
+                                <div class="d-flex">
+
+                                    <a href="{{route('fechas.detalle', array('partidoId' => $partido->partido_id))}}" class="btn btn-success m-1">Detalles</a>
+
+
+                                </div>
+
+                            </td>
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
             </div>
 
         </div>

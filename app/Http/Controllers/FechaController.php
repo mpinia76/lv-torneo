@@ -1087,8 +1087,8 @@ class FechaController extends Controller
                 //$strEquipoURL='ca-boca-juniors';
                 break;
             case 'Belgrano':
-                $strEquipoURL='belgrano-de-cordoba';
-                //$strEquipoURL='belgrano-cordoba';
+                $strEquipoURL='belgrano-de-cordoba';//ultimo
+                //$strEquipoURL='belgrano-cordoba';//viejo
                 break;
             case 'Central Córdoba (SdE)':
                 $strEquipoURL='central-cordoba-sde';
@@ -1109,8 +1109,8 @@ class FechaController extends Controller
                 //$strEquipoURL='csyd-defensa-y-justicia';
                 break;
             case 'Estudiantes (LP)':
-                $strEquipoURL='estudiantes';
-                //$strEquipoURL='estudiantes-de-la-plata';
+                $strEquipoURL='estudiantes';//ultimo
+                //$strEquipoURL='estudiantes-de-la-plata';//viejo
                 break;
             case 'Gimnasia (J)':
                 $strEquipoURL='gye-jujuy';
@@ -1118,7 +1118,7 @@ class FechaController extends Controller
             case 'Gimnasia (LP)':
                 $strEquipoURL='gimnasia-de-la-plata';//ultimo
                 //$strEquipoURL='gye-la-plata';//viejo
-                //$strEquipoURL='gimnasia-y-esgrima-de-la-plata';
+                //$strEquipoURL='gimnasia-y-esgrima-de-la-plata';//viejo
                 break;
             case 'Godoy Cruz':
                 $strEquipoURL='godoy-cruz';//ultimo
@@ -1137,8 +1137,8 @@ class FechaController extends Controller
                 $strEquipoURL='instituto-de-cordoba';
                 break;
             case 'Independiente':
-                //$strEquipoURL='ca-independiente';
-                $strEquipoURL='independiente';
+                //$strEquipoURL='ca-independiente';//viejo
+                $strEquipoURL='independiente';//ultimo
                 break;
             case 'Lanús':
                 $strEquipoURL='lanus';//ultimo
@@ -1148,15 +1148,15 @@ class FechaController extends Controller
                 $strEquipoURL='los-andes-de-lomas-de-zamora';
                 break;
             case 'Newell\'s Old Boys':
-                $strEquipoURL='newells-old-boys';
-                //$strEquipoURL='ca-newells-old-boys';
+                $strEquipoURL='newells-old-boys';//ultimo
+                //$strEquipoURL='ca-newells-old-boys';//viejo
                 break;
             case 'Nueva Chicago':
                 $strEquipoURL='nueva-chicago';
                 break;
             case 'Olimpo':
-                //$strEquipoURL='olimpo';
-                $strEquipoURL='olimpo-de-bahia-blanca';
+                $strEquipoURL='olimpo';//ultimo
+                //$strEquipoURL='olimpo-de-bahia-blanca';//viejo
                 break;
             case 'Patronato':
                 $strEquipoURL='patronato-de-parana';//ultimo
@@ -1166,16 +1166,16 @@ class FechaController extends Controller
                 $strEquipoURL='quilmes-ac';
                 break;
             case 'Racing Club':
-                $strEquipoURL='racing-club';
-                //$strEquipoURL='racing-club-de-avellaneda';
+                $strEquipoURL='racing-club';//ultimo
+                //$strEquipoURL='racing-club-de-avellaneda';//viejo
                 break;
             case 'River Plate':
                 $strEquipoURL='river-plate';
                 //$strEquipoURL='ca-river-plate';
                 break;
             case 'Rosario Central':
-                $strEquipoURL='rosario-central';
-                //$strEquipoURL='ca-rosario-central';
+                $strEquipoURL='rosario-central';//ultimo
+                //$strEquipoURL='ca-rosario-central';//viejo
                 break;
             case 'San Lorenzo':
                 $strEquipoURL='san-lorenzo';
@@ -1183,8 +1183,8 @@ class FechaController extends Controller
                 //$strEquipoURL='san-lorenzo-de-almagro';
                 break;
             case 'San Martín (SJ)':
-                $strEquipoURL='san-martin-de-san-juan';
-                //$strEquipoURL='ca-san-martin';
+                $strEquipoURL='san-martin-de-san-juan';//ultimo
+                //$strEquipoURL='ca-san-martin';//viejo
                 break;
             case 'San Martín (Tuc.)':
                 $strEquipoURL='san-martin-de-tucuman';//ultimo
@@ -1194,12 +1194,172 @@ class FechaController extends Controller
                 $strEquipoURL='sarmiento-de-junin';
                 break;
             case 'Talleres (Cba.)':
-                $strEquipoURL='talleres-de-cordoba';//nuevo
+                $strEquipoURL='talleres-de-cordoba';//ultimo
                 //$strEquipoURL='talleres-cordoba';//viejo
                 break;
             case 'Temperley':
-                //$strEquipoURL='ca-temperley';
-                $strEquipoURL='temperley';
+                //$strEquipoURL='ca-temperley';//viejo
+                $strEquipoURL='temperley';//ultimo
+                break;
+            case 'Tigre':
+                $strEquipoURL='tigre';
+                //$strEquipoURL='ca-tigre';
+                break;
+            case 'Tiro Federal de Rosario':
+                $strEquipoURL='tiro-federal-rosario';
+                break;
+            case 'Unión de Santa Fe':
+                $strEquipoURL='union-de-santa-fe';
+                break;
+            case 'Vélez Sarsfield':
+                $strEquipoURL='velez-sarsfield';
+                //$strEquipoURL='ca-velez-sarsfield';
+                break;
+        }
+        return $strEquipoURL;
+    }
+    public function dameNombreEquipoURL2ALT($strEquipo)
+    {
+        $strEquipoURL=strtr($strEquipo, " ", "-");
+        switch (trim($strEquipo)) {
+            case 'Almagro':
+                $strEquipoURL='almagro';
+                //$strEquipoURL='club-almagro';
+                break;
+            case 'Arsenal':
+                $strEquipoURL='arsenal-sarandi';//viejo
+                //$strEquipoURL='arsenal-de-sarandi';//ultimo
+                //$strEquipoURL='arsenal-fc';
+                break;
+            case 'Atlético de Rafaela':
+                $strEquipoURL='atletico-rafaela';
+                break;
+            case 'Atlético Tucumán':
+                $strEquipoURL='atletico-tucuman';
+                break;
+
+            case 'Banfield':
+                //$strEquipoURL='banfield';//ultimo
+                $strEquipoURL='ca-banfield';//viejo
+                break;
+            case 'Boca Juniors':
+                $strEquipoURL='boca-juniors';
+                //$strEquipoURL='ca-boca-juniors';
+                break;
+            case 'Belgrano':
+                //$strEquipoURL='belgrano-de-cordoba';//nuevo
+                $strEquipoURL='belgrano-cordoba';//viejo
+                break;
+            case 'Central Córdoba (SdE)':
+                $strEquipoURL='central-cordoba-sde';
+                break;
+            case 'Chacarita Juniors':
+                $strEquipoURL='chacarita-juniors';
+                //$strEquipoURL='ca-chacarita-juniors';
+                break;
+            case 'Colón de Santa Fe':
+                //$strEquipoURL='colon-de-santa-fe';//ultimo
+                $strEquipoURL='ca-colon';//viejo
+                break;
+            case 'Crucero del Norte':
+                $strEquipoURL='crucero-del-norte';
+                break;
+            case 'Defensa y Justicia':
+                $strEquipoURL='defensa-y-justicia';
+                //$strEquipoURL='csyd-defensa-y-justicia';
+                break;
+            case 'Estudiantes (LP)':
+                //$strEquipoURL='estudiantes';//nuevo
+                $strEquipoURL='estudiantes-de-la-plata';//viejo
+                break;
+            case 'Gimnasia (J)':
+                $strEquipoURL='gye-jujuy';
+                break;
+            case 'Gimnasia (LP)':
+                //$strEquipoURL='gimnasia-de-la-plata';//ultimo
+                $strEquipoURL='gye-la-plata';//viejo
+                //$strEquipoURL='gimnasia-y-esgrima-de-la-plata';//viejo
+                break;
+            case 'Godoy Cruz':
+                //$strEquipoURL='godoy-cruz';//ultimo
+                $strEquipoURL='cd-godoy-cruz';//viejo
+                break;
+            case 'Huracán':
+                $strEquipoURL='huracan';
+                //$strEquipoURL='ca-huracan';
+                break;
+            case 'Huracán (Tres Arroyos)':
+                $strEquipoURL='huracan-de-tres-arroyos';
+
+                break;
+            case 'Instituto de Córdoba':
+                //$strEquipoURL='instituto-cordoba';
+                $strEquipoURL='instituto-de-cordoba';
+                break;
+            case 'Independiente':
+                $strEquipoURL='ca-independiente';//viejo
+                //$strEquipoURL='independiente';//nuevo
+                break;
+            case 'Lanús':
+                //$strEquipoURL='lanus';//ultimo
+                $strEquipoURL='ca-lanus';//viejo
+                break;
+            case 'Los Andes':
+                $strEquipoURL='los-andes-de-lomas-de-zamora';
+                break;
+            case 'Newell\'s Old Boys':
+                //$strEquipoURL='newells-old-boys';//nuevo
+                $strEquipoURL='ca-newells-old-boys';//viejo
+                break;
+            case 'Nueva Chicago':
+                $strEquipoURL='nueva-chicago';
+                break;
+            case 'Olimpo':
+                $strEquipoURL='olimpo';//nuevo
+                //$strEquipoURL='olimpo-de-bahia-blanca';//viejo
+                break;
+            case 'Patronato':
+                //$strEquipoURL='patronato-de-parana';//ultimo
+                $strEquipoURL='patronato';//viejo
+                break;
+            case 'Quilmes':
+                $strEquipoURL='quilmes-ac';
+                break;
+            case 'Racing Club':
+                //$strEquipoURL='racing-club';//nuevo
+                $strEquipoURL='racing-club-de-avellaneda';//viejo
+                break;
+            case 'River Plate':
+                $strEquipoURL='river-plate';
+                //$strEquipoURL='ca-river-plate';
+                break;
+            case 'Rosario Central':
+                //$strEquipoURL='rosario-central';//nuevo
+                $strEquipoURL='ca-rosario-central';//viejo
+                break;
+            case 'San Lorenzo':
+                $strEquipoURL='san-lorenzo';
+                //$strEquipoURL='ca-san-lorenzo-de-almagro';
+                //$strEquipoURL='san-lorenzo-de-almagro';
+                break;
+            case 'San Martín (SJ)':
+                //$strEquipoURL='san-martin-de-san-juan';//nuevo
+                $strEquipoURL='ca-san-martin';//viejo
+                break;
+            case 'San Martín (Tuc.)':
+                //$strEquipoURL='san-martin-de-tucuman';//ultimo
+                $strEquipoURL='san-martin-tucuman';//viejo
+                break;
+            case 'Sarmiento (Junín)':
+                $strEquipoURL='sarmiento-de-junin';
+                break;
+            case 'Talleres (Cba.)':
+                //$strEquipoURL='talleres-de-cordoba';//nuevo
+                $strEquipoURL='talleres-cordoba';//viejo
+                break;
+            case 'Temperley':
+                $strEquipoURL='ca-temperley';//viejo
+                //$strEquipoURL='temperley';//nuevo
                 break;
             case 'Tigre':
                 $strEquipoURL='tigre';
@@ -4790,6 +4950,9 @@ return $string;
                                     case '1788':
                                         $nombre3='/puch-ignacio';
                                         break;
+                                    case '3144':
+                                        $nombre3='/mosquera-jherso';
+                                        break;
                                     default:
                                         $nombre3='';
                                         break;
@@ -5281,6 +5444,362 @@ return $string;
     }
 
 
+    public function controlarbitrosfecha(Request $request)
+    {
+        set_time_limit(0);
+        //Log::info('Entraaaaaa', []);
+
+        $grupo_id = $request->get('grupoId');
+
+        $grupo=Grupo::findOrFail($grupo_id);
+
+
+        $fechas=Fecha::where('grupo_id','=',"$grupo_id")->orderBy('numero','ASC')->get();
+
+        // these are the headers for the csv file.
+        $headers = array(
+            'Content-Type' => 'application/vnd.ms-excel; charset=utf-8',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Content-Disposition' => 'attachment; filename='.str_replace(' ','_',$grupo->torneo->nombre).'_'.str_replace('/','_',$grupo->torneo->year).'_arbitros.csv',
+            'Expires' => '0',
+            'Pragma' => 'public',
+        );
+
+
+        //I am storing the csv file in public >> files folder. So that why I am creating files folder
+        if (!File::exists(public_path()."/files")) {
+            File::makeDirectory(public_path() . "/files");
+        }
+
+        //creating the download file
+        $filename =  public_path('files/'.str_replace(' ','_',$grupo->torneo->nombre).'_'.str_replace('/','_',$grupo->torneo->year).'_arbitros.csv');
+        $handle = fopen($filename, 'w');
+
+        //adding the first row
+        fputcsv($handle, [
+            'Torneo', 'fecha','Partido','Cant', 'Arbitro', 'Linea 1', 'Linea 2','URL'
+        ], "|");
+
+
+
+
+        /*$fecha=Fecha::findOrFail($id);
+
+        $grupo=Grupo::findOrFail($fecha->grupo->id);*/
+        DB::beginTransaction();
+        foreach ($fechas as $fecha) {
+            $id = $fecha->id;
+            $arrYear = explode('/', $grupo->torneo->year);
+            $years = str_replace('/', '-', $grupo->torneo->year);
+            $year = (count($arrYear) > 1) ? $arrYear[1] : $arrYear[0];
+            $partidos = Partido::where('fecha_id', '=', "$id")->get();
+            $nombreTorneo = $grupo->torneo->nombre;
+            $ok = 1;
+
+            foreach ($partidos as $partido) {
+                $strLocal = $partido->equipol->nombre;
+                $strVisitante = $partido->equipov->nombre;
+                $golesTotales = $partido->golesl + $partido->golesv;
+                $golesLocales = $partido->golesl;
+                $golesVisitantes = $partido->golesv;
+                Log::info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                $arbitros = PartidoArbitro::where('partido_id', '=', "$partido->id")->get();
+                $url='';
+
+
+                if(count($arbitros)!=3){
+
+
+                    try {
+                        $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
+                        Log::info('OJO!!! URL ' .$url, []);
+                        $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+
+                        $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
+
+                        if (!$html2){
+                            $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        if (!$html2){
+                            $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        if (!$html2){
+                            $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        if (!$html2){
+                            $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/';
+                            Log::info('OJO!!! URL ' .$url, []);
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        $linkArray=array();
+                        $entrenadoresArray = array();
+                        $nombreArbitro ='';
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+
+
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+
+
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+
+
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+
+
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+                        if (!$html2) {
+                            $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
+                            Log::info('OJO!!! URL ' .$url, []);
+
+                            $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
+                        }
+
+                    }
+                    catch (Exception $ex) {
+                        $html2='';
+                    }
+                    if ($html2){
+                        if(count($arbitros)>3){
+                            Log::info('OJO!!! mas de 3 jueces', []);
+                            try {
+
+                                PartidoArbitro::where('partido_id',"$partido->id")->delete();
+                            }
+                            catch(QueryException $ex){
+                                $error = $ex->getMessage();
+                                $ok=0;
+
+                            }
+                        }
+                        $asistente=0;
+                        $asistente1='';
+                        $asistente2='';
+                        $arbitro='';
+                        $arbitro1='';
+                        $arbitro2='';
+                        foreach ($html2->find('table[class=standard_tabelle]') as $element) {
+                            foreach ($element->find('td[class="dunkel"]') as $element2) {
+
+                                foreach ($element2->find('a') as $link) {
+                                    $linkArray = explode(' ', $link->title);
+
+                                    if (($linkArray[0]) == 'Árbitro') {
+                                        if (($linkArray[1]) == 'asistente') {
+                                            $nombreAsistente = '';
+                                            for ($i = 2; $i < count($linkArray); $i++) {
+                                                $nombreAsistente .= ($linkArray[$i]) . ' ';
+                                            }
+                                            if ($asistente == 0) {
+                                                $asistente1 = $nombreAsistente;
+                                                Log::info('Asistente 1: ' . $nombreAsistente, []);
+                                                $asistente++;
+                                            } else {
+                                                $asistente2 = $nombreAsistente;
+                                                Log::info('Asistente 2: ' . $nombreAsistente, []);
+                                                $asistente++;
+                                            }
+
+                                        } else {
+                                            $nombreArbitro = '';
+                                            for ($i = 1; $i < count($linkArray); $i++) {
+                                                $nombreArbitro .= ($linkArray[$i]) . ' ';
+                                            }
+
+                                            Log::info('Arbitro: ' . $nombreArbitro, []);
+
+                                        }
+                                    }
+
+
+                                }
+
+                            }
+                            if ($nombreArbitro){
+                                $arrArbitro = explode(' ', $nombreArbitro);
+                                $arbitro=0;
+                                if(count($arrArbitro)>1) {
+                                    //$arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                                    $arbitro=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('apellido', 'like', "%$arrArbitro[1]%")->first();
+                                }
+
+                                if (!$arbitro){
+                                    Log::info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                                }
+                                else{
+                                    $data3=array(
+                                        'partido_id'=>$partido->id,
+                                        'arbitro_id'=>$arbitro->id,
+                                        'tipo'=>'Principal'
+                                    );
+                                    $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro->id")->first();
+                                    try {
+                                        if (!empty($partido_arbitro)){
+                                            //Log::info('OJO!! lo encuentra',[]);
+                                            $partido_arbitro->update($data3);
+                                        }
+                                        else{
+                                            $partido_arbitro=PartidoArbitro::create($data3);
+                                        }
+
+                                    }catch(QueryException $ex){
+                                        $error = $ex->getMessage();
+                                        $ok=0;
+                                        continue;
+                                    }
+                                }
+                            }
+                            if($asistente1){
+                                $arrArbitroA1 = explode(' ', $asistente1);
+                                $arbitro1=0;
+                                if(count($arrArbitroA1)>1) {
+                                    //$arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
+                                    $arbitro1=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitroA1[0]%")->where('apellido', 'like', "%$arrArbitroA1[1]%")->first();
+                                }
+
+                                if (!$arbitro1){
+                                    Log::info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                                }
+                                else{
+                                    $data3=array(
+                                        'partido_id'=>$partido->id,
+                                        'arbitro_id'=>$arbitro1->id,
+                                        'tipo'=>'Linea 1'
+                                    );
+                                    $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro1->id")->first();
+                                    try {
+                                        if (!empty($partido_arbitro)){
+
+                                            $partido_arbitro->update($data3);
+                                        }
+                                        else{
+                                            $partido_arbitro=PartidoArbitro::create($data3);
+                                        }
+
+                                    }catch(QueryException $ex){
+                                        $error = $ex->getMessage();
+                                        $ok=0;
+                                        continue;
+                                    }
+                                }
+                            }
+                            if($asistente2){
+                                $arrArbitroA2 = explode(' ', $asistente2);
+                                $arbitro2=0;
+                                if(count($arrArbitroA2)>1) {
+                                    //$arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
+                                    $arbitro2=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitroA2[0]%")->where('apellido', 'like', "%$arrArbitroA2[1]%")->first();
+                                }
+
+                                if (!$arbitro2){
+                                    Log::info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                                }
+                                else{
+                                    $data3=array(
+                                        'partido_id'=>$partido->id,
+                                        'arbitro_id'=>$arbitro2->id,
+                                        'tipo'=>'Linea 2'
+                                    );
+                                    $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro2->id")->first();
+                                    try {
+                                        if (!empty($partido_arbitro)){
+
+                                            $partido_arbitro->update($data3);
+                                        }
+                                        else{
+                                            $partido_arbitro=PartidoArbitro::create($data3);
+                                        }
+
+                                    }catch(QueryException $ex){
+                                        $error = $ex->getMessage();
+                                        $ok=0;
+                                        continue;
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                    fputcsv($handle, [
+
+                        utf8_decode($grupo->torneo->nombre . ' ' . $grupo->torneo->year),
+                        utf8_decode($fecha->numero),
+                        utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                        count($arbitros),
+                        utf8_decode( $nombreArbitro),
+                        utf8_decode($asistente1),
+                        utf8_decode($asistente2),
+                        $url
+                    ], "|");
+                    //Log::info('OJO!!! No se econtró la URL de cabezas', []);
+                }
+
+            }
+        }
+
+        fclose($handle);
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ='Importación exitosa. (ver log)';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('fechas.index', array('grupoId' => $fecha->grupo->id))->with($respuestaID,$respuestaMSJ);
+
+        //return view('fechas.index', compact('grupo'));
+    }
     /**
      * Display a listing of the resource.
      *
@@ -6732,6 +7251,7 @@ return $string;
                         $arbitro='';
                         $arbitro1='';
                         $arbitro2='';
+                        $nombreArbitro = '';
                         foreach ($element->find('td[class="dunkel"]') as $element2) {
 
                             foreach ($element2->find('a') as $link) {
@@ -6756,7 +7276,7 @@ return $string;
 
                                     }
                                     else{
-                                        $nombreArbitro = '';
+                                        //$nombreArbitro = '';
                                         for ($i = 1; $i < count($linkArray); $i++) {
                                             $nombreArbitro .= ($linkArray[$i]).' ';
                                         }

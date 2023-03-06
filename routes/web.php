@@ -51,6 +51,7 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('importincidenciasfecha', 'FechaController@importincidenciasfecha')->name('fechas.importincidenciasfecha');
     Route::get('importgolesfecha', 'FechaController@importgolesfecha')->name('fechas.importgolesfecha');
+    Route::get('controlarbitrosfecha', 'FechaController@controlarbitrosfecha')->name('fechas.controlarbitrosfecha');
 
 
     Route::get('importpoll', 'PollController@importPoll')->name('polls.importPoll');

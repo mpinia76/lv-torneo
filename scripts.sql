@@ -34,7 +34,7 @@ INNER JOIN equipos ON alineacions.equipo_id = equipos.id
 WHERE personas.nacimiento IS null
 
 ########################## Técnicos Sin nacimiento ##########################
-SELECT jugadors.id, personas.apellido, equipos.nombre, partidos.id
+SELECT tecnicos.id, personas.apellido, equipos.nombre, partidos.id
 FROM personas
 INNER JOIN tecnicos ON tecnicos.id = tecnicos.persona_id
 INNER JOIN partido_tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
@@ -67,7 +67,7 @@ WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.parti
 
 ########################## Goles repetidas ##########################
 SELECT partido_id, jugador_id, COUNT(partido_id)
-FROM goles
+FROM gols
 GROUP BY partido_id,jugador_id, minuto
 HAVING COUNT(partido_id)>1
 
@@ -108,9 +108,9 @@ WHERE id IN
       );
 
 ########################## Cambios impares ##########################
-SELECT partido_id, COUNT(partido_id)
+SELECT partido_id, minuto, COUNT(partido_id)
 FROM cambios
-GROUP BY partido_id
+GROUP BY partido_id, minuto
 HAVING COUNT(partido_id) % 2 != 0
 
 ########################## Diferencia en goles ##########################
@@ -119,11 +119,21 @@ FROM partidos
 WHERE partidos.golesl + partidos.golesv !=
 (SELECT COUNT(gols.id) FROM gols WHERE partidos.id = gols.partido_id GROUP BY gols.partido_id)
 
-########################## más de 3 arbitros ##########################
+########################## sin arbitro ##########################
+SELECT *
+FROM partidos
+WHERE NOT EXISTS (
+    SELECT partido_id
+    FROM partido_arbitros
+    WHERE TIPO = 'Principal' AND partidos.id = partido_arbitros.partido_id
+    GROUP BY partido_id)
+
+########################## distinto de 3 arbitros ##########################
 SELECT partido_id, COUNT(partido_id)
 FROM partido_arbitros
 GROUP BY partido_id
-HAVING COUNT(partido_id)>3
+HAVING COUNT(partido_id)!=3
+ORDER BY partido_id desc
 
 ########################## tipos de árbitros repetidos ##########################
 SELECT partido_id, COUNT(partido_id)

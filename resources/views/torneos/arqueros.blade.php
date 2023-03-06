@@ -5,7 +5,11 @@
 @section('content')
     <div class="container">
 
+        @php
+            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
+            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
+        @endphp
 
 
     <table class="table" style="width: 100%">
@@ -13,10 +17,10 @@
         <th>#</th>
         <th>Jugador</th>
 
+        <th><a href="{{route('torneos.arqueros', array('order'=>'jugados','tipoOrder'=>$tipoOrder))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.arqueros', array('order'=>'recibidos','tipoOrder'=>$tipoOrder))}}" > Goles @if($order=='recibidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.arqueros', array('order'=>'invictas','tipoOrder'=>$tipoOrder))}}" > Vallas invictas @if($order=='invictas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
-        <th>Jugados</th>
-        <th>Goles</th>
-        <th>Vallas Invictas</th>
         <th>Equipos</th>
         </thead>
         <tbody>
