@@ -630,7 +630,8 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
     {
         $torneo_id= $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
-
+        $order= ($request->query('order'))?$request->query('order'):'jugados';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
         $arrgrupos='';
         foreach ($grupos as $grupo){
@@ -667,7 +668,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
 GROUP BY jugadors.id, jugador, foto
-ORDER BY jugados DESC, recibidos ASC'));
+ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC'));
 
 
         $page = $request->query('page', 1);
@@ -701,12 +702,14 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
 
         }
 
-        $arqueros->setPath(route('grupos.arqueros',  array('torneoId' => $torneo->id)));
+
+
+        $arqueros->setPath(route('grupos.arqueros',  array('torneoId' => $torneo->id,'order'=>$order,'tipoOrder'=>$tipoOrder)));
 
         //dd($tarjetas);
 
         $i=$offSet+1;
-        return view('grupos.arqueros', compact('torneo','arqueros','i'));
+        return view('grupos.arqueros', compact('torneo','arqueros','i','order','tipoOrder'));
     }
 
     public function metodo(Request $request)
