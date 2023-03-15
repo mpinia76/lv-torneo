@@ -58,7 +58,12 @@ WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.parti
 ########################## Con goles y no jugaron ##########################
 SELECT *
 FROM gols
-WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.partido_id = gols.partido_id AND alineacions.jugador_id = gols.jugador_id)
+WHERE NOT EXISTS (
+	SELECT alineacions.id 
+	FROM alineacions 
+	LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id
+	WHERE alineacions.partido_id = gols.partido_id 
+	AND alineacions.jugador_id = gols.jugador_id AND (alineacions.tipo = 'Titular' OR cambios.tipo = 'Entra'))
 
 ########################## Con cambios y no jugaron ##########################
 SELECT *

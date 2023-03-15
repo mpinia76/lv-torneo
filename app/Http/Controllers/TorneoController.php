@@ -159,9 +159,11 @@ class TorneoController extends Controller
 
         $promedioTorneos = PromedioTorneo::where('torneo_id','=',"$id")->get();
 
+        $acumuladoTorneos = AcumuladoTorneo::where('torneo_id','=',"$id")->get();
+
         $grupos = Grupo::where('torneo_id','=',"$id")->get();
 
-        return view('torneos.edit', compact('torneo','torneosAnteriores','promedioTorneos','grupos'));
+        return view('torneos.edit', compact('torneo','torneosAnteriores','promedioTorneos','grupos','acumuladoTorneos'));
     }
 
     /**
@@ -178,12 +180,21 @@ class TorneoController extends Controller
 
         DB::beginTransaction();
         $noBorrar='';
+        $noBorrarAcumulado='';
         $noBorrarGrupos='';
         if($request->promedioTorneo_id)  {
 
                 foreach ($request->promedioTorneo_id as $anterior_id){
                     $noBorrar .=$anterior_id.',';
                 }
+
+
+        }
+        if($request->acumuladoTorneo_id)  {
+
+            foreach ($request->acumuladoTorneo_id as $anterior_id){
+                $noBorrarAcumulado .=$anterior_id.',';
+            }
 
 
         }
@@ -206,6 +217,7 @@ class TorneoController extends Controller
                     //print_r($request->posicionesGrupo);
                     $posiciones=0;
                     $promedios=0;
+                    $acumulados=0;
                     $penales=0;
                     if($request->get('posicionesGrupo')){
                         if(in_array($request->items[$item], $request->get('posicionesGrupo'))){
@@ -216,6 +228,12 @@ class TorneoController extends Controller
                     if($request->get('promediosGrupo')) {
                         if (in_array($request->items[$item], $request->get('promediosGrupo'))) {
                             $promedios = 1;
+                        }
+                    }
+
+                    if($request->get('acumuladosGrupo')) {
+                        if (in_array($request->items[$item], $request->get('acumuladosGrupo'))) {
+                            $acumulados = 1;
                         }
                     }
 
@@ -231,6 +249,7 @@ class TorneoController extends Controller
                         'equipos'=>$request->equiposGrupo[$item],
                         'posiciones'=>$posiciones,
                         'promedios'=>$promedios,
+                        'acumulados'=>$acumulados,
                         'penales'=>$penales,
                         'agrupacion'=>$request->agrupacionGrupo[$item]
                     );

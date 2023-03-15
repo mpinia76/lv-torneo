@@ -59,6 +59,7 @@
                 <th>Agrupacion</th>
                 <th>Posiciones</th>
                 <th>Promedios</th>
+                <th>Acumulado</th>
                 <th>Penales</th>
 
                 <th><a href="#" class="addRowGrupo"><i class="glyphicon glyphicon-plus"></i></a></th>
@@ -83,6 +84,7 @@
                         <td>{{ Form::number('agrupacionGrupo[]', $grupo->agrupacion,['class' => 'form-control', 'style' => 'width: 50px']) }}</td>
                         <td>{{ Form::checkbox('posicionesGrupo[]', $i,$grupo->posiciones) }}</td>
                         <td>{{ Form::checkbox('promediosGrupo[]', $i,$grupo->promedios) }}</td>
+                        <td>{{ Form::checkbox('acumuladosGrupo[]', $i,$grupo->acumulados) }}</td>
                         <td>{{ Form::checkbox('penalesGrupo[]', $i,$grupo->penales) }}</td>
 
 
@@ -122,6 +124,39 @@
 
 
                         <td><a href="#" class="btn btn-danger removeTorneo"><i class="glyphicon glyphicon-remove"></i></a></td>
+                    </tr>
+                @endforeach
+
+                </tbody>
+
+
+
+
+            </table>
+        </div>
+
+        <div class="form-group col-md-12">
+            <h1 class="display-6">Torneos que cuentan para el acumulado</h1>
+
+            <table class="table" style="width: 50%">
+                <thead>
+                <th></th>
+                <th>Torneos</th>
+
+                <th><a href="#" class="addRowTorneoAcumulado"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                </thead>
+
+                <tbody id="cuerpoTorneoAcumulado">
+                @foreach($acumuladoTorneos ?? '' as $acumuladoTorneo)
+
+                    <tr>
+                        <td>
+                            {{Form::hidden('acumuladoTorneo_id[]',$acumuladoTorneo->id)}}</td>
+                        <td>{{ Form::select('torneoAnteriorAcumulado[]',$torneosAnteriores, $acumuladoTorneo->torneoAnterior_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+
+
+                        <td><a href="#" class="btn btn-danger removeTorneoAcumulado"><i class="glyphicon glyphicon-remove"></i></a></td>
                     </tr>
                 @endforeach
 

@@ -350,6 +350,30 @@
 
     });
 
+    $('.addRowTorneoAcumulado').on('click',function(e){
+        e.preventDefault();
+        addRowTorneoAcumulado();
+    });
+    function addRowTorneo()
+    {
+        var tr='<tr>'+
+            '<td></td><td>'+'{{ Form::select('torneoAnteriorAcumulado[]',$torneosAnteriores ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+
+
+            '<td><a href="#" class="btn btn-danger removeTorneoAcumulado"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpoTorneoAcumulado').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removeTorneoAcumulado', function(e){
+        e.preventDefault();
+
+        $(this).parent().parent().remove();
+
+
+    });
+
+
     $('.addRowGrupo').on('click',function(e){
         e.preventDefault();
         addRowGrupo();
