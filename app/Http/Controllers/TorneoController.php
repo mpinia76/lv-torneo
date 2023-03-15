@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\AcumuladoTorneo;
 use App\Plantilla;
 use App\Torneo;
 use Illuminate\Database\QueryException;
@@ -25,7 +26,7 @@ class TorneoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos', 'arqueros');
+        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos', 'arqueros','acumulado');
     }
 
     /**
@@ -113,6 +114,23 @@ class TorneoController extends Controller
                     }
                 }
             }
+            if(!empty($request->torneoAnteriorAcumulado))
+            {
+                foreach($request->torneoAnteriorAcumulado as $item=>$v){
+
+                    $data2=array(
+                        'torneo_id'=>$torneo->id,
+                        'torneoAnterior_id'=>$request->torneoAnteriorAcumulado[$item]
+                    );
+                    try {
+                        AcumuladoTorneo::create($data2);
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+            }
         }catch(Exception $e){
             //if email or phone exist before in db redirect with error messages
             $ok=0;
@@ -175,7 +193,7 @@ class TorneoController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        //print_r($request);
         $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required']);
 
         DB::beginTransaction();
@@ -217,7 +235,7 @@ class TorneoController extends Controller
                     //print_r($request->posicionesGrupo);
                     $posiciones=0;
                     $promedios=0;
-                    $acumulados=0;
+                    $acumulado=0;
                     $penales=0;
                     if($request->get('posicionesGrupo')){
                         if(in_array($request->items[$item], $request->get('posicionesGrupo'))){
@@ -231,9 +249,9 @@ class TorneoController extends Controller
                         }
                     }
 
-                    if($request->get('acumuladosGrupo')) {
-                        if (in_array($request->items[$item], $request->get('acumuladosGrupo'))) {
-                            $acumulados = 1;
+                    if($request->get('acumuladoGrupo')) {
+                        if (in_array($request->items[$item], $request->get('acumuladoGrupo'))) {
+                            $acumulado = 1;
                         }
                     }
 
@@ -249,7 +267,7 @@ class TorneoController extends Controller
                         'equipos'=>$request->equiposGrupo[$item],
                         'posiciones'=>$posiciones,
                         'promedios'=>$promedios,
-                        'acumulados'=>$acumulados,
+                        'acumulado'=>$acumulado,
                         'penales'=>$penales,
                         'agrupacion'=>$request->agrupacionGrupo[$item]
                     );
@@ -299,12 +317,40 @@ class TorneoController extends Controller
                     }
                 }
             }
+            if($request->torneoAnteriorAcumulado)
+            {
+                foreach($request->torneoAnteriorAcumulado as $item=>$v){
+
+                    $data2=array(
+                        'torneo_id'=>$id,
+                        'torneoAnterior_id'=>$request->torneoAnteriorAcumulado[$item]
+                    );
+                    try {
+                        if (!empty($request->acumuladoTorneo_id[$item])){
+                            $data2['id']=$request->acumuladoTorneo_id[$item];
+                            $acumuladoTorneo=AcumuladoTorneo::find($request->acumuladoTorneo_id[$item]);
+                            $acumuladoTorneo->update($data2);
+                        }
+                        else{
+                            $acumuladoTorneo = AcumuladoTorneo::create($data2);
+                        }
+                        $noBorrarAcumulado .=$acumuladoTorneo->id.',';
+
+
+                    }catch(QueryException $ex){
+                        $error = $ex->getMessage();
+                        $ok=0;
+                        continue;
+                    }
+                }
+            }
         }catch(Exception $e){
             //if email or phone exist before in db redirect with error messages
             $ok=0;
         }
         try {
             PromedioTorneo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrar))->delete();
+            AcumuladoTorneo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrarAcumulado))->delete();
             Grupo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrarGrupos))->delete();
         }
         catch(QueryException $ex){
@@ -340,7 +386,9 @@ class TorneoController extends Controller
     	$torneo = Torneo::find($id);
         $torneo->grupoDetalle()->delete();
         PromedioTorneo::where('torneo_id',"$id")->delete();
+        AcumuladoTorneo::where('torneo_id',"$id")->delete();
         $torneo->delete();
+
         return redirect()->route('torneos.index')->with('success','Registro eliminado satisfactoriamente');
     }
 
@@ -570,6 +618,143 @@ order by promedio desc, puntaje desc, equipo ASC';
         $i=1;
         return view('torneos.promediosPublic', compact('torneo','promedios','i'));
     }
+
+
+    public function acumulado(Request $request)
+    {
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+        $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+
+
+        $equipos = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id');
+
+
+        //print_r($equipos);
+
+
+        $acumuladoTorneos = AcumuladoTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','DESC')->get();
+        $acumulado = array();
+        if (count($acumuladoTorneos)>0){
+            $sql='SELECT foto, equipo,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, (sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       )/count(*)) promedio, equipo_id
+
+from ( ';
+
+
+            foreach ($acumuladoTorneos as $acumuladoTorneo){
+                $grupos = Grupo::where('torneo_id', '=',$acumuladoTorneo->torneoAnterior_id)->get();
+                $arrgrupos='';
+                foreach ($grupos as $grupo){
+                    $arrgrupos .=$grupo->id.',';
+                }
+                $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+
+
+                $equiposAux = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id');
+
+
+
+                $borrar = array();
+                foreach ($equipos as $key => $value){
+
+                    if (!$equiposAux->contains($value) ){
+                        $borrar[]=$key;
+                    }
+                }
+
+                foreach ($borrar as $key){
+                    $equipos->forget($key);
+                }
+
+                $arrequipos='';
+                foreach ($equipos as $key => $value){
+                    $arrequipos .=$key.',';
+                }
+                $arrequipos = substr($arrequipos, 0, -1);//quito última coma
+
+
+
+
+
+                $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.acumulado = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.acumulado = 1 AND G1.torneo_id = '.$acumuladoTorneo->torneoAnterior_id.'
+		 WHERE golesl is not null AND golesv is not null ';
+                $sql .=' AND equipos.id IN ('.$arrequipos.')';
+                $sql .=' union all
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.acumulado = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.acumulado = 1 AND G1.torneo_id = '.$acumuladoTorneo->torneoAnterior_id.'
+		 WHERE golesl is not null AND golesv is not null';
+                $sql .=' AND equipos.id IN ('.$arrequipos.')';
+                $sql .=' union all ';
+            }
+
+            $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.acumulado = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.acumulado = 1 AND G1.torneo_id = '.$torneo_id.'
+		 WHERE golesl is not null AND golesv is not null
+
+     union all
+       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.acumulado = 1 AND grupos.torneo_id = '.$torneo_id.'
+		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.acumulado = 1 AND G1.torneo_id = '.$torneo_id.'
+		 WHERE golesl is not null AND golesv is not null) a
+
+
+group by equipo, foto, equipo_id
+
+order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
+            //echo $sql;
+            $acumulado = DB::select(DB::raw($sql));
+        }
+
+
+        //dd($promedios);
+
+        $i=1;
+        return view('torneos.acumulado', compact('torneo','acumulado','i'));
+    }
+
 
     public function historiales(Request $request)
     {

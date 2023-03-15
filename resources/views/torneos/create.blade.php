@@ -75,6 +75,29 @@
             </table>
         </div>
 
+        <div class="form-group col-md-12">
+            <h1 class="display-6">Torneos que cuentan para el acumulado</h1>
+
+            <table class="table" style="width: 50%">
+                <thead>
+                <th></th>
+                <th>Torneos</th>
+
+                <th><a href="#" class="addRowTorneoAcumulado"><i class="glyphicon glyphicon-plus"></i></a></th>
+
+                </thead>
+
+                <tbody id="cuerpoTorneoAcumulado">
+
+
+                </tbody>
+
+
+
+
+            </table>
+        </div>
+
     <!-- build the submission button -->
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
         <a href="{{route('torneos.index')}}" class="btn btn-success m-1">Volver</a>

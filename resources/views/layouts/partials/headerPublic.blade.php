@@ -45,6 +45,11 @@
 
                     <ul class="dropdown-menu" role="menu">
 
+                        <li><a class="dropdown-item" href="{{route('torneos.acumulado',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Acumulado
+                            </a>
+                        </li>
+
                         <li><a class="dropdown-item" href="{{route('grupos.arqueros',  array('torneoId' => Session::get('codigoTorneo')))}}">
                                 Arqueros
                             </a>

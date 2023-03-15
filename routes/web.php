@@ -87,6 +87,7 @@ Route::get('verTecnico', 'TecnicoController@ver')->name('tecnicos.ver');
 Route::get('tecnicoJugados', 'TecnicoController@jugados')->name('tecnicos.jugados');
 Route::get('verArbitro', 'ArbitroController@ver')->name('arbitros.ver');
 Route::get('descensos', 'TorneoController@promediosPublic')->name('torneos.promediosPublic');
+Route::get('acumulado', 'TorneoController@acumulado')->name('torneos.acumulado');
 Route::get('arqueros', 'GrupoController@arqueros')->name('grupos.arqueros');
 Route::get('metodo', 'GrupoController@metodo')->name('grupos.metodo');
 

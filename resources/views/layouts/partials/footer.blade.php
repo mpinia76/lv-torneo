@@ -354,7 +354,7 @@
         e.preventDefault();
         addRowTorneoAcumulado();
     });
-    function addRowTorneo()
+    function addRowTorneoAcumulado()
     {
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('torneoAnteriorAcumulado[]',$torneosAnteriores ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+

@@ -84,7 +84,7 @@
                         <td>{{ Form::number('agrupacionGrupo[]', $grupo->agrupacion,['class' => 'form-control', 'style' => 'width: 50px']) }}</td>
                         <td>{{ Form::checkbox('posicionesGrupo[]', $i,$grupo->posiciones) }}</td>
                         <td>{{ Form::checkbox('promediosGrupo[]', $i,$grupo->promedios) }}</td>
-                        <td>{{ Form::checkbox('acumuladosGrupo[]', $i,$grupo->acumulados) }}</td>
+                        <td>{{ Form::checkbox('acumuladoGrupo[]', $i,$grupo->acumulado) }}</td>
                         <td>{{ Form::checkbox('penalesGrupo[]', $i,$grupo->penales) }}</td>
 
 
