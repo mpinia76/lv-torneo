@@ -5,7 +5,11 @@
 @section('content')
     <div class="container">
 
+        @php
+            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
+            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
+        @endphp
 
 
     <table class="table" style="width: 100%">
@@ -13,8 +17,9 @@
         <th>#</th>
         <th>Jugador</th>
         <th>Equipos</th>
-        <th>Amarillas</th>
-        <th>Rojas</th>
+        <th><a href="{{route('grupos.tarjetasPublic', array('torneoId' => $torneo->id,'order'=>'amarillas','tipoOrder'=>$tipoOrder))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('grupos.tarjetasPublic', array('torneoId' => $torneo->id,'order'=>'rojas','tipoOrder'=>$tipoOrder))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+
         <th>Jugados</th>
         <th>Prom. A</th>
         <th>Prom. R</th>
@@ -57,8 +62,10 @@
 
                 <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Rojas'))}}" >{{$jugador->rojas}}</a></td>
                 <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >{{$jugador->jugados}}</a></td>
-                <td>{{round($jugador->amarillas / $jugador->jugados,2)}}</td>
-                <td>{{round($jugador->rojas / $jugador->jugados,2)}}</td>
+                <td>@if($jugador->jugados){{round($jugador->amarillas / $jugador->jugados,2)}} @else 0 @endif</td>
+                <td>@if($jugador->jugados){{round($jugador->rojas / $jugador->jugados,2)}} @else 0 @endif</td>
+
+
 
 
             </tr>

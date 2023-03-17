@@ -69,7 +69,10 @@
                                 Goleadores
                             </a>
                         </li>
-
+                        <li><a class="dropdown-item" href="{{route('grupos.jugadores',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Jugadores
+                            </a>
+                        </li>
                         <li><a class="dropdown-item" href="{{route('grupos.metodo',  array('torneoId' => Session::get('codigoTorneo')))}}">
                                 Método Paenza
                             </a>
