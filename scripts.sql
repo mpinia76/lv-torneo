@@ -3,12 +3,12 @@ DELETE plantilla_jugadors FROM
 plantillas INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
  INNER JOIN grupos ON grupos.id = plantillas.grupo_id
  INNER JOIN torneos ON torneos.id = grupos.torneo_id
-WHERE torneos.id = 30 AND NOT EXISTS (SELECT alineacions.jugador_id
+WHERE torneos.id = 2 AND NOT EXISTS (SELECT alineacions.jugador_id
 FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
 INNER JOIN fechas ON fechas.grupo_id = g2.id
 INNER JOIN partidos ON partidos.fecha_id = fechas.id
 INNER JOIN alineacions ON alineacions.partido_id = partidos.id
-WHERE t2.id = 30 AND alineacions.equipo_id = plantillas.equipo_id AND plantilla_jugadors.jugador_id = alineacions.jugador_id);
+WHERE t2.id = 2 AND alineacions.equipo_id = plantillas.equipo_id AND plantilla_jugadors.jugador_id = alineacions.jugador_id);
 
 ########################## Control dorsales jugadores ##########################
 SELECT  fechas.numero, alineacions.dorsal, plantilla_jugadors.dorsal, alineacions.jugador_id,
@@ -59,10 +59,10 @@ WHERE NOT EXISTS (SELECT alineacions.id FROM alineacions WHERE alineacions.parti
 SELECT *
 FROM gols
 WHERE NOT EXISTS (
-	SELECT alineacions.id 
-	FROM alineacions 
+	SELECT alineacions.id
+	FROM alineacions
 	LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id
-	WHERE alineacions.partido_id = gols.partido_id 
+	WHERE alineacions.partido_id = gols.partido_id
 	AND alineacions.jugador_id = gols.jugador_id AND (alineacions.tipo = 'Titular' OR cambios.tipo = 'Entra'))
 
 ########################## Con cambios y no jugaron ##########################
@@ -145,4 +145,27 @@ SELECT partido_id, COUNT(partido_id)
 FROM partido_arbitros
 GROUP BY partido_id, tipo
 HAVING COUNT(partido_id)>1
+
+########################## jugadores misma fechas en 2 equipos ##########################
+SELECT jugadors.id, CONCAT(personas.apellido,', ',personas.nombre) AS jugador, partidos.id, partidos.fecha_id, alineacions.equipo_id
+FROM alineacions
+         INNER JOIN partidos ON alineacions.partido_id = partidos.id
+         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
+         INNER JOIN personas ON jugadors.persona_id = personas.id
+WHERE partidos.fecha_id NOT IN(16,89,90,92,113,146,386,389,708,749,808,991) AND (alineacions.jugador_id, partidos.fecha_id) = ANY (
+    SELECT A2.jugador_id, P2.fecha_id
+    FROM alineacions A2
+             INNER JOIN partidos P2 ON A2.partido_id = P2.id
+    GROUP BY P2.fecha_id,A2.jugador_id
+    HAVING COUNT(P2.fecha_id)>1)
+ORDER BY partidos.fecha_id
+
+########################## consultar jugador equipo dorsal ##########################
+SELECT torneos.id, torneos.nombre, torneos.year, fechas.numero, dorsal, partidos.id
+FROM alineacions
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN fechas ON fechas.id = partidos.fecha_id
+INNER JOIN grupos ON fechas.grupo_id = grupos.id
+INNER JOIN torneos ON grupos.torneo_id = torneos.id
+WHERE jugador_id = 575 AND equipo_id = 14
 

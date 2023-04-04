@@ -18,7 +18,7 @@
             <thead>
             <th>#</th>
             <th>Técnico</th>
-
+            <th>Actual</th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Jugados','tipoOrder'=>$tipoOrder))}}" > J @if($order=='Jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Ganados','tipoOrder'=>$tipoOrder))}}" > G @if($order=='Ganados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Empatados','tipoOrder'=>$tipoOrder))}}" > E @if($order=='Empatados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
@@ -44,7 +44,23 @@
                             @endif
                         </a>
                         {{$tecnico->tecnico}}</td>
+                    <td>@if($tecnico->jugando)
+                            @php
+                                $escs = explode(',',$tecnico->jugando);
+                            @endphp
+                            @foreach($escs as $esc)
 
+                                @if($esc!='')
+                                    @php
+                                        $escArr = explode('_',$esc);
+                                    @endphp
+                                    <a href="{{route('equipos.ver', array('equipoId' => $escArr[1]))}}" >
+                                        <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25">
+                                    </a>
+                                @endif
+                            @endforeach
+
+                        @endif</td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id))}}" >{{$tecnico->jugados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Ganados'))}}" >{{$tecnico->ganados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Empatados'))}}" >{{$tecnico->empatados}}</a></td>

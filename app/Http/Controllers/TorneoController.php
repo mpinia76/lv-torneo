@@ -849,7 +849,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $order= ($request->query('order'))?$request->query('order'):'goles';
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
         $sql = 'SELECT jugadors.id, CONCAT(personas.apellido,\', \',personas.nombre) jugador, personas.foto, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo, "0" as jugados
-, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
+, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre, "" AS jugando
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
 INNER JOIN partidos ON gols.partido_id = partidos.id
@@ -864,7 +864,13 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
         $goleadores = DB::select(DB::raw($sql));
 
+        $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
 
+        $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
+        //$maxId = $ultimoTorneo['ultimo'];
+        foreach ($ultimoTorneos as $ultimoTorneo){
+            $maxId = $ultimoTorneo->ultimo;
+        }
 
         $page = $request->query('page', 1);
 
@@ -880,6 +886,24 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
 
         foreach ($goleadores as $goleador){
+
+            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN equipos ON alineacions.equipo_id = equipos.id
+WHERE grupos.torneo_id = '.$maxId.' AND jugadors.id = '.$goleador->id;
+            $jugando = '';
+            $juega = DB::select(DB::raw($sqlJugando));
+            foreach ($juega as $e){
+
+                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+            }
+
+            $goleador->jugando = $jugando;
 
             $sql2='SELECT escudo, equipo_id, COUNT(gols.id) goles
 FROM equipos
@@ -1784,7 +1808,7 @@ GROUP BY torneos.nombre, torneos.year) AS t )';
            + case when golesl = golesv then 1 else 0 end
        ) /COUNT(*) ),
       2
-    ) prom, "" escudo
+    ) prom, "" escudo, "" AS jugando
 from (
        select  DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
@@ -1818,7 +1842,13 @@ group by tecnico, fotoTecnico, tecnico_id
 
         $goleadores = DB::select(DB::raw($sql));
 
+        $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
 
+        $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
+        //$maxId = $ultimoTorneo['ultimo'];
+        foreach ($ultimoTorneos as $ultimoTorneo){
+            $maxId = $ultimoTorneo->ultimo;
+        }
 
         $page = $request->query('page', 1);
 
@@ -1834,6 +1864,24 @@ group by tecnico, fotoTecnico, tecnico_id
 
 
         foreach ($goleadores as $goleador){
+
+            $sqlJugando = 'SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id
+FROM partido_tecnicos
+INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+INNER JOIN personas ON tecnicos.persona_id = personas.id
+INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
+WHERE grupos.torneo_id = '.$maxId.' AND tecnicos.id = '.$goleador->tecnico_id;
+            $jugando = '';
+            $juega = DB::select(DB::raw($sqlJugando));
+            foreach ($juega as $e){
+
+                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+            }
+
+            $goleador->jugando = $jugando;
 
             $sql2='SELECT equipo, escudo, equipo_id,
        count(*) jugados,
@@ -1904,7 +1952,7 @@ order by puntaje desc, diferencia DESC, golesl DESC';
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
         $arqueros = DB::select(DB::raw('SELECT jugadors.id, CONCAT(personas.apellido,\', \',personas.nombre) jugador, COUNT(jugadors.id) as jugados,
 sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
-sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "" escudo, personas.foto
+sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "" escudo, personas.foto, "" as jugando
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1916,6 +1964,15 @@ WHERE  alineacions.tipo = \'Titular\'
 
 GROUP BY jugadors.id, jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC'));
+
+
+        $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
+
+        $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
+        //$maxId = $ultimoTorneo['ultimo'];
+        foreach ($ultimoTorneos as $ultimoTorneo){
+            $maxId = $ultimoTorneo->ultimo;
+        }
 
 
         $page = $request->query('page', 1);
@@ -1930,6 +1987,24 @@ ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC'));
 
 
         foreach ($arqueros as $arquero){
+
+            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN equipos ON alineacions.equipo_id = equipos.id
+WHERE grupos.torneo_id = '.$maxId.' AND jugadors.id = '.$arquero->id;
+            $jugando = '';
+            $juega = DB::select(DB::raw($sqlJugando));
+            foreach ($juega as $e){
+
+                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+            }
+
+            $arquero->jugando = $jugando;
 
             $sql2='SELECT escudo, equipo_id, COUNT(jugadors.id) as jugados,
 sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
@@ -1990,7 +2065,7 @@ ORDER BY partidos.dia ASC';
 from
 
 (SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "1" as goles, "0" as  amarillas
-, "0" as  rojas, "0" as  recibidos, "0" as  invictas
+, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2002,7 +2077,7 @@ WHERE gols.tipo <> \'En contra\'
 
  UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas
+, ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2015,7 +2090,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
-(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas
+(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" AS jugando
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2028,7 +2103,7 @@ WHERE  alineacions.tipo = \'Titular\'
 UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, "0" AS recibidos,
-"0" AS invictas
+"0" AS invictas, "0" AS jugando
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador != \'Arquero\'
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2037,6 +2112,19 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')
+
+UNION ALL
+ SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
+, "0" as  rojas, "0" AS recibidos,
+"0" AS invictas, "0" AS jugando
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+WHERE  (cambios.tipo = \'Entra\')
 ) a
 
 group by jugador_id,jugador, foto
@@ -2044,7 +2132,13 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
         $jugadores = DB::select(DB::raw($sql));
 
+        $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
 
+        $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
+        //$maxId = $ultimoTorneo['ultimo'];
+        foreach ($ultimoTorneos as $ultimoTorneo){
+            $maxId = $ultimoTorneo->ultimo;
+        }
 
         $page = $request->query('page', 1);
 
@@ -2060,6 +2154,24 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
 
         foreach ($jugadores as $jugador){
+
+            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN equipos ON alineacions.equipo_id = equipos.id
+WHERE grupos.torneo_id = '.$maxId.' AND jugadors.id = '.$jugador->jugador_id;
+            $jugando = '';
+            $juega = DB::select(DB::raw($sqlJugando));
+            foreach ($juega as $e){
+
+                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+            }
+
+            $jugador->jugando = $jugando;
 
             $sql2='SELECT DISTINCT escudo, equipo_id
 FROM equipos

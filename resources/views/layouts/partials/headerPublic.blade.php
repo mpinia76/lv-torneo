@@ -128,7 +128,10 @@
                                 Historiales
                             </a>
                         </li>
-
+                        <li><a class="dropdown-item" href="{{route('torneos.jugadores')}}">
+                                Jugadores
+                            </a>
+                        </li>
                         <li><a class="dropdown-item" href="{{route('torneos.estadisticasOtras')}}">
                                 Otras
                             </a>

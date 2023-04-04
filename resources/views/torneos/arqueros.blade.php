@@ -16,7 +16,7 @@
         <thead>
         <th>#</th>
         <th>Jugador</th>
-
+        <th>Actual</th>
         <th><a href="{{route('torneos.arqueros', array('order'=>'jugados','tipoOrder'=>$tipoOrder))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th><a href="{{route('torneos.arqueros', array('order'=>'recibidos','tipoOrder'=>$tipoOrder))}}" > Goles @if($order=='recibidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th><a href="{{route('torneos.arqueros', array('order'=>'invictas','tipoOrder'=>$tipoOrder))}}" > Vallas invictas @if($order=='invictas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
@@ -38,7 +38,23 @@
                     </a>
                     {{$jugador->jugador}}</td>
 
+                <td>@if($jugador->jugando)
+                        @php
+                            $escs = explode(',',$jugador->jugando);
+                        @endphp
+                        @foreach($escs as $esc)
 
+                            @if($esc!='')
+                                @php
+                                    $escArr = explode('_',$esc);
+                                @endphp
+                                <a href="{{route('equipos.ver', array('equipoId' => $escArr[1]))}}" >
+                                    <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25">
+                                </a>
+                            @endif
+                        @endforeach
+
+                    @endif</td>
 
                 <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{$jugador->jugados}}</a> </td>
                 <td>{{$jugador->recibidos}} ({{round($jugador->recibidos / $jugador->jugados,2)}})</td>
