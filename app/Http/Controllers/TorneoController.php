@@ -980,7 +980,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$goleador->id. " GROUP B
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
 
         $tarjetas = DB::select(DB::raw('SELECT jugadors.id, CONCAT(personas.apellido,\', \',personas.nombre) jugador, personas.foto,count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo, "0" as jugados
+, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo, "0" as jugados, "" as jugando
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -991,6 +991,13 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 GROUP BY jugadors.id, jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC'));
 
+        $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
+
+        $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
+        //$maxId = $ultimoTorneo['ultimo'];
+        foreach ($ultimoTorneos as $ultimoTorneo){
+            $maxId = $ultimoTorneo->ultimo;
+        }
 
         $page = $request->query('page', 1);
 
@@ -1004,7 +1011,23 @@ ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC'));
 
 
         foreach ($tarjetas as $tarjeta){
+            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN equipos ON alineacions.equipo_id = equipos.id
+WHERE grupos.torneo_id = '.$maxId.' AND jugadors.id = '.$tarjeta->id;
+            $jugando = '';
+            $juega = DB::select(DB::raw($sqlJugando));
+            foreach ($juega as $e){
 
+                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+            }
+
+            $tarjeta->jugando = $jugando;
             $sql2='SELECT escudo, equipo_id, count( case when tarjetas.tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
 , count( case when tarjetas.tipo=\'Roja\' or tarjetas.tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas
 FROM equipos

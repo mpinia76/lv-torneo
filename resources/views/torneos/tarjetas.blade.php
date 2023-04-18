@@ -16,7 +16,7 @@
         <thead>
         <th>#</th>
         <th>Jugador</th>
-
+        <th>Actual</th>
         <th><a href="{{route('torneos.tarjetas', array('order'=>'amarillas','tipoOrder'=>$tipoOrder))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th><a href="{{route('torneos.tarjetas', array('order'=>'rojas','tipoOrder'=>$tipoOrder))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
@@ -41,7 +41,23 @@
                     </a>
                     {{$jugador->jugador}}</td>
 
+                <td>@if($jugador->jugando)
+                        @php
+                            $escs = explode(',',$jugador->jugando);
+                        @endphp
+                        @foreach($escs as $esc)
 
+                            @if($esc!='')
+                                @php
+                                    $escArr = explode('_',$esc);
+                                @endphp
+                                <a href="{{route('equipos.ver', array('equipoId' => $escArr[1]))}}" >
+                                    <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25">
+                                </a>
+                            @endif
+                        @endforeach
+
+                    @endif</td>
 
                 <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo'=>'Amarillas'))}}" >{{$jugador->amarillas}}</a></td>
 

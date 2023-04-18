@@ -110,11 +110,13 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                    @elseif($g[0]=='Tiro Libre')
+                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -122,15 +124,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
 
                                                     @endif
 
@@ -141,9 +143,9 @@
                                                 @if (!empty($tieneCambio))
                                                     @foreach($tieneCambio as $t)
                                                         @if($t[0]=='Sale')
-                                                            <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                            <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
                                                         @else
-                                                            <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                            <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
                                                         @endif
                                                         {{$t[1]}}'
                                                 @endforeach
@@ -198,11 +200,13 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                    @elseif($g[0]=='Tiro Libre')
+                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -210,15 +214,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
 
                                                     @endif
 
@@ -229,9 +233,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -292,11 +296,13 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                    @elseif($g[0]=='Tiro Libre')
+                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -304,15 +310,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
 
                                                     @endif
 
@@ -323,9 +329,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -378,11 +384,13 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                    @elseif($g[0]=='Tiro Libre')
+                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20">
+                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -390,15 +398,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
 
                                                     @endif
 
@@ -409,9 +417,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
                                                     @else
-                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15">
+                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
