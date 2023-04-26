@@ -64,7 +64,7 @@ class TorneoController extends Controller
      */
     public function store(Request $request)
     {
-        //
+     //
         $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required']);
         DB::beginTransaction();
         $ok=1;
@@ -202,9 +202,9 @@ class TorneoController extends Controller
         $noBorrarGrupos='';
         if($request->promedioTorneo_id)  {
 
-            foreach ($request->promedioTorneo_id as $anterior_id){
-                $noBorrar .=$anterior_id.',';
-            }
+                foreach ($request->promedioTorneo_id as $anterior_id){
+                    $noBorrar .=$anterior_id.',';
+                }
 
 
         }
@@ -383,7 +383,7 @@ class TorneoController extends Controller
      */
     public function destroy($id)
     {
-        $torneo = Torneo::find($id);
+    	$torneo = Torneo::find($id);
         $torneo->grupoDetalle()->delete();
         PromedioTorneo::where('torneo_id',"$id")->delete();
         AcumuladoTorneo::where('torneo_id',"$id")->delete();
@@ -433,7 +433,7 @@ from ( ';
             //echo $promedioTorneos[0]->torneoAnterior_id;
             //foreach ($promedioTorneos as $promedioTorneo){
             for ($i=0; $i<count($promedioTorneos); $i++){
-                $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
+                   $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
@@ -442,7 +442,7 @@ from ( ';
 		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
 		 WHERE golesl is not null AND golesv is not null ';
                 $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
-                $sql .=' union all
+     $sql .=' union all
        select equipos.nombre equipo, golesv, golesl, equipos.escudo foto
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
@@ -452,7 +452,7 @@ from ( ';
 		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = '.$promedioTorneos[$i]->torneoAnterior_id.'
 		 WHERE golesl is not null AND golesv is not null';
                 $sql .=($i+1==count($promedioTorneos))?'':' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = '.$promedioTorneos[$i+1]->torneoAnterior_id.')';
-                $sql .=' union all ';
+     $sql .=' union all ';
             }
 
             $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto
@@ -878,7 +878,7 @@ WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 
 )':'';
 
-        $sql .=' GROUP BY jugadors.id,jugador, foto
+$sql .=' GROUP BY jugadors.id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
 
@@ -1024,7 +1024,7 @@ WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 
 )':'';
 
-        $sql .=' GROUP BY jugadors.id, jugador, foto
+$sql .=' GROUP BY jugadors.id, jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC';
 
 
@@ -1130,7 +1130,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$tarjeta->id. " GROUP BY
 
 
 
-        $sql='SELECT foto, equipo,
+                $sql='SELECT foto, equipo,
        count(*) jugados,
        count(case when golesl > golesv then 1 end) ganados,
        count(case when golesv > golesl then 1 end) perdidos,
@@ -1166,7 +1166,7 @@ group by equipo, foto, equipo_id
 
 order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
-        $posiciones = DB::select(DB::raw($sql));
+                $posiciones = DB::select(DB::raw($sql));
 
 
 
@@ -1574,7 +1574,7 @@ GROUP BY torneos.nombre, torneos.year, fechas.numero) AS t )';
 
 
 
-        $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
+            $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
 partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
 FROM partidos
 INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
@@ -1589,8 +1589,8 @@ from partidos p1)
 ORDER BY partidos.dia ASC';
 
 
-        //echo $sql;
-        $maxGoles = DB::select(DB::raw($sql));
+            //echo $sql;
+            $maxGoles = DB::select(DB::raw($sql));
 
         $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
 partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id
@@ -1904,7 +1904,7 @@ WHERE G1.torneo_id = '.$maxId.' AND T1.id = tecnicos.id
 
         )':'';
 
-        $sql .=' union all
+     $sql .=' union all
        select DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesv, golesl, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
@@ -1927,7 +1927,7 @@ INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 WHERE G1.torneo_id = '.$maxId.' AND T1.id = tecnicos.id
 
         )':'';
-        $sql .=' ) a
+$sql .=' ) a
 group by tecnico, fotoTecnico, tecnico_id
 
 
@@ -2185,7 +2185,7 @@ WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 
 )':'';
 
-        $sql .=' UNION ALL
+ $sql .=' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
 , ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando
 FROM tarjetas
@@ -2208,7 +2208,7 @@ WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 )':'';
 
 
-        $sql .=' UNION ALL
+$sql .=' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
 (case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" AS jugando
@@ -2232,7 +2232,7 @@ WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 
 )':'';
 
-        $sql .= ' UNION ALL
+$sql .= ' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, "0" AS recibidos,
 "0" AS invictas, "0" AS jugando
@@ -2256,7 +2256,7 @@ WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 
 )':'';
 
-        $sql .=' UNION ALL
+$sql .=' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, "0" AS recibidos,
 "0" AS invictas, "0" AS jugando
@@ -2279,7 +2279,7 @@ INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
 
 )':'';
-        $sql .=' ) a
+$sql .=' ) a
 
 group by jugador_id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
