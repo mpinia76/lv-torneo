@@ -9,6 +9,21 @@
             $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
         @endphp
+        <form class="form-inline">
+
+            <input type="hidden" name="tipoOrder" value="{{$tipoOrder}}">
+            <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
+            <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="this.form.submit()">
+
+           <strong>Jugando</strong>
+            </input>
+
+
+
+        </form>
+        <br>
+
+
 
 
 
@@ -18,12 +33,12 @@
         <th>Jugador</th>
         <th>Equipos</th>
         <th>Actual</th>
-        <th><a href="{{route('torneos.jugadores', array('order'=>'jugados','tipoOrder'=>$tipoOrder))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.jugadores', array('order'=>'Goles','tipoOrder'=>$tipoOrder))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.jugadores', array('order'=>'amarillas','tipoOrder'=>$tipoOrder))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.jugadores', array('order'=>'rojas','tipoOrder'=>$tipoOrder))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.jugadores', array('order'=>'recibidos','tipoOrder'=>$tipoOrder))}}" >Arq. Recibidos @if($order=='recibidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.jugadores', array('order'=>'invictas','tipoOrder'=>$tipoOrder))}}" > Arq. V. Invictas @if($order=='invictas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'jugados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'Goles','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'amarillas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'rojas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'recibidos','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" >Arq. Recibidos @if($order=='recibidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'invictas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Arq. V. Invictas @if($order=='invictas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
         </thead>
         <tbody>

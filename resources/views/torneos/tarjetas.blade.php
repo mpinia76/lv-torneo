@@ -10,15 +10,27 @@
             $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
         @endphp
+        <form class="form-inline">
 
+            <input type="hidden" name="tipoOrder" value="{{$tipoOrder}}">
+            <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
+            <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="this.form.submit()">
+
+            <strong>Jugando</strong>
+            </input>
+
+
+
+        </form>
+        <br>
 
     <table class="table" style="width: 100%">
         <thead>
         <th>#</th>
         <th>Jugador</th>
         <th>Actual</th>
-        <th><a href="{{route('torneos.tarjetas', array('order'=>'amarillas','tipoOrder'=>$tipoOrder))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.tarjetas', array('order'=>'rojas','tipoOrder'=>$tipoOrder))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.tarjetas', array('order'=>'amarillas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.tarjetas', array('order'=>'rojas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
 
         <th>Jugados</th>
