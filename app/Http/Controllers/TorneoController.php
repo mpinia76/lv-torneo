@@ -1837,6 +1837,7 @@ GROUP BY torneos.nombre, torneos.year) AS t )';
 
         $order= ($request->query('order'))?$request->query('order'):'puntaje';
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        $actuales= ($request->query('actuales'))?1:0;
         $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
 
         $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
@@ -1890,8 +1891,20 @@ from (
 		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 		 INNER JOIN personas ON personas.id = tecnicos.persona_id
 		 WHERE golesl is not null AND golesv is not null';
-        
-     union all
+        $sql .=($actuales)?' AND EXISTS (
+        SELECT PT1.id
+FROM partido_tecnicos PT1
+INNER JOIN tecnicos T1 ON PT1.tecnico_id = T1.id
+
+INNER JOIN partidos ON PT1.partido_id = partidos.id
+INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
+INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+
+WHERE G1.torneo_id = '.$maxId.' AND T1.id = tecnicos.id
+
+        )':'';
+
+     $sql .=' union all
        select DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesv, golesl, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
@@ -1901,8 +1914,20 @@ from (
 		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
 		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 		 INNER JOIN personas ON personas.id = tecnicos.persona_id
-		 WHERE golesl is not null AND golesv is not null
-) a
+		 WHERE golesl is not null AND golesv is not null';
+        $sql .=($actuales)?' AND EXISTS (
+        SELECT PT1.id
+FROM partido_tecnicos PT1
+INNER JOIN tecnicos T1 ON PT1.tecnico_id = T1.id
+
+INNER JOIN partidos ON PT1.partido_id = partidos.id
+INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
+INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+
+WHERE G1.torneo_id = '.$maxId.' AND T1.id = tecnicos.id
+
+        )':'';
+$sql .=' ) a
 group by tecnico, fotoTecnico, tecnico_id
 
 
@@ -2001,13 +2026,13 @@ order by puntaje desc, diferencia DESC, golesl DESC';
 
         }
 
-        $goleadores->setPath(route('torneos.tecnicos',array('order'=>$order,'tipoOrder'=>$tipoOrder)));
+        $goleadores->setPath(route('torneos.tecnicos',array('order'=>$order,'tipoOrder'=>$tipoOrder,'actuales'=>$actuales)));
 
 
         $i=$offSet+1;
 
 
-        return view('torneos.tecnicos', compact('goleadores','i','order','tipoOrder'));
+        return view('torneos.tecnicos', compact('goleadores','i','order','tipoOrder','actuales'));
     }
 
     public function arqueros(Request $request)
