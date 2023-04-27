@@ -2134,22 +2134,35 @@ ORDER BY partidos.dia ASC';
     public function jugadores(Request $request)
     {
 
-
+        set_time_limit(0);
         //dd($request);
 
         $order= ($request->query('order'))?$request->query('order'):'jugados';
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
         $actuales= ($request->query('actuales'))?1:0;
 
-        //dd($actuales);
+        if($request->query('torneoId')) {
+            $torneoId = $request->query('torneoId');
 
-        $sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
+        }
+        else{
+            $torneo=Torneo::orderBy('year','DESC')->first();
+            $torneoId = $torneo->id;
+        }
+
+        $torneos=Torneo::orderBy('year','DESC')->get();
+
+        //dd($torneoId);
+
+        /*$sqlUltimoTorneo = 'SELECT MAX(id) as ultimo FROM torneos';
 
         $ultimoTorneos = DB::select(DB::raw($sqlUltimoTorneo));
-        //$maxId = $ultimoTorneo['ultimo'];
+        //$torneoId = $ultimoTorneo['ultimo'];
         foreach ($ultimoTorneos as $ultimoTorneo){
-            $maxId = $ultimoTorneo->ultimo;
-        }
+            $torneoId = $ultimoTorneo->ultimo;
+        }*/
+
+        //$torneoId = $request->query('torneoId');
 
         $sql = 'SELECT jugador_id, "" escudo, foto, jugador,
        sum(jugados) jugados,
@@ -2181,7 +2194,7 @@ INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
-WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
+WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id
 
 )':'';
 
@@ -2203,7 +2216,7 @@ INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
-WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
+WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id
 
 )':'';
 
@@ -2228,7 +2241,7 @@ INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
-WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
+WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id
 
 )':'';
 
@@ -2252,7 +2265,7 @@ INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
-WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
+WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id
 
 )':'';
 
@@ -2276,7 +2289,7 @@ INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
-WHERE G1.torneo_id = '.$maxId.' AND J1.id = jugadors.id
+WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id
 
 )':'';
 $sql .=' ) a
@@ -2311,7 +2324,7 @@ INNER JOIN partidos ON alineacions.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-WHERE grupos.torneo_id = '.$maxId.' AND jugadors.id = '.$jugador->jugador_id;
+WHERE grupos.torneo_id = '.$torneoId.' AND jugadors.id = '.$jugador->jugador_id;
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
@@ -2341,14 +2354,14 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id;
 
         }
 
-        $jugadores->setPath(route('torneos.jugadores',  array('order'=>$order,'tipoOrder'=>$tipoOrder,'actuales'=>$actuales)));
+        $jugadores->setPath(route('torneos.jugadores',  array('order'=>$order,'tipoOrder'=>$tipoOrder,'actuales'=>$actuales,'torneoId'=>$torneoId)));
 
 
 
         $i=$offSet+1;
 
 
-        return view('torneos.jugadores', compact('jugadores','i','order','tipoOrder','actuales'));
+        return view('torneos.jugadores', compact('jugadores','i','order','tipoOrder','actuales','torneos','torneoId'));
     }
 
 
