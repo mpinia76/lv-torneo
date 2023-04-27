@@ -14,6 +14,16 @@
 
             <input type="hidden" name="tipoOrder" value="{{$tipoOrder}}">
             <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
+            <select class="orm-control js-example-basic-single" id="torneoId" name="torneoId" onchange="this.form.submit()">
+                @foreach($torneos as $torneo)
+
+                    <option value="{{$torneo->id}}" @if($torneo->id==$torneoId)
+                        selected
+
+                        @endif />{{$torneo->nombre}} - {{$torneo->year}}</option>
+                @endforeach
+
+            </select>
             <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="this.form.submit()">
 
             <strong>Jugando</strong>
@@ -29,8 +39,8 @@
         <th>#</th>
         <th>Jugador</th>
         <th>Actual</th>
-        <th><a href="{{route('torneos.tarjetas', array('order'=>'amarillas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.tarjetas', array('order'=>'rojas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.tarjetas', array('order'=>'amarillas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.tarjetas', array('order'=>'rojas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
 
         <th>Jugados</th>

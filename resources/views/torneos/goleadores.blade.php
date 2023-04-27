@@ -17,6 +17,16 @@
 
             <input type="hidden" name="tipoOrder" value="{{$tipoOrder}}">
             <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
+            <select class="orm-control js-example-basic-single" id="torneoId" name="torneoId" onchange="this.form.submit()">
+                @foreach($torneos as $torneo)
+
+                    <option value="{{$torneo->id}}" @if($torneo->id==$torneoId)
+                        selected
+
+                        @endif />{{$torneo->nombre}} - {{$torneo->year}}</option>
+                @endforeach
+
+            </select>
             <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="this.form.submit()">
 
             <strong>Jugando</strong>
@@ -31,11 +41,11 @@
         <th>#</th>
         <th>Jugador</th>
         <th>Actual</th>
-        <th><a href="{{route('torneos.goleadores', array('order'=>'Goles','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.goleadores', array('order'=>'Jugada','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Jugada @if($order=='Jugada') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.goleadores', array('order'=>'Cabeza','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" >Cabeza @if($order=='Cabeza')<img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.goleadores', array('order'=>'Penal','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Penal @if($order=='Penal') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.goleadores', array('order'=>'Tiro_Libre','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales))}}" > Tiro Libre @if($order=='Tiro_Libre') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Goles','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Jugada','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Jugada @if($order=='Jugada') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Cabeza','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" >Cabeza @if($order=='Cabeza')<img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Penal','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Penal @if($order=='Penal') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.goleadores', array('order'=>'Tiro_Libre','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Tiro Libre @if($order=='Tiro_Libre') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th>Jugados</th>
         <th>Prom.</th>
         <th>Equipos</th>
