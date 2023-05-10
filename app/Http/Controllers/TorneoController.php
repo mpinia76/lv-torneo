@@ -846,7 +846,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     public function goleadores(Request $request)
     {
 
-        $order= ($request->query('order'))?$request->query('order'):'goles';
+        $order= ($request->query('order'))?$request->query('order'):'Goles';
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
         $actuales= ($request->query('actuales'))?1:0;
 

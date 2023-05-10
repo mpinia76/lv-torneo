@@ -5887,7 +5887,7 @@ return $string;
         $tecnicosV = PartidoTecnico::where('partido_id','=',$partido_id)->where('equipo_id','=',$partido->equipov->id)->get();
 
 
-        $arbitros=PartidoArbitro::where('partido_id','=',"$partido_id")->get();
+        $arbitros=PartidoArbitro::where('partido_id','=',"$partido_id")->orderBy('tipo','ASC')->get();
 
         //dd($partido->fecha->grupo->torneo->nombre);
         return view('fechas.detalle', compact('goles','partido', 'tarjetas','cambios','titularesL','suplentesL','titularesV','suplentesV','tecnicosL','tecnicosV','arbitros'));

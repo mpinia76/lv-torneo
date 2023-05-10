@@ -13,11 +13,11 @@
 
         @endphp
 
-        <form class="form-inline">
+        <form class="form-inline" id="formulario">
 
-            <input type="hidden" name="tipoOrder" value="{{$tipoOrder}}">
+            <input type="hidden" id="tipoOrder" name="tipoOrder" value="{{$tipoOrder}}">
             <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
-            <select class="orm-control js-example-basic-single" id="torneoId" name="torneoId" onchange="this.form.submit()">
+            <select class="orm-control js-example-basic-single" id="torneoId" name="torneoId" onchange="enviarForm()">
                 @foreach($torneos as $torneo)
 
                     <option value="{{$torneo->id}}" @if($torneo->id==$torneoId)
@@ -27,7 +27,7 @@
                 @endforeach
 
             </select>
-            <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="this.form.submit()">
+            <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
 
             <strong>Jugando</strong>
             </input>
@@ -118,5 +118,12 @@
         </div>
     </div>
 
+    <script>
 
+
+        function enviarForm() {
+            $('#tipoOrder').val('DESC');
+            $('#formulario').submit();
+        }
+    </script>
 @endsection
