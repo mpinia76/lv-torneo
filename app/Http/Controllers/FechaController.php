@@ -6340,6 +6340,63 @@ return $string;
                             else{
                                 $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
                                 Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+
+                                Log::info(print_r($jugador), []);
+                                $arrApellido = explode(' ', $jugador['nombre']);
+                                $mismoDorsal = 0;
+                                $arrApellido = explode(' ', $jugador['nombre']);
+                                $mismoDorsal = 0;
+                                foreach ($arrApellido as $apellido) {
+                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->Join('plantilla_jugadors','jugadors.id','=','plantilla_jugadors.jugador_id')->wherein('plantilla_jugadors.plantilla_id',explode(',', $arrplantillas))->where('apellido', 'LIKE', "%$apellido%")->first();
+                                    //Log::info(json_encode($consultarJugador), []);
+                                    if (!empty($consultarJugador)) {
+                                        $mismoDorsal = 1;
+                                        //Log::info($consultarJugador['tipoJugador'], []);
+                                        break;
+                                    }
+                                }
+                                if ($mismoDorsal) {
+                                    $jugador_id = $consultarJugador['jugador_id'];
+                                    switch ($consultarJugador['tipoJugador']) {
+                                        case 'Arquero':
+                                            $orden = 0;
+                                            break;
+                                        case 'Defensor':
+                                            $orden = 1;
+                                            break;
+                                        case 'Medio':
+                                            $orden = 2;
+                                            break;
+                                        case 'Delantero':
+                                            $orden = 3;
+                                            break;
+
+                                    }
+                                    $alineaciondata = array(
+                                        'partido_id' => $partido->id,
+                                        'jugador_id' => $jugador_id,
+                                        'equipo_id' => $equipo->id,
+                                        'dorsal' => $consultarJugador['dorsal'],
+                                        'tipo' => $jugador['tipo'],
+                                        'orden' => $orden
+                                    );
+                                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $jugador_id)->first();
+
+                                    try {
+                                        if (!empty($alineacion)) {
+
+                                            $alineacion->update($alineaciondata);
+                                        } else {
+                                            $alineacion = Alineacion::create($alineaciondata);
+                                        }
+                                        Log::info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
+
+                                    } catch (QueryException $ex) {
+                                        $error = $ex->getMessage();
+                                        $ok = 0;
+                                        continue;
+                                    }
+                                }
                             }
                             foreach ($jugador['incidencias'] as $incidencia) {
 
@@ -7454,6 +7511,7 @@ return $string;
                     $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
                     if (!empty($equipo)){
                         foreach ($eq['jugadores'] as $jugador) {
+                            //Log::info(json_encode($jugador), []);
                             Log::info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                             $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
                             $arrgrupos='';
@@ -7488,10 +7546,11 @@ return $string;
                                 Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
                             }
                             if (!empty($plantillaJugador)) {
+                                $jugador_id = $plantillaJugador->jugador->id;
                                 $arrApellido = explode(' ', $jugador['nombre']);
                                 $mismoDorsal = 0;
                                 foreach ($arrApellido as $apellido) {
-                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
+                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $jugador_id)->where('apellido', 'LIKE', "%$apellido%")->first();
                                     if (!empty($consultarJugador)) {
                                         $mismoDorsal = 1;
                                         continue;
@@ -7517,13 +7576,13 @@ return $string;
                                 }
                                 $alineaciondata = array(
                                     'partido_id' => $partido->id,
-                                    'jugador_id' => $plantillaJugador->jugador->id,
+                                    'jugador_id' => $jugador_id,
                                     'equipo_id' => $equipo->id,
                                     'dorsal' =>  $jugador['dorsal'],
                                     'tipo' => $jugador['tipo'],
                                     'orden' => $orden
                                 );
-                                $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->first();
+                                $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $jugador_id)->first();
                                 try {
                                     if (!empty($alineacion)) {
 
@@ -7542,13 +7601,66 @@ return $string;
                             else{
                                 $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
                                 Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+
+                                $arrApellido = explode(' ', $jugador['nombre']);
+                                $mismoDorsal = 0;
+                                foreach ($arrApellido as $apellido) {
+                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->Join('plantilla_jugadors','jugadors.id','=','plantilla_jugadors.jugador_id')->wherein('plantilla_jugadors.plantilla_id',explode(',', $arrplantillas))->where('apellido', 'LIKE', "%$apellido%")->first();
+                                    //Log::info(json_encode($consultarJugador), []);
+                                    if (!empty($consultarJugador)) {
+                                        $mismoDorsal = 1;
+                                        //Log::info($consultarJugador['tipoJugador'], []);
+                                        break;
+                                    }
+                                }
+                                if ($mismoDorsal) {
+                                    $jugador_id = $consultarJugador['jugador_id'];
+                                    switch ($consultarJugador['tipoJugador']) {
+                                        case 'Arquero':
+                                            $orden = 0;
+                                            break;
+                                        case 'Defensor':
+                                            $orden = 1;
+                                            break;
+                                        case 'Medio':
+                                            $orden = 2;
+                                            break;
+                                        case 'Delantero':
+                                            $orden = 3;
+                                            break;
+
+                                    }
+                                    $alineaciondata = array(
+                                        'partido_id' => $partido->id,
+                                        'jugador_id' => $jugador_id,
+                                        'equipo_id' => $equipo->id,
+                                        'dorsal' => $consultarJugador['dorsal'],
+                                        'tipo' => $jugador['tipo'],
+                                        'orden' => $orden
+                                    );
+                                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $jugador_id)->first();
+                                    try {
+                                        if (!empty($alineacion)) {
+
+                                            $alineacion->update($alineaciondata);
+                                        } else {
+                                            $alineacion = Alineacion::create($alineaciondata);
+                                        }
+                                        Log::info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
+
+                                    } catch (QueryException $ex) {
+                                        $error = $ex->getMessage();
+                                        $ok = 0;
+                                        continue;
+                                    }
+                                }
                             }
 
                             foreach ($jugador['incidencias'] as $incidencia) {
 
                                 if (!empty($incidencia)) {
-                                    //Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
-                                    //Log::info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    Log::info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
                                     $tipogol='';
                                     switch (trim($incidencia[0])) {
                                         case 'Gol':
@@ -7569,14 +7681,14 @@ return $string;
 
                                     }
                                     if ($tipogol){
-                                        if (!empty($plantillaJugador)) {
+                                        //if (!empty($plantillaJugador)) {
                                             $goldata = array(
                                                 'partido_id' => $partido->id,
-                                                'jugador_id' => $plantillaJugador->jugador->id,
+                                                'jugador_id' => $jugador_id,
                                                 'minuto' => intval(trim($incidencia[1])),
                                                 'tipo' => $tipogol
                                             );
-                                            $gol = Gol::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->where('minuto', '=', intval(trim($incidencia[1])))->first();
+                                            $gol = Gol::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $jugador_id)->where('minuto', '=', intval(trim($incidencia[1])))->first();
                                             try {
                                                 if (!empty($gol)) {
 
@@ -7591,7 +7703,7 @@ return $string;
                                                 $ok = 0;
                                                 continue;
                                             }
-                                        }
+                                        //}
 
                                     }
                                     $tipotarjeta='';
@@ -7607,14 +7719,14 @@ return $string;
                                             break;
                                     }
                                     if ($tipotarjeta){
-                                        if (!empty($plantillaJugador)) {
+                                        //if (!empty($plantillaJugador)) {
                                             $tarjeadata=array(
                                                 'partido_id'=>$partido->id,
-                                                'jugador_id'=>$plantillaJugador->jugador->id,
+                                                'jugador_id'=>$jugador_id,
                                                 'minuto'=>intval(trim($incidencia[1])),
                                                 'tipo'=>$tipotarjeta
                                             );
-                                            $tarjeta=Tarjeta::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
+                                            $tarjeta=Tarjeta::where('partido_id','=',$partido->id)->where('jugador_id','=',$jugador_id)->where('minuto','=',intval(trim($incidencia[1])))->first();
                                             try {
                                                 if (!empty($tarjeta)){
 
@@ -7630,7 +7742,7 @@ return $string;
                                                 $ok=0;
                                                 continue;
                                             }
-                                        }
+                                        //}
 
 
 
@@ -7647,14 +7759,14 @@ return $string;
 
                                     }
                                     if ($tipocambio){
-                                        if (!empty($plantillaJugador)) {
+                                        //if (!empty($plantillaJugador)) {
                                             $cambiodata=array(
                                                 'partido_id'=>$partido->id,
-                                                'jugador_id'=>$plantillaJugador->jugador->id,
+                                                'jugador_id'=>$jugador_id,
                                                 'minuto'=>intval(trim($incidencia[1])),
                                                 'tipo'=>$tipocambio
                                             );
-                                            $cambio=Cambio::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
+                                            $cambio=Cambio::where('partido_id','=',$partido->id)->where('jugador_id','=',$jugador_id)->where('minuto','=',intval(trim($incidencia[1])))->first();
                                             try {
                                                 if (!empty($cambio)){
 
@@ -7670,7 +7782,7 @@ return $string;
                                                 $ok=0;
                                                 continue;
                                             }
-                                        }
+                                        //}
 
 
 
