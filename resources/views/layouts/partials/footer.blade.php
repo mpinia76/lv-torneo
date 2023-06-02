@@ -390,6 +390,7 @@
             '<td>'+'{{ Form::number('agrupacionGrupo[]', '1',['class' => 'form-control', 'style' => 'width: 50px']) }}'+'</td>'+
             '<td><input type="checkbox" name="posicionesGrupo[]" value="'+$cant+'"></td>'+
             '<td><input type="checkbox" name="promediosGrupo[]" value="'+$cant+'"></td>'+
+            '<td><input type="checkbox" name="acumuladoGrupo[]" value="'+$cant+'"></td>'+
             '<td><input type="checkbox" name="penalesGrupo[]" value="'+$cant+'"></td>'+
             '<td><a href="#" class="btn btn-danger removeGrupo"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
