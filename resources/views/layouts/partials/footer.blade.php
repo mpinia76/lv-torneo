@@ -23,6 +23,7 @@
     $(document).ready(function() {
 
         $('.js-example-basic-single').select2();
+            @if(isset($i))
             @for ($j =1; $j <= $i; $j++)
             $('#jugador{{$j}}').select2({
 
@@ -48,7 +49,7 @@
 
             });
         @endfor
-
+@endif
 
 
 
@@ -59,9 +60,17 @@
     });
     function addRow()
     {
+
         @php
-            $i = $j++;
+            if(isset($j)){
+                $i = $("#cantJugadors").val()+2;
+                $("#cantJugadors").val($i);
+            }
+            else{
+                $i=0;
+            }
         @endphp
+
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['id'=>'jugador'.$i,'class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
             '<td>'+'{{Form::number('dorsal[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+

@@ -45,6 +45,7 @@
                 {{Form::select('equipo_id',$equipos, $plantilla->equipo->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px'])}}
 
                 {{Form::hidden('grupo_id', (isset($_GET['grupoId']))?$_GET['grupoId']:$plantilla->grupo->id )}}
+                {{Form::hidden('cantJugadors', count($plantillaJugadors))}}
             </div>
 
             <div class="form-group col-md-12">
