@@ -12,17 +12,45 @@
 
 <script>
     $(window).on('load',function(){
-        console.log('carga');
+
         $('.load').hide();
         $('.wrapper').css('filter','blur(0)');
     });
     function baseUrl(url) {
         return '{{url('')}}/' + url;
     }
-
+    var CSRF_TOKEN = $('meta[name="csrf-token"]').attr('content');
     $(document).ready(function() {
 
         $('.js-example-basic-single').select2();
+            @for ($j =1; $j <= $i; $j++)
+            $('#jugador{{$j}}').select2({
+
+                minimumInputLength: 3,
+                ajax: {
+                    url: '{{ route("plantilla.search") }}',
+                    type: "get",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            _token: CSRF_TOKEN,
+                            search: params.term // search term
+                        };
+                    },
+                    processResults: function (response) {
+                        return {
+                            results: response
+                        };
+                    },
+                    cache: true
+                }
+
+            });
+        @endfor
+
+
+
 
     });
     $('.addRow').on('click',function(e){
@@ -31,14 +59,40 @@
     });
     function addRow()
     {
+        @php
+            $i = $j++;
+        @endphp
         var tr='<tr>'+
-            '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
-            '<td>'+'{{Form::number('dorsal[]', '', ['class' => 'form-control', 'size' => '4'])}}'+'</td>'+
+            '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['id'=>'jugador'.$i,'class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+            '<td>'+'{{Form::number('dorsal[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
 
             '<td><a href="#" class="btn btn-danger remove"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
         $('#cuerpoJugador').append(tr);
-        $('.js-example-basic-single').select2();
+        //$('.js-example-basic-single').select2();
+        $('#jugador{{$i}}').select2({
+
+            minimumInputLength: 3,
+            ajax: {
+                url: '{{ route("plantilla.search") }}',
+                type: "get",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        _token: CSRF_TOKEN,
+                        search: params.term // search term
+                    };
+                },
+                processResults: function (response) {
+                    return {
+                        results: response
+                    };
+                },
+                cache: true
+            }
+
+        });
     };
 
     $('body').on('click', '.remove', function(e){

@@ -160,6 +160,26 @@ class PlantillaController extends Controller
         //
     }
 
+    public function search(Request $request)
+    {
+        /*$cities = City::where('name', 'LIKE', '%'.$request->input('term', '').'%')
+            ->get(['id', 'name as text']);*/
+        $search = $request->search;
+        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('apellido', 'LIKE', '%'.$search.'%')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+        //$jugadors = $jugadors->pluck('persona.full_name_age', 'id')->prepend('','');
+
+        $response = array();
+        foreach($jugadors as $jugador){
+            $response[] = array(
+                "id"=>$jugador->id,
+                "text"=>$jugador->persona->full_name_age
+            );
+        }
+
+        //return ['results' => $jugadors];
+        return response()->json($response);
+    }
+
     /**
      * Show the form for editing the specified resource.
      *
@@ -174,9 +194,15 @@ class PlantillaController extends Controller
 
         $plantillaJugadors = PlantillaJugador::where('plantilla_id','=',"$id")->orderBy('dorsal','asc')->get();
 
+        $arrplantillajugador='';
+        foreach ($plantillaJugadors as $plantillaJugador){
+            $arrplantillajugador .=$plantillaJugador->jugador->id.',';
+        }
 
         //$jugadors = Jugador::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
-        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+        //$jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+
+        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('jugadors.id',explode(',', $arrplantillajugador))->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
 
         $jugadors = $jugadors->pluck('persona.full_name_age', 'id')->prepend('','');
 

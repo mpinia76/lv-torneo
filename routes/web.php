@@ -56,6 +56,8 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('importpoll', 'PollController@importPoll')->name('polls.importPoll');
     Route::post('importpollprocess', 'PollController@importpollprocess');
+    Route::get('plantillasearch', 'PlantillaController@search')
+        ->name('plantilla.search');
 });
 
 
