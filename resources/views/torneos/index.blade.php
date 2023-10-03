@@ -25,7 +25,7 @@
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:'' }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
+                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_torneo')}}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
                 <button class="btn btn-success m-1" type="submit">Buscar</button>
             </form>
@@ -41,7 +41,7 @@
         <th colspan="3"></th>
         </thead>
 
-        @foreach($torneos as $torneo)
+        @foreach($torneos1 as $torneo)
             <tr>
                 <td>{{$torneo->nombre}}</td>
                 <td>{{$torneo->year}}</td>
@@ -65,6 +65,15 @@
             </tr>
         @endforeach
     </table>
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                {{ $torneos1->links() }}
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                <strong>Total: {{ $torneos1->total() }}</strong>
+            </div>
+        </div>
     </div>
     <script>
 

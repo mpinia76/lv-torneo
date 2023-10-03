@@ -2,6 +2,12 @@
 
 use Illuminate\Support\Facades\Route;
 
+use Illuminate\Support\Facades\Soap;
+use Illuminate\Http\Response;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -39,6 +45,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::resource('partidoarbitros', 'PartidoArbitroController');
     Route::resource('alineaciones', 'AlineacionController');
     Route::resource('cambios', 'CambioController');
+    Route::get('importarJugador', 'JugadorController@importar')->name('jugadores.importar');
+    Route::post('importarJugadorProcess', 'JugadorController@importarProcess');
     Route::get('importarPartido', 'FechaController@importarPartido')->name('fechas.importarPartido');
     Route::post('importarPartidoProcess', 'FechaController@importarPartidoProcess');
     Route::get('importfechas', 'FechaController@import')->name('fechas.import');
@@ -106,4 +114,6 @@ Route::get('arquerosHistorico', 'TorneoController@arqueros')->name('torneos.arqu
 
 
 Route::get('logout', 'Auth\LoginController@logout');
+
+
 

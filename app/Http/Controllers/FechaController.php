@@ -48,7 +48,16 @@ class FechaController extends Controller
     public function index(Request $request)
     {
         $grupo_id= $request->query('grupoId');
-        $nombre = $request->get('buscarpor');
+        if ($request->has('buscarpor')){
+            $nombre = $request->get('buscarpor');
+
+            $request->session()->put('nombre_filtro_fecha', $request->get('buscarpor'));
+
+        }
+        else{
+            $nombre = $request->session()->get('nombre_filtro_fecha');
+
+        }
         $grupo=Grupo::findOrFail($grupo_id);
 
 
@@ -389,7 +398,7 @@ class FechaController extends Controller
                 DB::beginTransaction();
                 $ok=1;
                 foreach($importData_arr as $importData){
-                    Log::info('Fecha: '.$importData[0]);
+                    Log::channel('mi_log')->info('Fecha: '.$importData[0]);
                     $golesL = null;
                     $golesV = null;
                      $numero=$importData[0];
@@ -410,14 +419,14 @@ class FechaController extends Controller
                          $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->first();
 
                          if (!$equipol){
-                             Log::info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
+                             Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
                          }
                         else{
                             $strEquipoV = ($importData[6]);
                             $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
 
                             if (!$equipoV){
-                                Log::info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
+                                Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
                             }
                             else{
                                 /*$strArbitro = utf8_encode($importData[9]);
@@ -428,7 +437,7 @@ class FechaController extends Controller
                                 }
 
                                 if (!$arbitro){
-                                    Log::info('Arbitro NO encontrado: '.$numero.'-'.$dia.'-'.$strArbitro,[]);
+                                    Log::channel('mi_log')->info('Arbitro NO encontrado: '.$numero.'-'.$dia.'-'.$strArbitro,[]);
                                 }*/
                                 $nro= str_pad($numero, 2, "0", STR_PAD_LEFT);
                                 $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
@@ -672,7 +681,7 @@ class FechaController extends Controller
 
                                             foreach ($jugador['incidencias'] as $incidencia) {
                                                 if (count($incidencia)>1){
-                                                    Log::info('Incidencia: ' . trim($incidencia[0]).' MIN: '.intval(trim($incidencia[1])),[]);
+                                                    Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]).' MIN: '.intval(trim($incidencia[1])),[]);
                                                     $tipogol='';
                                                     switch (trim($incidencia[0])) {
                                                         case 'Penal':
@@ -710,7 +719,7 @@ class FechaController extends Controller
                                                             }
                                                         }
                                                         else{
-                                                                Log::info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoL,[]);
+                                                                Log::channel('mi_log')->info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoL,[]);
                                                             }
                                                     }
                                                     $tipotarjeta='';
@@ -751,7 +760,7 @@ class FechaController extends Controller
                                                             }
                                                         }
                                                         else{
-                                                            Log::info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoL,[]);
+                                                            Log::channel('mi_log')->info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoL,[]);
                                                         }
 
 
@@ -772,11 +781,11 @@ class FechaController extends Controller
                                         if (!empty($entrenadorL)){
                                             $plantillaTecnico = PartidoTecnico::where('plantilla_id','=',$plantilla->id)->where('tecnico_id','=',$entrenadorL->id)->first();
                                             if (empty($plantillaTecnico)){
-                                                Log::info('NO se encontró como entrenador: ' . $equipos[$i - 1]['entrenador'].' del equipo '.$equipos[$i - 1]['equipo'],[]);
+                                                Log::channel('mi_log')->info('NO se encontró como entrenador: ' . $equipos[$i - 1]['entrenador'].' del equipo '.$equipos[$i - 1]['equipo'],[]);
                                             }
                                         }
                                         else{
-                                            Log::info('NO se encontró al entrenador: ' . $equipos[$i - 1]['entrenador'].' del equipo '.$equipos[$i - 1]['equipo'],[]);
+                                            Log::channel('mi_log')->info('NO se encontró al entrenador: ' . $equipos[$i - 1]['entrenador'].' del equipo '.$equipos[$i - 1]['equipo'],[]);
                                         }
                                     }
                                     foreach ($equipos[$i]['jugadores'] as $jugador) {
@@ -801,7 +810,7 @@ class FechaController extends Controller
 
                                         foreach ($jugador['incidencias'] as $incidencia) {
                                             if (count($incidencia)>1){
-                                                Log::info('Incidencia: ' . trim($incidencia[0]).' MIN: '.intval(trim($incidencia[1])),[]);
+                                                Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]).' MIN: '.intval(trim($incidencia[1])),[]);
                                                 $tipogol='';
                                                 switch (trim($incidencia[0])) {
                                                     case 'Penal':
@@ -839,7 +848,7 @@ class FechaController extends Controller
                                                         }
                                                     }
                                                     else{
-                                                        Log::info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoV,[]);
+                                                        Log::channel('mi_log')->info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoV,[]);
                                                     }
                                                 }
                                                 $tipotarjeta='';
@@ -880,7 +889,7 @@ class FechaController extends Controller
                                                         }
                                                     }
                                                     else{
-                                                        Log::info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoV,[]);
+                                                        Log::channel('mi_log')->info('NO se encontró al jugador: ' . $jugador['dorsal'].' del equipo '.$strEquipoV,[]);
                                                     }
 
 
@@ -901,11 +910,11 @@ class FechaController extends Controller
                                         if (!empty($entrenadorV)){
                                             $plantillaTecnico = PartidoTecnico::where('plantilla_id','=',$plantilla->id)->where('tecnico_id','=',$entrenadorV->id)->first();
                                             if (empty($plantillaTecnico)){
-                                                Log::info('NO se encontró como entrenador: ' . $equipos[$i]['entrenador'].' del equipo '.$equipos[$i]['equipo'],[]);
+                                                Log::channel('mi_log')->info('NO se encontró como entrenador: ' . $equipos[$i]['entrenador'].' del equipo '.$equipos[$i]['equipo'],[]);
                                             }
                                         }
                                         else{
-                                            Log::info('NO se encontró al entrenador: ' . $equipos[$i]['entrenador'].' del equipo '.$equipos[$i]['equipo'],[]);
+                                            Log::channel('mi_log')->info('NO se encontró al entrenador: ' . $equipos[$i]['entrenador'].' del equipo '.$equipos[$i]['equipo'],[]);
                                         }
                                     }
 
@@ -913,15 +922,15 @@ class FechaController extends Controller
 
                                 }
                                 else{
-                                    Log::info('NO se encontró al partido: ' . $equipos[$i-1]['equipo'].' VS '.$equipos[$i]['equipo'],[]);
+                                    Log::channel('mi_log')->info('NO se encontró al partido: ' . $equipos[$i-1]['equipo'].' VS '.$equipos[$i]['equipo'],[]);
                                 }
                             }
                             else{
-                                Log::info('NO se encontró al equipo: ' . $equipos[$i]['equipo'],[]);
+                                Log::channel('mi_log')->info('NO se encontró al equipo: ' . $equipos[$i]['equipo'],[]);
                             }
                         }
                         else{
-                            Log::info('NO se encontró al equipo: ' . $equipos[$i-1]['equipo'],[]);
+                            Log::channel('mi_log')->info('NO se encontró al equipo: ' . $equipos[$i-1]['equipo'],[]);
                         }
 
 
@@ -1382,8 +1391,16 @@ class FechaController extends Controller
     {
         $strEquipoURL=strtr($strEquipo, " ", "-");
         switch (trim($strEquipo)) {
+            case 'Acassuso':
+                $strEquipoURL='1791';
+
+                break;
             case 'Aldosivi':
                 $strEquipoURL='158';
+
+                break;
+            case 'Alianza de Coronel Moldes':
+                $strEquipoURL='1998';
 
                 break;
             case 'All Boys':
@@ -1394,6 +1411,22 @@ class FechaController extends Controller
                 $strEquipoURL='74';
 
                 break;
+            case 'Almirante Brown':
+                $strEquipoURL='685';
+
+                break;
+            case 'Alvarado':
+                $strEquipoURL='1236';
+
+                break;
+            case 'Altos Hornos Zapla':
+                $strEquipoURL='1855';
+
+                break;
+            case 'Andino de La Rioja':
+                $strEquipoURL='1988';
+
+                break;
             case 'Argentinos Juniors':
                 $strEquipoURL='28';
                 break;
@@ -1402,8 +1435,24 @@ class FechaController extends Controller
                 $strEquipoURL='23';//ultimo
 
                 break;
+            case 'Atlanta':
+                $strEquipoURL='30';
+
+                break;
+            case 'Atlas':
+                $strEquipoURL='1771';
+
+                break;
             case 'Atlético de Rafaela':
                 $strEquipoURL='26';
+                break;
+            case 'Atlético Paraná':
+                $strEquipoURL='1851';
+
+                break;
+            case 'Atlético Policial':
+                $strEquipoURL='1826';//ultimo
+
                 break;
             case 'Atlético Tucumán':
                 $strEquipoURL='39';
@@ -1411,6 +1460,10 @@ class FechaController extends Controller
 
             case 'Banfield':
                 $strEquipoURL='19';//ultimo
+
+                break;
+            case 'Barracas Central':
+                $strEquipoURL='1834';//ultimo
 
                 break;
             case 'Belgrano':
@@ -1421,17 +1474,48 @@ class FechaController extends Controller
                 $strEquipoURL='3';
 
                 break;
+            case 'Boca Unidos':
+                $strEquipoURL='1203';
 
+                break;
+            case 'Brown de Adrogué':
+                $strEquipoURL='1792';
+
+                break;
+            case 'Cañuelas':
+                $strEquipoURL='1778';
+
+                break;
+            case 'Central Córdoba (Rosario)':
+                $strEquipoURL='1877';
+                break;
             case 'Central Córdoba (SdE)':
                 $strEquipoURL='1883';
+                break;
+            case 'Central Norte':
+                $strEquipoURL='1868';
+
                 break;
             case 'Chacarita Juniors':
                 $strEquipoURL='18';
 
                 break;
+            case 'Chaco For Ever':
+                $strEquipoURL='1828';
+
+                break;
+            case 'Cipolletti':
+                $strEquipoURL='1866';
+                break;
+            case 'Colegiales':
+                $strEquipoURL='1815';
+                break;
             case 'Colón de Santa Fe':
                 $strEquipoURL='16';//ultimo
 
+                break;
+            case 'Comunicaciones':
+                $strEquipoURL='1835';
                 break;
             case 'Crucero del Norte':
                 $strEquipoURL='1861';
@@ -1440,9 +1524,90 @@ class FechaController extends Controller
                 $strEquipoURL='152';
 
                 break;
+            case 'Defensores de Belgrano':
+                $strEquipoURL='1719';//ultimo
+
+                break;
+            case 'Defensores de Villa Ramallo':
+                $strEquipoURL='1824';//ultimo
+
+                break;
+            case 'Defensores Unidos de Zárate':
+                $strEquipoURL='1825';//ultimo
+
+                break;
+            case 'Deportivo Armenio':
+                $strEquipoURL='1802';
+
+                break;
+            case 'Deportivo Español':
+                $strEquipoURL='32';
+
+                break;
+            case 'Deportivo La Emilia':
+                $strEquipoURL='1807';
+
+                break;
+            case 'Deportivo Madryn':
+                $strEquipoURL='1832';
+
+                break;
+            case 'Deportivo Merlo':
+                $strEquipoURL='1182';
+
+                break;
+            case 'Deportivo Morón':
+                $strEquipoURL='990';
+
+                break;
+            case 'Deportivo Riestra':
+                $strEquipoURL='1776';
+
+                break;
+            case 'Desamparados':
+                $strEquipoURL='1720';
+
+                break;
+            case 'Douglas Haig':
+                $strEquipoURL='1817';
+
+                break;
+            case 'El Porvenir':
+                $strEquipoURL='156';
+
+                break;
+            case 'Estudiantes (BA)':
+                $strEquipoURL='1798';
+
+                break;
+            case 'Estudiantes de San Luis':
+                $strEquipoURL='1997';
+
+                break;
             case 'Estudiantes (LP)':
                 $strEquipoURL='14';
 
+                break;
+            case 'Excursionistas':
+                $strEquipoURL='1836';
+
+                break;
+            case 'Ferro':
+                $strEquipoURL='27';
+
+                break;
+            case 'Flandria':
+                $strEquipoURL='1805';
+
+                break;
+            case 'General Lamadrid':
+                $strEquipoURL='1837';
+                break;
+            case 'Gimnasia (CdU)':
+                $strEquipoURL='1847';
+                break;
+            case 'Gimnasia de Mendoza':
+                $strEquipoURL='1859';
                 break;
             case 'Gimnasia (J)':
                 $strEquipoURL='34';
@@ -1451,12 +1616,37 @@ class FechaController extends Controller
                 $strEquipoURL='15';//ultimo
 
                 break;
+            case 'Gimnasia y Tiro de Salta':
+                $strEquipoURL='36';//ultimo
+
+                break;
+            case 'Guaraní Antonio Franco':
+                $strEquipoURL='1862';//ultimo
+
+                break;
+            case 'Güemes de SdE':
+                $strEquipoURL='1995';//ultimo
+
+                break;
+            case 'Guillermo Brown':
+                $strEquipoURL='1753';//ultimo
+
+                break;
             case 'Godoy Cruz':
                 $strEquipoURL='153';//ultimo
 
                 break;
+
+            case 'Guaymallén':
+                $strEquipoURL='1860';
+
+                break;
             case 'Huracán':
                 $strEquipoURL='8';
+
+                break;
+            case 'Huracán de Las Heras':
+                $strEquipoURL='1858';
 
                 break;
             case 'Huracán (Tres Arroyos)':
@@ -1471,12 +1661,56 @@ class FechaController extends Controller
 
                 $strEquipoURL='5';
                 break;
+            case 'Independiente de Neuquén':
+
+                $strEquipoURL='2004';
+                break;
+            case 'Independiente Rivadavia':
+
+                $strEquipoURL='684';
+                break;
+            case 'Jorge Gibson Brown':
+
+                $strEquipoURL='1863';
+                break;
+            case 'Juventud Antoniana':
+
+                $strEquipoURL='159';
+                break;
+            case 'Juventud Unida de Gualeguaychú':
+
+                $strEquipoURL='1850';
+                break;
+            case 'Juventud Unida Universitario':
+
+                $strEquipoURL='1873';
+                break;
+            case 'Laferrere':
+                $strEquipoURL='1808';//ultimo
+
+                break;
             case 'Lanús':
                 $strEquipoURL='20';//ultimo
 
                 break;
+            case 'Leandro N. Alem':
+                $strEquipoURL='1804';//ultimo
+
+                break;
+            case 'Liniers':
+                $strEquipoURL='1794';//ultimo
+
+                break;
             case 'Los Andes':
-                $strEquipoURL='los-andes-de-lomas-de-zamora';
+                $strEquipoURL='936';
+                break;
+            case 'Midland':
+                $strEquipoURL='1809';
+
+                break;
+            case 'Mitre de SdE':
+                $strEquipoURL='1994';
+
                 break;
             case 'Newell\'s Old Boys':
                 $strEquipoURL='10';
@@ -1486,18 +1720,41 @@ class FechaController extends Controller
                 $strEquipoURL='25';
                 break;
             case 'Olimpo':
-                //$strEquipoURL='olimpo';
+
                 $strEquipoURL='21';
                 break;
-            case 'Patronato':
-                $strEquipoURL='1181';//ultimo
+            case 'Pacífico de Gral. Alvear':
+                $strEquipoURL='1990';
 
                 break;
+            case 'Patronato':
+                $strEquipoURL='1181';
+
+                break;
+            case 'Platense':
+                $strEquipoURL='29';
+
+                break;
+
             case 'Quilmes':
                 $strEquipoURL='24';
                 break;
             case 'Racing Club':
                 $strEquipoURL='6';
+
+                break;
+            case 'Racing (Olavarría)':
+                $strEquipoURL='1502';
+                break;
+            case 'Racing (Trelew)':
+                $strEquipoURL='1833';
+
+                break;
+            case 'Ramón Santamarina':
+                $strEquipoURL='1481';
+                break;
+            case 'Rivadavia de Venado Tuerto':
+                $strEquipoURL='2024';
 
                 break;
             case 'River Plate':
@@ -1508,8 +1765,16 @@ class FechaController extends Controller
                 $strEquipoURL='9';
 
                 break;
+            case 'Sacachispas':
+                $strEquipoURL='1838';
+
+                break;
             case 'San Lorenzo':
                 $strEquipoURL='7';
+
+                break;
+            case 'San Martín de Formosa':
+                $strEquipoURL='1853';
 
                 break;
             case 'San Martín (SJ)':
@@ -1520,11 +1785,51 @@ class FechaController extends Controller
                 $strEquipoURL='38';//ultimo
 
                 break;
+            case 'Sansinena de General Cerri':
+                $strEquipoURL='2534';//ultimo
+
+                break;
+            case 'San Telmo':
+                $strEquipoURL='1800';//ultimo
+
+                break;
             case 'Sarmiento (Junín)':
                 $strEquipoURL='1474';
                 break;
+            case 'Sarmiento (Resistencia)':
+                $strEquipoURL='1829';
+
+                break;
+            case 'Sol de América (Formosa)':
+                $strEquipoURL='2001';
+
+                break;
+            case 'Sol de Mayo de Viedma':
+                $strEquipoURL='2000';
+
+                break;
+            case 'Sportivo Barracas':
+                $strEquipoURL='1782';
+
+                break;
+            case 'Sportivo Belgrano':
+                $strEquipoURL='1845';
+
+                break;
+            case 'Sportivo Las Parejas':
+                $strEquipoURL='2018';
+
+                break;
+            case 'Sportivo Italiano':
+                $strEquipoURL='1196';
+
+                break;
             case 'Talleres (Cba.)':
                 $strEquipoURL='11';//nuevo
+
+                break;
+            case 'Talleres de Remedios de Escalada':
+                $strEquipoURL='1818';//nuevo
 
                 break;
             case 'Temperley':
@@ -1538,12 +1843,41 @@ class FechaController extends Controller
             case 'Tiro Federal de Rosario':
                 $strEquipoURL='149';
                 break;
+            case 'Tristán Suárez':
+                $strEquipoURL='1803';
+
+                break;
+            case 'UAI Urquiza':
+                $strEquipoURL='1823';
+
+                break;
+            case 'Unión de Aconquija':
+                $strEquipoURL='2010';
+                break;
             case 'Unión de Santa Fe':
                 $strEquipoURL='17';
+                break;
+            case 'Unión de Sunchales':
+                $strEquipoURL='1880';
+                break;
+            case 'Unión de Villa Krause':
+                $strEquipoURL='1870';
                 break;
             case 'Vélez Sarsfield':
                 $strEquipoURL='22';
 
+                break;
+            case 'Viale FBC':
+                $strEquipoURL='2189';
+                break;
+            case 'Villa Dálmine':
+                $strEquipoURL='1797';
+                break;
+            case 'Villa Mitre de Bahía Blanca':
+                $strEquipoURL='257';
+                break;
+            default:
+                Log::channel('mi_log')->info('Ojo!!! falta equipo: '.$strEquipoURL, []);
                 break;
         }
         return $strEquipoURL;
@@ -1551,169 +1885,420 @@ class FechaController extends Controller
     public function dameNombreEquipoURL3($strEquipo)
     {
         $strEquipoURL=strtr($strEquipo, " ", "-");
+        $arrEquipo = array();
         switch (trim($strEquipo)) {
+            case 'Acassuso':
+                $arrEquipo[]='Acassuso';
+
+                break;
+            case 'Aldosivi':
+                $arrEquipo[]='aldosivi';
+
+                break;
+            case 'Alianza de Coronel Moldes':
+                $arrEquipo[]='alianza-cm';
+
+                break;
+            case 'All Boys':
+                $arrEquipo[]='all-boys';
+
+                break;
             case 'Almagro':
-                $strEquipoURL='almagro';
-                //$strEquipoURL='club-almagro';
+                $arrEquipo[]='almagro';
+                $arrEquipo[]='club-almagro';
+                break;
+            case 'Altos Hornos Zapla':
+                $arrEquipo[]='altos-hornos';
+
+                break;
+            case 'Alvarado':
+                $arrEquipo[]='alvarado';
+
                 break;
             case 'Arsenal':
-                //$strEquipoURL='arsenal-sarandi';//viejo
-                $strEquipoURL='arsenal';//ultimo
-                //$strEquipoURL='arsenal-fc';
+                $arrEquipo[]='arsenal-sarandi';
+                $arrEquipo[]='arsenal';
+                $arrEquipo[]='arsenal-fc';
+                break;
+            case 'Atlanta':
+                $arrEquipo[]='atlanta';
+
+                break;
+            case 'Atlas':
+                $arrEquipo[]='atlas-a';
+
                 break;
             case 'Atlético de Rafaela':
-                $strEquipoURL='atl-rafaela';
+                $arrEquipo[]='atl-rafaela';
+                break;
+            case 'Atlético Paraná':
+                $arrEquipo[]='atl-parana';
+                break;
+            case 'Atlético Policial':
+                $arrEquipo[]='policial';
                 break;
             case 'Atlético Tucumán':
-                $strEquipoURL='atl-tucuman';
+                $arrEquipo[]='atl-tucuman';
                 break;
             case 'Argentinos Juniors':
-                $strEquipoURL='argentinos';
+                $arrEquipo[]='argentinos';
                 break;
             case 'Banfield':
-                $strEquipoURL='banfield';//ultimo
-                //$strEquipoURL='ca-banfield';//viejo
+                $arrEquipo[]='banfield';
+                $arrEquipo[]='ca-banfield';
+                break;
+            case 'Barracas Central':
+                $arrEquipo[]='barracas-cent';
+                break;
+
+            case 'Belgrano':
+                $arrEquipo[]='belgrano';
+                $arrEquipo[]='belgrano-cordoba';
                 break;
             case 'Boca Juniors':
-                $strEquipoURL='boca';
-                //$strEquipoURL='ca-boca-juniors';
+                $arrEquipo[]='boca';
+                $arrEquipo[]='ca-boca-juniors';
                 break;
-            case 'Belgrano':
-                $strEquipoURL='belgrano';
-                //$strEquipoURL='belgrano-cordoba';
+            case 'Boca Unidos':
+                $arrEquipo[]='boca-unidos';
+
+                break;
+            case 'Brown de Adrogué':
+                $arrEquipo[]='brown';
+
+                break;
+            case 'Cañuelas':
+                $arrEquipo[]='canuelas';
+
+                break;
+            case 'Central Córdoba (Rosario)':
+                $arrEquipo[]='c-cordoba-sf';
                 break;
             case 'Central Córdoba (SdE)':
-                $strEquipoURL='central-cordoba-sde';
+                $arrEquipo[]='central-cordoba-sde';
+                break;
+            case 'Central Norte':
+                $arrEquipo[]='central-norte';
                 break;
             case 'Chacarita Juniors':
-                $strEquipoURL='chacarita';
-                //$strEquipoURL='ca-chacarita-juniors';
+                $arrEquipo[]='chacarita';
+                $arrEquipo[]='ca-chacarita-juniors';
+                break;
+            case 'Chaco For Ever':
+                $arrEquipo[]='chaco-for-ever';
+
                 break;
             case 'Colón de Santa Fe':
-                $strEquipoURL='colon';//ultimo
-                //$strEquipoURL='ca-colon';//viejo
+                $arrEquipo[]='colon';
+                $arrEquipo[]='ca-colon';
+                break;
+            case 'Colegiales':
+                $arrEquipo[]='colegiales';
                 break;
             case 'Crucero del Norte':
-                $strEquipoURL='crucero-del-norte';
+                $arrEquipo[]='crucero-del-norte';
+                break;
+            case 'Defensores de Belgrano':
+                $arrEquipo[]='def-belgrano';
+
+                break;
+            case 'Defensores de Villa Ramallo':
+                $arrEquipo[]='defensores-ram';
+
                 break;
             case 'Defensa y Justicia':
-                $strEquipoURL='defensa-y-justicia';
-                //$strEquipoURL='csyd-defensa-y-justicia';
+                $arrEquipo[]='defensa-y-justicia';
+                $arrEquipo[]='csyd-defensa-y-justicia';
+                $arrEquipo[]='defensa-y-just';
+                break;
+            case 'Deportivo Armenio':
+                $arrEquipo[]='dep-armenio';
+
+                break;
+            case 'Deportivo Español':
+                $arrEquipo[]='social-espanol';
+
+                break;
+            case 'Deportivo Madryn':
+                $arrEquipo[]='dep.-madryn';
+
+                break;
+            case 'Deportivo Merlo':
+                $arrEquipo[]='deportivo-merlo';
+
+                break;
+            case 'Deportivo Morón':
+                $arrEquipo[]='deportivo-moron';
+
+                break;
+            case 'Douglas Haig':
+                $arrEquipo[]='douglas-haig';
+
+                break;
+            case 'Estudiantes (BA)':
+                $arrEquipo[]='estudiantes-ba';
+
+                break;
+            case 'Estudiantes de San Luis':
+                $arrEquipo[]='sp.-estudiantes';
+
                 break;
             case 'Estudiantes (LP)':
-                $strEquipoURL='estudiantes';
-                //$strEquipoURL='estudiantes-de-la-plata';
+                $arrEquipo[]='estudiantes';
+                $arrEquipo[]='estudiantes-de-la-plata';
+                break;
+            case 'Excursionistas':
+                $arrEquipo[]='excursionistas';
+
+                break;
+            case 'Ferro':
+                $arrEquipo[]='Ferro';
+
+                break;
+            case 'Gimnasia (CdU)':
+                $arrEquipo[]='gimnasia-con';
+                break;
+            case 'Gimnasia de Mendoza':
+                $arrEquipo[]='gimnasia-men.';
                 break;
             case 'Gimnasia (J)':
-                $strEquipoURL='gimnasia-juj';
+                $arrEquipo[]='gimnasia-juj';
                 break;
             case 'Gimnasia (LP)':
-                $strEquipoURL='gimnasia';//ultimo
-                //$strEquipoURL='gye-la-plata';//viejo
-                //$strEquipoURL='gimnasia-y-esgrima-de-la-plata';
+                $arrEquipo[]='gimnasia';
+                $arrEquipo[]='gye-la-plata';
+                $arrEquipo[]='gimnasia-y-esgrima-de-la-plata';
+                break;
+            case 'Gimnasia y Tiro de Salta':
+                $arrEquipo[]='gimnasia-y_tiro';
                 break;
             case 'Godoy Cruz':
-                $strEquipoURL='godoy-cruz';//ultimo
-                //$strEquipoURL='cd-godoy-cruz';//viejo
+                $arrEquipo[]='godoy-cruz';
+                $arrEquipo[]='cd-godoy-cruz';
+                break;
+            case 'Guaraní Antonio Franco':
+                $arrEquipo[]='guarani-a-f';
+
+                break;
+            case 'Güemes de SdE':
+                $arrEquipo[]='guemes';
+
+                break;
+            case 'Guillermo Brown':
+                $arrEquipo[]='guillermo-brown';
+
                 break;
             case 'Huracán':
-                $strEquipoURL='huracan';
-                //$strEquipoURL='ca-huracan';
+                $arrEquipo[]='huracan';
+                $arrEquipo[]='ca-huracan';
+                break;
+            case 'Huracán de Las Heras':
+                $arrEquipo[]='huracan-men';
+
                 break;
             case 'Huracán (Tres Arroyos)':
-                $strEquipoURL='huracan-ta';
+                $arrEquipo[]='huracan-ta';
 
                 break;
             case 'Instituto de Córdoba':
-                //$strEquipoURL='instituto';
-                $strEquipoURL='instituto-de-cordoba';
+                $arrEquipo[]='instituto';
+                $arrEquipo[]='instituto-de-cordoba';
                 break;
             case 'Independiente':
-                //$strEquipoURL='ca-independiente';
-                $strEquipoURL='independiente';
+                $arrEquipo[]='ca-independiente';
+                $arrEquipo[]='independiente';
+                break;
+            case 'Juventud Unida de Gualeguaychú':
+                $arrEquipo[]='juv-unida-g';
+
+                break;
+            case 'Juventud Unida Universitario':
+                $arrEquipo[]='juv-unida-univ';
+
+                break;
+            case 'Laferrere':
+                $arrEquipo[]='dep.-laferrere';
+
                 break;
             case 'Lanús':
-                $strEquipoURL='lanus';//ultimo
-                //$strEquipoURL='ca-lanus';//viejo
+                $arrEquipo[]='lanus';
+                $arrEquipo[]='ca-lanus';
+                break;
+            case 'Leandro N. Alem':
+                $arrEquipo[]='alem';
+
+                break;
+            case 'Liniers':
+                $arrEquipo[]='liniers-bb';
+
                 break;
             case 'Los Andes':
-                $strEquipoURL='los-andes-de-lomas-de-zamora';
+                $arrEquipo[]='los-andes-de-lomas-de-zamora';
+                $arrEquipo[]='los-andes';
+                break;
+            case 'Midlan':
+                $arrEquipo[]='midlan';
+
+                break;
+            case 'Mitre de SdE':
+                $arrEquipo[]='a.mitre';
+
                 break;
             case 'Newell\'s Old Boys':
-                $strEquipoURL='newells';
-                //$strEquipoURL='ca-newells-old-boys';
+                $arrEquipo[]='newells';
+                $arrEquipo[]='ca-newells-old-boys';
                 break;
             case 'Nueva Chicago':
-                $strEquipoURL='nueva-chicago';
+                $arrEquipo[]='nueva-chicago';
                 break;
             case 'Olimpo':
-                //$strEquipoURL='olimpo';
-                $strEquipoURL='olimpo';
+                $arrEquipo[]='olimpo';
+
+                break;
+            case 'Pacífico de Gral. Alvear':
+                $arrEquipo[]='pacifico';
                 break;
             case 'Patronato':
-                $strEquipoURL='patronato-de-parana';//ultimo
-                //$strEquipoURL='patronato';//viejo
+                $arrEquipo[]='patronato-de-parana';
+                $arrEquipo[]='patronato';
+                break;
+
+            case 'Platense':
+                $arrEquipo[]='platense';
                 break;
             case 'Quilmes':
-                $strEquipoURL='quilmes';
+                $arrEquipo[]='quilmes';
                 break;
             case 'Racing Club':
-                $strEquipoURL='racing';
-                //$strEquipoURL='racing-club-de-avellaneda';
+                $arrEquipo[]='racing';
+                $arrEquipo[]='racing-club-de-avellaneda';
+                break;
+            case 'Racing (Olavarría)':
+                $arrEquipo[]='racing-olav';
+
+                break;
+            case 'Racing (Trelew)':
+                $arrEquipo[]='racing-tre';
+
+                break;
+            case 'Ramón Santamarina':
+                $arrEquipo[]='santamarina';
+
+                break;
+            case 'Rivadavia de Venado Tuerto':
+                $arrEquipo[]='sp.-rivadavia';
+
                 break;
             case 'River Plate':
-                $strEquipoURL='river';
-                //$strEquipoURL='ca-river-plate';
+                $arrEquipo[]='river';
+                $arrEquipo[]='ca-river-plate';
                 break;
             case 'Rosario Central':
-                $strEquipoURL='rosario-central';
-                //$strEquipoURL='ca-rosario-central';
+                $arrEquipo[]='rosario-central';
+                $arrEquipo[]='ca-rosario-central';
+                break;
+            case 'Sacachispas':
+                $arrEquipo[]='sacachispas';
+
                 break;
             case 'San Lorenzo':
-                $strEquipoURL='san-lorenzo';
-                //$strEquipoURL='ca-san-lorenzo-de-almagro';
-                //$strEquipoURL='san-lorenzo-de-almagro';
+                $arrEquipo[]='san-lorenzo';
+                $arrEquipo[]='ca-san-lorenzo-de-almagro';
+                $arrEquipo[]='san-lorenzo-de-almagro';
+                break;
+            case 'San Martín de Formosa':
+                $arrEquipo[]='sp.-san-martin';
+
                 break;
             case 'San Martín (SJ)':
-                $strEquipoURL='san-martin-sj';
-                //$strEquipoURL='ca-san-martin';
+                $arrEquipo[]='san-martin-sj';
+                $arrEquipo[]='ca-san-martin';
                 break;
             case 'San Martín (Tuc.)':
-                $strEquipoURL='san-martin-t';//ultimo
-                //$strEquipoURL='san-martin-tucuman';//viejo
+                $arrEquipo[]='san-martin-t';
+                $arrEquipo[]='san-martin-tucuman';
+                break;
+            case 'Sansinena de General Cerri':
+                $arrEquipo[]='sansinena';
+
                 break;
             case 'Sarmiento (Junín)':
-                $strEquipoURL='sarmiento-de-junin';
+                $arrEquipo[]='sarmiento-de-junin';
+                $arrEquipo[]='sarmiento-ju';
+                break;
+            case 'Sarmiento (Resistencia)':
+                $arrEquipo[]='sarmiento-re';
+
+                break;
+            case 'Sol de Mayo de Viedma':
+                $arrEquipo[]='sol-de-mayo';
+
+                break;
+            case 'Sportivo Barracas':
+                $arrEquipo[]='sp.-barracas';
+
+                break;
+            case 'Sportivo Belgrano':
+                $arrEquipo[]='sp-belgrano';
+
+                break;
+            case 'Sportivo Las Parejas':
+                $arrEquipo[]='sp.-las-parejas';
+
                 break;
             case 'Talleres (Cba.)':
-                $strEquipoURL='talleres';//nuevo
-                //$strEquipoURL='talleres-cordoba';//viejo
+                $arrEquipo[]='talleres';
+                $arrEquipo[]='talleres-cordoba';
+                break;
+            case 'Talleres de Remedios de Escalada':
+                $arrEquipo[]='talleres-rem.';
+
                 break;
             case 'Temperley':
-                //$strEquipoURL='ca-temperley';
-                $strEquipoURL='temperley';
+                $arrEquipo[]='ca-temperley';
+                $arrEquipo[]='temperley';
                 break;
             case 'Tigre':
-                $strEquipoURL='tigre';
-                //$strEquipoURL='ca-tigre';
+                $arrEquipo[]='tigre';
+                $arrEquipo[]='ca-tigre';
                 break;
             case 'Tiro Federal de Rosario':
-                $strEquipoURL='tiro-federal';
+                $arrEquipo[]='tiro-federal';
+                break;
+            case 'Tristán Suárez':
+                $arrEquipo[]='tristan-suarez';
+
+                break;
+            case 'UAI Urquiza':
+                $arrEquipo[]='uai-urquiza';
+
+                break;
+            case 'Unión de Aconquija':
+                $arrEquipo[]='union-aconquija';
                 break;
             case 'Unión de Santa Fe':
-                $strEquipoURL='union';
+                $arrEquipo[]='union';
+                break;
+            case 'Unión de Sunchales':
+                $arrEquipo[]='union-sun.';
                 break;
             case 'Vélez Sarsfield':
-                $strEquipoURL='velez';
-                //$strEquipoURL='ca-velez-sarsfield';
+                $arrEquipo[]='velez';
+                $arrEquipo[]='ca-velez-sarsfield';
+                break;
+            case 'Viale FBC':
+                $arrEquipo[]='viale';
+                break;
+            default:
+                Log::channel('mi_log')->info('Ojo!!! no esta: '.$strEquipoURL, []);
                 break;
         }
-        return $strEquipoURL;
+        return $arrEquipo;
     }
 
     public function dameNombreEquipoDB($strEquipo)
     {
-        //Log::info('Transformar Equipo '.$strEquipo, []);
+        //Log::channel('mi_log')->info('Transformar Equipo '.$strEquipo, []);
         $strEquipoDB=$strEquipo;
         switch (trim($strEquipo)) {
 
@@ -1764,10 +2349,75 @@ class FechaController extends Controller
         return $strEquipoDB;
     }
 
+    public function dameNombreTorneoURL($strTorneo,$fecha,$year)
+    {
+        //Log::channel('mi_log')->info($strTorneo.' - '.$fecha.' - '.$year, []);
+        $strTorneo=strtr($strTorneo, " ", "-");
+        if (strpos($fecha, '32vos') !== false) {
+            $fecha = '32-de-final';
+        }
+        if (strpos($fecha, '16vos') !== false) {
+            $fecha = 'dieciseisavos';
+        }
+        if (strpos($fecha, '8vos') !== false) {
+            $fecha = 'octavos';
+        }
+        if (strpos($fecha, '4tos') !== false) {
+            $fecha = 'cuartos';
+        }
+        if (strpos($fecha, 'Semifinal') !== false) {
+            $fecha = 'semifinales';
+        }
+        if (strpos($fecha, 'Final') !== false) {
+            $fecha = 'final';
+        }
+
+        if (strpos($strTorneo, 'copa-argentina') !== false) {
+
+            $strTorneoURL='copa-argentina-'.$year.'/'.$fecha;
+            switch (trim($year)) {
+                case '2012':
+                    $strTorneoURL='copa-argentina-2011-12/'.$fecha;
+
+                    break;
+
+
+                case '2013':
+                    if ($fecha=='32-de-final'){
+                        $fecha='24-de-final';
+                    }
+                    $strTorneoURL='copa-argentina-2012-13/'.$fecha;
+
+                    break;
+                case '2014':
+                    if ($fecha=='32-de-final'){
+                        $fecha='segunda-ronda';
+                    }
+                    $strTorneoURL='copa-argentina-2013-14/'.$fecha;
+
+                    break;
+                case '2015':
+                    $strTorneoURL='copa-argentina-2014-15/'.$fecha;
+
+                    break;
+                case '2016':
+                    $strTorneoURL='copa-argentina-2015-16/'.$fecha;
+
+                    break;
+
+            }
+        }
+        else{
+            $strTorneoURL='torneo-'.$strTorneo.'-'.$year.'/'.intval($fecha).'-fecha';
+        }
+        //Log::channel('mi_log')->info($strTorneoURL, []);
+        return $strTorneoURL;
+    }
+
     public function importincidenciasfecha_old(Request $request)
     {
         set_time_limit(0);
-        //Log::info('Entraaaaaa', []);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
         $id = $request->get('fechaId');
         $fecha=Fecha::findOrFail($id);
 
@@ -1786,8 +2436,8 @@ class FechaController extends Controller
             $golesTotales = $partido->golesl+$partido->golesv;
             $golesLocales = $partido->golesl;
             $golesVisitantes = $partido->golesv;
-            Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-            Log::info('URL ' .'https://www.resultados-futbol.com/partido/'.$this->dameNombreEquipoURL($strLocal).'/'.$this->dameNombreEquipoURL($strVisitante).'/'.$year, []);
+            Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+            Log::channel('mi_log')->info('URL ' .'https://www.resultados-futbol.com/partido/'.$this->dameNombreEquipoURL($strLocal).'/'.$this->dameNombreEquipoURL($strVisitante).'/'.$year, []);
             try {
 
                 $html = HtmlDomParser::file_get_html('https://www.resultados-futbol.com/partido/'.$this->dameNombreEquipoURL($strLocal).'/'.$this->dameNombreEquipoURL($strVisitante).'/'.$year, false, null, 0);
@@ -1805,7 +2455,7 @@ class FechaController extends Controller
 
                 $equipos = array();
 
-                //Log::info('Elemento ' . $html,[]);
+                //Log::channel('mi_log')->info('Elemento ' . $html,[]);
                 $i = 1;
                 $goles=0;
                 $golesL=0;
@@ -1813,7 +2463,7 @@ class FechaController extends Controller
                 $j=0;
                 foreach ($html->find('div[class=team team1]') as $element) {
                     $equipo = $element->find('h3[class=nteam nteam1]');
-                    //Log::info('Equipo ' . $equipo[0]->plaintext, []);
+                    //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
                     $jugadores = array();
 
                     $jugadores = array();
@@ -1823,7 +2473,7 @@ class FechaController extends Controller
                             $dorsal = $li->find('small[class=align-dorsal]');
                             $jugador = $li->find('h5[class=align-player]');
                             $id =  explode('-',$li->find('a')[0]->href);
-                            //Log::info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
+                            //Log::channel('mi_log')->info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
 
                             $data2 = array(
                                 'dorsal' => $dorsal[0]->plaintext,
@@ -1850,7 +2500,7 @@ class FechaController extends Controller
                 $j=0;
                 foreach ($html->find('div[class=team team2]') as $element) {
                     $equipo = $element->find('h3[class=nteam nteam2]');
-                    //Log::info('Equipo ' . $equipo[0]->plaintext, []);
+                    //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
                     $jugadores = array();
                     foreach ($element->find('ul[class=aligns-list]') as $element2) {
                         $j++;
@@ -1858,7 +2508,7 @@ class FechaController extends Controller
                             $dorsal = $li->find('small[class=align-dorsal]');
                             $jugador = $li->find('h5[class=align-player]');
                             $id =  explode('-',$li->find('a')[0]->href);
-                            //Log::info('ID ' . $id[2], []);
+                            //Log::channel('mi_log')->info('ID ' . $id[2], []);
                             $data2 = array(
                                 'dorsal' => $dorsal[0]->plaintext,
                                 'nombre'=>$jugador[0]->plaintext,
@@ -1880,7 +2530,7 @@ class FechaController extends Controller
 
                     }
                 }
-                //Log::info('Partido ' . print_r($equipos,true), []);
+                //Log::channel('mi_log')->info('Partido ' . print_r($equipos,true), []);
                 foreach ($html->find('div[class=event-content]') as $element) {
 
                     $golL = $element->find('span[class=left event_1]');
@@ -1894,7 +2544,7 @@ class FechaController extends Controller
                             $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Gol', explode('\'', $minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
                         $golesL++;
@@ -1911,7 +2561,7 @@ class FechaController extends Controller
 
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
                         $golesL++;
@@ -1937,7 +2587,7 @@ class FechaController extends Controller
                             $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta amarilla',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -1976,7 +2626,7 @@ class FechaController extends Controller
                             $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Sale',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -1993,7 +2643,7 @@ class FechaController extends Controller
                             $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Entra',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -2011,7 +2661,7 @@ class FechaController extends Controller
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Gol',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
                         $golesV++;
@@ -2047,7 +2697,7 @@ class FechaController extends Controller
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta amarilla',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -2085,7 +2735,7 @@ class FechaController extends Controller
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Sale',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -2102,7 +2752,7 @@ class FechaController extends Controller
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Entra',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -2113,10 +2763,10 @@ class FechaController extends Controller
 
                 }
                 if (($golesL!=$golesLocales)||($golesV!=$golesVisitantes)) {
-                    Log::info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
+                    Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
                     /*try {
-                        Log::info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
-                        Log::info('URL ' . 'https://www.resultados-futbol.com/partido_8377/' . $this->dameNombreEquipoURL($strLocal) . '/' . $this->dameNombreEquipoURL($strVisitante) . '/' . $year, []);
+                        Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                        Log::channel('mi_log')->info('URL ' . 'https://www.resultados-futbol.com/partido_8377/' . $this->dameNombreEquipoURL($strLocal) . '/' . $this->dameNombreEquipoURL($strVisitante) . '/' . $year, []);
                         $html = HtmlDomParser::file_get_html('https://www.resultados-futbol.com/partido_8377/' . $this->dameNombreEquipoURL($strLocal) . '/' . $this->dameNombreEquipoURL($strVisitante) . '/' . $year, false, null, 0);
 
 
@@ -2125,11 +2775,11 @@ class FechaController extends Controller
                     }*/
                     $html = '';
                     if (!$html) {
-                        //Log::info('OJO!!! No se encontro la URL ' . 'https://www.resultados-futbol.com/partido_61201/' . $this->dameNombreEquipoURL($strLocal) . '/' . $this->dameNombreEquipoURL($strVisitante) . '/' . $year, []);
+                        //Log::channel('mi_log')->info('OJO!!! No se encontro la URL ' . 'https://www.resultados-futbol.com/partido_61201/' . $this->dameNombreEquipoURL($strLocal) . '/' . $this->dameNombreEquipoURL($strVisitante) . '/' . $year, []);
                     } else {
                         $equipos = array();
 
-                        //Log::info('Elemento ' . $html,[]);
+                        //Log::channel('mi_log')->info('Elemento ' . $html,[]);
                         $i = 1;
                         $goles = 0;
                         $golesL = 0;
@@ -2137,7 +2787,7 @@ class FechaController extends Controller
                         $j = 0;
                         foreach ($html->find('div[class=team team1]') as $element) {
                             $equipo = $element->find('h3[class=nteam nteam1]');
-                            //Log::info('Equipo ' . $equipo[0]->plaintext, []);
+                            //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
                             $jugadores = array();
 
                             $jugadores = array();
@@ -2147,7 +2797,7 @@ class FechaController extends Controller
                                     $dorsal = $li->find('small[class=align-dorsal]');
                                     $jugador = $li->find('h5[class=align-player]');
                                     $id = explode('-', $li->find('a')[0]->href);
-                                    //Log::info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
+                                    //Log::channel('mi_log')->info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
 
                                     $data2 = array(
                                         'dorsal' => $dorsal[0]->plaintext,
@@ -2174,7 +2824,7 @@ class FechaController extends Controller
                         $j = 0;
                         foreach ($html->find('div[class=team team2]') as $element) {
                             $equipo = $element->find('h3[class=nteam nteam2]');
-                            //Log::info('Equipo ' . $equipo[0]->plaintext, []);
+                            //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
                             $jugadores = array();
                             foreach ($element->find('ul[class=aligns-list]') as $element2) {
                                 $j++;
@@ -2182,7 +2832,7 @@ class FechaController extends Controller
                                     $dorsal = $li->find('small[class=align-dorsal]');
                                     $jugador = $li->find('h5[class=align-player]');
                                     $id = explode('-', $li->find('a')[0]->href);
-                                    //Log::info('ID ' . $id[2], []);
+                                    //Log::channel('mi_log')->info('ID ' . $id[2], []);
                                     $data2 = array(
                                         'dorsal' => $dorsal[0]->plaintext,
                                         'nombre' => $jugador[0]->plaintext,
@@ -2204,7 +2854,7 @@ class FechaController extends Controller
 
                             }
                         }
-                        //Log::info('Partido ' . print_r($equipos,true), []);
+                        //Log::channel('mi_log')->info('Partido ' . print_r($equipos,true), []);
                         foreach ($html->find('div[class=event-content]') as $element) {
 
                             $golL = $element->find('span[class=left event_1]');
@@ -2217,7 +2867,7 @@ class FechaController extends Controller
 
                                     $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Gol', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
                                 $golesL++;
@@ -2233,7 +2883,7 @@ class FechaController extends Controller
                                     $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Penal', explode('\'', $minL[1])[0]);
 
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
                                 $golesL++;
@@ -2258,7 +2908,7 @@ class FechaController extends Controller
 
                                     $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Tarjeta amarilla', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
 
@@ -2295,7 +2945,7 @@ class FechaController extends Controller
 
                                     $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Sale', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
 
@@ -2310,7 +2960,7 @@ class FechaController extends Controller
 
                                     $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Entra', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
 
@@ -2326,7 +2976,7 @@ class FechaController extends Controller
 
                                     $equipos[2]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Gol', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
                                 $golesV++;
@@ -2361,7 +3011,7 @@ class FechaController extends Controller
 
                                     $equipos[2]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Tarjeta amarilla', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
 
@@ -2398,7 +3048,7 @@ class FechaController extends Controller
 
                                     $equipos[2]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Sale', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
 
@@ -2413,7 +3063,7 @@ class FechaController extends Controller
 
                                     $equipos[2]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Entra', explode('\'', $minL[1])[0]);
                                 } else {
-                                    Log::info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                                    Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                                 }
 
 
@@ -2422,13 +3072,13 @@ class FechaController extends Controller
 
                         }
                         if (($golesL!=$golesLocales)||($golesV!=$golesVisitantes)) {
-                            Log::info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
+                            Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
                         }
 
                     }
                 }
                     foreach ($equipos as $eq) {
-                        //Log::info('Equipo  ' . $equipo['equipo'], []);
+                        //Log::channel('mi_log')->info('Equipo  ' . $equipo['equipo'], []);
                         $strEquipo=trim($eq['equipo']);
                         $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
                         if (!empty($equipo)){
@@ -2456,12 +3106,12 @@ class FechaController extends Controller
                                     }
                                     else{
                                         $plantillaJugador='';
-                                        Log::info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
+                                        Log::channel('mi_log')->info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
                                     }
                                 }
                                 else{
                                     $plantillaJugador='';
-                                    Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
                                 }
                                 if (!empty($plantillaJugador)) {
                                     $arrApellido = explode(' ', $jugador['nombre']);
@@ -2474,7 +3124,7 @@ class FechaController extends Controller
                                         }
                                     }
                                     if (!$mismoDorsal) {
-                                        Log::info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                                        Log::channel('mi_log')->info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                                     }
                                     switch ($plantillaJugador->jugador->tipoJugador) {
                                         case 'Arquero':
@@ -2517,12 +3167,12 @@ class FechaController extends Controller
                                 }
                                 else{
                                     $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
-                                    Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+                                    Log::channel('mi_log')->info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
                                 }
                                 foreach ($jugador['incidencias'] as $incidencia) {
 
                                     if (!empty($incidencia)) {
-                                        //Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                        //Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
 
                                         $tipogol='';
                                         switch (trim($incidencia[0])) {
@@ -2650,7 +3300,7 @@ class FechaController extends Controller
                             }
                         }
                         else{
-                            Log::info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
+                            Log::channel('mi_log')->info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
                         }
                     }
 
@@ -2666,28 +3316,28 @@ class FechaController extends Controller
 
 
             try {
-                //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                //Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
-                Log::info('URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', []);
+                Log::channel('mi_log')->info('URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', []);
                 $html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', false, null, 0);
                 if (!$html2){
-                    Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    Log::channel('mi_log')->info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
                     $html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
                 }
                 $linkArray=array();
                 $entrenadoresArray = array();
                 $nombreArbitro ='';
                 if (!$html2) {
-                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                     $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
-                    /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    /*Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                     $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
 
                 }
                 if (!$html2) {
-                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                     $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
                 }
@@ -2710,17 +3360,17 @@ class FechaController extends Controller
                             $incidenciaGol='';
                             if($td->find('a')){
                                 $jugadorGol = $td->find('a')[0]->title;
-                                Log::info('OJO!! gol: '.$jugadorGol,[]);
+                                Log::channel('mi_log')->info('OJO!! gol: '.$jugadorGol,[]);
                                 $lineaGol = $td->plaintext;
                                 if (str_contains($lineaGol, $jugadorGol)) {
                                     $minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
-                                    Log::info('OJO!! min: '.$minutoGol,[]);
+                                    Log::channel('mi_log')->info('OJO!! min: '.$minutoGol,[]);
                                 }
 
                                 $incidenciaArray = explode('/', $lineaGol);
                                 if (count($incidenciaArray)>1){
                                     $incidenciaGol = $incidenciaArray[1];
-                                    Log::info('OJO!! incidencia: '.$incidenciaGol,[]);
+                                    Log::channel('mi_log')->info('OJO!! incidencia: '.$incidenciaGol,[]);
                                 }
                             }
 
@@ -2728,7 +3378,7 @@ class FechaController extends Controller
                         }
                     }
                     if ($tabla==2){
-                        Log::info('OJO!! locales:',[]);
+                        Log::channel('mi_log')->info('OJO!! locales:',[]);
                         $suplentes=0;
                         foreach ($element->find('tr') as $tr) {
                             $dorsalTitularL = '';
@@ -2747,7 +3397,7 @@ class FechaController extends Controller
                             $rojaSuplenteL = '';
                             $mintutoTarjetaSuplenteL = '';
                             foreach ($tr->find('td') as $td) {
-                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                //Log::channel('mi_log')->info('OJO!! linea: ' . $td->plaintext, []);
                                 if (trim($td->plaintext)=='Banquillo') {
                                     $suplentes=1;
                                 }
@@ -2755,29 +3405,29 @@ class FechaController extends Controller
                                     if ($td->find('span[style=font-weight: bold; color: #646464]')) {
                                         if ($suplentes){
                                             $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
                                         }
                                         else{
                                             $dorsalTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            Log::info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
+                                            Log::channel('mi_log')->info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
                                         }
 
                                     }
                                     elseif ($td->find('span[class=rottext]')) {
                                         if ($suplentes){
                                             $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! sale suplente: ' . $saleSuplenteV, []);
                                         }
                                         else{
                                             $saleTitularL = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! sale titular: ' . $saleTitularL, []);
+                                            Log::channel('mi_log')->info('OJO!! sale titular: ' . $saleTitularL, []);
                                         }
 
                                     }
                                     elseif ($td->find('span[class=gruentext]')) {
                                         if ($suplentes){
                                             $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! entra suplente: ' . $td->find('span[class=gruentext]')[0]->plaintext, []);
+                                            Log::channel('mi_log')->info('OJO!! entra suplente: ' . $td->find('span[class=gruentext]')[0]->plaintext, []);
                                         }
 
 
@@ -2803,33 +3453,33 @@ class FechaController extends Controller
                                     if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                         if ($suplentes){
                                             $amarillaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! amarilla titular: ' . $amarillaSuplenteL, []);
+                                            Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaSuplenteL, []);
                                         }
                                         else{
                                             $amarillaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
+                                            Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Roja directa') {
                                         if ($suplentes){
                                             $rojaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! roja titular: ' . $rojaSuplenteL, []);
+                                            Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaSuplenteL, []);
                                         }
                                         else{
                                             $rojaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! roja titular: ' . $rojaTitularL, []);
+                                            Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularL, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Doble amarilla') {
                                         if ($suplentes){
                                             $dobleamarillaSuplenteL = $dorsalSuplenteL . '-' . (int) filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteL, []);
+                                            Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteL, []);
                                         }
                                         else{
                                             $dobleamarillaTitularL = $dorsalTitularL . '-' . (int) filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
+                                            Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
                                         }
 
                                     }
@@ -2839,11 +3489,11 @@ class FechaController extends Controller
                                 if ($td->find('a')) {
                                     if ($suplentes){
                                         $jugadorSuplenteL = $td->find('a')[0]->title;
-                                        Log::info('OJO!! suplente: ' . $jugadorSuplenteL, []);
+                                        Log::channel('mi_log')->info('OJO!! suplente: ' . $jugadorSuplenteL, []);
                                     }
                                     else{
                                         $jugadorTitularL = $td->find('a')[0]->title;
-                                        Log::info('OJO!! titular: ' . $jugadorTitularL, []);
+                                        Log::channel('mi_log')->info('OJO!! titular: ' . $jugadorTitularL, []);
                                     }
 
 
@@ -2854,7 +3504,7 @@ class FechaController extends Controller
                         }
                     }
                     if ($tabla==3){
-                        Log::info('OJO!! visitante:',[]);
+                        Log::channel('mi_log')->info('OJO!! visitante:',[]);
                         $suplentes=0;
                         foreach ($element->find('tr') as $tr) {
                             $dorsalTitularV = '';
@@ -2873,7 +3523,7 @@ class FechaController extends Controller
                             $rojaSuplenteV = '';
                             $mintutoTarjetaSuplenteV = '';
                             foreach ($tr->find('td') as $td) {
-                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                //Log::channel('mi_log')->info('OJO!! linea: ' . $td->plaintext, []);
                                 if (trim($td->plaintext)=='Banquillo') {
                                     $suplentes=1;
                                 }
@@ -2881,29 +3531,29 @@ class FechaController extends Controller
                                     if ($td->find('span[style=font-weight: bold; color: #646464]')) {
                                         if ($suplentes){
                                             $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
                                         }
                                         else{
                                             $dorsalTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            Log::info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
+                                            Log::channel('mi_log')->info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
                                         }
 
                                     }
                                     elseif ($td->find('span[class=rottext]')) {
                                         if ($suplentes){
                                             $saleSuplenteV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! sale suplente: ' . $saleSuplenteV, []);
                                         }
                                         else{
                                             $saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! sale titular: ' . $saleTitularV, []);
+                                            Log::channel('mi_log')->info('OJO!! sale titular: ' . $saleTitularV, []);
                                         }
 
                                     }
                                     elseif ($td->find('span[class=gruentext]')) {
                                         if ($suplentes){
                                             $entraSuplenteV = (int) filter_var($td->find('span[class=gruentext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
-                                            Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! entra suplente: ' . $entraSuplenteV, []);
                                         }
 
 
@@ -2929,33 +3579,33 @@ class FechaController extends Controller
                                     if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                         if ($suplentes){
                                             $amarillaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! amarilla titular: ' . $amarillaSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaSuplenteV, []);
                                         }
                                         else{
                                             $amarillaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
+                                            Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Roja directa') {
                                         if ($suplentes){
                                             $rojaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! roja titular: ' . $rojaSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaSuplenteV, []);
                                         }
                                         else{
                                             $rojaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! roja titular: ' . $rojaTitularV, []);
+                                            Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Doble amarilla') {
                                         if ($suplentes){
                                             $dobleamarillaSuplenteV = $dorsalSuplenteV . '-' . (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
+                                            Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
                                         }
                                         else{
                                             $dobleamarillaTitularV = $dorsalTitularV . '-' . (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
+                                            Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
                                         }
 
                                     }
@@ -2965,11 +3615,11 @@ class FechaController extends Controller
                                 if ($td->find('a')) {
                                     if ($suplentes){
                                         $jugadorSuplenteV = $td->find('a')[0]->title;
-                                        Log::info('OJO!! suplente: ' . $jugadorSuplenteV, []);
+                                        Log::channel('mi_log')->info('OJO!! suplente: ' . $jugadorSuplenteV, []);
                                     }
                                     else{
                                         $jugadorTitularV = $td->find('a')[0]->title;
-                                        Log::info('OJO!! titular: ' . $jugadorTitularV, []);
+                                        Log::channel('mi_log')->info('OJO!! titular: ' . $jugadorTitularV, []);
                                     }
 
 
@@ -2989,19 +3639,19 @@ class FechaController extends Controller
 
                     $entrenadoresArray = explode('Entrenador:', $element->plaintext);
                     if (count($entrenadoresArray)>3){
-                        Log::info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                        Log::channel('mi_log')->info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                     }
                     if(count($entrenadoresArray)>1){
                         $dtLocal = $entrenadoresArray[1];
-                        //Log::info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
+                        //Log::channel('mi_log')->info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
                         if (isset($entrenadoresArray[2])){
                             $dtVisitante = $entrenadoresArray[2];
                         }
                         else{
-                            Log::info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                            Log::channel('mi_log')->info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                         }
 
-                        //Log::info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
+                        //Log::channel('mi_log')->info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
                     }
                     else{
                         $asistente=0;
@@ -3023,12 +3673,12 @@ class FechaController extends Controller
                                         }
                                         if ($asistente==0){
                                             $asistente1= $nombreAsistente;
-                                            Log::info('Asistente 1: '.$nombreAsistente, []);
+                                            Log::channel('mi_log')->info('Asistente 1: '.$nombreAsistente, []);
                                             $asistente++;
                                         }
                                         else{
                                             $asistente2= $nombreAsistente;
-                                            Log::info('Asistente 2: '.$nombreAsistente, []);
+                                            Log::channel('mi_log')->info('Asistente 2: '.$nombreAsistente, []);
                                             $asistente++;
                                         }
 
@@ -3039,7 +3689,7 @@ class FechaController extends Controller
                                             $nombreArbitro .= ($linkArray[$i]).' ';
                                         }
 
-                                        Log::info('Arbitro: '.$nombreArbitro, []);
+                                        Log::channel('mi_log')->info('Arbitro: '.$nombreArbitro, []);
 
                                         }
                                 }
@@ -3060,7 +3710,7 @@ class FechaController extends Controller
                 }
 
                 if (!$arbitro){
-                    Log::info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    Log::channel('mi_log')->info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                 }
                 else{
                     $data3=array(
@@ -3092,7 +3742,7 @@ class FechaController extends Controller
                 }
 
                 if (!$arbitro1){
-                    Log::info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                 }
                 else{
                     $data3=array(
@@ -3124,7 +3774,7 @@ class FechaController extends Controller
                 }
 
                 if (!$arbitro2){
-                    Log::info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                 }
                 else{
                     $data3=array(
@@ -3179,7 +3829,7 @@ class FechaController extends Controller
                     }
                 }
                 else{
-                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
+                    Log::channel('mi_log')->info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
                 }
                 $strEntrenador=trim($dtVisitante);
                 $arrEntrenador = explode(' ', $strEntrenador);
@@ -3212,12 +3862,12 @@ class FechaController extends Controller
                     }
                 }
                 else{
-                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
+                    Log::channel('mi_log')->info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
                 }
 
             }
             else{
-                Log::info('OJO!!! No se econtró la URL2 ' , []);
+                Log::channel('mi_log')->info('OJO!!! No se econtró la URL2 ' , []);
                 /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
                 $ok=0;
                 continue;*/
@@ -3249,7 +3899,7 @@ class FechaController extends Controller
     public function importincidenciasfecha(Request $request)
     {
         set_time_limit(0);
-        //Log::info('Entraaaaaa', []);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
         $id = $request->get('fechaId');
         $fecha=Fecha::findOrFail($id);
 
@@ -3268,38 +3918,38 @@ class FechaController extends Controller
             $golesTotales = $partido->golesl+$partido->golesv;
             $golesLocales = $partido->golesl;
             $golesVisitantes = $partido->golesv;
-            Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+            Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
 
 
 
             try {
-                //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                //Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                Log::channel('mi_log')->info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
                 $html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
-                /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                /*Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                 $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
 
                 if (!$html2){
 
-                    Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', []);
+                    Log::channel('mi_log')->info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', []);
                     $html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/', false, null, 0);
                 }
                 $linkArray=array();
                 $entrenadoresArray = array();
                 $nombreArbitro ='';
                 if (!$html2) {
-                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                     $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
-                    /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    /*Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                     $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
 
                 }
                 if (!$html2) {
-                    Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                    Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                     $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);
                 }
@@ -3335,29 +3985,29 @@ class FechaController extends Controller
                             $incidenciaGol='';
                             if($td->find('a')){
                                 $jugadorGol = $td->find('a')[0]->title;
-                                //Log::info('OJO!! gol: '.$jugadorGol,[]);
+                                //Log::channel('mi_log')->info('OJO!! gol: '.$jugadorGol,[]);
                                 $lineaGol = $td->plaintext;
                                 if (str_contains($lineaGol, $jugadorGol)) {
                                     //$minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
-                                    //Log::info('OJO!! gol: '.$lineaGol,[]);
+                                    //Log::channel('mi_log')->info('OJO!! gol: '.$lineaGol,[]);
                                     $arrayGol= explode(".",$lineaGol);
 
                                     $minutoGol = (int) filter_var($arrayGol[0], FILTER_SANITIZE_NUMBER_INT);
                                     if (count($arrayGol)>1){
                                         $adiccion = (int) filter_var($arrayGol[1], FILTER_SANITIZE_NUMBER_INT);
                                         if ($adiccion>0){
-                                            Log::info('OJO!! gol addicion: ');
+                                            Log::channel('mi_log')->info('OJO!! gol addicion: ');
                                             $minutoGol = $minutoGol + $adiccion;
                                         }
 
                                     }
-                                    //Log::info('OJO!! min: '.$minutoGol,[]);
+                                    //Log::channel('mi_log')->info('OJO!! min: '.$minutoGol,[]);
                                 }
 
                                 $incidenciaArray = explode('/', $lineaGol);
                                 if (count($incidenciaArray)>1){
                                     $incidenciaGol = $incidenciaArray[1];
-                                    //Log::info('OJO!! incidencia: '.$incidenciaGol,[]);
+                                    //Log::channel('mi_log')->info('OJO!! incidencia: '.$incidenciaGol,[]);
                                 }
                                 $goles++;
                                 $golesArray[]=$jugadorGol.'-'.$minutoGol.'-'.$incidenciaGol;
@@ -3369,7 +4019,7 @@ class FechaController extends Controller
                     if ($tabla==2){
 
                         $jugadores = array();
-                        //Log::info('OJO!! locales:',[]);
+                        //Log::channel('mi_log')->info('OJO!! locales:',[]);
                         $suplentes=0;
                         foreach ($element->find('tr') as $tr) {
                             $dorsalTitularL = '';
@@ -3388,7 +4038,7 @@ class FechaController extends Controller
                             $rojaSuplenteL = '';
                             $mintutoTarjetaSuplenteL = '';
                             foreach ($tr->find('td') as $td) {
-                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                //Log::channel('mi_log')->info('OJO!! linea: ' . $td->plaintext, []);
                                 if (trim($td->plaintext) == 'Incidencias') {
                                     $tablaIncidencias = 1;
                                 }
@@ -3401,10 +4051,10 @@ class FechaController extends Controller
                                         if ($td->find('span[style=font-weight: bold; color: #646464]')) {
                                             if ($suplentes) {
                                                 $dorsalSuplenteL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dorsal suplente: ' . $dorsalSuplenteL, []);
                                             } else {
                                                 $dorsalTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
                                             }
 
                                         } elseif ($td->find('span[class=rottext]')) {
@@ -3415,12 +4065,12 @@ class FechaController extends Controller
                                                 if (count($arraySale)>1){
                                                     $adiccion = (int) $arraySale[1];
                                                     if ($adiccion>0){
-                                                        Log::info('OJO!! cambio addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                         $saleSuplenteV = $saleSuplenteV + $adiccion;
                                                     }
 
                                                 }
-                                                //Log::info('OJO!! sale suplente: ' . $saleSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! sale suplente: ' . $saleSuplenteL, []);
                                             } else {
                                                 //$saleTitularL = (int)filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
                                                 $arraySale= explode("'",$td->find('span[class=rottext]')[0]->plaintext);
@@ -3428,11 +4078,11 @@ class FechaController extends Controller
                                                 if (count($arraySale)>1){
                                                     $adiccion = (int) $arraySale[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! cambio addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                         $saleTitularL = $saleTitularL + $adiccion;
                                                     }
                                                 }
-                                                //Log::info('OJO!! sale titular: ' . $saleTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! sale titular: ' . $saleTitularL, []);
                                             }
 
                                         } elseif ($td->find('span[class=gruentext]')) {
@@ -3444,11 +4094,11 @@ class FechaController extends Controller
                                                 if (count($arrayEntra)>1){
                                                     $adiccion = (int) $arrayEntra[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! cambio addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                         $entraSuplenteL = $entraSuplenteL + $adiccion;
                                                     }
                                                 }
-                                                //Log::info('OJO!! entra suplente: ' . $entraSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! entra suplente: ' . $entraSuplenteL, []);
                                             }
 
 
@@ -3456,27 +4106,27 @@ class FechaController extends Controller
                                             if ($td->find('span[class=kleine_schrift]')[0]->title != '') {
                                                 if ($suplentes) {
                                                     //$mintutoTarjetaSuplenteL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                    //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                    //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
 
                                                     $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                     $mintutoTarjetaSuplenteL = (int) $arrayTarjeta[0];
                                                     if (count($arrayTarjeta)>1){
                                                         $adiccion = (int) $arrayTarjeta[1];
                                                         if ($adiccion>0){
-                                                            Log::info('OJO!! tarjeta addicion: ');
+                                                            Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                             $mintutoTarjetaSuplenteL = $mintutoTarjetaSuplenteL + $adiccion;
                                                         }
 
                                                     }
                                                 } else {
                                                     //$mintutoTarjetaTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                    //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                    //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
                                                     $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                     $mintutoTarjetaTitularL = (int) $arrayTarjeta[0];
                                                     if (count($arrayTarjeta)>1){
                                                         $adiccion = (int) $arrayTarjeta[1];
                                                         if ($adiccion>0) {
-                                                            Log::info('OJO!! tarjeta addicion: ');
+                                                            Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                             $mintutoTarjetaTitularL = $mintutoTarjetaTitularL + $adiccion;
                                                         }
                                                     }
@@ -3493,30 +4143,30 @@ class FechaController extends Controller
                                             if ($suplentes) {
 
                                                 $amarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! amarilla suplente: ' . $amarillaSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $amarillaSuplenteL, []);
                                             } else {
                                                 $amarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Roja directa') {
                                             if ($suplentes) {
                                                 $rojaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! roja suplente: ' . $rojaSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! roja suplente: ' . $rojaSuplenteL, []);
                                             } else {
                                                 $rojaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);
-                                                //Log::info('OJO!! roja titular: ' . $rojaTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Doble amarilla') {
                                             if ($suplentes) {
                                                 $dobleamarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! dobleamarilla suplente: ' . $dobleamarillaSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dobleamarilla suplente: ' . $dobleamarillaSuplenteL, []);
                                             } else {
                                                 $dobleamarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
                                             }
 
                                         }
@@ -3526,10 +4176,10 @@ class FechaController extends Controller
                                     if ($td->find('a')) {
                                         if ($suplentes) {
                                             $jugadorSuplenteL = $td->find('a')[0]->title;
-                                            //Log::info('OJO!! suplente: ' . $jugadorSuplenteL, []);
+                                            //Log::channel('mi_log')->info('OJO!! suplente: ' . $jugadorSuplenteL, []);
                                         } else {
                                             $jugadorTitularL = $td->find('a')[0]->title;
-                                            //Log::info('OJO!! titular: ' . $jugadorTitularL, []);
+                                            //Log::channel('mi_log')->info('OJO!! titular: ' . $jugadorTitularL, []);
                                         }
 
 
@@ -3557,7 +4207,7 @@ class FechaController extends Controller
 
                                     if (!empty($golesArray)) {
                                         foreach ($golesArray as $golmin) {
-                                            //Log::info('OJO!! comparar goles: ' . trim($jugadorTitularL).'=='.trim($jugador).' - '.$golmin, []);
+                                            //Log::channel('mi_log')->info('OJO!! comparar goles: ' . trim($jugadorTitularL).'=='.trim($jugador).' - '.$golmin, []);
                                             $incGol = explode('-', $golmin);
                                             if (trim($jugadorTitularL) == trim($incGol[0])) {
 
@@ -3698,7 +4348,7 @@ class FechaController extends Controller
 
                     if ($tabla==3){
                         $jugadores = array();
-                        //Log::info('OJO!! visitante:',[]);
+                        //Log::channel('mi_log')->info('OJO!! visitante:',[]);
                         $suplentes=0;
                         foreach ($element->find('tr') as $tr) {
                             $dorsalTitularV = '';
@@ -3717,7 +4367,7 @@ class FechaController extends Controller
                             $rojaSuplenteV = '';
                             $mintutoTarjetaSuplenteV = '';
                             foreach ($tr->find('td') as $td) {
-                                ////Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                ////Log::channel('mi_log')->info('OJO!! linea: ' . $td->plaintext, []);
                                 if (trim($td->plaintext)=='Banquillo') {
                                     $suplentes=1;
                                 }
@@ -3725,11 +4375,11 @@ class FechaController extends Controller
                                     if ($td->find('span[style=font-weight: bold; color: #646464]')) {
                                         if ($suplentes){
                                             $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            //Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
                                         }
                                         else{
                                             $dorsalTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            //Log::info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
                                         }
 
                                     }
@@ -3741,11 +4391,11 @@ class FechaController extends Controller
                                             if (count($arraySale)>1){
                                                 $adiccion = (int) $arraySale[1];
                                                 if ($adiccion>0) {
-                                                    Log::info('OJO!! cambio addicion: ');
+                                                    Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                     $saleSuplenteV = $saleSuplenteV + $adiccion;
                                                 }
                                             }
-                                            //Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! sale suplente: ' . $saleSuplenteV, []);
                                         }
                                         else{
                                             //$saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
@@ -3756,11 +4406,11 @@ class FechaController extends Controller
                                             if (count($arraySale)>1){
                                                 $adiccion = (int) $arraySale[1];
                                                 if ($adiccion>0) {
-                                                    Log::info('OJO!! cambio addicion: ');
+                                                    Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                     $saleTitularV = $saleTitularV + $adiccion;
                                                 }
                                             }
-                                            //Log::info('OJO!! sale titular: ' . $saleTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! sale titular: ' . $saleTitularV, []);
                                         }
 
                                     }
@@ -3773,11 +4423,11 @@ class FechaController extends Controller
                                             if (count($arrayEntra)>1){
                                                 $adiccion = (int) $arrayEntra[1];
                                                 if ($adiccion>0) {
-                                                    Log::info('OJO!! cambio addicion: ');
+                                                    Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                     $entraSuplenteV = $entraSuplenteV + $adiccion;
                                                 }
                                             }
-                                            //Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! entra suplente: ' . $entraSuplenteV, []);
                                         }
 
 
@@ -3786,26 +4436,26 @@ class FechaController extends Controller
                                         if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
                                             if ($suplentes){
                                                 //$mintutoTarjetaSuplenteV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
                                                 $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                 $mintutoTarjetaSuplenteV = (int) $arrayTarjeta[0];
                                                 if (count($arrayTarjeta)>1){
                                                     $adiccion = (int) $arrayTarjeta[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! tarjeta addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                         $mintutoTarjetaSuplenteV = $mintutoTarjetaSuplenteV + $adiccion;
                                                     }
                                                 }
                                             }
                                             else{
                                                 //$mintutoTarjetaTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
                                                 $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                 $mintutoTarjetaTitularV = (int) $arrayTarjeta[0];
                                                 if (count($arrayTarjeta)>1){
                                                     $adiccion = (int) $arrayTarjeta[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! tarjeta addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                         $mintutoTarjetaTitularV = $mintutoTarjetaTitularV + $adiccion;
                                                     }
                                                 }
@@ -3823,33 +4473,33 @@ class FechaController extends Controller
                                     if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                         if ($suplentes){
                                             $amarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! amarilla suplente: ' . $mintutoTarjetaSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $mintutoTarjetaSuplenteV, []);
                                         }
                                         else{
                                             $amarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Roja directa') {
                                         if ($suplentes){
                                             $rojaSuplenteV =  (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! roja titular: ' . $rojaSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaSuplenteV, []);
                                         }
                                         else{
                                             $rojaTitularV =  (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! roja titular: ' . $rojaTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Doble amarilla') {
                                         if ($suplentes){
                                             $dobleamarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
                                         }
                                         else{
                                             $dobleamarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
                                         }
 
                                     }
@@ -3859,11 +4509,11 @@ class FechaController extends Controller
                                 if ($td->find('a')) {
                                     if ($suplentes){
                                         $jugadorSuplenteV = $td->find('a')[0]->title;
-                                        //Log::info('OJO!! suplente: ' . $jugadorSuplenteV, []);
+                                        //Log::channel('mi_log')->info('OJO!! suplente: ' . $jugadorSuplenteV, []);
                                     }
                                     else{
                                         $jugadorTitularV = $td->find('a')[0]->title;
-                                        //Log::info('OJO!! titular: ' . $jugadorTitularV, []);
+                                        //Log::channel('mi_log')->info('OJO!! titular: ' . $jugadorTitularV, []);
                                     }
 
 
@@ -3889,7 +4539,7 @@ class FechaController extends Controller
 
                                 if (!empty($golesArray)){
                                     foreach ($golesArray as $golmin){
-                                        //Log::info('OJO!! comparar goles: ' . trim($jugador).' - '.$golmin, []);
+                                        //Log::channel('mi_log')->info('OJO!! comparar goles: ' . trim($jugador).' - '.$golmin, []);
                                         $incGol = explode('-',$golmin);
                                         if (trim($jugadorTitularV)==trim($incGol[0])){
 
@@ -4043,19 +4693,19 @@ class FechaController extends Controller
 
                     $entrenadoresArray = explode('Entrenador:', $element->plaintext);
                     if (count($entrenadoresArray)>3){
-                        Log::info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                        Log::channel('mi_log')->info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                     }
                     if(count($entrenadoresArray)>1){
                         $dtLocal = $entrenadoresArray[1];
-                        //Log::info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
+                        //Log::channel('mi_log')->info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
                         if (isset($entrenadoresArray[2])){
                             $dtVisitante = $entrenadoresArray[2];
                         }
                         else{
-                            Log::info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                            Log::channel('mi_log')->info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                         }
 
-                        //Log::info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
+                        //Log::channel('mi_log')->info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
                     }
                     else{
                         $asistente=0;
@@ -4077,12 +4727,12 @@ class FechaController extends Controller
                                         }
                                         if ($asistente==0){
                                             $asistente1= $nombreAsistente;
-                                            Log::info('Asistente 1: '.$nombreAsistente, []);
+                                            Log::channel('mi_log')->info('Asistente 1: '.$nombreAsistente, []);
                                             $asistente++;
                                         }
                                         else{
                                             $asistente2= $nombreAsistente;
-                                            Log::info('Asistente 2: '.$nombreAsistente, []);
+                                            Log::channel('mi_log')->info('Asistente 2: '.$nombreAsistente, []);
                                             $asistente++;
                                         }
 
@@ -4093,7 +4743,7 @@ class FechaController extends Controller
                                             $nombreArbitro .= ($linkArray[$i]).' ';
                                         }
 
-                                        Log::info('Arbitro: '.$nombreArbitro, []);
+                                        Log::channel('mi_log')->info('Arbitro: '.$nombreArbitro, []);
 
                                     }
                                 }
@@ -4115,7 +4765,7 @@ class FechaController extends Controller
                 }
 
                 if (!$arbitro){
-                    Log::info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    Log::channel('mi_log')->info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                 }
                 else{
                     $data3=array(
@@ -4147,7 +4797,7 @@ class FechaController extends Controller
                 }
 
                 if (!$arbitro1){
-                    Log::info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                 }
                 else{
                     $data3=array(
@@ -4179,7 +4829,7 @@ class FechaController extends Controller
                 }
 
                 if (!$arbitro2){
-                    Log::info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                 }
                 else{
                     $data3=array(
@@ -4234,7 +4884,7 @@ class FechaController extends Controller
                     }
                 }
                 else{
-                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
+                    Log::channel('mi_log')->info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
                 }
                 $strEntrenador=trim($dtVisitante);
                 $arrEntrenador = explode(' ', $strEntrenador);
@@ -4267,18 +4917,18 @@ class FechaController extends Controller
                     }
                 }
                 else{
-                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
+                    Log::channel('mi_log')->info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
                 }
                 if (($golesL!=$golesLocales)||($golesV!=$golesVisitantes)) {
-                    Log::info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
+                    Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
                 }
                 foreach ($equipos as $eq) {
-                    Log::info('Equipo  ' . $eq['equipo'], []);
+                    Log::channel('mi_log')->info('Equipo  ' . $eq['equipo'], []);
                     $strEquipo=trim($eq['equipo']);
                     $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
                     if (!empty($equipo)){
                         foreach ($eq['jugadores'] as $jugador) {
-                            Log::info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                            Log::channel('mi_log')->info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                             $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
                             $arrgrupos='';
                             foreach ($grupos as $grupo){
@@ -4304,12 +4954,12 @@ class FechaController extends Controller
                                 else{
                                     //print_r($jugador);
                                     $plantillaJugador='';
-                                    Log::info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
                                 }
                             }
                             else{
                                 $plantillaJugador='';
-                                Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
+                                Log::channel('mi_log')->info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
                             }
                             if (!empty($plantillaJugador)) {
                                 $arrApellido = explode(' ', $jugador['nombre']);
@@ -4322,7 +4972,7 @@ class FechaController extends Controller
                                     }
                                 }
                                 if (!$mismoDorsal) {
-                                    Log::info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                                 }
                                 switch ($plantillaJugador->jugador->tipoJugador) {
                                     case 'Arquero':
@@ -4365,14 +5015,14 @@ class FechaController extends Controller
                             }
                             else{
                                 $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
-                                Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+                                Log::channel('mi_log')->info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
                             }
 
                             foreach ($jugador['incidencias'] as $incidencia) {
 
                                 if (!empty($incidencia)) {
-                                    //Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
-                                    //Log::info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    //Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    //Log::channel('mi_log')->info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
                                     $tipogol='';
                                     switch (trim($incidencia[0])) {
                                         case 'Gol':
@@ -4506,12 +5156,12 @@ class FechaController extends Controller
                         }
                     }
                     else{
-                        Log::info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
+                        Log::channel('mi_log')->info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
                     }
                 }
             }
             else{
-                Log::info('OJO!!! No se econtró la URL2 ' , []);
+                Log::channel('mi_log')->info('OJO!!! No se econtró la URL2 ' , []);
                 /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
                 $ok=0;
                 continue;*/
@@ -4601,7 +5251,7 @@ return $string;
     public function importgolesfecha(Request $request)
     {
         set_time_limit(0);
-        //Log::info('Entraaaaaa', []);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
 
         $grupo_id = $request->get('grupoId');
 
@@ -4649,22 +5299,22 @@ return $string;
             $partidos = Partido::where('fecha_id', '=', "$id")->get();
             $nombreTorneo = $grupo->torneo->nombre;
             $ok = 1;
-
+            Log::channel('mi_log')->info('Fecha ' . $fecha->numero, []);
             foreach ($partidos as $partido) {
                 $strLocal = $partido->equipol->nombre;
                 $strVisitante = $partido->equipov->nombre;
                 $golesTotales = $partido->golesl + $partido->golesv;
                 $golesLocales = $partido->golesl;
                 $golesVisitantes = $partido->golesv;
-                Log::info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
 
                 $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
                 $jugadorGolArray = array();
                 foreach ($goles as $gol) {
-                    Log::info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
+                    Log::channel('mi_log')->info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
                     $alineacion=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$gol->jugador->id)->first();
                     if (!empty($alineacion)) {
-                        Log::info('OJO!!! - juega en: '.$alineacion->equipo->nombre, []);
+                        Log::channel('mi_log')->info('OJO!!! - juega en: '.$alineacion->equipo->nombre, []);
                         $juegaEn=$alineacion->equipo->nombre;
                     }
                     if ($gol->tipo=='Jugada'){
@@ -4682,7 +5332,7 @@ return $string;
                         }
                         try {
                             $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' . strtolower($this->sanear_string($apellido)).'-'.strtolower($this->sanear_string($nombre));
-                            Log::info('OJO!!! - '.$urlJugador, []);
+                            Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                             $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
 
@@ -4696,7 +5346,7 @@ return $string;
                             try {
                                 if ($nombre2) {
                                     $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2));
-                                    Log::info('OJO!!! - '.$urlJugador, []);
+                                    Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                     $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
                                 }
@@ -4711,7 +5361,7 @@ return $string;
                             try {
                                 if ($nombre2) {
                                     $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2));
-                                    Log::info('OJO!!! - '.$urlJugador, []);
+                                    Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                     $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
                                 }
@@ -4726,7 +5376,7 @@ return $string;
                             try {
                                 if ($apellido2){
                                     $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' . strtolower($this->sanear_string($apellido)).'-'. strtolower($this->sanear_string($apellido2)).'-'.strtolower($this->sanear_string($nombre));
-                                    Log::info('OJO!!! - '.$urlJugador, []);
+                                    Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                     $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
 
@@ -4953,12 +5603,24 @@ return $string;
                                     case '3144':
                                         $nombre3='/mosquera-jherso';
                                         break;
+                                    case '723':
+                                        $nombre3='/benedeto-dario';
+                                        break;
+                                    case '6275':
+                                        $nombre3='/carabelli-jeremias';
+                                        break;
+                                    case '1760':
+                                        $nombre3='/sanchez-brian';
+                                        break;
+                                    case '3096':
+                                        $nombre3='/martinez-diego-3449';
+                                        break;
                                     default:
                                         $nombre3='';
                                         break;
                                 }
                                 $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' .$nombre3;
-                                Log::info('OJO!!! - '.$urlJugador, []);
+                                Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                 $html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
 
@@ -4976,7 +5638,7 @@ return $string;
                                 if (strpos($s->innertext, 'id_player:') !== false) {
                                     $script_array = explode('id_player', $s->innertext);
                                     $id_jugador = trim(str_replace(':','',explode('}', $script_array[1])[0]));
-                                    Log::info('OJO!! Id jugador: '.$id_jugador,[]);
+                                    Log::channel('mi_log')->info('OJO!! Id jugador: '.$id_jugador,[]);
 
                                     //$token = $script_array[1];
                                     break;
@@ -4998,7 +5660,7 @@ return $string;
                                                                     if (str_contains($a->href, 'item=player&id=')) {
                                                                         $arrIdJugador = explode('item=player&id=', $a->href);
                                                                         $id_jugador = intval($arrIdJugador[1]);
-                                                                        Log::info('OJO!! ALT Id jugador: ' . $id_jugador, []);
+                                                                        Log::channel('mi_log')->info('OJO!! ALT Id jugador: ' . $id_jugador, []);
                                                                         break;
                                                                     }
                                                                 }
@@ -5020,11 +5682,11 @@ return $string;
                                 }
                                 try {
                                     $urlCabeza ='http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=head';
-                                    Log::info('OJO!!! - '.$urlCabeza, []);
+                                    Log::channel('mi_log')->info('OJO!!! - '.$urlCabeza, []);
 
                                     $htmlCabeza = HtmlDomParser::file_get_html($urlCabeza, false, null, 0);
 
-                                    //Log::info('OJO!! URL cabeza: '.$htmlCabeza,[]);
+                                    //Log::channel('mi_log')->info('OJO!! URL cabeza: '.$htmlCabeza,[]);
 
 
 
@@ -5041,18 +5703,29 @@ return $string;
                                                     foreach ($tr->find('th') as $th) {
                                                         foreach ($th->find('a') as $a) {
 
-                                                            if ($a->href=='/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/'){
-                                                                Log::info('OJO!! encontro gol cabeza: ' . $a->href, []);
-                                                                $data3 = array(
-                                                                    'partido_id' => $partido->id,
-                                                                    'jugador_id' => $gol->jugador->id,
-                                                                    'minuto' => $gol->minuto,
+                                                           $urlEncontrada=0;
+                                                           foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
+                                                               foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
+                                                                   if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')){
+                                                                       $urlEncontrada=1;
+                                                                       Log::channel('mi_log')->info('OJO!! encontro gol cabeza: ' . $a->href, []);
+                                                                       $data3 = array(
+                                                                           'partido_id' => $partido->id,
+                                                                           'jugador_id' => $gol->jugador->id,
+                                                                           'minuto' => $gol->minuto,
 
-                                                                    'tipo' => 'Cabeza',
-                                                                    'url' => $urlCabeza,
-                                                                );
-                                                                $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                                           'tipo' => 'Cabeza',
+                                                                           'url' => $urlCabeza,
+                                                                       );
+                                                                       $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                                   }
+                                                               }
+                                                           }
+
+                                                            if(!$urlEncontrada){
+                                                                Log::channel('mi_log')->info('no esta cabeza: ' . $a->href, []);
                                                             }
+
 
 
                                                         }
@@ -5073,15 +5746,15 @@ return $string;
                                         utf8_decode('No se econtró la URL de cabezas'),
                                         $urlCabeza
                                     ], "|");
-                                    Log::info('OJO!!! No se econtró la URL de cabezas' , []);
+                                    Log::channel('mi_log')->info('OJO!!! No se econtró la URL de cabezas' , []);
                                 }
                                 try {
                                     $urlLibres = 'http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=free_shot';
-                                    Log::info('OJO!!! - '.$urlLibres, []);
+                                    Log::channel('mi_log')->info('OJO!!! - '.$urlLibres, []);
 
                                     $htmlLibre = HtmlDomParser::file_get_html($urlLibres, false, null, 0);
 
-                                    //Log::info('OJO!! URL Libre: '.$htmlLibre,[]);
+                                    //Log::channel('mi_log')->info('OJO!! URL Libre: '.$htmlLibre,[]);
 
 
 
@@ -5097,21 +5770,29 @@ return $string;
                                                 if (trim($tr->plaintext)!='No hay resultados') {
                                                     foreach ($tr->find('th') as $th) {
                                                         foreach ($th->find('a') as $a) {
+                                                            $urlEncontrada=0;
+                                                            foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
+                                                                foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
+                                                                    if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')){
+                                                                        $urlEncontrada=1;
+                                                                        Log::channel('mi_log')->info('OJO!! encontro gol tiro libre: ' . $a->href, []);
+                                                                        $data3 = array(
+                                                                            'partido_id' => $partido->id,
+                                                                            'jugador_id' => $gol->jugador->id,
+                                                                            'minuto' => $gol->minuto,
 
-                                                            if ($a->href=='/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/'){
-                                                                Log::info('OJO!! encontro gol tiro libre: ' . $a->href, []);
-                                                                $data3 = array(
-                                                                    'partido_id' => $partido->id,
-                                                                    'jugador_id' => $gol->jugador->id,
-                                                                    'minuto' => $gol->minuto,
+                                                                            'tipo' => 'Tiro Libre',
+                                                                            'url' => $urlLibres,
+                                                                        );
 
-                                                                    'tipo' => 'Tiro Libre',
-                                                                    'url' => $urlLibres,
-                                                                );
-
-                                                                $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                                        $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                                    }
+                                                                }
                                                             }
 
+                                                            if(!$urlEncontrada){
+                                                                Log::channel('mi_log')->info('no esta libres: ' . $a->href, []);
+                                                            }
 
                                                         }
                                                     }
@@ -5131,7 +5812,74 @@ return $string;
                                         utf8_decode('No se econtró la URL de tiros libres'),
                                         $urlLibres
                                     ], "|");
-                                    Log::info('OJO!!! No se econtró la URL de tiros libres' , []);
+                                    Log::channel('mi_log')->info('OJO!!! No se econtró la URL de tiros libres' , []);
+                                }
+                                try {
+                                    $urlPenales = 'http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=penal_converted';
+                                    Log::channel('mi_log')->info('OJO!!! - '.$urlPenales, []);
+
+                                    $htmlPenal = HtmlDomParser::file_get_html($urlPenales, false, null, 0);
+
+                                    //Log::channel('mi_log')->info('OJO!! URL Penal: '.$htmlPenal,[]);
+
+
+
+
+                                }
+                                catch (Exception $ex) {
+                                    $htmlPenal='';
+                                }
+                                if ($htmlPenal){
+                                    foreach ($htmlPenal->find('div[id=matchesTable]') as $element) {
+                                        foreach ($element->find('table[class=tableStandard]') as $table) {
+                                            foreach ($table->find('tr') as $tr) {
+                                                if (trim($tr->plaintext)!='No hay resultados') {
+                                                    foreach ($tr->find('th') as $th) {
+                                                        foreach ($th->find('a') as $a) {
+                                                            $urlEncontrada=0;
+                                                            foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
+                                                                foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
+                                                                    if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')){
+                                                                        $urlEncontrada=1;
+                                                                        Log::channel('mi_log')->info('OJO!! encontro gol de penal: ' . $a->href, []);
+                                                                        $data3 = array(
+                                                                            'partido_id' => $partido->id,
+                                                                            'jugador_id' => $gol->jugador->id,
+                                                                            'minuto' => $gol->minuto,
+
+                                                                            'tipo' => 'Penal',
+                                                                            'url' => $urlPenales,
+                                                                        );
+
+                                                                        $jugadorGolArray[$gol->jugador->id][]=$data3;
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            if(!$urlEncontrada){
+                                                                Log::channel('mi_log')->info('no esta penal: ' . $a->href, []);
+                                                            }
+
+
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else{
+                                    fputcsv($handle, [
+
+                                        utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                        utf8_decode($fecha->numero),
+                                        utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                        utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                        utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                        utf8_decode('No se econtró la URL de penales'),
+                                        $urlPenales
+                                    ], "|");
+                                    Log::channel('mi_log')->info('OJO!!! No se econtró la URL de penales' , []);
                                 }
                             }
 
@@ -5147,7 +5895,7 @@ return $string;
                                 utf8_decode('No se econtró la URL del jugador'),
                                 $urlJugador
                             ], "|");
-                            Log::info('OJO!!! No se econtró la URL del jugador' , []);
+                            Log::channel('mi_log')->info('OJO!!! No se econtró la URL del jugador' , []);
                         }
                     }
                 }
@@ -5155,7 +5903,7 @@ return $string;
 
                     $jugador=Jugador::findOrFail($key);
                     if (count($item)>1){
-                        Log::info('OJO!!! más de un gol de '.$key , []);
+                        Log::channel('mi_log')->info('OJO!!! más de un gol de '.$key , []);
                         foreach ($item as $value){
                             fputcsv($handle, [
 
@@ -5167,13 +5915,13 @@ return $string;
                                 utf8_decode('más de un gol'),
                                 $value['url']
                             ], "|");
-                            Log::info(' => '.$value['tipo'].' - '.$value['minuto'] , []);
+                            Log::channel('mi_log')->info(' => '.$value['tipo'].' - '.$value['minuto'] , []);
                         }
 
                     }
                     else{
 
-                        Log::info('OJO!!! un solo gol de: '.$key.' => '.$item[0]['tipo'].' - '.$item[0]['minuto'] , []);
+                        Log::channel('mi_log')->info('OJO!!! un solo gol de: '.$key.' => '.$item[0]['tipo'].' - '.$item[0]['minuto'] , []);
                         $golesJugador = Gol::where('partido_id', '=', $item[0]['partido_id'])->where('jugador_id', '=', $key)->get();
                         if (count($golesJugador)==1) {
 
@@ -5196,7 +5944,7 @@ return $string;
                                     'tipo' => $item[0]['tipo']
                                 );
                                 try {
-                                    //$golesJugador[0]->update($dataGol);
+                                    $golesJugador[0]->update($dataGol);
                                 } catch (QueryException $ex) {
                                     $error = $ex->getMessage();
                                     $ok = 0;
@@ -5249,7 +5997,7 @@ return $string;
     public function importgolesfecha_old(Request $request)
     {
         set_time_limit(0);
-        //Log::info('Entraaaaaa', []);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
 
         $grupo_id = $request->get('grupoId');
 
@@ -5277,21 +6025,29 @@ return $string;
                 $golesTotales = $partido->golesl+$partido->golesv;
                 $golesLocales = $partido->golesl;
                 $golesVisitantes = $partido->golesv;
-                Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
 
 
 
                 try {
-                    //Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                    //Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
-                    /*Log::info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);*/
+                    /*Log::channel('mi_log')->info('OJO!!! URL ' .'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);*/
                     /*html2 = HtmlDomParser::file_get_html('https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
-                    Log::info('OJO!!! URL ' .'http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/inc/partido-'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', []);
+                    foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
+                        foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
+                            Log::channel('mi_log')->info('OJO!!! URL ' .'http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$local3.'-'.$visitante3.'/inc/partido-'.$local3.'-'.$visitante3.'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', []);
 
-                    $html2 = HtmlDomParser::file_get_html('http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'/inc/partido-'.$this->dameNombreEquipoURL3($strLocal).'-'.$this->dameNombreEquipoURL3($strVisitante).'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', false, null, 0);
+                            $htmlAux = HtmlDomParser::file_get_html('http://www.futbol360.com.ar/partidos/argentina/torneo-'.strtolower($grupo->torneo->nombre).'-'.$year.'/'.intval($fecha->numero).'-fecha/'.$local3.'-'.$visitante3.'/inc/partido-'.$local3.'-'.$visitante3.'-'.date('d-m-Y', strtotime($partido->dia)).'.php.inc', false, null, 0);
+                            if ($htmlAux){
+                                $html2=$htmlAux;
+                            }
+                        }
+                    }
 
-                    //Log::info('OJO!! error: '.$html2,[]);
+
+                    //Log::channel('mi_log')->info('OJO!! error: '.$html2,[]);
                     $linkArray=array();
 
 
@@ -5307,7 +6063,7 @@ return $string;
                     foreach ($html2->find('table[class=matchRecord]') as $element) {
 
                         foreach ($element->find('tr') as $tr) {
-                            //Log::info('OJO!! gol: '.$tr->plaintext,[]);
+                            //Log::channel('mi_log')->info('OJO!! gol: '.$tr->plaintext,[]);
 
                             if (str_contains($tr, 'iconMatchPenalty.gif')) {
                                 $arrTh = array();
@@ -5325,7 +6081,7 @@ return $string;
 
                                     if (str_contains($td, 'iconMatchPenalty.gif')) {
                                         $jugadorArr = explode('/', $tdAnt->find('a')[0]->href);
-                                        Log::info('OJO!! penal: ' . $jugadorArr[count($jugadorArr) - 2], []);
+                                        Log::channel('mi_log')->info('OJO!! penal: ' . $jugadorArr[count($jugadorArr) - 2], []);
                                         $jugadorGol = str_replace('-', ' ', $jugadorArr[count($jugadorArr) - 2]);
                                         $arrImg = array();
                                         foreach ($td->find('img') as $img) {
@@ -5340,7 +6096,7 @@ return $string;
 
                                         }
                                         for ($i = 0; $i < count($arrImg); $i++) {
-                                            // Log::info('OJO!! img: ' . $arrImg[$i], []);
+                                            // Log::channel('mi_log')->info('OJO!! img: ' . $arrImg[$i], []);
                                             if (str_contains($arrImg[$i], 'iconMatchPenalty.gif')) {
 
                                                 $minuto = str_replace('&#160', '', $arrImgText[$i]);
@@ -5350,7 +6106,7 @@ return $string;
                                                     $minuto = intval($minuto);
                                                 }
 
-                                                Log::info('OJO!! minuto: ' . $minuto, []);
+                                                Log::channel('mi_log')->info('OJO!! minuto: ' . $minuto, []);
                                                 $arrJugador = explode(' ', $jugadorGol);
                                                 //$entrenadorV=Tecnico::where('nombre','like',"%$arrEntrenador[0]%")->where('apellido','like',"%$arrEntrenador[1]%")->first();
                                                 $jugadors = Jugador::SELECT('jugadors.*')->Join('personas', 'personas.id', '=', 'jugadors.persona_id')->where('nombre', 'like', "%$arrJugador[1]%")->where('apellido', 'like', "%$arrJugador[0]%")->get();
@@ -5374,7 +6130,7 @@ return $string;
                                                     $golesArray[] = $data3;
                                                 }
                                                 else{
-                                                    Log::info('OJO!! no se encontro a : ' . $jugadorGol, []);
+                                                    Log::channel('mi_log')->info('OJO!! no se encontro a : ' . $jugadorGol, []);
                                                 }
                                             }
                                         }
@@ -5397,7 +6153,7 @@ return $string;
 
                                 $gol->update($goles);
                             } else {
-                                Log::info('OJO!! no estaba: ' . $goles['partido_id'].' - '.$goles['jugador_id'].' - '.$goles['minuto'], []);
+                                Log::channel('mi_log')->info('OJO!! no estaba: ' . $goles['partido_id'].' - '.$goles['jugador_id'].' - '.$goles['minuto'], []);
                                 $gol = Gol::create($goles);
                             }
 
@@ -5411,7 +6167,7 @@ return $string;
 
                 }
                 else{
-                    Log::info('OJO!!! No se econtró la URL2 ' , []);
+                    Log::channel('mi_log')->info('OJO!!! No se econtró la URL2 ' , []);
                     /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
                     $ok=0;
                     continue;*/
@@ -5447,7 +6203,7 @@ return $string;
     public function controlarbitrosfecha(Request $request)
     {
         set_time_limit(0);
-        //Log::info('Entraaaaaa', []);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
 
         $grupo_id = $request->get('grupoId');
 
@@ -5502,7 +6258,7 @@ return $string;
                 $golesTotales = $partido->golesl + $partido->golesv;
                 $golesLocales = $partido->golesl;
                 $golesVisitantes = $partido->golesv;
-                Log::info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                 $arbitros = PartidoArbitro::where('partido_id', '=', "$partido->id")->get();
                 $url='';
 
@@ -5512,30 +6268,30 @@ return $string;
 
                     try {
                         $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
-                        Log::info('OJO!!! URL ' .$url, []);
+                        Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
                         $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
-                        /*Log::info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
+                        /*Log::channel('mi_log')->info('OJO!!! URL ' .'https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', []);
 
                         $html2 = HtmlDomParser::file_get_html('https://arg.worldfootball.net/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/', false, null, 0);*/
 
                         if (!$html2){
                             $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         if (!$html2){
                             $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         if (!$html2){
                             $url = 'https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         if (!$html2){
                             $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'_2/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         $linkArray=array();
@@ -5543,7 +6299,7 @@ return $string;
                         $nombreArbitro ='';
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
 
@@ -5551,7 +6307,7 @@ return $string;
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
 
@@ -5559,7 +6315,7 @@ return $string;
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
 
@@ -5567,7 +6323,7 @@ return $string;
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/primera-division-'.$years.'-'.strtr($nombreTorneo, " ", "-").'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
 
@@ -5575,25 +6331,25 @@ return $string;
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2($strLocal).'-'.$this->dameNombreEquipoURL2ALT($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
                         if (!$html2) {
                             $url ='https://www.livefutbol.com/cronica/copa-de-la-superliga-'.$years.'-'.$this->dameNombreEquipoURL2ALT($strLocal).'-'.$this->dameNombreEquipoURL2($strVisitante).'/';
-                            Log::info('OJO!!! URL ' .$url, []);
+                            Log::channel('mi_log')->info('OJO!!! URL ' .$url, []);
 
                             $html2 = HtmlDomParser::file_get_html($url, false, null, 0);
                         }
@@ -5604,7 +6360,7 @@ return $string;
                     }
                     if ($html2){
                         if(count($arbitros)>3){
-                            Log::info('OJO!!! mas de 3 jueces', []);
+                            Log::channel('mi_log')->info('OJO!!! mas de 3 jueces', []);
                             try {
 
                                 PartidoArbitro::where('partido_id',"$partido->id")->delete();
@@ -5635,11 +6391,11 @@ return $string;
                                             }
                                             if ($asistente == 0) {
                                                 $asistente1 = $nombreAsistente;
-                                                Log::info('Asistente 1: ' . $nombreAsistente, []);
+                                                Log::channel('mi_log')->info('Asistente 1: ' . $nombreAsistente, []);
                                                 $asistente++;
                                             } else {
                                                 $asistente2 = $nombreAsistente;
-                                                Log::info('Asistente 2: ' . $nombreAsistente, []);
+                                                Log::channel('mi_log')->info('Asistente 2: ' . $nombreAsistente, []);
                                                 $asistente++;
                                             }
 
@@ -5649,7 +6405,7 @@ return $string;
                                                 $nombreArbitro .= ($linkArray[$i]) . ' ';
                                             }
 
-                                            Log::info('Arbitro: ' . $nombreArbitro, []);
+                                            Log::channel('mi_log')->info('Arbitro: ' . $nombreArbitro, []);
 
                                         }
                                     }
@@ -5667,7 +6423,7 @@ return $string;
                                 }
 
                                 if (!$arbitro){
-                                    Log::info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                                    Log::channel('mi_log')->info('OJO!! Arbitro NO encontrado: '.$nombreArbitro.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                                 }
                                 else{
                                     $data3=array(
@@ -5678,7 +6434,7 @@ return $string;
                                     $partido_arbitro=PartidoArbitro::where('partido_id','=',"$partido->id")->where('arbitro_id','=',"$arbitro->id")->first();
                                     try {
                                         if (!empty($partido_arbitro)){
-                                            //Log::info('OJO!! lo encuentra',[]);
+                                            //Log::channel('mi_log')->info('OJO!! lo encuentra',[]);
                                             $partido_arbitro->update($data3);
                                         }
                                         else{
@@ -5701,7 +6457,7 @@ return $string;
                                 }
 
                                 if (!$arbitro1){
-                                    Log::info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: '.$asistente1.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                                 }
                                 else{
                                     $data3=array(
@@ -5735,7 +6491,7 @@ return $string;
                                 }
 
                                 if (!$arbitro2){
-                                    Log::info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: '.$asistente2.' '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                                 }
                                 else{
                                     $data3=array(
@@ -5774,7 +6530,7 @@ return $string;
                         utf8_decode($asistente2),
                         $url
                     ], "|");
-                    //Log::info('OJO!!! No se econtró la URL de cabezas', []);
+                    //Log::channel('mi_log')->info('OJO!!! No se econtró la URL de cabezas', []);
                 }
 
             }
@@ -5906,7 +6662,7 @@ return $string;
     public function importarPartidoProcess(Request $request)
     {
         set_time_limit(0);
-        //Log::info('Entraaaaaa', []);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
         $partido_id = $request->get('partido_id');
         $url = $request->get('url');
         $url2 = $request->get('url2');
@@ -5926,8 +6682,8 @@ return $string;
             $html='';
             try {
                 if ($url){
-                    Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                    Log::info('URL ' .$url, []);
+                    Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                    Log::channel('mi_log')->info('URL ' .$url, []);
                     $html = HtmlDomParser::file_get_html($url, false, null, 0);
                 }
 
@@ -5944,13 +6700,13 @@ return $string;
 
                 $equipos = array();
 
-                //Log::info('Elemento ' . $html,[]);
+                //Log::channel('mi_log')->info('Elemento ' . $html,[]);
                 $i = 1;
                 $goles=0;
                 $j=0;
                 foreach ($html->find('div[class=team team1]') as $element) {
                     $equipo = $element->find('h3[class=nteam nteam1]');
-                    //Log::info('Equipo ' . $equipo[0]->plaintext, []);
+                    //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
                     $jugadores = array();
 
                     $jugadores = array();
@@ -5960,7 +6716,7 @@ return $string;
                             $dorsal = $li->find('small[class=align-dorsal]');
                             $jugador = $li->find('h5[class=align-player]');
                             $id =  explode('-',$li->find('a')[0]->href);
-                            //Log::info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
+                            //Log::channel('mi_log')->info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
 
                             $data2 = array(
                                 'dorsal' => $dorsal[0]->plaintext,
@@ -5987,7 +6743,7 @@ return $string;
                 $j=0;
                 foreach ($html->find('div[class=team team2]') as $element) {
                     $equipo = $element->find('h3[class=nteam nteam2]');
-                    //Log::info('Equipo ' . $equipo[0]->plaintext, []);
+                    //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
                     $jugadores = array();
                     foreach ($element->find('ul[class=aligns-list]') as $element2) {
                         $j++;
@@ -5995,7 +6751,7 @@ return $string;
                             $dorsal = $li->find('small[class=align-dorsal]');
                             $jugador = $li->find('h5[class=align-player]');
                             $id =  explode('-',$li->find('a')[0]->href);
-                            //Log::info('ID ' . $id[2], []);
+                            //Log::channel('mi_log')->info('ID ' . $id[2], []);
                             $data2 = array(
                                 'dorsal' => $dorsal[0]->plaintext,
                                 'nombre'=>$jugador[0]->plaintext,
@@ -6017,7 +6773,7 @@ return $string;
 
                     }
                 }
-                //Log::info('Partido ' . print_r($equipos,true), []);
+                //Log::channel('mi_log')->info('Partido ' . print_r($equipos,true), []);
                 foreach ($html->find('div[class=event-content]') as $element) {
 
                     $golL = $element->find('span[class=left event_1]');
@@ -6031,7 +6787,7 @@ return $string;
                             $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Gol', explode('\'', $minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
                         $goles++;
@@ -6048,7 +6804,7 @@ return $string;
 
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
                         $goles++;
@@ -6074,7 +6830,7 @@ return $string;
                             $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta amarilla',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -6113,7 +6869,7 @@ return $string;
                             $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Sale',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -6130,7 +6886,7 @@ return $string;
                             $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Entra',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -6148,7 +6904,7 @@ return $string;
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Gol',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
                         $goles++;
@@ -6184,7 +6940,7 @@ return $string;
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta amarilla',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -6222,7 +6978,7 @@ return $string;
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Sale',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -6239,7 +6995,7 @@ return $string;
                             $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Entra',explode('\'',$minL[1])[0]);
                         }
                         else{
-                            Log::info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
                         }
 
 
@@ -6250,11 +7006,11 @@ return $string;
 
                 }
                 if ($goles!=$golesTotales){
-                    Log::info('OJO!!! No coincide la cantidad de goles en: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre.' -> '.$goles.' - '.$golesTotales,[]);
+                    Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre.' -> '.$goles.' - '.$golesTotales,[]);
                 }
 
                 foreach ($equipos as $eq) {
-                    //Log::info('Equipo  ' . $equipo['equipo'], []);
+                    //Log::channel('mi_log')->info('Equipo  ' . $equipo['equipo'], []);
                     $strEquipo=trim($eq['equipo']);
                     $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
                     if (!empty($equipo)){
@@ -6278,12 +7034,12 @@ return $string;
                                 }
                                 else{
                                     $plantillaJugador='';
-                                    Log::info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
                                 }
                             }
                             else{
                                 $plantillaJugador='';
-                                Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
+                                Log::channel('mi_log')->info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
                             }
                             if (!empty($plantillaJugador)) {
                                 $arrApellido = explode(' ', $jugador['nombre']);
@@ -6296,7 +7052,7 @@ return $string;
                                     }
                                 }
                                 if (!$mismoDorsal) {
-                                    Log::info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                                 }
                                 switch ($plantillaJugador->jugador->tipoJugador) {
                                     case 'Arquero':
@@ -6339,19 +7095,18 @@ return $string;
                             }
                             else{
                                 $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
-                                Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+                                Log::channel('mi_log')->info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
 
-                                Log::info(print_r($jugador), []);
+                                //Log::channel('mi_log')->info(print_r($jugador), []);
                                 $arrApellido = explode(' ', $jugador['nombre']);
                                 $mismoDorsal = 0;
-                                $arrApellido = explode(' ', $jugador['nombre']);
-                                $mismoDorsal = 0;
+
                                 foreach ($arrApellido as $apellido) {
                                     $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->Join('plantilla_jugadors','jugadors.id','=','plantilla_jugadors.jugador_id')->wherein('plantilla_jugadors.plantilla_id',explode(',', $arrplantillas))->where('apellido', 'LIKE', "%$apellido%")->first();
-                                    //Log::info(json_encode($consultarJugador), []);
+                                    //Log::channel('mi_log')->info(json_encode($consultarJugador), []);
                                     if (!empty($consultarJugador)) {
                                         $mismoDorsal = 1;
-                                        //Log::info($consultarJugador['tipoJugador'], []);
+                                        //Log::channel('mi_log')->info($consultarJugador['tipoJugador'], []);
                                         break;
                                     }
                                 }
@@ -6389,7 +7144,7 @@ return $string;
                                         } else {
                                             $alineacion = Alineacion::create($alineaciondata);
                                         }
-                                        Log::info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
+                                        Log::channel('mi_log')->info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
 
                                     } catch (QueryException $ex) {
                                         $error = $ex->getMessage();
@@ -6401,7 +7156,7 @@ return $string;
                             foreach ($jugador['incidencias'] as $incidencia) {
 
                                 if (!empty($incidencia)) {
-                                    //Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    //Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
 
                                     $tipogol='';
                                     switch (trim($incidencia[0])) {
@@ -6529,7 +7284,7 @@ return $string;
                         }
                     }
                     else{
-                        Log::info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
+                        Log::channel('mi_log')->info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
                     }
                 }
 
@@ -6545,7 +7300,7 @@ return $string;
             $html2='';
             try {
                 if ($url2){
-                    Log::info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
+                    Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
                     $html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
                 }
@@ -6579,29 +7334,29 @@ return $string;
                             $incidenciaGol='';
                             if($td->find('a')){
                                 $jugadorGol = $td->find('a')[0]->title;
-                                //Log::info('OJO!! gol: '.$jugadorGol,[]);
+                                //Log::channel('mi_log')->info('OJO!! gol: '.$jugadorGol,[]);
                                 $lineaGol = $td->plaintext;
                                 if (str_contains($lineaGol, $jugadorGol)) {
                                     //$minutoGol = (int) filter_var($lineaGol, FILTER_SANITIZE_NUMBER_INT);
-                                    //Log::info('OJO!! gol: '.$lineaGol,[]);
+                                    //Log::channel('mi_log')->info('OJO!! gol: '.$lineaGol,[]);
                                     $arrayGol= explode(".",$lineaGol);
 
                                     $minutoGol = (int) filter_var($arrayGol[0], FILTER_SANITIZE_NUMBER_INT);
                                     if (count($arrayGol)>1){
                                         $adiccion = (int) filter_var($arrayGol[1], FILTER_SANITIZE_NUMBER_INT);
                                         if ($adiccion>0){
-                                            Log::info('OJO!! gol addicion: ');
+                                            Log::channel('mi_log')->info('OJO!! gol addicion: ');
                                             $minutoGol = $minutoGol + $adiccion;
                                         }
 
                                     }
-                                    //Log::info('OJO!! min: '.$minutoGol,[]);
+                                    //Log::channel('mi_log')->info('OJO!! min: '.$minutoGol,[]);
                                 }
 
                                 $incidenciaArray = explode('/', $lineaGol);
                                 if (count($incidenciaArray)>1){
                                     $incidenciaGol = $incidenciaArray[1];
-                                    //Log::info('OJO!! incidencia: '.$incidenciaGol,[]);
+                                    //Log::channel('mi_log')->info('OJO!! incidencia: '.$incidenciaGol,[]);
                                 }
                                 $goles++;
                                 $golesArray[]=$jugadorGol.'-'.$minutoGol.'-'.$incidenciaGol;
@@ -6613,7 +7368,7 @@ return $string;
                     if ($tabla==2){
 
                         $jugadores = array();
-                        //Log::info('OJO!! locales:',[]);
+                        //Log::channel('mi_log')->info('OJO!! locales:',[]);
                         $suplentes=0;
                         foreach ($element->find('tr') as $tr) {
                             $dorsalTitularL = '';
@@ -6632,8 +7387,11 @@ return $string;
                             $rojaSuplenteL = '';
                             $mintutoTarjetaSuplenteL = '';
                             foreach ($tr->find('td') as $td) {
-                                //Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                Log::channel('mi_log')->info('OJO!! linea: ' . $td->plaintext, []);
                                 if (trim($td->plaintext) == 'Incidencias') {
+                                    $tablaIncidencias = 1;
+                                }
+                                if (trim($td->plaintext) == 'Tanda de penaltis') {
                                     $tablaIncidencias = 1;
                                 }
                                 if (!$tablaIncidencias) {
@@ -6645,10 +7403,10 @@ return $string;
                                         if ($td->find('span[style=font-weight: bold; color: #646464]')) {
                                             if ($suplentes) {
                                                 $dorsalSuplenteL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dorsal suplente: ' . $dorsalSuplenteL, []);
                                             } else {
                                                 $dorsalTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dorsal titular: ' . $dorsalTitularL, []);
                                             }
 
                                         } elseif ($td->find('span[class=rottext]')) {
@@ -6659,12 +7417,12 @@ return $string;
                                                 if (count($arraySale)>1){
                                                     $adiccion = (int) $arraySale[1];
                                                     if ($adiccion>0){
-                                                        Log::info('OJO!! cambio addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                         $saleSuplenteV = $saleSuplenteV + $adiccion;
                                                     }
 
                                                 }
-                                                //Log::info('OJO!! sale suplente: ' . $saleSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! sale suplente: ' . $saleSuplenteL, []);
                                             } else {
                                                 //$saleTitularL = (int)filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
                                                 $arraySale= explode("'",$td->find('span[class=rottext]')[0]->plaintext);
@@ -6672,11 +7430,11 @@ return $string;
                                                 if (count($arraySale)>1){
                                                     $adiccion = (int) $arraySale[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! cambio addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                         $saleTitularL = $saleTitularL + $adiccion;
                                                     }
                                                 }
-                                                //Log::info('OJO!! sale titular: ' . $saleTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! sale titular: ' . $saleTitularL, []);
                                             }
 
                                         } elseif ($td->find('span[class=gruentext]')) {
@@ -6688,11 +7446,11 @@ return $string;
                                                 if (count($arrayEntra)>1){
                                                     $adiccion = (int) $arrayEntra[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! cambio addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                         $entraSuplenteL = $entraSuplenteL + $adiccion;
                                                     }
                                                 }
-                                                //Log::info('OJO!! entra suplente: ' . $entraSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! entra suplente: ' . $entraSuplenteL, []);
                                             }
 
 
@@ -6700,27 +7458,27 @@ return $string;
                                             if ($td->find('span[class=kleine_schrift]')[0]->title != '') {
                                                 if ($suplentes) {
                                                     //$mintutoTarjetaSuplenteL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                    //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                    //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
 
                                                     $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                     $mintutoTarjetaSuplenteL = (int) $arrayTarjeta[0];
                                                     if (count($arrayTarjeta)>1){
                                                         $adiccion = (int) $arrayTarjeta[1];
                                                         if ($adiccion>0){
-                                                            Log::info('OJO!! tarjeta addicion: ');
+                                                            Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                             $mintutoTarjetaSuplenteL = $mintutoTarjetaSuplenteL + $adiccion;
                                                         }
 
                                                     }
                                                 } else {
                                                     //$mintutoTarjetaTitularL = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                    //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                    //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
                                                     $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                     $mintutoTarjetaTitularL = (int) $arrayTarjeta[0];
                                                     if (count($arrayTarjeta)>1){
                                                         $adiccion = (int) $arrayTarjeta[1];
                                                         if ($adiccion>0) {
-                                                            Log::info('OJO!! tarjeta addicion: ');
+                                                            Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                             $mintutoTarjetaTitularL = $mintutoTarjetaTitularL + $adiccion;
                                                         }
                                                     }
@@ -6737,30 +7495,30 @@ return $string;
                                             if ($suplentes) {
 
                                                 $amarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! amarilla suplente: ' . $amarillaSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $amarillaSuplenteL, []);
                                             } else {
                                                 $amarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Roja directa') {
                                             if ($suplentes) {
                                                 $rojaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! roja suplente: ' . $rojaSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! roja suplente: ' . $rojaSuplenteL, []);
                                             } else {
                                                 $rojaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);
-                                                //Log::info('OJO!! roja titular: ' . $rojaTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Doble amarilla') {
                                             if ($suplentes) {
                                                 $dobleamarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! dobleamarilla suplente: ' . $dobleamarillaSuplenteL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dobleamarilla suplente: ' . $dobleamarillaSuplenteL, []);
                                             } else {
                                                 $dobleamarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
-                                                //Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
+                                                //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
                                             }
 
                                         }
@@ -6770,10 +7528,10 @@ return $string;
                                     if ($td->find('a')) {
                                         if ($suplentes) {
                                             $jugadorSuplenteL = $td->find('a')[0]->title;
-                                            //Log::info('OJO!! suplente: ' . $jugadorSuplenteL, []);
+                                            //Log::channel('mi_log')->info('OJO!! suplente: ' . $jugadorSuplenteL, []);
                                         } else {
                                             $jugadorTitularL = $td->find('a')[0]->title;
-                                            //Log::info('OJO!! titular: ' . $jugadorTitularL, []);
+                                            //Log::channel('mi_log')->info('OJO!! titular: ' . $jugadorTitularL, []);
                                         }
 
 
@@ -6801,7 +7559,7 @@ return $string;
 
                                     if (!empty($golesArray)) {
                                         foreach ($golesArray as $golmin) {
-                                            //Log::info('OJO!! comparar goles: ' . trim($jugadorTitularL).'=='.trim($jugador).' - '.$golmin, []);
+                                            //Log::channel('mi_log')->info('OJO!! comparar goles: ' . trim($jugadorTitularL).'=='.trim($jugador).' - '.$golmin, []);
                                             $incGol = explode('-', $golmin);
                                             if (trim($jugadorTitularL) == trim($incGol[0])) {
 
@@ -6942,7 +7700,7 @@ return $string;
 
                     if ($tabla==3){
                         $jugadores = array();
-                        //Log::info('OJO!! visitante:',[]);
+                        //Log::channel('mi_log')->info('OJO!! visitante:',[]);
                         $suplentes=0;
                         foreach ($element->find('tr') as $tr) {
                             $dorsalTitularV = '';
@@ -6961,7 +7719,7 @@ return $string;
                             $rojaSuplenteV = '';
                             $mintutoTarjetaSuplenteV = '';
                             foreach ($tr->find('td') as $td) {
-                                ////Log::info('OJO!! linea: ' . $td->plaintext, []);
+                                ////Log::channel('mi_log')->info('OJO!! linea: ' . $td->plaintext, []);
                                 if (trim($td->plaintext)=='Banquillo') {
                                     $suplentes=1;
                                 }
@@ -6969,11 +7727,11 @@ return $string;
                                     if ($td->find('span[style=font-weight: bold; color: #646464]')) {
                                         if ($suplentes){
                                             $dorsalSuplenteV= $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            //Log::info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dorsal suplente: ' . $dorsalSuplenteV, []);
                                         }
                                         else{
                                             $dorsalTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                            //Log::info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dorsal titular: ' . $dorsalTitularV, []);
                                         }
 
                                     }
@@ -6985,11 +7743,11 @@ return $string;
                                             if (count($arraySale)>1){
                                                 $adiccion = (int) $arraySale[1];
                                                 if ($adiccion>0) {
-                                                    Log::info('OJO!! cambio addicion: ');
+                                                    Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                     $saleSuplenteV = $saleSuplenteV + $adiccion;
                                                 }
                                             }
-                                            //Log::info('OJO!! sale suplente: ' . $saleSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! sale suplente: ' . $saleSuplenteV, []);
                                         }
                                         else{
                                             //$saleTitularV = (int) filter_var($td->find('span[class=rottext]')[0]->plaintext, FILTER_SANITIZE_NUMBER_INT);
@@ -7000,11 +7758,11 @@ return $string;
                                             if (count($arraySale)>1){
                                                 $adiccion = (int) $arraySale[1];
                                                 if ($adiccion>0) {
-                                                    Log::info('OJO!! cambio addicion: ');
+                                                    Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                     $saleTitularV = $saleTitularV + $adiccion;
                                                 }
                                             }
-                                            //Log::info('OJO!! sale titular: ' . $saleTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! sale titular: ' . $saleTitularV, []);
                                         }
 
                                     }
@@ -7017,11 +7775,11 @@ return $string;
                                             if (count($arrayEntra)>1){
                                                 $adiccion = (int) $arrayEntra[1];
                                                 if ($adiccion>0) {
-                                                    Log::info('OJO!! cambio addicion: ');
+                                                    Log::channel('mi_log')->info('OJO!! cambio addicion: ');
                                                     $entraSuplenteV = $entraSuplenteV + $adiccion;
                                                 }
                                             }
-                                            //Log::info('OJO!! entra suplente: ' . $entraSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! entra suplente: ' . $entraSuplenteV, []);
                                         }
 
 
@@ -7030,26 +7788,26 @@ return $string;
                                         if ($td->find('span[class=kleine_schrift]')[0]->title !=''){
                                             if ($suplentes){
                                                 //$mintutoTarjetaSuplenteV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
                                                 $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                 $mintutoTarjetaSuplenteV = (int) $arrayTarjeta[0];
                                                 if (count($arrayTarjeta)>1){
                                                     $adiccion = (int) $arrayTarjeta[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! tarjeta addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                         $mintutoTarjetaSuplenteV = $mintutoTarjetaSuplenteV + $adiccion;
                                                     }
                                                 }
                                             }
                                             else{
                                                 //$mintutoTarjetaTitularV = $td->find('span[class=kleine_schrift]')[0]->plaintext;
-                                                //Log::info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
+                                                //Log::channel('mi_log')->info('OJO!! tarjeta: ' . $td->find('span[class=kleine_schrift]')[0]->plaintext, []);
                                                 $arrayTarjeta= explode("'",$td->find('span[class=kleine_schrift]')[0]->plaintext);
                                                 $mintutoTarjetaTitularV = (int) $arrayTarjeta[0];
                                                 if (count($arrayTarjeta)>1){
                                                     $adiccion = (int) $arrayTarjeta[1];
                                                     if ($adiccion>0) {
-                                                        Log::info('OJO!! tarjeta addicion: ');
+                                                        Log::channel('mi_log')->info('OJO!! tarjeta addicion: ');
                                                         $mintutoTarjetaTitularV = $mintutoTarjetaTitularV + $adiccion;
                                                     }
                                                 }
@@ -7067,33 +7825,33 @@ return $string;
                                     if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                         if ($suplentes){
                                             $amarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! amarilla suplente: ' . $mintutoTarjetaSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $mintutoTarjetaSuplenteV, []);
                                         }
                                         else{
                                             $amarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Roja directa') {
                                         if ($suplentes){
                                             $rojaSuplenteV =  (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! roja titular: ' . $rojaSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaSuplenteV, []);
                                         }
                                         else{
                                             $rojaTitularV =  (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! roja titular: ' . $rojaTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Doble amarilla') {
                                         if ($suplentes){
                                             $dobleamarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
                                         }
                                         else{
                                             $dobleamarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
-                                            //Log::info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
+                                            //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
                                         }
 
                                     }
@@ -7103,11 +7861,11 @@ return $string;
                                 if ($td->find('a')) {
                                     if ($suplentes){
                                         $jugadorSuplenteV = $td->find('a')[0]->title;
-                                        //Log::info('OJO!! suplente: ' . $jugadorSuplenteV, []);
+                                        //Log::channel('mi_log')->info('OJO!! suplente: ' . $jugadorSuplenteV, []);
                                     }
                                     else{
                                         $jugadorTitularV = $td->find('a')[0]->title;
-                                        //Log::info('OJO!! titular: ' . $jugadorTitularV, []);
+                                        //Log::channel('mi_log')->info('OJO!! titular: ' . $jugadorTitularV, []);
                                     }
 
 
@@ -7133,7 +7891,7 @@ return $string;
 
                                 if (!empty($golesArray)){
                                     foreach ($golesArray as $golmin){
-                                        //Log::info('OJO!! comparar goles: ' . trim($jugador).' - '.$golmin, []);
+                                        //Log::channel('mi_log')->info('OJO!! comparar goles: ' . trim($jugador).' - '.$golmin, []);
                                         $incGol = explode('-',$golmin);
                                         if (trim($jugadorTitularV)==trim($incGol[0])){
 
@@ -7287,19 +8045,19 @@ return $string;
 
                     $entrenadoresArray = explode('Entrenador:', $element->plaintext);
                     if (count($entrenadoresArray)>3){
-                        Log::info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                        Log::channel('mi_log')->info('OJO!! varios entrenadores: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                     }
                     if(count($entrenadoresArray)>1){
                         $dtLocal = $entrenadoresArray[1];
-                        //Log::info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
+                        //Log::channel('mi_log')->info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
                         if (isset($entrenadoresArray[2])){
                             $dtVisitante = $entrenadoresArray[2];
                         }
                         else{
-                            Log::info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
+                            Log::channel('mi_log')->info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
                         }
 
-                        //Log::info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
+                        //Log::channel('mi_log')->info('DT Visitante: '.utf8_decode($entrenadoresArray[2]), []);
                     }
                     else{
                         $asistente=0;
@@ -7322,12 +8080,12 @@ return $string;
                                         }
                                         if ($asistente==0){
                                             $asistente1= $nombreAsistente;
-                                            Log::info('Asistente 1: '.$nombreAsistente, []);
+                                            Log::channel('mi_log')->info('Asistente 1: '.$nombreAsistente, []);
                                             $asistente++;
                                         }
                                         else{
                                             $asistente2= $nombreAsistente;
-                                            Log::info('Asistente 2: '.$nombreAsistente, []);
+                                            Log::channel('mi_log')->info('Asistente 2: '.$nombreAsistente, []);
                                             $asistente++;
                                         }
 
@@ -7338,7 +8096,7 @@ return $string;
                                             $nombreArbitro .= ($linkArray[$i]).' ';
                                         }
 
-                                        Log::info('Arbitro: '.$nombreArbitro, []);
+                                        Log::channel('mi_log')->info('Arbitro: '.$nombreArbitro, []);
 
                                     }
                                 }
@@ -7358,7 +8116,7 @@ return $string;
                 }
 
                 if (!$arbitro) {
-                    Log::info('OJO!! Arbitro NO encontrado: ' . $nombreArbitro . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                    Log::channel('mi_log')->info('OJO!! Arbitro NO encontrado: ' . $nombreArbitro . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                 } else {
                     $data3 = array(
                         'partido_id' => $partido->id,
@@ -7387,14 +8145,14 @@ return $string;
                 }
 
                 if (!$arbitro1) {
-                    Log::info('OJO!! Asistente NO encontrado: ' . $asistente1 . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: ' . $asistente1 . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                 } else {
                     $data3 = array(
                         'partido_id' => $partido->id,
-                        'arbitro_id' => $arbitro->id,
+                        'arbitro_id' => $arbitro1->id,
                         'tipo' => 'Linea 1'
                     );
-                    $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro->id")->first();
+                    $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro1->id")->first();
                     try {
                         if (!empty($partido_arbitro)) {
 
@@ -7416,14 +8174,14 @@ return $string;
                 }
 
                 if (!$arbitro2) {
-                    Log::info('OJO!! Asistente NO encontrado: ' . $asistente2 . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
+                    Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: ' . $asistente2 . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                 } else {
                     $data3 = array(
                         'partido_id' => $partido->id,
-                        'arbitro_id' => $arbitro->id,
+                        'arbitro_id' => $arbitro2->id,
                         'tipo' => 'Linea 2'
                     );
-                    $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro->id")->first();
+                    $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro2->id")->first();
                     try {
                         if (!empty($partido_arbitro)) {
 
@@ -7468,7 +8226,7 @@ return $string;
                     }
                 }
                 else{
-                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
+                    Log::channel('mi_log')->info('OJO!!! Técnico NO encontrado : ' . trim($dtLocal),[]);
                 }
                 $strEntrenador=trim($dtVisitante);
                 $arrEntrenador = explode(' ', $strEntrenador);
@@ -7497,22 +8255,23 @@ return $string;
                     }
                 }
                 else{
-                    Log::info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
+                    Log::channel('mi_log')->info('OJO!!! Técnico NO encontrado : ' . trim($dtVisitante),[]);
                 }
                 $golesTotales = $partido->golesl+$partido->golesv;
                 $golesLocales = $partido->golesl;
                 $golesVisitantes = $partido->golesv;
                 if (($golesL!=$golesLocales)||($golesV!=$golesVisitantes)) {
-                    Log::info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
+                    Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' -> ' . $golesL.' a '. $golesV. ' - ' . $golesLocales. ' a '.$golesVisitantes, []);
                 }
                 foreach ($equipos as $eq) {
-                    Log::info('Equipo  ' . $eq['equipo'], []);
+                    Log::channel('mi_log')->info('Equipo  ' . $eq['equipo'], []);
                     $strEquipo=trim($eq['equipo']);
                     $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
                     if (!empty($equipo)){
                         foreach ($eq['jugadores'] as $jugador) {
-                            //Log::info(json_encode($jugador), []);
-                            Log::info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                            //Log::channel('mi_log')->info(json_encode($jugador), []);
+                            $jugador_id =0;
+                            Log::channel('mi_log')->info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                             $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
                             $arrgrupos='';
                             foreach ($grupos as $grupo){
@@ -7538,12 +8297,12 @@ return $string;
                                 else{
                                     //print_r($jugador);
                                     $plantillaJugador='';
-                                    Log::info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
                                 }
                             }
                             else{
                                 $plantillaJugador='';
-                                Log::info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
+                                Log::channel('mi_log')->info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
                             }
                             if (!empty($plantillaJugador)) {
                                 $jugador_id = $plantillaJugador->jugador->id;
@@ -7557,7 +8316,7 @@ return $string;
                                     }
                                 }
                                 if (!$mismoDorsal) {
-                                    Log::info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                                    Log::channel('mi_log')->info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                                 }
                                 switch ($plantillaJugador->jugador->tipoJugador) {
                                     case 'Arquero':
@@ -7600,16 +8359,16 @@ return $string;
                             }
                             else{
                                 $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
-                                Log::info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
+                                Log::channel('mi_log')->info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
 
                                 $arrApellido = explode(' ', $jugador['nombre']);
                                 $mismoDorsal = 0;
                                 foreach ($arrApellido as $apellido) {
                                     $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->Join('plantilla_jugadors','jugadors.id','=','plantilla_jugadors.jugador_id')->wherein('plantilla_jugadors.plantilla_id',explode(',', $arrplantillas))->where('apellido', 'LIKE', "%$apellido%")->first();
-                                    //Log::info(json_encode($consultarJugador), []);
+                                    //Log::channel('mi_log')->info(json_encode($consultarJugador), []);
                                     if (!empty($consultarJugador)) {
                                         $mismoDorsal = 1;
-                                        //Log::info($consultarJugador['tipoJugador'], []);
+                                        //Log::channel('mi_log')->info($consultarJugador['tipoJugador'], []);
                                         break;
                                     }
                                 }
@@ -7646,7 +8405,7 @@ return $string;
                                         } else {
                                             $alineacion = Alineacion::create($alineaciondata);
                                         }
-                                        Log::info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
+                                        Log::channel('mi_log')->info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
 
                                     } catch (QueryException $ex) {
                                         $error = $ex->getMessage();
@@ -7659,8 +8418,8 @@ return $string;
                             foreach ($jugador['incidencias'] as $incidencia) {
 
                                 if (!empty($incidencia)) {
-                                    Log::info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
-                                    Log::info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    Log::channel('mi_log')->info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
                                     $tipogol='';
                                     switch (trim($incidencia[0])) {
                                         case 'Gol':
@@ -7794,13 +8553,13 @@ return $string;
                         }
                     }
                     else{
-                        Log::info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
+                        Log::channel('mi_log')->info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
                     }
                 }
 
             }
             else{
-                Log::info('OJO!!! No se econtró la URL2 ' .$url2, []);
+                Log::channel('mi_log')->info('OJO!!! No se econtró la URL2 ' .$url2, []);
                 /*$error = 'No se econtró la URL2 del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
                 $ok=0;
                 continue;*/

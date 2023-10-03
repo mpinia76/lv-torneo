@@ -14,5 +14,8 @@ class Jugador extends Model
     }
 
 
-
+    public function getFullNameAgeTipoAttribute()
+    {
+        return $this->persona->getFullNameAgeAttribute().' ('.$this->tipoJugador.')';
+    }
 }

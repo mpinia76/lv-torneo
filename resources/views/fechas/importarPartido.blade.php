@@ -4,8 +4,48 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Importar incidencias del partido {{$partido->equipol->nombre}} vs {{$partido->equipov->nombre}}</h1>
+    <h1 class="display-6">Importar incidencias</h1>
+        <div class="form-group col-md-12">
+            <h1 class="display-6">Partido</h1>
+            <table class="table">
+                <thead>
+                <th>Fecha</th>
+                <th>Local</th>
+                <th>GL</th>
+                <th>GV</th>
+                <th>Visitante</th>
 
+                </thead>
+
+                <tr>
+                    <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
+                    <td>@if($partido->equipol)
+                            @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
+                            @endif
+                            {{$partido->equipol->nombre}}
+                        @endif
+                    </td>
+                    <td>{{$partido->golesl}}
+                        @if($partido->penalesl)
+                            ({{$partido->penalesl}})
+                        @endif
+                    </td>
+                    <td>{{$partido->golesv}}
+                        @if($partido->penalesv)
+                            ({{$partido->penalesv}})
+                        @endif
+                    </td>
+                    <td>@if($partido->equipov)
+                            @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
+                            @endif
+                            {{$partido->equipov->nombre}}
+                        @endif
+                    </td>
+
+                </tr>
+
+            </table>
+        </div>
     <hr/>
 
     <!-- if validation in the controller fails, show the errors -->

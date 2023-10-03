@@ -99,6 +99,13 @@ return [
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
+        'mi_log' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/mi_log.log'), // Ruta al archivo personalizado
+            'level' => 'debug', // Nivel de registro deseado
+        ],
     ],
+
+
 
 ];

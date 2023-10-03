@@ -11,6 +11,7 @@ use App\Grupo;
 use App\PromedioTorneo;
 use App\Equipo;
 
+use Illuminate\Support\Facades\Log;
 use function GuzzleHttp\Promise\iter_for;
 
 use DB;
@@ -36,11 +37,20 @@ class TorneoController extends Controller
      */
     public function index(Request $request)
     {
-        $nombre = $request->get('buscarpor');
+        if ($request->has('buscarpor')){
+            $nombre = $request->get('buscarpor');
 
-        $torneos=Torneo::where('nombre','like',"%$nombre%")->orWhere('year','like',"%$nombre%")->orderBy('year','DESC')->paginate();
+            $request->session()->put('nombre_filtro_torneo', $request->get('buscarpor'));
 
-        return view('torneos.index', compact('torneos','torneos'));
+        }
+        else{
+            $nombre = $request->session()->get('nombre_filtro_torneo');
+
+        }
+
+        $torneos1=Torneo::where('nombre','like',"%$nombre%")->orWhere('year','like',"%$nombre%")->orderBy('year','DESC')->paginate();
+
+        return view('torneos.index', compact('torneos1'));
     }
 
     /**

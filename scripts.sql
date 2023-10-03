@@ -124,6 +124,25 @@ FROM partidos
 WHERE partidos.golesl + partidos.golesv !=
 (SELECT COUNT(gols.id) FROM gols WHERE partidos.id = gols.partido_id GROUP BY gols.partido_id)
 
+########################## sin técnico local ##########################
+SELECT *
+FROM partidos
+WHERE NOT EXISTS (
+    SELECT partido_id
+    FROM partido_tecnicos
+    WHERE partidos.id = partido_tecnicos.partido_id AND partidos.equipol_id = partido_tecnicos.equipo_id
+    GROUP BY partido_id)
+
+########################## sin técnico visitante ##########################
+SELECT *
+FROM partidos
+WHERE NOT EXISTS (
+    SELECT partido_id
+    FROM partido_tecnicos
+    WHERE partidos.id = partido_tecnicos.partido_id AND partidos.equipov_id = partido_tecnicos.equipo_id
+    GROUP BY partido_id)
+
+
 ########################## sin arbitro ##########################
 SELECT *
 FROM partidos
@@ -168,4 +187,46 @@ INNER JOIN fechas ON fechas.id = partidos.fecha_id
 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 INNER JOIN torneos ON grupos.torneo_id = torneos.id
 WHERE jugador_id = 575 AND equipo_id = 14
+
+########################## modificar jugador en un torneo ##########################
+UPDATE alineacions
+
+    INNER JOIN partidos ON alineacions.partido_id = partidos.id
+    INNER JOIN fechas ON fechas.id = partidos.fecha_id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET alineacions.jugador_id=7114
+WHERE alineacions.jugador_id = 938 AND alineacions.equipo_id = 21 AND torneos.id = 4;
+
+UPDATE plantilla_jugadors
+         INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
+
+         INNER JOIN grupos ON plantillas.grupo_id = grupos.id
+         INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET plantilla_jugadors.jugador_id=7114
+WHERE plantilla_jugadors.jugador_id = 938 AND plantillas.equipo_id = 21 AND torneos.id = 4;
+
+UPDATE gols
+         INNER JOIN partidos ON gols.partido_id = partidos.id
+         INNER JOIN fechas ON fechas.id = partidos.fecha_id
+         INNER JOIN grupos ON fechas.grupo_id = grupos.id
+         INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET gols.jugador_id=7114
+WHERE gols.jugador_id = 938 AND (partidos.equipol_id = 21 OR partidos.equipov_id = 21) AND torneos.id = 4;
+
+UPDATE cambios
+    INNER JOIN partidos ON cambios.partido_id = partidos.id
+    INNER JOIN fechas ON fechas.id = partidos.fecha_id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET cambios.jugador_id=7114
+WHERE cambios.jugador_id = 938 AND (partidos.equipol_id = 21 OR partidos.equipov_id = 21) AND torneos.id = 4;
+
+UPDATE tarjetas
+    INNER JOIN partidos ON tarjetas.partido_id = partidos.id
+    INNER JOIN fechas ON fechas.id = partidos.fecha_id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET tarjetas.jugador_id=7114
+WHERE tarjetas.jugador_id = 938 AND (partidos.equipol_id = 21 OR partidos.equipov_id = 21) AND torneos.id = 7;
 

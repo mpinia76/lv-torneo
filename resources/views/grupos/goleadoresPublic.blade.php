@@ -68,7 +68,16 @@
         @endforeach
         </tbody>
     </table>
-        {{$goleadores->links()}}
+
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                {{ $goleadores->links() }}
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                <strong>Total: {{ $goleadores->total() }}</strong>
+            </div>
+        </div>
         <div class="d-flex">
 
             <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id)) }}" class="btn btn-success m-1">Volver</a>

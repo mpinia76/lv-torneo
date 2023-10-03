@@ -29,7 +29,16 @@ class ArbitroController extends Controller
     public function index(Request $request)
     {
 
-        $nombre = $request->get('buscarpor');
+        if ($request->has('buscarpor')){
+            $nombre = $request->get('buscarpor');
+
+            $request->session()->put('nombre_filtro_arbitro', $request->get('buscarpor'));
+
+        }
+        else{
+            $nombre = $request->session()->get('nombre_filtro_arbitro');
+
+        }
 
         //$arbitros=Arbitro::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 

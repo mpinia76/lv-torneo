@@ -46,4 +46,17 @@ class Persona extends Model
         }
 
     }
+
+    public function getAgeWithDateAttribute()
+    {
+        if (!is_null($this->fallecimiento))
+        {
+            return Carbon::parse($this->nacimiento)->diff(Carbon::parse($this->fallecimiento))->format('%y').' años ('.date('d/m/Y', strtotime($this->nacimiento)).'-'.date('d/m/Y', strtotime($this->fallecimiento)).')';
+        }
+        if (!is_null($this->nacimiento))
+        {
+            return Carbon::parse($this->nacimiento)->age.' años ('.date('d/m/Y', strtotime($this->nacimiento)).')';
+        }
+
+    }
 }

@@ -37,7 +37,17 @@ class PlantillaController extends Controller
     public function index(Request $request)
     {
         $grupo_id= $request->query('grupoId');
-        $nombre = $request->get('buscarpor');
+        //$nombre = $request->get('buscarpor');
+        if ($request->has('buscarpor')){
+            $nombre = $request->get('buscarpor');
+
+            $request->session()->put('nombre_filtro_plantilla', $request->get('buscarpor'));
+
+        }
+        else{
+            $nombre = $request->session()->get('nombre_filtro_plantilla');
+
+        }
         $grupo=Grupo::findOrFail($grupo_id);
 
 
@@ -165,14 +175,14 @@ class PlantillaController extends Controller
         /*$cities = City::where('name', 'LIKE', '%'.$request->input('term', '').'%')
             ->get(['id', 'name as text']);*/
         $search = $request->search;
-        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('apellido', 'LIKE', '%'.$search.'%')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('apellido', 'LIKE', '%'.$search.'%')->orwhere('nombre', 'LIKE', '%'.$search.'%')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
         //$jugadors = $jugadors->pluck('persona.full_name_age', 'id')->prepend('','');
 
         $response = array();
         foreach($jugadors as $jugador){
             $response[] = array(
                 "id"=>$jugador->id,
-                "text"=>$jugador->persona->full_name_age
+                "text"=>$jugador->full_name_age_tipo
             );
         }
 

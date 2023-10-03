@@ -173,7 +173,16 @@
 
 
                 </table>
-                {{$partidos->links()}}
+                <div class="row">
+                    <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                        {{ $partidos->links() }}
+                    </div>
+
+                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                        <strong>Total: {{ $partidos->total() }}</strong>
+                    </div>
+                </div>
+
             </div>
         </div>
 

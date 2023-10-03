@@ -33,14 +33,23 @@ class TecnicoController extends Controller
     public function index(Request $request)
     {
 
-        $nombre = $request->get('buscarpor');
+        if ($request->has('buscarpor')){
+            $nombre = $request->get('buscarpor');
+
+            $request->session()->put('nombre_filtro_tecnico', $request->get('buscarpor'));
+
+        }
+        else{
+            $nombre = $request->session()->get('nombre_filtro_tecnico');
+
+        }
 
         //$tecnicos=Tecnico::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
 
         $tecnicos=Tecnico::SELECT('tecnicos.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
-        return view('tecnicos.index', compact('tecnicos','tecnicos'));
+        return view('tecnicos.index', compact('tecnicos'));
     }
 
     /**

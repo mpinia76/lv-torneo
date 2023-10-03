@@ -22,10 +22,11 @@
             </div>
         @endif
         <a class="btn btn-success m-1" href="{{route('jugadores.create')}}">Nuevo</a>
+        <a class="btn btn-info m-1" href="{{route('jugadores.importar')}}">Importar</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:'' }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
+                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
                 <button class="btn btn-success m-1" type="submit">Buscar</button>
             </form>
@@ -37,8 +38,10 @@
         <th>Posición</th>
         <th>Apellido</th>
         <th>Nombre</th>
-        <th>E-mail</th>
+
         <th>Edad</th>
+        <th>Ciudad</th>
+        <th>País</th>
 
         <th colspan="3"></th>
         </thead>
@@ -56,9 +59,10 @@
                 <td>{{$jugador->apellido}}</td>
                 <td>{{$jugador->nombre}}</td>
 
-                <td>{{$jugador->email}}</td>
-                <td>{{($jugador->nacimiento)?$jugador->persona->getAgeAttribute():''}}</td>
 
+                <td>{{($jugador->nacimiento)?$jugador->persona->getAgeWithDateAttribute():''}}</td>
+                <td>{{$jugador->ciudad}}</td>
+                <td>{{$jugador->nacionalidad}}</td>
                 <td>
                     <div class="d-flex">
                         <a href="{{route('jugadores.show', $jugador->id)}}" class="btn btn-info m-1">Ver</a>
@@ -75,7 +79,17 @@
             </tr>
         @endforeach
     </table>
-        <?php echo $jugadores->appends($data)->links(); ?>
+
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                {{ $jugadores->appends($data)->links() }}
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                <strong>Total: {{ $jugadores->total() }}</strong>
+            </div>
+        </div>
+
     </div>
 
     <script>

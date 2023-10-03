@@ -31,7 +31,16 @@ class EquipoController extends Controller
     public function index(Request $request)
     {
 
-        $nombre = $request->get('buscarpor');
+        if ($request->has('buscarpor')){
+            $nombre = $request->get('buscarpor');
+
+            $request->session()->put('nombre_filtro_equipo', $request->get('buscarpor'));
+
+        }
+        else{
+            $nombre = $request->session()->get('nombre_filtro_equipo');
+
+        }
 
         $equipos=Equipo::orwhere('nombre','like',"%$nombre%")->orWhere('siglas','like',"%$nombre%")->orWhere('socios','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,fundacion,CURDATE())'),'=',"$nombre")->orderBy('nombre','ASC')->paginate();
 
