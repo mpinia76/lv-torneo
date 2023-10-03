@@ -24,6 +24,7 @@
             @endif
         <a class="btn btn-success m-1" href="{{route('plantillas.create',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">Nuevo</a>
         <a class="btn btn-info m-1" href="{{route('plantillas.import',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">Importar datos</a>
+        <a class="btn btn-danger m-1" href="{{route('plantillas.controlar',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">No jugaron</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
                 <input type="hidden" name="grupoId" value="{{ (isset($_GET['grupoId']))?$_GET['grupoId']:'' }}">

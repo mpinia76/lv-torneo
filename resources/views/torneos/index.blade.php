@@ -22,6 +22,7 @@
             </div>
         @endif
         <a class="btn btn-success m-1" href="{{route('torneos.create')}}">Nuevo</a>
+        <a class="btn btn-info m-1" href="{{route('partidos.controlarAlineaciones')}}">Controlar alineaciones</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

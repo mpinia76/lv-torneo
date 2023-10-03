@@ -15,13 +15,17 @@
 
         $('.load').hide();
         $('.wrapper').css('filter','blur(0)');
+
     });
     function baseUrl(url) {
         return '{{url('')}}/' + url;
     }
     var CSRF_TOKEN = $('meta[name="csrf-token"]').attr('content');
     $(document).ready(function() {
+        $('#seleccionarTodosControlarPlantillas').click(function () {
 
+            $('input[name="jugador_ids[]"]').prop('checked', true);
+        });
         $('.js-example-basic-single').select2();
             @if(isset($i))
             @for ($j =1; $j <= $i; $j++)
@@ -54,6 +58,9 @@
 
 
     });
+
+
+
     $('.addRow').on('click',function(e){
         e.preventDefault();
         addRow();

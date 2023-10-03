@@ -45,6 +45,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::resource('partidoarbitros', 'PartidoArbitroController');
     Route::resource('alineaciones', 'AlineacionController');
     Route::resource('cambios', 'CambioController');
+
     Route::get('importarJugador', 'JugadorController@importar')->name('jugadores.importar');
     Route::post('importarJugadorProcess', 'JugadorController@importarProcess');
     Route::get('importarPartido', 'FechaController@importarPartido')->name('fechas.importarPartido');
@@ -53,6 +54,11 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('importprocess', 'FechaController@importprocess');
     Route::get('importplantillas', 'PlantillaController@import')->name('plantillas.import');
     Route::post('importplantillaprocess', 'PlantillaController@importprocess');
+    Route::get('controlarplantillas', 'PlantillaController@controlar')->name('plantillas.controlar');
+    Route::delete('/eliminar-jugador/{id}', 'PlantillaController@eliminarJugador')->name('plantilla.destroy');
+    Route::delete('/eliminar-jugadores-seleccionados', 'PlantillaController@eliminarJugadoresSeleccionados')->name('plantilla.eliminarSeleccionados');
+
+    Route::get('controlarAlineaciones', 'PartidoController@controlarAlineaciones')->name('partidos.controlarAlineaciones');
 
     Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');

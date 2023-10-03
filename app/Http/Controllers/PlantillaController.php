@@ -448,4 +448,78 @@ class PlantillaController extends Controller
 
         return response()->json($response);
     }
+
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function controlar(Request $request)
+    {
+
+
+        $grupo_id= $request->query('grupoId');
+        $grupo=Grupo::findOrFail($grupo_id);
+        $torneo_id= $grupo->torneo->id;
+        /*$torneo=Torneo::findOrFail($torneo_id);
+        $arrMetodo = array();*/
+
+        $jugadores = DB::table('plantilla_jugadors AS pj')
+            ->select('pj.id', 'p.foto', 'p.nombre','j.tipoJugador', 'p.apellido', 'pj.dorsal', 'e.escudo', 'e.nombre as equipo')
+            ->join('plantillas AS pl', 'pl.id', '=', 'pj.plantilla_id')
+            ->join('jugadors AS j', 'j.id', '=', 'pj.jugador_id')
+            ->join('personas AS p', 'p.id', '=', 'j.persona_id')
+            ->join('equipos AS e', 'e.id', '=', 'pl.equipo_id')
+            ->join('grupos AS g', 'g.id', '=', 'pl.grupo_id')
+            ->join('torneos AS t', 't.id', '=', 'g.torneo_id')
+            ->where('t.id', '=', $torneo_id)
+            ->whereNotExists(function ($query) use ($torneo_id) {
+                $query->select(DB::raw(1))
+                    ->from('torneos AS t2')
+                    ->join('grupos AS g2', 't2.id', '=', 'g2.torneo_id')
+                    ->join('fechas', 'fechas.grupo_id', '=', 'g2.id')
+                    ->join('partidos', 'partidos.fecha_id', '=', 'fechas.id')
+                    ->join('alineacions', 'alineacions.partido_id', '=', 'partidos.id')
+                    ->where('t2.id', '=', $torneo_id)
+                    ->whereRaw('alineacions.equipo_id = pl.equipo_id')
+                    ->whereRaw('pj.jugador_id = alineacions.jugador_id');
+            })
+            ->orderBy('e.nombre') // Ordenar por nombre del equipo
+            ->orderBy('apellido') // Luego ordenar por apellido
+            ->orderBy('nombre') // Y finalmente ordenar por nombre
+            ->paginate();
+
+        // Agrega el parámetro 'grupoId' a la paginación
+        $jugadores->appends(['grupoId' => $grupo_id]);
+
+        //dd($jugadores);
+        //echo $sql;
+        $i=1;
+        return view('plantillas.controlar', compact('jugadores','i','grupo_id'));
+    }
+
+    public function eliminarJugador($id)
+    {
+        // Lógica para eliminar un jugador por su ID
+        PlantillaJugador::destroy($id);
+
+        return redirect()->back()->with('success', 'Jugador eliminado de la plantilla.');
+    }
+
+    public function eliminarJugadoresSeleccionados(Request $request)
+    {
+        $grupoId = $request->input('grupoId');
+        $jugadorIds = $request->input('jugador_ids');
+
+        if (!empty($jugadorIds)) {
+            PlantillaJugador::whereIn('id', $jugadorIds)->delete();
+            return redirect()->back()->with('success', 'Los jugadores seleccionados han sido eliminados correctamente.');
+        } else {
+            return redirect()->back()->with('error', 'No se seleccionaron jugadores para eliminar.');
+        }
+    }
+
+
+
+
 }

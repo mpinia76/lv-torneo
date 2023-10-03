@@ -117,4 +117,21 @@ class PartidoController extends Controller
         //dd($partido->fecha->grupo->torneo->nombre);
         return view('partidos.arbitros', compact('partidoarbitros','partido','arbitros'));
     }
+
+    public function controlarAlineaciones(Request $request)
+    {
+        $partidos = Partido::select('partidos.id', 'partidos.dia', 'partidos.golesl', 'partidos.golesv', 'partidos.penalesl', 'partidos.penalesv')
+            ->with('equipol', 'equipov', 'fecha', 'fecha.grupo', 'fecha.grupo.torneo')
+            ->whereHas('alineacions', function ($query) {
+                $query->selectRaw('COUNT(partido_id)')
+                    ->where('tipo', 'Titular')
+                    ->groupBy('partido_id')
+                    ->havingRaw('COUNT(partido_id) != 11');
+            })
+            ->paginate();
+
+
+
+        return view('torneos.controlarAlineaciones', compact('partidos'));
+    }
 }
