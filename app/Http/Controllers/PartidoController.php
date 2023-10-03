@@ -122,10 +122,11 @@ class PartidoController extends Controller
     {
         $partidos = Partido::select('partidos.id', 'partidos.dia', 'partidos.golesl', 'partidos.golesv', 'partidos.penalesl', 'partidos.penalesv')
             ->with('equipol', 'equipov', 'fecha', 'fecha.grupo', 'fecha.grupo.torneo')
-            ->whereHas('alineacions', function ($query) {
-                $query->selectRaw('COUNT(partido_id)')
+            ->whereIn('partidos.id', function ($query) {
+                $query->select('partido_id')
+                    ->from('alineacions')
                     ->where('tipo', 'Titular')
-                    ->groupBy('partido_id')
+                    ->groupBy('partido_id','equipo_id')
                     ->havingRaw('COUNT(partido_id) != 11');
             })
             ->paginate();
