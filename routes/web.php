@@ -59,6 +59,11 @@ Route::group(['prefix' => 'admin'], function()
     Route::delete('/eliminar-jugadores-seleccionados', 'PlantillaController@eliminarJugadoresSeleccionados')->name('plantilla.eliminarSeleccionados');
 
     Route::get('controlarAlineaciones', 'PartidoController@controlarAlineaciones')->name('partidos.controlarAlineaciones');
+    Route::get('controlarTarjetas', 'PartidoController@controlarTarjetas')->name('partidos.controlarTarjetas');
+    Route::get('controlarGoles', 'PartidoController@controlarGoles')->name('partidos.controlarGoles');
+    Route::get('controlarCambios', 'PartidoController@controlarCambios')->name('partidos.controlarCambios');
+    Route::get('controlarArbitros', 'PartidoController@controlarArbitros')->name('partidos.controlarArbitros');
+    Route::get('controlarTecnicos', 'PartidoController@controlarTecnicos')->name('partidos.controlarTecnicos');
 
     Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');

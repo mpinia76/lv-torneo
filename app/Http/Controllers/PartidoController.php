@@ -6,6 +6,10 @@ use App\Partido;
 use App\Fecha;
 use App\PartidoArbitro;
 use Illuminate\Http\Request;
+use App\Tarjeta;
+use App\Gol;
+use App\Cambio;
+use DB;
 
 class PartidoController extends Controller
 {
@@ -120,8 +124,29 @@ class PartidoController extends Controller
 
     public function controlarAlineaciones(Request $request)
     {
-        $partidos = Partido::select('partidos.id', 'partidos.dia', 'partidos.golesl', 'partidos.golesv', 'partidos.penalesl', 'partidos.penalesv')
-            ->with('equipol', 'equipov', 'fecha', 'fecha.grupo', 'fecha.grupo.torneo')
+        //DB::enableQueryLog();
+        $partidos = DB::table('partidos')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+
             ->whereIn('partidos.id', function ($query) {
                 $query->select('partido_id')
                     ->from('alineacions')
@@ -129,10 +154,522 @@ class PartidoController extends Controller
                     ->groupBy('partido_id','equipo_id')
                     ->havingRaw('COUNT(partido_id) != 11');
             })
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+        //$queries = DB::getQueryLog();
+        //dd($queries);
+
+        return view('torneos.controlarAlineaciones', compact('partidos'));
+    }
+
+    public function controlarTarjetas(Request $request)
+    {
+        //DB::enableQueryLog();
+        $tarjetasSinCoincidencia = Tarjeta::whereNotExists(function ($query) {
+            $query->select(DB::raw(1))
+                ->from('alineacions')
+                ->whereRaw('alineacions.partido_id = tarjetas.partido_id')
+                ->whereRaw('alineacions.jugador_id = tarjetas.jugador_id');
+        });
+
+        $partidos = $tarjetasSinCoincidencia
+            ->join('partidos', 'tarjetas.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('jugadors', 'tarjetas.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+        //$queries = DB::getQueryLog();
+        //dd($queries);
+
+        $tarjetas = DB::table(DB::raw('(
+                    SELECT partido_id, jugador_id, COUNT(*) AS cantidad_tarjetas
+                    FROM tarjetas
+                    GROUP BY partido_id, jugador_id, tipo
+                    HAVING COUNT(*) > 1
+                ) AS t1'))
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->join('partidos', 't1.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('jugadors', 't1.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
             ->paginate();
 
 
 
-        return view('torneos.controlarAlineaciones', compact('partidos'));
+
+        return view('torneos.controlarTarjetas', compact('partidos','tarjetas'));
+    }
+
+    public function controlarGoles(Request $request)
+    {
+        //DB::enableQueryLog();
+
+
+        $partidos = DB::table('partidos')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('gols', 'partidos.id', '=', 'gols.partido_id')
+            ->join('jugadors', 'gols.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->whereIn('partidos.id', function ($query) {
+                $query->select('gols.partido_id')
+                    ->from('gols')
+                    ->whereNotExists(function ($subquery) {
+                        $subquery->select(DB::raw(1))
+                            ->from('alineacions')
+                            ->leftJoin('cambios', function ($join) {
+                                $join->on('alineacions.partido_id', '=', 'cambios.partido_id')
+                                    ->on('alineacions.jugador_id', '=', 'cambios.jugador_id');
+                            })
+                            ->whereRaw('alineacions.partido_id = gols.partido_id')
+                            ->whereRaw('alineacions.jugador_id = gols.jugador_id')
+                            ->where(function ($query) {
+                                $query->where('alineacions.tipo', '=', 'Titular')
+                                    ->orWhere('cambios.tipo', '=', 'Entra');
+                            });
+                    });
+            })
+            ->whereIn('jugadors.id', function ($query) {
+                $query->select('gols.jugador_id')
+                    ->from('gols')
+                    ->whereNotExists(function ($subquery) {
+                        $subquery->select(DB::raw(1))
+                            ->from('alineacions')
+                            ->leftJoin('cambios', function ($join) {
+                                $join->on('alineacions.partido_id', '=', 'cambios.partido_id')
+                                    ->on('alineacions.jugador_id', '=', 'cambios.jugador_id');
+                            })
+                            ->whereRaw('alineacions.partido_id = gols.partido_id')
+                            ->whereRaw('alineacions.jugador_id = gols.jugador_id')
+                            ->where(function ($query) {
+                                $query->where('alineacions.tipo', '=', 'Titular')
+                                    ->orWhere('cambios.tipo', '=', 'Entra');
+                            });
+                    });
+            })
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+
+        $gols = DB::table(DB::raw('(
+                    SELECT partido_id, jugador_id, COUNT(*) AS cantidad_goles
+                    FROM gols
+                    GROUP BY partido_id, jugador_id, minuto
+                    HAVING COUNT(*) > 1
+                ) AS g1'))
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->join('partidos', 'g1.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('jugadors', 'g1.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+        $diferencia = DB::table('partidos')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->whereRaw('partidos.golesl + partidos.golesv != (SELECT COUNT(gols.id) FROM gols WHERE partidos.id = gols.partido_id GROUP BY gols.partido_id)')
+            ->orderBy('year','desc')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+// Ahora $partidos contiene los datos de los partidos que cumplen con la condición.
+
+
+        return view('torneos.controlarGoles', compact('partidos','gols','diferencia'));
+    }
+
+    public function controlarCambios(Request $request)
+    {
+        //DB::enableQueryLog();
+        $cambiosSinCoincidencia = Cambio::whereNotExists(function ($query) {
+            $query->select(DB::raw(1))
+                ->from('alineacions')
+                ->whereRaw('alineacions.partido_id = cambios.partido_id')
+                ->whereRaw('alineacions.jugador_id = cambios.jugador_id');
+        });
+
+        $partidos = $cambiosSinCoincidencia
+            ->join('partidos', 'cambios.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('jugadors', 'cambios.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+        //$queries = DB::getQueryLog();
+        //dd($queries);
+
+        $cambios = DB::table(DB::raw('(
+                    SELECT partido_id, jugador_id, COUNT(*) AS cantidad_cambios
+                    FROM cambios
+                    GROUP BY partido_id, jugador_id, tipo
+                    HAVING COUNT(*) > 1
+                ) AS t1'))
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->join('partidos', 't1.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('jugadors', 't1.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+        $impares = DB::table(DB::raw('(
+                    SELECT partido_id, minuto, COUNT(partido_id) AS cantidad_cambios
+                    FROM cambios
+                    GROUP BY partido_id, minuto
+                    HAVING COUNT(partido_id) % 2 != 0
+                ) AS t1'))
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+            ->join('partidos', 't1.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+
+
+        return view('torneos.controlarCambios', compact('partidos','cambios','impares'));
+    }
+
+    public function controlarArbitros(Request $request)
+    {
+        //DB::enableQueryLog();
+        $partidosSinArbitroPrincipal = DB::table('partidos')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('partido_arbitros')
+                    ->where('tipo', 'Principal')
+                    ->whereColumn('partidos.id', 'partido_arbitros.partido_id')
+                    ->groupBy('partido_id');
+            });
+
+        $partidos = $partidosSinArbitroPrincipal
+
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+        //$queries = DB::getQueryLog();
+        //dd($queries);
+
+        $jueces = DB::table(DB::raw('(
+                    SELECT partido_id, COUNT(partido_id)
+                    FROM partido_arbitros
+                    GROUP BY partido_id
+                    HAVING COUNT(partido_id)!=3
+                ) AS t1'))
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+            ->join('partidos', 't1.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+        //dd($arbitros);
+
+        $repetidos = DB::table(DB::raw('(
+                    SELECT partido_id, COUNT(partido_id)
+                    FROM partido_arbitros
+                    GROUP BY partido_id, tipo
+                    HAVING COUNT(partido_id)>1
+                ) AS t1'))
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+            ->join('partidos', 't1.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+
+
+        return view('torneos.controlarArbitros', compact('partidos','jueces','repetidos'));
+    }
+
+    public function controlarTecnicos(Request $request)
+    {
+        //DB::enableQueryLog();
+        $partidos = DB::table('partidos')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('partido_tecnicos')
+                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipol_id = partido_tecnicos.equipo_id')
+                    ->groupBy('partido_id');
+            })
+            ->orWhereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('partido_tecnicos')
+                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipov_id = partido_tecnicos.equipo_id')
+                    ->groupBy('partido_id');
+            })
+            ->orderBy('year','desc')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+
+
+        ->paginate();
+
+
+
+
+        return view('torneos.controlarTecnicos', compact('partidos'));
     }
 }

@@ -175,14 +175,26 @@ class PlantillaController extends Controller
         /*$cities = City::where('name', 'LIKE', '%'.$request->input('term', '').'%')
             ->get(['id', 'name as text']);*/
         $search = $request->search;
-        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('apellido', 'LIKE', '%'.$search.'%')->orwhere('nombre', 'LIKE', '%'.$search.'%')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
-        //$jugadors = $jugadors->pluck('persona.full_name_age', 'id')->prepend('','');
+        $search = trim($search);
+        $search = preg_replace('/\s+/', ' ', $search);
+        $search = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
+
+        $jugadors = Jugador::select('jugadors.*', 'personas.nombre', 'personas.apellido', 'personas.nacimiento', 'personas.fallecimiento', 'personas.foto')
+            ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->where(function ($query) use ($search) {
+                $query->where('apellido', 'LIKE', "%$search%")
+                    ->orWhere('nombre', 'LIKE', "%$search%");
+            })
+            ->orderBy('personas.apellido', 'asc')
+            ->orderBy('personas.nombre', 'asc')
+            ->get();
 
         $response = array();
         foreach($jugadors as $jugador){
             $response[] = array(
                 "id"=>$jugador->id,
-                "text"=>$jugador->full_name_age_tipo
+                "text"=>$jugador->full_name_age_tipo,
+                "foto" => $jugador->foto ? url('images/'.$jugador->foto) : url('images/sin_foto.png') // Agregar URL de la foto o una imagen predeterminada si no hay foto
             );
         }
 

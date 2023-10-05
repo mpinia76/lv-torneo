@@ -23,6 +23,11 @@
         @endif
         <a class="btn btn-success m-1" href="{{route('torneos.create')}}">Nuevo</a>
         <a class="btn btn-info m-1" href="{{route('partidos.controlarAlineaciones')}}">Controlar alineaciones</a>
+        <a class="btn btn-info m-1" href="{{route('partidos.controlarGoles')}}">Controlar goles</a>
+        <a class="btn btn-info m-1" href="{{route('partidos.controlarTarjetas')}}">Controlar tarjetas</a>
+        <a class="btn btn-info m-1" href="{{route('partidos.controlarCambios')}}">Controlar cambios</a>
+        <a class="btn btn-info m-1" href="{{route('partidos.controlarArbitros')}}">Controlar arbitros</a>
+        <a class="btn btn-info m-1" href="{{route('partidos.controlarTecnicos')}}">Controlar técnicos</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

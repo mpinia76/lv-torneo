@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-@section('pageTitle', 'Controlar alineaciones')
+@section('pageTitle', 'Controlar tecnicos')
 
 @section('content')
     <div class="container">
-        <h1 class="display-6">Controlar alineaciones</h1>
+        <h1 class="display-6">Controlar técnicos</h1>
 
         <hr/>
         <!-- if validation in the controller fails, show the errors -->
@@ -32,7 +32,7 @@
             </div>
         @endif
 
-
+        <h1 class="display-6">Sin técnicos</h1>
 
         <!-- build our form inputs -->
         <div class="row">
@@ -41,6 +41,7 @@
                 <h1 class="display-6">Partidos</h1>
                 <table class="table">
                     <thead>
+
                     <th>Torneo</th>
                     <th>Fecha</th>
                     <th>Día</th>
@@ -81,6 +82,7 @@
                                         {{$partido->equipo_visitante_nombre}}
                                     @endif
                                 </td>
+
                                 <td>
                                     <div class="d-flex">
 
@@ -104,6 +106,8 @@
             </div>
 
         </div>
+
+
 
 
         <a href="{{ route('torneos.index') }}" class="btn btn-success m-1">Volver</a>
