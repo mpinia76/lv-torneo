@@ -92,7 +92,8 @@
                                     <div class="d-flex">
 
                                         <a href="{{route('alineaciones.index', array('partidoId' => $partido->id))}}" class="btn btn-success m-1">Alineaciones</a>
-                                        <a href="{{route('tarjetas.index', array('partidoId' => $partido->id))}}" class="btn btn-info m-1">Tarjetas</a>
+
+                                        <a href="{{route('cambios.index', array('partidoId' => $partido->id))}}" class="btn btn-info m-1">Cambios</a>
 
                                     </div>
 

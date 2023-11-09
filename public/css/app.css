@@ -13,6 +13,9 @@
     width: 100%;
     margin-bottom: 1rem;
     color: #212529;
+    border-collapse: collapse;
+
+        overflow-x: auto;
 }
 
 .table th,
@@ -292,6 +295,7 @@
     color: #fff;
     background-color: rgba(255, 255, 255, 0.075);
 }
+
 
 .float-right {
     float: right !important;

@@ -1184,10 +1184,20 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
 
                 $posiciones = DB::select(DB::raw($sql));
 
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($posiciones, $offSet, $paginate, true);
 
 
 
+        $posiciones = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($posiciones), $paginate, $page);
 
+
+        $posiciones->setPath(route('torneos.posiciones'));
 
 
 

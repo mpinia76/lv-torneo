@@ -42,7 +42,7 @@ class Persona extends Model
         }
         if (!is_null($this->nacimiento))
         {
-            return Carbon::parse($this->nacimiento)->age.' años';
+            return Carbon::parse($this->nacimiento)->age.' años ('.date('d/m/Y', strtotime($this->nacimiento)).')';
         }
 
     }

@@ -202,7 +202,20 @@ class AlineacionController extends Controller
                     }
                     $noBorrar .=$alineacion->id.',';
                 }catch(QueryException $ex){
-                    $error = $ex->getMessage();
+                    if ($ex->errorInfo[1] === 1062) {
+                        if (strpos($ex->errorInfo[2], 'partido_id_equipo_id_dorsal') !== false) {
+                            $consultarAlineacion=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('dorsal', '=', $request->dorsaltitularl[$item])->first();
+                            $jugadorRepetido = Jugador::where('id', '=', $consultarAlineacion->jugador_id)->first();
+                            $error = "El dorsal ".$request->dorsaltitularl[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." en ".$partido->equipol->nombre;
+                        } elseif (strpos($ex->errorInfo[2], 'partido_id_jugador_id') !== false) {
+                            $error = "Jugador repetido: ".$consultarJugador->persona->apellido.", ".$consultarJugador->persona->nombre." dorsal ".$request->dorsaltitularl[$item];
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+                    } else {
+                        $error = $ex->getMessage();
+                    }
+
                     $ok=0;
                     continue;
                 }
@@ -257,7 +270,19 @@ class AlineacionController extends Controller
                     }
                     $noBorrar .=$alineacion->id.',';
                 }catch(QueryException $ex){
-                    $error = $ex->getMessage();
+                    if ($ex->errorInfo[1] === 1062) {
+                        if (strpos($ex->errorInfo[2], 'partido_id_equipo_id_dorsal') !== false) {
+                        $consultarAlineacion=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('dorsal', '=', $request->dorsalsuplentel[$item])->first();
+                        $jugadorRepetido = Jugador::where('id', '=', $consultarAlineacion->jugador_id)->first();
+                        $error = "El dorsal ".$request->dorsalsuplentel[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." en ".$partido->equipol->nombre;
+                        } elseif (strpos($ex->errorInfo[2], 'partido_id_jugador_id') !== false) {
+                            $error = "Jugador repetido: ".$consultarJugador->persona->apellido.", ".$consultarJugador->persona->nombre." dorsal ".$request->dorsalsuplentel[$item];
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+                    } else {
+                        $error = $ex->getMessage();
+                    }
                     $ok=0;
                     continue;
                 }
@@ -348,7 +373,19 @@ class AlineacionController extends Controller
                     }
                     $noBorrar .=$alineacion->id.',';
                 }catch(QueryException $ex){
-                    $error = $ex->getMessage();
+                    if ($ex->errorInfo[1] === 1062) {
+                        if (strpos($ex->errorInfo[2], 'partido_id_equipo_id_dorsal') !== false) {
+                            $consultarAlineacion=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipov->id)->where('dorsal', '=', $request->dorsaltitularv[$item])->first();
+                            $jugadorRepetido = Jugador::where('id', '=', $consultarAlineacion->jugador_id)->first();
+                            $error = "El dorsal ".$request->dorsaltitularv[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." en ".$partido->equipol->nombre;
+                        } elseif (strpos($ex->errorInfo[2], 'partido_id_jugador_id') !== false) {
+                            $error = "Jugador repetido: ".$consultarJugador->persona->apellido.", ".$consultarJugador->persona->nombre." dorsal ".$request->dorsaltitularv[$item];
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+                    } else {
+                        $error = $ex->getMessage();
+                    }
                     $ok=0;
                     continue;
                 }
@@ -403,7 +440,19 @@ class AlineacionController extends Controller
                     }
                     $noBorrar .=$alineacion->id.',';
                 }catch(QueryException $ex){
-                    $error = $ex->getMessage();
+                    if ($ex->errorInfo[1] === 1062) {
+                        if (strpos($ex->errorInfo[2], 'partido_id_equipo_id_dorsal') !== false) {
+                            $consultarAlineacion=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipov->id)->where('dorsal', '=', $request->dorsalsuplentev[$item])->first();
+                            $jugadorRepetido = Jugador::where('id', '=', $consultarAlineacion->jugador_id)->first();
+                            $error = "El dorsal ".$request->dorsalsuplentev[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." en ".$partido->equipol->nombre;
+                        } elseif (strpos($ex->errorInfo[2], 'partido_id_jugador_id') !== false) {
+                            $error = "Jugador repetido: ".$consultarJugador->persona->apellido.", ".$consultarJugador->persona->nombre." dorsal ".$request->dorsalsuplentev[$item];
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+                    } else {
+                        $error = $ex->getMessage();
+                    }
                     $ok=0;
                     continue;
                 }

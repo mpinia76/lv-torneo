@@ -289,7 +289,21 @@ class PlantillaController extends Controller
 
 
                     }catch(QueryException $ex){
-                        $error = $ex->getMessage();
+                        if ($ex->errorInfo[1] === 1062) {
+                            if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
+                                $consultarPlantilla=PlantillaJugador::where('plantilla_id',"$id")->where('dorsal', $request->dorsal[$item])->first();
+                                $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
+                                $error = "El dorsal ".$request->dorsal[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre;
+                            } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
+                                $jugadorRepetido = Jugador::where('id', '=', $request->jugador[$item])->first();
+                                $error = "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." dorsal ".$request->dorsal[$item];
+                            } else {
+                                $error = $ex->getMessage();
+                            }
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+
                         $ok=0;
                         continue;
                     }
