@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\AcumuladoTorneo;
+use App\Fecha;
 use App\Plantilla;
 use App\Torneo;
 use Illuminate\Database\QueryException;
@@ -2420,6 +2421,169 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id;
         return view('torneos.jugadores', compact('jugadores','i','order','tipoOrder','actuales','torneos','torneoId'));
     }
 
+    public function finalizar(Request $request)
+    {
 
+
+
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+
+
+        $arrgrupos='';
+        foreach ($grupos as $grupo2){
+            $arrgrupos .=$grupo2->id.',';
+        }
+
+        $equipos = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id')->prepend('','');
+
+        if (count($grupos)==1){
+            foreach ($grupos as $grupo){
+                if ($grupo->posiciones){
+                    $posiciones = DB::select(
+                        "SELECT foto, equipo,
+    count(*) jugados,
+    count(case when golesl > golesv then 1 end) ganados,
+    count(case when golesv > golesl then 1 end) perdidos,
+    count(case when golesl = golesv then 1 end) empatados,
+    sum(golesl) golesl,
+    sum(golesv) golesv,
+    sum(golesl) - sum(golesv) diferencia,
+    sum(
+        case when golesl > golesv then 3 else 0 end
+        + case when golesl = golesv then 1 else 0 end
+    ) puntaje, equipo_id
+FROM (
+    SELECT DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+    FROM partidos
+    INNER JOIN equipos ON partidos.equipol_id = equipos.id
+    INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = ? AND grupos.agrupacion = ?
+    WHERE golesl IS NOT NULL AND golesv IS NOT NULL AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = ?)
+    UNION ALL
+    SELECT DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+    FROM partidos
+    INNER JOIN equipos ON partidos.equipov_id = equipos.id
+    INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = ? AND grupos.agrupacion = ?
+    WHERE golesl IS NOT NULL AND golesv IS NOT NULL AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = ?)
+) a
+GROUP BY equipo, foto, equipo_id
+ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC",
+                        [
+                            $grupo->torneo->id,
+                            $grupo->agrupacion,
+                            $grupo->id,
+                            $grupo->torneo->id,
+                            $grupo->agrupacion,
+                            $grupo->id,
+                        ]
+                    );
+
+
+
+                    //dd($posiciones);
+                }
+
+            }
+        }
+
+
+
+
+
+
+
+        return view('torneos.finalizar', compact('torneo','equipos'));
+    }
+
+
+    public function guardarFinalizar(Request $request)
+    {
+        //
+
+
+        //dd($request->plantillajugador_id);
+        /*$this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
+        DB::beginTransaction();
+        if($request->plantillajugador_id){
+            PlantillaJugador::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillajugador_id)->delete();
+        }
+        if($request->plantillatecnico_id)  {
+            PartidoTecnico::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillatecnico_id)->delete();
+        }
+        $ok=1;
+        $plantilla=plantilla::find($id);
+        try {
+            $plantilla->update($request->all());
+            //PlantillaJugador::where('plantilla_id', '=', "$id")->delete();
+            if(count($request->jugador) > 0)
+            {
+                foreach($request->jugador as $item=>$v){
+
+                    $data2=array(
+                        'plantilla_id'=>$id,
+                        'jugador_id'=>$request->jugador[$item],
+                        'dorsal'=>$request->dorsal[$item]
+                    );
+                    try {
+                        if (!empty($request->plantillajugador_id[$item])){
+                            $data2['id']=$request->plantillajugador_id[$item];
+                            $plantillaJugador=PlantillaJugador::find($request->plantillajugador_id[$item]);
+                            $plantillaJugador->update($data2);
+                        }
+                        else{
+                            PlantillaJugador::create($data2);
+                        }
+
+
+
+                    }catch(QueryException $ex){
+                        if ($ex->errorInfo[1] === 1062) {
+                            if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
+                                $consultarPlantilla=PlantillaJugador::where('plantilla_id',"$id")->where('dorsal', $request->dorsal[$item])->first();
+                                $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
+                                $error = "El dorsal ".$request->dorsal[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre;
+                            } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
+                                $jugadorRepetido = Jugador::where('id', '=', $request->jugador[$item])->first();
+                                $error = "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." dorsal ".$request->dorsal[$item];
+                            } else {
+                                $error = $ex->getMessage();
+                            }
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+
+                        $ok=0;
+                        continue;
+                    }
+                }
+            }
+
+        }catch(Exception $e){
+            //if email or phone exist before in db redirect with error messages
+            $ok=0;
+        }
+        if ($ok){
+            DB::commit();
+
+
+
+            $respuestaID='success';
+            $respuestaMSJ='Registro actualizado satisfactoriamente';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+
+        return redirect()->route('plantillas.index', array('grupoId' => $plantilla->grupo->id))->with($respuestaID,$respuestaMSJ);*/
+    }
 
 }
