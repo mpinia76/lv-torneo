@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\AcumuladoTorneo;
 use App\Fecha;
+use App\Partido;
 use App\Plantilla;
 use App\PosicionTorneo;
 use App\Torneo;
@@ -1162,7 +1163,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$tarjeta->id. " GROUP BY
        ) puntaje, (sum(
              case when golesl > golesv then 3 else 0 end
            + case when golesl = golesv then 1 else 0 end
-       )/count(*)) promedio, equipo_id
+       )/count(*)) promedio, equipo_id, "" as titulos
 from (
        select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
@@ -2426,7 +2427,7 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id;
     {
 
 
-
+        $resto=0;
         $torneo_id= $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
@@ -2442,6 +2443,8 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id;
 
         $posicionTorneo = PosicionTorneo::with('equipo')->where('torneo_id', '=',$torneo_id)->orderBy('posicion', 'asc')->get();
         //dd($posicionTorneo);
+        $posiciones=array();
+        $posiciones2=array();
         $arrPosiciones=array();
         if ($posicionTorneo->count() > 0) {
             for ($i = 0; $i < count($posicionTorneo); $i++) {
@@ -2450,79 +2453,124 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id;
         }
         else{
 
+            $fecha=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->where('numero','=','Final')->first();
+            if(!empty($fecha)){
+                //$resto=1;
+                $partidos=Partido::where('fecha_id','=',"$fecha->id")->get();
+                //dd($partidos);
+                foreach ($partidos as $partido){
+                    if ($partido->golesl>$partido->golesv){
+                        $equipo=Equipo::findOrFail($partido->equipol_id);
+                        $data = [
+                            'equipo_id' => $partido->equipol_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                        $equipo=Equipo::findOrFail($partido->equipov_id);
+                        $data = [
+                            'equipo_id' => $partido->equipov_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                    }
+                    elseif ($partido->golesl<$partido->golesv){
+                        $equipo=Equipo::findOrFail($partido->equipov_id);
+                        $data = [
+                            'equipo_id' => $partido->equipov_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                        $equipo=Equipo::findOrFail($partido->equipol_id);
+                        $data = [
+                            'equipo_id' => $partido->equipol_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                    }
+                    elseif ($partido->penalesl>$partido->penalesv){
+                        $equipo=Equipo::findOrFail($partido->equipol_id);
+                        $data = [
+                            'equipo_id' => $partido->equipol_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                        $equipo=Equipo::findOrFail($partido->equipov_id);
+                        $data = [
+                            'equipo_id' => $partido->equipov_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                    }
+                    else{
+                        $equipo=Equipo::findOrFail($partido->equipov_id);
+                        $data = [
+                            'equipo_id' => $partido->equipov_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                        $equipo=Equipo::findOrFail($partido->equipol_id);
+                        $data = [
+                            'equipo_id' => $partido->equipol_id,
+                            'foto' => $equipo->escudo
+                        ];
+                        $posiciones[]=(object) $data;
+                    }
+                }
+            }
 
-
-
-            if (count($grupos)==1){
-                foreach ($grupos as $grupo){
-                    if ($grupo->posiciones){
-                        $posiciones = DB::select(
-                            "SELECT foto, equipo,
-    count(*) jugados,
-    count(case when golesl > golesv then 1 end) ganados,
-    count(case when golesv > golesl then 1 end) perdidos,
-    count(case when golesl = golesv then 1 end) empatados,
-    sum(golesl) golesl,
-    sum(golesv) golesv,
-    sum(golesl) - sum(golesv) diferencia,
-    sum(
-        case when golesl > golesv then 3 else 0 end
-        + case when golesl = golesv then 1 else 0 end
-    ) puntaje, equipo_id
-FROM (
-    SELECT DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
-    FROM partidos
-    INNER JOIN equipos ON partidos.equipol_id = equipos.id
-    INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = ? AND grupos.agrupacion = ?
-    WHERE golesl IS NOT NULL AND golesv IS NOT NULL AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = ?)
-    UNION ALL
-    SELECT DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
-    FROM partidos
-    INNER JOIN equipos ON partidos.equipov_id = equipos.id
-    INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON fechas.grupo_id = grupos.id AND grupos.posiciones = 1 AND grupos.torneo_id = ? AND grupos.agrupacion = ?
-    WHERE golesl IS NOT NULL AND golesv IS NOT NULL AND EXISTS (SELECT p2.id FROM plantillas p2 WHERE plantillas.equipo_id = p2.equipo_id AND p2.grupo_id = ?)
+                $posiciones2 = DB::select(
+                    "SELECT foto, equipo,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, (sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       )/count(*)) promedio, equipo_id
+from (
+       select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id = ?
+     union all
+       select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id = ?
 ) a
-GROUP BY equipo, foto, equipo_id
-ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC",
-                            [
-                                $grupo->torneo->id,
-                                $grupo->agrupacion,
-                                $grupo->id,
-                                $grupo->torneo->id,
-                                $grupo->agrupacion,
-                                $grupo->id,
-                            ]
-                        );
+group by equipo, foto, equipo_id
+
+order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC",
+                    [
+                        $torneo_id,
+                        $torneo_id,
+                    ]
+                );
 
 
-
-                        //dd($posiciones);
-                    }
-
-                }
-            }
-            else{
-                $posiciones=array();
-                //dd($grupos);
-                foreach ($grupos as $grupo){
-                    if (!$grupo->posiciones){
-                        if ($grupo->nombre=='Final'){
-                            $fecha=Fecha::where('grupo_id',$grupo->id)->where('numero','=','Final')->first();
-
-
-                        }
-                    }
-                }
-            }
-
-
+            //dd($posiciones2);
             for ($i = 0; $i < count($posiciones); $i++) {
                 $arrPosiciones[$i]=array($posiciones[$i]->equipo_id,$posiciones[$i]->foto);
             }
+            if (count($posiciones2)>0){
+                for ($i = count($posiciones); $i < count($posiciones2); $i++) {
+                    $arrPosiciones[$i]=array($posiciones2[$i]->equipo_id,$posiciones2[$i]->foto);
+                }
+            }
+
 
             //dd($arrPosiciones);
         }
@@ -2567,20 +2615,9 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC",
 
 
                     }catch(QueryException $ex){
-                        if ($ex->errorInfo[1] === 1062) {
-                            if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
-                                $consultarPlantilla=PlantillaJugador::where('plantilla_id',"$id")->where('dorsal', $request->dorsal[$item])->first();
-                                $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
-                                $error = "El dorsal ".$request->dorsal[$item]." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre;
-                            } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
-                                $jugadorRepetido = Jugador::where('id', '=', $request->jugador[$item])->first();
-                                $error = "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre." dorsal ".$request->dorsal[$item];
-                            } else {
-                                $error = $ex->getMessage();
-                            }
-                        } else {
+
                             $error = $ex->getMessage();
-                        }
+
 
                         $ok=0;
                         continue;

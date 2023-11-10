@@ -21,7 +21,7 @@
             <th>Dif.</th>
             <th>Punt.</th>
             <th>Prom.</th>
-
+            <th>Títulos</th>
             </thead>
             <tbody>
             @php
@@ -52,7 +52,7 @@
                 2
                 )}}%</td>
 
-
+                    <td>{{$equipo->titulos}}</td>
                 </tr>
             @endforeach
             </tbody>

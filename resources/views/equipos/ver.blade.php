@@ -54,6 +54,25 @@
 
         </div>
 
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Titulos</dt>
+                <dd>{{$titulosLiga+$titulosCopa}}</dd>
+            </div>
+
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Titulos Liga</dt>
+                <dd>{{$titulosLiga}}</dd>
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Titulos Copa</dt>
+                <dd>{{$titulosCopa}}</dd>
+            </div>
+
+        </div>
+
 
 		<table class="table">
             <thead>
@@ -68,7 +87,7 @@
             <th>Dif.</th>
             <th>Punt.</th>
             <th>Prom.</th>
-
+            <th>Posición</th>
             </thead>
             <tbody>
             @php
@@ -103,6 +122,7 @@
                     <td>{{$torneo->favor - $torneo->contra}}</td>
                     <td>{{$torneo->puntaje}}</td>
                     <td>{{$torneo->porcentaje}}</td>
+                    <td>{!!$torneo->posicion!!}</td>
 
 
                 </tr>

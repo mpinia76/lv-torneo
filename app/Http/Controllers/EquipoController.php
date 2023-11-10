@@ -6,6 +6,7 @@ use App\Equipo;
 use App\Fecha;
 use App\Grupo;
 use App\Partido;
+use App\PosicionTorneo;
 use App\Torneo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -215,7 +216,7 @@ class EquipoController extends Controller
         $equipo=Equipo::findOrFail($id);
 
 
-		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje
+		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
@@ -224,8 +225,8 @@ WHERE partidos.equipol_id = '.$id.' OR partidos.equipov_id = '.$id.'
 GROUP BY torneos.id, torneos.nombre,torneos.year
 ORDER BY torneos.year DESC';
 
-
-
+        $titulosLiga=0;
+        $titulosCopa=0;
 
         $torneosEquipo = DB::select(DB::raw($sql));
 
@@ -298,6 +299,18 @@ group by equipo_id
 
             $jugados = DB::select(DB::raw($sqlJugados));
 
+            $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('equipo_id', '=',$id)->first();
+
+            if(!empty($posicionTorneo)){
+                if ($posicionTorneo->posicion == 1){
+                    if (strpos($torneo->nombreTorneo, 'Copa') !== false) {
+                        $titulosCopa++;
+                    }
+                    else{
+                        $titulosLiga++;
+                    }
+                }
+            }
 
             foreach ($jugados as $jugado){
 
@@ -309,11 +322,17 @@ group by equipo_id
                 $torneo->contra = $jugado->golesv;
                 $torneo->puntaje = $jugado->puntaje;
                 $torneo->porcentaje = $jugado->porcentaje;
+                $torneo->posicion = (!empty($posicionTorneo)) ? (
+                ($posicionTorneo->posicion == 1) ?
+                    '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
+                    (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
+                ) : '';
+
             }
         }
 
 
-        return view('equipos.ver', compact('equipo', 'torneosEquipo'));
+        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga'));
     }
 
     public function jugados(Request $request)
