@@ -513,4 +513,34 @@
 
     });
 
+    $('.addRowPosicion').on('click',function(e){
+        e.preventDefault();
+        addRowPosicion();
+    });
+    function addRowPosicion()
+
+    {
+        console.log($('#posicionEquipo').val());
+        var $cant =parseInt($('#posicionEquipo').val());
+        $cant=$cant+1;
+
+        $('#posicionEquipo').val($cant);
+        var tr='<tr>'+
+            '<td><input type="hidden" name="posicion[]" value="'+$cant+'"></td>'+
+            '<td>'+'{{ Form::select('equipo[]',$equipos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+
+
+            '<td><a href="#" class="btn btn-danger removePosicionEquipo"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpoPosicion').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removePosicionEquipo', function(e){
+        e.preventDefault();
+
+        $(this).parent().parent().remove();
+
+
+    });
+
 </script>

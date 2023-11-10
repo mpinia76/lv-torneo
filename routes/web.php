@@ -73,6 +73,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('controlarbitrosfecha', 'FechaController@controlarbitrosfecha')->name('fechas.controlarbitrosfecha');
 
     Route::get('finalizar', 'TorneoController@finalizar')->name('torneos.finalizar');
+    Route::put('guardarFinalizar', 'TorneoController@guardarFinalizar');
 
     Route::get('importpoll', 'PollController@importPoll')->name('polls.importPoll');
     Route::post('importpollprocess', 'PollController@importpollprocess');

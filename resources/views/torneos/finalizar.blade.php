@@ -41,6 +41,7 @@
 
                 {{Form::hidden('torneo_id', (isset($_GET['torneoId']))?$_GET['torneoId']:$torneo->id )}}
 
+                <input type="hidden" name="posicionEquipo" id="posicionEquipo" value="<?php echo count($arrPosiciones); ?>">
             </div>
 
             <div class="form-group col-md-12">
@@ -59,43 +60,42 @@
                     @php
                         $i = 1;
                     @endphp
-                    @foreach($plantillaJugadors ?? '' as $plantillaJugador)
+                    @foreach($arrPosiciones as $key => $value)
 
                         <tr>
                             <td>
                                 {{$i++}}
-                                @if($plantillaJugador->jugador->persona->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$plantillaJugador->jugador->persona->foto) }}" >
-                                @else
-                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                @if($value[1])
+                                    <img id="original" src="{{ url('images/'.$value[1]) }}" height="25">
                                 @endif
-                                {{Form::hidden('plantillajugador_id[]',$plantillaJugador->id)}}
+                                {{Form::hidden('posicion[]',($key+1))}}
                             </td>
 
-                            <td>{{ Form::select('jugador[]',$jugadors, $plantillaJugador->jugador->id,['id'=>'jugador'.$i,'class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
-                            <td>{{Form::number('dorsal[]', $plantillaJugador->dorsal, ['class' => 'form-control', 'style' => 'width:70px;'])}}</td>
+                            <td>
+                                {{ Form::select('equipo[]',$equipos, $value[0],['id'=>'equipo'.$i,'class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
 
-                            <td><a href="#" class="btn btn-danger remove"><i class="glyphicon glyphicon-remove"></i></a></td>
+
+                            <td><a href="#" class="btn btn-danger removePosicionEquipo"><i class="glyphicon glyphicon-remove"></i></a></td>
                         </tr>
 
                     @endforeach
                     </tbody>
                     <thead>
                     <th></th>
-                    <th>Jugador</th>
-                    <th>Dorsal</th>
-                    <th><a href="#" class="addRow"><i class="glyphicon glyphicon-plus"></i></a></th>
+                    <th>Equipo</th>
+
+                    <th><a href="#" class="addRowPosicion"><i class="glyphicon glyphicon-plus"></i></a></th>
 
                     </thead>
                 </table>
-                <a class="btn btn-success m-1" href="{{route('jugadores.create',  array('plantillaId' => $plantilla->id))}}">Nuevo</a>
+
             </div>
 
         </div>
 
         {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
 
-        <a href="{{ route('plantillas.index',array('grupoId'=>$grupo->id))  }}" class="btn btn-success m-1">Volver</a>
+        <a href="{{ route('torneos.show',$torneo->id) }}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}
 
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\AcumuladoTorneo;
 use App\Fecha;
 use App\Plantilla;
+use App\PosicionTorneo;
 use App\Torneo;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -2439,11 +2440,24 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id;
 
         $equipos = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id')->prepend('','');
 
-        if (count($grupos)==1){
-            foreach ($grupos as $grupo){
-                if ($grupo->posiciones){
-                    $posiciones = DB::select(
-                        "SELECT foto, equipo,
+        $posicionTorneo = PosicionTorneo::with('equipo')->where('torneo_id', '=',$torneo_id)->orderBy('posicion', 'asc')->get();
+        //dd($posicionTorneo);
+        $arrPosiciones=array();
+        if ($posicionTorneo->count() > 0) {
+            for ($i = 0; $i < count($posicionTorneo); $i++) {
+                $arrPosiciones[$i]=array($posicionTorneo[$i]->equipo_id,$posicionTorneo[$i]->equipo->escudo);
+            }
+        }
+        else{
+
+
+
+
+            if (count($grupos)==1){
+                foreach ($grupos as $grupo){
+                    if ($grupo->posiciones){
+                        $posiciones = DB::select(
+                            "SELECT foto, equipo,
     count(*) jugados,
     count(case when golesl > golesv then 1 end) ganados,
     count(case when golesv > golesl then 1 end) perdidos,
@@ -2474,31 +2488,49 @@ FROM (
 ) a
 GROUP BY equipo, foto, equipo_id
 ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC",
-                        [
-                            $grupo->torneo->id,
-                            $grupo->agrupacion,
-                            $grupo->id,
-                            $grupo->torneo->id,
-                            $grupo->agrupacion,
-                            $grupo->id,
-                        ]
-                    );
+                            [
+                                $grupo->torneo->id,
+                                $grupo->agrupacion,
+                                $grupo->id,
+                                $grupo->torneo->id,
+                                $grupo->agrupacion,
+                                $grupo->id,
+                            ]
+                        );
 
 
 
-                    //dd($posiciones);
+                        //dd($posiciones);
+                    }
+
                 }
-
             }
+            else{
+                $posiciones=array();
+                //dd($grupos);
+                foreach ($grupos as $grupo){
+                    if (!$grupo->posiciones){
+                        if ($grupo->nombre=='Final'){
+                            $fecha=Fecha::where('grupo_id',$grupo->id)->where('numero','=','Final')->first();
+
+
+                        }
+                    }
+                }
+            }
+
+
+            for ($i = 0; $i < count($posiciones); $i++) {
+                $arrPosiciones[$i]=array($posiciones[$i]->equipo_id,$posiciones[$i]->foto);
+            }
+
+            //dd($arrPosiciones);
         }
 
 
 
 
-
-
-
-        return view('torneos.finalizar', compact('torneo','equipos'));
+        return view('torneos.finalizar', compact('torneo','equipos','arrPosiciones'));
     }
 
 
@@ -2507,38 +2539,30 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC",
         //
 
 
-        //dd($request->plantillajugador_id);
-        /*$this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
+        //dd($request);
+        //$this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
         DB::beginTransaction();
-        if($request->plantillajugador_id){
-            PlantillaJugador::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillajugador_id)->delete();
-        }
-        if($request->plantillatecnico_id)  {
-            PartidoTecnico::where('plantilla_id',"$id")->whereNotIn('id', $request->plantillatecnico_id)->delete();
-        }
+
+            PosicionTorneo::where('torneo_id',"$request->torneo_id")->delete();
+
+
         $ok=1;
-        $plantilla=plantilla::find($id);
+
         try {
-            $plantilla->update($request->all());
-            //PlantillaJugador::where('plantilla_id', '=', "$id")->delete();
-            if(count($request->jugador) > 0)
+
+            if($request->equipo)
             {
-                foreach($request->jugador as $item=>$v){
+                foreach($request->equipo as $item=>$v){
 
                     $data2=array(
-                        'plantilla_id'=>$id,
-                        'jugador_id'=>$request->jugador[$item],
-                        'dorsal'=>$request->dorsal[$item]
+                        'torneo_id'=>$request->torneo_id,
+                        'equipo_id'=>$request->equipo[$item],
+                        'posicion'=>$request->posicion[$item]
                     );
                     try {
-                        if (!empty($request->plantillajugador_id[$item])){
-                            $data2['id']=$request->plantillajugador_id[$item];
-                            $plantillaJugador=PlantillaJugador::find($request->plantillajugador_id[$item]);
-                            $plantillaJugador->update($data2);
-                        }
-                        else{
-                            PlantillaJugador::create($data2);
-                        }
+
+                        PosicionTorneo::create($data2);
+
 
 
 
@@ -2583,7 +2607,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC",
         }
 
 
-        return redirect()->route('plantillas.index', array('grupoId' => $plantilla->grupo->id))->with($respuestaID,$respuestaMSJ);*/
+        return redirect()->route('torneos.show', $request->torneo_id)->with($respuestaID,$respuestaMSJ);
     }
 
 }

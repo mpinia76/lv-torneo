@@ -2631,7 +2631,7 @@ class FechaController extends Controller
                 foreach ($html->find('div[class=team team1]') as $element) {
                     $equipo = $element->find('h3[class=nteam nteam1]');
                     //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
-                    $jugadores = array();
+
 
                     $jugadores = array();
                     foreach ($element->find('ul[class=aligns-list]') as $element2) {
