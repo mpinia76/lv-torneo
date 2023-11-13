@@ -1199,6 +1199,29 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
 
         $posiciones = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($posiciones), $paginate, $page);
 
+        foreach ($posiciones as $posicion){
+            $titulosCopa=0;
+            $titulosLiga=0;
+            $posicionTorneo = PosicionTorneo::where('equipo_id', '=',$posicion->equipo_id)->get();
+            foreach ($posicionTorneo as $pt){
+                $torneo=Torneo::findOrFail($pt->torneo_id);
+                if ($pt->posicion == 1){
+                    if (stripos($torneo->nombre, 'Copa') !== false) {
+                        $titulosCopa++;
+                    }
+                    else{
+                        $titulosLiga++;
+                    }
+                }
+            }
+            if (($titulosCopa+$titulosLiga)==0){
+                $posicion->titulos='';
+            }
+            else{
+                $posicion->titulos=$titulosCopa+$titulosLiga. ' ('.$titulosLiga.' Ligas '.$titulosCopa.' Copas)';
+            }
+
+        }
 
         $posiciones->setPath(route('torneos.posiciones'));
 
