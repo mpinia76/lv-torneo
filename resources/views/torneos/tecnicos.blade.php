@@ -50,6 +50,8 @@
             <th><a href="{{route('torneos.tecnicos', array('order'=>'diferencia','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Dif. @if($order=='diferencia') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'prom','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > % @if($order=='prom') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+
+            <th>Títulos</th>
             <th>Equipos</th>
             </thead>
             <tbody>
@@ -92,7 +94,7 @@
                     <td>{{$tecnico->diferencia}}</td>
                     <td>{{$tecnico->puntaje}}</td>
                     <td>{{$tecnico->porcentaje}}</td>
-
+                    <td>{{$tecnico->titulos}}</td>
                     <td>@if($tecnico->escudo)
                             @php
                                 $escudos = explode(',',$tecnico->escudo);
@@ -115,7 +117,7 @@
             @endforeach
             </tbody>
         </table>
-        
+
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-9">
                 {{ $goleadores->links() }}

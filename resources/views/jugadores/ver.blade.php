@@ -81,6 +81,24 @@
 
         </div>
         <h1 class="display-6">Jugador</h1>
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Titulos</dt>
+                <dd>{{$titulosJugadorLiga+$titulosJugadorCopa}}</dd>
+            </div>
+
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Titulos Liga</dt>
+                <dd>{{$titulosJugadorLiga}}</dd>
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Titulos Copa</dt>
+                <dd>{{$titulosJugadorCopa}}</dd>
+            </div>
+
+        </div>
         <table class="table">
             <thead>
             <th>#</th>
@@ -139,6 +157,10 @@
                                     @endphp
                                     <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
                                         <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                        @if(isset($escudoArr[2]) && $escudoArr[2] != '')
+                                            <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
+                                            Pos: {!!  $escudoArr[2] !!}
+                                        @endif
                                     </a>
                                 @endif
                             @endforeach
@@ -202,6 +224,24 @@
         </table>
         @if(count($torneosTecnico)>0)
             <h1 class="display-6">Técnico</h1>
+            <div class="row">
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Titulos</dt>
+                    <dd>{{$titulosTecnicoLiga+$titulosTecnicoCopa}}</dd>
+                </div>
+
+
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Titulos Liga</dt>
+                    <dd>{{$titulosTecnicoLiga}}</dd>
+                </div>
+
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Titulos Copa</dt>
+                    <dd>{{$titulosTecnicoCopa}}</dd>
+                </div>
+
+            </div>
         <table class="table">
             <thead>
             <th>#</th>
@@ -256,6 +296,10 @@
                                     @endphp
                                     <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
                                         <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                        @if(isset($escudoArr[2]) && $escudoArr[2] != '')
+                                            <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
+                                            Pos: {!!  $escudoArr[2] !!}
+                                        @endif
                                     </a>
                                 @endif
                             @endforeach

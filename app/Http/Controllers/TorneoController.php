@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\AcumuladoTorneo;
 use App\Fecha;
 use App\Partido;
+use App\PartidoTecnico;
 use App\Plantilla;
 use App\PosicionTorneo;
 use App\Torneo;
@@ -1926,7 +1927,7 @@ GROUP BY torneos.nombre, torneos.year) AS t )';
            + case when golesl = golesv then 1 else 0 end
        ) /COUNT(*) ),
       2
-    ) prom, "" escudo, "" AS jugando
+    ) prom, "" escudo, "" AS jugando, "" AS titulos
 from (
        select  DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
@@ -2001,6 +2002,79 @@ group by tecnico, fotoTecnico, tecnico_id
 
 
         foreach ($goleadores as $goleador){
+            $titulosTecnicoCopa=0;
+            $titulosTecnicoLiga=0;
+
+            $sqlTorneos = 'SELECT DISTINCT grupos.torneo_id, partido_tecnicos.equipo_id
+FROM partido_tecnicos
+INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+INNER JOIN personas ON tecnicos.persona_id = personas.id
+INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
+WHERE tecnicos.id = '.$goleador->tecnico_id;
+
+            $torneosJugados = DB::select(DB::raw($sqlTorneos));
+            foreach ($torneosJugados as $tj){
+                $grupos = Grupo::where('torneo_id', '=',$tj->torneo_id)->get();
+                $arrgrupos='';
+                foreach ($grupos as $grupo){
+                    $arrgrupos .=$grupo->id.',';
+                }
+                $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+                $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+                $arrfechas='';
+                foreach ($fechas as $fecha){
+                    $arrfechas .=$fecha->id.',';
+                }
+                $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+                $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+                $arrpartidos='';
+                foreach ($partidos as $partido){
+                    $arrpartidos .=$partido->id.',';
+                }
+                $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+                $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$tj->torneo_id)->where('equipo_id', '=',$tj->equipo_id)->where('posicion', '=',1)->first();
+
+                if(!empty($posicionTorneo)){
+                    //if ($posicionTorneo->posicion == 1){
+                    $ultimoPartido = Partido::whereIn('fecha_id', explode(',', $arrfechas))
+                        ->where(function ($query) use ($posicionTorneo) {
+                            $query->where('equipol_id', $posicionTorneo->equipo_id)
+                                ->orWhere('equipov_id', $posicionTorneo->equipo_id);
+                        })
+                        ->orderBy('dia', 'DESC')
+                        ->first();
+
+                    $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$goleador->tecnico_id)->first();
+                    //print_r($partidoTecnico);
+                    if(!empty($partidoTecnico)) {
+                        $torneo=Torneo::findOrFail($torneoId);
+                        if (stripos($torneo->nombre, 'Copa') !== false) {
+                            $titulosTecnicoCopa++;
+                        } else {
+                            $titulosTecnicoLiga++;
+                        }
+                    }
+                    //}
+                }
+
+            }
+
+            if (($titulosTecnicoCopa+$titulosTecnicoLiga)==0){
+                $goleador->titulos='';
+            }
+            else{
+                $goleador->titulos=$titulosTecnicoCopa+$titulosTecnicoLiga. ' ('.$titulosTecnicoLiga.' Ligas '.$titulosTecnicoCopa.' Copas)';
+            }
+
+
 
             $sqlJugando = 'SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id
 FROM partido_tecnicos
@@ -2070,6 +2144,7 @@ order by puntaje desc, diferencia DESC, golesl DESC';
                 $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.',';
 
             }
+
 
         }
 
