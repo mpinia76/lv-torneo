@@ -31,6 +31,7 @@
             <strong>Jugando</strong>
             </input>
 
+            </input>
 
 
         </form>
@@ -42,16 +43,18 @@
             <th>Técnico</th>
             <th>Actual</th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Jugados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > J @if($order=='Jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'Ganados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > G @if($order=='Ganados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'Empatados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > E @if($order=='Empatados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'Perdidos','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > P @if($order=='Perdidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'golesl','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > GF @if($order=='golesl') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'golesv','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > GC @if($order=='golesv') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'diferencia','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Dif. @if($order=='diferencia') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'prom','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > % @if($order=='prom') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Ganados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > G @if($order=='Ganados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Empatados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > E @if($order=='Empatados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'Perdidos','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > P @if($order=='Perdidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'golesl','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > GF @if($order=='golesl') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'golesv','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > GC @if($order=='golesv') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'diferencia','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > Dif. @if($order=='diferencia') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'prom','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > % @if($order=='prom') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
-            <th>Títulos</th>
+            <th>Títulos <input type="checkbox" class="orm-control" id="campeones" name="campeones" @if ($campeones == 1) checked @endif onchange="enviarForm()">
+
+                </th>
             <th>Equipos</th>
             </thead>
             <tbody>
@@ -107,7 +110,12 @@
                                     <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
                                         <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
                                     </a>
-                                    Puntaje {{$escudoArr[2]}} - Porcentaje {{$escudoArr[3]}} <br>
+                                    Puntaje {{$escudoArr[2]}} - Porcentaje {{$escudoArr[3]}}
+                                    @if(isset($escudoArr[4]) && $escudoArr[4] != '')
+                                        <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
+                                        {{  $escudoArr[4] }}
+                                    @endif
+                                    <br>
                                 @endif
                             @endforeach
                         @endif
