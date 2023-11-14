@@ -30,8 +30,8 @@
 
             <strong>Jugando</strong>
             </input>
-
-            </input>
+<br><br>
+            <input type="checkbox" class="orm-control" id="campeones" name="campeones" @if ($campeones == 1) checked @endif onchange="enviarForm()"><strong>Campeones</strong> </input>
 
 
         </form>
@@ -52,7 +52,7 @@
             <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'prom','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > % @if($order=='prom') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
-            <th>Títulos <input type="checkbox" class="orm-control" id="campeones" name="campeones" @if ($campeones == 1) checked @endif onchange="enviarForm()">
+            <th>Títulos
 
                 </th>
             <th>Equipos</th>

@@ -44,6 +44,7 @@
         <th>Equipos</th>
         <th>Actual</th>
         <th><a href="{{route('torneos.jugadores', array('order'=>'jugados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        <th><a href="{{route('torneos.jugadores', array('order'=>'titulos','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Títulos @if($order=='titulos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th><a href="{{route('torneos.jugadores', array('order'=>'Goles','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th><a href="{{route('torneos.jugadores', array('order'=>'amarillas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
         <th><a href="{{route('torneos.jugadores', array('order'=>'rojas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
@@ -101,6 +102,7 @@
 
                     @endif</td>
                 <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->jugados}} </a></td>
+                <td>{{$jugador->titulos}}</td>
                 <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->goles}}</a></td>
                 <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->jugador_id,'tipo'=>'Amarillas'))}}" >{{$jugador->amarillas}}</a></td>
 
