@@ -24,9 +24,7 @@
             <th>Títulos</th>
             </thead>
             <tbody>
-            @php
-                $i = 1;
-            @endphp
+
             @foreach($posiciones as $equipo)
                 <tr>
                     <td>{{$i++}}</td>

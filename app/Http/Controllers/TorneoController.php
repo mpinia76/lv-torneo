@@ -1227,10 +1227,10 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
         $posiciones->setPath(route('torneos.posiciones'));
 
 
+        $i=$offSet+1;
 
 
-
-        return view('torneos.posiciones', compact('posiciones'));
+        return view('torneos.posiciones', compact('posiciones','i'));
     }
 
     public function estadisticasTorneo(Request $request)
