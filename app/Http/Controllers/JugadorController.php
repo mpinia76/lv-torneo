@@ -366,7 +366,8 @@ ORDER BY torneos.year DESC';
 FROM equipos
 INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
 INNER JOIN partidos ON partidos.id = alineacions.partido_id
-WHERE alineacions.jugador_id = '.$id.' AND alineacions.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
+WHERE alineacions.jugador_id = '.$id.' AND alineacions.partido_id IN ('.$arrpartidos.')
+ORDER BY partidos.dia ASC';
 
 
 
@@ -564,7 +565,8 @@ FROM equipos
 INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
 INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
-WHERE tecnicos.persona_id = '.$jugador->persona_id.' AND partido_tecnicos.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
+WHERE tecnicos.persona_id = '.$jugador->persona_id.' AND partido_tecnicos.partido_id IN ('.$arrpartidos.')
+ORDER BY partidos.dia ASC';
 
 
 
