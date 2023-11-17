@@ -1207,7 +1207,7 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
             foreach ($posicionTorneo as $pt){
                 $torneo=Torneo::findOrFail($pt->torneo_id);
                 if ($pt->posicion == 1){
-                    if (stripos($torneo->nombre, 'Copa') !== false) {
+                    if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
                         $titulosCopa++;
                     }
                     else{
@@ -2081,7 +2081,7 @@ WHERE tecnicos.id = '.$goleador->tecnico_id;
                     //print_r($partidoTecnico);
                     if(!empty($partidoTecnico)) {
                         $torneo=Torneo::findOrFail($tj->torneo_id);
-                        if (stripos($torneo->nombre, 'Copa') !== false) {
+                        if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
                             $titulosTecnicoCopa++;
                             if (!isset($titulosTecnicoCopaEquipo[$posicionTorneo->equipo_id])){
                                 $titulosTecnicoCopaEquipo[$posicionTorneo->equipo_id]=1;

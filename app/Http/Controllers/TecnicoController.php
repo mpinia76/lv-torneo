@@ -304,7 +304,7 @@ ORDER BY torneos.year DESC';
                     $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$id)->first();
                 //print_r($partidoTecnico);
                     if(!empty($partidoTecnico)) {
-                        if (stripos($torneo->nombreTorneo, 'Copa') !== false) {
+                        if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
                             $titulosTecnicoCopa++;
                         } else {
                             $titulosTecnicoLiga++;
@@ -466,7 +466,7 @@ ORDER BY torneos.year DESC';
 
                 //print_r($partidoTecnico);
                 if(!empty($alineacion)) {
-                    if (stripos($torneo->nombreTorneo, 'Copa') !== false) {
+                    if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
                         $titulosJugadorCopa++;
                     } else {
                         $titulosJugadorLiga++;

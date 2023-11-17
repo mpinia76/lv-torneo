@@ -303,7 +303,7 @@ group by equipo_id
 
             if(!empty($posicionTorneo)){
                 if ($posicionTorneo->posicion == 1){
-                    if (stripos($torneo->nombreTorneo, 'Copa') !== false) {
+                    if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
                         $titulosCopa++;
                     }
                     else{

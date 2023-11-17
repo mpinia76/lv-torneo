@@ -2516,7 +2516,7 @@ class FechaController extends Controller
         return $strEquipoDB;
     }
 
-    public function dameNombreTorneoURL($strTorneo,$fecha,$year)
+    public function dameNombreTorneoURL($strTorneo,$fecha,$year,$vuelta=0)
     {
         //Log::channel('mi_log')->info($strTorneo.' - '.$fecha.' - '.$year, []);
         $strTorneo=strtr($strTorneo, " ", "-");
@@ -2538,7 +2538,13 @@ class FechaController extends Controller
         if (strpos($fecha, 'Final') !== false) {
             $fecha = 'final';
         }
+        if (strpos($fecha, '1er Ronda') !== false) {
+            $fecha = 'primera-fase';
 
+        }
+        if ($vuelta){
+            $fecha .= ($vuelta==2)?'-vuelta':'-ida';
+        }
         if (strpos($strTorneo, 'copa-argentina') !== false) {
 
             $strTorneoURL='copa-argentina-'.$year.'/'.$fecha;
@@ -2572,6 +2578,15 @@ class FechaController extends Controller
 
                     break;
 
+            }
+        }
+        elseif (strpos($strTorneo, 'copa-de-la-superliga') !== false) {
+            $strTorneoURL='copa-de-la-superliga-argentina-'.$year.'/'.$fecha;
+            switch (trim($year)) {
+                case '2020':
+                    $strTorneoURL = 'copa-argentina-2011-12/' . $fecha;
+
+                    break;
             }
         }
         else{
@@ -5873,7 +5888,8 @@ return $string;
                                                            $urlEncontrada=0;
                                                            foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
                                                                foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
-                                                                   if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')){
+
+                                                                   if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,1).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,1).'/'.$visitante3.'-'.$local3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,2).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,2).'/'.$visitante3.'-'.$local3.'/')){
                                                                        $urlEncontrada=1;
                                                                        Log::channel('mi_log')->info('OJO!! encontro gol cabeza: ' . $a->href, []);
                                                                        $data3 = array(
@@ -5940,7 +5956,7 @@ return $string;
                                                             $urlEncontrada=0;
                                                             foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
                                                                 foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
-                                                                    if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')){
+                                                                    if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,1).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,1).'/'.$visitante3.'-'.$local3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,2).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,2).'/'.$visitante3.'-'.$local3.'/')){
                                                                         $urlEncontrada=1;
                                                                         Log::channel('mi_log')->info('OJO!! encontro gol tiro libre: ' . $a->href, []);
                                                                         $data3 = array(
@@ -6006,7 +6022,7 @@ return $string;
                                                             $urlEncontrada=0;
                                                             foreach ($this->dameNombreEquipoURL3($strLocal) as $local3){
                                                                 foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3){
-                                                                    if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')){
+                                                                    if (($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year).'/'.$visitante3.'-'.$local3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,1).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,1).'/'.$visitante3.'-'.$local3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,2).'/'.$local3.'-'.$visitante3.'/')||($a->href=='/partidos/argentina/'.$this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre),$fecha->numero,$year,2).'/'.$visitante3.'-'.$local3.'/')){
                                                                         $urlEncontrada=1;
                                                                         Log::channel('mi_log')->info('OJO!! encontro gol de penal: ' . $a->href, []);
                                                                         $data3 = array(
