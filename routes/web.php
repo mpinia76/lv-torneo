@@ -124,6 +124,7 @@ Route::get('otrasEstadisticas', 'TorneoController@estadisticasOtras')->name('tor
 Route::get('estadisticasTorneo', 'TorneoController@estadisticasTorneo')->name('torneos.estadisticasTorneo');
 Route::get('tecnicos', 'TorneoController@tecnicos')->name('torneos.tecnicos');
 Route::get('arquerosHistorico', 'TorneoController@arqueros')->name('torneos.arqueros');
+Route::get('titulosHistorico', 'TorneoController@titulos')->name('torneos.titulos');
 
 
 Route::get('logout', 'Auth\LoginController@logout');

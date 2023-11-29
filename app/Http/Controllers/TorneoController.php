@@ -31,7 +31,7 @@ class TorneoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos', 'arqueros','acumulado','jugadores');
+        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos', 'arqueros','acumulado','jugadores','titulos');
     }
 
     /**
@@ -41,6 +41,7 @@ class TorneoController extends Controller
      */
     public function index(Request $request)
     {
+
         if ($request->has('buscarpor')){
             $nombre = $request->get('buscarpor');
 
@@ -2804,6 +2805,60 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
 
 
         return redirect()->route('torneos.show', $request->torneo_id)->with($respuestaID,$respuestaMSJ);
+    }
+
+    public function titulos(Request $request)
+    {
+
+        $order= ($request->query('order'))?$request->query('order'):'Titulos';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+
+        $sql='SELECT id, escudo, nombre,
+       sum(titulos) titulos, sum(ligas) ligas, sum(copas) copas
+
+from (
+       SELECT equipos.id, equipos.nombre, equipos.escudo, 1 AS titulos, 0 AS ligas, 0 AS copas
+FROM equipos
+INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+UNION ALL
+SELECT equipos.id, equipos.nombre, equipos.escudo, 0 AS titulos, 1 AS ligas, 0 AS copas
+FROM equipos
+INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.nombre NOT LIKE \'%copa%\' AND torneos.nombre NOT LIKE \'%trofeo%\'
+UNION ALL
+SELECT equipos.id, equipos.nombre, equipos.escudo, 0 AS titulos, 0 AS ligas, 1 AS copas
+FROM equipos
+INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND (torneos.nombre LIKE \'%copa%\' OR torneos.nombre LIKE \'%trofeo%\')
+) a
+group by nombre, escudo, id
+
+order by  '.$order.' '.$tipoOrder.', nombre ASC';
+        //dd($sql);
+
+        $posiciones = DB::select(DB::raw($sql));
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($posiciones, $offSet, $paginate, true);
+
+
+
+        $posiciones = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($posiciones), $paginate, $page);
+
+
+
+        $posiciones->setPath(route('torneos.titulos',array('order'=>$order,'tipoOrder'=>$tipoOrder)));
+
+
+        $i=$offSet+1;
+
+
+        return view('torneos.titulos', compact('posiciones','i','order','tipoOrder'));
     }
 
 }

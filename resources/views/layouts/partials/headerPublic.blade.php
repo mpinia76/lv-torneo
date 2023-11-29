@@ -152,7 +152,10 @@
                             </a>
                         </li>
 
-
+                        <li><a class="dropdown-item" href="{{route('torneos.titulos')}}">
+                                Títulos
+                            </a>
+                        </li>
 
 
 
