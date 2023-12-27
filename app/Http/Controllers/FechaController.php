@@ -1510,6 +1510,10 @@ class FechaController extends Controller
                 $strEquipoURL='1868';
 
                 break;
+            case 'Centro Español':
+                $strEquipoURL='1785';
+
+                break;
             case 'Chacarita Juniors':
                 $strEquipoURL='18';
 
@@ -1520,6 +1524,9 @@ class FechaController extends Controller
                 break;
             case 'Cipolletti':
                 $strEquipoURL='1866';
+                break;
+            case 'Club Ciudad de Bolívar':
+                $strEquipoURL='3140';
                 break;
             case 'Claypole':
                 $strEquipoURL='1772';
@@ -1546,6 +1553,10 @@ class FechaController extends Controller
                 break;
             case 'Defensores de Belgrano':
                 $strEquipoURL='1719';//ultimo
+
+                break;
+            case 'Defensores de Cambaceres':
+                $strEquipoURL='1801';//ultimo
 
                 break;
             case 'Defensores de Pronunciamiento':
@@ -1717,6 +1728,10 @@ class FechaController extends Controller
 
                 $strEquipoURL='684';
                 break;
+            case 'Ituzaingó':
+
+                $strEquipoURL='1200';
+                break;
             case 'Jorge Gibson Brown':
 
                 $strEquipoURL='1863';
@@ -1793,6 +1808,10 @@ class FechaController extends Controller
                 break;
             case 'Platense':
                 $strEquipoURL='29';
+
+                break;
+            case 'Puerto Nuevo':
+                $strEquipoURL='1983';
 
                 break;
 
@@ -1945,6 +1964,9 @@ class FechaController extends Controller
             case 'Villa San Carlos':
                 $strEquipoURL='1796';
                 break;
+            case 'Yupanqui':
+                $strEquipoURL='1783';
+                break;
             default:
                 Log::channel('mi_log')->info('Ojo!!! falta equipo: '.$strEquipoURL, []);
                 break;
@@ -1957,7 +1979,7 @@ class FechaController extends Controller
         $arrEquipo = array();
         switch (trim($strEquipo)) {
             case 'Acassuso':
-                $arrEquipo[]='Acassuso';
+                $arrEquipo[]='acassuso';
 
                 break;
             case 'Agropecuario Argentino':
@@ -2058,6 +2080,7 @@ class FechaController extends Controller
                 break;
             case 'Central Ballester':
                 $arrEquipo[]='c.-ballester';
+                $arrEquipo[]='c-ballester';
                 break;
             case 'Central Córdoba (Rosario)':
                 $arrEquipo[]='c-cordoba-sf';
@@ -2067,6 +2090,9 @@ class FechaController extends Controller
                 break;
             case 'Central Norte':
                 $arrEquipo[]='central-norte';
+                break;
+            case 'Centro Español':
+                $arrEquipo[]='centro-español';
                 break;
             case 'Chacarita Juniors':
                 $arrEquipo[]='chacarita';
@@ -2088,6 +2114,10 @@ class FechaController extends Controller
                 $arrEquipo[]='cipolletti';
 
                 break;
+            case 'Club Ciudad de Bolívar':
+                $arrEquipo[]='cd-de-bolivar';
+
+                break;
             case 'Colón de Santa Fe':
                 $arrEquipo[]='colon';
                 $arrEquipo[]='ca-colon';
@@ -2107,6 +2137,10 @@ class FechaController extends Controller
                 $arrEquipo[]='def-belgrano';
 
                 break;
+            case 'Defensores de Cambaceres':
+                $arrEquipo[]='cambaceres';
+
+                break;
             case 'Defensores de Pronunciamiento':
                 $arrEquipo[]='depro';
 
@@ -2117,7 +2151,7 @@ class FechaController extends Controller
                 break;
             case 'Defensores Unidos de Zárate':
                 $arrEquipo[]='defensores-un.';
-
+                $arrEquipo[]='defensores-un';
                 break;
 
             case 'Deportivo Armenio':
@@ -2130,6 +2164,7 @@ class FechaController extends Controller
                 break;
             case 'Deportivo Madryn':
                 $arrEquipo[]='dep.-madryn';
+                $arrEquipo[]='dep-madryn';
                 break;
             case 'Deportivo Maipú':
                 $arrEquipo[]='deportivo-maipu';
@@ -2145,11 +2180,11 @@ class FechaController extends Controller
                 break;
             case 'Deportivo Riestra';
                 $arrEquipo[]='dep.-riestra';
-
+                $arrEquipo[]='dep-riestra';
                 break;
             case 'Deportivo Rincón';
                 $arrEquipo[]='dep.-rincon';
-
+                $arrEquipo[]='dep-rincon';
                 break;
             case 'Deportivo Roca';
                 $arrEquipo[]='deportivo-roca';
@@ -2171,7 +2206,7 @@ class FechaController extends Controller
                 break;
             case 'Estudiantes de San Luis':
                 $arrEquipo[]='sp.-estudiantes';
-
+                $arrEquipo[]='sp-estudiantes';
                 break;
             case 'Estudiantes (LP)':
                 $arrEquipo[]='estudiantes';
@@ -2193,6 +2228,7 @@ class FechaController extends Controller
                 break;
             case 'Gimnasia de Mendoza':
                 $arrEquipo[]='gimnasia-men.';
+                $arrEquipo[]='gimnasia-men';
                 break;
             case 'Gimnasia (J)':
                 $arrEquipo[]='gimnasia-juj';
@@ -2203,7 +2239,7 @@ class FechaController extends Controller
                 $arrEquipo[]='gimnasia-y-esgrima-de-la-plata';
                 break;
             case 'Gimnasia y Tiro de Salta':
-                $arrEquipo[]='gimnasia-y_tiro';
+                $arrEquipo[]='gimnasia-y-tiro';
                 break;
             case 'Godoy Cruz':
                 $arrEquipo[]='godoy-cruz';
@@ -2243,10 +2279,14 @@ class FechaController extends Controller
                 break;
             case 'Independiente de Chivilcoy':
                 $arrEquipo[]='indep.-chiv.';
-
+                $arrEquipo[]='indep-chiv';
                 break;
             case 'Independiente Rivadavia':
                 $arrEquipo[]='ind.-rivadavia';
+                $arrEquipo[]='ind-rivadavia';
+                break;
+            case 'Ituzaingó':
+                $arrEquipo[]='ituzaingo';
 
                 break;
             case 'Justo José de Urquiza':
@@ -2263,7 +2303,7 @@ class FechaController extends Controller
                 break;
             case 'Laferrere':
                 $arrEquipo[]='dep.-laferrere';
-
+                $arrEquipo[]='dep-laferrere';
                 break;
             case 'Lanús':
                 $arrEquipo[]='lanus';
@@ -2313,9 +2353,13 @@ class FechaController extends Controller
                 break;
             case 'Peñarol de Chimbas':
                 $arrEquipo[]='sp.-penarol';
+                $arrEquipo[]='sp-penarol';
                 break;
             case 'Platense':
                 $arrEquipo[]='platense';
+                break;
+            case 'Puerto Nuevo':
+                $arrEquipo[]='puerto-nuevo';
                 break;
             case 'Quilmes':
                 $arrEquipo[]='quilmes';
@@ -2344,7 +2388,7 @@ class FechaController extends Controller
                 break;
             case 'Rivadavia de Venado Tuerto':
                 $arrEquipo[]='sp.-rivadavia';
-
+                $arrEquipo[]='sp-rivadavia';
                 break;
             case 'River Plate':
                 $arrEquipo[]='river';
@@ -2365,7 +2409,7 @@ class FechaController extends Controller
                 break;
             case 'San Martín de Formosa':
                 $arrEquipo[]='sp.-san-martin';
-
+                $arrEquipo[]='sp-san-martin';
                 break;
             case 'San Martín (SJ)':
                 $arrEquipo[]='san-martin-sj';
@@ -2397,7 +2441,7 @@ class FechaController extends Controller
                 break;
             case 'Sportivo Barracas':
                 $arrEquipo[]='sp.-barracas';
-
+                $arrEquipo[]='sp-barracas';
                 break;
             case 'Sportivo Belgrano':
                 $arrEquipo[]='sp-belgrano';
@@ -2405,7 +2449,7 @@ class FechaController extends Controller
                 break;
             case 'Sportivo Las Parejas':
                 $arrEquipo[]='sp.-las-parejas';
-
+                $arrEquipo[]='sp-las-parejas';
                 break;
             case 'Talleres (Cba.)':
                 $arrEquipo[]='talleres';
@@ -2413,7 +2457,7 @@ class FechaController extends Controller
                 break;
             case 'Talleres de Remedios de Escalada':
                 $arrEquipo[]='talleres-rem.';
-
+                $arrEquipo[]='talleres-rem';
                 break;
             case 'Temperley':
                 $arrEquipo[]='ca-temperley';
@@ -2442,6 +2486,7 @@ class FechaController extends Controller
                 break;
             case 'Unión de Sunchales':
                 $arrEquipo[]='union-sun.';
+                $arrEquipo[]='union-sun';
                 break;
             case 'Vélez Sarsfield':
                 $arrEquipo[]='velez';
@@ -2455,6 +2500,9 @@ class FechaController extends Controller
                 break;
             case 'Villa San Carlos':
                 $arrEquipo[]='san-carlos';
+                break;
+            case 'Yupanqui':
+                $arrEquipo[]='yupanqui';
                 break;
             default:
                 Log::channel('mi_log')->info('Ojo!!! no esta: '.$strEquipoURL, []);
@@ -2575,6 +2623,30 @@ class FechaController extends Controller
                     break;
                 case '2016':
                     $strTorneoURL='copa-argentina-2015-16/'.$fecha;
+
+                    break;
+                case '2017':
+                    $strTorneoURL='copa-argentina-2017/'.$fecha;
+
+                    break;
+                case '2018':
+                    $strTorneoURL='copa-argentina-2018/'.$fecha;
+
+                    break;
+                case '2019':
+                    $strTorneoURL='copa-argentina-2019/'.$fecha;
+
+                    break;
+                case '2021':
+                    $strTorneoURL='copa-argentina-2020/'.$fecha;
+
+                    break;
+                case '2022':
+                    $strTorneoURL='copa-argentina-2022/'.$fecha;
+
+                    break;
+                case '2023':
+                    $strTorneoURL='copa-argentina-2023/'.$fecha;
 
                     break;
 
@@ -5796,6 +5868,15 @@ return $string;
                                         break;
                                     case '3096':
                                         $nombre3='/martinez-diego-3449';
+                                        break;
+                                    case '969':
+                                        $nombre3='/gonzalez-lucas-81443';
+                                        break;
+                                    case '2683':
+                                        $nombre3='/gauto-maximilaino';
+                                        break;
+                                    case '5984':
+                                        $nombre3='/montiveros-maximiliano';
                                         break;
                                     default:
                                         $nombre3='';

@@ -216,13 +216,13 @@ class EquipoController extends Controller
         $equipo=Equipo::findOrFail($id);
 
 
-		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion
+		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 
 WHERE partidos.equipol_id = '.$id.' OR partidos.equipov_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
 ORDER BY torneos.year DESC';
 
         $titulosLiga=0;
@@ -303,7 +303,8 @@ group by equipo_id
 
             if(!empty($posicionTorneo)){
                 if ($posicionTorneo->posicion == 1){
-                    if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                    if ($torneo->tipo == 'Copa') {
                         $titulosCopa++;
                     }
                     else{

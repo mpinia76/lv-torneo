@@ -7,6 +7,7 @@ use App\Fecha;
 use App\Partido;
 use App\PartidoTecnico;
 use App\Plantilla;
+use App\PlantillaJugador;
 use App\PosicionTorneo;
 use App\Torneo;
 use Illuminate\Database\QueryException;
@@ -31,7 +32,7 @@ class TorneoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos', 'arqueros','acumulado','jugadores','titulos');
+        $this->middleware('auth')->except('ver','promediosPublic','historiales','goleadores','tarjetas','posiciones','estadisticasTorneo','estadisticasOtras', 'tecnicos', 'arqueros','acumulado','jugadores','titulos','plantillas');
     }
 
     /**
@@ -80,7 +81,7 @@ class TorneoController extends Controller
     public function store(Request $request)
     {
      //
-        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required']);
+        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required']);
         DB::beginTransaction();
         $ok=1;
         try {
@@ -209,7 +210,7 @@ class TorneoController extends Controller
     public function update(Request $request, $id)
     {
         //print_r($request);
-        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required']);
+        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required']);
 
         DB::beginTransaction();
         $noBorrar='';
@@ -1208,7 +1209,8 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
             foreach ($posicionTorneo as $pt){
                 $torneo=Torneo::findOrFail($pt->torneo_id);
                 if ($pt->posicion == 1){
-                    if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+                    //if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+                    if ($torneo->tipo == 'Copa') {
                         $titulosCopa++;
                     }
                     else{
@@ -2082,7 +2084,8 @@ WHERE tecnicos.id = '.$goleador->tecnico_id;
                     //print_r($partidoTecnico);
                     if(!empty($partidoTecnico)) {
                         $torneo=Torneo::findOrFail($tj->torneo_id);
-                        if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+                        //if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+                        if ($torneo->tipo == 'Copa') {
                             $titulosTecnicoCopa++;
                             if (!isset($titulosTecnicoCopaEquipo[$posicionTorneo->equipo_id])){
                                 $titulosTecnicoCopaEquipo[$posicionTorneo->equipo_id]=1;
@@ -2824,16 +2827,16 @@ UNION ALL
 SELECT equipos.id, equipos.nombre, equipos.escudo, 0 AS titulos, 1 AS ligas, 0 AS copas
 FROM equipos
 INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.nombre NOT LIKE \'%copa%\' AND torneos.nombre NOT LIKE \'%trofeo%\'
+INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = \'Liga\'
 UNION ALL
 SELECT equipos.id, equipos.nombre, equipos.escudo, 0 AS titulos, 0 AS ligas, 1 AS copas
 FROM equipos
 INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND (torneos.nombre LIKE \'%copa%\' OR torneos.nombre LIKE \'%trofeo%\')
+INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = \'Copa\'
 ) a
 group by nombre, escudo, id
 
-order by  '.$order.' '.$tipoOrder.', nombre ASC';
+order by  '.$order.' '.$tipoOrder.',ligas DESC, copas DESC, nombre ASC';
         //dd($sql);
 
         $posiciones = DB::select(DB::raw($sql));
@@ -2859,6 +2862,54 @@ order by  '.$order.' '.$tipoOrder.', nombre ASC';
 
 
         return view('torneos.titulos', compact('posiciones','i','order','tipoOrder'));
+    }
+
+    public function plantillas(Request $request)
+    {
+
+        $equipo1= $request->query('equipo1');
+
+        if (!empty($equipo1)){
+            $e1=Equipo::findOrFail($equipo1);
+        }
+        else{
+            $e1 = new Equipo();
+        }
+
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+        $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+
+
+        //$equipos = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('equipo.nombre','ASC')->get()->pluck('equipo.nombre', 'equipo_id');
+        $equipos = Plantilla::with('equipo')
+            ->whereIn('grupo_id', explode(',', $arrgrupos))
+            ->join('equipos', 'plantillas.equipo_id', '=', 'equipos.id')
+            ->orderBy('equipos.nombre', 'ASC')
+            ->get()
+            ->pluck('equipo.nombre', 'equipo_id');
+
+//dd($equipos);
+
+        $plantilla=Plantilla::where('equipo_id', '=',$equipo1)->whereIn('grupo_id', explode(',', $arrgrupos))->first();
+
+        $plantillaJugadors =array();
+        if (!empty($plantilla)){
+            $plantillaJugadors = PlantillaJugador::where('plantilla_id','=',"$plantilla->id")->with('jugador')->orderBy('dorsal','asc')->get();
+        }
+
+
+        //dd($plantillaJugadors);
+
+        return view('torneos.plantillas', compact('torneo','equipos','e1','plantillaJugadors'));
     }
 
 }

@@ -102,7 +102,7 @@
 
                     @endif</td>
                 <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->jugados}} </a></td>
-                <td>{{$jugador->titulos}}</td>
+                <td><a href="{{route('jugadores.titulos', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->titulos}}</a></td>
                 <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->goles}}</a></td>
                 <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->jugador_id,'tipo'=>'Amarillas'))}}" >{{$jugador->amarillas}}</a></td>
 

@@ -44,7 +44,10 @@
             {{Form::label('grupos', 'Nro. de grupos')}}
             {{Form::number('grupos', $torneo->grupos, ['class' => 'form-control'])}}
         </div>
-
+        <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            {{Form::label('tipo', 'Tipo')}}
+            {{ Form::select('tipo',[''=>'Seleccionar...','Liga'=>'Liga','Copa'=>'Copa'],$torneo->tipo, ['class' => 'form-control']) }}
+        </div>
 
     </div>
 

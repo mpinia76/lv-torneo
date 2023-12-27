@@ -248,13 +248,13 @@ class TecnicoController extends Controller
         $id= $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 WHERE partido_tecnicos.tecnico_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
 ORDER BY torneos.year DESC';
 
 
@@ -304,7 +304,8 @@ ORDER BY torneos.year DESC';
                     $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$id)->first();
                 //print_r($partidoTecnico);
                     if(!empty($partidoTecnico)) {
-                        if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                        //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                        if ($torneo->tipo == 'Copa') {
                             $titulosTecnicoCopa++;
                         } else {
                             $titulosTecnicoLiga++;
@@ -415,13 +416,13 @@ group by tecnico_id
             }
         }
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, "" as idJugador
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
 INNER JOIN jugadors ON jugadors.id = plantilla_jugadors.jugador_id
 WHERE jugadors.persona_id = '.$tecnico->persona_id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
 ORDER BY torneos.year DESC';
 
 
@@ -466,7 +467,8 @@ ORDER BY torneos.year DESC';
 
                 //print_r($partidoTecnico);
                 if(!empty($alineacion)) {
-                    if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                    if ($torneo->tipo == 'Copa') {
                         $titulosJugadorCopa++;
                     } else {
                         $titulosJugadorLiga++;

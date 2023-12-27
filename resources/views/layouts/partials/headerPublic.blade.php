@@ -77,7 +77,10 @@
                                 Método Paenza
                             </a>
                         </li>
-
+                        <li><a class="dropdown-item" href="{{route('torneos.plantillas',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Plantillas
+                            </a>
+                        </li>
                         <li><a class="dropdown-item" href="{{route('grupos.posicionesPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
                                 Posiciones
                             </a>

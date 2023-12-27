@@ -43,7 +43,7 @@
         <th>Año</th>
         <th>Nro. de equipos</th>
         <th>Nro. de grupos</th>
-
+        <th>Tipo</th>
         <th colspan="3"></th>
         </thead>
 
@@ -53,7 +53,7 @@
                 <td>{{$torneo->year}}</td>
                 <td>{{$torneo->equipos}}</td>
                 <td>{{$torneo->grupos}}</td>
-
+                <td>{{$torneo->tipo}}</td>
                 <td>
                     <div class="d-flex">
                         <a href="{{route('torneos.show', $torneo->id)}}" class="btn btn-info m-1">Ver</a>
