@@ -36,6 +36,8 @@
 
         <th>Tipo</th>
 
+        <th>J</th>
+
         </thead>
         <tbody>
         @foreach($plantillaJugadors ?? '' as $titularl)
@@ -53,6 +55,7 @@
                     </a>
                     <span style="font-weight: bold"> {{ $titularl->jugador->persona->full_name}}</span>
                 </td>
+                <td>{{$titularl->jugador->tipoJugador}}</td>
                 <td>{{$titularl->jugador->tipoJugador}}</td>
             </tr>
         @endforeach
