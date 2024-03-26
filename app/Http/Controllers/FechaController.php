@@ -4396,30 +4396,30 @@ class FechaController extends Controller
                                         if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                             if ($suplentes) {
 
-                                                $amarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $amarillaSuplenteL = ($mintutoTarjetaSuplenteL)?(int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $amarillaSuplenteL, []);
                                             } else {
-                                                $amarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $amarillaTitularL = ($mintutoTarjetaTitularL)?(int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Roja directa') {
                                             if ($suplentes) {
-                                                $rojaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $rojaSuplenteL = ($mintutoTarjetaSuplenteL)?(int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! roja suplente: ' . $rojaSuplenteL, []);
                                             } else {
-                                                $rojaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);
+                                                $rojaTitularL = ($mintutoTarjetaTitularL)?(int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Doble amarilla') {
                                             if ($suplentes) {
-                                                $dobleamarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $dobleamarillaSuplenteL = ($mintutoTarjetaSuplenteL)?(int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! dobleamarilla suplente: ' . $dobleamarillaSuplenteL, []);
                                             } else {
-                                                $dobleamarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $dobleamarillaTitularL = ($mintutoTarjetaTitularL)?(int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
                                             }
 
@@ -4450,13 +4450,13 @@ class FechaController extends Controller
                                         $incidenciasT[] = array('Sale', $saleTitularL);
                                     }
                                     if ($amarillaTitularL) {
-                                        $incidenciasT[] = array('Tarjeta amarilla', $amarillaTitularL);
+                                        $incidenciasT[] = array('Tarjeta amarilla', ($amarillaTitularL==-1)?'':$amarillaTitularL);
                                     }
                                     if ($dobleamarillaTitularL) {
-                                        $incidenciasT[] = array('Expulsado por doble amarilla', $dobleamarillaTitularL);
+                                        $incidenciasT[] = array('Expulsado por doble amarilla', ($dobleamarillaTitularL==-1)?'':$dobleamarillaTitularL);
                                     }
                                     if ($rojaTitularL) {
-                                        $incidenciasT[] = array('Tarjeta roja', $rojaTitularL);
+                                        $incidenciasT[] = array('Tarjeta roja', ($rojaTitularL==-1)?'':$rojaTitularL);
                                     }
 
                                     if (!empty($golesArray)) {
@@ -4726,33 +4726,33 @@ class FechaController extends Controller
                                 if ($td->find('img')) {
                                     if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                         if ($suplentes){
-                                            $amarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $amarillaSuplenteV = ($mintutoTarjetaSuplenteV)?(int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $mintutoTarjetaSuplenteV, []);
                                         }
                                         else{
-                                            $amarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $amarillaTitularV = ($mintutoTarjetaTitularV)?(int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Roja directa') {
                                         if ($suplentes){
-                                            $rojaSuplenteV =  (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $rojaSuplenteV =  ($mintutoTarjetaSuplenteV)?(int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaSuplenteV, []);
                                         }
                                         else{
-                                            $rojaTitularV =  (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $rojaTitularV =  ($mintutoTarjetaTitularV)?(int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Doble amarilla') {
                                         if ($suplentes){
-                                            $dobleamarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $dobleamarillaSuplenteV = ($mintutoTarjetaSuplenteV)?(int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
                                         }
                                         else{
-                                            $dobleamarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $dobleamarillaTitularV = ($mintutoTarjetaTitularV)?(int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
                                         }
 
@@ -4782,13 +4782,13 @@ class FechaController extends Controller
                                     $incidenciasT[]=array('Sale', $saleTitularV);
                                 }
                                 if ($amarillaTitularV){
-                                    $incidenciasT[]=array('Tarjeta amarilla', $amarillaTitularV);
+                                    $incidenciasT[]=array('Tarjeta amarilla', ($amarillaTitularV==-1)?'':$amarillaTitularV);
                                 }
                                 if ($dobleamarillaTitularV){
-                                    $incidenciasT[]=array('Expulsado por doble amarilla', $dobleamarillaTitularV);
+                                    $incidenciasT[]=array('Expulsado por doble amarilla', ($dobleamarillaTitularV==-1)?'':$dobleamarillaTitularV);
                                 }
                                 if ($rojaTitularV){
-                                    $incidenciasT[]=array('Tarjeta roja', $rojaTitularV);
+                                    $incidenciasT[]=array('Tarjeta roja', ($rojaTitularV==-1)?'':$rojaTitularV);
                                 }
 
                                 if (!empty($golesArray)){
@@ -7758,30 +7758,30 @@ return $string;
                                         if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                             if ($suplentes) {
 
-                                                $amarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $amarillaSuplenteL = ($mintutoTarjetaSuplenteL)?(int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $amarillaSuplenteL, []);
                                             } else {
-                                                $amarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $amarillaTitularL = ($mintutoTarjetaTitularL)?(int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Roja directa') {
                                             if ($suplentes) {
-                                                $rojaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $rojaSuplenteL = ($mintutoTarjetaSuplenteL)?(int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! roja suplente: ' . $rojaSuplenteL, []);
                                             } else {
-                                                $rojaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);
+                                                $rojaTitularL = ($mintutoTarjetaTitularL)?(int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularL, []);
                                             }
 
                                         }
                                         if ($td->find('img')[0]->title == 'Doble amarilla') {
                                             if ($suplentes) {
-                                                $dobleamarillaSuplenteL = (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $dobleamarillaSuplenteL = ($mintutoTarjetaSuplenteL)?(int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! dobleamarilla suplente: ' . $dobleamarillaSuplenteL, []);
                                             } else {
-                                                $dobleamarillaTitularL = (int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT);;
+                                                $dobleamarillaTitularL = ($mintutoTarjetaTitularL)?(int)filter_var($mintutoTarjetaTitularL, FILTER_SANITIZE_NUMBER_INT):-1;
                                                 //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularL, []);
                                             }
 
@@ -7812,13 +7812,13 @@ return $string;
                                         $incidenciasT[] = array('Sale', $saleTitularL);
                                     }
                                     if ($amarillaTitularL) {
-                                        $incidenciasT[] = array('Tarjeta amarilla', $amarillaTitularL);
+                                        $incidenciasT[] = array('Tarjeta amarilla', ($amarillaTitularL==-1)?'':$amarillaTitularL);
                                     }
                                     if ($dobleamarillaTitularL) {
-                                        $incidenciasT[] = array('Expulsado por doble amarilla', $dobleamarillaTitularL);
+                                        $incidenciasT[] = array('Expulsado por doble amarilla', ($dobleamarillaTitularL==-1)?'':$dobleamarillaTitularL);
                                     }
                                     if ($rojaTitularL) {
-                                        $incidenciasT[] = array('Tarjeta roja', $rojaTitularL);
+                                        $incidenciasT[] = array('Tarjeta roja', ($rojaTitularL==-1)?'':$rojaTitularL);
                                     }
 
                                     if (!empty($golesArray)) {
@@ -8088,33 +8088,33 @@ return $string;
                                 if ($td->find('img')) {
                                     if ($td->find('img')[0]->title == 'Tarjeta amarilla') {
                                         if ($suplentes){
-                                            $amarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $amarillaSuplenteV = ($mintutoTarjetaSuplenteV)?(int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! amarilla suplente: ' . $mintutoTarjetaSuplenteV, []);
                                         }
                                         else{
-                                            $amarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $amarillaTitularV = ($mintutoTarjetaTitularV)?(int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! amarilla titular: ' . $amarillaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Roja directa') {
                                         if ($suplentes){
-                                            $rojaSuplenteV =  (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $rojaSuplenteV =  ($mintutoTarjetaSuplenteV)?(int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaSuplenteV, []);
                                         }
                                         else{
-                                            $rojaTitularV =  (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $rojaTitularV =  ($mintutoTarjetaTitularV)?(int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! roja titular: ' . $rojaTitularV, []);
                                         }
 
                                     }
                                     if ($td->find('img')[0]->title == 'Doble amarilla') {
                                         if ($suplentes){
-                                            $dobleamarillaSuplenteV = (int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $dobleamarillaSuplenteV = ($mintutoTarjetaSuplenteV)?(int) filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaSuplenteV, []);
                                         }
                                         else{
-                                            $dobleamarillaTitularV = (int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT);;
+                                            $dobleamarillaTitularV = ($mintutoTarjetaTitularV)?(int) filter_var($mintutoTarjetaTitularV, FILTER_SANITIZE_NUMBER_INT):-1;
                                             //Log::channel('mi_log')->info('OJO!! dobleamarilla titular: ' . $dobleamarillaTitularV, []);
                                         }
 
@@ -8144,13 +8144,13 @@ return $string;
                                     $incidenciasT[]=array('Sale', $saleTitularV);
                                 }
                                 if ($amarillaTitularV){
-                                    $incidenciasT[]=array('Tarjeta amarilla', $amarillaTitularV);
+                                    $incidenciasT[]=array('Tarjeta amarilla', ($amarillaTitularV==-1)?'':$amarillaTitularV);
                                 }
                                 if ($dobleamarillaTitularV){
-                                    $incidenciasT[]=array('Expulsado por doble amarilla', $dobleamarillaTitularV);
+                                    $incidenciasT[]=array('Expulsado por doble amarilla', ($dobleamarillaTitularV==-1)?'':$dobleamarillaTitularV);
                                 }
                                 if ($rojaTitularV){
-                                    $incidenciasT[]=array('Tarjeta roja', $rojaTitularV);
+                                    $incidenciasT[]=array('Tarjeta roja', ($rojaTitularV==-1)?'':$rojaTitularV);
                                 }
 
                                 if (!empty($golesArray)){

@@ -154,6 +154,8 @@ class PartidoController extends Controller
                     ->groupBy('partido_id','equipo_id')
                     ->havingRaw('COUNT(partido_id) != 11');
             })
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -201,6 +203,8 @@ class PartidoController extends Controller
                 'personas.apellido as jugador_apellido',
                 'personas.foto as jugador_foto'
             )
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -240,6 +244,8 @@ class PartidoController extends Controller
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
             ->join('jugadors', 't1.jugador_id', '=', 'jugadors.id')
             ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -319,6 +325,8 @@ class PartidoController extends Controller
                             });
                     });
             })
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -357,6 +365,8 @@ class PartidoController extends Controller
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
             ->join('jugadors', 'g1.jugador_id', '=', 'jugadors.id')
             ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -432,6 +442,8 @@ class PartidoController extends Controller
                 'personas.apellido as jugador_apellido',
                 'personas.foto as jugador_foto'
             )
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -471,6 +483,8 @@ class PartidoController extends Controller
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
             ->join('jugadors', 't1.jugador_id', '=', 'jugadors.id')
             ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -503,6 +517,8 @@ class PartidoController extends Controller
             ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -547,6 +563,8 @@ class PartidoController extends Controller
                 'equipo_local.escudo as equipo_local_escudo',
                 'equipo_visitante.escudo as equipo_visitante_escudo'
             )
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -581,6 +599,8 @@ class PartidoController extends Controller
             ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -614,6 +634,8 @@ class PartidoController extends Controller
             ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -651,15 +673,20 @@ class PartidoController extends Controller
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('partido_tecnicos')
-                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipol_id = partido_tecnicos.equipo_id')
+                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipol_id = partido_tecnicos.equipo_id ')
+
                     ->groupBy('partido_id');
-            })
+            })->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orWhereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('partido_tecnicos')
                     ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipov_id = partido_tecnicos.equipo_id')
+
                     ->groupBy('partido_id');
             })
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
             ->orderBy('year','desc')
             ->orderBy('torneo')
             ->orderBy('fecha')

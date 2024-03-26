@@ -27,7 +27,7 @@ class ComposerServiceProvider  extends ServiceProvider
     {
         View::composer('*', function($view){
             //any code to set $val variable
-            $torneos=Torneo::orderBy('year','DESC')->get();
+            $torneos=Torneo::orderBy('year','DESC')->orderBy('id','DESC')->get();
 
             $view->with('torneos', $torneos);
         });
