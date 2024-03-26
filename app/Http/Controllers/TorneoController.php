@@ -3003,10 +3003,67 @@ ORDER BY '.$order.' '.$tipoOrder.',dorsal, jugador ASC';
         $jugadores->setPath(route('torneos.plantillas',  array('torneoId' => $torneo->id,'order'=>$order,'tipoOrder'=>$tipoOrder,'equipo1' => $equipo1)));
 
 
+        $sql = 'SELECT tecnico, fotoTecnico, tecnico_id,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), \'%\') porcentaje,
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) /COUNT(*) ),
+      2
+    ) prom, "" escudo, "" AS jugando, "" AS titulos
+from (
+       select  DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 INNER JOIN personas ON personas.id = tecnicos.persona_id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.') AND partido_tecnicos.equipo_id='.$equipo1;
+
+
+        $sql .=' union all
+       select DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesv, golesl, equipos.escudo foto, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 INNER JOIN personas ON personas.id = tecnicos.persona_id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.') AND partido_tecnicos.equipo_id='.$equipo1;
+
+        $sql .=' ) a
+group by tecnico, fotoTecnico, tecnico_id
 
 
 
-        return view('torneos.plantillas', compact('torneo','equipos','e1','jugadores','order','tipoOrder'));
+        ORDER BY jugados DESC, tecnico ASC';
+
+        $tecnicosEquipo = DB::select(DB::raw($sql));
+        //dd($tecnicos);
+        return view('torneos.plantillas', compact('torneo','equipos','e1','jugadores','order','tipoOrder','tecnicosEquipo'));
     }
 
 }

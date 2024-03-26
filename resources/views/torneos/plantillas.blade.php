@@ -84,6 +84,52 @@
                 <strong>Total: {{ $jugadores->total() }}</strong>
             </div>
         </div>
+        <table class="table">
+            <thead>
+
+            <th>Técnico</th>
+
+            <th> J </th>
+            <th>G </th>
+            <th> E </th>
+            <th> P </th>
+            <th>GF </th>
+            <th>GC </th>
+            <th> Dif. </th>
+            <th>Punt. </th>
+            <th> % </th>
+
+
+            </thead>
+            <tbody>
+
+            @foreach($tecnicosEquipo as $tecnico)
+                <tr>
+
+                    <td>
+                        <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnico->tecnico_id))}}" >
+                            @if($tecnico->fotoTecnico)
+                                <img id="original" class="imgCircle" src="{{ url('images/'.$tecnico->fotoTecnico) }}" >
+                            @else
+                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                            @endif
+                        </a>
+                        {{$tecnico->tecnico}}</td>
+
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id))}}" >{{$tecnico->jugados}}</a></td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Ganados'))}}" >{{$tecnico->ganados}}</a></td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Empatados'))}}" >{{$tecnico->empatados}}</a></td>
+                    <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Perdidos'))}}" >{{$tecnico->perdidos}}</a></td>
+                    <td>{{$tecnico->golesl}}</td>
+                    <td>{{$tecnico->golesv}}</td>
+                    <td>{{$tecnico->diferencia}}</td>
+                    <td>{{$tecnico->puntaje}}</td>
+                    <td>{{$tecnico->porcentaje}}</td>
+
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
         <div class="d-flex">
 
             <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Volver</a>
