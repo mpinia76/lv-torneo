@@ -1,7 +1,19 @@
 @extends('layouts.appPublic')
 
 @section('pageTitle', 'Ver tecnico')
+<style>
+    /* Estilos personalizados para resaltar la pestaña activa */
+    .nav-link.active {
+        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
+        color: #fff; /* Cambia el color del texto de la pestaña activa */
+        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    }
 
+    /* Agrega un espacio entre las pestañas y el contenido */
+    .tab-content {
+        margin: 20px; /* Ajusta el margen superior del contenido */
+    }
+</style>
 @section('content')
     <div class="container">
 
@@ -58,7 +70,18 @@
             </div>
 
         </div>
-        <h1 class="display-6">Técnico</h1>
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="tecnico-tab" data-toggle="tab" href="#tecnico" role="tab" aria-controls="tecnico" aria-selected="true">Técnico</a>
+            </li>
+            @if(count($torneosJugador)>0)
+                <li class="nav-item">
+                    <a class="nav-link" id="jugador-tab" data-toggle="tab" href="#jugador" role="tab" aria-controls="jugador" aria-selected="false">Jugador</a>
+                </li>
+            @endif
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div role="tabpanel" class="tab-pane active" id="tecnico">
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Titulos</dt>
@@ -77,7 +100,7 @@
             </div>
 
         </div>
-        <table class="table">
+        <table class="table" style="font-size: 14px;">
             <thead>
             <th>#</th>
             <th>Torneo</th>
@@ -176,8 +199,9 @@
 
             </tbody>
         </table>
+            </div>
         @if(count($torneosJugador)>0)
-        <h1 class="display-6">Jugador</h1>
+                <div role="tabpanel" class="tab-pane" id="jugador">
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
                     <dt>Titulos</dt>
@@ -196,7 +220,7 @@
                 </div>
 
             </div>
-        <table class="table">
+        <table class="table" style="font-size: 14px;">
             <thead>
             <th>#</th>
             <th>Torneo</th>
@@ -320,8 +344,9 @@
             </tr>
             </tbody>
         </table>
+                </div>
         @endif
-
+        </div>
         <div class="d-flex">
 
             <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>

@@ -1,7 +1,19 @@
 @extends('layouts.app')
 
 @section('pageTitle', 'Controlar cambios')
+<style>
+    /* Estilos personalizados para resaltar la pestaña activa */
+    .nav-link.active {
+        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
+        color: #fff; /* Cambia el color del texto de la pestaña activa */
+        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    }
 
+    /* Agrega un espacio entre las pestañas y el contenido */
+    .tab-content {
+        margin: 20px; /* Ajusta el margen superior del contenido */
+    }
+</style>
 @section('content')
     <div class="container">
         <h1 class="display-6">Controlar cambios</h1>
@@ -32,14 +44,28 @@
             </div>
         @endif
 
-        <h1 class="display-6">No están en la alineación</h1>
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="sinjugar-tab" data-toggle="tab" href="#sinjugar" role="tab" aria-controls="sinjugar" aria-selected="true">Sin jugar</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="repetidos-tab" data-toggle="tab" href="#repetidos" role="tab" aria-controls="repetidos" aria-selected="false">Repetidos</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="diferencia-tab" data-toggle="tab" href="#diferencia" role="tab" aria-controls="diferencia" aria-selected="false">Impares</a>
+            </li>
+
+
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div role="tabpanel" class="tab-pane active" id="sinjugar">
 
         <!-- build our form inputs -->
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
-                <table class="table">
+
+                <table class="table" style="font-size: 14px;">
                     <thead>
                     <th>Jugador</th>
                     <th>Torneo</th>
@@ -114,14 +140,15 @@
 
         </div>
 
-        <h1 class="display-6">Cambios repetidos</h1>
+            </div>
+            <div role="tabpanel" class="tab-pane" id="repetidos">
 
         <!-- build our form inputs -->
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
-                <table class="table">
+
+                <table class="table" style="font-size: 14px;">
                     <thead>
                     <th>Jugador</th>
                     <th>Torneo</th>
@@ -195,14 +222,15 @@
 
         </div>
 
-        <h1 class="display-6">Cambios impares</h1>
+            </div>
+            <div role="tabpanel" class="tab-pane" id="diferencia">
 
         <!-- build our form inputs -->
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
-                <table class="table">
+
+                <table class="table" style="font-size: 14px;">
                     <thead>
 
                     <th>Torneo</th>
@@ -270,6 +298,8 @@
                 </div>
             </div>
 
+        </div>
+            </div>
         </div>
 
         <a href="{{ route('torneos.index') }}" class="btn btn-success m-1">Volver</a>

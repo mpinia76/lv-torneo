@@ -159,7 +159,7 @@ class JugadorController extends Controller
                     $persona->update($insert);
                     $persona->jugador()->create($insert);
                     $respuestaID='success';
-                    $respuestaMSJ='Registro creado satisfactoriamente';
+                    $respuestaMSJ='Registro creado satisfactoriamente - existe como tecnico';
                 }
             }catch(QueryException $ex){
 
@@ -307,7 +307,7 @@ INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
 WHERE plantilla_jugadors.jugador_id = '.$id.'
 GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
-ORDER BY torneos.year DESC';
+ORDER BY torneos.year DESC, torneos.id DESC';
 
 
 

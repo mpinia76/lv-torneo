@@ -130,7 +130,7 @@ class TecnicoController extends Controller
                 if (!empty($persona)){
                     $persona->tecnico()->create($insert);
                     $respuestaID='success';
-                    $respuestaMSJ='Registro creado satisfactoriamente';
+                    $respuestaMSJ='Registro creado satisfactoriamente - existe como jugador';
                 }
             }catch(QueryException $ex){
 
@@ -255,7 +255,7 @@ INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 WHERE partido_tecnicos.tecnico_id = '.$id.'
 GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
-ORDER BY torneos.year DESC';
+ORDER BY torneos.year DESC, torneos.id DESC';
 
 
 

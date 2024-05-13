@@ -1,7 +1,19 @@
 @extends('layouts.appPublic')
 
 @section('pageTitle', 'Ver jugador')
+<style>
+    /* Estilos personalizados para resaltar la pestaña activa */
+    .nav-link.active {
+        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
+        color: #fff; /* Cambia el color del texto de la pestaña activa */
+        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    }
 
+    /* Agrega un espacio entre las pestañas y el contenido */
+    .tab-content {
+        margin: 20px; /* Ajusta el margen superior del contenido */
+    }
+</style>
 @section('content')
     <div class="container">
 
@@ -80,150 +92,163 @@
             </div>
 
         </div>
-        <h1 class="display-6">Jugador</h1>
-        <div class="row">
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Titulos</dt>
-                <dd>{{$titulosJugadorLiga+$titulosJugadorCopa}}</dd>
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="jugador-tab" data-toggle="tab" href="#jugador" role="tab" aria-controls="jugador" aria-selected="true">Jugador</a>
+            </li>
+            @if(count($torneosTecnico)>0)
+            <li class="nav-item">
+                <a class="nav-link" id="tecnico-tab" data-toggle="tab" href="#tecnico" role="tab" aria-controls="tecnico" aria-selected="false">Técnico</a>
+            </li>
+            @endif
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div role="tabpanel" class="tab-pane active" id="jugador">
+            <div class="row">
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Titulos</dt>
+                    <dd>{{$titulosJugadorLiga+$titulosJugadorCopa}}</dd>
+                </div>
+
+
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Titulos Liga</dt>
+                    <dd>{{$titulosJugadorLiga}}</dd>
+                </div>
+
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Titulos Copa</dt>
+                    <dd>{{$titulosJugadorCopa}}</dd>
+                </div>
+
             </div>
+            <table class="table" style="font-size: 14px;">
+                <thead>
+                <th>#</th>
+                <th>Torneo</th>
+                <th>Equipos</th>
+                <th>Jugados</th>
+                <th>Goles</th>
+
+                <th>Amarillas</th>
+
+                <th>Rojas</th>
+
+                <th>Arq. Recibidos</th>
+                <th>Arq. V. Invictas</th>
+
+                </thead>
+                <tbody>
 
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Titulos Liga</dt>
-                <dd>{{$titulosJugadorLiga}}</dd>
-            </div>
-
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Titulos Copa</dt>
-                <dd>{{$titulosJugadorCopa}}</dd>
-            </div>
-
-        </div>
-        <table class="table">
-            <thead>
-            <th>#</th>
-            <th>Torneo</th>
-            <th>Equipos</th>
-            <th>Jugados</th>
-            <th>Goles</th>
-
-            <th>Amarillas</th>
-
-            <th>Rojas</th>
-
-            <th>Arq. Recibidos</th>
-            <th>Arq. V. Invictas</th>
-
-            </thead>
-            <tbody>
-
-
-            @php
-                $i = 1;
-                $totalJugados = 0;
-                $totalGoles = 0;
-                $totalAmarillas = 0;
-                $totalRojas = 0;
-                $totalRecibidos = 0;
-                $totalInvictas = 0;
-            @endphp
-            @foreach($torneosJugador as $torneo)
                 @php
-                    $totalJugados += $torneo->jugados;
-                    $totalGoles += $torneo->goles;
-                    $totalAmarillas += $torneo->amarillas;
-                    $totalRojas += $torneo->rojas;
-                    $totalRecibidos += $torneo->recibidos;
-                    $totalInvictas += $torneo->invictas;
-                    $jugo = 0;
-                    if($torneo->jugados>0){
-                        $jugo=1;
-                    }
-
-
+                    $i = 1;
+                    $totalJugados = 0;
+                    $totalGoles = 0;
+                    $totalAmarillas = 0;
+                    $totalRojas = 0;
+                    $totalRecibidos = 0;
+                    $totalInvictas = 0;
                 @endphp
+                @foreach($torneosJugador as $torneo)
+                    @php
+                        $totalJugados += $torneo->jugados;
+                        $totalGoles += $torneo->goles;
+                        $totalAmarillas += $torneo->amarillas;
+                        $totalRojas += $torneo->rojas;
+                        $totalRecibidos += $torneo->recibidos;
+                        $totalInvictas += $torneo->invictas;
+                        $jugo = 0;
+                        if($torneo->jugados>0){
+                            $jugo=1;
+                        }
+
+
+                    @endphp
+                    <tr>
+                        <td>{{$i++}}</td>
+                        <td>{{$torneo->nombreTorneo}}</td>
+                        <td>@if($torneo->escudo)
+                                @php
+                                    $escudos = explode(',',$torneo->escudo);
+                                @endphp
+                                @foreach($escudos as $escudo)
+
+                                    @if($escudo!='')
+                                        @php
+                                            $escudoArr = explode('_',$escudo);
+                                        @endphp
+                                        <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
+                                            <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                            @if(isset($escudoArr[2]) && $escudoArr[2] != '')
+                                                <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
+                                                Pos: {!!  $escudoArr[2] !!}
+                                            @endif
+                                        </a>
+                                    @endif
+                                @endforeach
+                            @endif
+
+                        </td>
+                        <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
+                        <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->goles}}
+                            @if($jugo)
+                                ({{round($torneo->goles / $torneo->jugados,2)}})
+                            @else
+                                ({{round(0,2)}})
+                            @endif
+                            </a>
+                        </td>
+                        <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Amarillas'))}}" >{{$torneo->amarillas}}
+                            @if($jugo)
+                                ({{round($torneo->amarillas / $torneo->jugados,2)}})
+                            @else
+                                ({{round(0,2)}})
+                            @endif
+                            </a>
+                        </td>
+                        <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Rojas'))}}" >{{$torneo->rojas}}
+                            @if($jugo)
+                                ({{round($torneo->rojas / $torneo->jugados,2)}})
+                            @else
+                                ({{round(0,2)}})
+                            @endif
+                            </a>
+                        </td>
+                        <td>{{$torneo->recibidos}}
+                            @if($jugo)
+                                ({{round($torneo->recibidos / $torneo->jugados,2)}})
+                            @else
+                                ({{round(0,2)}})
+                            @endif
+                        </td>
+                        <td>{{$torneo->invictas}}
+                            @if($jugo)
+                                ({{round($torneo->invictas / $torneo->jugados,2)}})
+                            @else
+                                ({{round(0,2)}})
+                            @endif
+                        </td>
+                    </tr>
+
+                @endforeach
                 <tr>
-                    <td>{{$i++}}</td>
-                    <td>{{$torneo->nombreTorneo}}</td>
-                    <td>@if($torneo->escudo)
-                            @php
-                                $escudos = explode(',',$torneo->escudo);
-                            @endphp
-                            @foreach($escudos as $escudo)
-
-                                @if($escudo!='')
-                                    @php
-                                        $escudoArr = explode('_',$escudo);
-                                    @endphp
-                                    <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
-                                        <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
-                                        @if(isset($escudoArr[2]) && $escudoArr[2] != '')
-                                            <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
-                                            Pos: {!!  $escudoArr[2] !!}
-                                        @endif
-                                    </a>
-                                @endif
-                            @endforeach
-                        @endif
-
-                    </td>
-                    <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
-                    <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->goles}}
-                        @if($jugo)
-                            ({{round($torneo->goles / $torneo->jugados,2)}})
-                        @else
-                            ({{round(0,2)}})
-                        @endif
-                        </a>
-                    </td>
-                    <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Amarillas'))}}" >{{$torneo->amarillas}}
-                        @if($jugo)
-                            ({{round($torneo->amarillas / $torneo->jugados,2)}})
-                        @else
-                            ({{round(0,2)}})
-                        @endif
-                        </a>
-                    </td>
-                    <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Rojas'))}}" >{{$torneo->rojas}}
-                        @if($jugo)
-                            ({{round($torneo->rojas / $torneo->jugados,2)}})
-                        @else
-                            ({{round(0,2)}})
-                        @endif
-                        </a>
-                    </td>
-                    <td>{{$torneo->recibidos}}
-                        @if($jugo)
-                            ({{round($torneo->recibidos / $torneo->jugados,2)}})
-                        @else
-                            ({{round(0,2)}})
-                        @endif
-                    </td>
-                    <td>{{$torneo->invictas}}
-                        @if($jugo)
-                            ({{round($torneo->invictas / $torneo->jugados,2)}})
-                        @else
-                            ({{round(0,2)}})
-                        @endif
-                    </td>
+                    <td></td>
+                    <td></td>
+                    <td><strong>Totales</strong></td>
+                    <td><strong><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{ $totalJugados}}</a></strong></td>
+                    <td><strong><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id))}}" >{{ $totalGoles}} ({{($totalJugados)?round($totalGoles / $totalJugados,2):0}})</a></strong></td>
+                    <td><strong><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo'=>'Amarillas'))}}" >{{ $totalAmarillas}} ({{($totalJugados)?round($totalAmarillas / $totalJugados,2):0}})</a></strong></td>
+                    <td><strong><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo'=>'Rojas'))}}" >{{ $totalRojas}} ({{($totalJugados)?round($totalRojas / $totalJugados,2):0}})</a></strong></td>
+                    <td><strong>{{ $totalRecibidos}} ({{($totalJugados)?round($totalRecibidos / $totalJugados,2):0}})</strong></td>
+                    <td><strong>{{ $totalInvictas}} ({{($totalJugados)?round($totalInvictas / $totalJugados,2):0}})</strong></td>
                 </tr>
+                </tbody>
+            </table>
+            </div>
 
-            @endforeach
-            <tr>
-                <td></td>
-                <td></td>
-                <td><strong>Totales</strong></td>
-                <td><strong><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{ $totalJugados}}</a></strong></td>
-                <td><strong><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id))}}" >{{ $totalGoles}} ({{($totalJugados)?round($totalGoles / $totalJugados,2):0}})</a></strong></td>
-                <td><strong><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo'=>'Amarillas'))}}" >{{ $totalAmarillas}} ({{($totalJugados)?round($totalAmarillas / $totalJugados,2):0}})</a></strong></td>
-                <td><strong><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->id,'tipo'=>'Rojas'))}}" >{{ $totalRojas}} ({{($totalJugados)?round($totalRojas / $totalJugados,2):0}})</a></strong></td>
-                <td><strong>{{ $totalRecibidos}} ({{($totalJugados)?round($totalRecibidos / $totalJugados,2):0}})</strong></td>
-                <td><strong>{{ $totalInvictas}} ({{($totalJugados)?round($totalInvictas / $totalJugados,2):0}})</strong></td>
-            </tr>
-            </tbody>
-        </table>
         @if(count($torneosTecnico)>0)
-            <h1 class="display-6">Técnico</h1>
+                <div role="tabpanel" class="tab-pane" id="tecnico">
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
                     <dt>Titulos</dt>
@@ -242,7 +267,7 @@
                 </div>
 
             </div>
-        <table class="table">
+        <table class="table" style="font-size: 14px;">
             <thead>
             <th>#</th>
             <th>Torneo</th>
@@ -341,7 +366,9 @@
 
             </tbody>
         </table>
+                </div>
         @endif
+        </div>
     <div class="d-flex">
 
         <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>

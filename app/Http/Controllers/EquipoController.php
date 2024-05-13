@@ -229,7 +229,7 @@ ORDER BY torneos.year DESC';
         $titulosCopa=0;
 
         $torneosEquipo = DB::select(DB::raw($sql));
-
+        $torneosTitulos=array();
         foreach ($torneosEquipo as $torneo){
             $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
             $arrgrupos='';
@@ -328,12 +328,148 @@ group by equipo_id
                     '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
                     (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
                 ) : '';
-
+                if ((!empty($posicionTorneo))&&($posicionTorneo->posicion == 1)){
+                    $torneosTitulos[]=$torneo;
+                }
             }
         }
+        set_time_limit(0);
+        //dd($request);
+
+        $order= ($request->query('order'))?$request->query('order'):'jugados';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
 
 
-        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga'));
+
+
+        $sql = 'SELECT jugador_id, "" escudo, foto, jugador,
+       sum(jugados) jugados,
+
+       sum(goles) goles,
+       sum(rojas) rojas,
+       sum(amarillas) amarillas,
+       sum(recibidos) recibidos,
+       sum(invictas) invictas, sum(titulos) titulos
+
+from
+
+(SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "1" as goles, "0" as  amarillas
+, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos
+FROM gols
+INNER JOIN jugadors ON gols.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON gols.partido_id = partidos.id
+INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+AND alineacions.jugador_id = jugadors.id AND alineacions.equipo_id ='.$id.'
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+WHERE gols.tipo <> \'En contra\'';
+
+
+
+        $sql .=' UNION ALL
+ SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, ( case when tarjetas.tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+, ( case when tarjetas.tipo=\'Roja\' or tarjetas.tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos
+FROM tarjetas
+INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+LEFT JOIN partidos ON tarjetas.partido_id = partidos.id
+INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+AND alineacions.jugador_id = jugadors.id AND alineacions.equipo_id ='.$id.'
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id';
+
+
+
+
+        $sql .=' UNION ALL
+ SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
+, "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
+(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" AS jugando, "0" AS titulos
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+WHERE  alineacions.tipo = \'Titular\' AND alineacions.equipo_id = '.$id;
+
+
+        $sql .= ' UNION ALL
+ SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
+, "0" as  rojas, "0" AS recibidos,
+"0" AS invictas, "0" AS jugando, "0" AS titulos
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador != \'Arquero\'
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\') AND alineacions.equipo_id = '.$id;
+
+
+        $sql .=' UNION ALL
+ SELECT jugadors.id AS jugador_id, personas.foto,"1" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as  amarillas
+, "0" as  rojas, "0" AS recibidos,
+"0" AS invictas, "0" AS jugando, "0" AS titulos
+FROM alineacions
+INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN partidos ON alineacions.partido_id = partidos.id
+
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+WHERE  (cambios.tipo = \'Entra\') AND alineacions.equipo_id = '.$id;
+
+        $sql.=' UNION ALL
+SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, CONCAT(personas.apellido,\', \',personas.nombre) jugador, "0" AS goles, "0" as amarillas , "0" as rojas, "0" AS recibidos,
+"0" AS invictas, "0" AS jugando, count(DISTINCT posicion_torneos.id) AS titulos
+FROM plantilla_jugadors
+INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
+
+INNER JOIN grupos ON grupos.id = plantillas.grupo_id
+INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND posicion_torneos.equipo_id = plantillas.equipo_id AND posicion_torneos.posicion=1
+WHERE plantillas.equipo_id='.$id.'
+GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre';
+        $sql .=' ) as subconsulta
+
+group by jugador_id,jugador, foto
+ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
+//dd($sql);
+        $jugadores = DB::select(DB::raw($sql));
+        //echo $sql;
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($jugadores, $offSet, $paginate, true);
+
+
+
+        $jugadores = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($jugadores), $paginate, $page);
+
+
+
+        $jugadores->setPath(route('equipos.ver',  array('equipoId'=>$id,'order'=>$order,'tipoOrder'=>$tipoOrder,'pestActiva'=>'jugadores')));
+
+
+
+        $iterator=$offSet+1;
+
+
+        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga','torneosTitulos','jugadores','order','tipoOrder','iterator'));
     }
 
     public function jugados(Request $request)

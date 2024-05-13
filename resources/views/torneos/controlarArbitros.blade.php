@@ -1,7 +1,19 @@
 @extends('layouts.app')
 
 @section('pageTitle', 'Controlar Arbitros')
+<style>
+    /* Estilos personalizados para resaltar la pestaña activa */
+    .nav-link.active {
+        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
+        color: #fff; /* Cambia el color del texto de la pestaña activa */
+        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    }
 
+    /* Agrega un espacio entre las pestañas y el contenido */
+    .tab-content {
+        margin: 20px; /* Ajusta el margen superior del contenido */
+    }
+</style>
 @section('content')
     <div class="container">
         <h1 class="display-6">Controlar arbitros</h1>
@@ -31,15 +43,28 @@
                 </ul>
             </div>
         @endif
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="principal-tab" data-toggle="tab" href="#principal" role="tab" aria-controls="principal" aria-selected="true">Sin árbitro</a>
+            </li>
 
-        <h1 class="display-6">Sin árbitro principal</h1>
+                <li class="nav-item">
+                    <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Distinto de 3</a>
+                </li>
+            <li class="nav-item">
+                <a class="nav-link" id="repetidos-tab" data-toggle="tab" href="#repetidos" role="tab" aria-controls="repetidos" aria-selected="false">Repetidos</a>
+            </li>
+
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div role="tabpanel" class="tab-pane active" id="principal">
 
         <!-- build our form inputs -->
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
-                <table class="table">
+
+                <table class="table" style="font-size: 14px;">
                     <thead>
 
                     <th>Torneo</th>
@@ -106,15 +131,16 @@
             </div>
 
         </div>
+            </div>
 
-        <h1 class="display-6">Distintos de 3</h1>
+            <div role="tabpanel" class="tab-pane" id="tres">
 
         <!-- build our form inputs -->
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
-                <table class="table">
+
+                <table class="table" style="font-size: 14px;">
                     <thead>
 
                     <th>Torneo</th>
@@ -181,15 +207,16 @@
             </div>
 
         </div>
+            </div>
 
-        <h1 class="display-6">Repetidos</h1>
+            <div role="tabpanel" class="tab-pane" id="repetidos">
 
         <!-- build our form inputs -->
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1 class="display-6">Partidos</h1>
-                <table class="table">
+
+                <table class="table" style="font-size: 14px;">
                     <thead>
 
                     <th>Torneo</th>
@@ -256,7 +283,8 @@
             </div>
 
         </div>
-
+            </div>
+        </div>
 
         <a href="{{ route('torneos.index') }}" class="btn btn-success m-1">Volver</a>
 

@@ -54,7 +54,7 @@ class TorneoController extends Controller
 
         }
 
-        $torneos1=Torneo::where('nombre','like',"%$nombre%")->orWhere('year','like',"%$nombre%")->orderBy('year','DESC')->paginate();
+        $torneos1=Torneo::where('nombre','like',"%$nombre%")->orWhere('year','like',"%$nombre%")->orderBy('year','DESC')->orderBy('id','DESC')->paginate();
 
         return view('torneos.index', compact('torneos1'));
     }
@@ -759,7 +759,7 @@ from ( ';
 
 group by equipo, foto, equipo_id
 
-order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
+order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             //echo $sql;
             $acumulado = DB::select(DB::raw($sql));
         }

@@ -90,10 +90,10 @@ Route::get('portada', 'PortadaController@index')->name('portada');
 Route::get('posiciones', 'GrupoController@posiciones')->name('grupos.posiciones');
 Route::get('tablaGoles', 'GrupoController@goleadores')->name('grupos.goleadores');
 Route::get('tablaJugadores', 'GrupoController@jugadores')->name('grupos.jugadores');
-Route::get('tablaTrajetas', 'GrupoController@tarjetas')->name('grupos.tarjetas');
+Route::get('tablaTarjetas', 'GrupoController@tarjetas')->name('grupos.tarjetas');
 Route::get('jueces', 'PartidoController@arbitros')->name('partidos.arbitros');
 Route::get('promedios', 'TorneoController@promedios')->name('torneos.promedios');
-
+Route::get('tecnicos', 'GrupoController@tecnicos')->name('grupos.tecnicos');
 Route::get('verTorneo', 'TorneoController@ver')->name('torneos.ver');
 Route::get('tabla', 'GrupoController@posicionesPublic')->name('grupos.posicionesPublic');
 Route::get('goleadores', 'GrupoController@goleadoresPublic')->name('grupos.goleadoresPublic');
@@ -124,7 +124,7 @@ Route::get('tarjetasHistorico', 'TorneoController@tarjetas')->name('torneos.tarj
 Route::get('posicionesHistorico', 'TorneoController@posiciones')->name('torneos.posiciones');
 Route::get('otrasEstadisticas', 'TorneoController@estadisticasOtras')->name('torneos.estadisticasOtras');
 Route::get('estadisticasTorneo', 'TorneoController@estadisticasTorneo')->name('torneos.estadisticasTorneo');
-Route::get('tecnicos', 'TorneoController@tecnicos')->name('torneos.tecnicos');
+Route::get('tecnicosHistorico', 'TorneoController@tecnicos')->name('torneos.tecnicos');
 Route::get('arquerosHistorico', 'TorneoController@arqueros')->name('torneos.arqueros');
 Route::get('titulosHistorico', 'TorneoController@titulos')->name('torneos.titulos');
 

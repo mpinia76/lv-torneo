@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Goleadores')
+@section('pageTitle', 'Jugadores')
 
 @section('content')
     <div class="container">

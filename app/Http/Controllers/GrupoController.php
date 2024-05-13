@@ -26,7 +26,7 @@ class GrupoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except(['posicionesPublic','goleadoresPublic','tarjetasPublic', 'arqueros', 'metodo','jugadores']);
+        $this->middleware('auth')->except(['posicionesPublic','goleadoresPublic','tarjetasPublic', 'arqueros', 'metodo','jugadores','tecnicos']);
     }
 
     /**
@@ -1001,5 +1001,171 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id.' AND alineacions.partido_
 
 
         return view('grupos.jugadores', compact('torneo','jugadores','i','order','tipoOrder'));
+    }
+
+    public function tecnicos(Request $request)
+    {
+
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+        $order= ($request->query('order'))?$request->query('order'):'puntaje';
+        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+
+
+
+
+        $sql = 'SELECT tecnico, fotoTecnico, tecnico_id,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), \'%\') porcentaje,
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) /COUNT(*) ),
+      2
+    ) prom, "" escudo, "" AS jugando, "" AS titulos
+from (
+       select  DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 INNER JOIN personas ON personas.id = tecnicos.persona_id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id = '.$torneo_id;
+
+
+        $sql .=' union all
+       select DISTINCT CONCAT (personas.apellido,\', \', personas.nombre) tecnico, personas.foto fotoTecnico, tecnicos.id tecnico_id, golesv, golesl, equipos.escudo foto, fechas.id fecha_id
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 INNER JOIN personas ON personas.id = tecnicos.persona_id
+		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id = '.$torneo_id;
+
+        $sql .=' ) a
+group by tecnico, fotoTecnico, tecnico_id
+
+
+
+        ORDER BY '.$order.' '.$tipoOrder.', diferencia DESC, golesl DESC, jugados DESC, tecnico ASC';
+
+//echo $sql;
+
+        $goleadores = DB::select(DB::raw($sql));
+
+
+
+        $page = $request->query('page', 1);
+
+        $paginate = 15;
+
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($goleadores, $offSet, $paginate, true);
+
+
+
+        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($goleadores), $paginate, $page);
+
+
+        foreach ($goleadores as $goleador){
+
+
+
+
+
+
+            //print_r($titulosTecnicoLigaEquipo);
+
+
+
+            $sql2='SELECT equipo, escudo, equipo_id,
+       count(*) jugados,
+       count(case when golesl > golesv then 1 end) ganados,
+       count(case when golesv > golesl then 1 end) perdidos,
+       count(case when golesl = golesv then 1 end) empatados,
+       sum(golesl) golesl,
+       sum(golesv) golesv,
+       sum(golesl) - sum(golesv) diferencia,
+       sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) puntaje, CONCAT(
+    ROUND(
+      (  sum(
+             case when golesl > golesv then 3 else 0 end
+           + case when golesl = golesv then 1 else 0 end
+       ) * 100/(COUNT(*)*3) ),
+      2
+    ), \'%\') porcentaje
+from (
+       select   equipos.nombre equipo, equipos.id equipo_id, golesl, golesv, equipos.escudo
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not NULL AND tecnicos.id = '.$goleador->tecnico_id.' AND grupos.torneo_id = '.$torneo_id.'
+     union all
+       select equipos.nombre equipo, equipos.id equipo_id, golesv, golesl, equipos.escudo
+		 from partidos
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+         INNER JOIN fechas ON partidos.fecha_id = fechas.id
+		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+		 WHERE golesl is not null AND golesv is not NULL AND tecnicos.id = '.$goleador->tecnico_id.' AND grupos.torneo_id = '.$torneo_id.'
+) a
+group by equipo, escudo, equipo_id
+
+order by puntaje desc, diferencia DESC, golesl DESC';
+
+
+
+            $escudos = DB::select(DB::raw($sql2));
+
+            foreach ($escudos as $escudo){
+
+                    $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.',';
+
+
+
+            }
+
+
+        }
+
+        $goleadores->setPath(route('grupos.tecnicos',array('order'=>$order,'tipoOrder'=>$tipoOrder,'torneoId'=>$torneo_id)));
+
+
+        $i=$offSet+1;
+
+
+        return view('grupos.tecnicos', compact('goleadores','i','order','tipoOrder','torneo_id'));
     }
 }

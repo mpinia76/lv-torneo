@@ -7272,7 +7272,7 @@ return $string;
                 if ($goles!=$golesTotales){
                     Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre.' -> '.$goles.' - '.$golesTotales,[]);
                 }
-
+                $error='';
                 foreach ($equipos as $eq) {
                     //Log::channel('mi_log')->info('Equipo  ' . $equipo['equipo'], []);
                     $strEquipo=trim($eq['equipo']);
@@ -7416,6 +7416,12 @@ return $string;
                                         continue;
                                     }
                                 }
+                                else{
+
+                                    $error .= 'NO se encontró al jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] .' del equipo '.$strEquipo.'<br>';
+                                    $ok = 0;
+                                    continue;
+                                }
                             }
                             foreach ($jugador['incidencias'] as $incidencia) {
 
@@ -7532,7 +7538,20 @@ return $string;
 
 
                                             }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
+                                                if ($ex->errorInfo[1] == 1452) {
+                                                    // Error de integridad de clave externa
+                                                    // Aquí puedes agregar un mensaje de error personalizado o redirigir a una página de error
+                                                    // También puedes registrar el error en un archivo de registro para su análisis posterior
+                                                    //Log::error('Error de integridad de clave externa: ' . $e->getMessage());
+                                                    $error = 'Error de integridad de clave externa: ';
+
+
+                                                } else {
+                                                    // Otro tipo de error de base de datos
+                                                    // Puedes manejarlo de acuerdo a tus necesidades
+                                                    $error = $ex->getMessage();
+                                                }
+
                                                 $ok=0;
                                                 continue;
                                             }
@@ -8682,6 +8701,12 @@ return $string;
                                         continue;
                                     }
                                 }
+                                else{
+
+                                    $error .= 'NO se encontró al jugador: '. $jugador['dorsal'] . ' ' . $jugador['nombre'] .' del equipo '.$strEquipo.'<br>';;
+                                    $ok = 0;
+                                    continue;
+                                }
                             }
 
                             foreach ($jugador['incidencias'] as $incidencia) {
@@ -8727,7 +8752,20 @@ return $string;
 
 
                                             } catch (QueryException $ex) {
-                                                $error = $ex->getMessage();
+                                                if ($ex->errorInfo[1] == 1452) {
+                                                    // Error de integridad de clave externa
+                                                    // Aquí puedes agregar un mensaje de error personalizado o redirigir a una página de error
+                                                    // También puedes registrar el error en un archivo de registro para su análisis posterior
+                                                    //Log::error('Error de integridad de clave externa: ' . $e->getMessage());
+
+                                                    $error .= 'Jugador no cargado: '.$jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])).' en el equipo '.$eq['equipo'].'<br>';;
+
+
+                                                } else {
+                                                    // Otro tipo de error de base de datos
+                                                    // Puedes manejarlo de acuerdo a tus necesidades
+                                                    $error = $ex->getMessage();
+                                                }
                                                 $ok = 0;
                                                 continue;
                                             }
@@ -8766,7 +8804,21 @@ return $string;
 
 
                                             }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
+                                                if ($ex->errorInfo[1] == 1452) {
+                                                    // Error de integridad de clave externa
+                                                    // Aquí puedes agregar un mensaje de error personalizado o redirigir a una página de error
+                                                    // También puedes registrar el error en un archivo de registro para su análisis posterior
+                                                    //Log::error('Error de integridad de clave externa: ' . $e->getMessage());
+
+                                                    $error .= 'Jugador no cargado: '.$jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])).' en el equipo '.$eq['equipo'].'<br>';
+
+
+                                                } else {
+                                                    // Otro tipo de error de base de datos
+                                                    // Puedes manejarlo de acuerdo a tus necesidades
+                                                    $error = $ex->getMessage();
+                                                }
+
                                                 $ok=0;
                                                 continue;
                                             }
@@ -8806,7 +8858,20 @@ return $string;
 
 
                                             }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
+                                                if ($ex->errorInfo[1] == 1452) {
+                                                    // Error de integridad de clave externa
+                                                    // Aquí puedes agregar un mensaje de error personalizado o redirigir a una página de error
+                                                    // También puedes registrar el error en un archivo de registro para su análisis posterior
+                                                    //Log::error('Error de integridad de clave externa: ' . $e->getMessage());
+
+                                                    $error .= 'Jugador no cargado: '.$jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - '. trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])).' en el equipo '.$eq['equipo'].'<br>';
+
+
+                                                } else {
+                                                    // Otro tipo de error de base de datos
+                                                    // Puedes manejarlo de acuerdo a tus necesidades
+                                                    $error = $ex->getMessage();
+                                                }
                                                 $ok=0;
                                                 continue;
                                             }

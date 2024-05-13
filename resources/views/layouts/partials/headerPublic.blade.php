@@ -90,7 +90,11 @@
                                 Promedios
                             </a>
                         </li>
+                        <li><a class="dropdown-item" href="{{route('grupos.tecnicos',  array('torneoId' => Session::get('codigoTorneo')))}}">
+                                Técnicos
+                            </a>
 
+                        </li>
                         <li><a class="dropdown-item" href="{{route('grupos.tarjetasPublic',  array('torneoId' => Session::get('codigoTorneo')))}}">
                                 Tarjetas
                             </a>
