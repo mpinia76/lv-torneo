@@ -24,11 +24,15 @@
                 @endforeach
 
             </select>
-            <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
+            <input type="checkbox" class="form-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
 
             <strong>Jugando</strong>
             </input>
+            <nav class="navbar navbar-light float-right">
+                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
+                <button class="btn btn-success m-1" type="button" onClick="enviarForm()">Buscar</button>
+            </nav>
 
 
         </form>
@@ -61,7 +65,7 @@
                             <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                         @endif
                     </a>
-                    {{$jugador->jugador}}</td>
+                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.$jugador->nacionalidad.'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
 
                 <td>@if($jugador->jugando)
                         @php

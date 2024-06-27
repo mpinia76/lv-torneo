@@ -49,6 +49,7 @@
     }
 
 
+
 </style>
 <div class="load">
     <div class="in"><img width="20%" src="{{ url('/images/hourglass.svg') }}"></div>

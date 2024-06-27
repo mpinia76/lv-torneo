@@ -75,7 +75,7 @@ class EquipoController extends Controller
         //
         //Log::info(print_r($request->file(), true));
 
-        $this->validate($request,[ 'nombre'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048']);
+        $this->validate($request,[ 'nombre'=>'required','pais'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('escudo')) {
@@ -99,6 +99,7 @@ class EquipoController extends Controller
         $insert['fundacion'] = $request->get('fundacion');
         $insert['estadio'] = $request->get('estadio');
         $insert['historia'] = $request->get('historia');
+        $insert['pais'] = $request->get('pais');
 
 
         $equipo = Equipo::create($insert);
@@ -144,7 +145,7 @@ class EquipoController extends Controller
     public function update(Request $request, $id)
     {
         //
-        $this->validate($request,[ 'nombre'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048']);
+        $this->validate($request,[ 'nombre'=>'required','pais'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('escudo')) {
@@ -168,7 +169,7 @@ class EquipoController extends Controller
         $update['fundacion'] = $request->get('fundacion');
         $update['estadio'] = $request->get('estadio');
         $update['historia'] = $request->get('historia');
-
+        $update['pais'] = $request->get('pais');
 
 
         $equipo=equipo::find($id);
@@ -216,17 +217,18 @@ class EquipoController extends Controller
         $equipo=Equipo::findOrFail($id);
 
 
-		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo
+		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo, torneos.ambito
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 
 WHERE partidos.equipol_id = '.$id.' OR partidos.equipov_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
 ORDER BY torneos.year DESC';
 
         $titulosLiga=0;
         $titulosCopa=0;
+        $titulosInternacional=0;
 
         $torneosEquipo = DB::select(DB::raw($sql));
         $torneosTitulos=array();
@@ -304,12 +306,18 @@ group by equipo_id
             if(!empty($posicionTorneo)){
                 if ($posicionTorneo->posicion == 1){
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->tipo == 'Copa') {
-                        $titulosCopa++;
+                    if ($torneo->ambito == 'Nacional'){
+                        if ($torneo->tipo == 'Copa') {
+                            $titulosCopa++;
+                        }
+                        else{
+                            $titulosLiga++;
+                        }
                     }
                     else{
-                        $titulosLiga++;
+                        $titulosInternacional++;
                     }
+
                 }
             }
 
@@ -469,7 +477,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
         $iterator=$offSet+1;
 
 
-        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga','torneosTitulos','jugadores','order','tipoOrder','iterator'));
+        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga','torneosTitulos','jugadores','order','tipoOrder','iterator','titulosInternacional'));
     }
 
     public function jugados(Request $request)

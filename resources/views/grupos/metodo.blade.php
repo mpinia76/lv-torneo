@@ -8,7 +8,7 @@
         <form class="form-inline">
             <input type="hidden" name="torneoId" value="{{ (isset($_GET['torneoId']))?$_GET['torneoId']:'' }}">
 
-            <select class="orm-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
+            <select class="form-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
                 @foreach($fechas as $f)
 
                     <option value="{{$f->numero}}" @if($f->numero==$fecha->numero)
@@ -70,6 +70,7 @@
                 <thead>
                 <th>#</th>
                 <th style="width: 300px;">Equipo</th>
+                <th>Punt.</th>
                 <th>J</th>
                 <th>G</th>
                 <th>E</th>
@@ -77,7 +78,7 @@
                 <th>GF</th>
                 <th>GC</th>
                 <th>Dif.</th>
-                <th>Punt.</th>
+
 
                 </thead>
                 <tbody>
@@ -92,6 +93,7 @@
                                 @endif
                             </a>
                             {{$equipo->equipo}}</td>
+                        <td>{{$equipo->puntaje}}</td>
                         <td>{{$equipo->jugados}}</td>
                         <td>{{$equipo->ganados}}</td>
                         <td>{{$equipo->empatados}}</td>
@@ -99,7 +101,7 @@
                         <td>{{$equipo->golesl}}</td>
                         <td>{{$equipo->golesv}}</td>
                         <td>{{$equipo->diferencia}}</td>
-                        <td>{{$equipo->puntaje}}</td>
+
 
 
 

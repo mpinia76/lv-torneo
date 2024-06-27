@@ -2,6 +2,6 @@
 
 @section('content')
     <script type="text/javascript">
-        window.location = "{{ url('/verFechas') }}";//here double curly bracket
+        window.location = "{{ url('/fixture') }}";//here double curly bracket
     </script>
 @endsection

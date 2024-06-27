@@ -12,10 +12,11 @@
         <thead>
         <th>#</th>
         <th>Equipo</th>
-        <th>Prom.</th>
+        <th>Punt.</th>
+
         <th>Jugados</th>
 
-        <th>Punt.</th>
+        <th>Prom.</th>
 
         </thead>
         <tbody>
@@ -29,11 +30,12 @@
                         <img id="original" src="{{ url('images/'.$equipo->foto) }}" height="25">
                     @endif
                     </a>
-                {{$equipo->equipo}}</td>
-                <td>{{$equipo->promedio}}</td>
+                {{$equipo->equipo}} <img id="original" src="{{ url('images/'.$equipo->pais.'.gif') }}" alt="{{ $equipo->pais }}"></td>
+                <td>{{$equipo->puntaje}}</td>
+
                 <td>{{$equipo->jugados}}</td>
 
-                <td>{{$equipo->puntaje}}</td>
+                <td>{{$equipo->promedio}}</td>
 
 
 

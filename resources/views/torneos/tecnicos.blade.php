@@ -26,14 +26,18 @@
                 @endforeach
 
             </select>
-            <input type="checkbox" class="orm-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
+            <input type="checkbox" class="form-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
 
             <strong>Jugando</strong>
             </input>
-<br><br>
-            <input type="checkbox" class="orm-control" id="campeones" name="campeones" @if ($campeones == 1) checked @endif onchange="enviarForm()"><strong>Campeones</strong> </input>
 
+            <input type="checkbox" class="form-control" id="campeones" name="campeones" @if ($campeones == 1) checked @endif onchange="enviarForm()"><strong>Campeones</strong> </input>
 
+            <nav class="navbar navbar-light float-right">
+                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
+
+                <button class="btn btn-success m-1" type="button" onClick="enviarForm()">Buscar</button>
+            </nav>
         </form>
         <br>
 
@@ -42,6 +46,7 @@
             <th>#</th>
             <th>Técnico</th>
             <th>Actual</th>
+            <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Jugados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > J @if($order=='Jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Ganados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > G @if($order=='Ganados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'Empatados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > E @if($order=='Empatados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
@@ -49,7 +54,7 @@
             <th><a href="{{route('torneos.tecnicos', array('order'=>'golesl','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > GF @if($order=='golesl') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'golesv','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > GC @if($order=='golesv') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.tecnicos', array('order'=>'diferencia','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > Dif. @if($order=='diferencia') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.tecnicos', array('order'=>'puntaje','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > Punt. @if($order=='puntaje') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+
             <th><a href="{{route('torneos.tecnicos', array('order'=>'prom','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,  'campeones'=>$campeones,'torneoId'=>$torneoId))}}" > % @if($order=='prom') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
             <th>Títulos
@@ -70,7 +75,7 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                             @endif
                         </a>
-                        {{$tecnico->tecnico}}</td>
+                        {{$tecnico->tecnico}} <img id="original" src="{{ url('images/'.$tecnico->nacionalidadTecnico.'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}"></td>
                     <td>@if($tecnico->jugando)
                             @php
                                 $escs = explode(',',$tecnico->jugando);
@@ -88,6 +93,7 @@
                             @endforeach
 
                         @endif</td>
+                    <td>{{$tecnico->puntaje}}</td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id))}}" >{{$tecnico->jugados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Ganados'))}}" >{{$tecnico->ganados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Empatados'))}}" >{{$tecnico->empatados}}</a></td>
@@ -95,7 +101,7 @@
                     <td>{{$tecnico->golesl}}</td>
                     <td>{{$tecnico->golesv}}</td>
                     <td>{{$tecnico->diferencia}}</td>
-                    <td>{{$tecnico->puntaje}}</td>
+
                     <td>{{$tecnico->porcentaje}}</td>
                     <td>{{$tecnico->titulos}}</td>
                     <td>@if($tecnico->escudo)

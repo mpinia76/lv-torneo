@@ -3,7 +3,7 @@ DELETE plantilla_jugadors FROM
 plantillas INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
  INNER JOIN grupos ON grupos.id = plantillas.grupo_id
  INNER JOIN torneos ON torneos.id = grupos.torneo_id
-WHERE torneos.id = 2 AND NOT EXISTS (SELECT alineacions.jugador_id
+WHERE torneos.id = 10 AND NOT EXISTS (SELECT alineacions.jugador_id
 FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
 INNER JOIN fechas ON fechas.grupo_id = g2.id
 INNER JOIN partidos ON partidos.fecha_id = fechas.id
@@ -210,38 +210,65 @@ UPDATE alineacions
     INNER JOIN fechas ON fechas.id = partidos.fecha_id
     INNER JOIN grupos ON fechas.grupo_id = grupos.id
     INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    SET alineacions.jugador_id=4321
-WHERE alineacions.jugador_id = 4059 AND alineacions.equipo_id = 20 AND torneos.id = 41;
+    SET alineacions.jugador_id=2174
+WHERE alineacions.jugador_id = 2608 AND alineacions.equipo_id = 22 AND torneos.id = 10;
 
 UPDATE plantilla_jugadors
          INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
 
          INNER JOIN grupos ON plantillas.grupo_id = grupos.id
          INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    SET plantilla_jugadors.jugador_id=4321
-WHERE plantilla_jugadors.jugador_id = 4059 AND plantillas.equipo_id = 20 AND torneos.id = 41;
+    SET plantilla_jugadors.jugador_id=2174
+WHERE plantilla_jugadors.jugador_id = 2608 AND plantillas.equipo_id = 22 AND torneos.id = 10;
 
 UPDATE gols
          INNER JOIN partidos ON gols.partido_id = partidos.id
          INNER JOIN fechas ON fechas.id = partidos.fecha_id
          INNER JOIN grupos ON fechas.grupo_id = grupos.id
          INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    SET gols.jugador_id=4321
-WHERE gols.jugador_id = 4059 AND (partidos.equipol_id = 20 OR partidos.equipov_id = 20) AND torneos.id = 41;
+    SET gols.jugador_id=2174
+WHERE gols.jugador_id = 2608 AND (partidos.equipol_id  = 22 OR partidos.equipov_id  = 22) AND torneos.id = 10;
 
 UPDATE cambios
     INNER JOIN partidos ON cambios.partido_id = partidos.id
     INNER JOIN fechas ON fechas.id = partidos.fecha_id
     INNER JOIN grupos ON fechas.grupo_id = grupos.id
     INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    SET cambios.jugador_id=4321
-WHERE cambios.jugador_id = 4059 AND (partidos.equipol_id = 20 OR partidos.equipov_id = 20) AND torneos.id = 41;
+    SET cambios.jugador_id=2174
+WHERE cambios.jugador_id = 2608 AND (partidos.equipol_id  = 22 OR partidos.equipov_id  = 22) AND torneos.id = 10;
 
 UPDATE tarjetas
     INNER JOIN partidos ON tarjetas.partido_id = partidos.id
     INNER JOIN fechas ON fechas.id = partidos.fecha_id
     INNER JOIN grupos ON fechas.grupo_id = grupos.id
     INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    SET tarjetas.jugador_id=4321
-WHERE tarjetas.jugador_id = 4059 AND (partidos.equipol_id = 20 OR partidos.equipov_id = 20) AND torneos.id = 41;
+    SET tarjetas.jugador_id=2174
+WHERE tarjetas.jugador_id = 2608 AND (partidos.equipol_id  = 22 OR partidos.equipov_id  = 22) AND torneos.id = 10;
 
+########################## modificar jugador repetido ##########################
+UPDATE alineacions
+    SET alineacions.jugador_id=2802
+WHERE alineacions.jugador_id = 1766 ;
+
+UPDATE plantilla_jugadors
+
+    SET plantilla_jugadors.jugador_id=2802
+WHERE plantilla_jugadors.jugador_id = 1766 ;
+
+UPDATE gols
+
+    SET gols.jugador_id=2802
+WHERE gols.jugador_id = 1766 ;
+
+UPDATE cambios
+
+    SET cambios.jugador_id=2802
+WHERE cambios.jugador_id = 1766 ;
+
+UPDATE tarjetas
+
+    SET tarjetas.jugador_id=2802
+WHERE tarjetas.jugador_id = 1766 ;
+
+########################## modificar arbitro repetido ##########################
+UPDATE `partido_arbitros` SET `arbitro_id`=207 WHERE  `arbitro_id`=6;

@@ -45,9 +45,11 @@ Route::group(['prefix' => 'admin'], function()
     Route::resource('partidoarbitros', 'PartidoArbitroController');
     Route::resource('alineaciones', 'AlineacionController');
     Route::resource('cambios', 'CambioController');
+    Route::resource('incidencias', 'IncidenciaController');
 
     Route::get('importarJugador', 'JugadorController@importar')->name('jugadores.importar');
     Route::post('importarJugadorProcess', 'JugadorController@importarProcess');
+    Route::get('verificarPersonas', 'JugadorController@verificarPersonas')->name('jugadores.verificarPersonas');
     Route::get('importarPartido', 'FechaController@importarPartido')->name('fechas.importarPartido');
     Route::post('importarPartidoProcess', 'FechaController@importarPartidoProcess');
     Route::get('importfechas', 'FechaController@import')->name('fechas.import');
@@ -99,6 +101,7 @@ Route::get('tabla', 'GrupoController@posicionesPublic')->name('grupos.posiciones
 Route::get('goleadores', 'GrupoController@goleadoresPublic')->name('grupos.goleadoresPublic');
 Route::get('tarjetero', 'GrupoController@tarjetasPublic')->name('grupos.tarjetasPublic');
 Route::get('verFechas', 'FechaController@ver')->name('fechas.ver');
+Route::get('fixture', 'FechaController@fixture')->name('fechas.fixture');
 Route::get('verFecha', 'FechaController@showPublic')->name('fechas.showPublic');
 Route::get('detalleFecha', 'FechaController@detalle')->name('fechas.detalle');
 Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');

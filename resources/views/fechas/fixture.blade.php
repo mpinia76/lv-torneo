@@ -1,18 +1,19 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Listado de fechas')
+@section('pageTitle', 'Partidos')
 
 @section('content')
     <div class="container">
+        <h1>Partidos</h1>
         <hr/>
 
-        <form class="form-inline">
-            <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
-            <select class="form-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
-                @foreach($fechas as $f)
-                    <option value="{{ $f->numero }}" @if($f->numero == $fecha->numero) selected @endif>Fecha {{ $f->numero }}</option>
-                @endforeach
-            </select>
+        <form class="form-inline" id="formFechas" method="GET" action="">
+            <div class="form-group">
+                <button type="button" class="btn btn-info" onclick="actualizarFecha(0)">Anterior</button>
+                <input type="date" name="dia" id="dia" class="form-control" value="{{ $dia }}" onchange="enviarFormulario()">
+
+                <button type="button" class="btn btn-info" onclick="actualizarFecha(2)">Siguiente</button>
+            </div>
         </form>
 
         <br>
@@ -23,6 +24,8 @@
                     <tbody>
                     @php
                         $lastDate = null;
+                         $lastTournament = null;
+                         $lastFecha = null;
                     @endphp
                     @foreach($partidosAgrupados as $partidos)
 
@@ -30,7 +33,20 @@
 
 
                                 @foreach($partidos as $partido)
+
+                                    @if ($partido->fecha->grupo->torneo->id != $lastTournament)
+                                        <tr>
+                                            <td colspan="6" style="text-align: center;">
+                                                <strong>{{ $partido->fecha->grupo->torneo->nombre }} {{ $partido->fecha->grupo->torneo->year }}</strong>
+                                            </td>
+                                        </tr>
+                                        @php
+                                            $lastTournament = $partido->fecha->grupo->torneo->id;
+                                        @endphp
+                                    @endif
+
                                     @php
+                                        //dd($partido->fecha->grupo->torneo) ;
                                         $currentDate = $partido->dia ? date('Y-m-d', strtotime($partido->dia)) : 'sin_fecha';
                                     @endphp
 
@@ -38,6 +54,16 @@
                                         <tr><td colspan="6" style="text-align: center;">
                                                 {{ $currentDate != 'sin_fecha' ? strftime('%A %d de %B de %Y', strtotime($currentDate)) : 'Sin Fecha' }}
                                             </td></tr>
+                                    @endif
+                                    @if ($partido->fecha->numero != $lastFecha)
+                                        <tr>
+                                            <td colspan="6" style="text-align: center;">
+                                                <strong>Fecha: {{ $partido->fecha->numero}}</strong>
+                                            </td>
+                                        </tr>
+                                        @php
+                                            $lastFecha = $partido->fecha->numero;
+                                        @endphp
                                     @endif
                                     <tr><td>{{ $partido->dia ? date(' H:i', strtotime($partido->dia)) : '' }}</td>
                                     <td>
@@ -72,8 +98,19 @@
                                     @endphp
                                 @endforeach
                             @else
-                                <tr>
+
                                 @foreach($partidos as $partido)
+                                    @if ($partido->fecha->grupo->torneo->id != $lastTournament)
+                                        <tr>
+                                            <td colspan="6" style="text-align: center;">
+                                                <strong>{{ $partido->fecha->grupo->torneo->nombre }} {{ $partido->fecha->grupo->torneo->year }}</strong>
+                                            </td>
+                                        </tr>
+                                        @php
+                                            $lastTournament = $partido->fecha->grupo->torneo->id;
+                                        @endphp
+                                    @endif
+                                    <tr>
                                     <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
                                     <td>
                                         <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
@@ -102,17 +139,41 @@
                                             <a href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}" class="btn btn-success m-1">Detalles</a>
                                         </div>
                                     </td>
+                                    </tr>
                                 @endforeach
                             @endif
-                        </tr>
+
                     @endforeach
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="d-flex">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">Volver</a>
-        </div>
+
     </div>
+
+    <script>
+        function enviarFormulario() {
+            document.getElementById('formFechas').submit();
+        }
+        function actualizarFecha(dias) {
+            let fechaHoy = document.getElementById('dia').value;
+            let fecha = new Date(fechaHoy);
+            console.log(dias);
+            fecha.setDate(fecha.getDate() + dias);
+            console.log(fecha);
+            let dia = String(fecha.getDate()).padStart(2, '0');
+            let mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            let anio = fecha.getFullYear();
+
+            let nuevaFecha = anio + '-' + mes + '-' + dia;
+
+            console.log(nuevaFecha);
+            // Actualizar el valor del input
+            document.getElementById('dia').value = nuevaFecha;
+
+            // Enviar el formulario
+            enviarFormulario();
+        }
+    </script>
 @endsection

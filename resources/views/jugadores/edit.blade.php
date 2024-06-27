@@ -93,6 +93,14 @@
                 {{Form::label('peso', 'Peso')}}
                 {{Form::number('peso', $jugador->persona->peso, ['class' => 'form-control','step' => '0.01'])}}
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('verificado', 'Verificado', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label>
+                        {{ Form::checkbox('verificado', 1, $jugador->persona->verificado) }}
+                    </label>
+                </div>
+            </div>
         </div>
         <div class="row">
 

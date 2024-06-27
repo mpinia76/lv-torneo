@@ -23,6 +23,7 @@
         @endif
         <a class="btn btn-success m-1" href="{{route('jugadores.create')}}">Nuevo</a>
         <a class="btn btn-info m-1" href="{{route('jugadores.importar')}}">Importar</a>
+        <a class="btn btn-info m-1" href="{{route('jugadores.verificarPersonas')}}">Verificar Personas</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 
@@ -41,7 +42,7 @@
 
         <th>Edad</th>
         <th>Ciudad</th>
-        <th>País</th>
+
 
         <th colspan="3"></th>
         </thead>
@@ -53,7 +54,7 @@
                         <img id="original" class="imgCircle" src="{{ url('images/'.$jugador->foto) }}" >
                     @else
                         <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                    @endif
+                    @endif <img id="original" src="{{ $jugador->persona->bandera_url }}" alt="{{ $jugador->persona->nacionalidad }}">
                 </td>
                 <td>{{$jugador->tipoJugador}}</td>
                 <td>{{$jugador->apellido}}</td>
@@ -62,7 +63,7 @@
 
                 <td>{{($jugador->nacimiento)?$jugador->persona->getAgeWithDateAttribute():''}}</td>
                 <td>{{$jugador->ciudad}}</td>
-                <td>{{$jugador->nacionalidad}}</td>
+
                 <td>
                     <div class="d-flex">
                         <a href="{{route('jugadores.show', $jugador->id)}}" class="btn btn-info m-1">Ver</a>

@@ -14,10 +14,11 @@
         <thead>
         <th>#</th>
         <th>Equipo</th>
-        <th>Prom.</th>
-        <th>Jugados</th>
-
         <th>Punt.</th>
+
+        <th>Jugados</th>
+        <th>Prom.</th>
+
 
         </thead>
         <tbody>
@@ -30,10 +31,11 @@
                     @endif
 
                 {{$equipo->equipo}}</td>
-                <td>{{$equipo->promedio}}</td>
+                <td>{{$equipo->puntaje}}</td>
+
                 <td>{{$equipo->jugados}}</td>
 
-                <td>{{$equipo->puntaje}}</td>
+                <td>{{$equipo->promedio}}</td>
 
 
 

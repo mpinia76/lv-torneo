@@ -1,23 +1,43 @@
 @extends('layouts.appPublic')
 
 @section('pageTitle', 'Otras estadísticas')
+<style>
+    /* Estilos personalizados para resaltar la pestaña activa */
+    .nav-link.active {
+        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
+        color: #fff; /* Cambia el color del texto de la pestaña activa */
+        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    }
 
+    /* Agrega un espacio entre las pestañas y el contenido */
+    .tab-content {
+        margin: 20px; /* Ajusta el margen superior del contenido */
+    }
+</style>
 @section('content')
     <div class="container">
 
 
-        <hr/>
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="torneos-tab" data-toggle="tab" href="#torneos" role="tab" aria-controls="torneos" aria-selected="true">Torneos</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="fechas-tab" data-toggle="tab" href="#fechas" role="tab" aria-controls="fechas" aria-selected="false">Fechas</a>
+            </li>
 
+            <li class="nav-item">
+                <a class="nav-link" id="partidos-tab" data-toggle="tab" href="#partidos" role="tab" aria-controls="partidos" aria-selected="false">Partidos</a>
+            </li>
 
-
-
-        <br>
-
+        </ul>
+        <div class="tab-content" id="myTabContent">
+            <div role="tabpanel" class="tab-pane active" id="torneos">
         <div class="row">
 
             <div class="form-group col-md-12">
-                <h1>Torneos con más goles</h1>
-                <table class="table" style="width: 100%">
+
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
 
@@ -47,8 +67,8 @@
 
 
                 </table>
-                <h1>Torneos con más goles locales</h1>
-                <table class="table" style="width: 100%">
+                <h1>Locales</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
 
@@ -78,8 +98,8 @@
 
 
                 </table>
-                <h1>Torneos con más goles visitantes</h1>
-                <table class="table" style="width: 100%">
+                <h1>Visitantes</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
 
@@ -109,8 +129,15 @@
 
 
                 </table>
-                <h1>Fechas con más goles</h1>
-                <table class="table" style="width: 100%">
+            </div>
+        </div>
+            </div>
+            <div role="tabpanel" class="tab-pane" id="fechas">
+                <div class="row">
+
+                    <div class="form-group col-md-12">
+
+                        <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
                     <th>Fecha</th>
@@ -141,8 +168,8 @@
 
                 </table>
 
-                <h1>Fechas con más goles locales</h1>
-                <table class="table" style="width: 100%">
+                <h1>Locales</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
                     <th>Fecha</th>
@@ -172,8 +199,8 @@
 
                 </table>
 
-                <h1>Fechas con más goles visitantes</h1>
-                <table class="table" style="width: 100%">
+                <h1>Visitantes</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
                     <th>Fecha</th>
@@ -201,10 +228,15 @@
 
 
                 </table>
+                    </div>
+                </div>
+            </div>
+            <div role="tabpanel" class="tab-pane" id="partidos">
+                <div class="row">
 
+                    <div class="form-group col-md-12">
 
-                <h1>Partidos con más goles</h1>
-                <table class="table" style="width: 100%">
+                        <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
                     <th>Fecha</th>
@@ -228,7 +260,7 @@
                                         @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->local}}
+                                {{$partido->local}} <img id="original" src="{{ url('images/'.$partido->paisLocal.'.gif') }}" alt="{{ $partido->paisLocal }}">
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
@@ -247,7 +279,7 @@
                                         @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->visitante}}
+                                {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
                                 @endif
                             </td>
                             <td>
@@ -269,8 +301,8 @@
                 </table>
 
 
-                <h1>Partidos con más goles locales</h1>
-                <table class="table" style="width: 100%">
+                <h1>Locales</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
                     <th>Fecha</th>
@@ -294,7 +326,7 @@
                                         @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->local}}
+                                {{$partido->local}} <img id="original" src="{{ url('images/'.$partido->paisLocal.'.gif') }}" alt="{{ $partido->paisLocal }}">
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
@@ -313,7 +345,7 @@
                                         @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->visitante}}
+                                {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
                                 @endif
                             </td>
                             <td>
@@ -333,8 +365,8 @@
 
 
                 </table>
-                <h1>Partidos con más goles visitantes</h1>
-                <table class="table" style="width: 100%">
+                <h1>Visitantes</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
                     <thead>
                     <th>Torneo</th>
                     <th>Fecha</th>
@@ -358,7 +390,7 @@
                                         @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->local}}
+                                {{$partido->local}} <img id="original" src="{{ url('images/'.$partido->paisLocal.'.gif') }}" alt="{{ $partido->paisLocal }}">
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
@@ -377,7 +409,7 @@
                                         @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->visitante}}
+                                {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
                                 @endif
                             </td>
                             <td>
@@ -397,11 +429,13 @@
 
 
                 </table>
-
+                    </div>
+                </div>
+            </div>
 
             </div>
 
-        </div>
+
         <div class="d-flex">
 
             <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>

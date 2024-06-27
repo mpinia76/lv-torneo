@@ -24,7 +24,7 @@
                 <div class="row">
                     <div class="form-group col-md-6">
                         <dt>Nombre</dt>
-                        <dd>{{$equipo->nombre}}</dd>
+                        <dd>{{$equipo->nombre}} <img id="original" src="{{ $equipo->bandera_url }}" alt="{{ $equipo->pais }}"></dd>
                     </div>
 
                     <div class="form-group col-md-6">
@@ -86,21 +86,26 @@
                 <div class="row">
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
                         <dt>Total</dt>
-                        <dd>{{$titulosLiga + $titulosCopa}}</dd>
+                        <dd>{{$titulosLiga + $titulosCopa+ $titulosInternacional}}</dd>
                     </div>
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                        <dt>Títulos Liga</dt>
+                        <dt>Ligas nacionales</dt>
                         <dd>{{$titulosLiga}}</dd>
                     </div>
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                        <dt>Títulos Copa</dt>
+                        <dt>Copas nacionales</dt>
                         <dd>{{$titulosCopa}}</dd>
+                    </div>
+                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                        <dt>Internacionales</dt>
+                        <dd>{{$titulosInternacional}}</dd>
                     </div>
                 </div>
                 <table class="table" style="font-size: 14px;">
                     <thead>
                     <th>#</th>
                     <th>Torneo</th>
+                    <th>Punt.</th>
                     <th>J</th>
                     <th>G</th>
                     <th>E</th>
@@ -108,7 +113,7 @@
                     <th>GF</th>
                     <th>GC</th>
                     <th>Dif.</th>
-                    <th>Punt.</th>
+
                     <th>Prom.</th>
 
                     </thead>
@@ -122,6 +127,7 @@
                         <tr>
                             <td>{{$j++}}</td>
                             <td>{{$torneoTitulo->nombreTorneo}}</td>
+                            <td>{{$torneoTitulo->porcentaje}}</td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneoTitulo->idTorneo))}}" >{{$torneoTitulo->jugados}}</a></td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneoTitulo->idTorneo,'tipo'=>'Ganados'))}}" >{{$torneoTitulo->ganados}}</a></td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneoTitulo->idTorneo,'tipo'=>'Empatados'))}}" >{{$torneoTitulo->empatados}}</a></td>
@@ -130,7 +136,7 @@
                             <td>{{$torneoTitulo->contra}}</td>
                             <td>{{$torneoTitulo->favor - $torneoTitulo->contra}}</td>
                             <td>{{$torneoTitulo->puntaje}}</td>
-                            <td>{{$torneoTitulo->porcentaje}}</td>
+
 
 
 
@@ -145,6 +151,7 @@
                     <thead>
                     <th>#</th>
                     <th>Torneo</th>
+                    v
                     <th>J</th>
                     <th>G</th>
                     <th>E</th>
@@ -152,7 +159,7 @@
                     <th>GF</th>
                     <th>GC</th>
                     <th>Dif.</th>
-                    <th>Punt.</th>
+
                     <th>Prom.</th>
                     <th>Posición</th>
                     </thead>
@@ -180,6 +187,7 @@
                         <tr>
                             <td>{{$i++}}</td>
                             <td>{{$torneo->nombreTorneo}}</td>
+                            <td>{{$torneo->puntaje}}</td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados'))}}" >{{$torneo->ganados}}</a></td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados'))}}" >{{$torneo->empatados}}</a></td>
@@ -187,7 +195,7 @@
                             <td>{{$torneo->favor}}</td>
                             <td>{{$torneo->contra}}</td>
                             <td>{{$torneo->favor - $torneo->contra}}</td>
-                            <td>{{$torneo->puntaje}}</td>
+
                             <td>{{$torneo->porcentaje}}</td>
                             <td>{!!$torneo->posicion!!}</td>
 

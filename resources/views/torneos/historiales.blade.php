@@ -13,18 +13,18 @@
         <form class="form-inline">
 
 
-            <select class="orm-control js-example-basic-single" id="equipo1" name="equipo1" onchange="this.form.submit()" style="width: 150px">
+            <select class="form-control js-example-basic-single" id="equipo1" name="equipo1" onchange="this.form.submit()" style="width: 150px">
                 @foreach($equipos as $equipo)
 
                     <option value="{{$equipo->id}}" @if($equipo->id==$e1->id)
                     selected
 
-                        @endif />{{$equipo->nombre}}</option>
+                        @endif />{{$equipo->nombre}} </option>
                 @endforeach
 
             </select>
             VS.
-            <select class="orm-control js-example-basic-single" id="equipo2" name="equipo2" onchange="this.form.submit()" style="width: 150px">
+            <select class="form-control js-example-basic-single" id="equipo2" name="equipo2" onchange="this.form.submit()" style="width: 150px">
                 @foreach($equipos as $equipo)
 
                     <option value="{{$equipo->id}}" @if($equipo->id==$e2->id)
@@ -67,7 +67,7 @@
                                         @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->local}}
+                                {{$partido->local}} <img id="original" src="{{ url('images/'.$partido->paisLocal.'.gif') }}" alt="{{ $partido->paisLocal }}">
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
@@ -86,7 +86,7 @@
                                         @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->visitante}}
+                                {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
                                 @endif
                             </td>
                             <td>
@@ -114,6 +114,7 @@
                     <thead>
 
                     <th>Equipo</th>
+                    <th>Punt.</th>
                     <th>J</th>
                     <th>G</th>
                     <th>E</th>
@@ -121,7 +122,7 @@
                     <th>GF</th>
                     <th>GC</th>
                     <th>Dif.</th>
-                    <th>Punt.</th>
+
 
                     </thead>
                     <tbody>
@@ -136,6 +137,7 @@
                                 @endif
                                 </a>
                                 {{$equipo->equipo}}</td>
+                            <td>{{$equipo->puntaje}}</td>
                             <td>{{$equipo->jugados}}</td>
                             <td>{{$equipo->ganados}}</td>
                             <td>{{$equipo->empatados}}</td>
@@ -143,7 +145,7 @@
                             <td>{{$equipo->golesl}}</td>
                             <td>{{$equipo->golesv}}</td>
                             <td>{{$equipo->diferencia}}</td>
-                            <td>{{$equipo->puntaje}}</td>
+
 
 
 

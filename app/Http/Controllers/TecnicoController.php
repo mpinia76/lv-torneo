@@ -87,7 +87,7 @@ class TecnicoController extends Controller
      */
     public function store(Request $request)
     {
-        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048']);
+        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -107,9 +107,10 @@ class TecnicoController extends Controller
         $insert['email'] = $request->get('email');
         $insert['telefono'] = $request->get('telefono');
         $insert['ciudad'] = $request->get('ciudad');
+        $insert['nacionalidad'] = $request->get('nacionalidad');
         $insert['observaciones'] = $request->get('observaciones');
-        $insert['tipoDocumento'] = $request->get('tipoDocumento');
-        $insert['documento'] = $request->get('documento');
+        /*$insert['tipoDocumento'] = $request->get('tipoDocumento');
+        $insert['documento'] = $request->get('documento');*/
         $insert['nacimiento'] = $request->get('nacimiento');
         $insert['fallecimiento'] = $request->get('fallecimiento');
 
@@ -189,7 +190,7 @@ class TecnicoController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048']);
+        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -209,12 +210,13 @@ class TecnicoController extends Controller
         $update['email'] = $request->get('email');
         $update['telefono'] = $request->get('telefono');
         $update['ciudad'] = $request->get('ciudad');
+        $update['nacionalidad'] = $request->get('nacionalidad');
         $update['observaciones'] = $request->get('observaciones');
-        $update['tipoDocumento'] = $request->get('tipoDocumento');
-        $update['documento'] = $request->get('documento');
+        /*$update['tipoDocumento'] = $request->get('tipoDocumento');
+        $update['documento'] = $request->get('documento');*/
         $update['nacimiento'] = $request->get('nacimiento');
         $update['fallecimiento'] = $request->get('fallecimiento');
-
+        $update['verificado'] = $request->get('verificado');
 
         $tecnico=tecnico::find($id);
         //$tecnico->update($update);
@@ -248,13 +250,13 @@ class TecnicoController extends Controller
         $id= $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 WHERE partido_tecnicos.tecnico_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
 ORDER BY torneos.year DESC, torneos.id DESC';
 
 
@@ -263,6 +265,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $torneosTecnico = DB::select(DB::raw($sql));
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
+        $titulosTecnicoInternacional=0;
         foreach ($torneosTecnico as $torneo){
 
 
@@ -305,10 +308,14 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                 //print_r($partidoTecnico);
                     if(!empty($partidoTecnico)) {
                         //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                        if ($torneo->tipo == 'Copa') {
-                            $titulosTecnicoCopa++;
-                        } else {
-                            $titulosTecnicoLiga++;
+                        if ($torneo->ambito == 'Nacional') {
+                            if ($torneo->tipo == 'Copa') {
+                                $titulosTecnicoCopa++;
+                            } else {
+                                $titulosTecnicoLiga++;
+                            }
+                        }else {
+                            $titulosTecnicoInternacional++;
                         }
                     }
                 //}
@@ -416,13 +423,13 @@ group by tecnico_id
             }
         }
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo, torneos.ambito
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
 INNER JOIN jugadors ON jugadors.id = plantilla_jugadors.jugador_id
 WHERE jugadors.persona_id = '.$tecnico->persona_id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
 ORDER BY torneos.year DESC';
 
 
@@ -431,6 +438,7 @@ ORDER BY torneos.year DESC';
         $torneosJugador = DB::select(DB::raw($sql));
         $titulosJugadorCopa=0;
         $titulosJugadorLiga=0;
+        $titulosJugadorInternacional=0;
         foreach ($torneosJugador as $torneo){
             $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
             $arrgrupos='';
@@ -468,10 +476,14 @@ ORDER BY torneos.year DESC';
                 //print_r($partidoTecnico);
                 if(!empty($alineacion)) {
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->tipo == 'Copa') {
-                        $titulosJugadorCopa++;
+                    if ($torneo->ambito == 'Nacional') {
+                        if ($torneo->tipo == 'Copa') {
+                            $titulosJugadorCopa++;
+                        } else {
+                            $titulosJugadorLiga++;
+                        }
                     } else {
-                        $titulosJugadorLiga++;
+                        $titulosJugadorInternacional++;
                     }
                 }
                 //}
@@ -613,7 +625,7 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.
         }
 
 
-        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa'));
+        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
     }
 
     public function jugados(Request $request)

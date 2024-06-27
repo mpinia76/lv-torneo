@@ -36,7 +36,7 @@
         <th></th>
         <th>Apellido</th>
         <th>Nombre</th>
-        <th>E-mail</th>
+
         <th>Edad</th>
 
         <th colspan="3"></th>
@@ -47,14 +47,14 @@
                 <td>@if($tecnico->persona->foto)
                         <img id="original" class="imgCircle" src="{{ url('images/'.$tecnico->persona->foto) }}" >
                     @else
-                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" > <img id="original" src="{{ $tecnico->persona->bandera_url }}" alt="{{ $tecnico->persona->nacionalidad }}">
                     @endif
                 </td>
                 <td>{{$tecnico->apellido}}</td>
                 <td>{{$tecnico->nombre}}</td>
 
-                <td>{{$tecnico->email}}</td>
-                <td>{{($tecnico->nacimiento)?$tecnico->persona->getAgeAttribute():''}}</td>
+
+                <td>{!! ($tecnico->persona->fallecimiento)?'<img id="original" src="'.url('images/death.png').'">':'' !!} {{($tecnico->nacimiento)?$tecnico->persona->getAgeAttribute():''}}</td>
 
                 <td>
                     <div class="d-flex">

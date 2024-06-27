@@ -52,7 +52,10 @@
                 {{Form::label('estadio', 'Estadio')}}
                 {{Form::text('estadio', $equipo->estadio, ['class' => 'form-control'])}}
             </div>
-
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                {{Form::label('pais', 'País')}}
+                {{Form::text('pais', $equipo->pais, ['class' => 'form-control'])}}
+            </div>
         </div>
         <div class="row">
 

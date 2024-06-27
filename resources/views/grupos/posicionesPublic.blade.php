@@ -18,6 +18,7 @@
                 <thead>
                 <th>#</th>
                 <th style="width: 300px;">Equipo</th>
+                <th>Punt.</th>
                 <th>J</th>
                 <th>G</th>
                 <th>E</th>
@@ -25,7 +26,7 @@
                 <th>GF</th>
                 <th>GC</th>
                 <th>Dif.</th>
-                <th>Punt.</th>
+
 
                 </thead>
                 <tbody>
@@ -39,7 +40,8 @@
                                 <img id="original" src="{{ url('images/'.$equipo->foto) }}" height="25">
                             @endif
                             </a>
-                            {{$equipo->equipo}}</td>
+                            {{$equipo->equipo}} <img id="original" src="{{ url('images/'.$equipo->pais.'.gif') }}" alt="{{ $equipo->pais }}"></td>
+                        <td>{{$equipo->puntaje}}</td>
                         <td>{{$equipo->jugados}}</td>
                         <td>{{$equipo->ganados}}</td>
                         <td>{{$equipo->empatados}}</td>
@@ -47,7 +49,7 @@
                         <td>{{$equipo->golesl}}</td>
                         <td>{{$equipo->golesv}}</td>
                         <td>{{$equipo->diferencia}}</td>
-                        <td>{{$equipo->puntaje}}</td>
+
 
 
 
@@ -56,9 +58,18 @@
                 </tbody>
             </table>
                 @endforeach
-
-
-
+            @if($incidencias->isNotEmpty())
+            <div class="mt-4">
+                <h5><strong>Incidencias</strong></h5>
+                <ul>
+                    @foreach($incidencias as $incidencia)
+                        <li>
+                            {{ $incidencia->observaciones }}
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
 
         <div class="d-flex">
 

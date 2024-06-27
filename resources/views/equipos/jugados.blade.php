@@ -36,7 +36,7 @@
                     <div class="form-group col-xs-12 col-sm-6 col-md-10">
                         <div class="form-group">
 
-                            <a href="{{route('equipos.ver', array('equipoId' => $equipo->id))}}" ><strong>{{$equipo->nombre}}</strong></a>
+                            <a href="{{route('equipos.ver', array('equipoId' => $equipo->id))}}" ><strong>{{$equipo->nombre}} <img id="original" src="{{ $equipo->bandera_url }}" alt="{{ $equipo->pais }}"></strong></a>
 
 
                         </div>

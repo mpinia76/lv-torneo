@@ -14,6 +14,7 @@
         <thead>
         <th>#</th>
         <th>Equipo</th>
+        <th>Punt.</th>
         <th>J</th>
         <th>G</th>
         <th>E</th>
@@ -21,7 +22,7 @@
         <th>GF</th>
         <th>GC</th>
         <th>Dif.</th>
-        <th>Punt.</th>
+
 
         </thead>
         <tbody>
@@ -34,6 +35,7 @@
                     @endif
 
                 {{$equipo->equipo}}</td>
+                <td>{{$equipo->puntaje}}</td>
                 <td>{{$equipo->jugados}}</td>
                 <td>{{$equipo->ganados}}</td>
                 <td>{{$equipo->empatados}}</td>
@@ -41,7 +43,7 @@
                 <td>{{$equipo->golesl}}</td>
                 <td>{{$equipo->golesv}}</td>
                 <td>{{$equipo->diferencia}}</td>
-                <td>{{$equipo->puntaje}}</td>
+
 
 
 

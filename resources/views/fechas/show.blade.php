@@ -58,7 +58,7 @@
                             <td>@if($partido->equipol)
                                     @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
                                     @endif
-                                    {{$partido->equipol->nombre}}
+                                    {{$partido->equipol->nombre}} <img id="original" src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}">
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
@@ -74,7 +74,7 @@
                             <td>@if($partido->equipov)
                                     @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                     @endif
-                                    {{$partido->equipov->nombre}}
+                                    {{$partido->equipov->nombre}} <img id="original" src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}">
                                 @endif
                             </td>
                         <td>

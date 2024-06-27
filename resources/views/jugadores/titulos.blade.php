@@ -41,6 +41,7 @@
 
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
                         <dt>Edad</dt>
+                        {!! ($jugador->persona->fallecimiento)?'<img id="original" src="'.url('images/death.png').'">':'' !!}
                         <dd>{{($jugador->persona->nacimiento)?$jugador->persona->getAgeAttribute():''}}</dd>
 
                     </div>
@@ -84,18 +85,23 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Titulos</dt>
-                <dd>{{$titulosJugadorLiga+$titulosJugadorCopa}}</dd>
+                <dd>{{$titulosJugadorLiga+$titulosJugadorCopa+$titulosJugadorInternacional}}</dd>
             </div>
 
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Titulos Liga</dt>
+                <dt>Ligas nacionales</dt>
                 <dd>{{$titulosJugadorLiga}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Titulos Copa</dt>
+                <dt>Copas nacionales</dt>
                 <dd>{{$titulosJugadorCopa}}</dd>
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Internacionales</dt>
+                <dd>{{$titulosJugadorInternacional}}</dd>
             </div>
 
         </div>
@@ -227,18 +233,23 @@
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
                     <dt>Titulos</dt>
-                    <dd>{{$titulosTecnicoLiga+$titulosTecnicoCopa}}</dd>
+                    <dd>{{$titulosTecnicoLiga+$titulosTecnicoCopa+$titulosTecnicoInternacional}}</dd>
                 </div>
 
 
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                    <dt>Titulos Liga</dt>
+                    <dt>Ligas nacionales</dt>
                     <dd>{{$titulosTecnicoLiga}}</dd>
                 </div>
 
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                    <dt>Titulos Copa</dt>
+                    <dt>Copas nacionales</dt>
                     <dd>{{$titulosTecnicoCopa}}</dd>
+                </div>
+
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Internacionales</dt>
+                    <dd>{{$titulosTecnicoInternacional}}</dd>
                 </div>
 
             </div>
@@ -247,7 +258,7 @@
             <th>#</th>
             <th>Torneo</th>
             <th>Equipos</th>
-
+            <th>Punt.</th>
             <th>J</th>
             <th>G</th>
             <th>E</th>
@@ -255,7 +266,7 @@
             <th>GF</th>
             <th>GC</th>
             <th>Dif.</th>
-            <th>Punt.</th>
+
             <th>%</th>
 
             </thead>
@@ -306,6 +317,7 @@
                         @endif
 
                     </td>
+                    <td>{{$torneo->puntaje}}</td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $torneo->idTecnico,'torneoId' => $torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $torneo->idTecnico,'torneoId' => $torneo->idTorneo,'tipo'=>'Ganados'))}}" >{{$torneo->ganados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $torneo->idTecnico,'torneoId' => $torneo->idTorneo,'tipo'=>'Empatados'))}}" >{{$torneo->empatados}}</a></td>
@@ -313,7 +325,7 @@
                     <td>{{$torneo->favor}}</td>
                     <td>{{$torneo->contra}}</td>
                     <td>{{$torneo->favor - $torneo->contra}}</td>
-                    <td>{{$torneo->puntaje}}</td>
+
                     <td>{{$torneo->porcentaje}}</td>
                 </tr>
 

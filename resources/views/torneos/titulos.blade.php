@@ -19,6 +19,7 @@
             <th><a href="{{route('torneos.titulos', array('order'=>'titulos','tipoOrder'=>$tipoOrder))}}" > Titulos @if($order=='titulos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.titulos', array('order'=>'ligas','tipoOrder'=>$tipoOrder))}}" > Ligas @if($order=='ligas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             <th><a href="{{route('torneos.titulos', array('order'=>'copas','tipoOrder'=>$tipoOrder))}}" > Copas @if($order=='copas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th><a href="{{route('torneos.titulos', array('order'=>'internacionales','tipoOrder'=>$tipoOrder))}}" > Internacionelas @if($order=='internacionales') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
             </thead>
             <tbody>
 
@@ -31,12 +32,13 @@
                             <img id="original" src="{{ url('images/'.$equipo->escudo) }}" height="25">
                         @endif
                         </a>
-                        {{$equipo->nombre}}</td>
+                        {{$equipo->nombre}} <img id="original" src="{{ url('images/'.$equipo->pais.'.gif') }}" alt="{{ $equipo->pais }}"></td>
 
 
                     <td>{{$equipo->titulos}}</td>
                     <td>{{$equipo->ligas}}</td>
                     <td>{{$equipo->copas}}</td>
+                    <td>{{$equipo->internacionales}}</td>
                 </tr>
             @endforeach
             </tbody>

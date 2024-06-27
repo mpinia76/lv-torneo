@@ -75,7 +75,7 @@ class ArbitroController extends Controller
      */
     public function store(Request $request)
     {
-        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048']);
+        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -95,9 +95,10 @@ class ArbitroController extends Controller
         $insert['email'] = $request->get('email');
         $insert['telefono'] = $request->get('telefono');
         $insert['ciudad'] = $request->get('ciudad');
+        $insert['nacionalidad'] = $request->get('nacionalidad');
         $insert['observaciones'] = $request->get('observaciones');
-        $insert['tipoDocumento'] = $request->get('tipoDocumento');
-        $insert['documento'] = $request->get('documento');
+        /*$insert['tipoDocumento'] = $request->get('tipoDocumento');
+        $insert['documento'] = $request->get('documento');*/
         $insert['nacimiento'] = $request->get('nacimiento');
         $insert['fallecimiento'] = $request->get('fallecimiento');
 
@@ -174,7 +175,7 @@ class ArbitroController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048']);
+        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -194,12 +195,13 @@ class ArbitroController extends Controller
         $update['email'] = $request->get('email');
         $update['telefono'] = $request->get('telefono');
         $update['ciudad'] = $request->get('ciudad');
+        $update['nacionalidad'] = $request->get('nacionalidad');
         $update['observaciones'] = $request->get('observaciones');
-        $update['tipoDocumento'] = $request->get('tipoDocumento');
-        $update['documento'] = $request->get('documento');
+        /*$update['tipoDocumento'] = $request->get('tipoDocumento');
+        $update['documento'] = $request->get('documento');*/
         $update['nacimiento'] = $request->get('nacimiento');
         $update['fallecimiento'] = $request->get('fallecimiento');
-
+        $update['verificado'] = $request->get('verificado');
 
 
         $arbitro=arbitro::find($id);

@@ -37,9 +37,9 @@
 
         <th>Nombre</th>
         <th>Estadio</th>
-        <th>Socios</th>
-        <th>Años</th>
 
+        <th>Años</th>
+        <th>País</th>
         <th colspan="3"></th>
         </thead>
 
@@ -52,9 +52,9 @@
 
                 <td>{{$equipo->nombre}}</td>
                 <td>{{$equipo->estadio}}</td>
-                <td>{{$equipo->socios}}</td>
-                <td>{{Carbon::parse($equipo->fundacion)->age}}</td>
 
+                <td>{{Carbon::parse($equipo->fundacion)->age}}</td>
+                <td>{{$equipo->pais}}</td>
                 <td>
                     <div class="d-flex">
                         <a href="{{route('equipos.show', $equipo->id)}}" class="btn btn-info m-1">Ver</a>

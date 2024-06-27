@@ -44,6 +44,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Edad</dt>
+                {!! ($jugador->persona->fallecimiento)?'<img id="original" src="'.url('images/death.png').'">':'' !!}
                 <dd>{{($jugador->persona->nacimiento)?$jugador->persona->getAgeAttribute():''}}</dd>
 
             </div>

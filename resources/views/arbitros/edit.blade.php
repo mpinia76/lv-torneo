@@ -33,24 +33,23 @@
                 {{Form::label('apellido', 'Apellido')}}
                 {{Form::text('apellido', $arbitro->persona->apellido, ['class' => 'form-control'])}}
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                {{Form::label('tipoDocumento', 'Tipo')}}
-                {{ Form::select('tipoDocumento',['DNI'=>'DNI','PAS'=>'Pasaporte','CI'=>'Cedula'], $arbitro->persona->tipoDocumento,['class' => 'form-control']) }}
-
-            </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                {{Form::label('documento', 'Documento')}}
-                {{Form::text('documento', $arbitro->persona->documento, ['class' => 'form-control'])}}
-            </div>
-
-        </div>
-        <div class="row">
-
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('email', 'E-mail')}}
                 {{Form::email('email', $arbitro->persona->email, ['class' => 'form-control'])}}
 
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('verificado', 'Verificado', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label>
+                        {{ Form::checkbox('verificado', 1, $arbitro->persona->verificado) }}
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+
+
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
                 {{Form::text('telefono', $arbitro->persona->telefono, ['class' => 'form-control'])}}
@@ -59,6 +58,10 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('ciudad', 'Ciudad Nacimiento')}}
                 {{Form::text('ciudad', $arbitro->persona->ciudad, ['class' => 'form-control'])}}
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('nacionalidad', 'Nacionalidad')}}
+                {{Form::text('nacionalidad', $arbitro->persona->nacionalidad, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}

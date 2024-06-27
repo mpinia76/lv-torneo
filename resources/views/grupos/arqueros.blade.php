@@ -11,7 +11,14 @@
 
         @endphp
 
+        <nav class="navbar navbar-light float-right">
+            <form class="form-inline">
+                <input type="hidden" id="torneoId" name="torneoId" value="{{$torneo->id}}">
+                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
+                <button class="btn btn-success m-1" type="submit">Buscar</button>
+            </form>
+        </nav>
     <table class="table">
         <thead>
         <th>#</th>
@@ -35,7 +42,7 @@
                             <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                         @endif
                     </a>
-                    {{$jugador->jugador}}</td>
+                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.$jugador->nacionalidad.'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
                 <td>@if($jugador->escudo)
                         @php
                             $escudos = explode(',',$jugador->escudo);

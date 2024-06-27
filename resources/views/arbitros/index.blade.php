@@ -36,7 +36,7 @@
         <th></th>
         <th>Apellido</th>
         <th>Nombre</th>
-        <th>E-mail</th>
+
         <th>Edad</th>
 
         <th colspan="3"></th>
@@ -48,13 +48,13 @@
                         <img id="original" class="imgCircle" src="{{ url('images/'.$arbitro->persona->foto) }}" >
                     @else
                         <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
-                    @endif
+                    @endif <img id="original" src="{{ $arbitro->persona->bandera_url }}" alt="{{ $arbitro->persona->nacionalidad }}">
                 </td>
                 <td>{{$arbitro->apellido}}</td>
                 <td>{{$arbitro->nombre}}</td>
 
-                <td>{{$arbitro->email}}</td>
-                <td>{{($arbitro->nacimiento)?$arbitro->persona->getAgeAttribute():''}}</td>
+
+                <td>{!! ($arbitro->persona->fallecimiento)?'<img id="original" src="'.url('images/death.png').'">':'' !!} {{($arbitro->nacimiento)?$arbitro->persona->getAgeAttribute():''}}</td>
 
                 <td>
                     <div class="d-flex">

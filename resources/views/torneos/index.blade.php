@@ -44,6 +44,7 @@
         <th>Nro. de equipos</th>
         <th>Nro. de grupos</th>
         <th>Tipo</th>
+        <th>Ambito</th>
         <th colspan="3"></th>
         </thead>
 
@@ -54,6 +55,7 @@
                 <td>{{$torneo->equipos}}</td>
                 <td>{{$torneo->grupos}}</td>
                 <td>{{$torneo->tipo}}</td>
+                <td>{{$torneo->ambito}}</td>
                 <td>
                     <div class="d-flex">
                         <a href="{{route('torneos.show', $torneo->id)}}" class="btn btn-info m-1">Ver</a>

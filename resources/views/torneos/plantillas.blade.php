@@ -7,7 +7,7 @@
         <form class="form-inline">
 
 <input type="hidden" id="torneoId" name="torneoId" value="{{$torneo->id}}">
-            <select class="orm-control js-example-basic-single" id="equipo1" name="equipo1" onchange="this.form.submit()" style="width: 150px">
+            <select class="form-control js-example-basic-single" id="equipo1" name="equipo1" onchange="this.form.submit()" style="width: 150px">
 
                 @foreach($equipos as $id => $equipo)
 
@@ -38,6 +38,8 @@
 
         <th><a href="{{route('torneos.plantillas', array('torneoId' => $torneo->id,'order'=>'jugador','tipoOrder'=>$tipoOrder,'equipo1'=>$e1->id))}}" > Jugador @if($order=='jugador') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
+        <th><a href="{{route('torneos.plantillas', array('torneoId' => $torneo->id,'order'=>'nacimiento','tipoOrder'=>$tipoOrder,'equipo1'=>$e1->id))}}" > Edad @if($order=='nacimiento') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+
         <th><a href="{{route('torneos.plantillas', array('torneoId' => $torneo->id,'order'=>'tipoJugador','tipoOrder'=>$tipoOrder,'equipo1'=>$e1->id))}}" > Tipo @if($order=='tipoJugador') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
 
         <th><a href="{{route('torneos.plantillas', array('torneoId' => $torneo->id,'order'=>'jugados','tipoOrder'=>$tipoOrder,'equipo1'=>$e1->id))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
@@ -60,7 +62,10 @@
                             <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                         @endif
                     </a>
-                    {{$jugador->jugador}}</td>
+                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.$jugador->nacionalidad.'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
+                <td>{{$jugador->edad}}
+
+                </td>
                 <td>{{$jugador->tipoJugador}}
 
                 </td>
@@ -88,7 +93,8 @@
             <thead>
 
             <th>Técnico</th>
-
+            <th>Edad</th>
+            <th>Punt. </th>
             <th> J </th>
             <th>G </th>
             <th> E </th>
@@ -96,7 +102,7 @@
             <th>GF </th>
             <th>GC </th>
             <th> Dif. </th>
-            <th>Punt. </th>
+
             <th> % </th>
 
 
@@ -114,8 +120,9 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                             @endif
                         </a>
-                        {{$tecnico->tecnico}}</td>
-
+                        {{$tecnico->tecnico}} <img id="original" src="{{ url('images/'.$tecnico->nacionalidadTecnico.'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}"></td>
+                    <td>{{$tecnico->edad}}
+                    <td>{{$tecnico->puntaje}}</td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id))}}" >{{$tecnico->jugados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Ganados'))}}" >{{$tecnico->ganados}}</a></td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id,'tipo'=>'Empatados'))}}" >{{$tecnico->empatados}}</a></td>
@@ -123,7 +130,7 @@
                     <td>{{$tecnico->golesl}}</td>
                     <td>{{$tecnico->golesv}}</td>
                     <td>{{$tecnico->diferencia}}</td>
-                    <td>{{$tecnico->puntaje}}</td>
+
                     <td>{{$tecnico->porcentaje}}</td>
 
                 </tr>

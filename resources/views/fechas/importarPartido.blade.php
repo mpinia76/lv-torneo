@@ -72,9 +72,9 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
                 {{Form::hidden('partido_id', (isset($_GET['partidoId']))?$_GET['partidoId']:'' )}}
-                <?php echo e(Form::label('url', 'URL')); ?>
+                <?php //echo e(Form::label('url', 'URL')); ?>
 
-                <?php echo e(Form::text('url', '', ['class' => 'form-control'])); ?>
+                <?php //echo e(Form::text('url', '', ['class' => 'form-control'])); ?>
 
             </div>
 
@@ -82,7 +82,7 @@
         </div>
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
-                <?php echo e(Form::label('url2', 'URL 2')); ?>
+                <?php echo e(Form::label('url2', 'URL')); ?>
 
                 <?php echo e(Form::text('url2', '', ['class' => 'form-control'])); ?>
 
