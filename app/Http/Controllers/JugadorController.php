@@ -286,6 +286,8 @@ class JugadorController extends Controller
         $jugador = Jugador::find($id);
 
         $jugador->delete();
+        $persona = Persona::find($jugador->persona_id);
+        $persona->delete();
         return redirect()->route('jugadores.index')->with('success','Registro eliminado satisfactoriamente');
     }
 

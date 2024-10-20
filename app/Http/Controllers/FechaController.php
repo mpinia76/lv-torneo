@@ -400,6 +400,7 @@ class FechaController extends Controller
                 // Insert to MySQL database
                 DB::beginTransaction();
                 $ok=1;
+                $success='';
                 foreach($importData_arr as $importData){
                     Log::channel('mi_log')->info('Fecha: '.$importData[0]);
                     $golesL = null;
@@ -423,6 +424,7 @@ class FechaController extends Controller
 
                          if (!$equipol){
                              Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
+                             $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
                          }
                         else{
                             $strEquipoV = ($importData[6]);
@@ -430,6 +432,7 @@ class FechaController extends Controller
 
                             if (!$equipoV){
                                 Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
+                                $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
                             }
                             else{
                                 /*$strArbitro = utf8_encode($importData[9]);
@@ -552,7 +555,7 @@ class FechaController extends Controller
 
             DB::commit();
             $respuestaID='success';
-            $respuestaMSJ='Importación exitosa. (ver log)';
+            $respuestaMSJ=$success;
         }
         else{
             DB::rollback();
@@ -1246,6 +1249,9 @@ class FechaController extends Controller
             case 'Atlético de Rafaela':
                 $strEquipoURL='atletico-rafaela';
                 break;
+            case 'Athletico Paranaense':
+                $strEquipoURL='paranaense';
+                break;
             case 'Atlético Tucumán':
                 $strEquipoURL='atletico-tucuman';
                 break;
@@ -1430,6 +1436,10 @@ class FechaController extends Controller
                 $strEquipoURL='1855';
 
                 break;
+            case 'América de Cali':
+                $strEquipoURL='116';
+
+                break;
             case 'Andino de La Rioja':
                 $strEquipoURL='1988';
 
@@ -1445,6 +1455,10 @@ class FechaController extends Controller
                 $strEquipoURL='23';//ultimo
 
                 break;
+            case 'Athletico Paranaense':
+                $strEquipoURL='115';
+
+                break;
             case 'Atlanta':
                 $strEquipoURL='30';
 
@@ -1453,6 +1467,7 @@ class FechaController extends Controller
                 $strEquipoURL='1771';
 
                 break;
+
             case 'Atlético de Rafaela':
                 $strEquipoURL='26';
                 break;
@@ -1727,6 +1742,10 @@ class FechaController extends Controller
 
                 $strEquipoURL='2004';
                 break;
+            case 'Independiente Medellín':
+
+                $strEquipoURL='114';
+                break;
             case 'Independiente Rivadavia':
 
                 $strEquipoURL='684';
@@ -1765,6 +1784,10 @@ class FechaController extends Controller
                 break;
             case 'Leandro N. Alem':
                 $strEquipoURL='1804';//ultimo
+
+                break;
+            case 'Libertad':
+                $strEquipoURL='65';//ultimo
 
                 break;
             case 'Liniers':
@@ -1881,6 +1904,9 @@ class FechaController extends Controller
                 $strEquipoURL='1800';//ultimo
 
                 break;
+            case 'São Paulo':
+                $strEquipoURL='46';
+                break;
             case 'Sarmiento (Junín)':
                 $strEquipoURL='1474';
                 break;
@@ -1924,6 +1950,9 @@ class FechaController extends Controller
 
                 $strEquipoURL='35';
                 break;
+            case 'The Strongest':
+                $strEquipoURL='51';
+                break;
             case 'Tigre':
                 $strEquipoURL='31';
 
@@ -1950,6 +1979,9 @@ class FechaController extends Controller
                 break;
             case 'Unión de Villa Krause':
                 $strEquipoURL='1870';
+                break;
+            case 'Universidad de Chile':
+                $strEquipoURL='113';
                 break;
             case 'Vélez Sarsfield':
                 $strEquipoURL='22';
@@ -2015,6 +2047,10 @@ class FechaController extends Controller
                 break;
             case 'Alvarado':
                 $arrEquipo[]='alvarado';
+
+                break;
+            case 'América de Cali':
+                $arrEquipo[]='america-de-cali';
 
                 break;
             case 'Argentino de Merlo':
@@ -2280,6 +2316,10 @@ class FechaController extends Controller
                 $arrEquipo[]='ca-independiente';
                 $arrEquipo[]='independiente';
                 break;
+            case 'Independiente Medellín':
+
+                $arrEquipo[]='independ.-m';
+                break;
             case 'Independiente de Chivilcoy':
                 $arrEquipo[]='indep.-chiv.';
                 $arrEquipo[]='indep-chiv';
@@ -2314,6 +2354,10 @@ class FechaController extends Controller
                 break;
             case 'Leandro N. Alem':
                 $arrEquipo[]='alem';
+
+                break;
+            case 'Libertad':
+                $arrEquipo[]='libertad';
 
                 break;
             case 'Liniers':
@@ -2430,6 +2474,10 @@ class FechaController extends Controller
                 $arrEquipo[]='san-telmo';
 
                 break;
+            case 'São Paulo':
+                $arrEquipo[]='san-pablo';
+
+                break;
             case 'Sarmiento (Junín)':
                 $arrEquipo[]='sarmiento-de-junin';
                 $arrEquipo[]='sarmiento-ju';
@@ -2466,6 +2514,10 @@ class FechaController extends Controller
                 $arrEquipo[]='ca-temperley';
                 $arrEquipo[]='temperley';
                 break;
+            case 'The Strongest':
+                $arrEquipo[]='the-strongest';
+
+                break;
             case 'Tigre':
                 $arrEquipo[]='tigre';
                 $arrEquipo[]='ca-tigre';
@@ -2490,6 +2542,9 @@ class FechaController extends Controller
             case 'Unión de Sunchales':
                 $arrEquipo[]='union-sun.';
                 $arrEquipo[]='union-sun';
+                break;
+            case 'Universidad de Chile':
+                $arrEquipo[]='univ.-de-chile';
                 break;
             case 'Vélez Sarsfield':
                 $arrEquipo[]='velez';
@@ -4400,6 +4455,45 @@ return $string;
                                     case '5984':
                                         $nombre3='/montiveros-maximiliano';
                                         break;
+                                    case '12808':
+                                        $nombre3='/marcao-24308';
+                                        break;
+                                    case '12815':
+                                        $nombre3='/denis-marques';
+                                        break;
+                                    case '5343':
+                                        $nombre3='/gonzalez-juan-1877';
+                                        break;
+                                    case '12818':
+                                        $nombre3='/maciel-12516';
+                                        break;
+                                    case '11784':
+                                        $nombre3='/maciel-12516';
+                                        break;
+                                    case '12199':
+                                        $nombre3='/danilo-de-andrade';
+                                        break;
+                                    case '12878':
+                                        $nombre3='/escobar-pablo-daniel';
+                                        break;
+                                    case '9865':
+                                        $nombre3='/luizao-1709';
+                                        break;
+                                    case '11051':
+                                        $nombre3='/grafite';
+                                        break;
+                                    case '10913':
+                                        $nombre3='/rogerio-ceni';
+                                        break;
+                                    case '12195':
+                                        $nombre3='/cicinho-1481';
+                                        break;
+                                    case '11924':
+                                        $nombre3='/diego-tardelli';
+                                        break;
+                                    case '11930':
+                                        $nombre3='/edcarlos';
+                                        break;
                                     default:
                                         $nombre3='';
                                         break;
@@ -5292,660 +5386,7 @@ return $string;
             $strVisitante = $partido->equipov->nombre;
             $golesTotales = $partido->golesl+$partido->golesv;
             $html='';
-            /*try {
-                if ($url){
-                    Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                    Log::channel('mi_log')->info('URL ' .$url, []);
-                    $html = HtmlDomParser::file_get_html($url, false, null, 0);
-                }
 
-
-
-
-            }
-            catch (Exception $ex) {
-                $html='';
-            }*/
-
-            /*if ($html){
-
-
-                $equipos = array();
-
-                //Log::channel('mi_log')->info('Elemento ' . $html,[]);
-                $i = 1;
-                $goles=0;
-                $j=0;
-                foreach ($html->find('div[class=team team1]') as $element) {
-                    $equipo = $element->find('h3[class=nteam nteam1]');
-                    //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
-                    $jugadores = array();
-
-                    $jugadores = array();
-                    foreach ($element->find('ul[class=aligns-list]') as $element2) {
-                        $j++;
-                        foreach ($element2->find('li') as $li) {
-                            $dorsal = $li->find('small[class=align-dorsal]');
-                            $jugador = $li->find('h5[class=align-player]');
-                            $id =  explode('-',$li->find('a')[0]->href);
-                            //Log::channel('mi_log')->info('Jugador ' . $j.' -> '.$jugador[0]->plaintext, []);
-
-                            $data2 = array(
-                                'dorsal' => $dorsal[0]->plaintext,
-                                'nombre'=>$jugador[0]->plaintext,
-                                'tipo' => ($j==1)?'Titular':'Suplente',
-                                'incidencias' => array()
-                            );
-                            $jugadores[$id[count($id)-1]]=$data2;
-                        }
-                        $data = array(
-
-                            'equipo' => $this->dameNombreEquipoDB($equipo[0]->plaintext),
-
-                            'jugadores' => $jugadores
-                        );
-                        $equipos[$i] = $data;
-
-                        //$i++;
-
-
-                    }
-                }
-                $i = 2;
-                $j=0;
-                foreach ($html->find('div[class=team team2]') as $element) {
-                    $equipo = $element->find('h3[class=nteam nteam2]');
-                    //Log::channel('mi_log')->info('Equipo ' . $equipo[0]->plaintext, []);
-                    $jugadores = array();
-                    foreach ($element->find('ul[class=aligns-list]') as $element2) {
-                        $j++;
-                        foreach ($element2->find('li') as $li) {
-                            $dorsal = $li->find('small[class=align-dorsal]');
-                            $jugador = $li->find('h5[class=align-player]');
-                            $id =  explode('-',$li->find('a')[0]->href);
-                            //Log::channel('mi_log')->info('ID ' . $id[2], []);
-                            $data2 = array(
-                                'dorsal' => $dorsal[0]->plaintext,
-                                'nombre'=>$jugador[0]->plaintext,
-                                'tipo' => ($j==1)?'Titular':'Suplente',
-                                'incidencias' => array()
-                            );
-                            $jugadores[$id[count($id)-1]]=$data2;
-                        }
-                        $data = array(
-
-                            'equipo' => $this->dameNombreEquipoDB($equipo[0]->plaintext),
-
-                            'jugadores' => $jugadores
-                        );
-                        $equipos[$i] = $data;
-
-                        //$i++;
-
-
-                    }
-                }
-                //Log::channel('mi_log')->info('Partido ' . print_r($equipos,true), []);
-                foreach ($html->find('div[class=event-content]') as $element) {
-
-                    $golL = $element->find('span[class=left event_1]');
-                    if ($golL){
-                        if($golL[0]->find('a')){
-                            $id =  explode('-',$golL[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-
-                            $equipos[1]['jugadores'][$id[count($id) - 1]]['incidencias'][] = array('Gol', explode('\'', $minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-                        $goles++;
-
-                    }
-
-                    $penalL = $element->find('span[class=left event_11]');
-                    if ($penalL){
-                        if ($penalL[0]->find('a')){
-                            $id =  explode('-',$penalL[0]->find('a')[0]->href);
-                            $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                            $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Penal',explode('\'',$minL[1])[0]);
-
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el penal local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-                        $goles++;
-                    }
-
-                    $ppL = $element->find('span[class=left event_12]');
-                    if ($ppL){
-                        $id =  explode('-',$ppL[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                        $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Gol en propia meta',explode('\'',$minL[1])[0]);
-                        $goles++;
-                    }
-
-                    $amarillaL = $element->find('span[class=left event_8]');
-                    if ($amarillaL){
-                        if ($amarillaL[0]->find('a')){
-                            $id =  explode('-',$amarillaL[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                            $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta amarilla',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-
-
-                    }
-
-                    $dobleamarillaL = $element->find('span[class=left event_10]');
-                    if ($dobleamarillaL){
-                        $id =  explode('-',$dobleamarillaL[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                        $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Expulsado por doble amarilla',explode('\'',$minL[1])[0]);
-
-
-                    }
-
-                    $rojaL = $element->find('span[class=left event_9]');
-                    if ($rojaL){
-                        $id =  explode('-',$rojaL[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                        $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta roja',explode('\'',$minL[1])[0]);
-
-
-                    }
-
-                    $saleL = $element->find('span[class=left event_6]');
-                    if ($saleL){
-                        if ($saleL[0]->find('a')){
-                            $id =  explode('-',$saleL[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                            $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Sale',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en el gol visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-
-
-                    }
-
-                    $entraL = $element->find('span[class=left event_7]');
-                    if ($entraL){
-                        if ($entraL[0]->find('a')){
-                            $id =  explode('-',$entraL[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=left minutos minutosizq]')[0]);
-
-                            $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Entra',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-
-
-                    }
-
-                    $golV = $element->find('span[class=right event_1]');
-                    if ($golV){
-                        if ($golV[0]->find('a')){
-                            $id =  explode('-',$golV[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-
-                            $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Gol',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada local de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-                        $goles++;
-                    }
-
-                    $penalV = $element->find('span[class=right event_11]');
-                    if ($penalV){
-                        $id =  explode('-',$penalV[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                        $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Penal',explode('\'',$minL[1])[0]);
-                        $goles++;
-                    }
-
-                    $ppV = $element->find('span[class=right event_12]');
-                    if ($ppV){
-                        $id =  explode('-',$ppV[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                        $equipos[1]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Gol en propia meta',explode('\'',$minL[1])[0]);
-                        $goles++;
-                    }
-
-                    $amarillaV = $element->find('span[class=right event_8]');
-                    if ($amarillaV){
-                        if ($amarillaV[0]->find('a')){
-                            $id =  explode('-',$amarillaV[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                            $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta amarilla',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la amarilla visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-
-                    }
-
-                    $dobleamarillaV = $element->find('span[class=right event_10]');
-                    if ($dobleamarillaV){
-                        $id =  explode('-',$dobleamarillaV[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                        $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Expulsado por doble amarilla',explode('\'',$minL[1])[0]);
-
-
-                    }
-
-                    $rojaV = $element->find('span[class=right event_9]');
-                    if ($rojaV){
-                        $id =  explode('-',$rojaV[0]->find('a')[0]->href);
-
-                        $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                        $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Tarjeta roja',explode('\'',$minL[1])[0]);
-
-
-                    }
-
-                    $saleV = $element->find('span[class=right event_6]');
-                    if ($saleV){
-                        if ($saleV[0]->find('a')){
-                            $id =  explode('-',$saleV[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                            $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Sale',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la salida visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-
-
-                    }
-
-                    $entraV = $element->find('span[class=right event_7]');
-                    if ($entraV){
-                        if ($entraV[0]->find('a')){
-                            $id =  explode('-',$entraV[0]->find('a')[0]->href);
-
-                            $minL = explode('</b>',$element->find('span[class=right minutos minutosder]')[0]);
-
-                            $equipos[2]['jugadores'][$id[count($id)-1]]['incidencias'][]=array('Entra',explode('\'',$minL[1])[0]);
-                        }
-                        else{
-                            Log::channel('mi_log')->info('OJO!!! falta el jugador en la entrada visitante de ' . $partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
-                        }
-
-
-
-                    }
-
-
-
-                }
-                if ($goles!=$golesTotales){
-                    Log::channel('mi_log')->info('OJO!!! No coincide la cantidad de goles en: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre.' -> '.$goles.' - '.$golesTotales,[]);
-                }
-                $error='';
-                foreach ($equipos as $eq) {
-                    //Log::channel('mi_log')->info('Equipo  ' . $equipo['equipo'], []);
-                    $strEquipo=trim($eq['equipo']);
-                    $equipo=Equipo::where('nombre','like',"%$strEquipo%")->first();
-                    if (!empty($equipo)){
-                        foreach ($eq['jugadores'] as $jugador) {
-                            $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
-                            $arrgrupos='';
-                            foreach ($grupos as $grupo){
-                                $arrgrupos .=$grupo->id.',';
-                            }
-
-                            $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipo->id)->get();
-
-                            $arrplantillas='';
-                            foreach ($plantillas as $plantilla){
-                                $arrplantillas .=$plantilla->id.',';
-                            }
-
-                            if (!empty($plantillas)){
-                                if(!empty($jugador['dorsal'])){
-                                $plantillaJugador = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillas))->distinct()->where('dorsal','=',$jugador['dorsal'])->first();
-                                }
-                                else{
-                                    $plantillaJugador='';
-                                    //Log::channel('mi_log')->info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
-                                }
-                            }
-                            else{
-                                $plantillaJugador='';
-                                Log::channel('mi_log')->info('OJO!!! No hay plantilla del equipo ' . $strEquipo, []);
-                            }
-                            if (!empty($plantillaJugador)) {
-                                $arrApellido = explode(' ', $jugador['nombre']);
-                                $mismoDorsal = 0;
-                                foreach ($arrApellido as $apellido) {
-                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('apellido', 'LIKE', "%$apellido%")->first();
-                                    if (!empty($consultarJugador)) {
-                                        $mismoDorsal = 1;
-                                        continue;
-                                    }
-                                }
-                                if (empty($consultarJugador)) {
-                                    foreach ($arrApellido as $apellido) {
-                                        Log::channel('mi_log')->info('OJO!!! busco por nombre', []);
-                                        $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $plantillaJugador->jugador->id)->where('nombre', 'LIKE', "%$apellido%")->first();
-
-                                    }
-                                }
-                                if (!$mismoDorsal) {
-                                    Log::channel('mi_log')->info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
-                                }
-                                switch ($plantillaJugador->jugador->tipoJugador) {
-                                    case 'Arquero':
-                                        $orden=0;
-                                        break;
-                                    case 'Defensor':
-                                        $orden=1;
-                                        break;
-                                    case 'Medio':
-                                        $orden=2;
-                                        break;
-                                    case 'Delantero':
-                                        $orden=3;
-                                        break;
-
-                                }
-                                $alineaciondata = array(
-                                    'partido_id' => $partido->id,
-                                    'jugador_id' => $plantillaJugador->jugador->id,
-                                    'equipo_id' => $equipo->id,
-                                    'dorsal' =>  $jugador['dorsal'],
-                                    'tipo' => $jugador['tipo'],
-                                    'orden' => $orden
-                                );
-                                $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->first();
-                                try {
-                                    if (!empty($alineacion)) {
-
-                                        $alineacion->update($alineaciondata);
-                                    } else {
-                                        $alineacion = Alineacion::create($alineaciondata);
-                                    }
-
-
-                                } catch (QueryException $ex) {
-                                    $error = $ex->getMessage();
-                                    $ok = 0;
-                                    continue;
-                                }
-                            }
-                            else{
-                                $jugadorMostrar = (!empty($jugador['dorsal']))?$jugador['dorsal']:'';
-                                Log::channel('mi_log')->info('OJO!!! NO se encontró al jugador: ' . $jugadorMostrar.' del equipo '.$strEquipo,[]);
-
-                                //Log::channel('mi_log')->info(print_r($jugador), []);
-                                $arrApellido = explode(' ', $jugador['nombre']);
-                                $mismoDorsal = 0;
-
-                                foreach ($arrApellido as $apellido) {
-                                    $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->Join('plantilla_jugadors','jugadors.id','=','plantilla_jugadors.jugador_id')->wherein('plantilla_jugadors.plantilla_id',explode(',', $arrplantillas))->where('apellido', 'LIKE', "%$apellido%")->first();
-                                    //Log::channel('mi_log')->info(json_encode($consultarJugador), []);
-                                    if (!empty($consultarJugador)) {
-                                        $mismoDorsal = 1;
-                                        //Log::channel('mi_log')->info($consultarJugador['tipoJugador'], []);
-                                        break;
-                                    }
-                                }
-                                if (empty($consultarJugador)) {
-                                    foreach ($arrApellido as $apellido) {
-                                        $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->Join('plantilla_jugadors','jugadors.id','=','plantilla_jugadors.jugador_id')->wherein('plantilla_jugadors.plantilla_id',explode(',', $arrplantillas))->where('nombre', 'LIKE', "%$apellido%")->first();
-                                        Log::channel('mi_log')->info('Busque por nombre', []);
-                                        if (!empty($consultarJugador)) {
-                                            $mismoDorsal = 1;
-                                            //Log::channel('mi_log')->info($consultarJugador['tipoJugador'], []);
-                                            break;
-                                        }
-                                    }
-                                }
-                                if ($mismoDorsal) {
-                                    $jugador_id = $consultarJugador['jugador_id'];
-                                    switch ($consultarJugador['tipoJugador']) {
-                                        case 'Arquero':
-                                            $orden = 0;
-                                            break;
-                                        case 'Defensor':
-                                            $orden = 1;
-                                            break;
-                                        case 'Medio':
-                                            $orden = 2;
-                                            break;
-                                        case 'Delantero':
-                                            $orden = 3;
-                                            break;
-
-                                    }
-                                    $alineaciondata = array(
-                                        'partido_id' => $partido->id,
-                                        'jugador_id' => $jugador_id,
-                                        'equipo_id' => $equipo->id,
-                                        'dorsal' => $consultarJugador['dorsal'],
-                                        'tipo' => $jugador['tipo'],
-                                        'orden' => $orden
-                                    );
-                                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $jugador_id)->first();
-
-                                    try {
-                                        if (!empty($alineacion)) {
-
-                                            $alineacion->update($alineaciondata);
-                                        } else {
-                                            $alineacion = Alineacion::create($alineaciondata);
-                                        }
-                                        Log::channel('mi_log')->info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
-
-                                    } catch (QueryException $ex) {
-                                        $error = $ex->getMessage();
-                                        $ok = 0;
-                                        continue;
-                                    }
-                                }
-                                else{
-
-                                    $error .= 'NO se entró al jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] .' del equipo '.$strEquipo.'<br>';
-                                    $ok = 0;
-                                    continue;
-                                }
-                            }
-                            foreach ($jugador['incidencias'] as $incidencia) {
-
-                                if (!empty($incidencia)) {
-                                    //Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
-
-                                    $tipogol='';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Penal':
-                                            $tipogol='Penal';
-                                            break;
-                                        case 'Gol':
-                                            $tipogol='Jugada';
-                                            break;
-                                        case 'Gol en propia meta':
-                                            $tipogol='En Contra';
-                                            break;
-                                    }
-                                    if ($tipogol){
-                                        if (!empty($plantillaJugador)) {
-                                            $goldata = array(
-                                                'partido_id' => $partido->id,
-                                                'jugador_id' => $plantillaJugador->jugador->id,
-                                                'minuto' => intval(trim($incidencia[1])),
-                                                'tipo' => $tipogol
-                                            );
-                                            $gol = Gol::where('partido_id', '=', $partido->id)->where('jugador_id', '=', $plantillaJugador->jugador->id)->where('minuto', '=', intval(trim($incidencia[1])))->first();
-                                            try {
-                                                if (!empty($gol)) {
-
-                                                    $gol->update($goldata);
-                                                } else {
-                                                    $gol = Gol::create($goldata);
-                                                }
-
-
-                                            } catch (QueryException $ex) {
-                                                $error = $ex->getMessage();
-                                                $ok = 0;
-                                                continue;
-                                            }
-                                        }
-
-                                    }
-                                    $tipotarjeta='';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Tarjeta amarilla':
-                                            $tipotarjeta='Amarilla';
-                                            break;
-                                        case 'Expulsado por doble amarilla':
-                                            $tipotarjeta='Doble Amarilla';
-                                            break;
-                                        case 'Tarjeta roja':
-                                            $tipotarjeta='Roja';
-                                            break;
-                                    }
-                                    if ($tipotarjeta){
-                                        if (!empty($plantillaJugador)) {
-                                            $tarjeadata=array(
-                                                'partido_id'=>$partido->id,
-                                                'jugador_id'=>$plantillaJugador->jugador->id,
-                                                'minuto'=>intval(trim($incidencia[1])),
-                                                'tipo'=>$tipotarjeta
-                                            );
-                                            $tarjeta=Tarjeta::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
-                                            try {
-                                                if (!empty($tarjeta)){
-
-                                                    $tarjeta->update($tarjeadata);
-                                                }
-                                                else{
-                                                    $tarjeta=Tarjeta::create($tarjeadata);
-                                                }
-
-
-                                            }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
-                                                $ok=0;
-                                                continue;
-                                            }
-                                        }
-
-
-
-
-                                    }
-                                    $tipocambio='';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Sale':
-                                            $tipocambio='Sale';
-                                            break;
-                                        case 'Entra':
-                                            $tipocambio='Entra';
-                                            break;
-
-                                    }
-                                    if ($tipocambio){
-                                        if (!empty($plantillaJugador)) {
-                                            $cambiodata=array(
-                                                'partido_id'=>$partido->id,
-                                                'jugador_id'=>$plantillaJugador->jugador->id,
-                                                'minuto'=>intval(trim($incidencia[1])),
-                                                'tipo'=>$tipocambio
-                                            );
-                                            $cambio=Cambio::where('partido_id','=',$partido->id)->where('jugador_id','=',$plantillaJugador->jugador->id)->where('minuto','=',intval(trim($incidencia[1])))->first();
-                                            try {
-                                                if (!empty($cambio)){
-
-                                                    $cambio->update($cambiodata);
-                                                }
-                                                else{
-                                                    $cambio=Cambio::create($cambiodata);
-                                                }
-
-
-                                            }catch(QueryException $ex){
-                                                if ($ex->errorInfo[1] == 1452) {
-                                                    // Error de integridad de clave externa
-                                                    // Aquí puedes agregar un mensaje de error personalizado o redirigir a una página de error
-                                                    // También puedes registrar el error en un archivo de registro para su análisis posterior
-                                                    //Log::error('Error de integridad de clave externa: ' . $e->getMessage());
-                                                    $error = 'Error de integridad de clave externa: ';
-
-
-                                                } else {
-                                                    // Otro tipo de error de base de datos
-                                                    // Puedes manejarlo de acuerdo a tus necesidades
-                                                    $error = $ex->getMessage();
-                                                }
-
-                                                $ok=0;
-                                                continue;
-                                            }
-                                        }
-
-
-
-
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                    else{
-                        Log::channel('mi_log')->info('OJO!!! NO se encontró al equipo: ' . $strEquipo,[]);
-                    }
-                }
-
-
-
-
-            }*/
-            /*else{
-                $error = 'No se econtró la URL del partido: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre;
-                $ok=0;
-                //continue;
-            }*/
         $error='';
         $success='';
             $html2='';
@@ -6702,14 +6143,27 @@ return $string;
 
                     }
                     if(count($entrenadoresArray)>1){
-                        $dtLocal = $entrenadoresArray[1];
+                        $segundoLocalArray = explode('Segundo entrenador:', $entrenadoresArray[1]);
+                        if(count($segundoLocalArray)>1){
+                            $dtLocal = $segundoLocalArray[0];
+                        }
+                        else{
+                            $dtLocal = $entrenadoresArray[1];
+                        }
+
                         //Log::channel('mi_log')->info('DT Local: '.utf8_decode($entrenadoresArray[1]), []);
                         if (isset($entrenadoresArray[2])){
-                            $dtVisitante = $entrenadoresArray[2];
+                            $segundoVisitanteArray = explode('Segundo entrenador:', $entrenadoresArray[2]);
+                            if(count($segundoVisitanteArray)>1){
+                                $dtVisitante = $segundoVisitanteArray[0];
+                            }
+                            else {
+                                $dtVisitante = $entrenadoresArray[2];
+                            }
                         }
                         else{
                             Log::channel('mi_log')->info('OJO!! Falta Entrenador visitante: '.$partido->equipol->nombre.' VS '.$partido->equipov->nombre,[]);
-                            $success .= 'Falta Entrenador visitante <br>';
+                            $success .= 'Falta un entrenador <br>';
                             $dtVisitante ='';
                         }
 
@@ -6767,11 +6221,28 @@ return $string;
                     }
 
                 }
-                $arrArbitro = explode(' ', $nombreArbitro);
+                if (!empty($nombreArbitro)){
+                    $partesNombre = explode(' ', $nombreArbitro);
+
+                    // Realizar la consulta buscando coincidencias en nombre y apellido
+                    $arbitro = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                        ->where(function($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                });
+                            }
+                        })
+                        ->select('arbitros.id as arbitro_id', 'personas.*') // Seleccionar arbitro_id y todos los campos de personas
+                        ->first();
+                }
+
+                /*$arrArbitro = explode(' ', $nombreArbitro);
                 if (count($arrArbitro) > 1) {
                     //$arbitro = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                     $arbitro=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
-                }
+                }*/
 
                 if (!$arbitro) {
                     Log::channel('mi_log')->info('OJO!! Arbitro NO encontrado: ' . $nombreArbitro . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
@@ -6779,7 +6250,7 @@ return $string;
                 } else {
                     $data3 = array(
                         'partido_id' => $partido->id,
-                        'arbitro_id' => $arbitro->id,
+                        'arbitro_id' => $arbitro->arbitro_id,
                         'tipo' => 'Principal'
                     );
                     $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro->id")->first();
@@ -6797,11 +6268,30 @@ return $string;
                         //continue;
                     }
                 }
-                $arrArbitro = explode(' ', $asistente1);
+
+                if (!empty($asistente1)){
+                    $partesNombre = explode(' ', $asistente1);
+
+                    // Realizar la consulta buscando coincidencias en nombre y apellido
+                    $arbitro1 = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                        ->where(function($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                });
+                            }
+                        })
+                        ->select('arbitros.id as arbitro_id', 'personas.*') // Seleccionar arbitro_id y todos los campos de personas
+                        ->first();
+                }
+
+
+                /*$arrArbitro = explode(' ', $asistente1);
                 if (count($arrArbitro) > 1) {
                     //$arbitro1 = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                     $arbitro1=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
-                }
+                }*/
 
                 if (!$arbitro1) {
                     Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: ' . $asistente1 . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
@@ -6809,7 +6299,7 @@ return $string;
                 } else {
                     $data3 = array(
                         'partido_id' => $partido->id,
-                        'arbitro_id' => $arbitro1->id,
+                        'arbitro_id' => $arbitro1->arbitro_id,
                         'tipo' => 'Linea 1'
                     );
                     $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro1->id")->first();
@@ -6827,11 +6317,30 @@ return $string;
                         //continue;
                     }
                 }
-                $arrArbitro = explode(' ', $asistente2);
+
+                if (!empty($asistente2)){
+                    $partesNombre = explode(' ', $asistente2);
+
+                    // Realizar la consulta buscando coincidencias en nombre y apellido
+                    $arbitro2 = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                        ->where(function($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                });
+                            }
+                        })
+                        ->select('arbitros.id as arbitro_id', 'personas.*') // Seleccionar arbitro_id y todos los campos de personas
+                        ->first();
+                }
+
+
+                /*$arrArbitro = explode(' ', $asistente2);
                 if (count($arrArbitro) > 1) {
                     //$arbitro2 = Arbitro::where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
                     $arbitro2=Arbitro::SELECT('arbitros.*')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre', 'like', "%$arrArbitro[0]%")->where('apellido', 'like', "%$arrArbitro[1]%")->first();
-                }
+                }*/
 
                 if (!$arbitro2) {
                     Log::channel('mi_log')->info('OJO!! Asistente NO encontrado: ' . $asistente2 . ' ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
@@ -6839,7 +6348,7 @@ return $string;
                 } else {
                     $data3 = array(
                         'partido_id' => $partido->id,
-                        'arbitro_id' => $arbitro2->id,
+                        'arbitro_id' => $arbitro2->arbitro_id,
                         'tipo' => 'Linea 2'
                     );
                     $partido_arbitro = PartidoArbitro::where('partido_id', '=', "$partido->id")->where('arbitro_id', '=', "$arbitro2->id")->first();
@@ -7014,12 +6523,13 @@ return $string;
                                 if(!empty($jugador['dorsal'])){
 
                                     $plantillaJugador = PlantillaJugador::wherein('plantilla_id',explode(',', $arrplantillas))->distinct()->where('dorsal','=',$jugador['dorsal'])->first();
+                                    $sinDorsal='';
                                 }
                                 else{
                                     //print_r($jugador);
                                     $plantillaJugador='';
                                     //Log::channel('mi_log')->info('OJO!!! con el jugador no está en la plantilla del equipo ' . $strEquipo, []);
-                                    $success .='El jugador ' . $jugador['nombre'] . ' no tiene dorsal - equipo ' . $strEquipo;
+                                    $sinDorsal =' es  ' . $jugador['nombre'] . ' - equipo ' . $strEquipo;
                                 }
                             }
                             else{
@@ -7030,7 +6540,26 @@ return $string;
                             }
                             if (!empty($plantillaJugador)) {
                                 $jugador_id = $plantillaJugador->jugador->id;
-                                $arrApellido = explode(' ', $jugador['nombre']);
+                                $partesNombre = explode(' ', $jugador['nombre']);
+                                $mismoDorsal = 0;
+                                // Realizar la consulta buscando coincidencias en nombre y apellido
+                                $consultarJugador = Jugador::join('personas', 'personas.id', '=', 'jugadors.persona_id')
+
+                                    ->where('jugadors.id', '=', $jugador_id)
+                                    ->where(function($query) use ($partesNombre) {
+                                        foreach ($partesNombre as $parte) {
+                                            $query->where(function($query) use ($parte) {
+                                                $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                            });
+                                        }
+                                    })
+                                    ->first();
+                                if (!empty($consultarJugador)) {
+                                    $mismoDorsal = 1;
+                                    //Log::channel('mi_log')->info($consultarJugador['tipoJugador'], []);
+                                }
+                                /*$arrApellido = explode(' ', $jugador['nombre']);
                                 $mismoDorsal = 0;
                                 foreach ($arrApellido as $apellido) {
                                     $consultarJugador = Jugador::Join('personas','personas.id','=','jugadors.persona_id')->where('jugadors.id', '=', $jugador_id)->where('apellido', 'LIKE', "%$apellido%")->first();
@@ -7038,7 +6567,7 @@ return $string;
                                         $mismoDorsal = 1;
                                         continue;
                                     }
-                                }
+                                }*/
                                 if (!$mismoDorsal) {
                                     Log::channel('mi_log')->info('OJO!!! con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                                     $success .='Problema con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
@@ -7160,7 +6689,7 @@ return $string;
                                             $alineacion = Alineacion::create($alineaciondata);
                                         }
                                         Log::channel('mi_log')->info('OJO!! verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'], []);
-                                        $success .=' - Verificar que sea correcto: '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].' dorsal '.$consultarJugador['dorsal'] . '<br>';
+                                        $success .=$consultarJugador['dorsal'].' - '.$consultarJugador['apellido'].', '.$consultarJugador['nombre'].$sinDorsal . '<br>';
 
                                     } catch (QueryException $ex) {
                                         $error = $ex->getMessage();
@@ -7383,7 +6912,7 @@ return $string;
         else{
             DB::rollback();
             $respuestaID='error';
-            $respuestaMSJ=$error;
+            $respuestaMSJ=$error.'<br>'.$success;
         }
 
         //

@@ -14,12 +14,13 @@
 
         <table class="table">
             <thead>
-            <th>#</th>
-            <th>Equipo</th>
-            <th><a href="{{route('torneos.titulos', array('order'=>'titulos','tipoOrder'=>$tipoOrder))}}" > Titulos @if($order=='titulos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.titulos', array('order'=>'ligas','tipoOrder'=>$tipoOrder))}}" > Ligas @if($order=='ligas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.titulos', array('order'=>'copas','tipoOrder'=>$tipoOrder))}}" > Copas @if($order=='copas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th><a href="{{route('torneos.titulos', array('order'=>'internacionales','tipoOrder'=>$tipoOrder))}}" > Internacionelas @if($order=='internacionales') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th style="width: 1%;">#</th>
+            <th style="width: 40%;">Equipo</th>
+            <th style="width: 10%;"><a href="{{route('torneos.titulos', array('order'=>'titulos','tipoOrder'=>$tipoOrder))}}" > Titulos @if($order=='titulos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th style="width: 10%;"><a href="{{route('torneos.titulos', array('order'=>'internacionales','tipoOrder'=>$tipoOrder))}}" > Internacionales @if($order=='internacionales') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th style="width: 10%;"><a href="{{route('torneos.titulos', array('order'=>'ligas','tipoOrder'=>$tipoOrder))}}" > Ligas @if($order=='ligas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+            <th ><a href="{{route('torneos.titulos', array('order'=>'copas','tipoOrder'=>$tipoOrder))}}" > Copas @if($order=='copas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+
             </thead>
             <tbody>
 
@@ -36,9 +37,10 @@
 
 
                     <td>{{$equipo->titulos}}</td>
+                    <td>{{$equipo->internacionales}}</td>
                     <td>{{$equipo->ligas}}</td>
                     <td>{{$equipo->copas}}</td>
-                    <td>{{$equipo->internacionales}}</td>
+
                 </tr>
             @endforeach
             </tbody>

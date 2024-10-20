@@ -222,6 +222,8 @@ class ArbitroController extends Controller
         $arbitro = Arbitro::find($id);
 
         $arbitro->delete();
+        $persona = Persona::find($arbitro->persona_id);
+        $persona->delete();
         return redirect()->route('arbitros.index')->with('success','Registro eliminado satisfactoriamente');
     }
 

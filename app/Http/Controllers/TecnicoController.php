@@ -236,6 +236,8 @@ class TecnicoController extends Controller
         $tecnico = Tecnico::find($id);
 
         $tecnico->delete();
+        $persona = Persona::find($tecnico->persona_id);
+        $persona->delete();
         return redirect()->route('tecnicos.index')->with('success','Registro eliminado satisfactoriamente');
     }
 

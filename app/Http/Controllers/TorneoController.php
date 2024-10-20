@@ -3089,7 +3089,7 @@ INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.ambito
 ) a
 group by nombre, pais, escudo, id
 
-order by  '.$order.' '.$tipoOrder.',ligas DESC, copas DESC, nombre ASC';
+order by  '.$order.' '.$tipoOrder.',internacionales DESC,ligas DESC, copas DESC, nombre ASC';
         //dd($sql);
 
         $posiciones = DB::select(DB::raw($sql));

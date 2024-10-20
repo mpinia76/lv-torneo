@@ -539,6 +539,18 @@ class PartidoController extends Controller
                     ->where('tipo', 'Principal')
                     ->whereColumn('partidos.id', 'partido_arbitros.partido_id')
                     ->groupBy('partido_id');
+            })
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id');
+            })
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('alineacions')
+                    ->whereRaw('(partidos.equipol_id = alineacions.equipo_id OR partidos.equipov_id = alineacions.equipo_id)')
+                    ->whereColumn('partidos.id', 'alineacions.partido_id')
+                    ->groupBy('alineacions.partido_id');
             });
 
         $partidos = $partidosSinArbitroPrincipal
@@ -578,6 +590,7 @@ class PartidoController extends Controller
                     GROUP BY partido_id
                     HAVING COUNT(partido_id)!=3
                 ) AS t1'))
+
             ->select(
                 'partidos.id',
                 'partidos.dia',
@@ -601,6 +614,11 @@ class PartidoController extends Controller
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id');
+            })
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
@@ -648,7 +666,6 @@ class PartidoController extends Controller
 
     public function controlarTecnicos(Request $request)
     {
-        //DB::enableQueryLog();
         $partidos = DB::table('partidos')
             ->select(
                 'partidos.id',
@@ -673,30 +690,29 @@ class PartidoController extends Controller
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
                     ->from('partido_tecnicos')
-                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipol_id = partido_tecnicos.equipo_id ')
-
-                    ->groupBy('partido_id');
-            })->whereNotNull('golesl')
-            ->whereNotNull('golesv')
-            ->orWhereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('partido_tecnicos')
-                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipov_id = partido_tecnicos.equipo_id')
-
+                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND (partidos.equipol_id = partido_tecnicos.equipo_id OR partidos.equipov_id = partido_tecnicos.equipo_id)')
                     ->groupBy('partido_id');
             })
-            ->whereNotNull('golesl')
-            ->whereNotNull('golesv')
-            ->orderBy('year','desc')
-            ->orderBy('torneo')
-            ->orderBy('fecha')
-
-
-        ->paginate();
-
-
-
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id');
+            })
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('alineacions')
+                    ->whereRaw('(partidos.equipol_id = alineacions.equipo_id OR partidos.equipov_id = alineacions.equipo_id)')
+                    ->whereColumn('partidos.id', 'alineacions.partido_id')
+                    ->groupBy('alineacions.partido_id');
+            })
+            ->whereNotNull('partidos.golesl')
+            ->whereNotNull('partidos.golesv')
+            ->orderBy('torneo.year', 'desc')
+            ->orderBy('torneo.nombre')
+            ->orderBy('fecha.numero')
+            ->paginate();
 
         return view('torneos.controlarTecnicos', compact('partidos'));
     }
+
 }
