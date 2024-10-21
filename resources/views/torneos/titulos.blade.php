@@ -33,7 +33,7 @@
                             <img id="original" src="{{ url('images/'.$equipo->escudo) }}" height="25">
                         @endif
                         </a>
-                        {{$equipo->nombre}} <img id="original" src="{{ url('images/'.$equipo->pais.'.gif') }}" alt="{{ $equipo->pais }}"></td>
+                        {{$equipo->nombre}} <img id="original" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}"></td>
 
 
                     <td>{{$equipo->titulos}}</td>

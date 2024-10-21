@@ -5280,7 +5280,7 @@ return $string;
 
         if (empty($fechaNumero)){
             //$fechaNumero = '01';
-            $ultimaFecha=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->orderBy('numero','desc')->get();
+            $ultimaFecha=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','desc')->get();
             $fechaNumero = $ultimaFecha[0]->numero;
         }
 
@@ -5297,7 +5297,7 @@ return $string;
         });
 
 
-        $fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('numero','ASC')->get();
+        $fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','DESC')->get();
 
         // Determinar si hay partidos de ida y vuelta
         $hayIdaVuelta = $partidosAgrupados->contains(function ($partidos) {

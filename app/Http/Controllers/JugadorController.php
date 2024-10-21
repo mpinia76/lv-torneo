@@ -1015,6 +1015,232 @@ WHERE (alineacions.jugador_id = ".$id.")";
     public function importarProcess(Request $request)
     {
         set_time_limit(0);
+        $url = $request->get('url');
+        $ok = 1;
+        DB::beginTransaction();
+        $success='';
+        $html = '';
+        try {
+            if ($url) {
+                // Obtener el contenido de la URL
+                $htmlContent = file_get_contents($url);
+
+                // Crear un nuevo DOMDocument
+                $dom = new \DOMDocument();
+                libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                $dom->loadHTML($htmlContent);
+                libxml_clear_errors();
+
+                // Crear un nuevo objeto XPath
+                $xpath = new \DOMXPath($dom);
+            }
+        } catch (Exception $ex) {
+            $html = '';
+        }
+
+        if ($htmlContent) {
+            // Seleccionar el div con id 'previewArea' que contiene la imagen
+            $fotoDiv = $xpath->query('//div[@id="previewArea"]/img');
+            if ($fotoDiv->length > 0) {
+                $imageUrl = $fotoDiv[0]->getAttribute('src');
+                //Log::info('Foto: ' . $imageUrl, []);
+            }
+
+            // Seleccionar todos los dt y dd dentro de div.contentitem
+            $dtElements = $xpath->query('//div[@class="contentitem"]/dl/dt');
+            $ddElements = $xpath->query('//div[@class="contentitem"]/dl/dd');
+
+            $nombre = '';
+            $apellido = '';
+            $nacimiento = '';
+            $fallecimiento = '';
+            $ciudad = '';
+            $nacionalidad = '';
+            $tipo = '';
+            $altura = '';
+            $peso = '';
+
+            for ($i = 0; $i < $dtElements->length; $i++) {
+                $dtText = trim($dtElements[$i]->textContent);
+                $ddText = trim($ddElements[$i]->textContent);
+
+                // Agregar los datos a la persona según el título (dt) encontrado
+                switch ($dtText) {
+                    case 'Nombre':
+                        $nombre = $ddText;
+                        break;
+                    case 'Apellidos':
+                        $apellido = $ddText;
+                        break;
+                    case 'Fecha de nacimiento':
+                        $nacimiento = Carbon::createFromFormat('d-m-Y', $ddText)->format('Y-m-d');
+                        break;
+                    case 'Fecha de fallecimiento':
+                        $fallecimiento = Carbon::createFromFormat('d-m-Y', $ddText)->format('Y-m-d');
+                        break;
+                    case 'Lugar de nacimiento':
+                        $ciudad = $ddText;
+                        break;
+                    case 'Nacionalidad':
+                        $nacionalidad = $ddText;
+                        break;
+                    case 'Demarcación':
+                        switch ($ddText) {
+                            case 'Portero':
+                                $tipo = 'Arquero';
+                                break;
+                            case 'Defensa':
+                                $tipo = 'Defensor';
+                                break;
+                            case 'Centrocampista':
+                                $tipo = 'Medio';
+                                break;
+                            case 'Delantero':
+                                $tipo = 'Delantero';
+                                break;
+                        }
+                        break;
+                    case 'Altura':
+                        if (preg_match('/\d+/', $ddText, $matches)) {
+                            $altura = number_format($matches[0] / 100, 2);
+                        }
+                        break;
+                    case 'Peso':
+                        if (preg_match('/\d+/', $ddText, $matches)) {
+                            $peso = $matches[0];
+                        }
+                        break;
+                    default:
+                        // Manejar otros datos según sea necesario
+                        break;
+                }
+            }
+
+            // Descarga y guarda la imagen si no es el avatar por defecto
+            if (!str_contains($imageUrl, 'avatar-player.jpg')) {
+                $client = new Client();
+                $response = $client->get($imageUrl);
+
+                if ($response->getStatusCode() === 200) {
+                    $imageData = $response->getBody()->getContents();
+                    $parsedUrl = parse_url($imageUrl);
+                    $pathInfo = pathinfo($parsedUrl['path']);
+                    $nombreArchivo = $pathInfo['filename'];
+                    $extension = $pathInfo['extension'];
+
+                    if (strrchr($nombreArchivo, '.') === '.') {
+                        $nombreArchivo = substr($nombreArchivo, 0, -1);
+                    }
+
+                    // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
+                    $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                    Log::info('URL de la foto: ' . $localFilePath, []);
+                    $insert['foto'] = "$nombreArchivo.$extension";
+
+                    file_put_contents($localFilePath, $imageData);
+                    Log::info('Foto subida', []);
+                } else {
+                    Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
+                    $success .='Foto no subida: ' . $fotoDiv[0]->getAttribute('alt').'<br>';
+                }
+            } else {
+                Log::info('No tiene foto: ' . $imageUrl, []);
+                $success .='No tiene foto: ' . $imageUrl.'<br>';
+            }
+
+            // Insertar los datos de la persona
+            if ($nombre) {
+                $insert['nombre'] = $nombre;
+            } else {
+                Log::info('Falta el nombre', []);
+                $success .='Falta el nombre <br>';
+            }
+
+            if ($apellido) {
+                $insert['apellido'] = $apellido;
+            } else {
+                Log::info('Falta el apellido', []);
+                $success .='Falta el apellido <br>';
+            }
+
+            if ($ciudad) {
+                $insert['ciudad'] = $ciudad;
+            }
+            if ($nacionalidad) {
+                $insert['nacionalidad'] = $nacionalidad;
+            } else {
+                Log::info('Falta la nacionalidad', []);
+                $success .='Falta la nacionalidad <br>';
+            }
+            if ($altura) {
+                $insert['altura'] = $altura;
+            }
+            if ($peso) {
+                $insert['peso'] = $peso;
+            }
+            if ($nacimiento) {
+                $insert['nacimiento'] = $nacimiento;
+            } else {
+                Log::info('Falta la fecha de nacimiento', []);
+                $success .='Falta la fecha de nacimiento <br>';
+            }
+            if ($fallecimiento) {
+                $insert['fallecimiento'] = $fallecimiento;
+            }
+            if ($tipo) {
+                $insert['tipoJugador'] = $tipo;
+            } else {
+                Log::info('Falta el tipo de jugador', []);
+                $success .='Falta el tipo de jugador <br>';
+            }
+
+            $request->session()->put('nombre_filtro_jugador', $apellido);
+
+            try {
+                $persona = Persona::create($insert);
+                $persona->jugador()->create($insert);
+            } catch (QueryException $ex) {
+                try {
+                    $persona = Persona::where('nombre', '=', $insert['nombre'])
+                        ->where('apellido', '=', $insert['apellido'])
+                        ->where('nacimiento', '=', $insert['nacimiento'])
+                        ->first();
+
+                    if (!empty($persona)) {
+                        $persona->update($insert);
+                        $persona->jugador()->create($insert);
+                    }
+                } catch (QueryException $ex) {
+                    $ok = 0;
+                    $errorCode = $ex->errorInfo[1];
+
+                    if ($errorCode == 1062) {
+                        $error = 'Jugador repetido';
+                    }
+                }
+            }
+        } else {
+            Log::info('No se encontró la URL: ' . $url, []);
+            $error = 'No se encontró la URL: ' . $url;
+        }
+
+        if ($ok) {
+            DB::commit();
+            $respuestaID = 'success';
+            $respuestaMSJ = $success;
+        } else {
+            DB::rollback();
+            $respuestaID = 'error';
+            $respuestaMSJ=$error.'<br>'.$success;
+        }
+
+        return redirect()->route('jugadores.index')->with($respuestaID, $respuestaMSJ);
+    }
+
+
+    public function importarProcess_old(Request $request)
+    {
+        set_time_limit(0);
         //Log::info('Entraaaaaa', []);
 
         $url = $request->get('url');

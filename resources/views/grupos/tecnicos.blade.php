@@ -50,7 +50,7 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                             @endif
                         </a>
-                        {{$tecnico->tecnico}} <img id="original" src="{{ url('images/'.$tecnico->nacionalidadTecnico.'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}"></td>
+                        {{$tecnico->tecnico}} <img id="original" src="{{ url('images/'.removeAccents($tecnico->nacionalidadTecnico).'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}"></td>
                     <td>@if($tecnico->escudo)
                             @php
                                 $escudos = explode(',',$tecnico->escudo);

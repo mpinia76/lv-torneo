@@ -72,7 +72,7 @@
                             <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                         @endif
                     </a>
-                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.$jugador->nacionalidad.'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
+                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
                 <td>@if($jugador->escudo)
                         @php
                             $escudos = explode(',',$jugador->escudo);

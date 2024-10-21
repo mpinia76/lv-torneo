@@ -24,7 +24,7 @@
                 <div class="row">
                     <div class="form-group col-md-6">
                         <dt>Nombre</dt>
-                        <dd>{{$equipo->nombre}} <img id="original" src="{{ $equipo->bandera_url }}" alt="{{ $equipo->pais }}"></dd>
+                        <dd>{{$equipo->nombre}} <img id="original" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}"></dd>
                     </div>
 
                     <div class="form-group col-md-6">
