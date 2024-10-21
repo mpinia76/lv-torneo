@@ -31,6 +31,23 @@
     .dropdown-menu.show {
         display: block;
     }
+    /* Estilos para móviles */
+    @media (max-width: 768px) {
+        /* Convertir menú horizontal a vertical */
+        #horizontalMenu ul {
+            display: block; /* Hacer que los elementos se apilen verticalmente */
+        }
+
+        #horizontalMenu ul li {
+            padding: 10px 0; /* Espaciado adecuado entre elementos */
+        }
+
+        #horizontalMenu ul li a {
+            padding: 10px 15px; /* Aumentar el área clicable */
+            display: block;
+            width: 100%; /* Ocupa todo el ancho del contenedor */
+        }
+    }
 
 </style>
 <nav class="navbar navbar-default navbar-static-top">

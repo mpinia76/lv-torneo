@@ -6824,7 +6824,7 @@ return $string;
 
 
 
-$ok=0;
+        //$ok=0;
         if ($ok){
 
 
