@@ -115,6 +115,9 @@
             font-size: 8px !important;
 
         }
+        .nav>li>a {
+            padding: 1px 5px;
+        }
     }
     .hamburger-menu.open span:nth-child(1) {
         transform: rotate(45deg) translate(5px, 5px);
