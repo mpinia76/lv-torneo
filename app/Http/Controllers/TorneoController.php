@@ -1007,7 +1007,7 @@ INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
 INNER JOIN partidos ON partidos.id = alineacions.partido_id
 INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
 WHERE alineacions.jugador_id = '.$goleador->id.' AND gols.tipo <> \'En contra\'
-GROUP BY escudo, equipo_id
+GROUP BY escudo, equipo_id, partidos.dia
             ORDER BY partidos.dia ASC';
 
 
