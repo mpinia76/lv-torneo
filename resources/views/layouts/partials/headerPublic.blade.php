@@ -500,15 +500,17 @@
 
             const hamburgerSub = document.getElementById('hamburgerSubMenu');
             const menuSub = document.getElementById('mobileSubMenu');
-
-            hamburgerSub.addEventListener('click', function () {
-                // Alternar la visibilidad del menú
-                if (menuSub.style.display === 'block') {
-                    menuSub.style.display = 'none';
-                } else {
-                    menuSub.style.display = 'block';
-                }
-            });
+            // Verifica si el elemento existe antes de agregar el event listener
+            if (hamburgerSub && menuSub) {
+                hamburgerSub.addEventListener('click', function () {
+                    // Alternar la visibilidad del menú
+                    if (menuSub.style.display === 'block') {
+                        menuSub.style.display = 'none';
+                    } else {
+                        menuSub.style.display = 'block';
+                    }
+                });
+            }
 
             const dropdownItems = document.querySelectorAll('.dropdown-item');
 
