@@ -1012,6 +1012,28 @@ WHERE (alineacions.jugador_id = ".$id.")";
         return view('jugadores.importar');
     }
 
+    function getHtmlContent($url) {
+        $ch = curl_init();
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Para seguir redirecciones
+
+        // Opcional: Si necesitas establecer un timeout
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
+
+        $response = curl_exec($ch);
+
+        // Maneja errores de cURL
+        if (curl_errno($ch)) {
+            Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
+            return false;
+        }
+
+        curl_close($ch);
+        return $response;
+    }
+
     public function importarProcess(Request $request)
     {
         set_time_limit(0);
@@ -1023,8 +1045,8 @@ WHERE (alineacions.jugador_id = ".$id.")";
         try {
             if ($url) {
                 // Obtener el contenido de la URL
-                $htmlContent = file_get_contents($url);
-
+                //$htmlContent = file_get_contents($url);
+                $htmlContent = $this->getHtmlContent($url);
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
