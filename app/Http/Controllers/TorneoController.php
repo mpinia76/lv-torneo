@@ -1007,7 +1007,7 @@ INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
 INNER JOIN partidos ON partidos.id = alineacions.partido_id
 INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
 WHERE alineacions.jugador_id = '.$goleador->id.' AND gols.tipo <> \'En contra\'
-GROUP BY escudo, equipo_id, partidos.dia
+GROUP BY escudo, equipo_id
             ORDER BY partidos.dia ASC';
 
 
@@ -1168,7 +1168,7 @@ INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
 INNER JOIN partidos ON partidos.id = alineacions.partido_id
 INNER JOIN tarjetas ON tarjetas.partido_id = partidos.id AND tarjetas.jugador_id = alineacions.jugador_id
 WHERE alineacions.jugador_id = '.$tarjeta->id.'
-GROUP BY escudo, equipo_id,partidos.dia
+GROUP BY escudo, equipo_id
 ORDER BY partidos.dia ASC';
 
 
@@ -2528,7 +2528,7 @@ INNER JOIN partidos ON partidos.id = alineacions.partido_id
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\') AND alineacions.jugador_id = '.$arquero->id.'
-GROUP BY escudo, equipo_id, partidos.dia
+GROUP BY escudo, equipo_id
 ORDER BY partidos.dia ASC';
 
 
