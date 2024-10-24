@@ -163,7 +163,44 @@ class PartidoController extends Controller
         //$queries = DB::getQueryLog();
         //dd($queries);
 
-        return view('torneos.controlarAlineaciones', compact('partidos'));
+        $partidosSinJugadores = DB::table('partidos')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo'
+            )
+
+            ->whereIn('partidos.id', function ($query) {
+                $query->select('partido_id')
+                    ->from('alineacions')
+                    ->where('tipo', 'Titular')
+                    ->groupBy('partido_id','equipo_id')
+                    ->havingRaw('COUNT(partido_id) = 0');
+            })
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
+            ->orderBy('year','DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+
+        return view('torneos.controlarAlineaciones', compact('partidos','partidosSinJugadores'));
     }
 
     public function controlarTarjetas(Request $request)
