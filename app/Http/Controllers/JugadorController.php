@@ -137,7 +137,7 @@ class JugadorController extends Controller
         $insert['tipoJugador'] = $request->get('tipoJugador');
 
         $insert['pie'] = $request->get('pie');
-
+        $insert['url_nombre'] = $request->get('url_nombre');
 
 
 
@@ -262,7 +262,7 @@ class JugadorController extends Controller
         $updateJ['tipoJugador'] = $request->get('tipoJugador');
 
         $updateJ['pie'] = $request->get('pie');
-
+        $updateJ['url_nombre'] = $request->get('url_nombre');
 
 
 
