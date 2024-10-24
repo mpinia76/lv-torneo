@@ -190,6 +190,11 @@ class PartidoController extends Controller
                     ->whereColumn('alineacions.partido_id', 'partidos.id')
                     ->where('alineacions.tipo', 'Titular');
             })
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('incidencias.partido_id', 'partidos.id');
+            })
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
             ->orderBy('year', 'DESC')
