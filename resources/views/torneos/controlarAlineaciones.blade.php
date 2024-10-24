@@ -1,7 +1,19 @@
 @extends('layouts.app')
 
 @section('pageTitle', 'Controlar alineaciones')
+<style>
+    /* Estilos personalizados para resaltar la pestaña activa */
+    .nav-link.active {
+        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
+        color: #fff; /* Cambia el color del texto de la pestaña activa */
+        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    }
 
+    /* Agrega un espacio entre las pestañas y el contenido */
+    .tab-content {
+        margin: 20px; /* Ajusta el margen superior del contenido */
+    }
+</style>
 @section('content')
     <div class="container">
         <h1 class="display-6">Controlar alineaciones</h1>
@@ -37,7 +49,7 @@
             </li>
 
             <li class="nav-item">
-                <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Sin jugadore</a>
+                <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Sin jugadores</a>
             </li>
 
 
@@ -116,6 +128,7 @@
             </div>
 
         </div>
+            </div>
                 <div role="tabpanel" class="tab-pane active" id="tres">
 
 
