@@ -100,6 +100,8 @@ class EquipoController extends Controller
         $insert['estadio'] = $request->get('estadio');
         $insert['historia'] = $request->get('historia');
         $insert['pais'] = $request->get('pais');
+        $insert['url_nombre'] = $request->get('url_nombre');
+        $insert['url_id'] = $request->get('url_id');
 
 
         $equipo = Equipo::create($insert);
@@ -170,6 +172,8 @@ class EquipoController extends Controller
         $update['estadio'] = $request->get('estadio');
         $update['historia'] = $request->get('historia');
         $update['pais'] = $request->get('pais');
+        $update['url_id'] = $request->get('url_id');
+        $update['url_nombre'] = $request->get('url_nombre');
 
 
         $equipo=equipo::find($id);

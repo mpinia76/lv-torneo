@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Equipo extends Model
 {
-    protected $fillable = ['siglas','nombre', 'socios','fundacion','estadio','escudo','historia','pais'];
+    protected $fillable = ['siglas','nombre', 'socios','fundacion','estadio','escudo','historia','pais', 'url_nombre','url_id'];
 
     public function getBanderaUrlAttribute()
     {

@@ -76,7 +76,20 @@
 
             </div>
         </div>
+        <div class="row">
+            <fieldset>
+                <legend>futbol360.com.ar</legend>
+            <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                {{Form::label('url_nombre', 'Nombre/s')}}
+                {{Form::text('url_nombre', '', ['class' => 'form-control'])}}
+            </div>
 
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('url_id', 'ID')}}
+                {{Form::number('url_id', '', ['class' => 'form-control'])}}
+            </div>
+            </fieldset>
+        </div>
     <!-- build the submission button -->
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
         <a href="{{ route('equipos.index')}}" class="btn btn-success">Volver</a>

@@ -1398,8 +1398,17 @@ class FechaController extends Controller
     }
     public function dameIdEquipoURL($strEquipo)
     {
-        $strEquipoURL=strtr($strEquipo, " ", "-");
-        switch (trim($strEquipo)) {
+        //$strEquipoURL=strtr($strEquipo, " ", "-");
+        $strEquipoURL='';
+        $equipo = Equipo::where('nombre', 'like', "%$strEquipo%")->first();
+        //dd($equipo);
+        if($equipo->url_id){
+            $strEquipoURL=$equipo->url_id;
+        }
+        else{
+            Log::channel('mi_log')->info('Ojo!!! falta equipo: '.$strEquipo, []);
+        }
+        /*switch (trim($strEquipo)) {
             case 'Acassuso':
                 $strEquipoURL='1791';
 
@@ -2005,14 +2014,22 @@ class FechaController extends Controller
             default:
                 Log::channel('mi_log')->info('Ojo!!! falta equipo: '.$strEquipoURL, []);
                 break;
-        }
+        }*/
         return $strEquipoURL;
     }
     public function dameNombreEquipoURL3($strEquipo)
     {
-        $strEquipoURL=strtr($strEquipo, " ", "-");
+        //$strEquipoURL=strtr($strEquipo, " ", "-");
+        $equipo = Equipo::where('nombre', 'like', "%$strEquipo%")->first();
         $arrEquipo = array();
-        switch (trim($strEquipo)) {
+        if($equipo->url_nombre){
+            $arrEquipo=explode($equipo->url_nombre,',');
+        }
+        else{
+            Log::channel('mi_log')->info('Ojo!!! no esta: '.$strEquipo, []);
+        }
+
+        /*switch (trim($strEquipo)) {
             case 'Acassuso':
                 $arrEquipo[]='acassuso';
 
@@ -2565,7 +2582,7 @@ class FechaController extends Controller
             default:
                 Log::channel('mi_log')->info('Ojo!!! no esta: '.$strEquipoURL, []);
                 break;
-        }
+        }*/
         return $arrEquipo;
     }
 
