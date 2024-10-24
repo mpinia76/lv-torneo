@@ -129,7 +129,7 @@
 
         </div>
             </div>
-                <div role="tabpanel" class="tab-pane active" id="tres">
+                <div role="tabpanel" class="tab-pane" id="tres">
 
 
                     <!-- build our form inputs -->
