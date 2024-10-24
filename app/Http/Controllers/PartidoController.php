@@ -184,20 +184,19 @@ class PartidoController extends Controller
                 'equipo_local.escudo as equipo_local_escudo',
                 'equipo_visitante.escudo as equipo_visitante_escudo'
             )
-
-            ->whereIn('partidos.id', function ($query) {
-                $query->select('partido_id')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
                     ->from('alineacions')
-                    ->where('tipo', 'Titular')
-                    ->groupBy('partido_id','equipo_id')
-                    ->havingRaw('COUNT(partido_id) = 0');
+                    ->whereColumn('alineacions.partido_id', 'partidos.id')
+                    ->where('alineacions.tipo', 'Titular');
             })
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
-            ->orderBy('year','DESC')
+            ->orderBy('year', 'DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
             ->paginate();
+
 
 
         return view('torneos.controlarAlineaciones', compact('partidos','partidosSinJugadores'));
