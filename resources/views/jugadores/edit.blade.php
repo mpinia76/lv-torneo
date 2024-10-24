@@ -121,7 +121,17 @@
             </div>
 
         </div>
+        <div class="row">
+            <fieldset>
+                <legend>futbol360.com.ar</legend>
+                <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                    {{Form::label('url_nombre', 'Nombre')}}
+                    {{Form::text('url_nombre', $jugador->url_nombre, ['class' => 'form-control'])}}
+                </div>
 
+
+            </fieldset>
+        </div>
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
         <a href="{{ route('jugadores.index')}}" class="btn btn-success">Volver</a>
     {{ Form::close() }}

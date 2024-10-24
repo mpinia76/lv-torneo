@@ -4243,7 +4243,7 @@ return $string;
                         }
                         if (!$html2){
                             try {
-                                switch ($gol->jugador->id){
+                                /*switch ($gol->jugador->id){
                                     case '3890':
                                         $nombre3='diaz-daniel-6231';
                                         break;
@@ -4517,7 +4517,8 @@ return $string;
                                     default:
                                         $nombre3='';
                                         break;
-                                }
+                                }*/
+                                $nombre3 = $gol->jugador->url_nombre;
                                 $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ','-',$gol->jugador->persona->nacionalidad))).'/' .$nombre3;
                                 Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
