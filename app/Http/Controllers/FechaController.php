@@ -4133,7 +4133,11 @@ return $string;
         ], "|");
 
 
-        $success='';
+        // Crear un enlace para descargar el archivo
+        $downloadLink = '<a href="'.asset($filename).'" download>Descargar CSV</a>';
+
+// Agregar el link de descarga a $success
+        $success = 'El archivo CSV ha sido generado. ' . $downloadLink;
 
         /*$fecha=Fecha::findOrFail($id);
 
@@ -4160,6 +4164,7 @@ return $string;
                 $jugadorGolArray = array();
                 foreach ($goles as $gol) {
                     Log::channel('mi_log')->info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
+                    $success .='Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto.'<br>';
                     $alineacion=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$gol->jugador->id)->first();
                     if (!empty($alineacion)) {
                         Log::channel('mi_log')->info('OJO!!! - juega en: '.$alineacion->equipo->nombre, []);
@@ -4550,7 +4555,7 @@ return $string;
                                     $script_array = explode('id_player', $script->textContent);
                                     $id_jugador = trim(str_replace(':', '', explode('}', $script_array[1])[0]));
                                     Log::channel('mi_log')->info('OJO!! Id jugador: ' . $id_jugador, []);
-                                    $success .='Id jugador: ' . $id_jugador.'<br>';
+                                    //$success .='Id jugador: ' . $id_jugador.'<br>';
                                     break;
                                 }
                             }
@@ -4582,7 +4587,7 @@ return $string;
                                                         $arrIdJugador = explode('item=player&id=', $href);
                                                         $id_jugador = intval($arrIdJugador[1]);
                                                         Log::channel('mi_log')->info('OJO!! ALT Id jugador: ' . $id_jugador, []);
-                                                        $success .='ALT Id jugador: ' . $id_jugador.'<br>';
+                                                        //$success .='ALT Id jugador: ' . $id_jugador.'<br>';
                                                         break 4; // Salir de los bucles anidados
                                                     }
                                                 }
