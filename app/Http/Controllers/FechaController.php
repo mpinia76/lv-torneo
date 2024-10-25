@@ -5523,41 +5523,38 @@ return $string;
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Para seguir redirecciones
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
 
-        // Incluir el encabezado en la respuesta para poder obtener el código HTTP
-        curl_setopt($ch, CURLOPT_HEADER, true);
-        curl_setopt($ch, CURLOPT_NOBODY, false); // Obtener el cuerpo también
+        // Opcional: Si necesitas establecer un timeout
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
 
         $response = curl_exec($ch);
 
-        // Verificar si hubo errores de cURL
+        // Maneja errores de cURL
         if (curl_errno($ch)) {
             Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
+            return false;
+        }
+
+        // Verificar si $response es falso, lo que indica un fallo en la ejecución
+        if ($response === false) {
+            Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $url);
             curl_close($ch);
             return false;
         }
 
-        // Obtener el código de estado HTTP antes de cerrar cURL
+        // Obtener el código de estado HTTP
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        // Ahora se puede cerrar cURL después de obtener la información
+        //dd($httpCode);
         curl_close($ch);
-
         // Controlar el código 404
         if ($httpCode == 404) {
-            Log::channel('mi_log')->warning("Página no encontrada (404) para la URL: " . $url);
+            Log::channel('mi_log')->warning('Página no encontrada (404) para la URL: ' . $url);
             return false;
         }
 
-        // Elimina los encabezados de la respuesta si están incluidos
-        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $body = substr($response, $header_size);
 
-        return $body;
+        return $response;
     }
-
-
 
 
     public function importarPartidoProcess(Request $request)
