@@ -1022,20 +1022,22 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
         // Incluir el encabezado en la respuesta para poder obtener el código HTTP
         curl_setopt($ch, CURLOPT_HEADER, true);
-
-        // Obtener solo el cuerpo de la respuesta sin el encabezado
-        curl_setopt($ch, CURLOPT_NOBODY, false);
+        curl_setopt($ch, CURLOPT_NOBODY, false); // Obtener el cuerpo también
 
         $response = curl_exec($ch);
 
-        // Obtener el código de estado HTTP
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        // Maneja errores de cURL
+        // Verificar si hubo errores de cURL
         if (curl_errno($ch)) {
             Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
+            curl_close($ch);
             return false;
         }
+
+        // Obtener el código de estado HTTP antes de cerrar cURL
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        // Ahora se puede cerrar cURL después de obtener la información
+        curl_close($ch);
 
         // Controlar el código 404
         if ($httpCode == 404) {
@@ -1043,14 +1045,13 @@ WHERE (alineacions.jugador_id = ".$id.")";
             return false;
         }
 
-        curl_close($ch);
-
         // Elimina los encabezados de la respuesta si están incluidos
         $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $body = substr($response, $header_size);
 
         return $body;
     }
+
 
 
     public function importarProcess(Request $request)
