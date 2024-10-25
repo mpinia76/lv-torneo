@@ -4700,7 +4700,7 @@ return $string;
                                         $urlCabeza
                                     ], "|");
                                     Log::channel('mi_log')->info('OJO!!! No se econtró la URL de cabezas' , []);
-                                    $success .='No se econtró la URL de cabezas <br>';
+                                    $success .='No se econtró la URL de cabezas '.$urlCabeza.'<br>';
                                 }
                                 try {
                                     $urlLibres = 'http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=free_shot';
@@ -4804,7 +4804,7 @@ return $string;
                                         $urlLibres
                                     ], "|");
                                     Log::channel('mi_log')->info('OJO!!! No se econtró la URL de tiros libres' , []);
-                                    $success .='No se econtró la URL de tiros libres<br>';
+                                    $success .='No se econtró la URL de tiros libres '.$urlLibres.'<br>';
                                 }
                                 try {
                                     $urlPenales = 'http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=penal_converted';
@@ -4908,7 +4908,7 @@ return $string;
                                         $urlPenales
                                     ], "|");
                                     Log::channel('mi_log')->info('OJO!!! No se econtró la URL de penales' , []);
-                                    $success .='No se econtró la URL de penales <br>';
+                                    $success .='No se econtró la URL de penales '.$urlPenales.'<br>';
                                 }
                             }
 
@@ -4925,7 +4925,7 @@ return $string;
                                 $urlJugador
                             ], "|");
                             Log::channel('mi_log')->info('OJO!!! No se econtró la URL del jugador' , []);
-                            $success .= 'No se econtró la URL del jugador <br>';
+                            $success .= 'No se econtró la URL del jugador '.$urlJugador.'<br>';
                         }
                     }
                 }
