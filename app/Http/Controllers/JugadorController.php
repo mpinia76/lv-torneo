@@ -1018,11 +1018,18 @@ WHERE (alineacions.jugador_id = ".$id.")";
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Para seguir redirecciones
-
-        // Opcional: Si necesitas establecer un timeout
         curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
 
+        // Incluir el encabezado en la respuesta para poder obtener el código HTTP
+        curl_setopt($ch, CURLOPT_HEADER, true);
+
+        // Obtener solo el cuerpo de la respuesta sin el encabezado
+        curl_setopt($ch, CURLOPT_NOBODY, false);
+
         $response = curl_exec($ch);
+
+        // Obtener el código de estado HTTP
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
         // Maneja errores de cURL
         if (curl_errno($ch)) {
@@ -1030,9 +1037,21 @@ WHERE (alineacions.jugador_id = ".$id.")";
             return false;
         }
 
+        // Controlar el código 404
+        if ($httpCode == 404) {
+            Log::channel('mi_log')->warning("Página no encontrada (404) para la URL: " . $url);
+            return false;
+        }
+
         curl_close($ch);
-        return $response;
+
+        // Elimina los encabezados de la respuesta si están incluidos
+        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $body = substr($response, $header_size);
+
+        return $body;
     }
+
 
     public function importarProcess(Request $request)
     {
