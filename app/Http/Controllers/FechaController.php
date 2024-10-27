@@ -4622,6 +4622,7 @@ return $string;
                                     $htmlCabeza='';
                                 }
                                 if ($htmlCabeza){
+                                    $success .='Econtró la URL de cabezas '.$urlCabeza.'<br>';
                                     // Crear un nuevo DOMDocument y cargar el HTML
                                     $dom = new \DOMDocument();
                                     libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
