@@ -4124,17 +4124,20 @@ return $string;
         }
 
         //creating the download file
-        $filename =  public_path('files/'.$grupo->torneo->nombre.'_'.str_replace('/','_',$grupo->torneo->year).'_goles.csv');
-        $handle = fopen($filename, 'w');
+        $filename = 'files/'.$grupo->torneo->nombre.'_'.str_replace('/','_',$grupo->torneo->year).'_goles.csv';
+        $filepath = public_path($filename); // Ruta física en el servidor
+        $handle = fopen($filepath, 'w');
 
-        //adding the first row
+// Añadir la primera fila al CSV
         fputcsv($handle, [
-            'Torneo', 'fecha','Partido', 'Jugador','Gol','Observaciones','URL'
+            'Torneo', 'Fecha', 'Partido', 'Jugador', 'Gol', 'Observaciones', 'URL'
         ], "|");
 
 
+
+
         // Crear un enlace para descargar el archivo
-        $downloadLink = '<a href="'.asset($filename).'" download>Descargar CSV</a>';
+        $downloadLink = '<a href="'.asset($filename).'" download>Descargar CSV</a><br>';
 
 // Agregar el link de descarga a $success
         $success = 'El archivo CSV ha sido generado. ' . $downloadLink;
@@ -4916,6 +4919,10 @@ return $string;
                                     $success .='No se econtró la URL de penales '.$urlPenales.'<br>';
                                 }
                             }
+                            else{
+                                $success .= 'No se econtró la URL del jugador '.$urlJugador.'<br>';
+                            }
+
 
                         }
                         else{
