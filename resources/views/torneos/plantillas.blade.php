@@ -120,7 +120,7 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                             @endif
                         </a>
-                        {{$tecnico->tecnico}} <img id="original" src="{{ url('images/'.$tecnico->nacionalidadTecnico.'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}"></td>
+                        {{$tecnico->tecnico}} <img id="original" src="{{ url('images/'.removeAccents($tecnico->nacionalidadTecnico).'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}"></td>
                     <td>{{$tecnico->edad}}
                     <td>{{$tecnico->puntaje}}</td>
                     <td><a href="{{route('tecnicos.jugados', array('tecnicoId' => $tecnico->tecnico_id))}}" >{{$tecnico->jugados}}</a></td>
