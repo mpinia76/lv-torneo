@@ -4552,6 +4552,13 @@ return $string;
 
                                     //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
                                     $html2 = $this->getHtmlContent($urlJugador);
+                                    if (!$html2){
+                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/'  .$nombre3;
+                                        Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                                        $html2 = $this->getHtmlContent($urlJugador);
+                                    }
 
                                 }
                                 catch (Exception $ex) {
