@@ -272,3 +272,25 @@ WHERE tarjetas.jugador_id = 1766 ;
 
 ########################## modificar arbitro repetido ##########################
 UPDATE `partido_arbitros` SET `arbitro_id`=207 WHERE  `arbitro_id`=6;
+
+########################## Modificar dorsal en un torneo ##########################
+SET @dorsal := 23;
+SET @jugador_id := 11396;
+SET @equipo_id := 216;
+SET @torneo_id := 99;
+
+UPDATE plantilla_jugadors
+    INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
+    INNER JOIN grupos ON plantillas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET plantilla_jugadors.dorsal = @dorsal
+WHERE plantilla_jugadors.jugador_id = @jugador_id AND plantillas.equipo_id = @equipo_id AND torneos.id = @torneo_id;
+
+UPDATE alineacions
+    INNER JOIN partidos ON alineacions.partido_id = partidos.id
+    INNER JOIN fechas ON fechas.id = partidos.fecha_id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    SET alineacions.dorsal = @dorsal
+WHERE alineacions.jugador_id = @jugador_id AND alineacions.equipo_id = @equipo_id AND torneos.id = @torneo_id;
+
