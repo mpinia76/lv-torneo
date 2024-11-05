@@ -4643,7 +4643,7 @@ return $string;
                                         $htmlCabeza = $this->getHtmlContent($urlCabeza);
                                         //Log::channel('mi_log')->info('OJO!! URL cabeza: '.$htmlCabeza,[]);
 
-                                        $success .='Url cabeza: ' . $htmlCabeza.'<br>';
+                                        $success .='Url cabeza: ' . $urlCabeza.'<br>';
 
 
                                     }
@@ -4748,7 +4748,7 @@ return $string;
                                         $htmlLibre = $this->getHtmlContent($urlLibres);
                                         //Log::channel('mi_log')->info('OJO!! URL Libre: '.$htmlLibre,[]);
 
-                                        $success .='Url tiro libre: ' . $htmlLibre.'<br>';
+                                        $success .='Url tiro libre: ' . $urlLibres.'<br>';
 
 
                                     }
@@ -4852,7 +4852,7 @@ return $string;
                                         $htmlPenal = $this->getHtmlContent($urlPenales);
                                         //Log::channel('mi_log')->info('OJO!! URL Penal: '.$htmlPenal,[]);
 
-                                        $success .='Url penal: ' . $htmlPenal.'<br>';
+                                        $success .='Url penal: ' . $urlPenales.'<br>';
 
 
                                     }
