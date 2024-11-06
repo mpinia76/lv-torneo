@@ -53,7 +53,17 @@
             {{ Form::select('ambito',[''=>'Seleccionar...','Nacional'=>'Nacional','Internacional'=>'Internacional'],$torneo->ambito, ['class' => 'form-control']) }}
         </div>
     </div>
+        <div class="row">
+            <fieldset>
+                <legend>futbol360.com.ar</legend>
+                <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                    {{Form::label('url_nombre', 'Nombre/s')}}
+                    {{Form::text('url_nombre', $torneo->url_nombre, ['class' => 'form-control'])}}
+                </div>
 
+
+            </fieldset>
+        </div>
         <div class="form-group col-md-12">
             <h1 class="display-6">Grupos</h1>
 

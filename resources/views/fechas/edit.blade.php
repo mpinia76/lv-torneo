@@ -82,7 +82,17 @@
             </div>
 
         </div>
+        <div class="row">
+            <fieldset>
+                <legend>futbol360.com.ar</legend>
+                <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                    {{Form::label('url_nombre', 'Nombre/s')}}
+                    {{Form::text('url_nombre', $fecha->url_nombre, ['class' => 'form-control'])}}
+                </div>
 
+
+            </fieldset>
+        </div>
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
         <a href="{{ route('fechas.index',array('grupoId'=>$grupo->id))}}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}
