@@ -2644,7 +2644,7 @@ class FechaController extends Controller
     public function dameNombreTorneoURL($strTorneo,$fecha,$year,$vuelta=0)
     {
         //Log::channel('mi_log')->info($strTorneo.' - '.$fecha.' - '.$year, []);
-        $strTorneo=strtr($strTorneo, " ", "-");
+        /*$strTorneo=strtr($strTorneo, " ", "-");
         if (strpos($fecha, '32vos') !== false) {
             $fecha = '32-de-final';
         }
@@ -2666,11 +2666,11 @@ class FechaController extends Controller
         if (strpos($fecha, '1er Ronda') !== false) {
             $fecha = 'primera-fase';
 
-        }
+        }*/
         if ($vuelta){
             $fecha .= ($vuelta==2)?'-vuelta':'-ida';
         }
-        if (strpos($strTorneo, 'copa-argentina') !== false) {
+        /*if (strpos($strTorneo, 'copa-argentina') !== false) {
 
             $strTorneoURL='copa-argentina-'.$year.'/'.$fecha;
             switch (trim($year)) {
@@ -2740,7 +2740,8 @@ class FechaController extends Controller
         }
         else{
             $strTorneoURL='torneo-'.$strTorneo.'-'.$year.'/'.intval($fecha).'-fecha';
-        }
+        }*/
+        $strTorneoURL=$strTorneo.'-'.$year.'/'.intval($fecha).'-fecha';
         //Log::channel('mi_log')->info($strTorneoURL, []);
         return $strTorneoURL;
     }
@@ -4690,13 +4691,19 @@ return $string;
                                                                 foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
                                                                     foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
                                                                         // Comparar las posibles combinaciones de URLs
-                                                                        if (
-                                                                            $href == '/partidos/argentina/' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre), $fecha->numero, $year) . '/' . $local3 . '-' . $visitante3 . '/' ||
-                                                                            $href == '/partidos/argentina/' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre), $fecha->numero, $year) . '/' . $visitante3 . '-' . $local3 . '/' ||
-                                                                            $href == '/partidos/argentina/' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre), $fecha->numero, $year, 1) . '/' . $local3 . '-' . $visitante3 . '/' ||
-                                                                            $href == '/partidos/argentina/' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre), $fecha->numero, $year, 1) . '/' . $visitante3 . '-' . $local3 . '/' ||
-                                                                            $href == '/partidos/argentina/' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre), $fecha->numero, $year, 2) . '/' . $local3 . '-' . $visitante3 . '/' ||
-                                                                            $href == '/partidos/argentina/' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->nombre), $fecha->numero, $year, 2) . '/' . $visitante3 . '-' . $local3 . '/'
+                                                                        if ((
+                                                                            strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                        )||(
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 1) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 1) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 2) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 2) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )
                                                                         ) {
                                                                             $urlEncontrada = 1;
                                                                             Log::channel('mi_log')->info('OJO!! encontró gol cabeza: ' . $href, []);
