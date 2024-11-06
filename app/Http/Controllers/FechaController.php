@@ -2021,14 +2021,14 @@ class FechaController extends Controller
     public function dameNombreEquipoURL3($strEquipo)
     {
         //$strEquipoURL=strtr($strEquipo, " ", "-");
-        Log::channel('mi_log')->info('Equipo: '.$strEquipo, []);
+        //Log::channel('mi_log')->info('Equipo: '.$strEquipo, []);
         $equipo = Equipo::where('nombre', 'like', "%$strEquipo%")->first();
         $arrEquipo = array();
         if($equipo->url_nombre){
-            Log::channel('mi_log')->info('URL Equipo: '.$equipo->url_nombre, []);
+            //Log::channel('mi_log')->info('URL Equipo: '.$equipo->url_nombre, []);
             $arrEquipo=explode(',',$equipo->url_nombre);
 
-            Log::info('Contenido del array: ' . print_r($arrEquipo, true));
+            //Log::info('Contenido del array: ' . print_r($arrEquipo, true));
         }
         else{
             Log::channel('mi_log')->info('Ojo!!! no esta: '.$strEquipo, []);
@@ -4913,12 +4913,12 @@ return $string;
                                                             foreach ($links as $link) {
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
-                                                                Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
+                                                                //Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
                                                                 // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
                                                                 foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
                                                                     foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
                                                                         // Comparar las posibles combinaciones de URLs
-                                                                        Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/', []);
+                                                                        //Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/', []);
                                                                         if ((
                                                                                 strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
                                                                             )||(
@@ -4935,7 +4935,7 @@ return $string;
                                                                         ) {
                                                                             $urlEncontrada = 1;
                                                                             Log::channel('mi_log')->info('OJO!! encontró gol de penal: ' . $href, []);
-                                                                            $succss .='Encontró gol de penal: ' . $href.'<br>';
+                                                                            $success .='Encontró gol de penal: ' . $href.'<br>';
 
                                                                             // Crear el array de datos para el jugador y el gol
                                                                             $data3 = array(
