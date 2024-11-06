@@ -4909,7 +4909,7 @@ return $string;
                                                             foreach ($links as $link) {
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
-
+                                                                Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
                                                                 // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
                                                                 foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
                                                                     foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
