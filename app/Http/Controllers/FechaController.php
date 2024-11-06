@@ -2025,6 +2025,8 @@ class FechaController extends Controller
         $arrEquipo = array();
         if($equipo->url_nombre){
             $arrEquipo=explode($equipo->url_nombre,',');
+
+            Log::info('Contenido del array: ' . print_r($arrEquipo, true));
         }
         else{
             Log::channel('mi_log')->info('Ojo!!! no esta: '.$strEquipo, []);
