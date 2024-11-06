@@ -4687,40 +4687,43 @@ return $string;
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
 
-                                                                // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
-                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
-                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
-                                                                        // Comparar las posibles combinaciones de URLs
-                                                                        if ((
-                                                                            strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                        )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 1) . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 1) . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 2) . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 2) . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            )
-                                                                        ) {
-                                                                            $urlEncontrada = 1;
-                                                                            Log::channel('mi_log')->info('OJO!! encontró gol cabeza: ' . $href, []);
-                                                                            $success .='Encontró gol cabeza: ' . $href.'<br>';
+                                                                if ($href){
+                                                                    // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
+                                                                    foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
+                                                                        foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
+                                                                            // Comparar las posibles combinaciones de URLs
+                                                                            if ((
+                                                                                    strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                                )||(
+                                                                                    strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                                )||(
+                                                                                    strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 1) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                                )||(
+                                                                                    strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 1) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                                )||(
+                                                                                    strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 2) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                                )||(
+                                                                                    strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 2) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                                )
+                                                                            ) {
+                                                                                $urlEncontrada = 1;
+                                                                                Log::channel('mi_log')->info('OJO!! encontró gol cabeza: ' . $href, []);
+                                                                                $success .='Encontró gol cabeza: ' . $href.'<br>';
 
-                                                                            // Crear el array de datos para el jugador y el gol
-                                                                            $data3 = array(
-                                                                                'partido_id' => $partido->id,
-                                                                                'jugador_id' => $gol->jugador->id,
-                                                                                'minuto' => $gol->minuto,
-                                                                                'tipo' => 'Cabeza',
-                                                                                'url' => $urlCabeza,
-                                                                            );
-                                                                            $jugadorGolArray[$gol->jugador->id][] = $data3;
+                                                                                // Crear el array de datos para el jugador y el gol
+                                                                                $data3 = array(
+                                                                                    'partido_id' => $partido->id,
+                                                                                    'jugador_id' => $gol->jugador->id,
+                                                                                    'minuto' => $gol->minuto,
+                                                                                    'tipo' => 'Cabeza',
+                                                                                    'url' => $urlCabeza,
+                                                                                );
+                                                                                $jugadorGolArray[$gol->jugador->id][] = $data3;
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
+
 
                                                                 // Si no se encontró la URL, registrar en el log
                                                                 if (!$urlEncontrada) {
