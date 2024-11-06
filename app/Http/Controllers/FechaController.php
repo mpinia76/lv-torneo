@@ -4192,7 +4192,7 @@ return $string;
                     $jugadorGolArray = array();
                     foreach ($goles as $gol) {
                         Log::channel('mi_log')->info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
-                        $success .='Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto.'<br>';
+                        //$success .='Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto.'<br>';
                         $alineacion=Alineacion::where('partido_id','=',"$partido->id")->where('jugador_id','=',$gol->jugador->id)->first();
                         if (!empty($alineacion)) {
                             Log::channel('mi_log')->info('OJO!!! - juega en: '.$alineacion->equipo->nombre, []);
