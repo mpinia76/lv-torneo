@@ -5038,7 +5038,7 @@ return $string;
                                     }
                                 }
                                 else{
-                                    $success .= 'No se econtró la URL del jugador '.$urlJugador.'<br>';
+                                    $success .= 'No se econtró la URL del jugador '.$gol->jugador->persona->nombre.' '.$gol->jugador->persona->apellido.'<br>';
                                 }
 
 
