@@ -4627,7 +4627,7 @@ return $string;
                                     }
                                 }
                                 if ($id_jugador){
-                                    $success .= 'URL del jugador '.$urlJugador.'<br>';
+
                                     if ($juegaEn==$strLocal){
                                         $juegaContra=$strVisitante;
                                     }
@@ -4651,7 +4651,7 @@ return $string;
                                         $htmlCabeza='';
                                     }
                                     if ($htmlCabeza){
-
+                                        $success .='Encontró gol cabeza: <br>';
                                         // Crear un nuevo DOMDocument y cargar el HTML
                                         $dom = new \DOMDocument();
                                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
