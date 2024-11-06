@@ -4914,6 +4914,7 @@ return $string;
                                                                 foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
                                                                     foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
                                                                         // Comparar las posibles combinaciones de URLs
+                                                                        Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/', []);
                                                                         if ((
                                                                                 strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
                                                                             )||(
