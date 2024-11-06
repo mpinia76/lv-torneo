@@ -2741,7 +2741,7 @@ class FechaController extends Controller
         else{
             $strTorneoURL='torneo-'.$strTorneo.'-'.$year.'/'.intval($fecha).'-fecha';
         }*/
-        $strTorneoURL=$strTorneo.'-'.$year.'/'.intval($fecha).'-fecha';
+        $strTorneoURL=$strTorneo.'/'.$fecha;
         //Log::channel('mi_log')->info($strTorneoURL, []);
         return $strTorneoURL;
     }
@@ -4692,17 +4692,17 @@ return $string;
                                                                     foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
                                                                         // Comparar las posibles combinaciones de URLs
                                                                         if ((
-                                                                            strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $local3 . '-' . $visitante3 . '/') !== false
                                                                         )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year) . '/' . $visitante3 . '-' . $local3 . '/') !== false
                                                                             )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 1) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 1) . '/' . $local3 . '-' . $visitante3 . '/') !== false
                                                                             )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 1) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 1) . '/' . $visitante3 . '-' . $local3 . '/') !== false
                                                                             )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 2) . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 2) . '/' . $local3 . '-' . $visitante3 . '/') !== false
                                                                             )||(
-                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->numero, $year, 2) . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                                strpos($href, $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, $year, 2) . '/' . $visitante3 . '-' . $local3 . '/') !== false
                                                                             )
                                                                         ) {
                                                                             $urlEncontrada = 1;
