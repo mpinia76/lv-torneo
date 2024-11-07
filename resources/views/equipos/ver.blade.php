@@ -151,7 +151,7 @@
                     <thead>
                     <th>#</th>
                     <th>Torneo</th>
-                    v
+                    
                     <th>J</th>
                     <th>G</th>
                     <th>E</th>
