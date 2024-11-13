@@ -565,9 +565,51 @@ class PartidoController extends Controller
             ->orderBy('fecha')
             ->paginate();
 
+// Consulta para titulares que tienen "Entra" en cambios
+        $titularesQueEntran = DB::table('alineacions')
+            ->join('cambios', function($join) {
+                $join->on('alineacions.partido_id', '=', 'cambios.partido_id')
+                    ->on('alineacions.jugador_id', '=', 'cambios.jugador_id')
+                    ->where('cambios.tipo', '=', 'Entra');
+            })
+            ->join('partidos', 'alineacions.partido_id', '=', 'partidos.id')
+            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
+            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
+            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->join('jugadors', 'alineacions.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->select(
+                'partidos.id',
+                'partidos.dia',
+                'partidos.golesl',
+                'partidos.golesv',
+                'partidos.penalesl',
+                'partidos.penalesv',
+                'fecha.numero as fecha',
+                'torneo.nombre as torneo',
+                'torneo.year as year',
+                'equipo_local.nombre as equipo_local_nombre',
+                'equipo_visitante.nombre as equipo_visitante_nombre',
+                'equipo_local.escudo as equipo_local_escudo',
+                'equipo_visitante.escudo as equipo_visitante_escudo',
+                'personas.nombre as jugador_nombre',
+                'personas.apellido as jugador_apellido',
+                'personas.foto as jugador_foto'
+            )
+            ->where('alineacions.tipo', '=', 'Titular') // Verificamos que el jugador es titular
+            ->whereNotNull('golesl')
+            ->whereNotNull('golesv')
+            ->orderBy('year', 'DESC')
+            ->orderBy('torneo')
+            ->orderBy('fecha')
+            ->paginate();
+
+//dd($titularesQueEntran);
 
 
-        return view('torneos.controlarCambios', compact('partidos','cambios','impares'));
+        return view('torneos.controlarCambios', compact('partidos','cambios','impares','titularesQueEntran'));
     }
 
     public function controlarArbitros(Request $request)
@@ -700,50 +742,8 @@ class PartidoController extends Controller
             ->orderBy('fecha')
             ->paginate();
 
-        // Consulta para titulares que tienen "Entra" en cambios
-        $titularesQueEntran = DB::table('alineacions')
-            ->join('cambios', function($join) {
-                $join->on('alineacions.partido_id', '=', 'cambios.partido_id')
-                    ->on('alineacions.jugador_id', '=', 'cambios.jugador_id')
-                    ->where('cambios.tipo', '=', 'Entra');
-            })
-            ->join('partidos', 'alineacions.partido_id', '=', 'partidos.id')
-            ->join('equipos as equipo_local', 'partidos.equipol_id', '=', 'equipo_local.id')
-            ->join('equipos as equipo_visitante', 'partidos.equipov_id', '=', 'equipo_visitante.id')
-            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
-            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
-            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
-            ->join('jugadors', 'alineacions.jugador_id', '=', 'jugadors.id')
-            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-            ->select(
-                'partidos.id',
-                'partidos.dia',
-                'partidos.golesl',
-                'partidos.golesv',
-                'partidos.penalesl',
-                'partidos.penalesv',
-                'fecha.numero as fecha',
-                'torneo.nombre as torneo',
-                'torneo.year as year',
-                'equipo_local.nombre as equipo_local_nombre',
-                'equipo_visitante.nombre as equipo_visitante_nombre',
-                'equipo_local.escudo as equipo_local_escudo',
-                'equipo_visitante.escudo as equipo_visitante_escudo',
-                'personas.nombre as jugador_nombre',
-                'personas.apellido as jugador_apellido',
-                'personas.foto as jugador_foto'
-            )
-            ->where('alineacions.tipo', '=', 'Titular') // Verificamos que el jugador es titular
-            ->whereNotNull('golesl')
-            ->whereNotNull('golesv')
-            ->orderBy('year', 'DESC')
-            ->orderBy('torneo')
-            ->orderBy('fecha')
-            ->paginate();
 
-//dd($titularesQueEntran);
-
-        return view('torneos.controlarArbitros', compact('partidos','jueces','repetidos','titularesQueEntran'));
+        return view('torneos.controlarArbitros', compact('partidos','jueces','repetidos'));
     }
 
     public function controlarTecnicos(Request $request)
