@@ -54,7 +54,9 @@
             <li class="nav-item">
                 <a class="nav-link" id="diferencia-tab" data-toggle="tab" href="#diferencia" role="tab" aria-controls="diferencia" aria-selected="false">Impares</a>
             </li>
-
+            <li class="nav-item">
+                <a class="nav-link" id="titular-tab" data-toggle="tab" href="#titular" role="tab" aria-controls="titular" aria-selected="false">Titulares que entran</a>
+            </li>
 
         </ul>
         <div class="tab-content" id="myTabContent">
@@ -299,6 +301,83 @@
             </div>
 
         </div>
+            </div>
+            <div role="tabpanel" class="tab-pane" id="titular">
+
+                <!-- build our form inputs -->
+                <div class="row">
+
+                    <div class="form-group col-md-12">
+
+                        <table class="table" style="font-size: 14px;">
+                            <thead>
+
+                            <th>Torneo</th>
+                            <th>Fecha</th>
+                            <th>Día</th>
+                            <th>Local</th>
+                            <th>GL</th>
+                            <th>GV</th>
+                            <th>Visitante</th>
+
+                            </thead>
+
+
+                            @foreach($titularesQueEntran as $cambio)
+
+                                @if($cambio->dia)
+                                    <tr>
+
+                                        <td>{{$cambio->torneo}} {{$cambio->year}}</td>
+                                        <td>{{$cambio->fecha}}</td>
+                                        <td>{{($cambio->dia)?date('d/m/Y H:i', strtotime($cambio->dia)):''}}</td>
+                                        <td>@if($cambio->equipo_local_nombre)
+                                                @if($cambio->equipo_local_escudo)<img id="original" src="{{ url('images/'.$cambio->equipo_local_escudo) }}" height="20">
+                                                @endif
+                                                {{$cambio->equipo_local_nombre}}
+                                            @endif
+                                        </td>
+                                        <td>{{$cambio->golesl}}
+                                            @if($cambio->penalesl)
+                                                ({{$cambio->penalesl}})
+                                            @endif
+                                        </td>
+                                        <td>{{$cambio->golesv}}
+                                            @if($cambio->penalesv)
+                                                ({{$cambio->penalesv}})
+                                            @endif
+                                        </td>
+                                        <td>@if($cambio->equipo_visitante_nombre)
+                                                @if($cambio->equipo_visitante_escudo)<img id="original" src="{{ url('images/'.$cambio->equipo_visitante_escudo) }}" height="20">
+                                                @endif
+                                                {{$cambio->equipo_visitante_nombre}}
+                                            @endif
+                                        </td>
+
+                                        <td>
+                                            <div class="d-flex">
+
+
+                                                <a href="{{route('cambios.index', array('partidoId' => $cambio->id))}}" class="btn btn-info m-1">Cambios</a>
+
+                                            </div>
+
+                                        </td>
+                                    </tr>
+                                @endif
+                            @endforeach
+                        </table>
+                        <div class="row">
+                            <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                                {{ $cambios->links() }}
+                            </div>
+                            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                                <strong>Total: {{ $cambios->total() }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
 
