@@ -311,7 +311,7 @@
 
                         <table class="table" style="font-size: 14px;">
                             <thead>
-
+                            <th>Jugador</th>
                             <th>Torneo</th>
                             <th>Fecha</th>
                             <th>Día</th>
@@ -327,7 +327,11 @@
 
                                 @if($cambio->dia)
                                     <tr>
-
+                                        <td>@if($cambio->jugador_foto)
+                                                <img id="original" class="imgCircle" src="{{ url('images/'.$cambio->jugador_foto) }}" >
+                                            @else
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                            @endif{{$cambio->jugador_apellido}}, {{$cambio->jugador_nombre}}</td>
                                         <td>{{$cambio->torneo}} {{$cambio->year}}</td>
                                         <td>{{$cambio->fecha}}</td>
                                         <td>{{($cambio->dia)?date('d/m/Y H:i', strtotime($cambio->dia)):''}}</td>
@@ -369,10 +373,10 @@
                         </table>
                         <div class="row">
                             <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                                {{ $cambios->links() }}
+                                {{ $titularesQueEntran->links() }}
                             </div>
                             <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                                <strong>Total: {{ $cambios->total() }}</strong>
+                                <strong>Total: {{ $titularesQueEntran->total() }}</strong>
                             </div>
                         </div>
                     </div>
