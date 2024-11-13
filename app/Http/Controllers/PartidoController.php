@@ -330,6 +330,11 @@ class PartidoController extends Controller
             ->join('gols', 'partidos.id', '=', 'gols.partido_id')
             ->join('jugadors', 'gols.jugador_id', '=', 'jugadors.id')
             ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id'); // No debe haber incidencias
+            })
             ->whereIn('partidos.id', function ($query) {
                 $query->select('gols.partido_id')
                     ->from('gols')
@@ -601,6 +606,11 @@ class PartidoController extends Controller
             ->where('alineacions.tipo', '=', 'Titular') // Verificamos que el jugador es titular
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id'); // No debe haber incidencias
+            })
             ->orderBy('year', 'DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
