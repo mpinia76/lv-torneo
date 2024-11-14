@@ -540,7 +540,7 @@ class PartidoController extends Controller
                     SELECT partido_id, minuto
                     FROM cambios
                     GROUP BY partido_id, minuto
-                    HAVING SUM(CASE WHEN tipo = "Entra" THEN 1 ELSE 0 END) = SUM(CASE WHEN tipo = "Sale" THEN 1 ELSE 0 END)
+                    HAVING SUM(CASE WHEN tipo = "Entra" THEN 1 ELSE 0 END) != SUM(CASE WHEN tipo = "Sale" THEN 1 ELSE 0 END)
                 ) AS t1'))
             ->select(
                 'partidos.id',

@@ -292,10 +292,10 @@
                 </table>
                 <div class="row">
                     <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                        {{ $cambios->links() }}
+                        {{ $impares->links() }}
                     </div>
                     <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                        <strong>Total: {{ $cambios->total() }}</strong>
+                        <strong>Total: {{ $impares->total() }}</strong>
                     </div>
                 </div>
             </div>
