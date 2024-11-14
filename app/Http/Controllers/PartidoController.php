@@ -537,10 +537,10 @@ class PartidoController extends Controller
             ->paginate();
 
         $impares = DB::table(DB::raw('(
-                    SELECT partido_id, minuto, COUNT(partido_id) AS cantidad_cambios
+                    SELECT partido_id, minuto
                     FROM cambios
                     GROUP BY partido_id, minuto
-                    HAVING COUNT(partido_id) % 2 != 0
+                    HAVING SUM(CASE WHEN tipo = "Entra" THEN 1 ELSE 0 END) = SUM(CASE WHEN tipo = "Sale" THEN 1 ELSE 0 END)
                 ) AS t1'))
             ->select(
                 'partidos.id',
@@ -569,6 +569,7 @@ class PartidoController extends Controller
             ->orderBy('torneo')
             ->orderBy('fecha')
             ->paginate();
+
 
 // Consulta para titulares que tienen "Entra" en cambios
         $titularesQueEntran = DB::table('alineacions')
