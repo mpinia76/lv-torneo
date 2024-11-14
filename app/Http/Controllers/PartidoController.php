@@ -565,6 +565,11 @@ class PartidoController extends Controller
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id'); // No debe haber incidencias
+            })
             ->orderBy('year','DESC')
             ->orderBy('torneo')
             ->orderBy('fecha')
