@@ -78,7 +78,7 @@
                 <div class="row">
                     <div class="form-group col-xs-12 col-sm-6 col-md-12">
 
-                        <dd>{{$equipo->historia}}</dd>
+                        <dd>{!! nl2br(e($equipo->historia)) !!}</dd>
                     </div>
                 </div>
             </div>
