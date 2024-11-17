@@ -77,6 +77,9 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('finalizar', 'TorneoController@finalizar')->name('torneos.finalizar');
     Route::put('guardarFinalizar', 'TorneoController@guardarFinalizar');
 
+    Route::get('dorsal', 'TorneoController@dorsal')->name('torneos.dorsal');
+    Route::put('guardarDorsal', 'TorneoController@guardarDorsal');
+
     Route::get('importpoll', 'PollController@importPoll')->name('polls.importPoll');
     Route::post('importpollprocess', 'PollController@importpollprocess');
     Route::get('plantillasearch', 'PlantillaController@search')

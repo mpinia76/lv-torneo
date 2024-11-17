@@ -274,10 +274,10 @@ WHERE tarjetas.jugador_id = 14065 ;
 UPDATE `partido_arbitros` SET `arbitro_id`=207 WHERE  `arbitro_id`=6;
 
 ########################## Modificar dorsal en un torneo ##########################
-SET @dorsal := 23;
-SET @jugador_id := 11396;
-SET @equipo_id := 216;
-SET @torneo_id := 99;
+SET @dorsal := 6;
+SET @jugador_id := 9754;
+SET @equipo_id := 182;
+SET @torneo_id := 102;
 
 UPDATE plantilla_jugadors
     INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id

@@ -53,6 +53,7 @@
             <a href="{{route('torneos.promedios',  array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Promedios</a>-->
             <a href="{{route('torneos.finalizar',  array('torneoId' => $torneo->id))}}" class="btn btn-info m-1">Guardar Posiciones</a>
             <a href="{{route('incidencias.index',  array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Incidencias</a>
+            <a href="{{route('torneos.dorsal',  array('torneoId' => $torneo->id))}}" class="btn btn-primary m-1">Modificar dorsales</a>
         </div>
         <h1 class="display-6">Grupos</h1>
 

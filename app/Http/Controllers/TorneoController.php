@@ -3336,4 +3336,218 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
         return view('torneos.plantillas', compact('torneo','equipos','e1','jugadores','order','tipoOrder','tecnicosEquipo'));
     }
 
+    public function dorsal(Request $request)
+    {
+
+        $equipo1= $request->query('equipo1');
+
+
+
+        $torneo_id= $request->query('torneoId');
+        $torneo=Torneo::findOrFail($torneo_id);
+
+
+        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+        $arrgrupos='';
+        foreach ($grupos as $grupo){
+            $arrgrupos .=$grupo->id.',';
+        }
+        $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+// Obtener la fecha del primer partido del torneo
+        $primerPartido = Partido::whereHas('fecha.grupo', function($query) use ($torneo_id) {
+            $query->where('torneo_id', $torneo_id);
+        })->orderBy('dia', 'asc')->first();
+
+        if ($primerPartido) {
+            $fechaPrimerPartido = $primerPartido->dia; // Obtener la fecha del primer partido
+        } else {
+            $fechaPrimerPartido = now(); // En caso de que no haya partidos, usar la fecha actual como fallback
+        }
+
+        $equipos = Plantilla::with('equipo')
+            ->whereIn('grupo_id', explode(',', $arrgrupos))
+            ->join('equipos', 'plantillas.equipo_id', '=', 'equipos.id')
+            ->orderBy('equipos.nombre', 'ASC')
+            ->get()
+            ->pluck('equipo.nombre', 'equipo_id');
+
+        if (empty($equipo1)){
+
+            $equipo1 = $equipos->keys()->first();
+        }
+        //dd($equipo1);
+
+        $plantillasL = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipo1)->get();
+
+
+
+        $arrplantillals='';
+        foreach ($plantillasL as $plantillal){
+            $arrplantillals .=$plantillal->id.',';
+        }
+
+        $e1=Equipo::findOrFail($equipo1);
+
+        $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+
+
+        //dd($jugadorsL);
+        $jugadorsL = $jugadorsL->pluck('nombre_dorsal','id')->sortBy('apellido')->prepend('','');
+
+
+        return view('torneos.dorsal', compact('torneo','equipos','e1','jugadorsL'));
+    }
+
+
+    public function guardarDorsal(Request $request)
+    {
+        //dd($request);
+        // Verifica si solo se está seleccionando el equipo
+        if ($request->has('equipo1') && !$request->filled('jugador_id')) {
+
+            $equipo1= $request->get('equipo1');
+
+
+
+            $torneo_id= $request->get('torneoId');
+
+            $torneo=Torneo::findOrFail($torneo_id);
+
+            //dd($torneo);
+            $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
+            $arrgrupos='';
+            foreach ($grupos as $grupo){
+                $arrgrupos .=$grupo->id.',';
+            }
+            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+// Obtener la fecha del primer partido del torneo
+            $primerPartido = Partido::whereHas('fecha.grupo', function($query) use ($torneo_id) {
+                $query->where('torneo_id', $torneo_id);
+            })->orderBy('dia', 'asc')->first();
+
+            if ($primerPartido) {
+                $fechaPrimerPartido = $primerPartido->dia; // Obtener la fecha del primer partido
+            } else {
+                $fechaPrimerPartido = now(); // En caso de que no haya partidos, usar la fecha actual como fallback
+            }
+
+            $equipos = Plantilla::with('equipo')
+                ->whereIn('grupo_id', explode(',', $arrgrupos))
+                ->join('equipos', 'plantillas.equipo_id', '=', 'equipos.id')
+                ->orderBy('equipos.nombre', 'ASC')
+                ->get()
+                ->pluck('equipo.nombre', 'equipo_id');
+
+            if (empty($equipo1)){
+
+                $equipo1 = $equipos->keys()->first();
+            }
+            //dd($equipo1);
+
+            $plantillasL = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipo1)->get();
+
+
+
+            $arrplantillals='';
+            foreach ($plantillasL as $plantillal){
+                $arrplantillals .=$plantillal->id.',';
+            }
+
+            $e1=Equipo::findOrFail($equipo1);
+
+            $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+
+
+            //dd($jugadorsL);
+            $jugadorsL = $jugadorsL->pluck('nombre_dorsal','id')->sortBy('apellido')->prepend('','');
+
+
+            return view('torneos.dorsal', compact('torneo','equipos','e1','jugadorsL'));
+        }
+        // Validar los datos recibidos
+        $validated = $request->validate([
+            'dorsal' => 'required|integer',
+            'jugador_id' => 'required|integer',
+            'equipo1' => 'required|integer',
+            'torneoId' => 'required|integer',
+        ]);
+
+        // Extraer las variables del request
+        $dorsal = $validated['dorsal'];
+        $jugador_id = $validated['jugador_id'];
+        $equipo_id = $validated['equipo1'];
+        $torneo_id = $validated['torneoId'];
+
+        //dd($request);
+        //$this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
+        DB::beginTransaction();
+
+
+
+
+        $ok=1;
+
+        try {
+            // Actualizar en la tabla plantilla_jugadors
+            DB::table('plantilla_jugadors')
+                ->join('plantillas', 'plantilla_jugadors.plantilla_id', '=', 'plantillas.id')
+                ->join('grupos', 'plantillas.grupo_id', '=', 'grupos.id')
+                ->join('torneos', 'grupos.torneo_id', '=', 'torneos.id')
+                ->where('plantilla_jugadors.jugador_id', $jugador_id)
+                ->where('plantillas.equipo_id', $equipo_id)
+                ->where('torneos.id', $torneo_id)
+                ->update(['plantilla_jugadors.dorsal' => $dorsal]);
+
+                try {
+
+                    // Actualizar en la tabla alineacions
+                    DB::table('alineacions')
+                        ->join('partidos', 'alineacions.partido_id', '=', 'partidos.id')
+                        ->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
+                        ->join('grupos', 'fechas.grupo_id', '=', 'grupos.id')
+                        ->join('torneos', 'grupos.torneo_id', '=', 'torneos.id')
+                        ->where('alineacions.jugador_id', $jugador_id)
+                        ->where('alineacions.equipo_id', $equipo_id)
+                        ->where('torneos.id', $torneo_id)
+                        ->update(['alineacions.dorsal' => $dorsal]);
+
+
+
+
+                }catch(QueryException $ex){
+
+                    $error = $ex->getMessage();
+
+
+                    $ok=0;
+
+                }
+
+
+
+        }catch(QueryException $e){
+            $error = $e->getMessage();
+            //if email or phone exist before in db redirect with error messages
+            $ok=0;
+        }
+        if ($ok){
+            DB::commit();
+
+
+
+            $respuestaID='success';
+            $respuestaMSJ='Registro actualizado satisfactoriamente';
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+
+        return redirect()->route('torneos.show', $torneo_id)->with($respuestaID,$respuestaMSJ);
+    }
+
 }
