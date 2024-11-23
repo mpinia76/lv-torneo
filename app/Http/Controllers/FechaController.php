@@ -4187,7 +4187,7 @@ return $string;
                     $golesLocales = $partido->golesl;
                     $golesVisitantes = $partido->golesv;
                     Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
-                    $success .='Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre.'<br>';
+                    $success .='Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre.' - '.$fecha->numero.'<br>';
                     $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
                     $jugadorGolArray = array();
                     foreach ($goles as $gol) {
