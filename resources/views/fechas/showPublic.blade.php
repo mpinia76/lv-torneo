@@ -4,7 +4,14 @@
 
 @section('content')
     <div class="container">
-        <h1 class="display-6">Fecha {{$fecha->numero}} </h1>
+        <h1 class="display-6">
+            @if(is_numeric($fecha->numero))
+                Fecha {{ $fecha->numero }}
+            @else
+                {{ $fecha->numero }}
+            @endif
+
+            </h1>
 
         <hr/>
 

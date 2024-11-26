@@ -17,7 +17,13 @@
 @section('content')
     <div class="container">
 
-        <h1 class="display-6">Fecha {{$partido->fecha->numero}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
+        <h1 class="display-6">
+            @if(is_numeric($partido->fecha->numero))
+                Fecha {{ $partido->fecha->numero }}
+            @else
+                {{ $partido->fecha->numero }}
+            @endif
+             de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
 
 
         <div class="row">

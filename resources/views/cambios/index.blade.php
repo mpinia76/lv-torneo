@@ -4,7 +4,11 @@
 
 @section('content')
     <div class="container">
-        <h1 class="display-6">Fecha {{$partido->fecha->numero}} del grupo {{$partido->fecha->grupo->nombre}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
+        <h1 class="display-6">@if(is_numeric($partido->fecha->numero))
+                Fecha {{ $partido->fecha->numero }}
+            @else
+                {{ $partido->fecha->numero }}
+            @endif del grupo {{$partido->fecha->grupo->nombre}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
 
         <hr/>
     <!-- if validation in the controller fails, show the errors -->

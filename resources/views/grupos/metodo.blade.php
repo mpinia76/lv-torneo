@@ -14,7 +14,14 @@
                     <option value="{{$f->numero}}" @if($f->numero==$fecha->numero)
                         selected
 
-                        @endif />Fecha {{$f->numero}}</option>
+                        @endif />
+                    @if(is_numeric($f->numero))
+                        Fecha {{ $f->numero }}
+                    @else
+                        {{ $f->numero }}
+                    @endif
+
+                    </option>
                 @endforeach
 
             </select>

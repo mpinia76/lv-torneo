@@ -58,7 +58,13 @@
                                     @if ($partido->fecha->numero != $lastFecha)
                                         <tr>
                                             <td colspan="6" style="text-align: center;">
-                                                <strong>Fecha: {{ $partido->fecha->numero}}</strong>
+                                                <strong>
+                                                    @if(is_numeric($partido->fecha->numero))
+                                                        Fecha {{ $partido->fecha->numero }}
+                                                    @else
+                                                        {{ $partido->fecha->numero }}
+                                                    @endif
+                                                    </strong>
                                             </td>
                                         </tr>
                                         @php
