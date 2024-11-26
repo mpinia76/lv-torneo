@@ -5602,7 +5602,7 @@ return $string;
         });
 
 
-        $fechas=Fecha::select('id','numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','DESC')->get();
+        $fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','DESC')->get();
 
         // Determinar si hay partidos de ida y vuelta
         $hayIdaVuelta = $partidosAgrupados->contains(function ($partidos) {

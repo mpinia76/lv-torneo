@@ -10,7 +10,14 @@
             <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
             <select class="form-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
                 @foreach($fechas as $f)
-                    <option value="{{ $f->numero }}" @if($f->numero == $fecha->numero) selected @endif>Fecha {{ $f->numero }}</option>
+                    <option value="{{ $f->numero }}" @if($f->numero == $fecha->numero) selected @endif>
+                        @if(is_numeric($f->numero))
+                            Fecha {{ $f->numero }}
+                        @else
+                            {{ $f->numero }}
+                        @endif
+                    </option>
+
                 @endforeach
             </select>
         </form>
