@@ -785,11 +785,17 @@ class PartidoController extends Controller
             ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('partido_tecnicos')
-                    ->whereRaw('partidos.id = partido_tecnicos.partido_id AND (partidos.equipol_id = partido_tecnicos.equipo_id OR partidos.equipov_id = partido_tecnicos.equipo_id)')
-                    ->groupBy('partido_id');
+            ->where(function ($query) {
+                $query->whereNotExists(function ($subQuery) {
+                    $subQuery->select(DB::raw(1))
+                        ->from('partido_tecnicos')
+                        ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipol_id = partido_tecnicos.equipo_id');
+                })
+                    ->orWhereNotExists(function ($subQuery) {
+                        $subQuery->select(DB::raw(1))
+                            ->from('partido_tecnicos')
+                            ->whereRaw('partidos.id = partido_tecnicos.partido_id AND partidos.equipov_id = partido_tecnicos.equipo_id');
+                    });
             })
             ->whereNotExists(function ($query) {
                 $query->select(DB::raw(1))
