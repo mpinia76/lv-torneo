@@ -153,7 +153,10 @@
                     @foreach($estadisticas['fechaMasGoles'] as $partido)
                         <tr>
                             <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                    Fecha {{ $partido->numero }}
+                                @else
+                                    {{ $partido->numero }}</td>
 
                             <td>{{$partido->goles}}</td>
                             <td>{{$partido->promedio}}</td>
@@ -184,7 +187,10 @@
                     @foreach($estadisticas['fechaMasGolesLocales'] as $partido)
                         <tr>
                             <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                    Fecha {{ $partido->numero }}
+                                @else
+                                    {{ $partido->numero }}</td>
 
                             <td>{{$partido->goles}}</td>
                             <td>{{$partido->promedio}}</td>
@@ -215,7 +221,10 @@
                     @foreach($estadisticas['fechaMasGolesVisitantes'] as $partido)
                         <tr>
                             <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                    Fecha {{ $partido->numero }}
+                                @else
+                                    {{ $partido->numero }}</td>
 
                             <td>{{$partido->goles}}</td>
                             <td>{{$partido->promedio}}</td>
@@ -252,7 +261,10 @@
                     @foreach($estadisticas['maxGoles'] as $partido)
                         <tr>
                             <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                    Fecha {{ $partido->numero }}
+                                @else
+                                    {{ $partido->numero }}</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -318,7 +330,10 @@
                     @foreach($estadisticas['maxGolesLocales'] as $partido)
                         <tr>
                             <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                    Fecha {{ $partido->numero }}
+                                @else
+                                    {{ $partido->numero }}</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -382,7 +397,10 @@
                     @foreach($estadisticas['maxGolesVisitantes'] as $partido)
                         <tr>
                             <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                    Fecha {{ $partido->numero }}
+                                @else
+                                    {{ $partido->numero }}</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >

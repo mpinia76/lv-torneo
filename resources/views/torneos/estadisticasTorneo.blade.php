@@ -101,7 +101,13 @@
                         @foreach($estadisticas['fechaMasGoles'] as $partido)
                             <tr>
                                 <td>{{$i++}}</td>
-                                <td>Fecha {{$partido->numero}}</td>
+                                <td>
+                                    @if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif
+                                </td>
 
                                 <td>{{$partido->goles}}</td>
                                 <td>{{$partido->promedio}}</td>
@@ -135,7 +141,11 @@
                         @foreach($estadisticas['fechaMasGolesLocales'] as $partido)
                             <tr>
                                 <td>{{$i++}}</td>
-                                <td>Fecha {{$partido->numero}}</td>
+                                <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
 
                                 <td>{{$partido->goles}}</td>
                                 <td>{{$partido->promedio}}</td>
@@ -167,7 +177,11 @@
                         @foreach($estadisticas['fechaMasGolesVisitantes'] as $partido)
                             <tr>
                                 <td>{{$i++}}</td>
-                                <td>Fecha {{$partido->numero}}</td>
+                                <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
 
                                 <td>{{$partido->goles}}</td>
                                 <td>{{$partido->promedio}}</td>
@@ -203,7 +217,11 @@
                     @foreach($estadisticas['maxGoles'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -273,7 +291,11 @@
                     @foreach($estadisticas['maxGolesLocales'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -339,7 +361,11 @@
                     @foreach($estadisticas['maxGolesVisitantes'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -407,7 +433,11 @@
                     @foreach($estadisticas['fechaMinGoles'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
 
                             <td>{{$partido->goles}}</td>
                             <td>{{$partido->promedio}}</td>
@@ -441,7 +471,11 @@
                     @foreach($estadisticas['fechaMinGolesLocales'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
 
                             <td>{{$partido->goles}}</td>
                             <td>{{$partido->promedio}}</td>
@@ -473,7 +507,11 @@
                     @foreach($estadisticas['fechaMinGolesVisitantes'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
 
                             <td>{{$partido->goles}}</td>
                             <td>{{$partido->promedio}}</td>
@@ -509,7 +547,11 @@
                     @foreach($estadisticas['minGoles'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -579,7 +621,11 @@
                     @foreach($estadisticas['minGolesLocales'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
@@ -645,7 +691,11 @@
                     @foreach($estadisticas['minGolesVisitantes'] as $partido)
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>Fecha {{$partido->numero}}</td>
+                            <td>@if(is_numeric($partido->numero))
+                                        Fecha {{ $partido->numero }}
+                                    @else
+                                        {{ $partido->numero }}
+                                    @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
