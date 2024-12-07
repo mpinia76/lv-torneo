@@ -7,7 +7,7 @@
         <h1 class="display-6">@if(is_numeric($partido->fecha->numero))
                 Fecha {{ $partido->fecha->numero }}
             @else
-                {{ $partido->fecha->numero }} del grupo {{$partido->fecha->grupo->nombre}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
+                {{ $partido->fecha->numero }}@endif del grupo {{$partido->fecha->grupo->nombre}} de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
     <!-- if validation in the controller fails, show the errors -->
     @if ($errors->any())
         <div class="alert alert-danger">

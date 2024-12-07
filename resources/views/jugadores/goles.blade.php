@@ -142,7 +142,8 @@
                             <td>@if(is_numeric($partido->numero))
                                     Fecha {{ $partido->numero }}
                                 @else
-                                    {{ $partido->numero }}</td>
+                                    {{ $partido->numero }}
+                                @endif</td>
                             <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >

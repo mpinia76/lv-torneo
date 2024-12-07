@@ -7,7 +7,7 @@
         <h1 class="display-6">Datos complementarios de la @if(is_numeric($fecha->numero))
                 Fecha {{ $fecha->numero }}
             @else
-                {{ $fecha->numero }} del grupo {{$grupo->nombre}} de {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
+                {{ $fecha->numero }}@endif del grupo {{$grupo->nombre}} de {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
 
         <hr/>
         <!-- if validation in the controller fails, show the errors -->

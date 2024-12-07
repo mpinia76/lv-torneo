@@ -7,7 +7,7 @@
         <h1 class="display-6">Editar @if(is_numeric($partido->numero))
                 Fecha {{ $partido->numero }}
             @else
-                {{ $partido->numero }} del grupo {{$grupo->nombre}} de {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
+                {{ $partido->numero }} @endif del grupo {{$grupo->nombre}} de {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
 
     <hr/>
     <!-- if validation in the controller fails, show the errors -->
