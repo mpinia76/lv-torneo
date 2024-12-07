@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Partidos de la @if(is_numeric($fecha->numero))
+    <h1 class="display-6">Partidos de @if(is_numeric($fecha->numero))
             Fecha {{ $fecha->numero }}
         @else
             {{ $fecha->numero }} @endif del grupo {{$grupo->nombre}} de {{$grupo->torneo->nombre}} {{$grupo->torneo->year}}</h1>
