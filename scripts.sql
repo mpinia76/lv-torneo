@@ -247,28 +247,28 @@ WHERE tarjetas.jugador_id = 2608 AND (partidos.equipol_id  = 22 OR partidos.equi
 
 ########################## modificar jugador repetido ##########################
 UPDATE alineacions
-    SET alineacions.jugador_id=2916
-WHERE alineacions.jugador_id = 14065 ;
+    SET alineacions.jugador_id=4136
+WHERE alineacions.jugador_id = 15432 ;
 
 UPDATE plantilla_jugadors
 
-    SET plantilla_jugadors.jugador_id=2916
-WHERE plantilla_jugadors.jugador_id = 14065 ;
+    SET plantilla_jugadors.jugador_id=4136
+WHERE plantilla_jugadors.jugador_id = 15432 ;
 
 UPDATE gols
 
-    SET gols.jugador_id=2916
-WHERE gols.jugador_id = 14065 ;
+    SET gols.jugador_id=4136
+WHERE gols.jugador_id = 15432 ;
 
 UPDATE cambios
 
-    SET cambios.jugador_id=2916
-WHERE cambios.jugador_id = 14065 ;
+    SET cambios.jugador_id=4136
+WHERE cambios.jugador_id = 15432 ;
 
 UPDATE tarjetas
 
-    SET tarjetas.jugador_id=2916
-WHERE tarjetas.jugador_id = 14065 ;
+    SET tarjetas.jugador_id=4136
+WHERE tarjetas.jugador_id = 15432 ;
 
 ########################## modificar arbitro repetido ##########################
 UPDATE `partido_arbitros` SET `arbitro_id`=207 WHERE  `arbitro_id`=6;
