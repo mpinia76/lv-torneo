@@ -684,35 +684,7 @@ class PartidoController extends Controller
         //$queries = DB::getQueryLog();
         //dd($queries);
 
-        $jueces = DB::table(DB::raw('(
-                    SELECT partido_id, COUNT(partido_id)
-                    FROM partido_arbitros
-                    GROUP BY partido_id
-                    HAVING COUNT(partido_id)!=3
-                ) AS t1'))
-
-            ->select(
-
-                'torneo.id as torneo_id',
-                'partidos.id as partido_id'
-            )
-            ->join('partidos', 't1.partido_id', '=', 'partidos.id')
-
-            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
-            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
-            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
-            ->whereNotNull('golesl')
-            ->whereNotNull('golesv')
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('incidencias')
-                    ->whereColumn('partidos.id', 'incidencias.partido_id');
-            })
-            ->get();
-        foreach ($jueces as $partido){
-            //dd($partido);
-            Log::info('insert into incidencias (torneo_id, partido_id, observaciones) value(\''.$partido->torneo_id.'\',\''.$partido->partido_id.'\',\'sin asistentes\')');
-        }
+       
 
 
         $jueces = DB::table(DB::raw('(
