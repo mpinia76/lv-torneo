@@ -684,7 +684,7 @@ class PartidoController extends Controller
         //$queries = DB::getQueryLog();
         //dd($queries);
 
-       
+
 
 
         $jueces = DB::table(DB::raw('(
