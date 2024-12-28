@@ -440,6 +440,11 @@ class PartidoController extends Controller
             ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('partidos.id', 'incidencias.partido_id'); // No debe haber incidencias
+            })
             ->whereRaw('partidos.golesl + partidos.golesv != (SELECT COUNT(gols.id) FROM gols WHERE partidos.id = gols.partido_id GROUP BY gols.partido_id)')
             ->orderBy('year','desc')
             ->orderBy('torneo')
