@@ -34,6 +34,7 @@
                 </ul>
             </div>
         @endif
+
     <!-- Open the form with the store function route. -->
     {{ Form::open(['action' => ['PlantillaController@update', $plantilla->id], 'method' => 'put']) }}
     <!-- Include the CRSF token -->
@@ -51,7 +52,7 @@
             <div class="form-group col-md-12">
                 <h1 class="display-6">Jugadores</h1>
                 <a class="btn btn-success m-1" href="{{route('jugadores.create',  array('plantillaId' => $plantilla->id))}}">Nuevo</a>
-
+                <a class="btn btn-info m-1" href="{{route('plantilla.importar',  array('plantillaId' => $plantilla->id))}}">Importar</a>
                 <table class="table" style="width: 50%">
                     <thead>
                     <th></th>

@@ -56,6 +56,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('importprocess', 'FechaController@importprocess');
     Route::get('importplantillas', 'PlantillaController@import')->name('plantillas.import');
     Route::post('importplantillaprocess', 'PlantillaController@importprocess');
+    Route::get('importarplantilla', 'PlantillaController@importar')->name('plantilla.importar');
+    Route::post('importarplantillaprocess', 'PlantillaController@importarProcess');
     Route::get('controlarplantillas', 'PlantillaController@controlar')->name('plantillas.controlar');
     Route::delete('/eliminar-jugador/{id}', 'PlantillaController@eliminarJugador')->name('plantilla.destroy');
     Route::delete('/eliminar-jugadores-seleccionados', 'PlantillaController@eliminarJugadoresSeleccionados')->name('plantilla.eliminarSeleccionados');

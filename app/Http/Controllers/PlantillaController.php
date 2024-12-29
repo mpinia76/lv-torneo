@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Grupo;
+use App\Persona;
 use App\PlantillaJugador;
 use App\PartidoTecnico;
 use App\Torneo;
@@ -10,11 +11,14 @@ use App\Plantilla;
 use App\Jugador;
 use App\Tecnico;
 use App\Equipo;
+use Carbon\Carbon;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 
 use Illuminate\Database\QueryException;
 
 use DB;
+use Illuminate\Support\Facades\Log;
 
 class PlantillaController extends Controller
 {
@@ -341,6 +345,343 @@ class PlantillaController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    public function importar(Request $request)
+    {
+
+        $plantilla=Plantilla::findOrFail($request->query('plantillaId'));
+
+        $grupo=Grupo::findOrFail($plantilla->grupo->id);
+        //
+        return view('plantillas.importar',compact('plantilla','grupo'));
+    }
+    function getHtmlContent($url) {
+        $ch = curl_init();
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Para seguir redirecciones
+
+        // Opcional: Si necesitas establecer un timeout
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
+
+        $response = curl_exec($ch);
+
+        // Maneja errores de cURL
+        if (curl_errno($ch)) {
+            Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
+            return false;
+        }
+
+        // Verificar si $response es falso, lo que indica un fallo en la ejecución
+        if ($response === false) {
+            Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $url);
+            curl_close($ch);
+            return false;
+        }
+
+        // Obtener el código de estado HTTP
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        //dd($httpCode);
+        curl_close($ch);
+        // Controlar el código 404
+        if ($httpCode == 404) {
+            Log::channel('mi_log')->warning('Página no encontrada (404) para la URL: ' . $url);
+            return false;
+        }
+
+
+        return $response;
+    }
+    public function importarProcess(Request $request)
+    {
+        //dd($request);
+        set_time_limit(0);
+        $url = $request->get('url');
+        $id = $request->get('plantilla_id');
+        $ok = 1;
+        DB::beginTransaction();
+        $success='';
+        $html = '';
+        try {
+            if ($url) {
+                // Obtener el contenido de la URL
+                //$htmlContent = file_get_contents($url);
+                $htmlContent = $this->getHtmlContent($url);
+                // Crear un nuevo DOMDocument
+                $dom = new \DOMDocument();
+                libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                $dom->loadHTML($htmlContent);
+                libxml_clear_errors();
+
+                // Crear un nuevo objeto XPath
+                $xpath = new \DOMXPath($dom);
+            }
+        } catch (Exception $ex) {
+            $html = '';
+        }
+        //dd($htmlContent);
+        if ($htmlContent) {
+
+
+            // Seleccionar todos los dt y dd dentro de div.contentitem
+            $dtElements = $xpath->query('//tr[@itemprop="employee"]/th/a');
+
+
+            for ($i = 0; $i < 1; $i++) {
+                $href = $dtElements[$i]->getAttribute('href');
+                $urlJugador = 'https://www.resultados-futbol.com' . $href;
+                Log::info('URL jugador: ' . $urlJugador, []);
+
+                try {
+                    if ($urlJugador) {
+                        // Obtener el contenido de la URL
+
+                        $htmlContentJugador = $this->getHtmlContent($urlJugador);
+                        // Crear un nuevo DOMDocument
+                        $domJugador = new \DOMDocument();
+                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                        $domJugador->loadHTML($htmlContentJugador);
+                        libxml_clear_errors();
+
+                        // Crear un nuevo objeto XPath
+                        $xpathJugador = new \DOMXPath($domJugador);
+                    }
+                } catch (Exception $ex) {
+                    $html = '';
+                }
+
+                if ($htmlContentJugador) {
+                    // Seleccionar el div con id 'previewArea' que contiene la imagen
+                    $fotoDiv = $xpathJugador->query('//div[@id="previewArea"]/img');
+                    if ($fotoDiv->length > 0) {
+                        $imageUrl = $fotoDiv[0]->getAttribute('src');
+                        //Log::info('Foto: ' . $imageUrl, []);
+                    }
+
+                    // Seleccionar todos los dt y dd dentro de div.contentitem
+                    $dtElements = $xpathJugador->query('//div[@class="contentitem"]/dl/dt');
+                    $ddElements = $xpathJugador->query('//div[@class="contentitem"]/dl/dd');
+
+                    $nombre = '';
+                    $apellido = '';
+                    $nacimiento = '';
+                    $fallecimiento = '';
+                    $ciudad = '';
+                    $nacionalidad = '';
+                    $tipo = '';
+                    $altura = '';
+                    $peso = '';
+
+                    for ($iJugador = 0; $iJugador < $dtElements->length; $iJugador++) {
+                        $dtText = trim($dtElements[$iJugador]->textContent);
+                        $ddText = trim($ddElements[$iJugador]->textContent);
+
+                        // Agregar los datos a la persona según el título (dt) encontrado
+                        switch ($dtText) {
+                            case 'Nombre':
+                                $nombre = $ddText;
+                                break;
+                            case 'Apellidos':
+                                $apellido = $ddText;
+                                break;
+                            case 'Fecha de nacimiento':
+                                $nacimiento = Carbon::createFromFormat('d-m-Y', $ddText)->format('Y-m-d');
+                                break;
+                            case 'Fecha de fallecimiento':
+                                $fallecimiento = Carbon::createFromFormat('d-m-Y', $ddText)->format('Y-m-d');
+                                break;
+                            case 'Lugar de nacimiento':
+                                $ciudad = $ddText;
+                                break;
+                            case 'Nacionalidad':
+                                $nacionalidad = $ddText;
+                                break;
+                            case 'Demarcación':
+                                switch ($ddText) {
+                                    case 'Portero':
+                                        $tipo = 'Arquero';
+                                        break;
+                                    case 'Defensa':
+                                        $tipo = 'Defensor';
+                                        break;
+                                    case 'Centrocampista':
+                                        $tipo = 'Medio';
+                                        break;
+                                    case 'Delantero':
+                                        $tipo = 'Delantero';
+                                        break;
+                                }
+                                break;
+                            case 'Altura':
+                                if (preg_match('/\d+/', $ddText, $matches)) {
+                                    $altura = number_format($matches[0] / 100, 2);
+                                }
+                                break;
+                            case 'Peso':
+                                if (preg_match('/\d+/', $ddText, $matches)) {
+                                    $peso = $matches[0];
+                                }
+                                break;
+                            default:
+                                // Manejar otros datos según sea necesario
+                                break;
+                        }
+                    }
+
+                    // Descarga y guarda la imagen si no es el avatar por defecto
+                    if (!str_contains($imageUrl, 'avatar-player.jpg')) {
+                        $client = new Client();
+                        $response = $client->get($imageUrl);
+
+                        if ($response->getStatusCode() === 200) {
+                            $imageData = $response->getBody()->getContents();
+                            $parsedUrl = parse_url($imageUrl);
+                            $pathInfo = pathinfo($parsedUrl['path']);
+                            $nombreArchivo = $pathInfo['filename'];
+                            $extension = $pathInfo['extension'];
+
+                            if (strrchr($nombreArchivo, '.') === '.') {
+                                $nombreArchivo = substr($nombreArchivo, 0, -1);
+                            }
+
+                            // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
+                            $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                            Log::info('URL de la foto: ' . $localFilePath, []);
+                            $insert['foto'] = "$nombreArchivo.$extension";
+
+                            file_put_contents($localFilePath, $imageData);
+                            Log::info('Foto subida', []);
+                        } else {
+                            Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
+                            //$success .= 'Foto no subida: ' . $fotoDiv[0]->getAttribute('alt') . '<br>';
+                        }
+                    } else {
+                        Log::info('No tiene foto: ' . $imageUrl, []);
+                        //$success .= 'No tiene foto: ' . $imageUrl . '<br>';
+                    }
+
+                    // Insertar los datos de la persona
+                    if ($nombre) {
+                        $insert['nombre'] = $nombre;
+                    } else {
+                        Log::info('Falta el nombre', []);
+                        //$success .= 'Falta el nombre <br>';
+                    }
+
+                    if ($apellido) {
+                        $insert['apellido'] = $apellido;
+                    } else {
+                        Log::info('Falta el apellido', []);
+                        //$success .= 'Falta el apellido <br>';
+                    }
+
+                    if ($ciudad) {
+                        $insert['ciudad'] = $ciudad;
+                    }
+                    if ($nacionalidad) {
+                        $insert['nacionalidad'] = $nacionalidad;
+                    } else {
+                        Log::info('Falta la nacionalidad', []);
+                        //$success .= 'Falta la nacionalidad <br>';
+                    }
+                    if ($altura) {
+                        $insert['altura'] = $altura;
+                    }
+                    if ($peso) {
+                        $insert['peso'] = $peso;
+                    }
+                    if ($nacimiento) {
+                        $insert['nacimiento'] = $nacimiento;
+                    } else {
+                        Log::info('Falta la fecha de nacimiento', []);
+                        //$success .= 'Falta la fecha de nacimiento <br>';
+                    }
+                    if ($fallecimiento) {
+                        $insert['fallecimiento'] = $fallecimiento;
+                    }
+                    if ($tipo) {
+                        $insert['tipoJugador'] = $tipo;
+                    } else {
+                        Log::info('Falta el tipo de jugador', []);
+                        //$success .= 'Falta el tipo de jugador <br>';
+                    }
+
+
+                    try {
+                        $persona = Persona::create($insert);
+                        $persona->jugador()->create($insert);
+                    } catch (QueryException $ex) {
+                        try {
+                            $persona = Persona::where('nombre', '=', $insert['nombre'])
+                                ->where('apellido', '=', $insert['apellido'])
+                                ->where('nacimiento', '=', $insert['nacimiento'])
+                                ->first();
+
+                            if (!empty($persona)) {
+                                $persona->update($insert);
+                                $persona->jugador()->create($insert);
+                            }
+                        } catch (QueryException $ex) {
+                            //$ok = 0;
+                            $errorCode = $ex->errorInfo[1];
+
+                            if ($errorCode == 1062) {
+                                //$error = 'Jugador repetido';
+                            }
+                        }
+                    }
+                } else {
+                    Log::info('No se encontró la URL: ' . $urlJugador, []);
+                    //$error = 'No se encontró la URL: ' . $urlJugador;
+                }
+
+                $data2=array(
+                    'plantilla_id'=>$id,
+                    'jugador_id'=>$persona->jugador->id
+                );
+                try {
+
+                        PlantillaJugador::create($data2);
+
+
+
+
+                }catch(QueryException $ex){
+                    if ($ex->errorInfo[1] === 1062) {
+                        if (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
+                            $jugadorRepetido = Jugador::where('id', '=', $persona->jugador->id)->first();
+                            $success .= "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
+                        } else {
+                            $error = $ex->getMessage();
+                        }
+                    } else {
+                        $error = $ex->getMessage();
+                    }
+
+                    /*$ok=0;
+                    continue;*/
+                }
+
+            }
+
+        }
+
+        if ($ok) {
+
+            DB::commit();
+            $respuestaID = 'success';
+            $respuestaMSJ = $success;
+        } else {
+            DB::rollback();
+            $respuestaID = 'error';
+            $respuestaMSJ=$error.'<br>'.$success;
+        }
+
+
+            //return redirect()->route('plantillas.edit', array('id' => $id))->with($respuestaID,$respuestaMSJ);
+        return redirect()->route('plantillas.edit', ['plantilla' => $id])->with($respuestaID, $respuestaMSJ);
     }
 
     public function import(Request $request)
