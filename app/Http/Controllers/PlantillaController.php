@@ -433,7 +433,7 @@ class PlantillaController extends Controller
                 $href = $thElements[$i]->getAttribute('href');
                 $urlJugador = 'https://www.resultados-futbol.com' . $href;
                 Log::info('URL jugador: ' . $urlJugador, []);
-
+                $insert['foto'] =null;
                 try {
                     if ($urlJugador) {
                         // Obtener el contenido de la URL
