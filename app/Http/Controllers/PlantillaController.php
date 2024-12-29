@@ -433,7 +433,7 @@ class PlantillaController extends Controller
                 $href = $thElements[$i]->getAttribute('href');
                 $urlJugador = 'https://www.resultados-futbol.com' . $href;
                 Log::info('URL jugador: ' . $urlJugador, []);
-                $insert['foto'] =null;
+
                 try {
                     if ($urlJugador) {
                         // Obtener el contenido de la URL
@@ -555,10 +555,12 @@ class PlantillaController extends Controller
                             Log::info('Foto subida', []);
                         } else {
                             Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
+                            $insert['foto'] =null;
                             //$success .= 'Foto no subida: ' . $fotoDiv[0]->getAttribute('alt') . '<br>';
                         }
                     } else {
                         Log::info('No tiene foto: ' . $imageUrl, []);
+                        $insert['foto'] =null;
                         //$success .= 'No tiene foto: ' . $imageUrl . '<br>';
                     }
 
@@ -567,6 +569,7 @@ class PlantillaController extends Controller
                         $insert['nombre'] = $nombre;
                     } else {
                         Log::info('Falta el nombre', []);
+                        $insert['nombre'] = null;
                         //$success .= 'Falta el nombre <br>';
                     }
 
@@ -574,39 +577,54 @@ class PlantillaController extends Controller
                         $insert['apellido'] = $apellido;
                     } else {
                         Log::info('Falta el apellido', []);
+                        $insert['apellido'] = null;
                         //$success .= 'Falta el apellido <br>';
                     }
 
                     if ($ciudad) {
                         $insert['ciudad'] = $ciudad;
+                    }else {
+                        Log::info('Falta la ciudad', []);
+                        $insert['ciudad'] = null;
                     }
                     if ($nacionalidad) {
                         $insert['nacionalidad'] = $nacionalidad;
                     } else {
                         Log::info('Falta la nacionalidad', []);
-                        //$success .= 'Falta la nacionalidad <br>';
+                        $insert['nacionalidad'] = null;
                     }
                     if ($altura) {
                         $insert['altura'] = $altura;
                     }
+                    else {
+                        Log::info('Falta la altura', []);
+                        $insert['altura'] = null;
+                    }
                     if ($peso) {
                         $insert['peso'] = $peso;
+                    }else {
+                        Log::info('Falta el peso', []);
+                        $insert['peso'] = null;
                     }
                     if ($nacimiento) {
                         $insert['nacimiento'] = $nacimiento;
                     } else {
                         Log::info('Falta la fecha de nacimiento', []);
-                        //$success .= 'Falta la fecha de nacimiento <br>';
+                        $insert['nacimiento'] = null;
                     }
                     if ($fallecimiento) {
                         $insert['fallecimiento'] = $fallecimiento;
+                    }else {
+                        Log::info('Falta la fecha de fallecimiento', []);
+                        $insert['fallecimiento'] = null;
                     }
                     if ($tipo) {
                         $insert['tipoJugador'] = $tipo;
                     } else {
                         Log::info('Falta el tipo de jugador', []);
-                        //$success .= 'Falta el tipo de jugador <br>';
+                        $insert['tipoJugador'] = null;
                     }
+                    Log::info('Contenido de insert: ' . json_encode($insert));
 
 
                     try {
