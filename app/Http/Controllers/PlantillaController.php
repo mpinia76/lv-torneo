@@ -426,11 +426,11 @@ class PlantillaController extends Controller
 
 
             // Seleccionar todos los dt y dd dentro de div.contentitem
-            $dtElements = $xpath->query('//tr[@itemprop="employee"]/th/a');
+            $thElements = $xpath->query('//tr[@itemprop="employee"]/th/a');
 
 
-            for ($i = 0; $i < 1; $i++) {
-                $href = $dtElements[$i]->getAttribute('href');
+            for ($i = 0; $i < $thElements->length; $i++) {
+                $href = $thElements[$i]->getAttribute('href');
                 $urlJugador = 'https://www.resultados-futbol.com' . $href;
                 Log::info('URL jugador: ' . $urlJugador, []);
 
