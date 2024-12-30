@@ -668,7 +668,7 @@ class PlantillaController extends Controller
                     'dorsal'=>$dorsal
                 );
                 try {
-
+                    Log::info('Contenido de data: ' . json_encode($data2));
                         PlantillaJugador::create($data2);
 
 
@@ -679,7 +679,7 @@ class PlantillaController extends Controller
                         if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
                             $consultarPlantilla=PlantillaJugador::where('plantilla_id',"$id")->where('dorsal', $dorsal)->first();
                             $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
-                            $error = "El dorsal ".$dorsal." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
+                            $success .= "El dorsal ".$dorsal." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
                         } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
                             $jugadorRepetido = Jugador::where('id', '=', $persona->jugador->id)->first();
                             $success .= "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
