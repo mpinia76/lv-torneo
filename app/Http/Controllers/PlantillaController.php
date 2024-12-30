@@ -665,7 +665,7 @@ class PlantillaController extends Controller
                 $data2=array(
                     'plantilla_id'=>$id,
                     'jugador_id'=>$persona->jugador->id,
-                    'dorsal'=>$dorsal
+                    'dorsal'=>($dorsal=='')?null:$dorsal
                 );
                 try {
                     Log::info('Contenido de data: ' . json_encode($data2));
