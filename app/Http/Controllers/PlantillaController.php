@@ -426,13 +426,20 @@ class PlantillaController extends Controller
 
 
             // Seleccionar todos los dt y dd dentro de div.contentitem
-            $thElements = $xpath->query('//tr[@itemprop="employee"]/th/a');
+            // Seleccionar todos los <tr> con itemprop="employee"
+            $trElements = $xpath->query('//tr[@itemprop="employee"]');
 
+            // Recorrer cada <tr> para obtener el href y el dorsal
+            foreach ($trElements as $tr) {
+                // Obtener el enlace del jugador
+                $thElement = $xpath->query('.//th/a', $tr)->item(0);
+                $href = $thElement ? $thElement->getAttribute('href') : null;
+                $urlJugador = $href ? 'https://www.resultados-futbol.com' . $href : null;
 
-            for ($i = 0; $i < $thElements->length; $i++) {
-                $href = $thElements[$i]->getAttribute('href');
-                $urlJugador = 'https://www.resultados-futbol.com' . $href;
-                Log::info('URL jugador: ' . $urlJugador, []);
+                // Obtener el número del dorsal
+                $tdNumElement = $xpath->query('.//td[@class="num"]', $tr)->item(0);
+                $dorsal = $tdNumElement ? trim($tdNumElement->textContent) : null;
+
 
                 try {
                     if ($urlJugador) {
@@ -657,7 +664,8 @@ class PlantillaController extends Controller
 
                 $data2=array(
                     'plantilla_id'=>$id,
-                    'jugador_id'=>$persona->jugador->id
+                    'jugador_id'=>$persona->jugador->id,
+                    'dorsal'=>$dorsal
                 );
                 try {
 
@@ -668,7 +676,11 @@ class PlantillaController extends Controller
 
                 }catch(QueryException $ex){
                     if ($ex->errorInfo[1] === 1062) {
-                        if (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
+                        if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
+                            $consultarPlantilla=PlantillaJugador::where('plantilla_id',"$id")->where('dorsal', $dorsal)->first();
+                            $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
+                            $error = "El dorsal ".$dorsal." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
+                        } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
                             $jugadorRepetido = Jugador::where('id', '=', $persona->jugador->id)->first();
                             $success .= "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
                         } else {
