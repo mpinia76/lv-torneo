@@ -653,7 +653,7 @@ class PlantillaController extends Controller
                             $errorCode = $ex->errorInfo[1];
 
                             if ($errorCode == 1062) {
-                                //$error = 'Jugador repetido';
+                                $success .= 'Jugador repetido: '.$insert['apellido'].', '.$insert['nombre'].'<br>';
                             }
                         }
                     }
