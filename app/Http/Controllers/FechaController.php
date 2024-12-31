@@ -5556,6 +5556,7 @@ return $string;
         }
 
         $request->session()->put('nombreTorneo', $torneo->nombre.' '.$torneo->year);
+        $request->session()->put('escudoTorneo', $torneo->escudo);
         $request->session()->put('codigoTorneo', $torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
