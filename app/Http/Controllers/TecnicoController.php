@@ -252,7 +252,7 @@ class TecnicoController extends Controller
         $id= $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id

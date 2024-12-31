@@ -316,7 +316,9 @@
                 @endphp
                 <tr>
                     <td>{{$i++}}</td>
-                    <td>{{$torneo->nombreTorneo}}</td>
+                    <td>@if($torneo->escudoTorneo)
+                            <img id="original" src="{{ url('images/'.$torneo->escudoTorneo) }}" height="25">
+                        @endif {{$torneo->nombreTorneo}}</td>
                     <td>@if($torneo->escudo)
                             @php
                                 $escudos = explode(',',$torneo->escudo);
