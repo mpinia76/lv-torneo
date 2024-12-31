@@ -62,7 +62,7 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
                     Escudo
-                    <input type="file" name="escudo" class="form-control" placeholder="">
+                    <input type="file" name="escudoTmp" class="form-control" placeholder="">
 
                 </div>
             </div>

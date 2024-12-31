@@ -87,8 +87,8 @@ class TorneoController extends Controller
 
 
 
-        if ($files = $request->file('escudo')) {
-            $image = $request->file('escudo');
+        if ($files = $request->file('escudoTmp')) {
+            $image = $request->file('escudoTmp');
             $name = time().'.'.$image->getClientOriginalExtension();
             $destinationPath = public_path('/images');
             $image->move($destinationPath, $name);
