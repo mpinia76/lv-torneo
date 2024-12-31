@@ -326,7 +326,7 @@
             </div>
             <span id="spanTorneo" style="background-color: #ccf1cd;"><a href="#" style="color: #4ea3e7;font-weight: bold;">@if(Session::get('escudoTorneo'))
                         <img id="original" src="{{ url('images/'.Session::get('escudoTorneo')) }}" height="25">
-                    @endif{{Session::get('nombreTorneo')}}</a></span>
+                    @endif {{Session::get('escudoTorneo')}}</a></span>
             <!-- Menú móvil -->
             <div class="mobile-menu" id="mobileSubMenu">
                 <ul>
