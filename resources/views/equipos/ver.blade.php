@@ -126,8 +126,8 @@
                         <?php //dd($torneoTitulo);?>
                         <tr>
                             <td>{{$j++}}</td>
-                            <td>@if($torneo->escudoTorneo)
-                                    <img id="original" src="{{ url('images/'.$torneo->escudoTorneo) }}" height="25">
+                            <td>@if($torneoTitulo->escudoTorneo)
+                                    <img id="original" src="{{ url('images/'.$torneoTitulo->escudoTorneo) }}" height="25">
                                 @endif {{$torneoTitulo->nombreTorneo}}</td>
                             <td>{{$torneoTitulo->porcentaje}}</td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneoTitulo->idTorneo))}}" >{{$torneoTitulo->jugados}}</a></td>
