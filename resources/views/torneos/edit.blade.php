@@ -61,7 +61,7 @@
                     @if($torneo->escudo)
                         <img id="original" src="{{ url('images/'.$torneo->escudo) }}" height="200">
                     @endif
-                    <input type="file" name="escudo" class="form-control" placeholder="">
+                    <input type="file" name="escudoTmp" class="form-control" placeholder="">
 
                 </div>
             </div>

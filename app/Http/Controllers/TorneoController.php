@@ -228,8 +228,8 @@ class TorneoController extends Controller
         $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
-        if ($files = $request->file('escudo')) {
-            $image = $request->file('escudo');
+        if ($files = $request->file('escudoTmp')) {
+            $image = $request->file('escudoTmp');
             $name = time().'.'.$image->getClientOriginalExtension();
             $destinationPath = public_path('/images');
             $image->move($destinationPath, $name);
