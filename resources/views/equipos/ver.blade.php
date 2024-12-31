@@ -126,7 +126,9 @@
                         <?php //dd($torneoTitulo);?>
                         <tr>
                             <td>{{$j++}}</td>
-                            <td>{{$torneoTitulo->nombreTorneo}}</td>
+                            <td>@if($torneo->escudoTorneo)
+                                    <img id="original" src="{{ url('images/'.$torneo->escudoTorneo) }}" height="25">
+                                @endif {{$torneoTitulo->nombreTorneo}}</td>
                             <td>{{$torneoTitulo->porcentaje}}</td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneoTitulo->idTorneo))}}" >{{$torneoTitulo->jugados}}</a></td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneoTitulo->idTorneo,'tipo'=>'Ganados'))}}" >{{$torneoTitulo->ganados}}</a></td>
@@ -186,7 +188,11 @@
                         @endphp
                         <tr>
                             <td>{{$i++}}</td>
-                            <td>{{$torneo->nombreTorneo}}</td>
+                            <td>
+                                @if($torneo->escudoTorneo)
+                                    <img id="original" src="{{ url('images/'.$torneo->escudoTorneo) }}" height="25">
+                                @endif
+                                {{$torneo->nombreTorneo}}</td>
                             <td>{{$torneo->puntaje}}</td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo))}}" >{{$torneo->jugados}}</a></td>
                             <td><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados'))}}" >{{$torneo->ganados}}</a></td>

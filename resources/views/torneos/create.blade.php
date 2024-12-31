@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'TorneoController@store']) }}
+    {{ Form::open(['action' => 'TorneoController@store', 'enctype' => 'multipart/form-data']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}
@@ -57,6 +57,17 @@
             {{ Form::select('ambito',[''=>'Seleccionar...','Nacional'=>'Nacional','Internacional'=>'Internacional'],'', ['class' => 'form-control']) }}
         </div>
     </div>
+        <div class="row">
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-4">
+                <div class="form-group">
+                    Escudo
+                    <input type="file" name="escudo" class="form-control" placeholder="">
+
+                </div>
+            </div>
+
+        </div>
         <div class="row">
             <fieldset>
                 <legend>futbol360.com.ar</legend>

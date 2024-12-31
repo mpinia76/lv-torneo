@@ -65,7 +65,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <div class="form-group">
-                    Foto
+                    Escudo
                     <input type="file" name="escudo" class="form-control" placeholder="">
 
                 </div>

@@ -83,7 +83,20 @@ class TorneoController extends Controller
     public function store(Request $request)
     {
      //
-        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required']);
+        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+
+
+
+        if ($files = $request->file('escudo')) {
+            $image = $request->file('escudo');
+            $name = time().'.'.$image->getClientOriginalExtension();
+            $destinationPath = public_path('/images');
+            $image->move($destinationPath, $name);
+
+
+
+            $request->merge(['escudo' => $name]);
+        }
         DB::beginTransaction();
         $ok=1;
         try {
@@ -212,7 +225,18 @@ class TorneoController extends Controller
     public function update(Request $request, $id)
     {
         //print_r($request);
-        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required']);
+        $this->validate($request,[ 'nombre'=>'required', 'year'=>'required', 'equipos'=>'required', 'grupos'=>'required', 'tipo'=>'required','escudo' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+
+
+        if ($files = $request->file('escudo')) {
+            $image = $request->file('escudo');
+            $name = time().'.'.$image->getClientOriginalExtension();
+            $destinationPath = public_path('/images');
+            $image->move($destinationPath, $name);
+
+
+            $request->merge(['escudo' => $name]);
+        }
 
         DB::beginTransaction();
         $noBorrar='';
@@ -422,6 +446,7 @@ class TorneoController extends Controller
 
         $torneo=Torneo::findOrFail($torneo_id);
         $request->session()->put('nombreTorneo', $torneo->nombre.' '.$torneo->year);
+        $request->session()->put('escudoTorneo', $torneo->escudo);
         $request->session()->put('codigoTorneo', $torneo_id);
         return view('torneos.ver', compact('torneo','torneo'));
     }

@@ -324,7 +324,9 @@
                 <span></span>
 
             </div>
-            <span id="spanTorneo" style="background-color: #ccf1cd;"><a href="#" style="color: #4ea3e7;font-weight: bold;">{{Session::get('nombreTorneo')}}</a></span>
+            <span id="spanTorneo" style="background-color: #ccf1cd;"><a href="#" style="color: #4ea3e7;font-weight: bold;">@if(Session::get('nombreTorneo'))
+                        <img id="original" src="{{ url('images/'.Session::get('nombreTorneo')) }}" height="25">
+                    @endif{{Session::get('nombreTorneo')}}</a></span>
             <!-- Menú móvil -->
             <div class="mobile-menu" id="mobileSubMenu">
                 <ul>
