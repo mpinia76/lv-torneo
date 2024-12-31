@@ -50,7 +50,9 @@
 
         @foreach($torneos1 as $torneo)
             <tr>
-                <td>{{$torneo->nombre}}</td>
+                <td>@if($torneo->escudo)
+                        <img id="original" src="{{ url('images/'.$torneo->escudo) }}" height="25">
+                    @endif {{$torneo->nombre}}</td>
                 <td>{{$torneo->year}}</td>
                 <td>{{$torneo->equipos}}</td>
                 <td>{{$torneo->grupos}}</td>
