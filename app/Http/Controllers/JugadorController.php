@@ -320,7 +320,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
         foreach ($torneosJugador as $torneo){
-            $torneo->escudoNombre = $torneo->escudo;
+            $torneo->escudoTorneo = $torneo->escudo;
             $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
             $arrgrupos='';
             foreach ($grupos as $grupo){
