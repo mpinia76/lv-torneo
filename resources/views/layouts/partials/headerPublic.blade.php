@@ -324,9 +324,9 @@
                 <span></span>
 
             </div>
-            <span id="spanTorneo" style="background-color: #ccf1cd;"><a href="#" style="color: #4ea3e7;font-weight: bold;">@if(Session::get('escudoTorneo'))
+            <span id="spanTorneo" style="background-color: #ccf1cd;"><a href="#" style="color: #4ea3e7;font-weight: bold;">@if(Session::has('escudoTorneo'))
                         <img id="original" src="{{ url('images/'.Session::get('escudoTorneo')) }}" height="25">
-                    @endif {{Session::get('escudoTorneo')}}</a></span>
+                    @endif {{Session::get('nombreTorneo')}}</a></span>
             <!-- Menú móvil -->
             <div class="mobile-menu" id="mobileSubMenu">
                 <ul>
@@ -371,7 +371,9 @@
             </div>
             <div id="horizontalMenu" class="navbar-collapse collapse">
                 <ul>
-                    <li><a href="#" style="color: #4ea3e7;font-weight: bold;">{{Session::get('nombreTorneo')}}</a></li>
+                    <li><a href="#" style="color: #4ea3e7;font-weight: bold;">@if(Session::has('escudoTorneo'))
+                                <img id="original" src="{{ url('images/'.Session::get('escudoTorneo')) }}" height="25">
+                            @endif{{Session::get('nombreTorneo')}}</a></li>
                     <li><a class="dropdown-item" href="{{route('fechas.ver',  array('torneoId' => Session::get('codigoTorneo')))}}">Fixture</a></li>
                     @if(Session::has('sessionPosiciones'))
                         <li class="dropdown">
