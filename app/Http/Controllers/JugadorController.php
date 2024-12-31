@@ -304,7 +304,7 @@ class JugadorController extends Controller
 
 
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, torneos.tipo, torneos.ambito
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
@@ -320,7 +320,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
         foreach ($torneosJugador as $torneo){
-            $torneo->escudoTorneo = $torneo->escudo;
+
             $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
             $arrgrupos='';
             foreach ($grupos as $grupo){
