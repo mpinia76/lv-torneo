@@ -2004,4 +2004,44 @@ group by tecnico_id
 
         return view('jugadores.reasignar', compact('jugador'));
     }
+
+    public function guardarReasignar(Request $request)
+    {
+        // Validar los datos de entrada
+        $request->validate([
+            'jugadorId' => 'required|integer|exists:jugadors,id',
+            'reasignarId' => 'required|integer|exists:jugadors,id|different:jugadorId',
+        ]);
+
+        $jugadorActual = $request->input('jugadorId');
+        $jugadorNuevo = $request->input('reasignarId');
+
+        try {
+            // Inicia una transacción para garantizar que todas las actualizaciones se completen
+            DB::beginTransaction();
+
+            // Actualizar en las tablas necesarias
+            DB::update('UPDATE alineacions SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
+            DB::update('UPDATE plantilla_jugadors SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
+            DB::update('UPDATE gols SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
+            DB::update('UPDATE cambios SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
+            DB::update('UPDATE tarjetas SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
+
+            // Confirmar la transacción
+            DB::commit();
+
+            // Redirigir con un mensaje de éxito
+            return redirect()->route('jugadores.verificarPersonas')->with('success', 'Jugador reasignado exitosamente.');
+        } catch (\Exception $e) {
+            // Revertir los cambios si hay algún error
+            DB::rollBack();
+
+            // Regresar con un mensaje de error
+            return redirect()->back()->withErrors(['error' => 'Hubo un problema al reasignar el jugador.']);
+        }
+    }
+
+
+
+
 }
