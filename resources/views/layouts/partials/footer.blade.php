@@ -97,16 +97,26 @@
             // Obtener el valor seleccionado
             var selectedValue = e.target.value;
 
-            console.log(selectedValue);
+
             // Obtener el elemento td anterior
             var tdWithImage = $(this).closest('tr').find('td').eq(0); // Primer td en la misma fila
-            console.log(tdWithImage);
+
             // Obtener la URL de la foto del jugador desde la respuesta JSON
             var fotoURL = $(this).select2('data')[0].foto;
-            console.log(fotoURL);
 
+
+            var img = document.createElement('img');
+            img.id = 'original';
+            img.className = 'imgCircle';
+            img.src = fotoURL;
+            // Crear un elemento de texto para el número
+            //var numeroText = document.createTextNode(cantJugadores-1); // Cambia '1' al número que desees
+
+            // Insertar el número antes de la imagen en el <td>
+            //tdWithImage.prepend(numeroText);
+            tdWithImage.append(img);
             // Actualizar la imagen en el td anterior con la URL de la foto
-            tdWithImage.find('img').attr('src', fotoURL);
+            //tdWithImage.find('img').attr('src', fotoURL);
         });
 
 
