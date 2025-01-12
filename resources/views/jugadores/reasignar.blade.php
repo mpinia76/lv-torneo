@@ -63,7 +63,7 @@
 
                 </thead>
 
-                <tbody id="cuerpoJugador">
+                <tbody id="cuerpoReasignar">
 
 
                     <tr>
