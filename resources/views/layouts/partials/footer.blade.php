@@ -97,12 +97,13 @@
             // Obtener el valor seleccionado
             var selectedValue = e.target.value;
 
+            console.log(selectedValue);
             // Obtener el elemento td anterior
             var tdWithImage = $(this).closest('tr').find('td').eq(0); // Primer td en la misma fila
-
+            console.log(tdWithImage);
             // Obtener la URL de la foto del jugador desde la respuesta JSON
             var fotoURL = $(this).select2('data')[0].foto;
-
+            console.log(fotoURL);
 
             // Actualizar la imagen en el td anterior con la URL de la foto
             tdWithImage.find('img').attr('src', fotoURL);
