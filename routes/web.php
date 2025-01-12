@@ -62,6 +62,9 @@ Route::group(['prefix' => 'admin'], function()
     Route::delete('/eliminar-jugador/{id}', 'PlantillaController@eliminarJugador')->name('plantilla.destroy');
     Route::delete('/eliminar-jugadores-seleccionados', 'PlantillaController@eliminarJugadoresSeleccionados')->name('plantilla.eliminarSeleccionados');
 
+    Route::get('/reasignar/{id}', 'JugadorController@reasignar')->name('jugadores.reasignar');
+    Route::put('guardarReasignar', 'JugadorController@guardarReasignar');
+
     Route::get('controlarAlineaciones', 'PartidoController@controlarAlineaciones')->name('partidos.controlarAlineaciones');
     Route::get('controlarTarjetas', 'PartidoController@controlarTarjetas')->name('partidos.controlarTarjetas');
     Route::get('controlarGoles', 'PartidoController@controlarGoles')->name('partidos.controlarGoles');

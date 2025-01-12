@@ -64,7 +64,14 @@
                     <td>{{($persona->arbitro)?$persona->arbitro->id:''}}</td>
                     <td>
                         @if($persona->jugador)
+                            <a href="{{route('jugadores.reasignar', $persona->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
                             <a href="{{route('jugadores.edit', $persona->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+
+                            <form action="{{ route('jugadores.destroy', $persona->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
+                                <input type="hidden" name="_method" value="DELETE">
+                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-danger m-1">Eliminar</button>
+                            </form>
                         @elseif($persona->tecnico)
                             <a href="{{route('tecnicos.edit', $persona->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
                         @elseif($persona->arbitro)
@@ -200,5 +207,16 @@
 
             $('#formulario').submit();
         }
+
+
+        function ConfirmDelete()
+        {
+            var x = confirm("Está seguro?");
+            if (x)
+                return true;
+            else
+                return false;
+        }
+
     </script>
 @endsection

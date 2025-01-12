@@ -23,7 +23,7 @@
         @endif
         <a class="btn btn-success m-1" href="{{route('jugadores.create')}}">Nuevo</a>
         <a class="btn btn-info m-1" href="{{route('jugadores.importar')}}">Importar</a>
-        <a class="btn btn-info m-1" href="{{route('jugadores.verificarPersonas')}}">Verificar Personas</a>
+        <a class="btn btn-primary m-1" href="{{route('jugadores.verificarPersonas')}}">Verificar Personas</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

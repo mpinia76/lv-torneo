@@ -1997,4 +1997,10 @@ group by tecnico_id
         return view('jugadores.verificarPersona', ['personas' => $resultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados]);
     }
 
+
+    public function reasignar($id)
+    {
+        $jugador=Jugador::findOrFail($id);
+        return view('jugadores.reasignar', compact('jugador','jugador'));
+    }
 }
