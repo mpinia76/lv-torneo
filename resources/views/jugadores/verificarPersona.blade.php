@@ -7,6 +7,20 @@
 @section('content')
     <div class="container">
         <h1 class="display-6">Posibles repetidos</h1>
+        @if (\Session::has('error'))
+            <div class="alert alert-danger">
+                <ul>
+                    <li>{!! \Session::get('error') !!}</li>
+                </ul>
+            </div>
+        @endif
+        @if (\Session::has('success'))
+            <div class="alert alert-success">
+                <ul>
+                    <li>{!! \Session::get('success') !!}</li>
+                </ul>
+            </div>
+        @endif
         <form class="form-inline" id="formulario">
 
 
