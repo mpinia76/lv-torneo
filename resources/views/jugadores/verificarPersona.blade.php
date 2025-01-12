@@ -63,6 +63,7 @@
                     <td>{{($persona->tecnico)?$persona->tecnico->id:''}}</td>
                     <td>{{($persona->arbitro)?$persona->arbitro->id:''}}</td>
                     <td>
+                        <div class="d-flex">
                         @if($persona->jugador)
                             <a href="{{route('jugadores.reasignar', $persona->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
                             <a href="{{route('jugadores.edit', $persona->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
@@ -77,7 +78,7 @@
                         @elseif($persona->arbitro)
                             <a href="{{route('arbitros.edit', $persona->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
                         @endif
-
+                        </div>
                     </td>
                 </tr>
             @endforeach
