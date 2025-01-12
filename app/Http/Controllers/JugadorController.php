@@ -2001,9 +2001,7 @@ group by tecnico_id
     public function reasignar($id)
     {
         $jugador=Jugador::findOrFail($id);
-        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
 
-        $jugadors = $jugadors->pluck('persona.full_name_age', 'id')->prepend('','');
-        return view('jugadores.reasignar', compact('jugador','jugadors'));
+        return view('jugadores.reasignar', compact('jugador'));
     }
 }
