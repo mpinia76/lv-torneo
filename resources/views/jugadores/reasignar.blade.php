@@ -71,7 +71,7 @@
                         <td>
 
                         </td>
-                        <td>{{ Form::select('reasignarId','','' ,['id'=>'reasignarId','class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
+                        <td>{{ Form::select('reasignarId',[],'' ,['id'=>'reasignarId','class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
 
                     </tr>
 
