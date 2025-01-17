@@ -294,3 +294,5 @@ UPDATE alineacions
     SET alineacions.dorsal = @dorsal
 WHERE alineacions.jugador_id = @jugador_id AND alineacions.equipo_id = @equipo_id AND torneos.id = @torneo_id;
 
+#################Actualizar URL de fechas #############################
+UPDATE `fechas` set url_nombre='grupo-4' WHERE id>=2265 AND id <= 2270
