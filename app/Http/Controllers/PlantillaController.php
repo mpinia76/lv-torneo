@@ -629,7 +629,8 @@ class PlantillaController extends Controller
                         $insert['tipoJugador'] = $tipo;
                     } else {
                         Log::info('Falta el tipo de jugador', []);
-                        $insert['tipoJugador'] = null;
+                        $insert['tipoJugador'] = 'Delantero';
+                        $success .= 'Le falta el tipo: '.$insert['apellido'].', '.$insert['nombre'].'<br>';
                     }
                     Log::info('Contenido de insert: ' . json_encode($insert));
 
