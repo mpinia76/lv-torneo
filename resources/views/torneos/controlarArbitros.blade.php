@@ -188,7 +188,7 @@
                                     <div class="d-flex">
 
                                         <a href="{{route('partidos.arbitros', array('partidoId' => $partido->id))}}" class="btn btn-success m-1">Jueces</a>
-
+                                        <a class="btn btn-info m-1" href="{{route('incidencias.create',  array('torneoId' => $partido->torneoId,'partidoId' => $partido->id))}}">Incidencia</a>
                                     </div>
 
                                 </td>
@@ -264,6 +264,7 @@
                                     <div class="d-flex">
 
                                         <a href="{{route('partidos.arbitros', array('partidoId' => $partido->id))}}" class="btn btn-success m-1">Jueces</a>
+
 
                                     </div>
 

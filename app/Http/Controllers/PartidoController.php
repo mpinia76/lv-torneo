@@ -707,6 +707,7 @@ class PartidoController extends Controller
                 'partidos.penalesl',
                 'partidos.penalesv',
                 'fecha.numero as fecha',
+                'torneo.id as torneoId',
                 'torneo.nombre as torneo',
                 'torneo.year as year',
                 'equipo_local.nombre as equipo_local_nombre',

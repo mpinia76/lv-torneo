@@ -54,7 +54,10 @@ class IncidenciaController extends Controller
      */
     public function create(Request $request)
     {
-
+        $partido_id=null;
+        if ($request->has('partidoId')){
+            $partido_id= $request->query('partidoId');
+        }
         $torneo_id= $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
         $grupos = Grupo::where('torneo_id', '=',$torneo->id)->get();
@@ -90,7 +93,7 @@ class IncidenciaController extends Controller
 
         //dd($partidos);
 
-        return view('incidencias.create', compact('torneo','equipos','partidos'));
+        return view('incidencias.create', compact('torneo','equipos','partidos', 'partido_id'));
     }
 
     /**

@@ -47,7 +47,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
                 {{Form::label('partido', 'Partido')}}
-                {{Form::select('partido_id',$partidos, '',['class' => 'form-control js-example-basic-single'])}}
+                {{Form::select('partido_id',$partidos, $partido_id,['class' => 'form-control js-example-basic-single'])}}
             </div>
 
 

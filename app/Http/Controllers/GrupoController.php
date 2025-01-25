@@ -256,7 +256,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
         }
 
 
-        $incidencias=Incidencia::where('torneo_id',$torneo_id)->paginate();
+        $incidencias=Incidencia::where('torneo_id',$torneo_id)->->whereNotNull('equipo_id')->paginate();
 
 
 
