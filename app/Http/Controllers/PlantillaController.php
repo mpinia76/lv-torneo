@@ -82,8 +82,8 @@ class PlantillaController extends Controller
         $grupo_id= $request->query('grupoId');
         $grupo=Grupo::findOrFail($grupo_id);
 
-        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
-        $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');
+        /*$jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+        $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');*/
 
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
         $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
@@ -92,7 +92,7 @@ class PlantillaController extends Controller
         /*$tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
         $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');*/
         //
-        return view('plantillas.create', compact('grupo','jugadors','equipos'));
+        return view('plantillas.create', compact('grupo','equipos'));
     }
 
     /**
