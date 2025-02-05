@@ -446,17 +446,23 @@ class PlantillaController extends Controller
                         // Obtener el contenido de la URL
 
                         $htmlContentJugador = $this->getHtmlContent($urlJugador);
-                        // Crear un nuevo DOMDocument
-                        $domJugador = new \DOMDocument();
-                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                        $domJugador->loadHTML($htmlContentJugador);
-                        libxml_clear_errors();
+                        if (!empty($htmlContentJugador)) {
+                            // Crear un nuevo DOMDocument
+                            $domJugador = new \DOMDocument();
+                            libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                            $domJugador->loadHTML($htmlContentJugador);
+                            libxml_clear_errors();
 
-                        // Crear un nuevo objeto XPath
-                        $xpathJugador = new \DOMXPath($domJugador);
+                            // Crear un nuevo objeto XPath
+                            $xpathJugador = new \DOMXPath($domJugador);
+                        } else {
+                            // Manejo de error o asignación de valores por defecto
+                            //Log::warning('El contenido HTML del jugador está vacío: ' . $urlJugador);
+                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
+                        }
                     }
                 } catch (Exception $ex) {
-                    $html = '';
+                    $htmlContentJugador = '';
                 }
 
                 if ($htmlContentJugador) {
