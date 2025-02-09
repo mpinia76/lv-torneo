@@ -1948,7 +1948,7 @@ group by tecnico_id
         $verificados= ($request->query('verificados'))?1:0;
         // Obtener todas las personas de la base de datos
         if ($verificados){
-            $personas = Persona::where('verificado', true)->orderBy('apellido','ASC')->get();
+            $personas = Persona::orderBy('apellido','ASC')->get();
         }
         else{
             $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
