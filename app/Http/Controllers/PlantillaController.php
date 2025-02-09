@@ -82,8 +82,8 @@ class PlantillaController extends Controller
         $grupo_id= $request->query('grupoId');
         $grupo=Grupo::findOrFail($grupo_id);
 
-        $jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
-        $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');
+        /*$jugadors = Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->orderBy('personas.apellido', 'asc')->orderBy('personas.nombre', 'asc')->get();
+        $jugadors = $jugadors->pluck('full_name', 'id')->prepend('','');*/
 
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
         $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
@@ -92,7 +92,7 @@ class PlantillaController extends Controller
         /*$tecnicos = Tecnico::orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
         $tecnicos = $tecnicos->pluck('full_name', 'id')->prepend('','');*/
         //
-        return view('plantillas.create', compact('grupo','jugadors','equipos'));
+        return view('plantillas.create', compact('grupo','equipos'));
     }
 
     /**
@@ -446,17 +446,23 @@ class PlantillaController extends Controller
                         // Obtener el contenido de la URL
 
                         $htmlContentJugador = $this->getHtmlContent($urlJugador);
-                        // Crear un nuevo DOMDocument
-                        $domJugador = new \DOMDocument();
-                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                        $domJugador->loadHTML($htmlContentJugador);
-                        libxml_clear_errors();
+                        if (!empty($htmlContentJugador)) {
+                            // Crear un nuevo DOMDocument
+                            $domJugador = new \DOMDocument();
+                            libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                            $domJugador->loadHTML($htmlContentJugador);
+                            libxml_clear_errors();
 
-                        // Crear un nuevo objeto XPath
-                        $xpathJugador = new \DOMXPath($domJugador);
+                            // Crear un nuevo objeto XPath
+                            $xpathJugador = new \DOMXPath($domJugador);
+                        } else {
+                            // Manejo de error o asignación de valores por defecto
+                            //Log::warning('El contenido HTML del jugador está vacío: ' . $urlJugador);
+                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
+                        }
                     }
                 } catch (Exception $ex) {
-                    $html = '';
+                    $htmlContentJugador = '';
                 }
 
                 if ($htmlContentJugador) {
