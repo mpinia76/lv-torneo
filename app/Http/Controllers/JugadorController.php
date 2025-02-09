@@ -1948,7 +1948,7 @@ group by tecnico_id
         $verificados= ($request->query('verificados'))?1:0;
         // Obtener todas las personas de la base de datos
         if ($verificados){
-            $personas = Persona::orderBy('apellido','ASC')->get();
+            $personas = Persona::where('verificado', true)->orderBy('apellido','ASC')->get();
         }
         else{
             $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
@@ -2027,6 +2027,11 @@ group by tecnico_id
             DB::update('UPDATE cambios SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
             DB::update('UPDATE tarjetas SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
 
+            $jugador = Jugador::find($jugadorActual);
+            $persona = Persona::find($jugador->persona_id);
+            $jugador->delete();
+
+            $persona->delete();
             // Confirmar la transacción
             DB::commit();
 
