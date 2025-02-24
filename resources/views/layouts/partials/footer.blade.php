@@ -591,6 +591,38 @@
 
     });
 
+    $('.addRowFecha').on('click',function(e){
+        e.preventDefault();
+        addRowFecha();
+    });
 
+    function addRowFecha()
+    {
+
+        var tr='<tr>'+
+            '<td>'+'{{Form::date('fecha[]', '', ['class' => 'form-control','style' =>'width:155px;'])}}'+'</td>'+
+            '<td>'+'{{Form::time('hora[]', '', ['class' => 'form-control'])}}'+'</td>'+
+            '<td></td><td>'+'{{ Form::select('equipol[]',$equipos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}'+'</td>'+
+            '<td>'+'{{Form::number('golesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>'+
+            '<td>'+'{{Form::number('golesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>'+
+            '<td></td><td>'+'{{ Form::select('equipov[]',$equipos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}'+'</td>';
+            @if((isset($grupo))&&($grupo->penales))
+                tr=tr+'<td>'+'{{Form::number('penalesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>';
+                tr=tr+'<td>'+'{{Form::number('penalesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>';
+                @endif
+                    tr=tr+'<td><a href="#" class="btn btn-danger removefecha"><i class="glyphicon glyphicon-remove"></i></a></td></tr>';
+
+        $('#cuerpoFecha').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removefecha', function(e){
+
+        e.preventDefault();
+        var last=$('tbody tr').length;
+
+        $(this).parent().parent().remove();
+
+
+    });
 
 </script>

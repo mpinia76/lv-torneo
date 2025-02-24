@@ -48,9 +48,10 @@
                         <th>PL</th>
                         <th>PV</th>
                     @endif
+                    <th><a href="#" class="addRowFecha"><i class="glyphicon glyphicon-plus"></i></a></th>
                     </thead>
 
-
+                    <tbody id="cuerpoFecha">
                     @foreach($fecha->partidos as $partido)
 
                         <tr>
@@ -79,8 +80,10 @@
                                 <td>{{Form::number('penalesl[]', $partido->penalesl, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                                 <td>{{Form::number('penalesv[]', $partido->penalesv, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                             @endif
+                            <td><a href="#" class="btn btn-danger removefecha"><i class="glyphicon glyphicon-remove"></i></a></td>
                         </tr>
                     @endforeach
+                    </tbody>
                 </table>
             </div>
 
