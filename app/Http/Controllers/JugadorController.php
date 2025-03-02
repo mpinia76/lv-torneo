@@ -1973,7 +1973,7 @@ group by tecnico_id
             $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
         }*/
 
-        $personas = Persona::orderBy('apellido','ASC')->paginate(50);
+        $personas = Persona::orderBy('apellido','ASC')->paginate(200);
 
         // Separar personas con y sin fecha de nacimiento
         /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
