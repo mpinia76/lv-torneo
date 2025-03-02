@@ -1966,19 +1966,19 @@ group by tecnico_id
         $verificados= ($request->query('verificados'))?1:0;
         $total= ($request->query('total'))?1:0;
         // Obtener todas las personas de la base de datos
-        if ($verificados){
+        /*if ($verificados){
             $personas = Persona::orderBy('apellido','ASC')->get();
         }
         else{
             $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
-        }
+        }*/
 
-
+        $personas = Persona::orderBy('apellido','ASC')->get();
 
         // Separar personas con y sin fecha de nacimiento
-        $personasConFechaNacimiento = $personas->filter(function ($persona) {
+        /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
             return !is_null($persona->nacimiento);
-        });
+        });*/
 
         $personasSinFechaNacimiento = $personas->filter(function ($persona) {
             return is_null($persona->nacimiento);
@@ -1989,13 +1989,13 @@ group by tecnico_id
         });*/
         $personasSinFoto =array();
         // Agrupar personas por fecha de nacimiento
-        $personasPorFechaNacimiento = $personasConFechaNacimiento->groupBy('nacimiento');
+        //$personasPorFechaNacimiento = $personasConFechaNacimiento->groupBy('nacimiento');
 
         // Colección para almacenar personas con apellidos similares
-        $resultados = collect();
+        //$resultados = collect();
 
         // Verificar personas con la misma fecha de nacimiento y apellidos similares
-        foreach ($personasPorFechaNacimiento as $grupo) {
+        /*foreach ($personasPorFechaNacimiento as $grupo) {
             foreach ($grupo as $persona) {
                 $similares = $grupo->filter(function ($item) use ($persona) {
                     // Verificar si el apellido de la persona actual es similar al de las otras personas
@@ -2021,7 +2021,7 @@ group by tecnico_id
             $porPagina,
             $pagina,
             ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
-        );
+        );*/
 
 
         // Filtrar las personas con nombres y apellidos similares
@@ -2033,16 +2033,31 @@ group by tecnico_id
                     $query->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
                         ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
                         ->where('id', '!=', $persona->id); // Evitar que se compare la persona consigo misma
-                })->get();
+                })
+                    ->whereNotExists(function ($query) use ($persona) {
+                        // Evitar personas ya verificadas
+                        $query->select(DB::raw(1))
+                            ->from('personas_verificadas')
+                            ->whereRaw('(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)', [$persona->id, $persona->id]);
+                    })
+                    ->get();
 
                 // Si se encuentran personas similares, agregamos a los resultados
                 if ($similares->isNotEmpty()) {
-                    $personasSimilares = $personasSimilares->merge([$persona])->merge($similares);
+                    $personasSimilares = $personasSimilares->merge([$persona]); // Agregar la persona principal
+
+                    $similares = $similares->map(function ($simil) use ($persona) {
+                        // Agregar el campo simil_id a cada objeto Persona
+                        $simil->simil_id = $persona->id;
+                        return $simil;
+                    });
+
+                    $personasSimilares = $personasSimilares->merge($similares); // Agregar los similares con estructura adecuada
                 }
             }
 
             // Eliminar duplicados de la colección de resultados
-            $personasSimilares = $personasSimilares->unique('id');
+            //$personasSimilares = $personasSimilares->unique('id');
         }
         // Paginación de la colección filtrada
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
@@ -2057,9 +2072,31 @@ group by tecnico_id
         );
 
 
-        return view('jugadores.verificarPersona', ['personas' => $paginadosResultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $paginatedResults]);
+        return view('jugadores.verificarPersona', ['sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $paginatedResults]);
     }
 
+
+    public function verificarSimilitud(Request $request)
+    {
+        $persona_id = $request->input('persona_id');
+        $simil_id = $request->input('simil_id');
+
+        // Verificar si la similitud ya existe en la tabla personas
+        $persona = \DB::table('personas_verificadas')
+            ->where('persona_id', $persona_id)
+            ->where('simil_id', $simil_id)
+            ->first();
+
+        // Si no existe, crear la similitud
+        if (!$persona) {
+            \DB::table('personas_verificadas')->insert([
+                'persona_id' => $persona_id,
+                'simil_id' => $simil_id,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Verificado correctamente');
+    }
 
     public function reasignar($id)
     {

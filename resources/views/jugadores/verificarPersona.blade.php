@@ -31,28 +31,15 @@
                 </ul>
             </div>
         @endif
-        <form class="form-inline" id="formulario">
 
-
-            <input type="checkbox" class="form-control" id="verificados" name="verificados" @if ($verificados == 1) checked @endif onchange="enviarForm()">
-
-            <strong>Verificados</strong>
-            </input>
-
-            <input type="checkbox" class="form-control" id="total" name="total" @if ($total == 1) checked @endif onchange="enviarForm()">
-
-            <strong>Control total</strong>
-            </input>
-
-        </form>
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="principal-tab" data-toggle="tab" href="#principal" role="tab" aria-controls="principal" aria-selected="true">Nacimiento</a>
+                <a class="nav-link active" id="principal-tab" data-toggle="tab" href="#principal" role="tab" aria-controls="principal" aria-selected="true">Similares</a>
             </li>
 
-            <li class="nav-item">
+            <!--<li class="nav-item">
                 <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Similares</a>
-            </li>
+            </li>-->
 
             <li class="nav-item">
                 <a class="nav-link" id="sin-tab" data-toggle="tab" href="#sin" role="tab" aria-controls="sin" aria-selected="false">Sin nacimiento</a>
@@ -62,87 +49,7 @@
         </ul>
         <div class="tab-content" id="myTabContent">
             <div role="tabpanel" class="tab-pane active" id="principal">
-                <div class="row">
 
-                    <div class="form-group col-md-12">
-        <table class="table">
-            <thead>
-            <th></th>
-            <th>Id</th>
-            <th>Apellido</th>
-            <th>Nombre</th>
-
-            <th>Edad</th>
-            <th>Jugador</th>
-            <th>Técnico</th>
-
-            <th>Arbitro</th>
-            <th></th>
-            </thead>
-
-            @php
-                $i = 0;
-            @endphp
-            @foreach($personas as $persona)
-                @php
-                    $i++;
-                @endphp
-                <tr>
-                    <td>{{$i}}@if($persona->foto)
-                            <img id="original" class="imgCircle" src="{{ url('images/'.$persona->foto) }}" >
-                        @else
-                            @if($persona->jugador)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                            @elseif($persona->tecnico)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
-                            @elseif($persona->arbitro)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
-                            @endif
-                        @endif
-                        <img id="original" src="{{ $persona->bandera_url }}" alt="{{ $persona->nacionalidad }}">
-                    </td>
-                    <td> {{$persona->id}}</td>
-                    <td>{{$persona->apellido}}</td>
-                    <td>{{$persona->nombre}}</td>
-
-
-                    <td>{{($persona->nacimiento)?$persona->getAgeWithDateAttribute():''}}</td>
-                    <td>{{($persona->jugador)?$persona->jugador->id:''}}</td>
-                    <td>{{($persona->tecnico)?$persona->tecnico->id:''}}</td>
-                    <td>{{($persona->arbitro)?$persona->arbitro->id:''}}</td>
-                    <td>
-                        <div class="d-flex">
-                        @if($persona->jugador)
-                            <a href="{{route('jugadores.reasignar', $persona->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
-                            <a href="{{route('jugadores.edit', $persona->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
-
-                            <form action="{{ route('jugadores.destroy', $persona->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
-                                <input type="hidden" name="_method" value="DELETE">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-danger m-1">Eliminar</button>
-                            </form>
-                        @elseif($persona->tecnico)
-                            <a href="{{route('tecnicos.edit', $persona->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
-                        @elseif($persona->arbitro)
-                            <a href="{{route('arbitros.edit', $persona->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
-                        @endif
-                        </div>
-                    </td>
-                </tr>
-            @endforeach
-        </table>
-                    </div>
-                        <div class="row">
-                            <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                                {{ $personas->links() }}
-                            </div>
-                            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                                <strong>Total: {{ $personas->total() }}</strong>
-                            </div>
-                        </div>
-                    </div>
-            </div>
-            <div role="tabpanel" class="tab-pane" id="tres">
                 <div class="row">
 
                     <div class="form-group col-md-12">
@@ -166,7 +73,10 @@
             @foreach($similaresNombreApellido as $personaSimilares)
                 @php
                     $i++;
+
+//dd($personaSimilares);
                 @endphp
+
                 <tr>
                     <td>{{$i}} @if($personaSimilares->foto)
                             <img id="original" class="imgCircle" src="{{ url('images/'.$personaSimilares->foto) }}" >
@@ -191,11 +101,12 @@
                     <td>{{($personaSimilares->tecnico)?$personaSimilares->tecnico->id:''}}</td>
                     <td>{{($personaSimilares->arbitro)?$personaSimilares->arbitro->id:''}}</td>
                     <td>
+                        <div class="d-flex" style="align-items: center;">
                         @if($personaSimilares->jugador)
                             <a href="{{route('jugadores.reasignar', $personaSimilares->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
                             <a href="{{route('jugadores.edit', $personaSimilares->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
 
-                            <form action="{{ route('jugadores.destroy', $personaSimilares->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
+                            <form action="{{ route('jugadores.destroy', $personaSimilares->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
                                 <input type="hidden" name="_method" value="DELETE">
                                 <input type="hidden" name="_token" value="{{ csrf_token() }}">
                                 <button class="btn btn-danger m-1">Eliminar</button>
@@ -205,7 +116,17 @@
                         @elseif($personaSimilares->arbitro)
                             <a href="{{route('arbitros.edit', $personaSimilares->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
                         @endif
+                        @if($personaSimilares->simil_id)
+                            <!-- Botón para verificar similitud -->
+                            <form action="{{ route('jugadores.verificarSimilitud') }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
+                                @csrf
+                                <input type="hidden" name="persona_id" value="{{ $personaSimilares->id }}">
+                                <input type="hidden" name="simil_id" value="{{ $personaSimilares->simil_id }}">
 
+                                <button type="submit" class="btn btn-success m-1">Verificado</button>
+                            </form>
+                            @endif
+                        </div>
                     </td>
                 </tr>
             @endforeach

@@ -50,6 +50,10 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('importarJugador', 'JugadorController@importar')->name('jugadores.importar');
     Route::post('importarJugadorProcess', 'JugadorController@importarProcess');
     Route::get('verificarPersonas', 'JugadorController@verificarPersonas')->name('jugadores.verificarPersonas');
+
+    Route::post('verificar-similitud', 'JugadorController@verificarSimilitud')->name('jugadores.verificarSimilitud');
+
+
     Route::get('importarPartido', 'FechaController@importarPartido')->name('fechas.importarPartido');
     Route::post('importarPartidoProcess', 'FechaController@importarPartidoProcess');
     Route::get('importfechas', 'FechaController@import')->name('fechas.import');
