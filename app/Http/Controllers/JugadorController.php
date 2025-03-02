@@ -20,7 +20,7 @@ use DB;
 use GuzzleHttp\Client;
 use Carbon\Carbon;
 
-
+use Illuminate\Pagination\LengthAwarePaginator;
 class JugadorController extends Controller
 {
     /**
@@ -1964,6 +1964,7 @@ group by tecnico_id
     {
         set_time_limit(0); // Aumentamos tiempo solo para pruebas
         $verificados= ($request->query('verificados'))?1:0;
+        $total= ($request->query('total'))?1:0;
         // Obtener todas las personas de la base de datos
         if ($verificados){
             $personas = Persona::orderBy('apellido','ASC')->get();
@@ -2011,23 +2012,45 @@ group by tecnico_id
         // Eliminar duplicados
         $resultados = $resultados->unique('id');
 
+        // Aplicar paginación manual
+        $pagina = request()->input('page', 1);
+        $porPagina = 50; // Define cuántos elementos mostrar por página
+        $paginadosResultados = new LengthAwarePaginator(
+            $resultados->forPage($pagina, $porPagina),
+            $resultados->count(),
+            $porPagina,
+            $pagina,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
 
         $similaresPorNombreYApellido = collect();
-
-        // 🔥 **Nueva lógica para encontrar los que coinciden en algún nombre y algún apellido**
-        foreach ($personas as $persona) {
-            foreach ($personas as $otraPersona) {
-                if ($persona->id !== $otraPersona->id && $this->sonSimilaresPorNombreYApellido($persona, $otraPersona)) {
-                    $similaresPorNombreYApellido->push($persona);
-                    $similaresPorNombreYApellido->push($otraPersona);
+        if ($total) {
+            // 🔥 **Nueva lógica para encontrar los que coinciden en algún nombre y algún apellido**
+            foreach ($personas as $persona) {
+                foreach ($personas as $otraPersona) {
+                    if ($persona->id !== $otraPersona->id && $this->sonSimilaresPorNombreYApellido($persona, $otraPersona)) {
+                        $similaresPorNombreYApellido->push($persona);
+                        $similaresPorNombreYApellido->push($otraPersona);
+                    }
                 }
             }
+
+            $similaresPorNombreYApellido = $similaresPorNombreYApellido->unique('id');
         }
+        // Aplicar paginación manual
+        $pagina = request()->input('page', 1);
+        $porPagina = 50; // Define cuántos elementos mostrar por página
+        $paginadosSimilares = new LengthAwarePaginator(
+            $similaresPorNombreYApellido->forPage($pagina, $porPagina),
+            $similaresPorNombreYApellido->count(),
+            $porPagina,
+            $pagina,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
 
-        $similaresPorNombreYApellido = $similaresPorNombreYApellido->unique('id');
 
-
-        return view('jugadores.verificarPersona', ['personas' => $resultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'similaresNombreApellido' => $similaresPorNombreYApellido]);
+        return view('jugadores.verificarPersona', ['personas' => $paginadosResultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $paginadosSimilares]);
     }
 
 

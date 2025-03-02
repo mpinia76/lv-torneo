@@ -39,7 +39,10 @@
             <strong>Verificados</strong>
             </input>
 
+            <input type="checkbox" class="form-control" id="total" name="total" @if ($total == 1) checked @endif onchange="enviarForm()">
 
+            <strong>Control total</strong>
+            </input>
 
         </form>
         <ul class="nav nav-tabs" id="myTab" role="tablist">
@@ -59,6 +62,9 @@
         </ul>
         <div class="tab-content" id="myTabContent">
             <div role="tabpanel" class="tab-pane active" id="principal">
+                <div class="row">
+
+                    <div class="form-group col-md-12">
         <table class="table">
             <thead>
             <th></th>
@@ -124,10 +130,21 @@
                 </tr>
             @endforeach
         </table>
-
+                    </div>
+                        <div class="row">
+                            <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                                {{ $personas->links() }}
+                            </div>
+                            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                                <strong>Total: {{ $personas->total() }}</strong>
+                            </div>
+                        </div>
+                    </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="tres">
+                <div class="row">
 
+                    <div class="form-group col-md-12">
         <table class="table">
             <thead>
             <th></th>
@@ -154,11 +171,18 @@
                             <img id="original" class="imgCircle" src="{{ url('images/'.$personaSimilares->foto) }}" >
                         @else
                             @if($personaSimilares->jugador)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                <a href="{{route('jugadores.reasignar', $personaSimilares->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
+                                <a href="{{route('jugadores.edit', $personaSimilares->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+
+                                <form action="{{ route('jugadores.destroy', $personaSimilares->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
+                                    <input type="hidden" name="_method" value="DELETE">
+                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                    <button class="btn btn-danger m-1">Eliminar</button>
+                                </form>
                             @elseif($personaSimilares->tecnico)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                                <a href="{{route('tecnicos.edit', $personaSimilares->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
                             @elseif($personaSimilares->arbitro)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
+                                <a href="{{route('arbitros.edit', $personaSimilares->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
                             @endif
                         @endif
                     </td>
@@ -184,8 +208,17 @@
                 </tr>
             @endforeach
         </table>
+                    </div>
+                    <div class="row">
+                        <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                            {{ $similaresNombreApellido->links() }}
+                        </div>
+                        <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                            <strong>Total: {{ $similaresNombreApellido->total() }}</strong>
+                        </div>
+                    </div>
 
-
+            </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="sin">
 
