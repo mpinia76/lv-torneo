@@ -1942,9 +1942,27 @@ group by tecnico_id
         return $percent > 80; // Ajusta este umbral según tus necesidades
     }
 
+    private function sonSimilaresPorNombreYApellido($persona1, $persona2)
+    {
+        $apellidos1 = explode(' ', strtolower($persona1->apellido));
+        $apellidos2 = explode(' ', strtolower($persona2->apellido));
+
+        $nombres1 = explode(' ', strtolower($persona1->nombre));
+        $nombres2 = explode(' ', strtolower($persona2->nombre));
+
+        // Verificar si tienen al menos un apellido en común
+        $coincideApellido = !empty(array_intersect($apellidos1, $apellidos2));
+
+        // Verificar si tienen al menos un nombre en común
+        $coincideNombre = !empty(array_intersect($nombres1, $nombres2));
+
+        return $coincideApellido && $coincideNombre;
+    }
+
+
     public function verificarPersonas(Request $request)
     {
-
+        set_time_limit(0); // Aumentamos tiempo solo para pruebas
         $verificados= ($request->query('verificados'))?1:0;
         // Obtener todas las personas de la base de datos
         if ($verificados){
@@ -1994,7 +2012,22 @@ group by tecnico_id
         $resultados = $resultados->unique('id');
 
 
-        return view('jugadores.verificarPersona', ['personas' => $resultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados]);
+        $similaresPorNombreYApellido = collect();
+
+        // 🔥 **Nueva lógica para encontrar los que coinciden en algún nombre y algún apellido**
+        foreach ($personas as $persona) {
+            foreach ($personas as $otraPersona) {
+                if ($persona->id !== $otraPersona->id && $this->sonSimilaresPorNombreYApellido($persona, $otraPersona)) {
+                    $similaresPorNombreYApellido->push($persona);
+                    $similaresPorNombreYApellido->push($otraPersona);
+                }
+            }
+        }
+
+        $similaresPorNombreYApellido = $similaresPorNombreYApellido->unique('id');
+
+
+        return view('jugadores.verificarPersona', ['personas' => $resultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'similaresNombreApellido' => $similaresPorNombreYApellido]);
     }
 
 
