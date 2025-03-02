@@ -99,8 +99,9 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                             @endif
                         @endif
+                        <img id="original" src="{{ $persona->bandera_url }}" alt="{{ $persona->nacionalidad }}">
                     </td>
-                    <td><img id="original" src="{{ $persona->bandera_url }}" alt="{{ $persona->nacionalidad }}"> {{$persona->id}}</td>
+                    <td> {{$persona->id}}</td>
                     <td>{{$persona->apellido}}</td>
                     <td>{{$persona->nombre}}</td>
 
@@ -171,22 +172,16 @@
                             <img id="original" class="imgCircle" src="{{ url('images/'.$personaSimilares->foto) }}" >
                         @else
                             @if($personaSimilares->jugador)
-                                <a href="{{route('jugadores.reasignar', $personaSimilares->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
-                                <a href="{{route('jugadores.edit', $personaSimilares->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
-
-                                <form action="{{ route('jugadores.destroy', $personaSimilares->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
-                                    <input type="hidden" name="_method" value="DELETE">
-                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                    <button class="btn btn-danger m-1">Eliminar</button>
-                                </form>
+                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                             @elseif($personaSimilares->tecnico)
-                                <a href="{{route('tecnicos.edit', $personaSimilares->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
+                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                             @elseif($personaSimilares->arbitro)
-                                <a href="{{route('arbitros.edit', $personaSimilares->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
+                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                             @endif
                         @endif
+                        <img id="original" src="{{ $personaSimilares->bandera_url }}" alt="{{ $personaSimilares->nacionalidad }}">
                     </td>
-                    <td><img id="original" src="{{ $personaSimilares->bandera_url }}" alt="{{ $personaSimilares->nacionalidad }}">  {{$personaSimilares->id}}</td>
+                    <td>  {{$personaSimilares->id}}</td>
                     <td>{{$personaSimilares->apellido}}</td>
                     <td>{{$personaSimilares->nombre}}</td>
 
@@ -197,7 +192,14 @@
                     <td>{{($personaSimilares->arbitro)?$personaSimilares->arbitro->id:''}}</td>
                     <td>
                         @if($personaSimilares->jugador)
+                            <a href="{{route('jugadores.reasignar', $personaSimilares->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
                             <a href="{{route('jugadores.edit', $personaSimilares->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+
+                            <form action="{{ route('jugadores.destroy', $personaSimilares->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
+                                <input type="hidden" name="_method" value="DELETE">
+                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <button class="btn btn-danger m-1">Eliminar</button>
+                            </form>
                         @elseif($personaSimilares->tecnico)
                             <a href="{{route('tecnicos.edit', $personaSimilares->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
                         @elseif($personaSimilares->arbitro)
@@ -255,8 +257,9 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                             @endif
                         @endif
+                        <img id="original" src="{{ $personaSinNac->bandera_url }}" alt="{{ $personaSinNac->nacionalidad }}">
                     </td>
-                    <td><img id="original" src="{{ $personaSinNac->bandera_url }}" alt="{{ $personaSinNac->nacionalidad }}">  {{$personaSinNac->id}}</td>
+                    <td> {{$personaSinNac->id}}</td>
                     <td>{{$personaSinNac->apellido}}</td>
                     <td>{{$personaSinNac->nombre}}</td>
 

@@ -2020,37 +2020,44 @@ group by tecnico_id
             $resultados->count(),
             $porPagina,
             $pagina,
-            ['path' => request()->url(), 'query' => request()->query()]
+            ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
         );
 
 
-        $similaresPorNombreYApellido = collect();
+        // Filtrar las personas con nombres y apellidos similares
+        $personasSimilares = collect();
         if ($total) {
-            // 🔥 **Nueva lógica para encontrar los que coinciden en algún nombre y algún apellido**
             foreach ($personas as $persona) {
-                foreach ($personas as $otraPersona) {
-                    if ($persona->id !== $otraPersona->id && $this->sonSimilaresPorNombreYApellido($persona, $otraPersona)) {
-                        $similaresPorNombreYApellido->push($persona);
-                        $similaresPorNombreYApellido->push($otraPersona);
-                    }
+                // Filtramos personas por apellido y nombre similares
+                $similares = Persona::where(function ($query) use ($persona) {
+                    $query->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
+                        ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
+                        ->where('id', '!=', $persona->id); // Evitar que se compare la persona consigo misma
+                })->get();
+
+                // Si se encuentran personas similares, agregamos a los resultados
+                if ($similares->isNotEmpty()) {
+                    $personasSimilares = $personasSimilares->merge([$persona])->merge($similares);
                 }
             }
 
-            $similaresPorNombreYApellido = $similaresPorNombreYApellido->unique('id');
+            // Eliminar duplicados de la colección de resultados
+            $personasSimilares = $personasSimilares->unique('id');
         }
-        // Aplicar paginación manual
-        $pagina = request()->input('page', 1);
-        $porPagina = 50; // Define cuántos elementos mostrar por página
-        $paginadosSimilares = new LengthAwarePaginator(
-            $similaresPorNombreYApellido->forPage($pagina, $porPagina),
-            $similaresPorNombreYApellido->count(),
-            $porPagina,
-            $pagina,
-            ['path' => request()->url(), 'query' => request()->query()]
+        // Paginación de la colección filtrada
+        $currentPage = LengthAwarePaginator::resolveCurrentPage();
+        $perPage = 50; // Número de elementos por página
+
+        $paginatedResults = new LengthAwarePaginator(
+            $personasSimilares->forPage($currentPage, $perPage),
+            $personasSimilares->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
         );
 
 
-        return view('jugadores.verificarPersona', ['personas' => $paginadosResultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $paginadosSimilares]);
+        return view('jugadores.verificarPersona', ['personas' => $paginadosResultados,'sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $paginatedResults]);
     }
 
 
