@@ -2026,7 +2026,7 @@ group by tecnico_id
 
         // Filtrar las personas con nombres y apellidos similares
         $personasSimilares = collect();
-        if ($total) {
+
             foreach ($personas as $persona) {
                 // Filtramos personas por apellido y nombre similares
                 $similares = Persona::where(function ($query) use ($persona) {
@@ -2058,7 +2058,7 @@ group by tecnico_id
 
             // Eliminar duplicados de la colección de resultados
             //$personasSimilares = $personasSimilares->unique('id');
-        }
+
         // Paginación de la colección filtrada
         $currentPage = LengthAwarePaginator::resolveCurrentPage();
         $perPage = 50; // Número de elementos por página
