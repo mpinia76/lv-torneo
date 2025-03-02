@@ -1973,7 +1973,7 @@ group by tecnico_id
             $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
         }*/
 
-        $personas = Persona::orderBy('apellido','ASC')->get();
+        $personas = Persona::orderBy('apellido','ASC')->paginate(50);
 
         // Separar personas con y sin fecha de nacimiento
         /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
@@ -2059,20 +2059,10 @@ group by tecnico_id
             // Eliminar duplicados de la colección de resultados
             //$personasSimilares = $personasSimilares->unique('id');
 
-        // Paginación de la colección filtrada
-        $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $perPage = 50; // Número de elementos por página
-
-        $paginatedResults = new LengthAwarePaginator(
-            $personasSimilares->forPage($currentPage, $perPage),
-            $personasSimilares->count(),
-            $perPage,
-            $currentPage,
-            ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
-        );
 
 
-        return view('jugadores.verificarPersona', ['sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $paginatedResults]);
+
+        return view('jugadores.verificarPersona', ['sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas]);
     }
 
 

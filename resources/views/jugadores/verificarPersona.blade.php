@@ -134,10 +134,10 @@
                     </div>
                     <div class="row">
                         <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                            {{ $similaresNombreApellido->links() }}
+                            {{ $personas->links() }}
                         </div>
                         <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                            <strong>Total: {{ $similaresNombreApellido->total() }}</strong>
+                            <strong>Total: {{ $personas->total() }}</strong>
                         </div>
                     </div>
 
