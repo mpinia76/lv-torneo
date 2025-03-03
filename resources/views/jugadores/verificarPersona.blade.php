@@ -69,6 +69,7 @@
             </thead>
             @php
                 $i = 0;
+                dd($personas);
             @endphp
             @foreach($similaresNombreApellido as $personaSimilares)
                 @php
