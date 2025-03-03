@@ -2047,7 +2047,7 @@ group by tecnico_id
             ->exists(); // Devuelve true si hay al menos un similar
 
 
-        dd($existenSimilares);
+
         if (!$existenSimilares) {
             return response()->json(['message' => 'No hay personas similares'], 200);
 
