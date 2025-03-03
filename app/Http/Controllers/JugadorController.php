@@ -2023,7 +2023,26 @@ group by tecnico_id
             ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
         );*/
 
+        $existenSimilares = Persona::where(function ($query) use ($personas) {
+            foreach ($personas as $persona) {
+                $query->orWhere(function ($q) use ($persona) {
+                    $q->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
+                        ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
+                        ->where('id', '!=', $persona->id);
+                });
+            }
+        })
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('personas_verificadas')
+                    ->whereRaw('(persona_id = personas.id AND simil_id = personas.id)');
+            })
+            ->exists(); // Esto devuelve true o false
 
+
+        if (!$existenSimilares) {
+            return response()->json(['message' => 'No hay personas similares'], 200);
+        }
         // Filtrar las personas con nombres y apellidos similares
         $personasSimilares = collect();
 
