@@ -2048,12 +2048,10 @@ group by tecnico_id
 
 
 
-        if (!$existenSimilares) {
-            return response()->json(['message' => 'No hay personas similares'], 200);
+        if ($existenSimilares) {
 
-        }
-        // Filtrar las personas con nombres y apellidos similares
-        $personasSimilares = collect();
+            // Filtrar las personas con nombres y apellidos similares
+            $personasSimilares = collect();
 
             foreach ($personas as $persona) {
                 // Filtramos personas por apellido y nombre similares
@@ -2086,6 +2084,10 @@ group by tecnico_id
 
             // Eliminar duplicados de la colección de resultados
             //$personasSimilares = $personasSimilares->unique('id');
+        }
+        else{
+            $personas = Persona::orderBy('apellido','ASC')->paginate(1);
+        }
 
 
 
