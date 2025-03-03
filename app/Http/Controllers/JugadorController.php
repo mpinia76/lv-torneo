@@ -2039,10 +2039,10 @@ group by tecnico_id
             })
             ->exists(); // Esto devuelve true o false
 
-
+        dd($existenSimilares);
         if (!$existenSimilares) {
             return response()->json(['message' => 'No hay personas similares'], 200);
-            dd($personasSinFechaNacimiento);
+
         }
         // Filtrar las personas con nombres y apellidos similares
         $personasSimilares = collect();
