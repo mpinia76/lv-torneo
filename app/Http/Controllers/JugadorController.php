@@ -2032,12 +2032,20 @@ group by tecnico_id
                 });
             }
         })
-            ->whereNotExists(function ($query) {
+            ->whereNotExists(function ($query) use ($personas) {
                 $query->select(DB::raw(1))
                     ->from('personas_verificadas')
-                    ->whereRaw('(persona_id = personas.id AND simil_id = personas.id)');
+                    ->where(function ($q) use ($personas) {
+                        foreach ($personas as $persona) {
+                            $q->orWhereRaw(
+                                '(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)',
+                                [$persona->id, $persona->id]
+                            );
+                        }
+                    });
             })
-            ->exists(); // Esto devuelve true o false
+            ->exists(); // Devuelve true si hay al menos un similar
+
 
         dd($existenSimilares);
         if (!$existenSimilares) {
