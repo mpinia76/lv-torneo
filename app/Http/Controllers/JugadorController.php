@@ -1980,9 +1980,9 @@ group by tecnico_id
             return !is_null($persona->nacimiento);
         });*/
 
-        $personasSinFechaNacimiento = $personas->filter(function ($persona) {
+        /*$personasSinFechaNacimiento = $personas->filter(function ($persona) {
             return is_null($persona->nacimiento);
-        });
+        });*/
 
         /*$personasSinFoto = $personas->filter(function ($persona) {
             return is_null($persona->foto);
@@ -2092,7 +2092,7 @@ group by tecnico_id
 
 
 
-        return view('jugadores.verificarPersona', ['sinNacimiento'=>$personasSinFechaNacimiento,'sinFoto'=>$personasSinFoto, 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas]);
+        return view('jugadores.verificarPersona', [ 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas]);
     }
 
 

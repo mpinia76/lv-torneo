@@ -39,11 +39,11 @@
 
             <!--<li class="nav-item">
                 <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Similares</a>
-            </li>-->
+            </li>
 
             <li class="nav-item">
                 <a class="nav-link" id="sin-tab" data-toggle="tab" href="#sin" role="tab" aria-controls="sin" aria-selected="false">Sin nacimiento</a>
-            </li>
+            </li>-->
 
 
         </ul>
@@ -143,66 +143,7 @@
 
             </div>
             </div>
-            <div role="tabpanel" class="tab-pane" id="sin">
 
-        <table class="table">
-            <thead>
-            <th></th>
-            <th>Id</th>
-            <th>Apellido</th>
-            <th>Nombre</th>
-
-            <th>Edad</th>
-            <th>Jugador</th>
-            <th>Técnico</th>
-
-            <th>Arbitro</th>
-            <th></th>
-            </thead>
-            @php
-                $i = 0;
-            @endphp
-            @foreach($sinNacimiento as $personaSinNac)
-                @php
-                    $i++;
-                @endphp
-                <tr>
-                    <td>{{$i}} @if($personaSinNac->foto)
-                            <img id="original" class="imgCircle" src="{{ url('images/'.$personaSinNac->foto) }}" >
-                        @else
-                            @if($personaSinNac->jugador)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                            @elseif($personaSinNac->tecnico)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
-                            @elseif($personaSinNac->arbitro)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
-                            @endif
-                        @endif
-                        <img id="original" src="{{ $personaSinNac->bandera_url }}" alt="{{ $personaSinNac->nacionalidad }}">
-                    </td>
-                    <td> {{$personaSinNac->id}}</td>
-                    <td>{{$personaSinNac->apellido}}</td>
-                    <td>{{$personaSinNac->nombre}}</td>
-
-
-                    <td>{{($personaSinNac->nacimiento)?$personaSinNac->getAgeWithDateAttribute():''}}</td>
-                    <td>{{($personaSinNac->jugador)?$personaSinNac->jugador->id:''}}</td>
-                    <td>{{($personaSinNac->tecnico)?$personaSinNac->tecnico->id:''}}</td>
-                    <td>{{($personaSinNac->arbitro)?$personaSinNac->arbitro->id:''}}</td>
-                    <td>
-                            @if($personaSinNac->jugador)
-                            <a href="{{route('jugadores.edit', $personaSinNac->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
-                            @elseif($personaSinNac->tecnico)
-                            <a href="{{route('tecnicos.edit', $personaSinNac->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
-                            @elseif($personaSinNac->arbitro)
-                                <a href="{{route('arbitros.edit', $personaSinNac->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
-                            @endif
-
-                    </td>
-                </tr>
-            @endforeach
-        </table>
-            </div>
 
 
     </div>
