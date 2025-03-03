@@ -2086,7 +2086,7 @@ group by tecnico_id
             //$personasSimilares = $personasSimilares->unique('id');
         }
         else{
-            $personas = Persona::orderBy('apellido','ASC')->paginate(1);
+            $personas->setCollection(collect([])); // Vaciar la colección
         }
 
 
