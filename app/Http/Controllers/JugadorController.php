@@ -1973,7 +1973,8 @@ group by tecnico_id
             $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
         }*/
 
-        $personas = Persona::orderBy('apellido','ASC')->paginate(50);
+        $personas = Persona::orderBy('apellido','ASC')->get();
+        //$personas = Persona::orderBy('apellido','ASC')->paginate(50);
 
         // Separar personas con y sin fecha de nacimiento
         /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
@@ -2023,33 +2024,12 @@ group by tecnico_id
             ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
         );*/
 
-        $existenSimilares = Persona::where(function ($query) use ($personas) {
-            foreach ($personas as $persona) {
-                $query->orWhere(function ($q) use ($persona) {
-                    $q->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
-                        ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
-                        ->where('id', '!=', $persona->id);
-                });
-            }
-        })
-            ->whereNotExists(function ($query) use ($personas) {
-                $query->select(DB::raw(1))
-                    ->from('personas_verificadas')
-                    ->where(function ($q) use ($personas) {
-                        foreach ($personas as $persona) {
-                            $q->orWhereRaw(
-                                '(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)',
-                                [$persona->id, $persona->id]
-                            );
-                        }
-                    });
-            })
-            ->exists(); // Devuelve true si hay al menos un similar
+
 
         // Filtrar las personas con nombres y apellidos similares
         $personasSimilares = collect();
 
-        if ($existenSimilares) {
+
 
 
 
@@ -2084,10 +2064,7 @@ group by tecnico_id
 
             // Eliminar duplicados de la colección de resultados
             //$personasSimilares = $personasSimilares->unique('id');
-        }
-        else{
-            $personas->setCollection(collect([])); // Vaciar la colección
-        }
+
 
 
 
