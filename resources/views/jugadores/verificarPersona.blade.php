@@ -69,7 +69,6 @@
             </thead>
             @php
                 $i = 0;
-                dd($personas);
             @endphp
             @foreach($similaresNombreApellido as $personaSimilares)
                 @php
@@ -133,7 +132,14 @@
             @endforeach
         </table>
                     </div>
-
+                    <div class="row">
+                        <div class="form-group col-xs-12 col-sm-6 col-md-9">
+                            {{ $personas->links() }}
+                        </div>
+                        <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                            <strong>Total: {{ $personas->total() }}</strong>
+                        </div>
+                    </div>
 
             </div>
             </div>
