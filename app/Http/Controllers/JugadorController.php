@@ -2046,12 +2046,12 @@ group by tecnico_id
             })
             ->exists(); // Devuelve true si hay al menos un similar
 
-
+        // Filtrar las personas con nombres y apellidos similares
+        $personasSimilares = collect();
 
         if ($existenSimilares) {
 
-            // Filtrar las personas con nombres y apellidos similares
-            $personasSimilares = collect();
+
 
             foreach ($personas as $persona) {
                 // Filtramos personas por apellido y nombre similares
