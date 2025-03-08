@@ -760,7 +760,7 @@ class PlantillaController extends Controller
                 $data2=array(
                     'plantilla_id'=>$id,
                     'jugador_id'=>$persona->jugador->id,
-                    'dorsal'=>($dorsal=='')?null:$dorsal
+                    'dorsal' => is_numeric($dorsal) ? $dorsal : null
                 );
                 try {
                     Log::info('Contenido de data: ' . json_encode($data2));
@@ -1087,7 +1087,7 @@ class PlantillaController extends Controller
                 $data2=array(
                     'plantilla_id'=>$id,
                     'jugador_id'=>$persona->jugador->id,
-                    'dorsal'=>($dorsal=='')?null:$dorsal
+                    'dorsal' => is_numeric($dorsal) ? $dorsal : null
                 );
                 try {
                     Log::info('Contenido de data: ' . json_encode($data2));
