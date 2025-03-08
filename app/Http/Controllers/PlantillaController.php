@@ -664,7 +664,7 @@ class PlantillaController extends Controller
 
                     // Insertar los datos de la persona
                     if ($nombre) {
-                        $insert['nombre'] = $nombre;
+                        $insert['nombre'] = trim($nombre);
                     } else {
                         Log::info('Falta el nombre', []);
                         $insert['nombre'] = null;
@@ -672,7 +672,7 @@ class PlantillaController extends Controller
                     }
 
                     if ($apellido) {
-                        $insert['apellido'] = $apellido;
+                        $insert['apellido'] = trim($apellido);
                     } else {
                         Log::info('Falta el apellido', []);
                         $insert['apellido'] = null;
@@ -680,51 +680,51 @@ class PlantillaController extends Controller
                     }
 
                     if ($ciudad) {
-                        $insert['ciudad'] = $ciudad;
+                        $insert['ciudad'] = trim($ciudad);
                     }else {
                         Log::info('Falta la ciudad', []);
                         $insert['ciudad'] = null;
                     }
                     if ($nacionalidad) {
-                        $insert['nacionalidad'] = $nacionalidad;
+                        $insert['nacionalidad'] = trim($nacionalidad);
                     } else {
                         Log::info('Falta la nacionalidad', []);
                         $insert['nacionalidad'] = null;
                     }
                     if ($altura) {
-                        $insert['altura'] = $altura;
+                        $insert['altura'] = trim($altura);
                     }
                     else {
                         Log::info('Falta la altura', []);
                         $insert['altura'] = null;
                     }
                     if ($peso) {
-                        $insert['peso'] = $peso;
+                        $insert['peso'] = trim($peso);
                     }else {
                         Log::info('Falta el peso', []);
                         $insert['peso'] = null;
                     }
                     if ($nacimiento) {
-                        $insert['nacimiento'] = $nacimiento;
+                        $insert['nacimiento'] = trim($nacimiento);
                     } else {
                         Log::info('Falta la fecha de nacimiento', []);
                         $insert['nacimiento'] = null;
                     }
                     if ($fallecimiento) {
-                        $insert['fallecimiento'] = $fallecimiento;
+                        $insert['fallecimiento'] = trim($fallecimiento);
                     }else {
                         Log::info('Falta la fecha de fallecimiento', []);
                         $insert['fallecimiento'] = null;
                     }
                     if ($tipo) {
-                        $insert['tipoJugador'] = $tipo;
+                        $insert['tipoJugador'] = trim($tipo);
                     } else {
                         Log::info('Falta el tipo de jugador', []);
                         $insert['tipoJugador'] = 'Delantero';
                         $success .= 'Le falta el tipo: '.$insert['apellido'].', '.$insert['nombre'].'<br>';
                     }
                     if ($pie) {
-                        $insert['pie'] = $pie;
+                        $insert['pie'] = trim($pie);
                     }
                     Log::info('Contenido de insert: ' . json_encode($insert));
 

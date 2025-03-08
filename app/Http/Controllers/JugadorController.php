@@ -1269,51 +1269,51 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
             // Insertar los datos de la persona
             if ($nombre) {
-                $insert['nombre'] = $nombre;
+                $insert['nombre'] = trim($nombre);
             } else {
                 Log::info('Falta el nombre', []);
                 $success .='Falta el nombre <br>';
             }
 
             if ($apellido) {
-                $insert['apellido'] = $apellido;
+                $insert['apellido'] = trim($apellido);
             } else {
                 Log::info('Falta el apellido', []);
                 $success .='Falta el apellido <br>';
             }
 
             if ($ciudad) {
-                $insert['ciudad'] = $ciudad;
+                $insert['ciudad'] = trim($ciudad);
             }
             if ($nacionalidad) {
-                $insert['nacionalidad'] = $nacionalidad;
+                $insert['nacionalidad'] = trim($nacionalidad);
             } else {
                 Log::info('Falta la nacionalidad', []);
                 $success .='Falta la nacionalidad <br>';
             }
             if ($altura) {
-                $insert['altura'] = $altura;
+                $insert['altura'] = trim($altura);
             }
             if ($peso) {
-                $insert['peso'] = $peso;
+                $insert['peso'] = trim($peso);
             }
             if ($nacimiento) {
-                $insert['nacimiento'] = $nacimiento;
+                $insert['nacimiento'] = trim($nacimiento);
             } else {
                 Log::info('Falta la fecha de nacimiento', []);
                 $success .='Falta la fecha de nacimiento <br>';
             }
             if ($fallecimiento) {
-                $insert['fallecimiento'] = $fallecimiento;
+                $insert['fallecimiento'] = trim($fallecimiento);
             }
             if ($tipo) {
-                $insert['tipoJugador'] = $tipo;
+                $insert['tipoJugador'] = trim($tipo);
             } else {
                 Log::info('Falta el tipo de jugador', []);
                 $success .='Falta el tipo de jugador <br>';
             }
             if ($pie) {
-                $insert['pie'] = $pie;
+                $insert['pie'] = trim($pie);
             }
 
             $request->session()->put('nombre_filtro_jugador', $apellido);
