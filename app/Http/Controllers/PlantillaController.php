@@ -686,7 +686,7 @@ class PlantillaController extends Controller
                         $insert['ciudad'] = null;
                     }
                     if ($nacionalidad) {
-                        $insert['nacionalidad'] = trim($nacionalidad);
+                        $insert['nacionalidad'] = preg_replace('/^[\pZ\pC]+|[\pZ\pC]+$/u', '', $nacionalidad);
                     } else {
                         Log::info('Falta la nacionalidad', []);
                         $insert['nacionalidad'] = null;

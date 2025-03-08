@@ -1286,7 +1286,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 $insert['ciudad'] = trim($ciudad);
             }
             if ($nacionalidad) {
-                $insert['nacionalidad'] = trim($nacionalidad);
+                $insert['nacionalidad'] = preg_replace('/^[\pZ\pC]+|[\pZ\pC]+$/u', '', $nacionalidad);
             } else {
                 Log::info('Falta la nacionalidad', []);
                 $success .='Falta la nacionalidad <br>';
