@@ -1075,6 +1075,313 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 $xpath = new \DOMXPath($dom);
             }
         } catch (Exception $ex) {
+            $htmlContent = '';
+        }
+        //Log::info('HTML: ' . print_r($xpath, true), []);
+
+
+        if ($htmlContent) {
+
+
+            $nombre = '';
+            $apellido = '';
+            $nacimiento = '';
+            $fallecimiento = '';
+            $ciudad = '';
+            $nacionalidad = '';
+            $tipo = '';
+            $altura = '';
+            $peso = '';
+
+            // Obtener el elemento h1 con la clase específica
+            $dtElements = $xpath->query('//h1[@class="data-header__headline-wrapper"]');
+
+            if ($dtElements->length > 0) {
+                $h1Element = $dtElements->item(0);
+
+                // Obtener el apellido desde el <strong>
+                $strongElement = $xpath->query('.//strong', $h1Element);
+
+                if ($strongElement->length > 0) {
+                    $apellido = trim($strongElement->item(0)->textContent);
+
+                    // Obtener el nombre eliminando el dorsal y el apellido
+                    $fullText = trim($h1Element->textContent);
+
+                    // Eliminar el número de camiseta (# y dígitos)
+                    $fullText = preg_replace('/^#\d+\s*/', '', $fullText);
+
+                    // Remover el apellido para obtener solo el nombre
+                    $nombre = trim(str_replace($apellido, '', $fullText));
+                } else {
+                    $nombre = trim($fullText);
+                    $apellido = '';
+                }
+            }
+            // Obtener la URL de la imagen (src)
+            $imgElements = $xpath->query('//img[@class="data-header__profile-image"]');
+
+            if ($imgElements->length > 0) {
+                $imageUrl = $imgElements->item(0)->getAttribute('src'); // Obtener el atributo 'src' de la imagen
+            } else {
+                $imageUrl = null; // Si no se encuentra la imagen
+            }
+            // Extraer la fecha de nacimiento
+            $nacimiento = $xpath->query('//span[contains(text(), "F. Nacim./Edad:")]/following-sibling::span[1]/a');
+            $nacimiento = $nacimiento->length > 0 ? trim($nacimiento->item(0)->textContent) : null;
+
+            // Si la fecha de nacimiento contiene la edad entre paréntesis, la eliminamos
+            if ($nacimiento) {
+                // Usamos una expresión regular para quitar la edad entre paréntesis
+                $nacimiento = preg_replace('/\s?\(\d+\)$/', '', $nacimiento);
+
+                // Asegurarse de que no haya caracteres adicionales y convertir la fecha
+                try {
+                    $nacimiento = Carbon::createFromFormat('d/m/Y', $nacimiento)->format('Y-m-d'); // Formato Y-m-d
+                } catch (\Carbon\Exceptions\InvalidFormatException $e) {
+                    // Si el formato no es válido, imprimir un error o manejar el caso
+                    Log::error("Fecha de nacimiento no válida: " . $nacimiento);
+                    $nacimiento = null; // O tomar un valor por defecto si es necesario
+                }
+            }
+
+            // Extraer lugar de nacimiento
+            $ciudad = $xpath->query('//span[contains(text(), "Lugar de nac.:")]/following-sibling::span[1]');
+            $ciudad = $ciudad->length > 0 ? trim($ciudad->item(0)->textContent) : null;
+
+            // Extraer nacionalidad
+            $nacionalidad = $xpath->query('//span[contains(text(), "Nacionalidad:")]/following-sibling::span[1]');
+            $nacionalidad = $nacionalidad->length > 0 ? trim($nacionalidad->item(0)->textContent) : null;
+
+            // Extraer fecha de fallecimiento
+            $fallecimiento = $xpath->query('//span[contains(text(), "Fecha de fallecimiento:")]/following-sibling::span[1]');
+            $fallecimiento = $fallecimiento->length > 0 ? trim($fallecimiento->item(0)->textContent) : null;
+
+            // Asegurarse de que no haya caracteres adicionales en la fecha y convertirla con Carbon
+            if ($fallecimiento) {
+                // Usamos una expresión regular para quitar la edad entre paréntesis en la fecha de fallecimiento
+                $fallecimiento = preg_replace('/\s?\(\d+\)$/', '', $fallecimiento);
+
+                try {
+                    $fallecimiento = Carbon::createFromFormat('d.m.Y', $fallecimiento)->format('Y-m-d'); // Formato Y-m-d
+                } catch (\Carbon\Exceptions\InvalidFormatException $e) {
+                    // Si el formato no es válido, imprimir un error o manejar el caso
+                    Log::error("Fecha de fallecimiento no válida: " . $fallecimiento);
+                    $fallecimiento = null; // O tomar un valor por defecto si es necesario
+                }
+            }
+
+
+            // Extraer altura
+            $altura = $xpath->query('//span[contains(text(), "Altura:")]/following-sibling::span[1]');
+            $altura = $altura->length > 0 ? trim($altura->item(0)->textContent) : null;
+            if ($altura) {
+                // Eliminar unidades de medida (como "m" o "cm") y limpiar espacios extra
+                $altura = preg_replace('/\s?m|cm/', '', $altura); // Eliminar 'm' o 'cm'
+                $altura = trim($altura); // Eliminar espacios adicionales
+
+                // Convertir a decimal, si el valor es numérico
+                if (is_numeric($altura)) {
+                    $altura = (float)$altura; // Convertir a decimal
+                }
+                else{
+                    $altura = null;
+                }
+            }
+
+
+
+            // Extraer posición
+            $posicion = $xpath->query('//span[contains(text(), "Posición:")]/following-sibling::span[1]');
+            $posicion = $posicion->length > 0 ? trim($posicion->item(0)->textContent) : null;
+            $arrPosicion = explode("-", $posicion);
+            $tipo = trim($arrPosicion[0]);
+            switch ($tipo) {
+                case 'Portero':
+                    $tipo = 'Arquero';
+                    break;
+                case 'Defensa':
+                    $tipo = 'Defensor';
+                    break;
+                case 'Medio campo':
+                    $tipo = 'Medio';
+                    break;
+                case 'Delantero':
+                    $tipo = 'Delantero';
+                    break;
+                default:
+                    $tipo = null;
+                    break;
+            }
+            // Extraer pie
+            $pie = $xpath->query('//span[contains(text(), "Pie:")]/following-sibling::span[1]');
+            $pie = $pie->length > 0 ? trim($pie->item(0)->textContent) : null;
+
+            switch (trim($pie)) {
+                case 'Derecho':
+                    $pie = 'Derecha';
+                    break;
+                case 'Izquierdo':
+                    $pie = 'Izquierda';
+                    break;
+                case 'Ambidiestro':
+                    $pie = 'Ambas';
+                    break;
+                default:
+                    $pie = null;
+                    break;
+
+            }
+
+            Log::info('Nacimiento: ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad.' - '.$altura.' - '.$tipo.' - '.$pie, []);
+
+            // Descarga y guarda la imagen si no es el avatar por defecto
+            if (!str_contains($imageUrl, 'default.jpg')) {
+                $client = new Client();
+                $response = $client->get($imageUrl);
+
+                if ($response->getStatusCode() === 200) {
+                    $imageData = $response->getBody()->getContents();
+                    $parsedUrl = parse_url($imageUrl);
+                    $pathInfo = pathinfo($parsedUrl['path']);
+                    $nombreArchivo = $pathInfo['filename'];
+                    $extension = $pathInfo['extension'];
+
+                    if (strrchr($nombreArchivo, '.') === '.') {
+                        $nombreArchivo = substr($nombreArchivo, 0, -1);
+                    }
+
+                    // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
+                    $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                    Log::info('URL de la foto: ' . $localFilePath, []);
+                    $insert['foto'] = "$nombreArchivo.$extension";
+
+                    file_put_contents($localFilePath, $imageData);
+                    Log::info('Foto subida', []);
+                } else {
+                    Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
+                    $success .='Foto no subida: ' . $fotoDiv[0]->getAttribute('alt').'<br>';
+                }
+            } else {
+                Log::info('No tiene foto: ' . $imageUrl, []);
+                $success .='No tiene foto: ' . $imageUrl.'<br>';
+            }
+
+            // Insertar los datos de la persona
+            if ($nombre) {
+                $insert['nombre'] = $nombre;
+            } else {
+                Log::info('Falta el nombre', []);
+                $success .='Falta el nombre <br>';
+            }
+
+            if ($apellido) {
+                $insert['apellido'] = $apellido;
+            } else {
+                Log::info('Falta el apellido', []);
+                $success .='Falta el apellido <br>';
+            }
+
+            if ($ciudad) {
+                $insert['ciudad'] = $ciudad;
+            }
+            if ($nacionalidad) {
+                $insert['nacionalidad'] = $nacionalidad;
+            } else {
+                Log::info('Falta la nacionalidad', []);
+                $success .='Falta la nacionalidad <br>';
+            }
+            if ($altura) {
+                $insert['altura'] = $altura;
+            }
+            if ($peso) {
+                $insert['peso'] = $peso;
+            }
+            if ($nacimiento) {
+                $insert['nacimiento'] = $nacimiento;
+            } else {
+                Log::info('Falta la fecha de nacimiento', []);
+                $success .='Falta la fecha de nacimiento <br>';
+            }
+            if ($fallecimiento) {
+                $insert['fallecimiento'] = $fallecimiento;
+            }
+            if ($tipo) {
+                $insert['tipoJugador'] = $tipo;
+            } else {
+                Log::info('Falta el tipo de jugador', []);
+                $success .='Falta el tipo de jugador <br>';
+            }
+            if ($pie) {
+                $insert['pie'] = $pie;
+            }
+
+            $request->session()->put('nombre_filtro_jugador', $apellido);
+
+            try {
+                $persona = Persona::create($insert);
+                $persona->jugador()->create($insert);
+            } catch (QueryException $ex) {
+                try {
+                    $persona = Persona::where('nombre', '=', $insert['nombre'])
+                        ->where('apellido', '=', $insert['apellido'])
+                        ->where('nacimiento', '=', $insert['nacimiento'])
+                        ->first();
+
+                    if (!empty($persona)) {
+                        $persona->update($insert);
+                        $persona->jugador()->create($insert);
+                    }
+                } catch (QueryException $ex) {
+                    $ok = 0;
+                    $errorCode = $ex->errorInfo[1];
+
+                    if ($errorCode == 1062) {
+                        $error = 'Jugador repetido';
+                    }
+                }
+            }
+        } else {
+            Log::info('No se encontró la URL: ' . $url, []);
+            $error = 'No se encontró la URL: ' . $url;
+        }
+
+        if ($ok) {
+            DB::commit();
+            $respuestaID = 'success';
+            $respuestaMSJ = $success;
+        } else {
+            DB::rollback();
+            $respuestaID = 'error';
+            $respuestaMSJ=$error.'<br>'.$success;
+        }
+
+        return redirect()->route('jugadores.index')->with($respuestaID, $respuestaMSJ);
+    }
+
+    public function importarProcess_old2(Request $request)
+    {
+        set_time_limit(0);
+        $url = $request->get('url');
+        $ok = 1;
+        DB::beginTransaction();
+        $success='';
+        $html = '';
+        try {
+            if ($url) {
+                // Obtener el contenido de la URL
+                //$htmlContent = file_get_contents($url);
+                $htmlContent = $this->getHtmlContent($url);
+                // Crear un nuevo DOMDocument
+                $dom = new \DOMDocument();
+                libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                $dom->loadHTML($htmlContent);
+                libxml_clear_errors();
+
+                // Crear un nuevo objeto XPath
+                $xpath = new \DOMXPath($dom);
+            }
+        } catch (Exception $ex) {
             $html = '';
         }
 
