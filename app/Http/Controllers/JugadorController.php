@@ -2330,7 +2330,7 @@ group by tecnico_id
             ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
         );*/
 
-        $existenSimilares = Persona::where(function ($query) use ($personas) {
+        /*$existenSimilares = Persona::where(function ($query) use ($personas) {
             foreach ($personas as $persona) {
                 $query->orWhere(function ($q) use ($persona) {
                     $q->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
@@ -2351,12 +2351,12 @@ group by tecnico_id
                         }
                     });
             })
-            ->exists(); // Devuelve true si hay al menos un similar
+            ->exists(); // Devuelve true si hay al menos un similar*/
 
         // Filtrar las personas con nombres y apellidos similares
         $personasSimilares = collect();
 
-        if ($existenSimilares) {
+        //if ($existenSimilares) {
 
 
 
@@ -2391,10 +2391,10 @@ group by tecnico_id
 
             // Eliminar duplicados de la colección de resultados
             //$personasSimilares = $personasSimilares->unique('id');
-        }
+        /*}
         else{
             $personas = Persona::where('nombre','=','anacleto')->orderBy('apellido','ASC')->paginate(50);
-        }
+        }*/
 
 
 
