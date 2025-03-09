@@ -74,6 +74,7 @@
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
+                        <a href="{{route('jugadores.reasignar', $jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
                     </div>
 
                 </td>
