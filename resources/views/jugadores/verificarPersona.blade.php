@@ -37,11 +37,11 @@
                 <a class="nav-link active" id="principal-tab" data-toggle="tab" href="#principal" role="tab" aria-controls="principal" aria-selected="true">Similares</a>
             </li>
 
-            <!--<li class="nav-item">
-                <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Similares</a>
+            <li class="nav-item">
+                <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Sin nombre/apellido</a>
             </li>
 
-            <li class="nav-item">
+            <!--<li class="nav-item">
                 <a class="nav-link" id="sin-tab" data-toggle="tab" href="#sin" role="tab" aria-controls="sin" aria-selected="false">Sin nacimiento</a>
             </li>-->
 
@@ -144,6 +144,85 @@
             </div>
             </div>
 
+            <div role="tabpanel" class="tab-pane" id="tres">
+
+                <div class="row">
+
+                    <div class="form-group col-md-12">
+                        <table class="table">
+                            <thead>
+                            <th></th>
+                            <th>Id</th>
+                            <th>Apellido</th>
+                            <th>Nombre</th>
+
+                            <th>Edad</th>
+                            <th>Jugador</th>
+                            <th>Técnico</th>
+
+                            <th>Arbitro</th>
+                            <th></th>
+                            </thead>
+                            @php
+                                $i = 0;
+                            @endphp
+                            @foreach($personasSinNombreApellido as $sinNombreApellido)
+                                @php
+                                    $i++;
+
+                //dd($sinNombreApellido);
+                                @endphp
+
+                                <tr>
+                                    <td>{{$i}} @if($sinNombreApellido->foto)
+                                            <img id="original" class="imgCircle" src="{{ url('images/'.$sinNombreApellido->foto) }}" >
+                                        @else
+                                            @if($sinNombreApellido->jugador)
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                            @elseif($sinNombreApellido->tecnico)
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                                            @elseif($sinNombreApellido->arbitro)
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
+                                            @endif
+                                        @endif
+                                        <img id="original" src="{{ $sinNombreApellido->bandera_url }}" alt="{{ $sinNombreApellido->nacionalidad }}">
+                                    </td>
+                                    <td>  {{$sinNombreApellido->id}}</td>
+                                    <td>{{$sinNombreApellido->apellido}}</td>
+                                    <td>{{$sinNombreApellido->nombre}}</td>
+
+
+                                    <td>{{($sinNombreApellido->nacimiento)?$sinNombreApellido->getAgeWithDateAttribute():''}}</td>
+                                    <td>{{($sinNombreApellido->jugador)?$sinNombreApellido->jugador->id:''}}</td>
+                                    <td>{{($sinNombreApellido->tecnico)?$sinNombreApellido->tecnico->id:''}}</td>
+                                    <td>{{($sinNombreApellido->arbitro)?$sinNombreApellido->arbitro->id:''}}</td>
+                                    <td>
+                                        <div class="d-flex" style="align-items: center;">
+                                            @if($sinNombreApellido->jugador)
+                                                <a href="{{route('jugadores.reasignar', $sinNombreApellido->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
+                                                <a href="{{route('jugadores.edit', $sinNombreApellido->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+
+                                                <form action="{{ route('jugadores.destroy', $sinNombreApellido->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
+                                                    <input type="hidden" name="_method" value="DELETE">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                                    <button class="btn btn-danger m-1">Eliminar</button>
+                                                </form>
+                                            @elseif($sinNombreApellido->tecnico)
+                                                <a href="{{route('tecnicos.edit', $sinNombreApellido->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @elseif($sinNombreApellido->arbitro)
+                                                <a href="{{route('arbitros.edit', $sinNombreApellido->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @endif
+
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </table>
+                    </div>
+
+
+                </div>
+            </div>
 
 
     </div>

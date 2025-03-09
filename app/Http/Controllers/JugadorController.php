@@ -2267,140 +2267,146 @@ group by tecnico_id
     }
 
 
-    public function verificarPersonas(Request $request)
-    {
-        set_time_limit(0); // Aumentamos tiempo solo para pruebas
-        $verificados= ($request->query('verificados'))?1:0;
-        $total= ($request->query('total'))?1:0;
-        // Obtener todas las personas de la base de datos
-        /*if ($verificados){
-            $personas = Persona::orderBy('apellido','ASC')->get();
-        }
-        else{
-            $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
-        }*/
+        public function verificarPersonas(Request $request)
+        {
+            set_time_limit(0); // Aumentamos tiempo solo para pruebas
+            $verificados= ($request->query('verificados'))?1:0;
+            $total= ($request->query('total'))?1:0;
+            // Obtener todas las personas de la base de datos
+            /*if ($verificados){
+                $personas = Persona::orderBy('apellido','ASC')->get();
+            }
+            else{
+                $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
+            }*/
 
-        $personas = Persona::orderBy('apellido','ASC')->paginate(300);
+            $personas = Persona::orderBy('apellido','ASC')->paginate(300);
 
-        // Separar personas con y sin fecha de nacimiento
-        /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
-            return !is_null($persona->nacimiento);
-        });*/
+            // Separar personas con y sin fecha de nacimiento
+            /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
+                return !is_null($persona->nacimiento);
+            });*/
 
-        /*$personasSinFechaNacimiento = $personas->filter(function ($persona) {
-            return is_null($persona->nacimiento);
-        });*/
+            /*$personasSinFechaNacimiento = $personas->filter(function ($persona) {
+                return is_null($persona->nacimiento);
+            });*/
 
-        /*$personasSinFoto = $personas->filter(function ($persona) {
-            return is_null($persona->foto);
-        });*/
-        $personasSinFoto =array();
-        // Agrupar personas por fecha de nacimiento
-        //$personasPorFechaNacimiento = $personasConFechaNacimiento->groupBy('nacimiento');
+            /*$personasSinFoto = $personas->filter(function ($persona) {
+                return is_null($persona->foto);
+            });*/
+            $personasSinFoto =array();
+            // Agrupar personas por fecha de nacimiento
+            //$personasPorFechaNacimiento = $personasConFechaNacimiento->groupBy('nacimiento');
 
-        // Colección para almacenar personas con apellidos similares
-        //$resultados = collect();
+            // Colección para almacenar personas con apellidos similares
+            //$resultados = collect();
 
-        // Verificar personas con la misma fecha de nacimiento y apellidos similares
-        /*foreach ($personasPorFechaNacimiento as $grupo) {
-            foreach ($grupo as $persona) {
-                $similares = $grupo->filter(function ($item) use ($persona) {
-                    // Verificar si el apellido de la persona actual es similar al de las otras personas
-                    return $item->id !== $persona->id && $this->sonApellidosSimilares($item->apellido, $persona->apellido);
-                });
+            // Verificar personas con la misma fecha de nacimiento y apellidos similares
+            /*foreach ($personasPorFechaNacimiento as $grupo) {
+                foreach ($grupo as $persona) {
+                    $similares = $grupo->filter(function ($item) use ($persona) {
+                        // Verificar si el apellido de la persona actual es similar al de las otras personas
+                        return $item->id !== $persona->id && $this->sonApellidosSimilares($item->apellido, $persona->apellido);
+                    });
 
-                if ($similares->isNotEmpty()) {
-                    // Si hay personas con apellido similar, agregar la persona actual y los similares a los resultados
-                    $resultados = $resultados->merge([$persona])->merge($similares);
+                    if ($similares->isNotEmpty()) {
+                        // Si hay personas con apellido similar, agregar la persona actual y los similares a los resultados
+                        $resultados = $resultados->merge([$persona])->merge($similares);
+                    }
                 }
             }
-        }
 
-        // Eliminar duplicados
-        $resultados = $resultados->unique('id');
+            // Eliminar duplicados
+            $resultados = $resultados->unique('id');
 
-        // Aplicar paginación manual
-        $pagina = request()->input('page', 1);
-        $porPagina = 50; // Define cuántos elementos mostrar por página
-        $paginadosResultados = new LengthAwarePaginator(
-            $resultados->forPage($pagina, $porPagina),
-            $resultados->count(),
-            $porPagina,
-            $pagina,
-            ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
-        );*/
+            // Aplicar paginación manual
+            $pagina = request()->input('page', 1);
+            $porPagina = 50; // Define cuántos elementos mostrar por página
+            $paginadosResultados = new LengthAwarePaginator(
+                $resultados->forPage($pagina, $porPagina),
+                $resultados->count(),
+                $porPagina,
+                $pagina,
+                ['path' => request()->url(),  'query' => ['verificados' => $verificados, 'total' => $total] ]// ⬅ Agregar checkboxes en paginación]
+            );*/
 
-        /*$existenSimilares = Persona::where(function ($query) use ($personas) {
-            foreach ($personas as $persona) {
-                $query->orWhere(function ($q) use ($persona) {
-                    $q->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
-                        ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
-                        ->where('id', '!=', $persona->id);
-                });
-            }
-        })
-            ->whereNotExists(function ($query) use ($personas) {
-                $query->select(DB::raw(1))
-                    ->from('personas_verificadas')
-                    ->where(function ($q) use ($personas) {
-                        foreach ($personas as $persona) {
-                            $q->orWhereRaw(
-                                '(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)',
-                                [$persona->id, $persona->id]
-                            );
-                        }
+            /*$existenSimilares = Persona::where(function ($query) use ($personas) {
+                foreach ($personas as $persona) {
+                    $query->orWhere(function ($q) use ($persona) {
+                        $q->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
+                            ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
+                            ->where('id', '!=', $persona->id);
                     });
+                }
             })
-            ->exists(); // Devuelve true si hay al menos un similar*/
-
-        // Filtrar las personas con nombres y apellidos similares
-        $personasSimilares = collect();
-
-        //if ($existenSimilares) {
-
-
-
-            foreach ($personas as $persona) {
-                // Filtramos personas por apellido y nombre similares
-                $similares = Persona::where(function ($query) use ($persona) {
-                    $query->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
-                        ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
-                        ->where('id', '!=', $persona->id); // Evitar que se compare la persona consigo misma
+                ->whereNotExists(function ($query) use ($personas) {
+                    $query->select(DB::raw(1))
+                        ->from('personas_verificadas')
+                        ->where(function ($q) use ($personas) {
+                            foreach ($personas as $persona) {
+                                $q->orWhereRaw(
+                                    '(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)',
+                                    [$persona->id, $persona->id]
+                                );
+                            }
+                        });
                 })
-                    ->whereNotExists(function ($query) use ($persona) {
-                        // Evitar personas ya verificadas
-                        $query->select(DB::raw(1))
-                            ->from('personas_verificadas')
-                            ->whereRaw('(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)', [$persona->id, $persona->id]);
+                ->exists(); // Devuelve true si hay al menos un similar*/
+
+            // Filtrar las personas con nombres y apellidos similares
+            $personasSimilares = collect();
+
+            //if ($existenSimilares) {
+
+
+
+                foreach ($personas as $persona) {
+                    // Filtramos personas por apellido y nombre similares
+                    $similares = Persona::where(function ($query) use ($persona) {
+                        $query->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
+                            ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
+                            ->where('id', '!=', $persona->id); // Evitar que se compare la persona consigo misma
                     })
-                    ->get();
+                        ->whereNotExists(function ($query) use ($persona) {
+                            // Evitar personas ya verificadas
+                            $query->select(DB::raw(1))
+                                ->from('personas_verificadas')
+                                ->whereRaw('(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)', [$persona->id, $persona->id]);
+                        })
+                        ->get();
 
-                // Si se encuentran personas similares, agregamos a los resultados
-                if ($similares->isNotEmpty()) {
-                    $personasSimilares = $personasSimilares->merge([$persona]); // Agregar la persona principal
+                    // Si se encuentran personas similares, agregamos a los resultados
+                    if ($similares->isNotEmpty()) {
+                        $personasSimilares = $personasSimilares->merge([$persona]); // Agregar la persona principal
 
-                    $similares = $similares->map(function ($simil) use ($persona) {
-                        // Agregar el campo simil_id a cada objeto Persona
-                        $simil->simil_id = $persona->id;
-                        return $simil;
-                    });
+                        $similares = $similares->map(function ($simil) use ($persona) {
+                            // Agregar el campo simil_id a cada objeto Persona
+                            $simil->simil_id = $persona->id;
+                            return $simil;
+                        });
 
-                    $personasSimilares = $personasSimilares->merge($similares); // Agregar los similares con estructura adecuada
+                        $personasSimilares = $personasSimilares->merge($similares); // Agregar los similares con estructura adecuada
+                    }
                 }
-            }
 
-            // Eliminar duplicados de la colección de resultados
-            //$personasSimilares = $personasSimilares->unique('id');
-        /*}
-        else{
-            $personas = Persona::where('nombre','=','anacleto')->orderBy('apellido','ASC')->paginate(50);
-        }*/
+                // Eliminar duplicados de la colección de resultados
+                //$personasSimilares = $personasSimilares->unique('id');
+            /*}
+            else{
+                $personas = Persona::where('nombre','=','anacleto')->orderBy('apellido','ASC')->paginate(50);
+            }*/
+
+            // Obtener personas sin nombre y/o sin apellido
+            $personasSinNombreApellido = Persona::whereNull('nombre')
+                ->orWhere('nombre', '')
+                ->orWhereNull('apellido')
+                ->orWhere('apellido', '')
+                ->orderBy('apellido', 'ASC')
+                ->get();
 
 
-
-
-        return view('jugadores.verificarPersona', [ 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas]);
-    }
+            return view('jugadores.verificarPersona', [ 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas, 'personasSinNombreApellido' => $personasSinNombreApellido]);
+        }
 
 
     public function verificarSimilitud(Request $request)
