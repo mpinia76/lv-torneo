@@ -394,7 +394,7 @@ class PlantillaController extends Controller
 
         return $response;
     }
-    public function importarProcess(Request $request)
+    public function importarProcess_new(Request $request)
     {
         //dd($request);
         set_time_limit(0);
@@ -809,7 +809,7 @@ class PlantillaController extends Controller
         return redirect()->route('plantillas.edit', ['plantilla' => $id])->with($respuestaID, $respuestaMSJ);
     }
 
-    public function importarProcess_old(Request $request)
+    public function importarProcess(Request $request)
     {
         //dd($request);
         set_time_limit(0);

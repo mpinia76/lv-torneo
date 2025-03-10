@@ -1052,7 +1052,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
         return $response;
     }
 
-    public function importarProcess(Request $request)
+    public function importarProcess_new(Request $request)
     {
         set_time_limit(0);
         $url = $request->get('url');
@@ -1359,7 +1359,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
         return redirect()->route('jugadores.index')->with($respuestaID, $respuestaMSJ);
     }
 
-    public function importarProcess_old2(Request $request)
+    public function importarProcess(Request $request)
     {
         set_time_limit(0);
         $url = $request->get('url');
