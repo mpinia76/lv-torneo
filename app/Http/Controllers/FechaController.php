@@ -6807,7 +6807,7 @@ return $string;
                                 if (!empty($jugador['dorsal'])) {
 
                                     $plantillaJugador = PlantillaJugador::wherein('plantilla_id', explode(',', $arrplantillas))->distinct()->where('dorsal', '=', $jugador['dorsal'])->first();
-                                    $sinDorsal = '';
+                                    $sinDorsal = ' OJO!!! ';
                                 } else {
                                     //print_r($jugador);
                                     $plantillaJugador = '';
