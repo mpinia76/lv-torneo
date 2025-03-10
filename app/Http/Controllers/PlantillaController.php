@@ -815,7 +815,7 @@ class PlantillaController extends Controller
         set_time_limit(0);
         $url2 = $request->get('url2');
         if ($url2){
-            $this->importarProcess_new($request);
+           return $this->importarProcess_new($request);
         }
         $url = $request->get('url');
         $id = $request->get('plantilla_id');
