@@ -41,6 +41,8 @@
                 <?php echo e(Form::text('url', '', ['class' => 'form-control'])); ?>
 
             </div>
+        </div>
+        <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-6">
 
                 <?php echo e(Form::label('url2', 'Transfermarkt')); ?>
