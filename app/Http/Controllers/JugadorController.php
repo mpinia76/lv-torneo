@@ -1055,7 +1055,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
     public function importarProcess_new(Request $request)
     {
         set_time_limit(0);
-        $url = $request->get('url');
+        $url = $request->get('url2');
         $ok = 1;
         DB::beginTransaction();
         $success='';
