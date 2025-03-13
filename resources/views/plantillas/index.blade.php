@@ -61,7 +61,11 @@
 
                         <a href="{{route('plantillas.edit', $plantilla->id)}}" class="btn btn-primary m-1">Editar</a>
 
-
+                        <form action="{{ route('plantillas.destroy', $plantilla->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
+                            <input type="hidden" name="_method" value="DELETE">
+                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <button class="btn btn-danger m-1">Eliminar</button>
+                        </form>
 
                     </div>
 

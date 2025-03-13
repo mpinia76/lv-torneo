@@ -344,7 +344,13 @@ class PlantillaController extends Controller
      */
     public function destroy($id)
     {
-        //
+
+        $plantilla = Plantilla::find($id);
+        PlantillaJugador::where('plantilla_id',"$id")->delete();
+        $grupo_id = $plantilla->grupo->id;
+        $plantilla->delete();
+        return redirect()->route('plantillas.index', array('grupoId' => $grupo_id))->with('success','Registro eliminado satisfactoriamente');
+
     }
 
     public function importar(Request $request)
