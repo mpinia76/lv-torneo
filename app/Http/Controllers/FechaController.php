@@ -539,23 +539,29 @@ class FechaController extends Controller
 
                 $golesL = null;
                 $golesV = null;
-
+                /*echo "<pre>";
+                print_r($partidos);
+                echo "</pre>";*/
                 //$grupo_id=intval($importData[1]);
+                $grupoId = $request->get('grupo_id');
                 if($numero){
-                    foreach ($partidos as $partido) {
-                        $dia =$partido['fecha'].' '.$partido['fecha'];
+                    foreach ($partidos as $index => $partido) {
+                        $dia =$partido['fecha'].' '.$partido['hora'];
                         $strEquipoL = trim($partido['equipo1']);
                         $golesL = intval($partido['marcador']['gl']);
                         $golesV = intval($partido['marcador']['gv']);
+                        $penalesL = intval($partido['marcador']['pl']);
+                        $penalesV = intval($partido['marcador']['pv']);
                         $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->first();
 
                         if (!$equipol){
                             Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
-                            $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
+                            $error .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
+                            $ok=0;
                         }
                         else{
-                            $grupo_id = $request->get('grupo_id');
-                            $grupo=Grupo::findOrFail($grupo_id);
+
+                            $grupo=Grupo::findOrFail($grupoId);
                             $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
                             $arrgrupos='';
                             foreach ($grupos as $grupo){
@@ -563,75 +569,113 @@ class FechaController extends Controller
                             }
 
 
-                            $plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipol->id)->get();
-                            if (!$plantilla){
-                                Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
-                                $success .='Equipo sin plantilla: '.$strEquipoL.'<br>';
+                            $plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipol->id)->first();
+                           // dd($plantilla);
+
+                            if (!$plantilla) {
+
+                                $error .='Equipo sin plantilla: '.$strEquipoL.'<br>';
+                                $ok=0;
                             }
                             else{
+                                $grupo_id = $plantilla->grupo->id;
                                 $strEquipoV = trim($partido['equipo2']);
                                 $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
 
                                 if (!$equipoV){
                                     Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
-                                    $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
+                                    $error .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV.'<br>';
+                                    $ok=0;
                                 }
                                 else{
-                                    $nro = str_replace('. Jornada', '', $numero); // Elimina ". Jornada"
-                                    $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
+                                    // Solo calcular la jornada si $numero contiene "Grupo"
+                                    $fechaNumero = $numero;
+                                    if (str_contains($numero, 'Grupo')) {
 
-                                    $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
+                                        // Obtener la cantidad de equipos en el grupo
+                                        $cantidadEquipos = Plantilla::where('grupo_id', $grupo_id)->count();
 
-                                    try {
 
-                                        if(!$fecha){
+                                        if ($cantidadEquipos > 0) {
+                                            // En cada jornada juegan la mitad de los equipos
+                                            $partidosPorJornada = $cantidadEquipos / 2;
 
-                                            $data1=array(
+                                            // Si la cantidad de equipos es impar, ajustar
+                                            if ($cantidadEquipos % 2 != 0) {
+                                                $partidosPorJornada = ($cantidadEquipos - 1) / 2;
+                                            }
 
-                                                'numero'=>$nro,
-                                                'grupo_id'=>$grupo_id
-                                            );
-
-                                            $fecha = fecha::create($data1);
-
+                                            $fechaNumero = intval($index / $partidosPorJornada) + 1;
 
                                         }
-                                        $lastid=$fecha->id;
+                                    }
+                                    $plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipoV->id)->first();
+                                    //dd($plantilla);
+                                    if (!$plantilla) {
 
+                                        $error .='Equipo sin plantilla: '.$strEquipoV.'<br>';
+                                        $ok=0;
+                                    }
+                                    else{
+                                        $nro = str_replace('. Jornada', '', $fechaNumero); // Elimina ". Jornada"
+                                        $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
 
-                                        $data2=array(
-                                            'fecha_id'=>$lastid,
-                                            'dia'=>$dia,
-                                            'equipol_id'=>$equipol->id,
-                                            'equipov_id'=>$equipoV->id,
-                                            'golesl'=>$golesL,
-                                            'golesv'=>$golesV
-                                        );
-                                        $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$equipol->id")->where('equipov_id','=',"$equipoV->id")->first();
+                                        $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
+
                                         try {
-                                            if (!empty($partido)){
 
-                                                $partido->update($data2);
+                                            if(!$fecha){
+
+                                                $data1=array(
+
+                                                    'numero'=>$nro,
+                                                    'grupo_id'=>$grupo_id
+                                                );
+                                                //Log::debug(print_r($data1),[]);
+                                                $fecha = fecha::create($data1);
+
+
                                             }
-                                            else{
-                                                $partido=Partido::create($data2);
+                                            $lastid=$fecha->id;
+
+
+                                            $data2=array(
+                                                'fecha_id'=>$lastid,
+                                                'dia'=>$dia,
+                                                'equipol_id'=>$equipol->id,
+                                                'equipov_id'=>$equipoV->id,
+                                                'golesl'=>$golesL,
+                                                'golesv'=>$golesV,
+                                                'penalesl'=>$penalesL,
+                                                'penalesv'=>$penalesV
+                                            );
+                                            $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$equipol->id")->where('equipov_id','=',"$equipoV->id")->first();
+                                            try {
+                                                if (!empty($partido)){
+
+                                                    $partido->update($data2);
+                                                }
+                                                else{
+                                                    $partido=Partido::create($data2);
+                                                }
+
+
+                                            }catch(QueryException $ex){
+                                                $error = $ex->getMessage();
+                                                $ok=0;
+                                                continue;
                                             }
 
 
-                                        }catch(QueryException $ex){
+
+                                        }catch(Exception $e){
+                                            //if email or phone exist before in db redirect with error messages
                                             $error = $ex->getMessage();
                                             $ok=0;
                                             continue;
                                         }
-
-
-
-                                    }catch(Exception $e){
-                                        //if email or phone exist before in db redirect with error messages
-                                        $error = $ex->getMessage();
-                                        $ok=0;
-                                        continue;
                                     }
+
 
                                 }
                             }
@@ -653,6 +697,22 @@ class FechaController extends Controller
 
             }
         }
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ=$success;
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('fechas.index', array('grupoId' => $grupoId))->with($respuestaID,$respuestaMSJ);
     }
 
     public function importprocess(Request $request)
