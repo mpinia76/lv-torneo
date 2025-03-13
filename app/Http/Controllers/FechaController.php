@@ -655,7 +655,7 @@ class FechaController extends Controller
                                                 'penalesl'=>$penalesL,
                                                 'penalesv'=>$penalesV
                                             );
-                                            $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$equipol->id")->where('equipov_id','=',"$equipoV->id")->first();
+                                            $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$idLocal")->where('equipov_id','=',"$idVisitante")->first();
                                             try {
                                                 if (!empty($partido)){
 
