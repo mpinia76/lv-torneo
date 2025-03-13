@@ -338,10 +338,336 @@ class FechaController extends Controller
         return view('fechas.importincidencias', compact('grupo'));
     }
 
+    public function formatearMarcador($marcador)
+    {
+        // Expresión regular para capturar los goles en tiempo reglamentario, los goles de los dos tiempos y los penales si están presentes
+        $pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?/';
+
+        // Intentamos hacer el match con la cadena
+        $matches = [];
+        preg_match($pattern, $marcador, $matches);
+
+        if (empty($matches)) {
+            // Si no hay coincidencias, no es un marcador válido.
+            return null;
+        }
+
+        // Extraemos los goles locales y visitantes del marcador
+        $golesLocales = (int) $matches[1];
+        $golesVisitantes = (int) $matches[2];
+
+        // Extraemos los goles del primer tiempo
+        $golesPrimerTiempoLocales = (int) $matches[3];
+        $golesPrimerTiempoVisitantes = (int) $matches[4];
+
+        // Verificamos si hay un segundo tiempo (si es opcional)
+        $golesSegundoTiempoLocales = isset($matches[5]) ? (int) $matches[5] : $golesLocales;
+        $golesSegundoTiempoVisitantes = isset($matches[6]) ? (int) $matches[6] : $golesVisitantes;
+
+        // Comprobamos si hay penales y los extraemos
+        $penalesLocales = $penalesVisitantes = null; // Inicializamos en 0 por defecto
+        if (isset($matches[7]) && $matches[7] == 'pn.') {
+            // Si hay penales, extraemos los goles de los penales
+            $penales = explode(':', $matches[1] . ':' . $matches[2]); // Usamos los goles del marcador para los penales
+            $penalesLocales = (int) $penales[0];
+            $penalesVisitantes = (int) $penales[1];
+            $golesLocales = (int) $matches[5];
+            $golesVisitantes = (int) $matches[6];
+        }
+        // Devolvemos un arreglo con todos los resultados
+        return [
+            'gl' => $golesLocales,
+            'gv' => $golesVisitantes,
+
+            'pl' => $penalesLocales,
+            'pv' => $penalesVisitantes
+        ];
+
+
+    }
+
+    public function importprocess_new(Request $request)
+    {
+        $url2 = $request->get('url2');
+        $ok=1;
+        DB::beginTransaction();
+        $error='';
+        $success='';
+        $html2='';
+        try {
+            if ($url2){
+
+
+                //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
+                $html2 = $this->getHtmlContent($url2);
+            }
+
+
+        }
+        catch (Exception $ex) {
+            $html2='';
+        }
+        if ($html2) {
+            // Crea un nuevo DOMDocument
+            $dom = new \DOMDocument();
+
+            // Evita advertencias de HTML mal formado
+            libxml_use_internal_errors(true);
+
+            // Carga el HTML en el DOMDocument
+            $dom->loadHTML($html2);
+
+            // Restaura la gestión de errores de libxml
+            libxml_clear_errors();
+
+            // Intenta cargar el HTML recuperado
+            if ($dom->loadHTML($html2)) {
+                $xpath = new \DOMXPath($dom);
+
+                // Buscar el `option` que tiene el atributo `selected`
+                $selectedOption = $xpath->query('//select[@name="phase"]/option[@selected]');
+
+                if ($selectedOption->length > 0) {
+                    $numero = trim($selectedOption[0]->textContent);
+
+
+                } else {
+                    // Buscar el `option` que tiene el atributo `selected`
+                    $selectedOption = $xpath->query('//select[@name="runde"]/option[@selected]');
+                    $numero = trim($selectedOption[0]->textContent);
+                }
+                $matches = $xpath->query('//table[@class="standard_tabelle"]');
+
+                $pattern = '/([IV]):\s*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/'; // Expresión regular para extraer las fechas
+
+// Array para almacenar los partidos
+                $partidos = [];
+
+
+                foreach ($matches as $match) {
+                    // Obtener todas las filas dentro de la tabla
+                    $rows = $match->getElementsByTagName('tr');
+
+                    foreach ($rows as $row) {
+                        // Obtener todas las celdas dentro de la fila
+                        $cols = $row->getElementsByTagName('td');
+
+                        if ($cols->length > 0) { // Verifica que haya datos en la fila
+
+                            if ($cols->length == 7) { // Fila con información del partido (equipos y fecha/hora)
+                                if (trim($cols[0]->textContent)!=''){
+                                    $fecha = trim($cols[0]->textContent);
+                                    list($dia, $mes, $anio) = explode('.', $fecha);
+
+// Crear la variable para la fecha en el formato "yyyy-mm-dd"
+                                    $fechaFormateada = "$anio-$mes-$dia";
+                                }
+                                $hora = trim($cols[1]->textContent);
+                                $equipo1 = trim($cols[2]->textContent);
+                                $equipo2 = trim($cols[4]->textContent);
+                                $marcador = $this->formatearMarcador(trim($cols[5]->textContent));
+                                // Almacenar el partido con la fecha y equipos
+                                $partidos[] = [
+                                    'fecha' => $fechaFormateada ,
+                                    'hora' => $hora,
+                                    'equipo1' => $equipo1,
+                                    'equipo2' => $equipo2,
+                                    'marcador' => $marcador,
+                                ];
+                            }
+                            if ($cols->length == 6) { // Fila con información del partido (equipos y fecha/hora)
+
+                                $equipo1 = trim($cols[1]->textContent);
+                                $equipo2 = trim($cols[3]->textContent);
+                                $marcador = $this->formatearMarcador(trim($cols[4]->textContent));
+
+
+                                // Almacenar el partido con la fecha y equipos
+                                $partidos[] = [
+
+                                    'equipo1' => $equipo1,
+                                    'equipo2' => $equipo2,
+                                    'marcador' => $marcador,
+                                ];
+                            }
+                            else{
+                                foreach ($cols as $col) {
+                                    $textoColumna = trim($col->textContent);
+
+                                    if (strpos($textoColumna, 'I:') === 0) {
+
+                                        $fechaHora = substr($textoColumna, 3); // Extraemos la fecha de ida
+                                        // Separar fecha y hora
+                                        list($fecha, $hora) = explode(' ', $fechaHora);
+
+// Separar los componentes de la fecha (dd.mm.yyyy)
+                                        list($dia, $mes, $anio) = explode('.', $fecha);
+
+// Crear la variable para la fecha en el formato "yyyy-mm-dd"
+                                        $fechaFormateada = "$anio-$mes-$dia";
+
+// Ahora tenemos la fecha y la hora separadas
+                                        $horaFormateada = $hora;
+
+                                        $partidos[count($partidos) - 2]['fecha'] = $fechaFormateada;
+                                        $partidos[count($partidos) - 2]['hora'] = $horaFormateada;
+                                    }
+                                    if (strpos($textoColumna, 'V:') === 0) {
+
+                                        $fechaHora = substr($textoColumna, 3); // Extraemos la fecha de ida
+                                        // Separar fecha y hora
+                                        list($fecha, $hora) = explode(' ', $fechaHora);
+
+// Separar los componentes de la fecha (dd.mm.yyyy)
+                                        list($dia, $mes, $anio) = explode('.', $fecha);
+
+// Crear la variable para la fecha en el formato "yyyy-mm-dd"
+                                        $fechaFormateada = "$anio-$mes-$dia";
+
+// Ahora tenemos la fecha y la hora separadas
+                                        $horaFormateada = $hora;
+
+                                        $partidos[count($partidos) - 1]['fecha'] = $fechaFormateada;
+                                        $partidos[count($partidos) - 1]['hora'] = $horaFormateada;
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $golesL = null;
+                $golesV = null;
+
+                //$grupo_id=intval($importData[1]);
+                if($numero){
+                    foreach ($partidos as $partido) {
+                        $dia =$partido['fecha'].' '.$partido['fecha'];
+                        $strEquipoL = trim($partido['equipo1']);
+                        $golesL = intval($partido['marcador']['gl']);
+                        $golesV = intval($partido['marcador']['gv']);
+                        $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->first();
+
+                        if (!$equipol){
+                            Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
+                            $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
+                        }
+                        else{
+                            $grupo_id = $request->get('grupo_id');
+                            $grupo=Grupo::findOrFail($grupo_id);
+                            $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
+                            $arrgrupos='';
+                            foreach ($grupos as $grupo){
+                                $arrgrupos .=$grupo->id.',';
+                            }
+
+
+                            $plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipol->id)->get();
+                            if (!$plantilla){
+                                Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
+                                $success .='Equipo sin plantilla: '.$strEquipoL.'<br>';
+                            }
+                            else{
+                                $strEquipoV = trim($partido['equipo2']);
+                                $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
+
+                                if (!$equipoV){
+                                    Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
+                                    $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
+                                }
+                                else{
+                                    $nro = str_replace('. Jornada', '', $numero); // Elimina ". Jornada"
+                                    $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
+
+                                    $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
+
+                                    try {
+
+                                        if(!$fecha){
+
+                                            $data1=array(
+
+                                                'numero'=>$nro,
+                                                'grupo_id'=>$grupo_id
+                                            );
+
+                                            $fecha = fecha::create($data1);
+
+
+                                        }
+                                        $lastid=$fecha->id;
+
+
+                                        $data2=array(
+                                            'fecha_id'=>$lastid,
+                                            'dia'=>$dia,
+                                            'equipol_id'=>$equipol->id,
+                                            'equipov_id'=>$equipoV->id,
+                                            'golesl'=>$golesL,
+                                            'golesv'=>$golesV
+                                        );
+                                        $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$equipol->id")->where('equipov_id','=',"$equipoV->id")->first();
+                                        try {
+                                            if (!empty($partido)){
+
+                                                $partido->update($data2);
+                                            }
+                                            else{
+                                                $partido=Partido::create($data2);
+                                            }
+
+
+                                        }catch(QueryException $ex){
+                                            $error = $ex->getMessage();
+                                            $ok=0;
+                                            continue;
+                                        }
+
+
+
+                                    }catch(Exception $e){
+                                        //if email or phone exist before in db redirect with error messages
+                                        $error = $ex->getMessage();
+                                        $ok=0;
+                                        continue;
+                                    }
+
+                                }
+                            }
+
+
+
+
+
+                        }
+                    }
+
+
+
+
+
+                }
+
+
+
+            }
+        }
+    }
+
     public function importprocess(Request $request)
     {
 
         set_time_limit(0);
+
+
+        $url2 = $request->get('url2');
+
+        if ($url2){
+            return $this->importprocess_new($request);
+        }
+
+
 
         $grupo_id = $request->get('grupo_id');
 

@@ -39,7 +39,15 @@
             </div>
 
         </div>
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-6">
 
+                <?php echo e(Form::label('url2', 'URL')); ?>
+
+                <?php echo e(Form::text('url2', '', ['class' => 'form-control'])); ?>
+
+            </div>
+        </div>
         <!-- build the submission button -->
         {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
         <a href="{{route('fechas.index',array('grupoId'=>$grupo->id)) }}" class="btn btn-success m-1">Volver</a>
