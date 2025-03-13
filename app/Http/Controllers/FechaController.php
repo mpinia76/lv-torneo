@@ -550,8 +550,9 @@ class FechaController extends Controller
                         $strEquipoL = trim($partido['equipo1']);
                         $golesL = intval($partido['marcador']['gl']);
                         $golesV = intval($partido['marcador']['gv']);
-                        $penalesL = intval($partido['marcador']['pl']);
-                        $penalesV = intval($partido['marcador']['pv']);
+                        $penalesL = isset($partido['marcador']['pl']) ? ($partido['marcador']['pl'] === null ? null : intval($partido['marcador']['pl'])) : null;
+                        $penalesV = isset($partido['marcador']['pv']) ? ($partido['marcador']['pv'] === null ? null : intval($partido['marcador']['pv'])) : null;
+
                         $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->get();
 
                         if ($equipol->isEmpty()) {
