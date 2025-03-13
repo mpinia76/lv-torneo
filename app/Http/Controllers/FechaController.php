@@ -567,7 +567,7 @@ class FechaController extends Controller
                             $plantilla = Plantilla::whereIn('grupo_id', $grupos)
                                 ->whereIn('equipo_id', $equipol->pluck('id')->toArray())
                                 ->first();
-                           // dd($plantilla);
+
 
                             if (!$plantilla) {
 
@@ -575,6 +575,7 @@ class FechaController extends Controller
                                 $ok=0;
                             }
                             else{
+                                $idLocal = $plantilla->equipo->id;
                                 $grupo_id = $plantilla->grupo->id;
                                 $strEquipoV = trim($partido['equipo2']);
                                 //$equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
@@ -621,6 +622,7 @@ class FechaController extends Controller
                                         $ok=0;
                                     }
                                     else{
+                                        $idVisitante = $plantilla->equipo->id;
                                         $nro = str_replace('. Jornada', '', $fechaNumero); // Elimina ". Jornada"
                                         $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
 
@@ -646,8 +648,8 @@ class FechaController extends Controller
                                             $data2=array(
                                                 'fecha_id'=>$lastid,
                                                 'dia'=>$dia,
-                                                'equipol_id'=>$equipol->id,
-                                                'equipov_id'=>$equipoV->id,
+                                                'equipol_id'=>$idLocal,
+                                                'equipov_id'=>$idVisitante,
                                                 'golesl'=>$golesL,
                                                 'golesv'=>$golesV,
                                                 'penalesl'=>$penalesL,
