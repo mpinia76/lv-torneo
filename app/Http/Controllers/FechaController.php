@@ -577,9 +577,10 @@ class FechaController extends Controller
                             else{
                                 $grupo_id = $plantilla->grupo->id;
                                 $strEquipoV = trim($partido['equipo2']);
-                                $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
+                                //$equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
+                                $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->get();
 
-                                if (!$equipoV){
+                                if ($equipoV->isEmpty()) {
                                     Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
                                     $error .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV.'<br>';
                                     $ok=0;
@@ -606,7 +607,13 @@ class FechaController extends Controller
 
                                         }
                                     }
-                                    $plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipoV->id)->first();
+                                    //$plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipoV->id)->first();
+
+                                    $plantilla = Plantilla::whereIn('grupo_id', $grupos)
+                                        ->whereIn('equipo_id', $equipoV->pluck('id')->toArray())
+                                        ->first();
+
+
                                     //dd($plantilla);
                                     if (!$plantilla) {
 
