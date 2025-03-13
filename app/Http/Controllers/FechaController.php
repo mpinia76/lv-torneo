@@ -552,9 +552,9 @@ class FechaController extends Controller
                         $golesV = intval($partido['marcador']['gv']);
                         $penalesL = intval($partido['marcador']['pl']);
                         $penalesV = intval($partido['marcador']['pv']);
-                        $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->first();
+                        $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->get();
 
-                        if (!$equipol){
+                        if ($equipol->isEmpty()) {
                             Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
                             $error .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
                             $ok=0;
@@ -562,14 +562,11 @@ class FechaController extends Controller
                         else{
 
                             $grupo=Grupo::findOrFail($grupoId);
-                            $grupos = Grupo::where('torneo_id', '=',$grupo->torneo->id)->get();
-                            $arrgrupos='';
-                            foreach ($grupos as $grupo){
-                                $arrgrupos .=$grupo->id.',';
-                            }
+                            $grupos = Grupo::where('torneo_id', '=', $grupo->torneo->id)->pluck('id')->toArray();
 
-
-                            $plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipol->id)->first();
+                            $plantilla = Plantilla::whereIn('grupo_id', $grupos)
+                                ->whereIn('equipo_id', $equipol->pluck('id')->toArray())
+                                ->first();
                            // dd($plantilla);
 
                             if (!$plantilla) {
