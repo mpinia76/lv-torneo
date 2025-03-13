@@ -61,6 +61,7 @@
             <th>Nombre</th>
 
             <th>Edad</th>
+            <th>Posición</th>
             <th>Jugador</th>
             <th>Técnico</th>
 
@@ -97,6 +98,7 @@
 
 
                     <td>{{($personaSimilares->nacimiento)?$personaSimilares->getAgeWithDateAttribute():''}}</td>
+                    <td>{{($personaSimilares->jugador)?$personaSimilares->jugador->tipoJugador:''}}</td>
                     <td>{{($personaSimilares->jugador)?$personaSimilares->jugador->id:''}}</td>
                     <td>{{($personaSimilares->tecnico)?$personaSimilares->tecnico->id:''}}</td>
                     <td>{{($personaSimilares->arbitro)?$personaSimilares->arbitro->id:''}}</td>
@@ -157,6 +159,7 @@
                             <th>Nombre</th>
 
                             <th>Edad</th>
+
                             <th>Jugador</th>
                             <th>Técnico</th>
 
@@ -193,6 +196,8 @@
 
 
                                     <td>{{($sinNombreApellido->nacimiento)?$sinNombreApellido->getAgeWithDateAttribute():''}}</td>
+
+
                                     <td>{{($sinNombreApellido->jugador)?$sinNombreApellido->jugador->id:''}}</td>
                                     <td>{{($sinNombreApellido->tecnico)?$sinNombreApellido->tecnico->id:''}}</td>
                                     <td>{{($sinNombreApellido->arbitro)?$sinNombreApellido->arbitro->id:''}}</td>
