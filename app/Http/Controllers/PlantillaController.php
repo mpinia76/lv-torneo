@@ -639,7 +639,14 @@ class PlantillaController extends Controller
                     if (!str_contains($imageUrl, 'default.jpg')) {
                         try {
                             $client = new Client();
-                            $response = $client->get($imageUrl);
+                            //$response = $client->get($imageUrl);
+
+                            // Intentar obtener la imagen con reintentos y asegurarnos de que Guzzle lanza excepciones en caso de error HTTP
+                            $response = $client->get($imageUrl, [
+                                'http_errors' => true,  // Asegura que Guzzle lanza excepciones en errores HTTP (como 502)
+                                'timeout' => 10, // Tiempo máximo de espera
+                            ]);
+
 
                             if ($response->getStatusCode() === 200) {
                                 $imageData = $response->getBody()->getContents();
