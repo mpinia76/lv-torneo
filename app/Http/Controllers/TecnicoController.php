@@ -237,6 +237,10 @@ class TecnicoController extends Controller
 
         $tecnico->delete();
         $persona = Persona::find($tecnico->persona_id);
+        // Verificar si la persona tiene una foto y eliminarla del servidor
+        if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
+            unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
+        }
         $persona->delete();
         return redirect()->route('tecnicos.index')->with('success','Registro eliminado satisfactoriamente');
     }

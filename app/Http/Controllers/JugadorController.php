@@ -287,6 +287,10 @@ class JugadorController extends Controller
 
         $jugador->delete();
         $persona = Persona::find($jugador->persona_id);
+        // Verificar si la persona tiene una foto y eliminarla del servidor
+        if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
+            unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
+        }
         $persona->delete();
         return redirect()->route('jugadores.index')->with('success','Registro eliminado satisfactoriamente');
     }
@@ -2467,7 +2471,10 @@ group by tecnico_id
             $jugador = Jugador::find($jugadorActual);
             $persona = Persona::find($jugador->persona_id);
             $jugador->delete();
-
+// Verificar si la persona tiene una foto y eliminarla del servidor
+            if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
+                unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
+            }
             $persona->delete();
             // Confirmar la transacción
             DB::commit();

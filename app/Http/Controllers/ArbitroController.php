@@ -223,6 +223,10 @@ class ArbitroController extends Controller
 
         $arbitro->delete();
         $persona = Persona::find($arbitro->persona_id);
+        // Verificar si la persona tiene una foto y eliminarla del servidor
+        if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
+            unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
+        }
         $persona->delete();
         return redirect()->route('arbitros.index')->with('success','Registro eliminado satisfactoriamente');
     }
