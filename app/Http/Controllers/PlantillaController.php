@@ -486,6 +486,7 @@ class PlantillaController extends Controller
                     $altura = '';
                     $peso = '';
                     $pie = '';
+                    $nombreCompleto= '';
 
                     // Obtener el elemento h1 con la clase específica
                     $dtElements = $xpathJugador->query('//h1[@class="data-header__headline-wrapper"]');
@@ -521,6 +522,14 @@ class PlantillaController extends Controller
                     } else {
                         $imageUrl = null; // Si no se encuentra la imagen
                     }
+
+                    $nombreCompleto = $xpathJugador->query('//span[contains(text(), "Nombre en país de origen:")]/following-sibling::span[1]');
+                    $nombreCompleto = $nombreCompleto->length > 0 ? trim($nombreCompleto->item(0)->textContent) : null;
+                    if (!$nombreCompleto) {
+                        $nombreCompleto = $xpathJugador->query('//span[contains(text(), "Nombre completo:")]/following-sibling::span[1]');
+                        $nombreCompleto = $nombreCompleto->length > 0 ? trim($nombreCompleto->item(0)->textContent) : null;
+                    }
+
                     // Extraer la fecha de nacimiento
                     $nacimiento = $xpathJugador->query('//span[contains(text(), "F. Nacim./Edad:")]/following-sibling::span[1]/a');
                     $nacimiento = $nacimiento->length > 0 ? trim($nacimiento->item(0)->textContent) : null;
@@ -628,7 +637,7 @@ class PlantillaController extends Controller
 
                     }
 
-                    Log::info('Nacimiento: ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad.' - '.$altura.' - '.$tipo.' - '.$pie, []);
+                    Log::info($nombreCompleto.' - ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad.' - '.$altura.' - '.$tipo.' - '.$pie, []);
 
 
 
@@ -746,6 +755,9 @@ class PlantillaController extends Controller
                     }
                     if ($pie) {
                         $insert['pie'] = trim($pie);
+                    }
+                    if ($nombreCompleto) {
+                        $insert['observaciones'] = trim($nombreCompleto);
                     }
                     Log::info('Contenido de insert: ' . json_encode($insert));
 
