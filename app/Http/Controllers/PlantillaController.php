@@ -637,7 +637,7 @@ class PlantillaController extends Controller
 
                     }
 
-                    Log::info($nombreCompleto.' - ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad.' - '.$altura.' - '.$tipo.' - '.$pie, []);
+                    //Log::info($nombreCompleto.' - ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad.' - '.$altura.' - '.$tipo.' - '.$pie, []);
 
 
 
@@ -756,10 +756,10 @@ class PlantillaController extends Controller
                     if ($pie) {
                         $insert['pie'] = trim($pie);
                     }
-                    if ($nombreCompleto) {
+                    if (($nombreCompleto)&&(!$nombre)) {
                         $insert['observaciones'] = trim($nombreCompleto);
                     }
-                    Log::info('Contenido de insert: ' . json_encode($insert));
+                    //Log::info('Contenido de insert: ' . json_encode($insert));
 
 
                     try {
