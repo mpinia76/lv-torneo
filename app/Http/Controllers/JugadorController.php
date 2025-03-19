@@ -1400,9 +1400,6 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 $imageUrl = $fotoDiv[0]->getAttribute('src');
                 //Log::info('Foto: ' . $imageUrl, []);
             }
-            else{
-                $imageUrl = 'avatar-player.jpg';
-            }
 
             // Seleccionar todos los dt y dd dentro de div.contentitem
             $dtElements = $xpath->query('//div[@class="contentitem"]/dl/dt');
