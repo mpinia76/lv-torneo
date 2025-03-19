@@ -1475,7 +1475,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             if (!str_contains($imageUrl, 'avatar-player.jpg')) {
                 try {
                     $client = new Client();
-                    Log::info('sin exxepciones ');
+
                     //$response = $client->get($imageUrl);
                     // Intentar obtener la imagen con reintentos y asegurarnos de que Guzzle lanza excepciones en caso de error HTTP
                     $response = $client->get($imageUrl, [

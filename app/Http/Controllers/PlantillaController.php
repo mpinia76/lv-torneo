@@ -997,31 +997,41 @@ class PlantillaController extends Controller
 
                     // Descarga y guarda la imagen si no es el avatar por defecto
                     if (!str_contains($imageUrl, 'avatar-player.jpg')) {
-                        $client = new Client();
-                        $response = $client->get($imageUrl);
+                        try {
+                            $client = new Client();
+                            //$response = $client->get($imageUrl);
+                            $response = $client->get($imageUrl, [
+                                'http_errors' => false,  // No lanzar excepción en errores HTTP (como 404)
+                                'timeout' => 10, // Tiempo máximo de espera
+                            ]);
 
-                        if ($response->getStatusCode() === 200) {
-                            $imageData = $response->getBody()->getContents();
-                            $parsedUrl = parse_url($imageUrl);
-                            $pathInfo = pathinfo($parsedUrl['path']);
-                            $nombreArchivo = $pathInfo['filename'];
-                            $extension = $pathInfo['extension'];
+                            if ($response->getStatusCode() === 200) {
+                                $imageData = $response->getBody()->getContents();
+                                $parsedUrl = parse_url($imageUrl);
+                                $pathInfo = pathinfo($parsedUrl['path']);
+                                $nombreArchivo = $pathInfo['filename'];
+                                $extension = $pathInfo['extension'];
 
-                            if (strrchr($nombreArchivo, '.') === '.') {
-                                $nombreArchivo = substr($nombreArchivo, 0, -1);
+                                if (strrchr($nombreArchivo, '.') === '.') {
+                                    $nombreArchivo = substr($nombreArchivo, 0, -1);
+                                }
+
+                                // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
+                                $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                                Log::info('URL de la foto: ' . $localFilePath, []);
+                                $insert['foto'] = "$nombreArchivo.$extension";
+
+                                file_put_contents($localFilePath, $imageData);
+                                Log::info('Foto subida', []);
+                            } else {
+                                Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
+                                $insert['foto'] =null;
+                                //$success .= 'Foto no subida: ' . $fotoDiv[0]->getAttribute('alt') . '<br>';
                             }
-
-                            // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
-                            $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
-                            Log::info('URL de la foto: ' . $localFilePath, []);
-                            $insert['foto'] = "$nombreArchivo.$extension";
-
-                            file_put_contents($localFilePath, $imageData);
-                            Log::info('Foto subida', []);
-                        } else {
-                            Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
-                            $insert['foto'] =null;
-                            //$success .= 'Foto no subida: ' . $fotoDiv[0]->getAttribute('alt') . '<br>';
+                        } catch (RequestException $e) {
+                            // Capturar la excepción y continuar con el flujo
+                            Log::error('Error al intentar obtener la imagen: ' . $e->getMessage(), []);
+                            $insert['foto'] = null;
                         }
                     } else {
                         Log::info('No tiene foto: ' . $imageUrl, []);
