@@ -1478,7 +1478,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
                     //$response = $client->get($imageUrl);
                     // Intentar obtener la imagen con reintentos y asegurarnos de que Guzzle lanza excepciones en caso de error HTTP
                     $response = $client->get($imageUrl, [
-                        'http_errors' => true,  // Asegura que Guzzle lanza excepciones en errores HTTP (como 502)
+                        'http_errors' => false,  // No lanzar excepción en errores HTTP (como 404)
                         'timeout' => 10, // Tiempo máximo de espera
                     ]);
 
