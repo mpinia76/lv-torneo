@@ -2485,7 +2485,7 @@ group by tecnico_id
             $jugador->delete();
 // Verificar si la persona tiene una foto y eliminarla del servidor
             if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
-                unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
+                //unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
             }
             $persona->delete();
             // Confirmar la transacción
