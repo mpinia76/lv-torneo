@@ -285,6 +285,8 @@ class FechaController extends Controller
                 }
             }
             else{
+                // Eliminar primero los partidos asociados
+                Partido::where('fecha_id', $id)->delete();
                 $fecha->delete();
             }
         }catch(Exception $e){
