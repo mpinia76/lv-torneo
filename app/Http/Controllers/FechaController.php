@@ -241,7 +241,7 @@ class FechaController extends Controller
         try {
             $fecha->update($request->all());
             //Partido::where('fecha_id', '=', "$id")->delete();
-            if(count($request->fecha) > 0)
+            if (is_array($request->fecha) && count($request->fecha) > 0)
             {
                 foreach($request->fecha as $item=>$v){
                     if (($request->penalesl[$item]) && ($request->penalesv[$item])){
@@ -283,6 +283,9 @@ class FechaController extends Controller
                     }
 
                 }
+            }
+            else{
+                $fecha->delete();
             }
         }catch(Exception $e){
             //if email or phone exist before in db redirect with error messages
