@@ -349,7 +349,9 @@ class FechaController extends Controller
     public function formatearMarcador($marcador)
     {
         // Expresión regular para capturar los goles en tiempo reglamentario, los goles de los dos tiempos y los penales si están presentes
-        $pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?/';
+        //$pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?/';
+        $pattern = '/^(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)(?:\s?(pn\.))?$/';
+
         Log::debug($marcador,[]);
         // Intentamos hacer el match con la cadena
         $matches = [];
