@@ -351,18 +351,18 @@ class FechaController extends Controller
         // Expresión regular para capturar los goles en tiempo reglamentario, los goles de los dos tiempos y los penales si están presentes
         $pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?$/';
 
-        Log::debug("Marcador recibido: " . $marcador);
+        //Log::debug("Marcador recibido: " . $marcador);
 
         // Intentamos hacer el match con la cadena
         $matches = [];
         preg_match($pattern, $marcador, $matches);
 
         if (empty($matches)) {
-            Log::debug("No se encontró un marcador válido.");
+            //Log::debug("No se encontró un marcador válido.");
             return null;
         }
 
-        Log::debug(print_r($matches, true));
+        //Log::debug(print_r($matches, true));
 
         // Buscamos la posición de 'pn.' en el arreglo de coincidencias
         $indicePn = array_search('pn.', $matches, true);
@@ -373,20 +373,20 @@ class FechaController extends Controller
             $gl = (int) $matches[1]; // Goles Local
             $gv = (int) $matches[2]; // Goles Visitante
             $pl = $pv = null; // No hay goles de penales
-            Log::debug("sin penales gl: " . $gl. ' gv: ' . $gv. ' pl: ' . $pl. ' pv: ' . $pv);
+            //Log::debug("sin penales gl: " . $gl. ' gv: ' . $gv. ' pl: ' . $pl. ' pv: ' . $pv);
         } else {
             // Si hay penales, tomamos los goles de los penales (índices 1 y 2) y el marcador final es el último
             $gl = (int) $matches[5]; // Goles Local
             $gv = (int) $matches[6]; // Goles Visitante
             $pl = (int) $matches[1]; // Goles en penales Local
             $pv = (int) $matches[2]; // Goles en penales Visitante
-            Log::debug("con penales gl: " . $gl. ' gv: ' . $gv. ' pl: ' . $pl. ' pv: ' . $pv);
+            //Log::debug("con penales gl: " . $gl. ' gv: ' . $gv. ' pl: ' . $pl. ' pv: ' . $pv);
             // Si hay prórroga, el marcador final se toma de los goles del último tiempo (índices 5 y 6, o 3 y 4 si no hay segundo tiempo)
             if (isset($matches[7]) && isset($matches[8])) {
                 // Si hay goles de segundo tiempo, los últimos goles son los del segundo tiempo
                 $gl = (int) $matches[7];
                 $gv = (int) $matches[8];
-                Log::debug("con prorroga gl: " . $gl. ' gv: ' . $gv. ' pl: ' . $pl. ' pv: ' . $pv);
+                //Log::debug("con prorroga gl: " . $gl. ' gv: ' . $gv. ' pl: ' . $pl. ' pv: ' . $pv);
             }
         }
 
@@ -656,7 +656,7 @@ class FechaController extends Controller
                                                     'grupo_id'=>$grupo_id
                                                 );
                                                 //Log::debug(print_r($data1),[]);
-                                                Log::debug(print_r($data1, true));
+                                                //Log::debug(print_r($data1, true));
                                                 $fecha = fecha::create($data1);
 
 
@@ -674,7 +674,7 @@ class FechaController extends Controller
                                                 'penalesl'=>$penalesL,
                                                 'penalesv'=>$penalesV
                                             );
-                                            Log::debug(print_r($data2, true));
+                                            //Log::debug(print_r($data2, true));
                                             $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$idLocal")->where('equipov_id','=',"$idVisitante")->first();
                                             try {
                                                 if (!empty($partido)){
