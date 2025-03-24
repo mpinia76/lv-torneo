@@ -360,6 +360,8 @@ class FechaController extends Controller
             return null;
         }
 
+        Log::debug(print_r($matches),[]);
+
         // Extraemos los goles locales y visitantes del marcador
         $golesLocales = (int) $matches[1];
         $golesVisitantes = (int) $matches[2];
