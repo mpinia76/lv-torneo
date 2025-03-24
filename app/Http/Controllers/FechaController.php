@@ -330,8 +330,11 @@ class FechaController extends Controller
         $grupo_id= $request->query('grupoId');
         $grupo=Grupo::findOrFail($grupo_id);
 
+        $grupos = Grupo::where('torneo_id', $grupo->torneo->id)
+            ->pluck('nombre', 'id'); // Obtiene los nombres con los IDs como clave
+
         //
-        return view('fechas.import', compact('grupo'));
+        return view('fechas.import', compact('grupo','grupos'));
     }
 
     public function importincidencias(Request $request)
@@ -548,7 +551,7 @@ class FechaController extends Controller
                 print_r($partidos);
                 echo "</pre>";*/
                 //$grupo_id=intval($importData[1]);
-                $grupoId = $request->get('grupo_id');
+                $grupoId = $request->get('grupoSelect_id');
                 if($numero){
                     foreach ($partidos as $index => $partido) {
                         $dia =$partido['fecha'].' '.$partido['hora'];
@@ -582,7 +585,8 @@ class FechaController extends Controller
                             }
                             else{
                                 $idLocal = $plantilla->equipo->id;
-                                $grupo_id = $plantilla->grupo->id;
+                                //$grupo_id = $plantilla->grupo->id;
+                                $grupo_id = $grupoId;
                                 $strEquipoV = trim($partido['equipo2']);
                                 //$equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
                                 $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->get();
