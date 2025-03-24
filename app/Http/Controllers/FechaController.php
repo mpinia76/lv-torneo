@@ -350,7 +350,7 @@ class FechaController extends Controller
     {
         // Expresión regular para capturar los goles en tiempo reglamentario, los goles de los dos tiempos y los penales si están presentes
         $pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?/';
-
+        Log::debug($marcador,[]);
         // Intentamos hacer el match con la cadena
         $matches = [];
         preg_match($pattern, $marcador, $matches);
