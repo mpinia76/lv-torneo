@@ -656,6 +656,7 @@ class FechaController extends Controller
                                                     'grupo_id'=>$grupo_id
                                                 );
                                                 //Log::debug(print_r($data1),[]);
+                                                Log::debug(print_r($data1, true));
                                                 $fecha = fecha::create($data1);
 
 
@@ -673,6 +674,7 @@ class FechaController extends Controller
                                                 'penalesl'=>$penalesL,
                                                 'penalesv'=>$penalesV
                                             );
+                                            Log::debug(print_r($data2, true));
                                             $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$idLocal")->where('equipov_id','=',"$idVisitante")->first();
                                             try {
                                                 if (!empty($partido)){
