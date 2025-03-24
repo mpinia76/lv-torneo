@@ -375,19 +375,19 @@ class FechaController extends Controller
             $pl = $pv = null; // No hay goles de penales
         } else {
             // Si hay penales, tomamos los goles de los penales (índices 1 y 2) y el marcador final es el último
-            $gl = (int) $matches[3]; // Goles Local
-            $gv = (int) $matches[4]; // Goles Visitante
+            $gl = (int) $matches[5]; // Goles Local
+            $gv = (int) $matches[6]; // Goles Visitante
             $pl = (int) $matches[1]; // Goles en penales Local
             $pv = (int) $matches[2]; // Goles en penales Visitante
 
             // Si hay prórroga, el marcador final se toma de los goles del último tiempo (índices 5 y 6, o 3 y 4 si no hay segundo tiempo)
-            if (isset($matches[5]) && isset($matches[6])) {
+            if (isset($matches[7]) && isset($matches[8])) {
                 // Si hay goles de segundo tiempo, los últimos goles son los del segundo tiempo
-                $gl = (int) $matches[5];
-                $gv = (int) $matches[6];
+                $gl = (int) $matches[7];
+                $gv = (int) $matches[8];
             }
         }
-
+        Log::debug("Gl: " . $gl. ' gv: ' . $gv. ' pn: ' . $pv);
         return [
             'gl' => $gl, // Marcador final después de tiempos reglamentarios o penales
             'gv' => $gv,
