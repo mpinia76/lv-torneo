@@ -348,17 +348,18 @@ class FechaController extends Controller
 
     public function formatearMarcador($marcador)
     {
-        // Expresión regular para capturar los goles en tiempo reglamentario, los goles de los dos tiempos y los penales si están presentes
-        //$pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?/';
+        // Expresión regular corregida
         $pattern = '/^(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?\)(?:\s?(pn\.))?$/';
 
-        Log::debug($marcador,[]);
+        Log::debug("Marcador recibido: " . $marcador);
+
         // Intentamos hacer el match con la cadena
         $matches = [];
         preg_match($pattern, $marcador, $matches);
 
         if (empty($matches)) {
             // Si no hay coincidencias, no es un marcador válido.
+            Log::debug("No se encontró un marcador válido.");
             return null;
         }
 
@@ -377,26 +378,28 @@ class FechaController extends Controller
         $golesSegundoTiempoVisitantes = isset($matches[6]) ? (int) $matches[6] : $golesVisitantes;
 
         // Comprobamos si hay penales y los extraemos
-        $penalesLocales = $penalesVisitantes = null; // Inicializamos en 0 por defecto
+        $penalesLocales = null;
+        $penalesVisitantes = null;
+
         if (isset($matches[7]) && $matches[7] == 'pn.') {
-            // Si hay penales, extraemos los goles de los penales
-            $penales = explode(':', $matches[1] . ':' . $matches[2]); // Usamos los goles del marcador para los penales
-            $penalesLocales = (int) $penales[0];
-            $penalesVisitantes = (int) $penales[1];
-            $golesLocales = (int) $matches[5];
-            $golesVisitantes = (int) $matches[6];
+            // Si hay penales, los goles de los penales son los finales del marcador
+            $penalesLocales = $golesLocales;
+            $penalesVisitantes = $golesVisitantes;
+
+            // Los goles en tiempo reglamentario son los del segundo tiempo
+            $golesLocales = $golesSegundoTiempoLocales;
+            $golesVisitantes = $golesSegundoTiempoVisitantes;
         }
+
         // Devolvemos un arreglo con todos los resultados
         return [
             'gl' => $golesLocales,
             'gv' => $golesVisitantes,
-
             'pl' => $penalesLocales,
             'pv' => $penalesVisitantes
         ];
-
-
     }
+
 
     public function importprocess_new(Request $request)
     {
