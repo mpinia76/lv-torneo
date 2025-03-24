@@ -348,8 +348,8 @@ class FechaController extends Controller
 
     public function formatearMarcador($marcador)
     {
-        // Expresión regular mejorada
-        $pattern = '/^(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?(?:,\s?(pn\.)?,?\s?(\d+):(\d+))?\)\s?(pn\.)?$/';
+        // Expresión regular para capturar los goles en tiempo reglamentario, los goles de los dos tiempos y los penales si están presentes
+        $pattern = '/(\d+):(\d+)\s?\((\d+):(\d+)(?:,\s?(\d+):(\d+))?(?:,\s?(\d+):(\d+))?\)\s?(pn\.)?$/';
 
         Log::debug("Marcador recibido: " . $marcador);
 
@@ -364,50 +364,38 @@ class FechaController extends Controller
 
         Log::debug(print_r($matches, true));
 
-        // Extraemos los goles locales y visitantes del marcador
-        $golesLocales = (int) $matches[1];
-        $golesVisitantes = (int) $matches[2];
+        // Buscamos la posición de 'pn.' en el arreglo de coincidencias
+        $indicePn = array_search('pn.', $matches, true);
 
-        // Extraemos los goles del primer tiempo
-        $golesPrimerTiempoLocales = (int) $matches[3];
-        $golesPrimerTiempoVisitantes = (int) $matches[4];
+        // Si no hay penales
+        if ($indicePn === false) {
+            // Si no hay penales, el marcador final es el de tiempo reglamentario (índices 1 y 2)
+            $gl = (int) $matches[1]; // Goles Local
+            $gv = (int) $matches[2]; // Goles Visitante
+            $pl = $pv = null; // No hay goles de penales
+        } else {
+            // Si hay penales, tomamos los goles de los penales (índices 1 y 2) y el marcador final es el último
+            $gl = (int) $matches[3]; // Goles Local
+            $gv = (int) $matches[4]; // Goles Visitante
+            $pl = (int) $matches[1]; // Goles en penales Local
+            $pv = (int) $matches[2]; // Goles en penales Visitante
 
-        // Extraemos los goles del segundo tiempo si existen
-        $golesSegundoTiempoLocales = isset($matches[5]) ? (int) $matches[5] : null;
-        $golesSegundoTiempoVisitantes = isset($matches[6]) ? (int) $matches[6] : null;
-
-        // Comprobamos si hay prórroga
-        $golesProrrogaLocales = isset($matches[9]) ? (int) $matches[9] : null;
-        $golesProrrogaVisitantes = isset($matches[10]) ? (int) $matches[10] : null;
-
-        // Determinar si hubo penales
-        $penalesLocales = null;
-        $penalesVisitantes = null;
-
-        if (!empty($matches[7]) || !empty($matches[11])) {
-            // Si hay "pn." en la posición 7 o 11, consideramos que hubo penales
-            $penalesLocales = $golesLocales;
-            $penalesVisitantes = $golesVisitantes;
-
-            // Si hay prórroga, usamos el resultado de prórroga
-            if (!is_null($golesProrrogaLocales)) {
-                $golesLocales = $golesProrrogaLocales;
-                $golesVisitantes = $golesProrrogaVisitantes;
-            } else {
-                // Si no hay prórroga, usamos el segundo tiempo
-                $golesLocales = $golesSegundoTiempoLocales;
-                $golesVisitantes = $golesSegundoTiempoVisitantes;
+            // Si hay prórroga, el marcador final se toma de los goles del último tiempo (índices 5 y 6, o 3 y 4 si no hay segundo tiempo)
+            if (isset($matches[5]) && isset($matches[6])) {
+                // Si hay goles de segundo tiempo, los últimos goles son los del segundo tiempo
+                $gl = (int) $matches[5];
+                $gv = (int) $matches[6];
             }
         }
 
-        // Devolvemos el resultado formateado
         return [
-            'gl' => $golesLocales,
-            'gv' => $golesVisitantes,
-            'pl' => $penalesLocales,
-            'pv' => $penalesVisitantes
+            'gl' => $gl, // Marcador final después de tiempos reglamentarios o penales
+            'gv' => $gv,
+            'pl' => $pl, // Goles en penales (si hay)
+            'pv' => $pv
         ];
     }
+
 
 
 
