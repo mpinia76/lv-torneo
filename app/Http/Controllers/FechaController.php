@@ -686,16 +686,22 @@ class FechaController extends Controller
                                                 }
 
 
-                                            }catch(QueryException $ex){
-                                                $error = $ex->getMessage();
-                                                $ok=0;
+                                            } catch (QueryException $ex) {
+                                                if ($ex->errorInfo[1] == 1062) { // Código de error para "Duplicate entry"
+                                                    $success .= "Equipo repetido en partido ".$strEquipoL.' - '.$strEquipoV;
+                                                    $ok = 1;
+                                                } else {
+                                                    $error = $ex->getMessage();
+                                                    $ok = 0;
+                                                }
+
                                                 continue;
                                             }
 
 
 
                                         }catch(Exception $e){
-                                            //if email or phone exist before in db redirect with error messages
+
                                             $error = $ex->getMessage();
                                             $ok=0;
                                             continue;
