@@ -688,7 +688,7 @@ class FechaController extends Controller
 
                                             } catch (QueryException $ex) {
                                                 if ($ex->errorInfo[1] == 1062) { // Código de error para "Duplicate entry"
-                                                    $success .= "Equipo repetido en partido ".$strEquipoL.' - '.$strEquipoV;
+                                                    $success .= "Equipo repetido en partido ".$strEquipoL.' - '.$strEquipoV."<br>";
                                                     $ok = 1;
                                                 } else {
                                                     $error = $ex->getMessage();
