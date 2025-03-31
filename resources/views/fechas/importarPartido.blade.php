@@ -26,12 +26,12 @@
                         @endif
                     </td>
                     <td>{{$partido->golesl}}
-                        @if($partido->penalesl)
+                        @if(iseet($partido->penalesl))
                             ({{$partido->penalesl}})
                         @endif
                     </td>
                     <td>{{$partido->golesv}}
-                        @if($partido->penalesv)
+                        @if(iseet($partido->penalesv))
                             ({{$partido->penalesv}})
                         @endif
                     </td>
