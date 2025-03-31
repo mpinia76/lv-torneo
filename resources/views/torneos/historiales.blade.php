@@ -75,14 +75,14 @@
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
-                                @if($partido->penalesl)
+                                @if(isset($partido->penalesl))
                                     ({{$partido->penalesl}})
                                 @endif
                             </td>
                             <td>{{$partido->golesv}}
-                                @if($partido->penalesv)
-                                    ({{$partido->penalesv}})
-                                @endif
+                                @if(isset($partido->penalesv))
+    ({{$partido->penalesv}})
+@endif
                             </td>
                             <td>
                                 <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov_id))}}">
