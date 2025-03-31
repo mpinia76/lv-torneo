@@ -114,27 +114,19 @@ class FechaController extends Controller
             {
                 foreach($request->fecha as $item=>$v){
 
-                    if (($request->penalesl[$item]) && ($request->penalesv[$item])){
-                        $data2=array(
-                            'fecha_id'=>$lastid,
-                            'dia'=>$request->fecha[$item].' '.$request->hora[$item],
-                            'equipol_id'=>$request->equipol[$item],
-                            'equipov_id'=>$request->equipov[$item],
-                            'golesl'=>$request->golesl[$item],
-                            'golesv'=>$request->golesv[$item],
-                            'penalesl'=>$request->penalesl[$item],
-                            'penalesv'=>$request->penalesv[$item]
-                        );
-                    }
-                    else{
-                        $data2=array(
-                            'fecha_id'=>$lastid,
-                            'dia'=>$request->fecha[$item].' '.$request->hora[$item],
-                            'equipol_id'=>$request->equipol[$item],
-                            'equipov_id'=>$request->equipov[$item],
-                            'golesl'=>$request->golesl[$item],
-                            'golesv'=>$request->golesv[$item]
-                        );
+                    $data2 = [
+                        'fecha_id' => $lastid,
+                        'dia' => $request->fecha[$item] . ' ' . $request->hora[$item],
+                        'equipol_id' => $request->equipol[$item],
+                        'equipov_id' => $request->equipov[$item],
+                        'golesl' => $request->golesl[$item],
+                        'golesv' => $request->golesv[$item]
+                    ];
+
+// Agregar penales solo si fueron enviados
+                    if (isset($request->penalesl[$item]) && isset($request->penalesv[$item])) {
+                        $data2['penalesl'] = $request->penalesl[$item];
+                        $data2['penalesv'] = $request->penalesv[$item];
                     }
 
 
@@ -244,27 +236,19 @@ class FechaController extends Controller
             if (is_array($request->fecha) && count($request->fecha) > 0)
             {
                 foreach($request->fecha as $item=>$v){
-                    if (($request->penalesl[$item]) && ($request->penalesv[$item])){
-                        $data2=array(
-                            'fecha_id'=>$id,
-                            'dia'=>$request->fecha[$item].' '.$request->hora[$item],
-                            'equipol_id'=>$request->equipol[$item],
-                            'equipov_id'=>$request->equipov[$item],
-                            'golesl'=>$request->golesl[$item],
-                            'golesv'=>$request->golesv[$item],
-                            'penalesl'=>$request->penalesl[$item],
-                            'penalesv'=>$request->penalesv[$item]
-                        );
-                    }
-                    else{
-                        $data2=array(
-                            'fecha_id'=>$id,
-                            'dia'=>$request->fecha[$item].' '.$request->hora[$item],
-                            'equipol_id'=>$request->equipol[$item],
-                            'equipov_id'=>$request->equipov[$item],
-                            'golesl'=>$request->golesl[$item],
-                            'golesv'=>$request->golesv[$item]
-                        );
+                    $data2 = [
+                        'fecha_id' => $id,
+                        'dia' => $request->fecha[$item] . ' ' . $request->hora[$item],
+                        'equipol_id' => $request->equipol[$item],
+                        'equipov_id' => $request->equipov[$item],
+                        'golesl' => $request->golesl[$item],
+                        'golesv' => $request->golesv[$item]
+                    ];
+
+                    // Agregar penales solo si fueron enviados
+                    if (isset($request->penalesl[$item]) && isset($request->penalesv[$item])) {
+                        $data2['penalesl'] = $request->penalesl[$item];
+                        $data2['penalesv'] = $request->penalesv[$item];
                     }
 
                     try {
