@@ -228,6 +228,10 @@ class FechaController extends Controller
         $this->validate($request,[ 'numero'=>'required',  'grupo_id'=>'required']);
         DB::beginTransaction();
 
+        if($request->partido_id){
+            Partido::where('fecha_id',"$id")->whereNotIn('id', $request->partido_id)->delete();
+        }
+
         $fecha=fecha::find($id);
         $ok=1;
         try {
