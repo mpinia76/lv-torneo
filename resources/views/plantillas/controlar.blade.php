@@ -82,7 +82,10 @@
             </div>
         </div>
     </div>
+    <div class="d-flex">
 
+        <a href="{{ route('plantillas.index',array('grupoId'=>$grupo_id))  }}" class="btn btn-success m-1">Volver</a>
+    </div>
     <script>
 
 
