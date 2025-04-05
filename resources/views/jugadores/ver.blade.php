@@ -260,18 +260,22 @@
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
                     <dt>Titulos</dt>
-                    <dd>{{$titulosTecnicoLiga+$titulosTecnicoCopa}}</dd>
+                    <dd>{{$titulosTecnicoLiga+$titulosTecnicoCopa+$titulosTecnicoInternacional}}</dd>
                 </div>
 
 
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                    <dt>Titulos Liga</dt>
+                    <dt>Ligas nacionales</dt>
                     <dd>{{$titulosTecnicoLiga}}</dd>
                 </div>
 
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                    <dt>Titulos Copa</dt>
+                    <dt>Copas nacionales</dt>
                     <dd>{{$titulosTecnicoCopa}}</dd>
+                </div>
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Internacionales</dt>
+                    <dd>{{$titulosTecnicoInternacional}}</dd>
                 </div>
 
             </div>
