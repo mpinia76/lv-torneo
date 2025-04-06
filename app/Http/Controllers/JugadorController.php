@@ -2426,20 +2426,14 @@ group by tecnico_id
 
             // Filtrar las que no tienen bandera (no existe la imagen)
             $personasSinBandera = $personas->filter(function ($persona) {
-                $nacionalidad = explode(',', $persona->nacionalidad)[0];
-                $nacionalidad = trim($nacionalidad);
-
                 $nacionalidadSinAcentos = str_replace(
                     ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
                     ['a', 'e', 'i', 'o', 'u', 'n', 'A', 'E', 'I', 'O', 'U', 'N'],
-                    $nacionalidad
+                    $persona->nacionalidad
                 );
 
-                // Podés convertir a minúsculas si las imágenes están así
-                $nacionalidadSinAcentos = strtolower($nacionalidadSinAcentos);
-
                 $path = public_path('images/' . $nacionalidadSinAcentos . '.gif');
-                return !file_exists($path); // Solo devuelve las que NO tienen bandera
+                return !file_exists($path); // Solo las que no tienen bandera
             });
 
 
