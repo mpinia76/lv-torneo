@@ -252,53 +252,53 @@
                             @php
                                 $i = 0;
                             @endphp
-                            @foreach($personasConComa as $conComa)
+                            @foreach($personasSinBandera as $SinBandera)
                                 @php
                                     $i++;
 
-                //dd($conComa);
+                //dd($SinBandera);
                                 @endphp
 
                                 <tr>
-                                    <td>{{$i}} @if($conComa->foto)
-                                            <img id="original" class="imgCircle" src="{{ url('images/'.$conComa->foto) }}" >
+                                    <td>{{$i}} @if($SinBandera->foto)
+                                            <img id="original" class="imgCircle" src="{{ url('images/'.$SinBandera->foto) }}" >
                                         @else
-                                            @if($conComa->jugador)
+                                            @if($SinBandera->jugador)
                                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                            @elseif($conComa->tecnico)
+                                            @elseif($SinBandera->tecnico)
                                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
-                                            @elseif($conComa->arbitro)
+                                            @elseif($SinBandera->arbitro)
                                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                                             @endif
                                         @endif
-                                        <img id="original" src="{{ $conComa->bandera_url }}" alt="{{ $conComa->nacionalidad }}">
+                                        <img id="original" src="{{ $SinBandera->bandera_url }}" alt="{{ $SinBandera->nacionalidad }}">
                                     </td>
-                                    <td>  {{$conComa->id}}</td>
-                                    <td>{{$conComa->apellido}}</td>
-                                    <td>{{$conComa->nombre}}</td>
+                                    <td>  {{$SinBandera->id}}</td>
+                                    <td>{{$SinBandera->apellido}}</td>
+                                    <td>{{$SinBandera->nombre}}</td>
 
 
-                                    <td>{{($conComa->nacimiento)?$conComa->getAgeWithDateAttribute():''}}</td>
+                                    <td>{{($SinBandera->nacimiento)?$SinBandera->getAgeWithDateAttribute():''}}</td>
 
 
-                                    <td>{{($conComa->jugador)?$conComa->jugador->id:''}}</td>
-                                    <td>{{($conComa->tecnico)?$conComa->tecnico->id:''}}</td>
-                                    <td>{{($conComa->arbitro)?$conComa->arbitro->id:''}}</td>
+                                    <td>{{($SinBandera->jugador)?$SinBandera->jugador->id:''}}</td>
+                                    <td>{{($SinBandera->tecnico)?$SinBandera->tecnico->id:''}}</td>
+                                    <td>{{($SinBandera->arbitro)?$SinBandera->arbitro->id:''}}</td>
                                     <td>
                                         <div class="d-flex" style="align-items: center;">
-                                            @if($conComa->jugador)
-                                                <a href="{{route('jugadores.reasignar', $conComa->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
-                                                <a href="{{route('jugadores.edit', $conComa->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @if($SinBandera->jugador)
+                                                <a href="{{route('jugadores.reasignar', $SinBandera->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
+                                                <a href="{{route('jugadores.edit', $SinBandera->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
 
-                                                <form action="{{ route('jugadores.destroy', $conComa->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
+                                                <form action="{{ route('jugadores.destroy', $SinBandera->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
                                                     <input type="hidden" name="_method" value="DELETE">
                                                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
                                                     <button class="btn btn-danger m-1">Eliminar</button>
                                                 </form>
-                                            @elseif($conComa->tecnico)
-                                                <a href="{{route('tecnicos.edit', $conComa->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
-                                            @elseif($conComa->arbitro)
-                                                <a href="{{route('arbitros.edit', $conComa->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @elseif($SinBandera->tecnico)
+                                                <a href="{{route('tecnicos.edit', $SinBandera->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @elseif($SinBandera->arbitro)
+                                                <a href="{{route('arbitros.edit', $SinBandera->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
                                             @endif
 
                                         </div>
