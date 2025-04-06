@@ -41,9 +41,9 @@
                 <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Sin nombre/apellido</a>
             </li>
 
-            <!--<li class="nav-item">
-                <a class="nav-link" id="sin-tab" data-toggle="tab" href="#sin" role="tab" aria-controls="sin" aria-selected="false">Sin nacimiento</a>
-            </li>-->
+            <li class="nav-item">
+                <a class="nav-link" id="sin-tab" data-toggle="tab" href="#sin" role="tab" aria-controls="sin" aria-selected="false">Problema en nacionalidad</a>
+            </li>
 
 
         </ul>
@@ -216,6 +216,89 @@
                                                 <a href="{{route('tecnicos.edit', $sinNombreApellido->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
                                             @elseif($sinNombreApellido->arbitro)
                                                 <a href="{{route('arbitros.edit', $sinNombreApellido->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @endif
+
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </table>
+                    </div>
+
+
+                </div>
+            </div>
+
+            <div role="tabpanel" class="tab-pane" id="sin">
+
+                <div class="row">
+
+                    <div class="form-group col-md-12">
+                        <table class="table">
+                            <thead>
+                            <th></th>
+                            <th>Id</th>
+                            <th>Apellido</th>
+                            <th>Nombre</th>
+
+                            <th>Edad</th>
+
+                            <th>Jugador</th>
+                            <th>Técnico</th>
+
+                            <th>Arbitro</th>
+                            <th></th>
+                            </thead>
+                            @php
+                                $i = 0;
+                            @endphp
+                            @foreach($personasConComa as $conComa)
+                                @php
+                                    $i++;
+
+                //dd($conComa);
+                                @endphp
+
+                                <tr>
+                                    <td>{{$i}} @if($conComa->foto)
+                                            <img id="original" class="imgCircle" src="{{ url('images/'.$conComa->foto) }}" >
+                                        @else
+                                            @if($conComa->jugador)
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                            @elseif($conComa->tecnico)
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                                            @elseif($conComa->arbitro)
+                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
+                                            @endif
+                                        @endif
+                                        <img id="original" src="{{ $conComa->bandera_url }}" alt="{{ $conComa->nacionalidad }}">
+                                    </td>
+                                    <td>  {{$conComa->id}}</td>
+                                    <td>{{$conComa->apellido}}</td>
+                                    <td>{{$conComa->nombre}}</td>
+
+
+                                    <td>{{($conComa->nacimiento)?$conComa->getAgeWithDateAttribute():''}}</td>
+
+
+                                    <td>{{($conComa->jugador)?$conComa->jugador->id:''}}</td>
+                                    <td>{{($conComa->tecnico)?$conComa->tecnico->id:''}}</td>
+                                    <td>{{($conComa->arbitro)?$conComa->arbitro->id:''}}</td>
+                                    <td>
+                                        <div class="d-flex" style="align-items: center;">
+                                            @if($conComa->jugador)
+                                                <a href="{{route('jugadores.reasignar', $conComa->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
+                                                <a href="{{route('jugadores.edit', $conComa->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+
+                                                <form action="{{ route('jugadores.destroy', $conComa->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
+                                                    <input type="hidden" name="_method" value="DELETE">
+                                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                                    <button class="btn btn-danger m-1">Eliminar</button>
+                                                </form>
+                                            @elseif($conComa->tecnico)
+                                                <a href="{{route('tecnicos.edit', $conComa->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
+                                            @elseif($conComa->arbitro)
+                                                <a href="{{route('arbitros.edit', $conComa->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
                                             @endif
 
                                         </div>

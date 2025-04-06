@@ -2424,8 +2424,13 @@ group by tecnico_id
                 ->orderBy('apellido', 'ASC')
                 ->get();
 
+            // Buscar personas cuya nacionalidad contiene una coma
+            $personasConComa = Persona::where('nacionalidad', 'LIKE', '%,%')
+                ->orderBy('apellido', 'ASC')
+                ->get();
 
-            return view('jugadores.verificarPersona', [ 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas, 'personasSinNombreApellido' => $personasSinNombreApellido]);
+
+            return view('jugadores.verificarPersona', [ 'verificados' => $verificados,'total' => $total,'similaresNombreApellido' => $personasSimilares, 'personas' => $personas, 'personasSinNombreApellido' => $personasSinNombreApellido, 'personasConComa' => $personasConComa]);
         }
 
 
