@@ -1087,7 +1087,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
         if ($htmlContent) {
 
-            $name = '';
+            $name = null;
             $nombre = '';
             $apellido = '';
             $nacimiento = '';
@@ -1118,7 +1118,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
                     // Remover el apellido para obtener solo el nombre
                     $nombre = trim(str_replace($apellido, '', $fullText));
-                    $name = $apellido.', '.$nombre;
+                    $name = $nombre.' '.$apellido;
                 } else {
                     $nombre = trim($fullText);
                     $name = trim($fullText);
@@ -1586,7 +1586,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             }
 
             $request->session()->put('nombre_filtro_jugador', $apellido);
-            log::info(print_r($insert, true));
+            //log::info(print_r($insert, true));
             try {
                 $persona = Persona::create($insert);
                 $persona->jugador()->create($insert);

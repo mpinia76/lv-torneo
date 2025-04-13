@@ -476,7 +476,7 @@ class PlantillaController extends Controller
 
                 if ($htmlContentJugador) {
 
-
+                    $name = '';
                     $nombre = '';
                     $apellido = '';
                     $nacimiento = '';
@@ -509,8 +509,10 @@ class PlantillaController extends Controller
 
                             // Remover el apellido para obtener solo el nombre
                             $nombre = trim(str_replace($apellido, '', $fullText));
+                            $name = $nombre.' '.$apellido;
                         } else {
                             $nombre = trim($fullText);
+                            $name = trim($fullText);
                             $apellido = '';
                         }
                     }
@@ -694,6 +696,13 @@ class PlantillaController extends Controller
 
 
                     // Insertar los datos de la persona
+                    if ($name) {
+                        $insert['name'] = trim($name);
+                    } else {
+                        Log::info('Falta el name', []);
+                        $insert['name'] = null;
+                        //$success .= 'Falta el name <br>';
+                    }
                     if ($nombre) {
                         $insert['nombre'] = trim($nombre);
                     } else {
@@ -929,7 +938,7 @@ class PlantillaController extends Controller
                     // Seleccionar todos los dt y dd dentro de div.contentitem
                     $dtElements = $xpathJugador->query('//div[@class="contentitem"]/dl/dt');
                     $ddElements = $xpathJugador->query('//div[@class="contentitem"]/dl/dd');
-
+                    $name = '';
                     $nombre = '';
                     $apellido = '';
                     $nacimiento = '';
@@ -947,6 +956,9 @@ class PlantillaController extends Controller
                         // Agregar los datos a la persona según el título (dt) encontrado
                         switch ($dtText) {
                             case 'Nombre':
+                                if (empty($name)) {
+                                    $name = $ddText; // Guarda solo la primera aparición
+                                }
                                 $nombre = $ddText;
                                 break;
                             case 'Apellidos':
@@ -1041,6 +1053,13 @@ class PlantillaController extends Controller
                     }
 
                     // Insertar los datos de la persona
+                    if ($name) {
+                        $insert['name'] = $name;
+                    } else {
+                        Log::info('Falta el name', []);
+                        $insert['name'] = null;
+                        //$success .= 'Falta el name <br>';
+                    }
                     if ($nombre) {
                         $insert['nombre'] = $nombre;
                     } else {
