@@ -40,7 +40,10 @@
                         <dt>Nombre</dt>
                         <dd>{{$jugador->persona->name}}</dd>
                     </div>
-
+                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                        <dt>Completo</dt>
+                        <dd>{{$jugador->persona->name}} {{$jugador->persona->apellido}}</dd>
+                    </div>
 
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
                         <dt>Ciudad Nacimiento</dt>

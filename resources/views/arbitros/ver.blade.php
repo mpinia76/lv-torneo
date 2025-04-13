@@ -9,13 +9,14 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Nombre</dt>
-                <dd>{{$arbitro->persona->nombre}}</dd>
+                <dd>{{$arbitro->persona->name}}</dd>
             </div>
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-4">
-                <dt>Apellido</dt>
-                <dd>{{$arbitro->persona->apellido}}</dd>
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <dt>Completo</dt>
+                <dd>{{$arbitro->persona->name}} {{$arbitro->persona->apellido}}</dd>
             </div>
+
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
                 <dt>Ciudad Nacimiento</dt>
                 <dd>{{$arbitro->persona->ciudad}}</dd>

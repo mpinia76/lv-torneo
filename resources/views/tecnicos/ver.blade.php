@@ -40,7 +40,10 @@
                     <dt>Nombre</dt>
                     <dd>{{$tecnico->persona->name}}</dd>
                 </div>
-
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    <dt>Completo</dt>
+                    <dd>{{$tecnico->persona->name}} {{$tecnico->persona->apellido}}</dd>
+                </div>
 
                 <div class="form-group col-xs-12 col-sm-6 col-md-3">
                     <dt>Ciudad Nacimiento</dt>
