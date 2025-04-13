@@ -60,7 +60,7 @@ class AlineacionController extends Controller
 
         //$jugadorsL = PlantillaJugador::SELECT('jugadors.id','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->Join('jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
 
-        $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+        $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.name, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
 
 
         //dd($jugadorsL);
@@ -79,7 +79,7 @@ class AlineacionController extends Controller
 
         $jugadorsV = $jugadorsV->pluck('jugador.full_name','jugador_id')->sortBy('jugador.apellido')->prepend('','');*/
 
-        $jugadorsV = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillavs))->distinct()->get();
+        $jugadorsV = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.name, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillavs))->distinct()->get();
 
         $jugadorsV = $jugadorsV->pluck('nombre_dorsal','id')->sortBy('apellido')->prepend('','');
 
