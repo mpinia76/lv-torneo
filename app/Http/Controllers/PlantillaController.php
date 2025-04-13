@@ -187,7 +187,8 @@ class PlantillaController extends Controller
             ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
             ->where(function ($query) use ($search) {
                 $query->where('apellido', 'LIKE', "%$search%")
-                    ->orWhere('nombre', 'LIKE', "%$search%");
+                    ->orWhere('nombre', 'LIKE', "%$search%")
+                    ->orWhere('name', 'LIKE', "%$search%");
             })
             ->orderBy('personas.apellido', 'asc')
             ->orderBy('personas.nombre', 'asc')
