@@ -34,6 +34,7 @@
     <table class="table">
         <thead>
         <th></th>
+        <th>Mostrar</th>
         <th>Apellido</th>
         <th>Nombre</th>
 
@@ -50,6 +51,7 @@
                         <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" > <img id="original" src="{{ $tecnico->persona->bandera_url }}" alt="{{ $tecnico->persona->nacionalidad }}">
                     @endif
                 </td>
+                <td>{{$tecnico->name}}</td>
                 <td>{{$tecnico->apellido}}</td>
                 <td>{{$tecnico->nombre}}</td>
 

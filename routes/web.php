@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 use Illuminate\Support\Facades\Soap;
 use Illuminate\Http\Response;
-
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -147,4 +147,15 @@ Route::get('titulosHistorico', 'TorneoController@titulos')->name('torneos.titulo
 Route::get('logout', 'Auth\LoginController@logout');
 
 
+Route::get('/ejecutar-actualizar-nombres', function (Request $request) {
+    // Token de seguridad
+    $token = $request->query('token');
 
+    if ($token !== 'Zp4rV9kN2qM7LbXy') {
+        abort(403, 'Acceso no autorizado');
+    }
+
+    Artisan::call('personas:actualizar-nombres');
+
+    return '✅ Comando ejecutado correctamente.';
+});

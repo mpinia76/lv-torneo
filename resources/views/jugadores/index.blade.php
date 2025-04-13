@@ -37,6 +37,7 @@
         <thead>
         <th></th>
         <th>Posición</th>
+        <th>Mostrar</th>
         <th>Apellido</th>
         <th>Nombre</th>
 
@@ -57,6 +58,7 @@
                     @endif <img id="original" src="{{ $jugador->persona->bandera_url }}" alt="{{ $jugador->persona->nacionalidad }}">
                 </td>
                 <td>{{$jugador->tipoJugador}}</td>
+                <td>{{$jugador->name}}</td>
                 <td>{{$jugador->apellido}}</td>
                 <td>{{$jugador->nombre}}</td>
 

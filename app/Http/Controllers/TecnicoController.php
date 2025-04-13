@@ -51,7 +51,7 @@ class TecnicoController extends Controller
         //$tecnicos=Tecnico::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
 
-        $tecnicos=Tecnico::SELECT('tecnicos.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
+        $tecnicos=Tecnico::SELECT('tecnicos.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
         return view('tecnicos.index', compact('tecnicos'));
     }
@@ -87,7 +87,7 @@ class TecnicoController extends Controller
      */
     public function store(Request $request)
     {
-        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+        $this->validate($request,[ 'name'=>'required','nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -101,7 +101,7 @@ class TecnicoController extends Controller
             $insert['foto'] = "$name";
         }
 
-
+        $insert['name'] = $request->get('name');
         $insert['nombre'] = $request->get('nombre');
         $insert['apellido'] = $request->get('apellido');
         $insert['email'] = $request->get('email');
@@ -190,7 +190,7 @@ class TecnicoController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $this->validate($request,[ 'nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+        $this->validate($request,[ 'name'=>'required','nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -204,7 +204,7 @@ class TecnicoController extends Controller
             $update['foto'] = "$name";
         }
 
-
+        $update['name'] = $request->get('name');
         $update['nombre'] = $request->get('nombre');
         $update['apellido'] = $request->get('apellido');
         $update['email'] = $request->get('email');

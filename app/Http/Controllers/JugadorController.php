@@ -57,7 +57,7 @@ class JugadorController extends Controller
 
         //$jugadores=Jugador::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
-        $jugadores=Jugador::SELECT('jugadors.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.ciudad','personas.nacionalidad','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->orderBy('nombre','ASC')->paginate();
+        $jugadores=Jugador::SELECT('jugadors.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.ciudad','personas.nacionalidad','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->orderBy('nombre','ASC')->paginate();
 
         //$jugadores=Jugador::where('persona_id','like',"%4914%")->paginate();
 
@@ -103,7 +103,7 @@ class JugadorController extends Controller
         //
         //Log::info(print_r($request->file(), true));
 
-        $this->validate($request,[ 'tipoJugador'=>'required','nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+        $this->validate($request,[ 'tipoJugador'=>'required','name'=>'required','nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -119,7 +119,7 @@ class JugadorController extends Controller
             $files->move($destinationPath, $profileImage);*/
             $insert['foto'] = "$name";
         }
-
+        $insert['name'] = $request->get('name');
         $insert['nombre'] = $request->get('nombre');
         $insert['apellido'] = $request->get('apellido');
         $insert['email'] = $request->get('email');
@@ -227,7 +227,7 @@ class JugadorController extends Controller
     public function update(Request $request, $id)
     {
         //
-        $this->validate($request,[ 'tipoJugador'=>'required','nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
+        $this->validate($request,[ 'tipoJugador'=>'required','name'=>'required','nombre'=>'required', 'apellido'=>'required','foto' => 'image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048']);
 
 
         if ($files = $request->file('foto')) {
@@ -244,6 +244,7 @@ class JugadorController extends Controller
             $update['foto'] = "$name";
         }
 
+        $update['name'] = $request->get('name');
         $update['nombre'] = $request->get('nombre');
         $update['apellido'] = $request->get('apellido');
         $update['email'] = $request->get('email');
@@ -1086,7 +1087,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
         if ($htmlContent) {
 
-
+            $name = '';
             $nombre = '';
             $apellido = '';
             $nacimiento = '';
@@ -1117,8 +1118,10 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
                     // Remover el apellido para obtener solo el nombre
                     $nombre = trim(str_replace($apellido, '', $fullText));
+                    $name = $apellido.', '.$nombre;
                 } else {
                     $nombre = trim($fullText);
+                    $name = trim($fullText);
                     $apellido = '';
                 }
             }
@@ -1272,12 +1275,22 @@ WHERE (alineacions.jugador_id = ".$id.")";
             }
 
             // Insertar los datos de la persona
+
+            if ($name) {
+                $insert['name'] = trim($name);
+            } else {
+                Log::info('Falta el name', []);
+                $success .='Falta el name <br>';
+            }
+
             if ($nombre) {
                 $insert['nombre'] = trim($nombre);
             } else {
                 Log::info('Falta el nombre', []);
                 $success .='Falta el nombre <br>';
             }
+
+
 
             if ($apellido) {
                 $insert['apellido'] = trim($apellido);
@@ -1405,6 +1418,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             $dtElements = $xpath->query('//div[@class="contentitem"]/dl/dt');
             $ddElements = $xpath->query('//div[@class="contentitem"]/dl/dd');
 
+            $name = '';
             $nombre = '';
             $apellido = '';
             $nacimiento = '';
@@ -1422,6 +1436,9 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 // Agregar los datos a la persona según el título (dt) encontrado
                 switch ($dtText) {
                     case 'Nombre':
+                        if (empty($name)) {
+                            $name = $ddText; // Guarda solo la primera aparición
+                        }
                         $nombre = $ddText;
                         break;
                     case 'Apellidos':
@@ -1516,6 +1533,12 @@ WHERE (alineacions.jugador_id = ".$id.")";
             }
 
             // Insertar los datos de la persona
+            if ($name) {
+                $insert['name'] = $name;
+            } else {
+                Log::info('Falta el name', []);
+                $success .='Falta el name <br>';
+            }
             if ($nombre) {
                 $insert['nombre'] = $nombre;
             } else {
@@ -1642,6 +1665,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
             $dtElements = $html->find('div.contentitem dl dt');
             $ddElements = $html->find('div.contentitem dl dd');
+            $name='';
             $nombre='';
             $apellido='';
             $nacimiento='';
@@ -1659,6 +1683,9 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 switch ($dtText) {
 
                     case 'Nombre':
+                        if (empty($name)) {
+                            $name = $ddText; // Guarda solo la primera aparición
+                        }
                         $nombre = $ddText;
 
                         break;
@@ -1754,6 +1781,12 @@ WHERE (alineacions.jugador_id = ".$id.")";
             }
             else{
                 Log::info('OJO!!! no tiene foto: ' .$imageUrl, []);
+            }
+            if ($name){
+                $insert['name'] = $name;
+            }
+            else{
+                Log::info('OJO!!! falta el name', []);
             }
             if ($nombre){
                 $insert['nombre'] = $nombre;

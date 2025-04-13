@@ -33,10 +33,14 @@
                 {{Form::label('apellido', 'Apellido')}}
                 {{Form::text('apellido', $tecnico->persona->apellido, ['class' => 'form-control'])}}
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <!--<div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('email', 'E-mail')}}
                 {{Form::email('email', $tecnico->persona->email, ['class' => 'form-control'])}}
 
+            </div>-->
+            <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                {{Form::label('name', 'Mostrar')}}
+                {{Form::text('name', $tecnico->persona->name, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{ Form::label('verificado', 'Verificado', ['class' => 'control-label']) }}
@@ -51,19 +55,19 @@
         <div class="row">
 
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+            <!--<div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
                 {{Form::text('telefono', $tecnico->persona->telefono, ['class' => 'form-control'])}}
-            </div>
-
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                {{Form::label('ciudad', 'Ciudad Nacimiento')}}
-                {{Form::text('ciudad', $tecnico->persona->ciudad, ['class' => 'form-control'])}}
-            </div>
+            </div>-->
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacionalidad', 'Nacionalidad')}}
                 {{Form::text('nacionalidad', $tecnico->persona->nacionalidad, ['class' => 'form-control'])}}
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('ciudad', 'Ciudad Nacimiento')}}
+                {{Form::text('ciudad', $tecnico->persona->ciudad, ['class' => 'form-control'])}}
+            </div>
+
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}
                 {{Form::date('nacimiento', ($tecnico->persona->nacimiento)?date('Y-m-d', strtotime($tecnico->persona->nacimiento)):'', ['class' => 'form-control'])}}

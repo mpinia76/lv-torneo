@@ -7,7 +7,7 @@ use Carbon\Carbon;
 
 class Persona extends Model
 {
-    protected $fillable = ['nombre', 'apellido','email','telefono','ciudad','observaciones','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento','nacionalidad','verificado'];
+    protected $fillable = ['name','nombre', 'apellido','email','telefono','ciudad','observaciones','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento','nacionalidad','verificado'];
 
     public function jugador()
     {
@@ -25,6 +25,11 @@ class Persona extends Model
     }
 
     public function getFullNameAttribute()
+    {
+        return $this->name;
+    }
+
+    public function getFullNameCompleteAttribute()
     {
         return $this->apellido . ', ' . $this->nombre;
     }

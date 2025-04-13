@@ -33,7 +33,7 @@
                 {{Form::label('apellido', 'Apellido')}}
                 {{Form::text('apellido', $jugador->persona->apellido, ['class' => 'form-control'])}}
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+            <!--<div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('tipoDocumento', 'Tipo')}}
                 {{ Form::select('tipoDocumento',['DNI'=>'DNI','PAS'=>'Pasaporte','CI'=>'Cedula'], $jugador->persona->tipoDocumento,['class' => 'form-control']) }}
 
@@ -41,12 +41,16 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('documento', 'Documento')}}
                 {{Form::text('documento', $jugador->persona->documento, ['class' => 'form-control'])}}
+            </div>-->
+            <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                {{Form::label('name', 'Mostrar')}}
+                {{Form::text('name', $jugador->persona->name, ['class' => 'form-control'])}}
             </div>
 
         </div>
         <div class="row">
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <!--<div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('email', 'E-mail')}}
                 {{Form::email('email', $jugador->persona->email, ['class' => 'form-control'])}}
 
@@ -54,6 +58,14 @@
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('telefono', 'Teléfono')}}
                 {{Form::text('telefono', $jugador->persona->telefono, ['class' => 'form-control'])}}
+            </div>-->
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('nacionalidad', 'Nacionalidad')}}
+                {{Form::text('nacionalidad', $jugador->persona->nacionalidad, ['class' => 'form-control'])}}
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('ciudad', 'Ciudad Nacimiento')}}
+                {{Form::text('ciudad', $jugador->persona->ciudad, ['class' => 'form-control'])}}
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('nacimiento', 'Nacimiento')}}
@@ -63,18 +75,12 @@
                 {{Form::label('fallecimiento', 'Fallecimiento')}}
                 {{Form::date('fallecimiento', ($jugador->persona->fallecimiento)?date('Y-m-d', strtotime($jugador->persona->fallecimiento)):'', ['class' => 'form-control'])}}
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                {{Form::label('ciudad', 'Ciudad Nacimiento')}}
-                {{Form::text('ciudad', $jugador->persona->ciudad, ['class' => 'form-control'])}}
-            </div>
+
 
         </div>
         <div class="row">
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                {{Form::label('nacionalidad', 'Nacionalidad')}}
-                {{Form::text('nacionalidad', $jugador->persona->nacionalidad, ['class' => 'form-control'])}}
-            </div>
+
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('tipoJugador', 'Posición')}}
                 {{ Form::select('tipoJugador',[''=>'Seleccionar...','Arquero'=>'Arquero','Defensor'=>'Defensor','Medio'=>'Medio','Delantero'=>'Delantero'],$jugador->tipoJugador, ['class' => 'form-control']) }}
