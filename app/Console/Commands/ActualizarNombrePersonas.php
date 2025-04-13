@@ -12,6 +12,7 @@ class ActualizarNombrePersonas extends Command
 
     public function handle()
     {
+        set_time_limit(0);
         $total = 0;
 
         \App\Persona::chunk(500, function ($personas) use (&$total) {
