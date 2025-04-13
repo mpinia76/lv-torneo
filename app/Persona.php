@@ -36,6 +36,11 @@ class Persona extends Model
 
     public function getFullNameAgeAttribute()
     {
+        return $this->name.' ('.$this->getAgeAttribute().')';
+    }
+
+    public function getFullNameCompleteAgeAttribute()
+    {
         return $this->apellido . ', ' . $this->nombre.' ('.$this->getAgeAttribute().')';
     }
 

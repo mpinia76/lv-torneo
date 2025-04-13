@@ -17,8 +17,8 @@
                 <dd>{{$jugador->persona->apellido}}</dd>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
-                <dt>Documento</dt>
-                <dd>{{$jugador->persona->tipoDocumento}} {{$jugador->persona->documento}}</dd>
+                <dt>Mostrar</dt>
+                <dd>{{$jugador->persona->name}}</dd>
             </div>
 
         </div>

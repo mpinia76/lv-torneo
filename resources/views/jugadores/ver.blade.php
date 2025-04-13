@@ -38,13 +38,10 @@
                 <div class="row">
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
                         <dt>Nombre</dt>
-                        <dd>{{$jugador->persona->nombre}}</dd>
+                        <dd>{{$jugador->persona->name}}</dd>
                     </div>
 
-                    <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                        <dt>Apellido</dt>
-                        <dd>{{$jugador->persona->apellido}}</dd>
-                    </div>
+
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
                         <dt>Ciudad Nacimiento</dt>
                         <dd>{{$jugador->persona->ciudad}}</dd>

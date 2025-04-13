@@ -832,7 +832,7 @@ WHERE ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = ".$id.") OR (c
 
         $tipo = ($request->query('tipo'))?$request->query('tipo'):'';
 
-        $sql = 'SELECT jugadors.id, CONCAT(personas.apellido,\', \',personas.nombre) jugador, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as foto
+        $sql = 'SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as foto
 , count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
@@ -931,7 +931,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
 
         $tipo = ($request->query('tipo'))?$request->query('tipo'):'';
 
-        $sql = 'SELECT jugadors.id, CONCAT(personas.apellido,\', \',personas.nombre) jugador, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+        $sql = 'SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
 , count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" foto
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
