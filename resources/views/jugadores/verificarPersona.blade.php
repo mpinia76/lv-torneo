@@ -57,6 +57,7 @@
             <thead>
             <th></th>
             <th>Id</th>
+            <th>Mostrar</th>
             <th>Apellido</th>
             <th>Nombre</th>
 
@@ -93,6 +94,7 @@
                         <img id="original" src="{{ $personaSimilares->bandera_url }}" alt="{{ $personaSimilares->nacionalidad }}">
                     </td>
                     <td>  {{$personaSimilares->id}}</td>
+                    <td>{{$personaSimilares->name}}</td>
                     <td>{{$personaSimilares->apellido}}</td>
                     <td>{{$personaSimilares->nombre}}</td>
 
@@ -155,6 +157,7 @@
                             <thead>
                             <th></th>
                             <th>Id</th>
+                            <th>Mostrar</th>
                             <th>Apellido</th>
                             <th>Nombre</th>
 
@@ -191,6 +194,7 @@
                                         <img id="original" src="{{ $sinNombreApellido->bandera_url }}" alt="{{ $sinNombreApellido->nacionalidad }}">
                                     </td>
                                     <td>  {{$sinNombreApellido->id}}</td>
+                                    <td>{{$sinNombreApellido->name}}</td>
                                     <td>{{$sinNombreApellido->apellido}}</td>
                                     <td>{{$sinNombreApellido->nombre}}</td>
 
@@ -238,6 +242,7 @@
                             <thead>
                             <th></th>
                             <th>Id</th>
+                            <th>Mostrar</th>
                             <th>Apellido</th>
                             <th>Nombre</th>
 
@@ -274,6 +279,7 @@
                                         <img id="original" src="{{ $SinBandera->bandera_url }}" alt="{{ $SinBandera->nacionalidad }}">
                                     </td>
                                     <td>  {{$SinBandera->id}}</td>
+                                    <td>{{$SinBandera->name}}</td>
                                     <td>{{$SinBandera->apellido}}</td>
                                     <td>{{$SinBandera->nombre}}</td>
 
