@@ -6954,7 +6954,8 @@ return $string;
                             foreach ($partesNombre as $parte) {
                                 $query->where(function ($query) use ($parte) {
                                     $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
                                 });
                             }
                         })
@@ -6997,7 +6998,8 @@ return $string;
                             foreach ($partesNombre as $parte) {
                                 $query->where(function ($query) use ($parte) {
                                     $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
                                 });
                             }
                         })
@@ -7041,7 +7043,8 @@ return $string;
                             foreach ($partesNombre as $parte) {
                                 $query->where(function ($query) use ($parte) {
                                     $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
                                 });
                             }
                         })
@@ -7089,7 +7092,8 @@ return $string;
                             foreach ($partesNombre as $parte) {
                                 $query->where(function ($query) use ($parte) {
                                     $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
                                 });
                             }
                         })
@@ -7139,7 +7143,8 @@ return $string;
                             foreach ($partesNombre as $parte) {
                                 $query->where(function ($query) use ($parte) {
                                     $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
                                 });
                             }
                         })
@@ -7237,7 +7242,8 @@ return $string;
                                         foreach ($partesNombre as $parte) {
                                             $query->where(function ($query) use ($parte) {
                                                 $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                                    ->orWhere('personas.name', 'LIKE', "%$parte%");
                                             });
                                         }
                                     })
@@ -7303,7 +7309,8 @@ return $string;
                                         foreach ($partesNombre as $parte) {
                                             $query->where(function ($query) use ($parte) {
                                                 $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%");
+                                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                                    ->orWhere('personas.name', 'LIKE', "%$parte%");
                                             });
                                         }
                                     })
