@@ -14,7 +14,7 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <dt>Completo</dt>
-                <dd>{{$arbitro->persona->name}} {{$arbitro->persona->apellido}}</dd>
+                <dd>{{$arbitro->persona->nombre}} {{$arbitro->persona->apellido}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
