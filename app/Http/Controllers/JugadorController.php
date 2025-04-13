@@ -1418,7 +1418,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             $dtElements = $xpath->query('//div[@class="contentitem"]/dl/dt');
             $ddElements = $xpath->query('//div[@class="contentitem"]/dl/dd');
 
-            $name = '';
+            $name = null;
             $nombre = '';
             $apellido = '';
             $nacimiento = '';
@@ -1436,6 +1436,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 // Agregar los datos a la persona según el título (dt) encontrado
                 switch ($dtText) {
                     case 'Nombre':
+                        log::info($ddText);
                         if (empty($name)) {
                             $name = $ddText; // Guarda solo la primera aparición
                         }
