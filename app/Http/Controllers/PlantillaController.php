@@ -1149,7 +1149,7 @@ class PlantillaController extends Controller
                 } else {
                     Log::info('No se encontró la URL: ' . $urlJugador, []);
                     //$error = 'No se encontró la URL: ' . $urlJugador;
-                    $success .= 'No se encontró la URL: ' . $urlJugador.'<br>';
+                    //$success .= 'No se encontró la URL: ' . $urlJugador.'<br>';
                 }
                 if ($htmlContentJugador) {
                     $data2 = array(
