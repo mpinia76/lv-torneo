@@ -1149,38 +1149,38 @@ class PlantillaController extends Controller
                 } else {
                     Log::info('No se encontró la URL: ' . $urlJugador, []);
                     //$error = 'No se encontró la URL: ' . $urlJugador;
+                    $success .= 'No se encontró la URL: ' . $urlJugador.'<br>';
                 }
-
-                $data2=array(
-                    'plantilla_id'=>$id,
-                    'jugador_id'=>$persona->jugador->id,
-                    'dorsal' => is_numeric($dorsal) ? $dorsal : null
-                );
-                try {
-                    Log::info('Contenido de data: ' . json_encode($data2));
-                    PlantillaJugador::create($data2);
-
-
+                if ($htmlContentJugador) {
+                    $data2 = array(
+                        'plantilla_id' => $id,
+                        'jugador_id' => $persona->jugador->id,
+                        'dorsal' => is_numeric($dorsal) ? $dorsal : null
+                    );
+                    try {
+                        Log::info('Contenido de data: ' . json_encode($data2));
+                        PlantillaJugador::create($data2);
 
 
-                }catch(QueryException $ex){
-                    if ($ex->errorInfo[1] === 1062) {
-                        if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
-                            $consultarPlantilla=PlantillaJugador::where('plantilla_id',"$id")->where('dorsal', $dorsal)->first();
-                            $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
-                            $success .= "El dorsal ".$dorsal." ya lo usa ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
-                        } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
-                            $jugadorRepetido = Jugador::where('id', '=', $persona->jugador->id)->first();
-                            $success .= "Jugador repetido: ".$jugadorRepetido->persona->apellido.", ".$jugadorRepetido->persona->nombre. '<br>';
+                    } catch (QueryException $ex) {
+                        if ($ex->errorInfo[1] === 1062) {
+                            if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
+                                $consultarPlantilla = PlantillaJugador::where('plantilla_id', "$id")->where('dorsal', $dorsal)->first();
+                                $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
+                                $success .= "El dorsal " . $dorsal . " ya lo usa " . $jugadorRepetido->persona->apellido . ", " . $jugadorRepetido->persona->nombre . '<br>';
+                            } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
+                                $jugadorRepetido = Jugador::where('id', '=', $persona->jugador->id)->first();
+                                $success .= "Jugador repetido: " . $jugadorRepetido->persona->apellido . ", " . $jugadorRepetido->persona->nombre . '<br>';
+                            } else {
+                                $error = $ex->getMessage();
+                            }
                         } else {
                             $error = $ex->getMessage();
                         }
-                    } else {
-                        $error = $ex->getMessage();
-                    }
 
-                    /*$ok=0;
-                    continue;*/
+                        /*$ok=0;
+                        continue;*/
+                    }
                 }
 
             }
