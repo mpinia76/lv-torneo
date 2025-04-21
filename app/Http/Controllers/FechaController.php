@@ -502,7 +502,10 @@ class FechaController extends Controller
 
                                         $fechaHora = substr($textoColumna, 3); // Extraemos la fecha de ida
                                         // Separar fecha y hora
-                                        list($fecha, $hora) = explode(' ', $fechaHora);
+                                        //list($fecha, $hora) = explode(' ', $fechaHora);
+                                        $partes = explode(' ', $fechaHora);
+                                        $fecha = $partes[0] ?? null;
+                                        $hora = $partes[1] ?? '00:00'; // Si no hay hora, asignamos "00:00"
 
 // Separar los componentes de la fecha (dd.mm.yyyy)
                                         list($dia, $mes, $anio) = explode('.', $fecha);
@@ -520,7 +523,10 @@ class FechaController extends Controller
 
                                         $fechaHora = substr($textoColumna, 3); // Extraemos la fecha de ida
                                         // Separar fecha y hora
-                                        list($fecha, $hora) = explode(' ', $fechaHora);
+                                        //list($fecha, $hora) = explode(' ', $fechaHora);
+                                        $partes = explode(' ', $fechaHora);
+                                        $fecha = $partes[0] ?? null;
+                                        $hora = $partes[1] ?? '00:00'; // Si no hay hora, asignamos "00:00"
 
 // Separar los componentes de la fecha (dd.mm.yyyy)
                                         list($dia, $mes, $anio) = explode('.', $fecha);
