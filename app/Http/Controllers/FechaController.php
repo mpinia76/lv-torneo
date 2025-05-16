@@ -7201,31 +7201,36 @@ return $string;
                     $strEquipo = trim($eq['equipo']);
                     $equipo = Equipo::where('nombre', 'like', "%$strEquipo%")->first();
                     if (!empty($equipo)) {
-                        // Detectar dorsales duplicados
-                        // Revisión de dorsales repetidos en el equipo
+                        // Detectar dorsales duplicados en el equipo
                         $dorsales = [];
                         $dorsalesRepetidos = [];
 
                         foreach ($eq['jugadores'] as $jugador) {
-                            $dorsal = $jugador['dorsal'] ?? null;
+                            $dorsal = isset($jugador['dorsal']) ? trim($jugador['dorsal']) : '';
 
-                            if ($dorsal !== null) {
-                                if (isset($dorsales[$dorsal])) {
-                                    // Ya existe este dorsal en el equipo, es repetido
-                                    $dorsalesRepetidos[$dorsal][] = $jugador['nombre'];
-                                } else {
-                                    $dorsales[$dorsal] = $jugador['nombre'];
+                            // Ignorar si el dorsal está vacío
+                            if ($dorsal === '') {
+                                continue;
+                            }
+
+                            if (isset($dorsales[$dorsal])) {
+                                // Si ya existe, agregamos al actual como repetido
+                                // Si es la primera repetición, también agregamos al primero registrado
+                                if (!isset($dorsalesRepetidos[$dorsal])) {
+                                    $dorsalesRepetidos[$dorsal] = [$dorsales[$dorsal]];
                                 }
+                                $dorsalesRepetidos[$dorsal][] = $jugador['nombre'];
+                            } else {
+                                $dorsales[$dorsal] = $jugador['nombre'];
                             }
                         }
 
                         if (!empty($dorsalesRepetidos)) {
                             foreach ($dorsalesRepetidos as $dorsal => $jugadores) {
-                                $jugadores[] = $dorsales[$dorsal]; // incluir el primero también
-                                //Log::channel('mi_log')->warning("DORSAL REPETIDO en equipo $strEquipo: dorsal $dorsal usado por " . implode(', ', $jugadores));
-                                $success .= 'DORSAL REPETIDO en equipo '.$strEquipo.': dorsal '.$dorsal.' usado por ' . implode(', ', $jugadores). '<br>';
+                                $success .= 'DORSAL REPETIDO en equipo ' . $strEquipo . ': dorsal ' . $dorsal . ' usado por ' . implode(', ', $jugadores) . '<br>';
                             }
                         }
+
                         foreach ($eq['jugadores'] as $jugador) {
                             //Log::channel('mi_log')->info(json_encode($jugador), []);
                             $jugador_id = 0;
