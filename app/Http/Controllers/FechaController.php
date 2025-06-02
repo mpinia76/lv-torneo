@@ -918,7 +918,7 @@ class FechaController extends Controller
                                         }*/
 
                                     }catch(QueryException $ex){
-                                        $error = $ex->getMessage();
+                                        $error .= $ex->getMessage();
                                         $ok=0;
                                         continue;
                                     }

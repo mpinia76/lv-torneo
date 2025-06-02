@@ -39,6 +39,10 @@
                 <dd>{{$tecnico->persona->ciudad}}</dd>
 
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <img id="original" src="{{ $tecnico->persona->bandera_url }}" alt="{{ $tecnico->persona->nacionalidad }}">
+
+            </div>
         </div>
         <div class="row">
 
