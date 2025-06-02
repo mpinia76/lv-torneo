@@ -219,7 +219,15 @@ class PlantillaController extends Controller
 
         $grupo=Grupo::findOrFail($plantilla->grupo->id);
 
-        $plantillaJugadors = PlantillaJugador::where('plantilla_id','=',"$id")->orderBy('dorsal','asc')->get();
+        //$plantillaJugadors = PlantillaJugador::where('plantilla_id','=',"$id")->orderBy('dorsal','asc')->get();
+        $plantillaJugadors = PlantillaJugador::select('plantilla_jugadors.*')
+            ->leftJoin('jugadors', 'plantilla_jugadors.jugador_id', '=', 'jugadors.id')
+            ->leftJoin('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->where('plantilla_jugadors.plantilla_id', $id)
+            ->orderByRaw('CASE WHEN plantilla_jugadors.dorsal IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('plantilla_jugadors.dorsal')
+            ->orderBy('personas.name')
+            ->get();
 
         $arrplantillajugador='';
         foreach ($plantillaJugadors as $plantillaJugador){
