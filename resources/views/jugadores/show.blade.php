@@ -64,10 +64,7 @@
                 <dd>{{$jugador->persona->peso}} kg.</dd>
 
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <img id="original" src="{{ $jugador->persona->bandera_url }}" alt="{{ $jugador->persona->nacionalidad }}">
 
-            </div>
         </div>
         <div class="row">
 
@@ -87,6 +84,12 @@
 
             </div>
 
+        </div>
+        <div class="row">
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                <img id="original" src="{{ $jugador->persona->bandera_url }}" alt="{{ $jugador->persona->nacionalidad }}">
+
+            </div>
         </div>
 
 
