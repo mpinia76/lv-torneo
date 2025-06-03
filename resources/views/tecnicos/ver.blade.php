@@ -62,7 +62,7 @@
         </div>
 
         <div class="row">
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <div style="text-align: center;" class="form-group col-xs-12 col-sm-6 col-md-2">
                 <img id="original" src="{{ $tecnico->persona->bandera_url }}" alt="{{ $tecnico->persona->nacionalidad }}">
 
             </div>
