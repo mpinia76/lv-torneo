@@ -459,54 +459,28 @@ class PlantillaController extends Controller
                 // Mostrar la información
 
                 try {
-                    if ($urlJugador && filter_var($urlJugador, FILTER_VALIDATE_URL)) {
-                        // Sanear la URL por si tiene caracteres invisibles o espacios
-                        $urlJugador = trim($urlJugador);
-                        $urlJugador = filter_var($urlJugador, FILTER_SANITIZE_URL);
+                    if ($urlJugador) {
+                        // Obtener el contenido de la URL
 
-                        Log::info('Probando URL: [' . $urlJugador . '] longitud: ' . strlen($urlJugador));
-
-                        // Obtener el contenido HTML con Guzzle
                         $htmlContentJugador = $this->getHtmlContent($urlJugador);
-
                         if (!empty($htmlContentJugador)) {
-                            Log::info('Contenido HTML recuperado: ' . $urlJugador);
-
-                            libxml_use_internal_errors(true);
+                            // Crear un nuevo DOMDocument
                             $domJugador = new \DOMDocument();
-
-                            // Intentar cargar el HTML
+                            libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
                             $domJugador->loadHTML($htmlContentJugador);
-                            $errors = libxml_get_errors();
                             libxml_clear_errors();
 
-                            // Registrar errores del DOM si existen
-                            if (!empty($errors)) {
-                                foreach ($errors as $error) {
-                                    $success .= 'Error DOM en ' . $urlJugador . ': ' . $error->message . '<br>';
-                                }
-                            }
-
-                            // Verificar si el DOM tiene nodos válidos
-                            if ($domJugador->hasChildNodes()) {
-                                $xpathJugador = new \DOMXPath($domJugador);
-                                // Continuar con el procesamiento...
-                            } else {
-                                $success .= 'DOM del jugador vacío o mal formado: ' . $urlJugador . '<br>';
-                                continue;
-                            }
+                            // Crear un nuevo objeto XPath
+                            $xpathJugador = new \DOMXPath($domJugador);
                         } else {
-                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador . '<br>';
-                            continue;
+                            // Manejo de error o asignación de valores por defecto
+                            //Log::warning('El contenido HTML del jugador está vacío: ' . $urlJugador);
+                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
                         }
                     }
-                } catch (\Throwable $ex) {
-                    $success .= 'Excepción al procesar ' . $urlJugador . ': ' . $ex->getMessage() . '<br>';
-                    Log::error('Error con URL: ' . $urlJugador . ' - ' . $ex->getMessage());
-                    continue;
+                } catch (Exception $ex) {
+                    $htmlContentJugador = '';
                 }
-
-
 
                 if ($htmlContentJugador) {
 
@@ -684,44 +658,42 @@ class PlantillaController extends Controller
                     // Descarga y guarda la imagen si no es el avatar por defecto
                     if (!str_contains($imageUrl, 'default.jpg')) {
                         try {
+                            // Validar si la URL parece válida
+                            if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                                throw new \Exception("URL inválida: $imageUrl");
+                            }
+
                             $client = new Client();
-                            //$response = $client->get($imageUrl);
-
-                            // Intentar obtener la imagen con reintentos y asegurarnos de que Guzzle lanza excepciones en caso de error HTTP
                             $response = $client->get($imageUrl, [
-                                'http_errors' => true,  // Asegura que Guzzle lanza excepciones en errores HTTP (como 502)
-                                'timeout' => 10, // Tiempo máximo de espera
+                                'http_errors' => true,
+                                'timeout' => 10,
                             ]);
-
 
                             if ($response->getStatusCode() === 200) {
                                 $imageData = $response->getBody()->getContents();
                                 $parsedUrl = parse_url($imageUrl);
                                 $pathInfo = pathinfo($parsedUrl['path']);
-                                $nombreArchivo = $pathInfo['filename'];
-                                $extension = $pathInfo['extension'];
+                                $nombreArchivo = $pathInfo['filename'] ?? 'imagen';
+                                $extension = $pathInfo['extension'] ?? 'jpg';
 
                                 if (strrchr($nombreArchivo, '.') === '.') {
                                     $nombreArchivo = substr($nombreArchivo, 0, -1);
                                 }
 
-                                // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
                                 $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
-                                Log::info('URL de la foto: ' . $localFilePath, []);
+                                Log::info('URL de la foto: ' . $localFilePath);
                                 $insert['foto'] = "$nombreArchivo.$extension";
 
                                 file_put_contents($localFilePath, $imageData);
-                                Log::info('Foto subida', []);
+                                Log::info('Foto subida');
                             } else {
-                                //Log::info('Foto no subida: ' . $fotoDiv[0]->getAttribute('alt'), []);
-                                $insert['foto'] =null;
-                                //$success .= 'Foto no subida: ' . $fotoDiv[0]->getAttribute('alt') . '<br>';
+                                $insert['foto'] = null;
                             }
-                        } catch (RequestException $e) {
-                            // Capturar la excepción y continuar con el flujo
-                            Log::error('Error al intentar obtener la imagen: ' . $e->getMessage(), []);
+                        } catch (\Exception $e) {
+                            Log::error('Error al intentar obtener la imagen: ' . $e->getMessage());
                             $insert['foto'] = null;
                         }
+
                     } else {
                         Log::info('No tiene foto: ' . $imageUrl, []);
                         $insert['foto'] =null;
