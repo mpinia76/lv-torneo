@@ -470,12 +470,20 @@ class PlantillaController extends Controller
                             $domJugador->loadHTML($htmlContentJugador);
                             libxml_clear_errors();
 
-                            // Crear un nuevo objeto XPath
-                            $xpathJugador = new \DOMXPath($domJugador);
+                            if ($domJugador->hasChildNodes()) {
+                                // Crear un nuevo objeto XPath
+                                $xpathJugador = new \DOMXPath($domJugador);
+                            } else {
+                                $success .= 'DOM del jugador vacío o mal formado: ' . $urlJugador;
+                                continue; // Salta este jugador
+                            }
+
+
                         } else {
                             // Manejo de error o asignación de valores por defecto
                             //Log::warning('El contenido HTML del jugador está vacío: ' . $urlJugador);
                             $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
+                            continue;
                         }
                     }
                 } catch (Exception $ex) {
