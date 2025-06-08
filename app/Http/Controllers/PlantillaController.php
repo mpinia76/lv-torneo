@@ -459,36 +459,39 @@ class PlantillaController extends Controller
                 // Mostrar la información
 
                 try {
-                    if ($urlJugador) {
-                        // Obtener el contenido de la URL
-
+                    if ($urlJugador && filter_var($urlJugador, FILTER_VALIDATE_URL)) {
                         $htmlContentJugador = $this->getHtmlContent($urlJugador);
+
                         if (!empty($htmlContentJugador)) {
-                            // Crear un nuevo DOMDocument
+                            libxml_use_internal_errors(true);
                             $domJugador = new \DOMDocument();
-                            libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
                             $domJugador->loadHTML($htmlContentJugador);
+                            $errors = libxml_get_errors();
                             libxml_clear_errors();
 
-                            if ($domJugador->hasChildNodes()) {
-                                // Crear un nuevo objeto XPath
-                                $xpathJugador = new \DOMXPath($domJugador);
-                            } else {
-                                $success .= 'DOM del jugador vacío o mal formado: ' . $urlJugador;
-                                continue; // Salta este jugador
+                            if (!empty($errors)) {
+                                foreach ($errors as $error) {
+                                    $success .= 'Error DOM en ' . $urlJugador . ': ' . $error->message . '<br>';
+                                }
                             }
 
-
+                            if ($domJugador->hasChildNodes()) {
+                                $xpathJugador = new \DOMXPath($domJugador);
+                                // continúa con el procesamiento
+                            } else {
+                                $success .= 'DOM del jugador vacío o mal formado: ' . $urlJugador . '<br>';
+                                continue;
+                            }
                         } else {
-                            // Manejo de error o asignación de valores por defecto
-                            //Log::warning('El contenido HTML del jugador está vacío: ' . $urlJugador);
-                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
+                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador . '<br>';
                             continue;
                         }
                     }
-                } catch (Exception $ex) {
-                    $htmlContentJugador = '';
+                } catch (\Throwable $ex) {
+                    $success .= 'Excepción al procesar ' . $urlJugador . ': ' . $ex->getMessage() . '<br>';
+                    continue;
                 }
+
 
                 if ($htmlContentJugador) {
 
