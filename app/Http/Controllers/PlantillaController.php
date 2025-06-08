@@ -460,9 +460,11 @@ class PlantillaController extends Controller
 
                 try {
                     if ($urlJugador && filter_var($urlJugador, FILTER_VALIDATE_URL)) {
+                        Log::info('urlJugador: ' . $urlJugador, []);
                         $htmlContentJugador = $this->getHtmlContent($urlJugador);
 
                         if (!empty($htmlContentJugador)) {
+                            Log::info('urlJugador no vacia: ' . $urlJugador, []);
                             libxml_use_internal_errors(true);
                             $domJugador = new \DOMDocument();
                             $domJugador->loadHTML($htmlContentJugador);
