@@ -460,26 +460,37 @@ class PlantillaController extends Controller
 
                 try {
                     if ($urlJugador && filter_var($urlJugador, FILTER_VALIDATE_URL)) {
-                        Log::info('urlJugador: ' . $urlJugador, []);
+                        // Sanear la URL por si tiene caracteres invisibles o espacios
+                        $urlJugador = trim($urlJugador);
+                        $urlJugador = filter_var($urlJugador, FILTER_SANITIZE_URL);
+
+                        Log::info('Probando URL: [' . $urlJugador . '] longitud: ' . strlen($urlJugador));
+
+                        // Obtener el contenido HTML con Guzzle
                         $htmlContentJugador = $this->getHtmlContent($urlJugador);
 
                         if (!empty($htmlContentJugador)) {
-                            Log::info('urlJugador no vacia: ' . $urlJugador, []);
+                            Log::info('Contenido HTML recuperado: ' . $urlJugador);
+
                             libxml_use_internal_errors(true);
                             $domJugador = new \DOMDocument();
+
+                            // Intentar cargar el HTML
                             $domJugador->loadHTML($htmlContentJugador);
                             $errors = libxml_get_errors();
                             libxml_clear_errors();
 
+                            // Registrar errores del DOM si existen
                             if (!empty($errors)) {
                                 foreach ($errors as $error) {
                                     $success .= 'Error DOM en ' . $urlJugador . ': ' . $error->message . '<br>';
                                 }
                             }
 
+                            // Verificar si el DOM tiene nodos válidos
                             if ($domJugador->hasChildNodes()) {
                                 $xpathJugador = new \DOMXPath($domJugador);
-                                // continúa con el procesamiento
+                                // Continuar con el procesamiento...
                             } else {
                                 $success .= 'DOM del jugador vacío o mal formado: ' . $urlJugador . '<br>';
                                 continue;
@@ -491,8 +502,10 @@ class PlantillaController extends Controller
                     }
                 } catch (\Throwable $ex) {
                     $success .= 'Excepción al procesar ' . $urlJugador . ': ' . $ex->getMessage() . '<br>';
+                    Log::error('Error con URL: ' . $urlJugador . ' - ' . $ex->getMessage());
                     continue;
                 }
+
 
 
                 if ($htmlContentJugador) {
