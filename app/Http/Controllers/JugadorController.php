@@ -1598,6 +1598,9 @@ WHERE (alineacions.jugador_id = ".$id.")";
                         ->first();
 
                     if (!empty($persona)) {
+                        if (!empty($persona->nacionalidad)) {
+                            unset($insert['nacionalidad']);
+                        }
                         $persona->update($insert);
                         $persona->jugador()->create($insert);
                     }

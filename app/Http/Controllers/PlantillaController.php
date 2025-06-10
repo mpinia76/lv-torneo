@@ -1140,10 +1140,14 @@ class PlantillaController extends Controller
                                 ->first();
 
                             if (!empty($persona)) {
+                                if (!empty($persona->nacionalidad)) {
+                                    unset($insert['nacionalidad']);
+                                }
                                 $persona->update($insert);
                                 $persona->jugador()->create($insert);
                             }
                         } catch (QueryException $ex) {
+
                             //$ok = 0;
                             $errorCode = $ex->errorInfo[1];
 
