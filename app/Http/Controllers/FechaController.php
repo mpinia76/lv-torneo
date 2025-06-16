@@ -578,7 +578,7 @@ class FechaController extends Controller
 
                             $grupo=Grupo::findOrFail($grupoId);
                             $grupos = Grupo::where('torneo_id', '=', $grupo->torneo->id)->pluck('id')->toArray();
-
+                            $torneo=Torneo::findOrFail($grupo->torneo->id);
                             $plantilla = Plantilla::whereIn('grupo_id', $grupos)
                                 ->whereIn('equipo_id', $equipol->pluck('id')->toArray())
                                 ->first();
@@ -670,7 +670,8 @@ class FechaController extends Controller
                                                 'golesl'=>$golesL,
                                                 'golesv'=>$golesV,
                                                 'penalesl'=>$penalesL,
-                                                'penalesv'=>$penalesV
+                                                'penalesv'=>$penalesV,
+                                                'neutral' => $torneo->neutral,
                                             );
                                             //Log::debug(print_r($data2, true));
                                             $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$idLocal")->where('equipov_id','=',"$idVisitante")->first();
