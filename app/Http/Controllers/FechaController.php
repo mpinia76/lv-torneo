@@ -146,6 +146,7 @@ class FechaController extends Controller
         }
         if ($ok){
             DB::commit();
+            \App\Helpers\PlayoffHelper::actualizarCruces($fecha->grupo->id);
             $respuestaID='success';
             $respuestaMSJ='Registro creado satisfactoriamente';
         }
@@ -283,6 +284,7 @@ class FechaController extends Controller
         }
         if ($ok){
             DB::commit();
+            \App\Helpers\PlayoffHelper::actualizarCruces($fecha->grupo->id);
             $respuestaID='success';
             $respuestaMSJ='Registro actualizado satisfactoriamente';
         }

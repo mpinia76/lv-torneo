@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Partido extends Model
 {
-    protected $fillable = ['fecha_id', 'dia', 'equipol_id','equipov_id','golesl','golesv','penalesl','penalesv'];
+    protected $fillable = ['fecha_id', 'dia', 'equipol_id','equipov_id','golesl','golesv','penalesl','penalesv', 'orden'];
 
     public function equipol()
     {

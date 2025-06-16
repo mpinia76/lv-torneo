@@ -46,6 +46,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::resource('alineaciones', 'AlineacionController');
     Route::resource('cambios', 'CambioController');
     Route::resource('incidencias', 'IncidenciaController');
+    Route::resource('cruces', 'CruceController');
 
     Route::get('importarJugador', 'JugadorController@importar')->name('jugadores.importar');
     Route::post('importarJugadorProcess', 'JugadorController@importarProcess');

@@ -18,4 +18,9 @@ class Torneo extends Model
         return $this->nombre . ' ' . $this->year;
     }
 
+    public function cruces()
+    {
+        return $this->hasMany('App\Cruce');
+    }
+
 }
