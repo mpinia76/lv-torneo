@@ -66,7 +66,14 @@
 
                 </div>
             </div>
-
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('neutral', 'Cancha Neutral', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label>
+                        {{ Form::checkbox('neutral', 1, false) }}
+                    </label>
+                </div>
+            </div>
         </div>
         <div class="row">
             <fieldset>

@@ -120,7 +120,8 @@ class FechaController extends Controller
                         'equipol_id' => $request->equipol[$item],
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
-                        'golesv' => $request->golesv[$item]
+                        'golesv' => $request->golesv[$item],
+                        'neutral' => $request->neutral[$item]
                     ];
 
 // Agregar penales solo si fueron enviados
@@ -247,7 +248,8 @@ class FechaController extends Controller
                         'equipol_id' => $request->equipol[$item],
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
-                        'golesv' => $request->golesv[$item]
+                        'golesv' => $request->golesv[$item],
+                        'neutral' => $request->neutral[$item]
                     ];
 
                     // Agregar penales solo si fueron enviados

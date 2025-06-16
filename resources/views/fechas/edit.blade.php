@@ -38,6 +38,7 @@
                     <thead>
                     <th >Fecha</th>
                     <th >Hora</th>
+                    <th>Neutral</th>
                     <th></th>
                     <th>Local</th>
                     <th>GL</th>
@@ -52,8 +53,13 @@
                     </thead>
 
                     <tbody id="cuerpoFecha">
+                    @php
+                        $i = 0;
+                    @endphp
                     @foreach($fecha->partidos as $partido)
-
+                        @php
+                            $i++;
+                        @endphp
                         <tr>
                             <td>{{Form::hidden('partido_id[]',$partido->id)}}
                                 {{Form::date('fecha[]', ($partido->dia)?date('Y-m-d', strtotime($partido->dia)):'', ['class' => 'form-control','style' =>'width:155px;'])}}
@@ -62,6 +68,7 @@
                                 {{Form::time('hora[]', ($partido->dia)?date('H:i', strtotime($partido->dia)):'', ['class' => 'form-control'])}}
 
                             </td>
+                            <td>{{ Form::checkbox('neutral[]', $i,$partido->neutral) }}</td>
                             <td> @if($partido->equipol)
                                     @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
                                     @endif
@@ -70,6 +77,7 @@
                                 {{ Form::select('equipol[]',$equipos, $partido->equipol_id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}</td>
                             <td>{{Form::number('golesl[]', $partido->golesl, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                             <td>{{Form::number('golesv[]', $partido->golesv, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
+
                             <td> @if($partido->equipov)
                                     @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
                                     @endif

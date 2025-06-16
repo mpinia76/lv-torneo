@@ -602,11 +602,13 @@
         var tr='<tr>'+
             '<td>'+'{{Form::date('fecha[]', '', ['class' => 'form-control','style' =>'width:155px;'])}}'+'</td>'+
             '<td>'+'{{Form::time('hora[]', '', ['class' => 'form-control'])}}'+'</td>'+
+            '<td>'+'{{ Form::checkbox('neutral[]', $i??'',false) }}'+'</td>'+
             '<td></td><td>'+'{{ Form::select('equipol[]',$equipos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}'+'</td>'+
             '<td>'+'{{Form::number('golesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>'+
             '<td>'+'{{Form::number('golesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>'+
             '<td></td><td>'+'{{ Form::select('equipov[]',$equipos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}'+'</td>';
-            @if((isset($grupo))&&($grupo->penales))
+
+        @if((isset($grupo))&&($grupo->penales))
                 tr=tr+'<td>'+'{{Form::number('penalesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>';
                 tr=tr+'<td>'+'{{Form::number('penalesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>';
                 @endif

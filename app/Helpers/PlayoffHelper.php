@@ -58,6 +58,7 @@ class PlayoffHelper
                 'equipol_id' => $equipo1,
                 'equipov_id' => $equipo2,
                 'dia' => $cruce->dia,
+                'neutral' => $cruce->neutral,
             ]);
         }
     }
