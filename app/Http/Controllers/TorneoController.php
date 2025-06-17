@@ -1680,6 +1680,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $maxGolesVisitantes = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesv = (SELECT MAX(golesv) FROM partidos)');
         $maxGolesNeutrales = $getPartidosQuery('partidos.neutral != 0 AND partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos)');
 
+        dd($maxGolesLocales);
         // Helper para fechas con más goles
         $getFechaMasGoles = function ($columna, $neutralCondition) {
             return DB::select(DB::raw("
