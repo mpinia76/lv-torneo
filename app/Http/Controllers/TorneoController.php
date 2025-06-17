@@ -1448,22 +1448,28 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
         $minGoles = $this->partidosPorGolesTotales($torneo_id, 'MIN');
 
         // Reuso una función para obtener partidos con max o min goles locales
-        $maxGolesLocales = $this->partidosPorGolesIndividuales($torneo_id, 'golesl', 'MAX');
-        $minGolesLocales = $this->partidosPorGolesIndividuales($torneo_id, 'golesl', 'MIN');
+        $maxGolesLocales = $this->partidosPorGolesIndividuales($torneo_id, 'golesl', 'MAX',2);
+        $minGolesLocales = $this->partidosPorGolesIndividuales($torneo_id, 'golesl', 'MIN',2);
 
         // Reuso una función para obtener partidos con max o min goles visitantes
-        $maxGolesVisitantes = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MAX');
-        $minGolesVisitantes = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MIN');
+        $maxGolesVisitantes = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MAX',2);
+        $minGolesVisitantes = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MIN',2);
+
+        $maxGolesNeutrales = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MAX',1);
+        $minGolesNeutrales = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MIN',1);
 
         // Reuso una función para obtener fechas con más/menos goles (totales, locales, visitantes)
         $fechaMasGoles = $this->fechasPorGoles($torneo_id, 'MAX', 'golesl + golesv');
         $fechaMinGoles = $this->fechasPorGoles($torneo_id, 'MIN', 'golesl + golesv');
 
-        $fechaMasGolesLocales = $this->fechasPorGoles($torneo_id, 'MAX', 'golesl');
-        $fechaMinGolesLocales = $this->fechasPorGoles($torneo_id, 'MIN', 'golesl');
+        $fechaMasGolesLocales = $this->fechasPorGoles($torneo_id, 'MAX', 'golesl',2);
+        $fechaMinGolesLocales = $this->fechasPorGoles($torneo_id, 'MIN', 'golesl',2);
 
-        $fechaMasGolesVisitantes = $this->fechasPorGoles($torneo_id, 'MAX', 'golesv');
-        $fechaMinGolesVisitantes = $this->fechasPorGoles($torneo_id, 'MIN', 'golesv');
+        $fechaMasGolesVisitantes = $this->fechasPorGoles($torneo_id, 'MAX', 'golesv',2);
+        $fechaMinGolesVisitantes = $this->fechasPorGoles($torneo_id, 'MIN', 'golesv',2);
+
+        $fechaMasGolesNeutrales = $this->fechasPorGoles($torneo_id, 'MAX', 'golesv',1);
+        $fechaMinGolesNeutrales = $this->fechasPorGoles($torneo_id, 'MIN', 'golesv',1);
 
         $estadisticas['goles']=$estadisticas;
         $estadisticas['maxGoles']=$maxGoles;
@@ -1472,12 +1478,16 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
         $estadisticas['minGolesLocales']=$minGolesLocales;
         $estadisticas['maxGolesVisitantes']=$maxGolesVisitantes;
         $estadisticas['minGolesVisitantes']=$minGolesVisitantes;
+        $estadisticas['maxGolesNeutrales']=$maxGolesNeutrales;
+        $estadisticas['minGolesNeutrales']=$minGolesNeutrales;
         $estadisticas['fechaMasGoles']=$fechaMasGoles;
         $estadisticas['fechaMinGoles']=$fechaMinGoles;
         $estadisticas['fechaMasGolesLocales']=$fechaMasGolesLocales;
         $estadisticas['fechaMinGolesLocales']=$fechaMinGolesLocales;
         $estadisticas['fechaMasGolesVisitantes']=$fechaMasGolesVisitantes;
         $estadisticas['fechaMinGolesVisitantes']=$fechaMinGolesVisitantes;
+        $estadisticas['fechaMasGolesNeutrales']=$fechaMasGolesNeutrales;
+        $estadisticas['fechaMinGolesNeutrales']=$fechaMinGolesNeutrales;
 
 
         return view('torneos.estadisticasTorneo', compact('estadisticas'));
@@ -1520,8 +1530,19 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
      * Obtiene partidos donde los goles de un lado ($campo: 'golesl' o 'golesv')
      * son el máximo o mínimo según $tipo ('MAX' o 'MIN')
      */
-    private function partidosPorGolesIndividuales(int $torneo_id, string $campo, string $tipo)
+    private function partidosPorGolesIndividuales(int $torneo_id, string $campo, string $tipo, $neutral=0)
     {
+// Construcción dinámica del filtro según el valor de $neutral
+        $neutralCondition = '';
+        $neutralCondition2 = '';
+        if ($neutral === 1) {
+            $neutralCondition = 'AND partidos.neutral = 1';
+            $neutralCondition2 = 'AND p1.neutral = 1';
+        } elseif ($neutral === 2) {
+            $neutralCondition = 'AND partidos.neutral = 0';
+            $neutralCondition2 = 'AND p1.neutral = 0';
+        }
+
         return DB::select(DB::raw("
         SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, partidos.golesl,
 partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e1.pais AS paisLocal, e2.pais AS paisVisitante
@@ -1532,7 +1553,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 		INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE torneos.id = :torneo_id_1
-        AND partidos.neutral = 0
+        {$neutralCondition}
         AND partidos.{$campo} = (
             SELECT {$tipo}(p1.{$campo})
             FROM partidos p1
@@ -1540,7 +1561,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 			INNER JOIN grupos g1 ON f1.grupo_id = g1.id
 			INNER JOIN torneos t1 ON g1.torneo_id = t1.id
             WHERE t1.id = :torneo_id_2
-            AND p1.neutral = 0
+            {$neutralCondition2}
         )
         ORDER BY partidos.dia ASC
     "), ['torneo_id_1' => $torneo_id, 'torneo_id_2' => $torneo_id]);
@@ -1550,8 +1571,16 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
      * Obtiene fechas con máximo o mínimo de goles según $tipo ('MAX' o 'MIN')
      * y el campo de goles para sumar ($campo, puede ser 'golesl + golesv', 'golesl', 'golesv')
      */
-    private function fechasPorGoles(int $torneo_id, string $tipo, string $campo)
+    private function fechasPorGoles(int $torneo_id, string $tipo, string $campo, int $neutral = 0)
     {
+        // Construcción dinámica del filtro según el valor de $neutral
+        $neutralCondition = '';
+        if ($neutral === 1) {
+            $neutralCondition = 'AND partidos.neutral = 1';
+        } elseif ($neutral === 2) {
+            $neutralCondition = 'AND partidos.neutral = 0';
+        }
+
         return DB::select(DB::raw("
         SELECT t.nombreTorneo, t.year, t.numero, t.partidos, t.goles, t.promedio FROM (
             SELECT
@@ -1566,7 +1595,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             INNER JOIN torneos ON grupos.torneo_id = torneos.id
             WHERE torneos.id = :torneo_id_1
-            AND partidos.neutral = 0
+            {$neutralCondition}
             GROUP BY torneos.nombre, torneos.year, fechas.numero
         ) AS t
         WHERE t.goles = (
@@ -1577,12 +1606,16 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
                 INNER JOIN torneos ON grupos.torneo_id = torneos.id
                 WHERE torneos.id = :torneo_id_2
-                AND partidos.neutral = 0
+                {$neutralCondition}
                 GROUP BY fechas.numero
             ) AS t2
         )
-    "), ['torneo_id_1' => $torneo_id, 'torneo_id_2' => $torneo_id]);
+    "), [
+            'torneo_id_1' => $torneo_id,
+            'torneo_id_2' => $torneo_id,
+        ]);
     }
+
 
 
     public function estadisticasOtras(Request $request)
