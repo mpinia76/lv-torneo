@@ -1439,7 +1439,7 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
         INNER JOIN grupos ON fechas.grupo_id = grupos.id
         INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE torneos.id = :torneo_id
-        AND partidos.neutral = 0
+
         GROUP BY torneos.nombre, torneos.year
     "), ['torneo_id' => $torneo_id]);
 
@@ -1502,7 +1502,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 		INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE torneos.id = :torneo_id_1
-        AND partidos.neutral = 0
+
         AND (partidos.golesl + partidos.golesv) = (
             SELECT {$tipo}(p1.golesl + p1.golesv)
             FROM partidos p1
@@ -1510,7 +1510,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 			INNER JOIN grupos g1 ON f1.grupo_id = g1.id
 			INNER JOIN torneos t1 ON g1.torneo_id = t1.id
             WHERE t1.id = :torneo_id_2
-            AND p1.neutral = 0
+
         )
         ORDER BY partidos.dia ASC
     "), ['torneo_id_1' => $torneo_id, 'torneo_id_2' => $torneo_id]);
