@@ -1424,24 +1424,33 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
 
         // Consulta general para las estadísticas básicas
         $estadisticas = DB::select(DB::raw("
-        SELECT
-            torneos.nombre AS nombreTorneo,
-            torneos.year,
-            SUM(partidos.golesl + partidos.golesv) AS total,
-            COUNT(*) AS partidos,
-            (SUM(partidos.golesl + partidos.golesv) / COUNT(*)) AS promedio,
-            SUM(partidos.golesl) AS local,
-            (SUM(partidos.golesl) / COUNT(*)) AS promediolocal,
-            SUM(partidos.golesv) AS visitante,
-            (SUM(partidos.golesv) / COUNT(*)) AS promediovisitante
-        FROM partidos
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON fechas.grupo_id = grupos.id
-        INNER JOIN torneos ON grupos.torneo_id = torneos.id
-        WHERE torneos.id = :torneo_id
+    SELECT
+        torneos.nombre AS nombreTorneo,
+        torneos.year,
 
-        GROUP BY torneos.nombre, torneos.year
-    "), ['torneo_id' => $torneo_id]);
+        COUNT(*) AS total_partidos,
+        SUM(partidos.golesl + partidos.golesv) AS total_goles,
+        (SUM(partidos.golesl + partidos.golesv) * 1.0 / COUNT(*)) AS promedio_total,
+
+        SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesl ELSE 0 END) AS goles_local,
+        SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesv ELSE 0 END) AS goles_visitante,
+        SUM(CASE WHEN partidos.neutral = 1 THEN partidos.golesl + partidos.golesv ELSE 0 END) AS goles_neutral,
+
+        COUNT(CASE WHEN partidos.neutral = 0 THEN 1 ELSE NULL END) AS partidos_no_neutrales,
+        COUNT(CASE WHEN partidos.neutral = 1 THEN 1 ELSE NULL END) AS partidos_neutrales,
+
+        (SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesl ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral = 0 THEN 1 END), 0)) AS promedio_local,
+        (SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesv ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral = 0 THEN 1 END), 0)) AS promedio_visitante,
+        (SUM(CASE WHEN partidos.neutral = 1 THEN partidos.golesl + partidos.golesv ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral = 1 THEN 1 END), 0)) AS promedio_neutral
+
+    FROM partidos
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    WHERE torneos.id = :torneo_id
+    GROUP BY torneos.nombre, torneos.year
+"), ['torneo_id' => $torneo_id]);
+
 
         // Reuso una función para obtener partidos con max o min goles totales
         $maxGoles = $this->partidosPorGolesTotales($torneo_id, 'MAX');

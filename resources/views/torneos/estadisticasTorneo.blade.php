@@ -56,7 +56,8 @@
                             <th>Promedio</th>
                             <th>Visitante</th>
                             <th>Promedio</th>
-
+                            <th>Neutrales</th>
+                            <th>Promedio</th>
                             </thead>
                             <tbody>
 
@@ -68,10 +69,12 @@
                                     <td>{{$partido->total}}</td>
                                     <td>{{$partido->promedio}}</td>
 
-                                    <td>{{$partido->local}}</td>
-                                    <td>{{$partido->promediolocal}}</td>
-                                    <td>{{$partido->visitante}}</td>
-                                    <td>{{$partido->promediovisitante}}</td>
+                                    <td>{{$partido->goles_local}}</td>
+                                    <td>{{$partido->promedio_local}}</td>
+                                    <td>{{$partido->goles_visitante}}</td>
+                                    <td>{{$partido->promedio_visitante}}</td>
+                                    <td>{{$partido->goles_neutral}}</td>
+                                    <td>{{$partido->promedio_neutral}}</td>
 
                                 </tr>
                             @endforeach
