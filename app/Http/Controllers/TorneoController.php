@@ -1523,6 +1523,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 		INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE torneos.id = :torneo_id_1
+        AND partidos.golesl IS NOT NULL
+        AND partidos.golesv IS NOT NULL
 
         AND (partidos.golesl + partidos.golesv) = (
             SELECT {$tipo}(p1.golesl + p1.golesv)
@@ -1531,6 +1533,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 			INNER JOIN grupos g1 ON f1.grupo_id = g1.id
 			INNER JOIN torneos t1 ON g1.torneo_id = t1.id
             WHERE t1.id = :torneo_id_2
+            AND p1.golesl IS NOT NULL
+            AND p1.golesv IS NOT NULL
 
         )
         ORDER BY partidos.dia ASC
@@ -1564,6 +1568,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 		INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE torneos.id = :torneo_id_1
+        AND partidos.golesl IS NOT NULL
+        AND partidos.golesv IS NOT NULL
         {$neutralCondition}
         AND partidos.{$campo} = (
             SELECT {$tipo}(p1.{$campo})
@@ -1572,6 +1578,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 			INNER JOIN grupos g1 ON f1.grupo_id = g1.id
 			INNER JOIN torneos t1 ON g1.torneo_id = t1.id
             WHERE t1.id = :torneo_id_2
+            AND p1.golesl IS NOT NULL
+            AND p1.golesv IS NOT NULL
             {$neutralCondition2}
         )
         ORDER BY partidos.dia ASC
@@ -1606,6 +1614,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             INNER JOIN torneos ON grupos.torneo_id = torneos.id
             WHERE torneos.id = :torneo_id_1
+            AND partidos.golesl IS NOT NULL
+            AND partidos.golesv IS NOT NULL
             {$neutralCondition}
             GROUP BY torneos.nombre, torneos.year, fechas.numero
         ) AS t
@@ -1617,6 +1627,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
                 INNER JOIN torneos ON grupos.torneo_id = torneos.id
                 WHERE torneos.id = :torneo_id_2
+                AND partidos.golesl IS NOT NULL
+                AND partidos.golesv IS NOT NULL
                 {$neutralCondition}
                 GROUP BY fechas.numero
             ) AS t2
@@ -1656,6 +1668,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             INNER JOIN torneos ON grupos.torneo_id = torneos.id
             WHERE $condition
+            AND partidos.golesl IS NOT NULL
+            AND partidos.golesv IS NOT NULL
             ORDER BY partidos.dia ASC
         "));
         };
@@ -1679,6 +1693,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 INNER JOIN fechas ON partidos.fecha_id = fechas.id
                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
                 INNER JOIN torneos ON grupos.torneo_id = torneos.id
+                WHERE partidos.golesl IS NOT NULL
+                AND partidos.golesv IS NOT NULL
                 GROUP BY torneos.nombre, torneos.year, fechas.numero
             ) AS t
             WHERE t.goles = (
@@ -1692,6 +1708,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                     INNER JOIN fechas ON partidos.fecha_id = fechas.id
                     INNER JOIN grupos ON fechas.grupo_id = grupos.id
                     INNER JOIN torneos ON grupos.torneo_id = torneos.id
+                    WHERE partidos.golesl IS NOT NULL
+                    AND partidos.golesv IS NOT NULL
                     GROUP BY torneos.nombre, torneos.year, fechas.numero
                 ) AS t
             )
@@ -1717,6 +1735,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             INNER JOIN torneos ON grupos.torneo_id = torneos.id
             WHERE $neutralCondition
+            AND partidos.golesl IS NOT NULL
+            AND partidos.golesv IS NOT NULL
             GROUP BY torneos.nombre, torneos.year
         ) AS t
         WHERE t.goles = (
@@ -1731,6 +1751,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
                 INNER JOIN torneos ON grupos.torneo_id = torneos.id
                 WHERE $neutralCondition
+                AND partidos.golesl IS NOT NULL
+                AND partidos.golesv IS NOT NULL
                 GROUP BY torneos.nombre, torneos.year
             ) AS t
         )
