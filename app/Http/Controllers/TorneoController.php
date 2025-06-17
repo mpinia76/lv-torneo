@@ -1455,8 +1455,8 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
         $maxGolesVisitantes = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MAX',2);
         $minGolesVisitantes = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MIN',2);
 
-        $maxGolesNeutrales = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MAX',1);
-        $minGolesNeutrales = $this->partidosPorGolesIndividuales($torneo_id, 'golesv', 'MIN',1);
+        $maxGolesNeutrales = $this->partidosPorGolesIndividuales($torneo_id, 'golesl + golesv', 'MAX',1);
+        $minGolesNeutrales = $this->partidosPorGolesIndividuales($torneo_id, 'golesl + golesv', 'MIN',1);
 
         // Reuso una función para obtener fechas con más/menos goles (totales, locales, visitantes)
         $fechaMasGoles = $this->fechasPorGoles($torneo_id, 'MAX', 'golesl + golesv');
@@ -1468,8 +1468,8 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
         $fechaMasGolesVisitantes = $this->fechasPorGoles($torneo_id, 'MAX', 'golesv',2);
         $fechaMinGolesVisitantes = $this->fechasPorGoles($torneo_id, 'MIN', 'golesv',2);
 
-        $fechaMasGolesNeutrales = $this->fechasPorGoles($torneo_id, 'MAX', 'golesv',1);
-        $fechaMinGolesNeutrales = $this->fechasPorGoles($torneo_id, 'MIN', 'golesv',1);
+        $fechaMasGolesNeutrales = $this->fechasPorGoles($torneo_id, 'MAX', 'golesl + golesv',1);
+        $fechaMinGolesNeutrales = $this->fechasPorGoles($torneo_id, 'MIN', 'golesl + golesv',1);
 
         $estadisticas['goles']=$estadisticas;
         $estadisticas['maxGoles']=$maxGoles;
