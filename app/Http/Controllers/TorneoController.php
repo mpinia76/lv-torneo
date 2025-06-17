@@ -1448,6 +1448,8 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
     INNER JOIN grupos ON fechas.grupo_id = grupos.id
     INNER JOIN torneos ON grupos.torneo_id = torneos.id
     WHERE torneos.id = :torneo_id
+    AND partidos.golesl IS NOT NULL
+      AND partidos.golesv IS NOT NULL
     GROUP BY torneos.nombre, torneos.year
 "), ['torneo_id' => $torneo_id]);
 
