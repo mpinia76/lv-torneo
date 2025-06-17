@@ -1738,7 +1738,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         };
 
 
-        $torneoMasGoles = $getTorneoMasGoles('golesl + golesv','');
+        $torneoMasGoles = $getTorneoMasGoles('golesl + golesv','1=1');
         $torneoMasGolesLocales = $getTorneoMasGoles('golesl', 'partidos.neutral = 0');
         $torneoMasGolesVisitantes = $getTorneoMasGoles('golesv', 'partidos.neutral = 0');
         $torneoMasGolesNeutrales = $getTorneoMasGoles('golesl + golesv','partidos.neutral != 0');
