@@ -25,20 +25,28 @@ class CruceController extends Controller
      */
     public function index(Request $request)
     {
-
-        if ($request->has('buscarpor')){
+        if ($request->has('buscarpor')) {
             $nombre = $request->get('buscarpor');
-
-            $request->session()->put('nombre_filtro_cruce', $request->get('buscarpor'));
-
-        }
-        else{
+            $request->session()->put('nombre_filtro_cruce', $nombre);
+        } else {
             $nombre = $request->session()->get('nombre_filtro_cruce');
-
         }
 
-        $cruces = Cruce::with('torneo')
-            ->where(function($query) use ($nombre) {
+        $torneo = null;
+        $torneoId = $request->query('torneo_id');
+        if ($torneoId) {
+            $torneo = Torneo::findOrFail($torneoId);
+        }
+        $crucesQuery = Cruce::with('torneo');
+
+        // Filtrar por torneo si se pasa
+        if ($torneoId) {
+            $crucesQuery->where('torneo_id', $torneoId);
+        }
+
+        // Filtro por búsqueda
+        if ($nombre) {
+            $crucesQuery->where(function ($query) use ($nombre) {
                 $query->whereHas('torneo', function ($q) use ($nombre) {
                     $q->where('nombre', 'like', "%$nombre%")
                         ->orWhere('year', 'like', "%$nombre%");
@@ -46,26 +54,34 @@ class CruceController extends Controller
                     ->orWhere('fase', 'like', "%$nombre%")
                     ->orWhere('clasificado_1', 'like', "%$nombre%")
                     ->orWhere('clasificado_2', 'like', "%$nombre%");
-            })
+            });
+        }
+
+        $cruces = $crucesQuery
             ->orderBy('torneo_id')
             ->orderBy('fase')
             ->orderBy('orden')
             ->paginate();
 
-        return view('cruces.index', compact('cruces'));
-
+        return view('cruces.index', compact('cruces','torneo'));
     }
+
 
     /**
      * Show the form for creating a new resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(Request $request)
     {
-        $torneos=Torneo:: orderBy('year','DESC')->get();
-        $torneosAnteriores = $torneos->pluck('full_name', 'id')->prepend('','');
-        return view('cruces.create', compact('torneosAnteriores'));
+        $torneoId = $request->input('torneo_id');
+        $torneo = null;
+
+        // Si se proporciona un ID de torneo, buscalo en la base de datos
+        if ($torneoId) {
+            $torneo = Torneo::findOrFail($torneoId);
+        }
+        return view('cruces.create', compact('torneo'));
     }
 
     /**
@@ -99,7 +115,8 @@ class CruceController extends Controller
 
         //$cruce = Cruce::create($request->all());
 
-        return redirect()->route('cruces.index')->with('success','Registro creado satisfactoriamente');
+        return redirect()->route('cruces.index', array('torneo_id' => $torneo->id))->with('success','Registro creado satisfactoriamente');
+
     }
 
     /**
@@ -110,11 +127,11 @@ class CruceController extends Controller
      */
     public function edit($id)
     {
-        $torneos=Torneo:: orderBy('year','DESC')->get();
-        $torneosAnteriores = $torneos->pluck('full_name', 'id')->prepend('','');
+
         $cruce=cruce::findOrFail($id);
 
-        return view('cruces.edit', compact('cruce','torneosAnteriores'));
+
+        return view('cruces.edit', compact('cruce'));
     }
 
     /**
@@ -127,13 +144,13 @@ class CruceController extends Controller
     public function update(Request $request, $id)
     {
         //
-        $this->validate($request,[ 'torneo_id'=>'required','fase'=>'required','orden'=>'required','clasificado_1'=>'required','clasificado_2'=>'required']);
+        $this->validate($request,[ 'fase'=>'required','orden'=>'required','clasificado_1'=>'required','clasificado_2'=>'required']);
 
 
 
 
 
-        $update['torneo_id'] = $request->get('torneo_id');
+
         $update['dia'] = $request->get('fecha') . ' ' . $request->get('hora');
         $update['fase'] = $request->get('fase');
         $update['orden'] = $request->get('orden');
@@ -145,7 +162,7 @@ class CruceController extends Controller
         $cruce=cruce::find($id);
         $cruce->update($update);
 
-        return redirect()->route('cruces.index')->with('success','Registro actualizado satisfactoriamente');
+        return redirect()->route('cruces.index', array('torneo_id' => $cruce->torneo->id))->with('success','Registro actualizado satisfactoriamente');
 
     }
 

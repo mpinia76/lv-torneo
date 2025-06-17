@@ -4,7 +4,8 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Cruces</h1>
+    <h1 class="display-6">Cruces @if($torneo) - {{ $torneo->nombre }} {{ $torneo->year }} @endif</h1>
+
 
     <hr/>
         @if (\Session::has('error'))
@@ -21,7 +22,7 @@
                 </ul>
             </div>
         @endif
-        <a class="btn btn-success m-1" href="{{route('cruces.create')}}">Nuevo</a>
+        @if($torneo)<a class="btn btn-success m-1" href="{{route('cruces.create', ['torneo_id' => $torneo->id])}}">Nuevo</a>@endif
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

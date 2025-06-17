@@ -68,6 +68,8 @@
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
+                        <a href="{{route('cruces.index')}}?torneo_id={{$torneo->id}}" class="btn btn-success m-1">Cruces</a>
+
 
                     </div>
 

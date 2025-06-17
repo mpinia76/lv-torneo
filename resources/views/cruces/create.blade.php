@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-    <h1 class="display-6">Nuevo cruce</h1>
+    <h1 class="display-6">Nuevo cruce @if($torneo) - {{ $torneo->nombre }} {{ $torneo->year }}@endif</h1>
 
     <hr/>
 
@@ -30,10 +30,7 @@
     <div class="row">
 
 
-        <div class="form-group col-xs-12 col-sm-6 col-md-4">
-            {{Form::label('torneo', 'Torneo')}}
-            {{Form::select('torneo_id',$torneosAnteriores, '',['class' => 'form-control js-example-basic-single'])}}
-        </div>
+        <input type="hidden" name="torneo_id" value="{{ $torneo->id ?? '' }}">
 
         <div class="form-group col-xs-12 col-sm-6 col-md-2">
             {{Form::label('fecha', 'Fecha')}}
@@ -47,17 +44,17 @@
         </div>
 
 
-
+        <div class="form-group col-xs-12 col-sm-6 col-md-3">
+            <label for="fase">Fase</label>
+            <input type="text" name="fase" class="form-control" value="{{ old('fase', $cruce->fase ?? '') }}" required>
+            <small class="form-text text-muted">Ej: 32avos, 16avos, Octavos, Cuartos, Semifinal, Final</small>
+        </div>
 
 
     </div>
 
         <div class="row">
-            <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <label for="fase">Fase</label>
-                <input type="text" name="fase" class="form-control" value="{{ old('fase', $cruce->fase ?? '') }}" required>
-                <small class="form-text text-muted">Ej: 32avos, 16avos, Octavos, Cuartos, Semifinal, Final</small>
-            </div>
+
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('orden', 'Orden')}}
                 {{Form::number('orden', '', ['class' => 'form-control'])}}
@@ -75,7 +72,8 @@
 
     <!-- build the submission button -->
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
-        <a href="{{ route('cruces.index')}}" class="btn btn-success">Volver</a>
+        <a href="{{ route('cruces.index')}}?torneo_id={{ $torneo->id }}" class="btn btn-success">Volver</a>
+
     {{ Form::close() }}
     </div>
 @endsection

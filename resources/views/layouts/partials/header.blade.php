@@ -27,10 +27,7 @@
                                 {{ __('Arbitros') }}
                             </a>
                         </li>
-                        <li><a class="dropdown-item" href="{{route('cruces.index')}}">
-                                {{ __('Cruces') }}
-                            </a>
-                        </li>
+
                         <li><a class="dropdown-item" href="{{route('equipos.index')}}">
                                 {{ __('Equipos') }}
                             </a>
