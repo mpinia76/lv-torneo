@@ -64,10 +64,10 @@
                             @foreach($estadisticas['goles'] as $partido)
                                 <tr>
 
-                                    <td>{{$partido->partidos}}</td>
+                                    <td>{{$partido->total_partidos}}</td>
 
-                                    <td>{{$partido->total}}</td>
-                                    <td>{{$partido->promedio}}</td>
+                                    <td>{{$partido->total_goles}}</td>
+                                    <td>{{$partido->promedio_total}}</td>
 
                                     <td>{{$partido->goles_local}}</td>
                                     <td>{{$partido->promedio_local}}</td>
