@@ -52,7 +52,7 @@
                     <th>GL</th>
                     <th>GV</th>
                     <th>Visitante</th>
-
+                    <th>Cancha Neutral</th>
                     </thead>
                     <tbody>
 
@@ -92,6 +92,9 @@
                                 </a>
                                 {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
                                 @endif
+                            </td>
+                            <td style="text-align: center">
+                                {{$partido->neutral}}
                             </td>
                             <td>
                                 <div class="d-flex">
