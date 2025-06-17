@@ -1676,11 +1676,11 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
         // Consultas de máximos
         $maxGoles = $getPartidosQuery('partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos)');
-        $maxGolesLocales = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesl = (SELECT MAX(golesl) FROM partidos)');
-        $maxGolesVisitantes = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesv = (SELECT MAX(golesv) FROM partidos)');
-        $maxGolesNeutrales = $getPartidosQuery('partidos.neutral != 0 AND partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos)');
+        $maxGolesLocales = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesl = (SELECT MAX(golesl) FROM partidos WHERE partidos.neutral = 0)');
+        $maxGolesVisitantes = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesv = (SELECT MAX(golesv) FROM partidos WHERE partidos.neutral = 0)');
+        $maxGolesNeutrales = $getPartidosQuery('partidos.neutral != 0 AND partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos WHERE partidos.neutral != 0)');
 
-        dd($maxGolesLocales);
+        //dd($maxGolesLocales);
         // Helper para fechas con más goles
         $getFechaMasGoles = function ($columna, $neutralCondition) {
             return DB::select(DB::raw("
