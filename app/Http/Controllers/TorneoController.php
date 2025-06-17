@@ -1434,14 +1434,14 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
 
         SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesl ELSE 0 END) AS goles_local,
         SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesv ELSE 0 END) AS goles_visitante,
-        SUM(CASE WHEN partidos.neutral = 1 THEN partidos.golesl + partidos.golesv ELSE 0 END) AS goles_neutral,
+        SUM(CASE WHEN partidos.neutral != 0 THEN partidos.golesl + partidos.golesv ELSE 0 END) AS goles_neutral,
 
         COUNT(CASE WHEN partidos.neutral = 0 THEN 1 ELSE NULL END) AS partidos_no_neutrales,
-        COUNT(CASE WHEN partidos.neutral = 1 THEN 1 ELSE NULL END) AS partidos_neutrales,
+        COUNT(CASE WHEN partidos.neutral != 0 THEN 1 ELSE NULL END) AS partidos_neutrales,
 
         (SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesl ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral = 0 THEN 1 END), 0)) AS promedio_local,
         (SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesv ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral = 0 THEN 1 END), 0)) AS promedio_visitante,
-        (SUM(CASE WHEN partidos.neutral = 1 THEN partidos.golesl + partidos.golesv ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral = 1 THEN 1 END), 0)) AS promedio_neutral
+        (SUM(CASE WHEN partidos.neutral != 0 THEN partidos.golesl + partidos.golesv ELSE 0 END) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.neutral != 0 THEN 1 END), 0)) AS promedio_neutral
 
     FROM partidos
     INNER JOIN fechas ON partidos.fecha_id = fechas.id
@@ -1547,8 +1547,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $neutralCondition = '';
         $neutralCondition2 = '';
         if ($neutral === 1) {
-            $neutralCondition = 'AND partidos.neutral = 1';
-            $neutralCondition2 = 'AND p1.neutral = 1';
+            $neutralCondition = 'AND partidos.neutral != 0';
+            $neutralCondition2 = 'AND p1.neutral != 0';
         } elseif ($neutral === 2) {
             $neutralCondition = 'AND partidos.neutral = 0';
             $neutralCondition2 = 'AND p1.neutral = 0';
@@ -1587,7 +1587,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         // Construcción dinámica del filtro según el valor de $neutral
         $neutralCondition = '';
         if ($neutral === 1) {
-            $neutralCondition = 'AND partidos.neutral = 1';
+            $neutralCondition = 'AND partidos.neutral != 0';
         } elseif ($neutral === 2) {
             $neutralCondition = 'AND partidos.neutral = 0';
         }
