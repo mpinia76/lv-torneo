@@ -870,7 +870,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         if ($equipo1 && $equipo2){
             $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e1.pais AS paisLocal, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, e2.pais AS paisVisitante, partidos.golesl,
-partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, CASE WHEN partidos.neutral IS 0 THEN \'NO\' ELSE \'SI\' END AS neutral,
+partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, CASE WHEN partidos.neutral IS 0 THEN \'NO\' ELSE \'SI\' END AS neutral
 FROM partidos
 INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
 INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
