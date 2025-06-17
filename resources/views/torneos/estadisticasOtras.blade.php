@@ -129,6 +129,37 @@
 
 
                 </table>
+                <h1>Neutrales</h1>
+                <table class="table" style="width: 100%;font-size: 14px;">
+                    <thead>
+                    <th>Torneo</th>
+
+
+                    <th>Goles</th>
+                    <th>Promedio</th>
+                    <th>Partidos</th>
+
+
+                    </thead>
+                    <tbody>
+
+                    @foreach($estadisticas['torneoMasGolesNeutrales'] as $partido)
+                        <tr>
+                            <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+
+
+                            <td>{{$partido->goles}}</td>
+                            <td>{{$partido->promedio}}</td>
+                            <td>{{$partido->partidos}}</td>
+
+
+
+                        </tr>
+                    @endforeach
+                    </tbody>
+
+
+                </table>
             </div>
         </div>
             </div>
