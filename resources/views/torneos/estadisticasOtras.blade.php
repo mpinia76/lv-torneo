@@ -271,6 +271,39 @@
 
 
                 </table>
+                        <h1>Neutrales</h1>
+                        <table class="table" style="width: 100%;font-size: 14px;">
+                            <thead>
+                            <th>Torneo</th>
+                            <th>Fecha</th>
+
+                            <th>Goles</th>
+                            <th>Promedio</th>
+                            <th>Partidos</th>
+
+                            </thead>
+                            <tbody>
+
+                            @foreach($estadisticas['fechaMasGolesNeutrales'] as $partido)
+                                <tr>
+                                    <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+                                    <td>@if(is_numeric($partido->numero))
+                                            Fecha {{ $partido->numero }}
+                                        @else
+                                            {{ $partido->numero }}
+                                        @endif</td>
+
+                                    <td>{{$partido->goles}}</td>
+                                    <td>{{$partido->promedio}}</td>
+                                    <td>{{$partido->partidos}}</td>
+
+
+                                </tr>
+                            @endforeach
+                            </tbody>
+
+
+                        </table>
                     </div>
                 </div>
             </div>
@@ -484,6 +517,74 @@
 
 
                 </table>
+                        <h1>Neutrales</h1>
+                        <table class="table" style="width: 100%;font-size: 14px;">
+                            <thead>
+                            <th>Torneo</th>
+                            <th>Fecha</th>
+                            <th>Día</th>
+                            <th>Local</th>
+                            <th>GL</th>
+                            <th>GV</th>
+                            <th>Visitante</th>
+
+                            </thead>
+                            <tbody>
+
+                            @foreach($estadisticas['maxGolesNeutrales'] as $partido)
+                                <tr>
+                                    <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
+                                    <td>@if(is_numeric($partido->numero))
+                                            Fecha {{ $partido->numero }}
+                                        @else
+                                            {{ $partido->numero }}
+                                        @endif</td>
+                                    <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
+                                    <td>
+                                        <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol_id))}}" >
+                                            @if($partido->local)
+                                                @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
+                                                @endif
+                                        </a>
+                                        {{$partido->local}} <img id="original" src="{{ url('images/'.$partido->paisLocal.'.gif') }}" alt="{{ $partido->paisLocal }}">
+                                        @endif
+                                    </td>
+                                    <td>{{$partido->golesl}}
+                                        @if(isset($partido->penalesl))
+                                            ({{$partido->penalesl}})
+                                        @endif
+                                    </td>
+                                    <td>{{$partido->golesv}}
+                                        @if(isset($partido->penalesv))
+                                            ({{$partido->penalesv}})
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov_id))}}">
+                                            @if($partido->visitante)
+                                                @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
+                                                @endif
+                                        </a>
+                                        {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div class="d-flex">
+
+                                            <a href="{{route('fechas.detalle', array('partidoId' => $partido->partido_id))}}" class="btn btn-success m-1">Detalles</a>
+
+
+                                        </div>
+
+                                    </td>
+
+
+                                </tr>
+                            @endforeach
+                            </tbody>
+
+
+                        </table>
                     </div>
                 </div>
             </div>

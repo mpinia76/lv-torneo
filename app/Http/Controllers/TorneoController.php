@@ -1676,11 +1676,12 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
         // Consultas de máximos
         $maxGoles = $getPartidosQuery('partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos)');
-        $maxGolesLocales = $getPartidosQuery('partidos.golesl = (SELECT MAX(golesl) FROM partidos)');
-        $maxGolesVisitantes = $getPartidosQuery('partidos.golesv = (SELECT MAX(golesv) FROM partidos)');
+        $maxGolesLocales = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesl = (SELECT MAX(golesl) FROM partidos)');
+        $maxGolesVisitantes = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesv = (SELECT MAX(golesv) FROM partidos)');
+        $maxGolesNeutrales = $getPartidosQuery('partidos.neutral != 0 AND partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos)');
 
         // Helper para fechas con más goles
-        $getFechaMasGoles = function ($columna) {
+        $getFechaMasGoles = function ($columna, $neutralCondition) {
             return DB::select(DB::raw("
             SELECT t.nombreTorneo, t.year, t.numero, t.partidos, t.goles, t.promedio
             FROM (
@@ -1693,7 +1694,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 INNER JOIN fechas ON partidos.fecha_id = fechas.id
                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
                 INNER JOIN torneos ON grupos.torneo_id = torneos.id
-                WHERE partidos.golesl IS NOT NULL
+                WHERE $neutralCondition
+                AND partidos.golesl IS NOT NULL
                 AND partidos.golesv IS NOT NULL
                 GROUP BY torneos.nombre, torneos.year, fechas.numero
             ) AS t
@@ -1708,7 +1710,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                     INNER JOIN fechas ON partidos.fecha_id = fechas.id
                     INNER JOIN grupos ON fechas.grupo_id = grupos.id
                     INNER JOIN torneos ON grupos.torneo_id = torneos.id
-                    WHERE partidos.golesl IS NOT NULL
+                    WHERE $neutralCondition
+                    AND partidos.golesl IS NOT NULL
                     AND partidos.golesv IS NOT NULL
                     GROUP BY torneos.nombre, torneos.year, fechas.numero
                 ) AS t
@@ -1716,9 +1719,10 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         "));
         };
 
-        $fechaMasGoles = $getFechaMasGoles('golesl + golesv');
-        $fechaMasGolesLocales = $getFechaMasGoles('golesl');
-        $fechaMasGolesVisitantes = $getFechaMasGoles('golesv');
+        $fechaMasGoles = $getFechaMasGoles('golesl + golesv','1=1');
+        $fechaMasGolesLocales = $getFechaMasGoles('golesl','partidos.neutral = 0');
+        $fechaMasGolesVisitantes = $getFechaMasGoles('golesv','partidos.neutral = 0');
+        $fechaMasGolesNeutrales = $getFechaMasGoles('golesl + golesv','partidos.neutral != 0');
 
         // Helper para torneos con más goles
         $getTorneoMasGoles = function ($columna, $neutralCondition) {
@@ -1772,9 +1776,11 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $estadisticas['maxGoles']=$maxGoles;
         $estadisticas['maxGolesLocales']=$maxGolesLocales;
         $estadisticas['maxGolesVisitantes']=$maxGolesVisitantes;
+        $estadisticas['maxGolesNeutrales']=$maxGolesNeutrales;
         $estadisticas['fechaMasGoles']=$fechaMasGoles;
         $estadisticas['fechaMasGolesLocales']=$fechaMasGolesLocales;
         $estadisticas['fechaMasGolesVisitantes']=$fechaMasGolesVisitantes;
+        $estadisticas['fechaMasGolesNeutrales']=$fechaMasGolesNeutrales;
 
 
         return view('torneos.estadisticasOtras', compact('estadisticas'));
