@@ -1553,9 +1553,9 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 torneos.nombre AS nombreTorneo,
                 torneos.year,
                 fechas.numero,
-                SUM(partidos.golesl + partidos.golesv) AS goles,
+                SUM({$campo}) AS goles,
                 COUNT(*) AS partidos,
-                (SUM(partidos.golesl + partidos.golesv) / COUNT(*)) AS promedio
+                (SUM({$campo}) / COUNT(*)) AS promedio
             FROM partidos
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
