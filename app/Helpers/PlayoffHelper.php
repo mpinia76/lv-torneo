@@ -5,10 +5,10 @@ use App\Grupo;
 use App\Fecha;
 use App\Partido;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Log;
 class PlayoffHelper
 {
-    public static function actualizarCruces($grupo_id)
+    public static function actualizarCruces($grupo_id , $profundidad = 0)
     {
         $grupo = Grupo::with('torneo')->findOrFail($grupo_id);
         $torneo_id = $grupo->torneo->id;
@@ -18,7 +18,9 @@ class PlayoffHelper
 
         $grupos = Grupo::where('torneo_id', $torneo_id)->get();
         foreach ($grupos as $g) {
-            $tabla[$g->nombre] = self::posiciones($g->id);
+            if ($g->posiciones) {
+                $tabla[$g->nombre] = self::posiciones($g->id);
+            }
         }
 
         // Obtenemos los cruces predefinidos (ej: 1A vs 2B)
@@ -30,16 +32,10 @@ class PlayoffHelper
         if (!$grupoPlayoffs) return;
 
         foreach ($cruces as $cruce) {
-            // Ej: clasificado_1 = '1A', clasificado_2 = '2B'
-            $pos1 = intval($cruce->clasificado_1[0]);
-            $grupo1 = substr($cruce->clasificado_1, 1);
+            $equipo1 = self::resolverEquipo($cruce->clasificado_1, $tabla, $torneo_id,$cruce->fase);
+            $equipo2 = self::resolverEquipo($cruce->clasificado_2, $tabla, $torneo_id,$cruce->fase);
 
-            $pos2 = intval($cruce->clasificado_2[0]);
-            $grupo2 = substr($cruce->clasificado_2, 1);
-
-            $equipo1 = $tabla[$grupo1][$pos1 - 1] ?? null;
-            $equipo2 = $tabla[$grupo2][$pos2 - 1] ?? null;
-
+            Log::info($equipo1.' vs. '.$equipo2);
             if (!$equipo1 || !$equipo2) continue; // aún no hay suficientes resultados
 
             // Crear o buscar la fecha correspondiente a la fase
@@ -61,6 +57,10 @@ class PlayoffHelper
                 'neutral' => $cruce->neutral,
             ]);
         }
+        if ($profundidad === 0) {
+            self::actualizarCruces($grupo_id, 1);
+        }
+
     }
 
     private static function posiciones($grupo_id)
@@ -105,6 +105,72 @@ class PlayoffHelper
             return $row->equipo_id;
         }, $result);
 
+    }
+
+    private static function resolverEquipo($referencia, $tabla, $torneo_id, $fase_actual)
+    {
+        if (preg_match('/^(G|P)(\d+)$/', $referencia, $matches)) {
+            $tipo = $matches[1];
+            $orden = intval($matches[2]);
+            Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
+
+            // Buscar cruce anterior por siguiente_fase
+            $cruceAnterior = DB::table('cruces')
+                ->where('torneo_id', $torneo_id)
+                ->where('orden', $orden)
+                ->where('siguiente_fase', $fase_actual)
+                ->first();
+
+            if (!$cruceAnterior) return null;
+
+            $resultado = self::calcularResultadoDelCruce($cruceAnterior, $tabla, $torneo_id);
+
+            if (!$resultado) return null;
+
+            return $tipo === 'G' ? $resultado['ganador'] : $resultado['perdedor'];
+        }
+
+        if (preg_match('/^(\d+)([A-Z])$/', $referencia, $matches)) {
+            $pos = intval($matches[1]);
+            $grupo = $matches[2];
+            return $tabla[$grupo][$pos - 1] ?? null;
+        }
+
+        return null;
+    }
+
+    private static function calcularResultadoDelCruce($cruce, $tabla, $torneo_id)
+    {
+        // Buscar partido correspondiente a este cruce
+        $fechaPlayoffs = Grupo::where('torneo_id', $torneo_id)
+            ->where('nombre', 'Playoffs')
+            ->first();
+
+        if (!$fechaPlayoffs) return null;
+
+        Log::info(print_r($cruce));
+
+        $fecha = Fecha::where('grupo_id', $fechaPlayoffs->id)
+            ->where('numero', $cruce->fase)
+            ->first();
+
+        if (!$fecha) return null;
+
+        $partido = Partido::where('fecha_id', $fecha->id)
+            ->where('orden', $cruce->orden)
+            ->first();
+
+        if (!$partido) return null;
+
+        // Determinar ganador y perdedor
+        if ($partido->golesl > $partido->golesv) {
+            return ['ganador' => $partido->equipol_id, 'perdedor' => $partido->equipov_id];
+        } elseif ($partido->golesv > $partido->golesl) {
+            return ['ganador' => $partido->equipov_id, 'perdedor' => $partido->equipol_id];
+        }
+
+        // En empate, podrías agregar lógica para penales, etc.
+        return null;
     }
 }
 

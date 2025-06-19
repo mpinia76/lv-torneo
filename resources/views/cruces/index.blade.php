@@ -40,6 +40,8 @@
         <th>Orden</th>
         <th>Clasificado 1</th>
         <th>Clasificado 2</th>
+        <th>Sig. fase</th>
+        <th>Sig. orden</th>
         <th colspan="3"></th>
         </thead>
 
@@ -53,6 +55,8 @@
                 <td>{{ $cruce->orden }}</td>
                 <td>{{ $cruce->clasificado_1 }}</td>
                 <td>{{ $cruce->clasificado_2 }}</td>
+                <td>{{ $cruce->siguiente_fase }}</td>
+                <td>{{ $cruce->orden_siguiente }}</td>
                 <td>
                     <div class="d-flex">
 

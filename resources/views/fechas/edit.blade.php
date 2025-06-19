@@ -68,7 +68,7 @@
                                 {{Form::time('hora[]', ($partido->dia)?date('H:i', strtotime($partido->dia)):'', ['class' => 'form-control'])}}
 
                             </td>
-                            <td>{{ Form::checkbox('neutral[]', $i,$partido->neutral) }}</td>
+                            <td>{{ Form::checkbox('neutral[]', 1,($partido->neutral)?true:false) }}</td>
                             <td> @if($partido->equipol)
                                     @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
                                     @endif

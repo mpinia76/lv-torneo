@@ -113,7 +113,10 @@ class FechaController extends Controller
             if(count($request->fecha) > 0)
             {
                 foreach($request->fecha as $item=>$v){
-
+                    $esNeutral = 0;
+                    if (isset($request->neutral[$item]) ) {
+                        $esNeutral=1;
+                    }
                     $data2 = [
                         'fecha_id' => $lastid,
                         'dia' => $request->fecha[$item] . ' ' . $request->hora[$item],
@@ -121,7 +124,7 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
-                        'neutral' => $request->neutral[$item]
+                        'neutral' => $esNeutral
                     ];
 
 // Agregar penales solo si fueron enviados
@@ -226,6 +229,7 @@ class FechaController extends Controller
      */
     public function update(Request $request, $id)
     {
+        //dd($request);
         //
         $this->validate($request,[ 'numero'=>'required',  'grupo_id'=>'required']);
         DB::beginTransaction();
@@ -242,6 +246,12 @@ class FechaController extends Controller
             if (is_array($request->fecha) && count($request->fecha) > 0)
             {
                 foreach($request->fecha as $item=>$v){
+
+                    $esNeutral = 0;
+                    if (isset($request->neutral[$item]) ) {
+                        $esNeutral=1;
+                    }
+
                     $data2 = [
                         'fecha_id' => $id,
                         'dia' => $request->fecha[$item] . ' ' . $request->hora[$item],
@@ -249,7 +259,7 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
-                        'neutral' => $request->neutral[$item]
+                        'neutral' => (int) $esNeutral
                     ];
 
                     // Agregar penales solo si fueron enviados
@@ -262,9 +272,11 @@ class FechaController extends Controller
                         if (!empty($request->partido_id[$item])){
                             $data2['id']=$request->partido_id[$item];
                             $partido=Partido::find($request->partido_id[$item]);
+
                             $partido->update($data2);
                         }
                         else{
+
                             Partido::create($data2);
                         }
                     }catch(QueryException $ex){
@@ -286,7 +298,7 @@ class FechaController extends Controller
         }
         if ($ok){
             DB::commit();
-            \App\Helpers\PlayoffHelper::actualizarCruces($fecha->grupo->id);
+           \App\Helpers\PlayoffHelper::actualizarCruces($fecha->grupo->id);
             $respuestaID='success';
             $respuestaMSJ='Registro actualizado satisfactoriamente';
         }

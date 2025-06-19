@@ -9,7 +9,8 @@ class Cruce extends Model
     protected $fillable = [
         'torneo_id', 'fase', 'orden',
         'clasificado_1', 'clasificado_2',
-        'ganador_id', 'partido_id','dia','neutral'
+        'ganador_id', 'partido_id','dia','neutral',
+        'siguiente_fase', 'orden_siguiente'
     ];
 
     public function torneo()

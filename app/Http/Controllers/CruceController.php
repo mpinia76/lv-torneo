@@ -109,7 +109,8 @@ class CruceController extends Controller
         $insert['clasificado_2'] = $request->get('clasificado_2');
         $torneo=Torneo::findOrFail($request->get('torneo_id'));
         $insert['neutral'] = $torneo->neutral;
-
+        $insert['siguiente_fase'] = $request->get('siguiente_fase');
+        $insert['orden_siguiente'] = $request->get('orden_siguiente');
 
         $cruce = Cruce::create($insert);
 
@@ -157,7 +158,8 @@ class CruceController extends Controller
         $update['clasificado_1'] = $request->get('clasificado_1');
         $update['clasificado_2'] = $request->get('clasificado_2');
         $update['neutral'] = $request->get('neutral');
-
+        $update['siguiente_fase'] = $request->get('siguiente_fase');
+        $update['orden_siguiente'] = $request->get('orden_siguiente');
 
         $cruce=cruce::find($id);
         $cruce->update($update);
