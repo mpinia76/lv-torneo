@@ -322,7 +322,7 @@ class ArbitroController extends Controller
                     $valueCell = $xpath->query('.//td[2]', $row)->item(0);
                     $value = trim($valueCell ? $valueCell->textContent : '');
 
-                    echo $label . ' - ' . $value . '<br>';
+                    //echo $label . ' - ' . $value . '<br>';
                     // Agregar los datos a la persona según el título (dt) encontrado
                     switch ($label) {
                         case 'Nombre completo:':
