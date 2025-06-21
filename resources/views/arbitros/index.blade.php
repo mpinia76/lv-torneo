@@ -22,6 +22,7 @@
             </div>
         @endif
         <a class="btn btn-success m-1" href="{{route('arbitros.create')}}">Nuevo</a>
+        <a class="btn btn-info m-1" href="{{route('arbitros.importar')}}">Importar</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

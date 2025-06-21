@@ -28,6 +28,7 @@ use Excel;
 
 use Response;
 use File;
+use App\Services\HttpHelper;
 
 use Illuminate\Support\Carbon;
 
@@ -150,7 +151,7 @@ class FechaController extends Controller
         }
         if ($ok){
             DB::commit();
-            \App\Helpers\PlayoffHelper::actualizarCruces($fecha->grupo->id);
+            \App\Services\PlayoffHelper::actualizarCruces($fecha->grupo->id);
             $respuestaID='success';
             $respuestaMSJ='Registro creado satisfactoriamente';
         }
@@ -298,7 +299,7 @@ class FechaController extends Controller
         }
         if ($ok){
             DB::commit();
-           \App\Helpers\PlayoffHelper::actualizarCruces($fecha->grupo->id);
+           \App\Services\PlayoffHelper::actualizarCruces($fecha->grupo->id);
             $respuestaID='success';
             $respuestaMSJ='Registro actualizado satisfactoriamente';
         }
@@ -419,7 +420,7 @@ class FechaController extends Controller
 
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                $html2 = $this->getHtmlContent($url2);
+                $html2 =  HttpHelper::getHtmlContent($url2);
             }
 
 
@@ -6100,44 +6101,6 @@ return $string;
         return view('fechas.importarPartido', compact('partido'));
     }
 
-    function getHtmlContent($url) {
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Para seguir redirecciones
-
-        // Opcional: Si necesitas establecer un timeout
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
-
-        $response = curl_exec($ch);
-
-        // Maneja errores de cURL
-        if (curl_errno($ch)) {
-            Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
-            return false;
-        }
-
-        // Verificar si $response es falso, lo que indica un fallo en la ejecución
-        if ($response === false) {
-            Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $url);
-            curl_close($ch);
-            return false;
-        }
-
-        // Obtener el código de estado HTTP
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        //dd($httpCode);
-        curl_close($ch);
-        // Controlar el código 404
-        if ($httpCode == 404) {
-            Log::channel('mi_log')->warning('Página no encontrada (404) para la URL: ' . $url);
-            return false;
-        }
-
-
-        return $response;
-    }
 
 
     public function importarPartidoProcess(Request $request)
@@ -6170,7 +6133,7 @@ return $string;
                 Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                $html2 = $this->getHtmlContent($url2);
+                $html2 =  HttpHelper::getHtmlContent($url2);
             }
 
 

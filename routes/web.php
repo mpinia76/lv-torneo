@@ -90,6 +90,12 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('dorsal', 'TorneoController@dorsal')->name('torneos.dorsal');
     Route::put('guardarDorsal', 'TorneoController@guardarDorsal');
 
+    Route::get('importarArbitro', 'ArbitroController@importar')->name('arbitros.importar');
+    Route::post('importarArbitroProcess', 'ArbitroController@importarProcess');
+
+    Route::get('importarTecnico', 'TecnicoController@importar')->name('tecnicos.importar');
+    Route::post('importarTecnicoProcess', 'TecnicoController@importarProcess');
+
     Route::get('importpoll', 'PollController@importPoll')->name('polls.importPoll');
     Route::post('importpollprocess', 'PollController@importpollprocess');
     Route::get('plantillasearch', 'PlantillaController@search')

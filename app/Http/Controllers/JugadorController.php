@@ -19,6 +19,7 @@ use Sunra\PhpSimple\HtmlDomParser;
 use DB;
 use GuzzleHttp\Client;
 use Carbon\Carbon;
+use App\Services\HttpHelper;
 
 use Illuminate\Pagination\LengthAwarePaginator;
 class JugadorController extends Controller
@@ -1018,44 +1019,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
         return view('jugadores.importar');
     }
 
-    function getHtmlContent($url) {
-        $ch = curl_init();
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Para seguir redirecciones
-
-        // Opcional: Si necesitas establecer un timeout
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30); // Timeout de 30 segundos
-
-        $response = curl_exec($ch);
-
-        // Maneja errores de cURL
-        if (curl_errno($ch)) {
-            Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
-            return false;
-        }
-
-        // Verificar si $response es falso, lo que indica un fallo en la ejecución
-        if ($response === false) {
-            Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $url);
-            curl_close($ch);
-            return false;
-        }
-
-        // Obtener el código de estado HTTP
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        //dd($httpCode);
-        curl_close($ch);
-        // Controlar el código 404
-        if ($httpCode == 404) {
-            Log::channel('mi_log')->warning('Página no encontrada (404) para la URL: ' . $url);
-            return false;
-        }
-
-
-        return $response;
-    }
 
     public function importarProcess_new(Request $request)
     {
@@ -1069,7 +1033,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             if ($url) {
                 // Obtener el contenido de la URL
                 //$htmlContent = file_get_contents($url);
-                $htmlContent = $this->getHtmlContent($url);
+                $htmlContent =  HttpHelper::getHtmlContent($url);
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
@@ -1392,7 +1356,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             if ($url) {
                 // Obtener el contenido de la URL
                 //$htmlContent = file_get_contents($url);
-                $htmlContent = $this->getHtmlContent($url);
+                $htmlContent =  HttpHelper::getHtmlContent($url);
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
