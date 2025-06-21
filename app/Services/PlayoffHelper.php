@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 class PlayoffHelper
 {
-    public static function actualizarCruces($grupo_id , $profundidad = 0)
+    public static function actualizarCruces($grupo_id)
     {
         $grupo = Grupo::with('torneo')->findOrFail($grupo_id);
         $torneo_id = $grupo->torneo->id;
@@ -45,21 +45,43 @@ class PlayoffHelper
             ], [
                 'url_nombre' => strtolower(str_replace(' ', '-', $cruce->fase))
             ]);
+            // Antes de borrar o recalcular, verificar si hay resultados para esa fecha
+            $existenResultados = Partido::where('fecha_id', $fecha->id)
+                ->where(function ($query) {
+                    $query->whereNotNull('golesl')
+                        ->orWhereNotNull('golesv');
+                })
+                ->exists();
 
-            // Crear o actualizar partido
-            Partido::updateOrCreate([
-                'fecha_id' => $fecha->id,
-                'orden' => $cruce->orden
-            ], [
-                'equipol_id' => $equipo1,
-                'equipov_id' => $equipo2,
-                'dia' => $cruce->dia,
-                'neutral' => $cruce->neutral,
-            ]);
+            if (!$existenResultados) {
+                // Eliminar partidos previos que involucren a estos equipos en esta fecha
+                Partido::where('fecha_id', $fecha->id)
+                    ->where(function ($query) use ($equipo1, $equipo2) {
+                        $query->where('equipol_id', $equipo1)
+                            ->orWhere('equipov_id', $equipo1)
+                            ->orWhere('equipol_id', $equipo2)
+                            ->orWhere('equipov_id', $equipo2);
+                    })
+                    ->delete();
+
+                // Crear o actualizar partido
+                Partido::updateOrCreate([
+                    'fecha_id' => $fecha->id,
+                    'orden' => $cruce->orden
+                ], [
+                    'equipol_id' => $equipo1,
+                    'equipov_id' => $equipo2,
+                    'dia' => $cruce->dia,
+                    'neutral' => $cruce->neutral,
+                ]);
+            } else {
+                // Ya hay resultados, no modificar ese partido para no perder datos
+                Log::info("Resultados cargados, no se recalcula ni borra para fecha $fecha->id");
+            }
         }
-        if ($profundidad === 0) {
-            self::actualizarCruces($grupo_id, 1);
-        }
+
+
+
 
     }
 
@@ -112,7 +134,7 @@ class PlayoffHelper
         if (preg_match('/^(G|P)(\d+)$/', $referencia, $matches)) {
             $tipo = $matches[1];
             $orden = intval($matches[2]);
-            Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
+            //Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
 
             // Buscar cruce anterior por siguiente_fase
             $cruceAnterior = DB::table('cruces')
@@ -148,7 +170,7 @@ class PlayoffHelper
 
         if (!$fechaPlayoffs) return null;
 
-        Log::info(print_r($cruce));
+        //Log::info(print_r($cruce));
 
         $fecha = Fecha::where('grupo_id', $fechaPlayoffs->id)
             ->where('numero', $cruce->fase)
@@ -169,7 +191,14 @@ class PlayoffHelper
             return ['ganador' => $partido->equipov_id, 'perdedor' => $partido->equipol_id];
         }
 
-        // En empate, podrías agregar lógica para penales, etc.
+        // En empate, resolver por penales si están cargados
+        if (!is_null($partido->penalesl) && !is_null($partido->penalesv)) {
+            if ($partido->penalesl > $partido->penalesv) {
+                return ['ganador' => $partido->equipol_id, 'perdedor' => $partido->equipov_id];
+            } elseif ($partido->penalesv > $partido->penalesl) {
+                return ['ganador' => $partido->equipov_id, 'perdedor' => $partido->equipol_id];
+            }
+        }
         return null;
     }
 }
