@@ -372,7 +372,7 @@ class PlantillaController extends Controller
         //
         return view('plantillas.importar',compact('plantilla','grupo'));
     }
-   
+
     public function importarProcess_new(Request $request)
     {
         //dd($request);
@@ -877,7 +877,7 @@ class PlantillaController extends Controller
                     if ($urlJugador) {
                         // Obtener el contenido de la URL
 
-                        $htmlContentJugador = $this->getHtmlContent($urlJugador);
+                        $htmlContentJugador = HttpHelper::getHtmlContent($urlJugador);
                         if (!empty($htmlContentJugador)) {
                             // Crear un nuevo DOMDocument
                             $domJugador = new \DOMDocument();
