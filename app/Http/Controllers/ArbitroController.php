@@ -331,11 +331,15 @@ class ArbitroController extends Controller
                             break;
 
                         case 'Fecha de nacimiento:':
-
-                            $nacimiento = Carbon::createFromFormat('d.m.Y', $value)->format('Y-m-d');
+                            if (!empty($value)) {
+                                $nacimiento = Carbon::createFromFormat('d.m.Y', $value)->format('Y-m-d');
+                            }
                             break;
+
                         case 'Fecha de fallecimiento:':
-                            $fallecimiento = Carbon::createFromFormat('d.m.Y', $value)->format('Y-m-d');
+                            if (!empty($value)) {
+                                $fallecimiento = Carbon::createFromFormat('d.m.Y', $value)->format('Y-m-d');
+                            }
                             break;
                         case 'Lugar de nacimiento:':
                             $ciudad = $value;
