@@ -118,6 +118,10 @@ class FechaController extends Controller
                     if (isset($request->neutral[$item]) ) {
                         $esNeutral=1;
                     }
+                    $bloqueado = 0;
+                    if (isset($request->bloquear[$item]) ) {
+                        $bloqueado=1;
+                    }
                     $data2 = [
                         'fecha_id' => $lastid,
                         'dia' => $request->fecha[$item] . ' ' . $request->hora[$item],
@@ -125,7 +129,8 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
-                        'neutral' => $esNeutral
+                        'neutral' => $esNeutral,
+                        'bloqueado' => $bloqueado,
                     ];
 
 // Agregar penales solo si fueron enviados
@@ -253,6 +258,11 @@ class FechaController extends Controller
                         $esNeutral=1;
                     }
 
+                    $bloqueado = 0;
+                    if (isset($request->bloquear[$item]) ) {
+                        $bloqueado=1;
+                    }
+
                     $data2 = [
                         'fecha_id' => $id,
                         'dia' => $request->fecha[$item] . ' ' . $request->hora[$item],
@@ -260,7 +270,8 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
-                        'neutral' => (int) $esNeutral
+                        'neutral' => (int) $esNeutral,
+                        'bloquear' => (int) $bloqueado
                     ];
 
                     // Agregar penales solo si fueron enviados

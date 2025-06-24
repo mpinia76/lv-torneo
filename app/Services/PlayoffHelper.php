@@ -45,15 +45,11 @@ class PlayoffHelper
             ], [
                 'url_nombre' => strtolower(str_replace(' ', '-', $cruce->fase))
             ]);
-            // Antes de borrar o recalcular, verificar si hay resultados para esa fecha
-            $existenResultados = Partido::where('fecha_id', $fecha->id)
-                ->where(function ($query) {
-                    $query->whereNotNull('golesl')
-                        ->orWhereNotNull('golesv');
-                })
-                ->exists();
+            $partidoExistente = Partido::where('fecha_id', $fecha->id)
+                ->where('orden', $cruce->orden)
+                ->first();
 
-            if (!$existenResultados) {
+            if (!$partidoExistente || !$partidoExistente->bloquear) {
                 // Eliminar partidos previos que involucren a estos equipos en esta fecha
                 Partido::where('fecha_id', $fecha->id)
                     ->where(function ($query) use ($equipo1, $equipo2) {

@@ -37,6 +37,7 @@
         <h1 class="display-6">Partidos</h1>
         <table class="table">
             <thead>
+            <th >Bloquear</th>
             <th>Fecha</th>
             <th >Hora</th>
             <th >Neutral</th>
@@ -55,6 +56,7 @@
             @for ($i =1; $i <= $grupo->equipos/2; $i++)
 
                 <tr>
+                    <td>{{ Form::checkbox('bloquear[]', 1,false) }}</td>
                     <td>{{Form::date('fecha[]', '', ['class' => 'form-control','style' =>'width:155px;'])}}</td>
                     <td>{{Form::time('hora[]', '', ['class' => 'form-control'])}}</td>
                     <td>{{ Form::checkbox('neutral[]', 1,false) }}</td>
