@@ -245,6 +245,11 @@ class PartidoController extends Controller
                 'personas.apellido as jugador_apellido',
                 'personas.foto as jugador_foto'
             )
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('incidencias.partido_id', 'partidos.id');
+            })
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
             ->orderBy('year','DESC')
@@ -286,6 +291,11 @@ class PartidoController extends Controller
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
             ->join('jugadors', 't1.jugador_id', '=', 'jugadors.id')
             ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('incidencias')
+                    ->whereColumn('incidencias.partido_id', 'partidos.id');
+            })
             ->whereNotNull('golesl')
             ->whereNotNull('golesv')
             ->orderBy('year','DESC')
