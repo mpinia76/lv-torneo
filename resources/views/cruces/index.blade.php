@@ -27,7 +27,7 @@
             <form class="form-inline">
 
                 <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_cruce') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
-
+                <input type="hidden" name="torneo_id" value="{{ $torneo->id }}">
                 <button class="btn btn-success m-1" type="submit">Buscar</button>
             </form>
         </nav>
@@ -75,7 +75,7 @@
     </table>
          <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                {{ $cruces->links() }}
+                {{ $cruces->appends(request()->query())->links() }}
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
