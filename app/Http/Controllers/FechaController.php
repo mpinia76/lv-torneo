@@ -129,6 +129,7 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
+                        'orden' => $request->orden[$item],
                         'neutral' => $esNeutral,
                         'bloqueado' => $bloqueado,
                     ];
@@ -270,6 +271,7 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
+                        'orden' => $request->orden[$item],
                         'neutral' => (int) $esNeutral,
                         'bloquear' => (int) $bloqueado
                     ];

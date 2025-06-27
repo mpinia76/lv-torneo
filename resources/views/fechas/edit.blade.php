@@ -37,6 +37,7 @@
                 <table class="table">
                     <thead>
                     <th>Bloquear</th>
+                    <th>Orden</th>
                     <th >Fecha</th>
                     <th >Hora</th>
                     <th>Neutral</th>
@@ -63,6 +64,7 @@
                         @endphp
                         <tr>
                             <td>{{ Form::checkbox('bloquear[]', 1,($partido->bloquear)?true:false) }}</td>
+                            <td>{{Form::number('orden[]', $partido->orden, ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                             <td>{{Form::hidden('partido_id[]',$partido->id)}}
                                 {{Form::date('fecha[]', ($partido->dia)?date('Y-m-d', strtotime($partido->dia)):'', ['class' => 'form-control','style' =>'width:155px;'])}}
                             </td>
