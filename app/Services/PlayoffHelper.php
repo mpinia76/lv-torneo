@@ -130,7 +130,7 @@ class PlayoffHelper
         if (preg_match('/^(G|P)(\d+)$/', $referencia, $matches)) {
             $tipo = $matches[1];
             $orden = intval($matches[2]);
-            //Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
+            Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
 
             // Buscar cruce anterior por siguiente_fase
             $cruceAnterior = DB::table('cruces')
@@ -166,7 +166,7 @@ class PlayoffHelper
 
         if (!$fechaPlayoffs) return null;
 
-        //Log::info(print_r($cruce));
+        Log::info(print_r($cruce));
 
         $fecha = Fecha::where('grupo_id', $fechaPlayoffs->id)
             ->where('numero', $cruce->fase)
