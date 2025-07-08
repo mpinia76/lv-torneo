@@ -6345,6 +6345,7 @@ return $string;
                                     // Consulta imágenes
                                     $imgs = $xpath->query('.//img', $td);
                                     if ($imgs->length > 0) {
+                                        log::info(print_r($imgs, true));
                                         if ($imgs[0]->getAttribute('title') == 'Tarjeta amarilla') {
                                             if ($suplentes) {
                                                 $amarillaSuplenteL = ($mintutoTarjetaSuplenteL) ? (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT) : -1;
