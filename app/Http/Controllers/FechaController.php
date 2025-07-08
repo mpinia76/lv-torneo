@@ -6345,7 +6345,13 @@ return $string;
                                     // Consulta imágenes
                                     $imgs = $xpath->query('.//img', $td);
                                     if ($imgs->length > 0) {
-                                        Log::debug(print_r($imgs, true));
+                                        foreach ($imgs as $img) {
+                                            Log::debug('Imagen encontrada', [
+                                                'src' => $img->getAttribute('src'),
+                                                'title' => $img->getAttribute('title'),
+                                                'alt' => $img->getAttribute('alt'),
+                                            ]);
+                                        }
                                         if ($imgs[0]->getAttribute('title') == 'Tarjeta amarilla') {
                                             if ($suplentes) {
                                                 $amarillaSuplenteL = ($mintutoTarjetaSuplenteL) ? (int)filter_var($mintutoTarjetaSuplenteL, FILTER_SANITIZE_NUMBER_INT) : -1;
@@ -6654,6 +6660,13 @@ return $string;
                                 // Consulta imágenes
                                 $imgs = $xpath->query('.//img', $td);
                                 if ($imgs->length > 0) {
+                                    foreach ($imgs as $img) {
+                                        Log::debug('Imagen encontrada', [
+                                            'src' => $img->getAttribute('src'),
+                                            'title' => $img->getAttribute('title'),
+                                            'alt' => $img->getAttribute('alt'),
+                                        ]);
+                                    }
                                     if ($imgs[0]->getAttribute('title') == 'Tarjeta amarilla') {
                                         if ($suplentes) {
                                             $amarillaSuplenteV = ($mintutoTarjetaSuplenteV) ? (int)filter_var($mintutoTarjetaSuplenteV, FILTER_SANITIZE_NUMBER_INT) : -1;
