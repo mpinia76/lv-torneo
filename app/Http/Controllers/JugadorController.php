@@ -1310,11 +1310,14 @@ WHERE (alineacions.jugador_id = ".$id.")";
                         ->first();
 
                     if (!empty($persona)) {
+                        if (!empty($persona->nacionalidad)) {
+                            unset($insert['nacionalidad']);
+                        }
                         $persona->update($insert);
                         $persona->jugador()->create($insert);
                     }
                 } catch (QueryException $ex) {
-                    $ok = 0;
+                    //$ok = 0;
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
@@ -1586,7 +1589,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
         if ($ok) {
             DB::commit();
             $respuestaID = 'success';
-            $respuestaMSJ = $success;
+            $respuestaMSJ = $error.'<br>'.$success;
         } else {
             DB::rollback();
             $respuestaID = 'error';

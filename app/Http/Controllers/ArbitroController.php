@@ -461,7 +461,7 @@ class ArbitroController extends Controller
                         $persona->arbitro()->create($insert);
                     }
                 } catch (QueryException $ex) {
-                    $ok = 0;
+                    //$ok = 0;
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
@@ -477,7 +477,7 @@ class ArbitroController extends Controller
         if ($ok) {
             DB::commit();
             $respuestaID = 'success';
-            $respuestaMSJ = $success;
+            $respuestaMSJ = $error.'<br>'.$success;
         } else {
             DB::rollback();
             $respuestaID = 'error';
