@@ -983,7 +983,7 @@ WHERE (tecnicos.id = ".$id.")";
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
-                        $error = 'Tecnico repetido';
+                        $success .= 'Tecnico repetido';
                     }
                 }
             }
@@ -995,7 +995,7 @@ WHERE (tecnicos.id = ".$id.")";
         if ($ok) {
             DB::commit();
             $respuestaID = 'success';
-            $respuestaMSJ = $error.'<br>'.$success;
+            $respuestaMSJ = $success;
         } else {
             DB::rollback();
             $respuestaID = 'error';

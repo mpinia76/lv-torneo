@@ -1577,7 +1577,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
-                        $error = 'Jugador repetido';
+                        $success .= 'Jugador repetido';
                     }
                 }
             }
@@ -1589,7 +1589,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
         if ($ok) {
             DB::commit();
             $respuestaID = 'success';
-            $respuestaMSJ = $error.'<br>'.$success;
+            $respuestaMSJ = $success;
         } else {
             DB::rollback();
             $respuestaID = 'error';

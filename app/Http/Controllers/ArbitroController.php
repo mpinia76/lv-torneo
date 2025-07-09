@@ -465,7 +465,7 @@ class ArbitroController extends Controller
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
-                        $error = 'Arbitro repetido';
+                        $success .= 'Arbitro repetido';
                     }
                 }
             }
@@ -477,7 +477,7 @@ class ArbitroController extends Controller
         if ($ok) {
             DB::commit();
             $respuestaID = 'success';
-            $respuestaMSJ = $error.'<br>'.$success;
+            $respuestaMSJ = $success;
         } else {
             DB::rollback();
             $respuestaID = 'error';
