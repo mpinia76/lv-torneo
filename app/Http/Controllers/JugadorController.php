@@ -1550,7 +1550,7 @@ WHERE (alineacions.jugador_id = ".$id.")";
             }
 
             $request->session()->put('nombre_filtro_jugador', $apellido);
-            log::info(print_r($insert, true));
+            //log::info(print_r($insert, true));
             try {
                 $persona = Persona::create($insert);
                 $persona->jugador()->create($insert);
@@ -1562,15 +1562,15 @@ WHERE (alineacions.jugador_id = ".$id.")";
                         ->first();
 
                     if (!empty($persona)) {
-                        /*if (!empty($persona->nacionalidad)) {
+                        if (!empty($persona->nacionalidad)) {
                             unset($insert['nacionalidad']);
-                        }*/
+                        }
 
                         $persona->update($insert);
                         $persona->jugador()->create($insert);
                     }
                 } catch (QueryException $ex) {
-                    $ok = 0;
+                    //$ok = 0;
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
