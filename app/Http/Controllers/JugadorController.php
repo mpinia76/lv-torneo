@@ -144,7 +144,7 @@ class JugadorController extends Controller
 
 
 
-
+        $respuestaID='success';
 
         try {
             $persona = Persona::create($insert);
