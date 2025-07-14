@@ -38,9 +38,6 @@ class PlayoffHelper
             Log::info($equipo1.' vs. '.$equipo2);
             if (!$equipo1 || !$equipo2) continue; // aún no hay suficientes resultados
 
-
-            Log::info($grupoPlayoffs->id.' fase: '.$cruce->fase);
-
             // Crear o buscar la fecha correspondiente a la fase
             $fecha = Fecha::firstOrCreate([
                 'grupo_id' => $grupoPlayoffs->id,
@@ -133,7 +130,7 @@ class PlayoffHelper
         if (preg_match('/^(G|P)(\d+)$/', $referencia, $matches)) {
             $tipo = $matches[1];
             $orden = intval($matches[2]);
-            //Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
+            Log::info('Tipo: ' . $tipo . ' Orden: ' . $orden . ' Fase actual: ' . $fase_actual);
 
             // Buscar cruce anterior por siguiente_fase
             $cruceAnterior = DB::table('cruces')
@@ -154,6 +151,7 @@ class PlayoffHelper
         if (preg_match('/^(\d+)([A-Z])$/', $referencia, $matches)) {
             $pos = intval($matches[1]);
             $grupo = $matches[2];
+            Log::info('Pos: ' . $pos . ' Grupo: ' . $grupo. ' Equipo: ' . $tabla[$grupo][$pos - 1] ?? null);
             return $tabla[$grupo][$pos - 1] ?? null;
         }
 
