@@ -142,10 +142,6 @@ class JugadorController extends Controller
 
 
 
-
-
-
-
         try {
             $persona = Persona::create($insert);
             $persona->jugador()->create($insert);
