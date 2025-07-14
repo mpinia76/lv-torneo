@@ -38,6 +38,9 @@ class PlayoffHelper
             Log::info($equipo1.' vs. '.$equipo2);
             if (!$equipo1 || !$equipo2) continue; // aún no hay suficientes resultados
 
+
+            Log::info($grupoPlayoffs->id.' fase: '.$cruce->fase);
+
             // Crear o buscar la fecha correspondiente a la fase
             $fecha = Fecha::firstOrCreate([
                 'grupo_id' => $grupoPlayoffs->id,
