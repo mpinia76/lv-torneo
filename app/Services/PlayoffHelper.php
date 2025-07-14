@@ -151,7 +151,9 @@ class PlayoffHelper
         if (preg_match('/^(\d+)([A-Z])$/', $referencia, $matches)) {
             $pos = intval($matches[1]);
             $grupo = $matches[2];
-            Log::info('Pos: ' . $pos . ' Grupo: ' . $grupo. ' Equipo: ' . $tabla[$grupo][$pos - 1] ?? null);
+            Log::info('Pos: ' . $pos . ' Grupo: ' . $grupo);
+            Log::info(print_r($matches, true));
+            Log::info(print_r($tabla, true));
             return $tabla[$grupo][$pos - 1] ?? null;
         }
 
