@@ -6146,12 +6146,22 @@ return $string;
                 Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                $html2 =  HttpHelper::getHtmlContent($url2);
+                //$html2 =  HttpHelper::getHtmlContent($url2);
+                // Ejecutar el script Node.js y capturar la salida
+                $scriptPath = escapeshellarg(base_path('scripts/scrape.js'));
+                $escapedUrl = escapeshellarg($url2);
+
+                // Ejecutar el script Node.js con ambas partes escapadas
+                $html2 = shell_exec("node $scriptPath $escapedUrl 2>&1");
+
+                // Log parcial del HTML para debug
+                Log::channel('mi_log')->debug("HTML capturado: " . substr($html2, 0, 500));
             }
 
 
         }
         catch (Exception $ex) {
+            Log::channel('mi_log')->error('Error en la ejecución del scraper: ' . $ex->getMessage());
             $html2='';
         }
         if ($html2) {
