@@ -1,0 +1,10 @@
+{
+    "build": {
+        "root": "scripts",
+        "buildCommand": "npm install"
+    },
+    "start": {
+        "root": "scripts",
+        "startCommand": "node scrape.js"
+    }
+}
