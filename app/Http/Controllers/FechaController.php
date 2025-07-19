@@ -6146,16 +6146,20 @@ return $string;
                 Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                //$html2 =  HttpHelper::getHtmlContent($url2);
+                $html2 = HttpHelper::getHtmlContent($url2, true);
                 // Ejecutar el script Node.js y capturar la salida
-                $scriptPath = escapeshellarg(base_path('scripts/scrape.js'));
-                $escapedUrl = escapeshellarg($url2);
+                //$scriptPath = escapeshellarg(base_path('scripts/scrape.js'));
+                //$escapedUrl = escapeshellarg($url2);
 
                 // Ejecutar el script Node.js con ambas partes escapadas
-                $html2 = shell_exec("node $scriptPath $escapedUrl 2>&1");
+                //$html2 = shell_exec("node $scriptPath $escapedUrl 2>&1");
+
+                /*$endpoint = 'https://scrape-prod.up.railway.app/scrape?url=' . urlencode($url2);
+                $html2 = file_get_contents($endpoint);*/
+
 
                 // Log parcial del HTML para debug
-                Log::channel('mi_log')->debug("HTML capturado: " . substr($html2, 0, 500));
+                //Log::channel('mi_log')->debug("HTML capturado: " . substr($html2, 0, 5000));
             }
 
 

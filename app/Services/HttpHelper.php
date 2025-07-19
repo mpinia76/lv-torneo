@@ -7,36 +7,60 @@ use Illuminate\Support\Facades\Log;
 
 class HttpHelper
 {
-    public static function getHtmlContent($url)
+    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
-        $ch = curl_init();
+        if ($usarScraperRemoto) {
+            $scraperEndpoint = 'https://scrape-prod.up.railway.app/scrape?url=' . urlencode($urlOriginal);
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $scraperEndpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
-        $response = curl_exec($ch);
+            $response = curl_exec($ch);
 
-        if (curl_errno($ch)) {
-            Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
-            return false;
-        }
+            if (curl_errno($ch)) {
+                //Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
+                return false;
+            }
 
-        if ($response === false) {
-            Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $url);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            return false;
+
+            if ($httpCode >= 400) {
+                //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
+                return false;
+            }
+
+            // Acá NO decodificás JSON, simplemente devolvés el HTML crudo
+            return $response;
+        } else {
+            // Hace scraping local (cURL directo)
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $urlOriginal);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
+
+            $response = curl_exec($ch);
+
+            if (curl_errno($ch)) {
+                //Log::channel('mi_log')->error('Error en cURL (local): ' . curl_error($ch));
+                return false;
+            }
+
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode >= 400) {
+                //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraping local para: $urlOriginal");
+                return false;
+            }
+
+            return $response;
         }
-
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode == 404) {
-            Log::channel('mi_log')->warning('Página no encontrada (404) para la URL: ' . $url);
-            return false;
-        }
-
-        return $response;
     }
 }
+
