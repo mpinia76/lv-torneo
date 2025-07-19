@@ -874,7 +874,7 @@ WHERE (tecnicos.id = ".$id.")";
             }
 
             // Descarga y guarda la imagen si no es el avatar por defecto
-            if (!str_contains($imageUrl, 'avatar-player.jpg')) {
+            if (!empty($imageUrl) && !str_contains($imageUrl, 'avatar-player.jpg')) {
                 try {
                     $client = new Client();
 
