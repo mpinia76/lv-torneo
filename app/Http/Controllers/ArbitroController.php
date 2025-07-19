@@ -270,6 +270,7 @@ class ArbitroController extends Controller
                 // Obtener el contenido de la URL
                 //$htmlContent = file_get_contents($url);
                 $htmlContent =  HttpHelper::getHtmlContent($url, true);
+                Log::channel('mi_log')->debug("HTML capturado: " . substr($htmlContent, 0, 5000));
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
@@ -295,6 +296,8 @@ class ArbitroController extends Controller
                 if ($fotoDiv->length > 0) {
 
                     $imageUrl = $fotoDiv[0]->getAttribute('data-cfsrc');
+                    //Log::info('URL imagen capturada:', ['url' => $imageUrl]);
+
                     //dd($imageUrl);
                     //Log::info('Foto: ' . $imageUrl, []);
                 }
@@ -356,7 +359,7 @@ class ArbitroController extends Controller
             }
 
             // Descarga y guarda la imagen si no es el avatar por defecto
-            if (!str_contains($imageUrl, 'avatar-player.jpg')) {
+            if (!empty($imageUrl) && !str_contains($imageUrl, 'avatar-player.jpg')) {
                 try {
                     $client = new Client();
 
