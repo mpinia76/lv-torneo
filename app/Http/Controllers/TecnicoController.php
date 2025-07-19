@@ -783,7 +783,7 @@ WHERE (tecnicos.id = ".$id.")";
             if ($url) {
                 // Obtener el contenido de la URL
                 //$htmlContent = file_get_contents($url);
-                $htmlContent =  HttpHelper::getHtmlContent($url);
+                $htmlContent =  HttpHelper::getHtmlContent($url, true);
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
