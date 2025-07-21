@@ -805,10 +805,12 @@ WHERE (tecnicos.id = ".$id.")";
                 // Seleccionar el div con id 'previewArea' que contiene la imagen
 
                 $fotoDiv = $xpath->query('.//div[@class="data"]/img', $sidebarDiv);
-
+                //log::info(print_r($fotoDiv, true));
                 if ($fotoDiv->length > 0) {
 
-                    $imageUrl = $fotoDiv[0]->getAttribute('data-cfsrc');
+                    //$imageUrl = $fotoDiv[0]->getAttribute('data-cfsrc');
+                    $imageUrl = $fotoDiv[0]->getAttribute('src');
+
                     //dd($imageUrl);
                     //Log::info('Foto: ' . $imageUrl, []);
                 }

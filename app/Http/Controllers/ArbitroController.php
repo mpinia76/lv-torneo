@@ -295,7 +295,8 @@ class ArbitroController extends Controller
 
                 if ($fotoDiv->length > 0) {
 
-                    $imageUrl = $fotoDiv[0]->getAttribute('data-cfsrc');
+                    //$imageUrl = $fotoDiv[0]->getAttribute('data-cfsrc');
+                    $imageUrl = $fotoDiv[0]->getAttribute('src');
                     //Log::info('URL imagen capturada:', ['url' => $imageUrl]);
 
                     //dd($imageUrl);
