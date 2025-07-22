@@ -22,7 +22,7 @@ class PlayoffHelper
                 $tabla[$g->nombre] = self::posiciones($g->id);
             }
         }
-        Log::info('Tabla:', $tabla);
+        //Log::info('Tabla:', $tabla);
         // Obtenemos los cruces predefinidos (ej: 1A vs 2B)
         $cruces = DB::table('cruces')
             ->where('torneo_id', $torneo_id)
@@ -35,7 +35,7 @@ class PlayoffHelper
             $equipo1 = self::resolverEquipo($cruce->clasificado_1, $tabla, $torneo_id,$cruce->fase);
             $equipo2 = self::resolverEquipo($cruce->clasificado_2, $tabla, $torneo_id,$cruce->fase);
 
-            Log::info($equipo1.' vs. '.$equipo2);
+            //Log::info($equipo1.' vs. '.$equipo2);
             if (!$equipo1 || !$equipo2) continue; // aún no hay suficientes resultados
 
             // Crear o buscar la fecha correspondiente a la fase
@@ -85,37 +85,38 @@ class PlayoffHelper
     {
         // Devuelve un array de equipo_id en orden de posición
         $sql = "
-            SELECT equipo_id
-            FROM (
-                SELECT
-                    e.id AS equipo_id,
-                    SUM(
-                        CASE
-                            WHEN p.equipol_id = e.id THEN
-                                CASE
-                                    WHEN p.golesl > p.golesv THEN 3
-                                    WHEN p.golesl = p.golesv THEN 1
-                                    ELSE 0
-                                END
-                            WHEN p.equipov_id = e.id THEN
-                                CASE
-                                    WHEN p.golesv > p.golesl THEN 3
-                                    WHEN p.golesv = p.golesl THEN 1
-                                    ELSE 0
-                                END
-                            ELSE 0
-                        END
-                    ) AS puntos,
-                    SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl WHEN p.equipov_id = e.id THEN p.golesv ELSE 0 END) AS gf,
-                    SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv WHEN p.equipov_id = e.id THEN p.golesl ELSE 0 END) AS gc
-                FROM equipos e
-                LEFT JOIN partidos p ON (p.equipol_id = e.id OR p.equipov_id = e.id)
-                LEFT JOIN fechas f ON p.fecha_id = f.id
-                WHERE f.grupo_id = :grupo_id
-                GROUP BY e.id
-            ) AS tabla
-            ORDER BY puntos DESC, (gf - gc) DESC, gf DESC
-        ";
+        SELECT equipo_id
+        FROM (
+            SELECT
+                e.id AS equipo_id,
+                SUM(
+                    CASE
+                        WHEN p.equipol_id = e.id THEN
+                            CASE
+                                WHEN p.golesl > p.golesv THEN 3
+                                WHEN p.golesl = p.golesv THEN 1
+                                ELSE 0
+                            END
+                        WHEN p.equipov_id = e.id THEN
+                            CASE
+                                WHEN p.golesv > p.golesl THEN 3
+                                WHEN p.golesv = p.golesl THEN 1
+                                ELSE 0
+                            END
+                        ELSE 0
+                    END
+                ) AS puntos,
+                SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl WHEN p.equipov_id = e.id THEN p.golesv ELSE 0 END) AS gf,
+                SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv WHEN p.equipov_id = e.id THEN p.golesl ELSE 0 END) AS gc
+            FROM equipos e
+            JOIN plantillas pl ON pl.equipo_id = e.id AND pl.grupo_id = :grupo_id
+            LEFT JOIN partidos p ON (p.equipol_id = e.id OR p.equipov_id = e.id)
+            LEFT JOIN fechas f ON p.fecha_id = f.id
+            WHERE f.grupo_id = :grupo_id
+            GROUP BY e.id
+        ) AS tabla
+        ORDER BY puntos DESC, (gf - gc) DESC, gf DESC
+    ";
 
         $result = DB::select($sql, ['grupo_id' => $grupo_id]);
 
