@@ -83,57 +83,40 @@ class PlayoffHelper
 
     private static function posiciones($grupo_id)
     {
-        // Devuelve un array de equipo_id en orden de posición
+        $grupo = \App\Grupo::findOrFail($grupo_id);
+
         $sql = "
-        SELECT equipo_id
-        FROM (
-            SELECT
-                e.id AS equipo_id,
-                SUM(
-                    CASE
-                        WHEN p.equipol_id = e.id THEN
-                            CASE
-                                WHEN p.golesl > p.golesv THEN 3
-                                WHEN p.golesl = p.golesv THEN 1
-                                ELSE 0
-                            END
-                        WHEN p.equipov_id = e.id THEN
-                            CASE
-                                WHEN p.golesv > p.golesl THEN 3
-                                WHEN p.golesv = p.golesl THEN 1
-                                ELSE 0
-                            END
-                        ELSE 0
-                    END
-                ) AS puntos,
-                SUM(
-                    CASE
-                        WHEN p.equipol_id = e.id THEN p.golesl
-                        WHEN p.equipov_id = e.id THEN p.golesv
-                        ELSE 0
-                    END
-                ) AS gf,
-                SUM(
-                    CASE
-                        WHEN p.equipol_id = e.id THEN p.golesv
-                        WHEN p.equipov_id = e.id THEN p.golesl
-                        ELSE 0
-                    END
-                ) AS gc
-            FROM equipos e
-            JOIN plantillas pl ON pl.equipo_id = e.id AND pl.grupo_id = :grupo_id
-            LEFT JOIN partidos p ON
-                (p.equipol_id = e.id OR p.equipov_id = e.id)
-                AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL
-            WHERE pl.grupo_id = :grupo_id_2
-            GROUP BY e.id
-        ) AS tabla
-        ORDER BY puntos DESC, (gf - gc) DESC, gf DESC
+        SELECT
+            e.id AS equipo_id,
+            SUM(
+                CASE
+                    WHEN p.equipol_id = e.id AND p.golesl > p.golesv THEN 3
+                    WHEN p.equipol_id = e.id AND p.golesl = p.golesv THEN 1
+                    WHEN p.equipov_id = e.id AND p.golesv > p.golesl THEN 3
+                    WHEN p.equipov_id = e.id AND p.golesv = p.golesl THEN 1
+                    ELSE 0
+                END
+            ) AS puntos,
+            SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl WHEN p.equipov_id = e.id THEN p.golesv ELSE 0 END) AS gf,
+            SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv WHEN p.equipov_id = e.id THEN p.golesl ELSE 0 END) AS gc,
+            SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl WHEN p.equipov_id = e.id THEN p.golesv ELSE 0 END) -
+            SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv WHEN p.equipov_id = e.id THEN p.golesl ELSE 0 END) AS diferencia
+        FROM equipos e
+        INNER JOIN plantillas pl ON pl.equipo_id = e.id AND pl.grupo_id = :grupo_id
+        LEFT JOIN partidos p ON (p.equipol_id = e.id OR p.equipov_id = e.id)
+        LEFT JOIN fechas f ON p.fecha_id = f.id
+        LEFT JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneo_id
+          AND g.agrupacion = :agrupacion
+          AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL
+        GROUP BY e.id
+        ORDER BY puntos DESC, diferencia DESC, gf DESC
     ";
 
-        $result = DB::select($sql, [
+        $result = \DB::select($sql, [
             'grupo_id' => $grupo_id,
-            'grupo_id_2' => $grupo_id
+            'torneo_id' => $grupo->torneo_id,
+            'agrupacion' => $grupo->agrupacion,
         ]);
 
         return array_map(function ($row) {
