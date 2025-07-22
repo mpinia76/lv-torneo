@@ -22,7 +22,7 @@ class PlayoffHelper
                 $tabla[$g->nombre] = self::posiciones($g->id);
             }
         }
-        //Log::info('Tabla:', $tabla);
+        Log::info('Tabla:', $tabla);
         // Obtenemos los cruces predefinidos (ej: 1A vs 2B)
         $cruces = DB::table('cruces')
             ->where('torneo_id', $torneo_id)
