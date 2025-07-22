@@ -112,13 +112,13 @@ class PlayoffHelper
             JOIN plantillas pl ON pl.equipo_id = e.id AND pl.grupo_id = :grupo_id
             LEFT JOIN partidos p ON (p.equipol_id = e.id OR p.equipov_id = e.id)
             LEFT JOIN fechas f ON p.fecha_id = f.id
-            WHERE f.grupo_id = :grupo_id
+            WHERE f.grupo_id = :grupo_id_2
             GROUP BY e.id
         ) AS tabla
         ORDER BY puntos DESC, (gf - gc) DESC, gf DESC
     ";
 
-        $result = DB::select($sql, ['grupo_id' => $grupo_id]);
+        $result = DB::select($sql, ['grupo_id' => $grupo_id, 'grupo_id_2' => $grupo_id]);
 
         return array_map(function ($row) {
             return $row->equipo_id;
