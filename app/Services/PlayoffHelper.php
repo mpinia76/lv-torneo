@@ -22,7 +22,7 @@ class PlayoffHelper
                 $tabla[$g->nombre] = self::posiciones($g->id);
             }
         }
-        Log::info('Tabla:', $tabla);
+        //Log::info('Tabla:', $tabla);
         // Obtenemos los cruces predefinidos (ej: 1A vs 2B)
         $cruces = DB::table('cruces')
             ->where('torneo_id', $torneo_id)
@@ -106,25 +106,41 @@ class PlayoffHelper
                         ELSE 0
                     END
                 ) AS puntos,
-                SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl WHEN p.equipov_id = e.id THEN p.golesv ELSE 0 END) AS gf,
-                SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv WHEN p.equipov_id = e.id THEN p.golesl ELSE 0 END) AS gc
+                SUM(
+                    CASE
+                        WHEN p.equipol_id = e.id THEN p.golesl
+                        WHEN p.equipov_id = e.id THEN p.golesv
+                        ELSE 0
+                    END
+                ) AS gf,
+                SUM(
+                    CASE
+                        WHEN p.equipol_id = e.id THEN p.golesv
+                        WHEN p.equipov_id = e.id THEN p.golesl
+                        ELSE 0
+                    END
+                ) AS gc
             FROM equipos e
             JOIN plantillas pl ON pl.equipo_id = e.id AND pl.grupo_id = :grupo_id
-            LEFT JOIN partidos p ON (p.equipol_id = e.id OR p.equipov_id = e.id)
-            LEFT JOIN fechas f ON p.fecha_id = f.id
-            WHERE f.grupo_id = :grupo_id_2
+            LEFT JOIN partidos p ON
+                (p.equipol_id = e.id OR p.equipov_id = e.id)
+                AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL
+            WHERE pl.grupo_id = :grupo_id_2
             GROUP BY e.id
         ) AS tabla
         ORDER BY puntos DESC, (gf - gc) DESC, gf DESC
     ";
 
-        $result = DB::select($sql, ['grupo_id' => $grupo_id, 'grupo_id_2' => $grupo_id]);
+        $result = DB::select($sql, [
+            'grupo_id' => $grupo_id,
+            'grupo_id_2' => $grupo_id
+        ]);
 
         return array_map(function ($row) {
             return $row->equipo_id;
         }, $result);
-
     }
+
 
     private static function resolverEquipo($referencia, $tabla, $torneo_id, $fase_actual)
     {
