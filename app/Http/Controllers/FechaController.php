@@ -433,7 +433,7 @@ class FechaController extends Controller
 
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                $html2 =  HttpHelper::getHtmlContent($url2);
+                $html2 =  HttpHelper::getHtmlContent($url2,true);
             }
 
 
