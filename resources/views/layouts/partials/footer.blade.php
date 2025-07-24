@@ -598,9 +598,9 @@
 
     function addRowFecha()
     {
-
         var tr='<tr>'+
             '<td>'+'{{ Form::checkbox('bloquear[]', 1,false) }}'+'</td>'+
+            '<td>'+'{{Form::number('orden[]', $partido->orden, ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>'+
             '<td>'+'{{Form::date('fecha[]', '', ['class' => 'form-control','style' =>'width:155px;'])}}'+'</td>'+
             '<td>'+'{{Form::time('hora[]', '', ['class' => 'form-control'])}}'+'</td>'+
             '<td>'+'{{ Form::checkbox('neutral[]', 1,false) }}'+'</td>'+
