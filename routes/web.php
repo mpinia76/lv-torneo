@@ -77,6 +77,9 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('controlarArbitros', 'PartidoController@controlarArbitros')->name('partidos.controlarArbitros');
     Route::get('controlarTecnicos', 'PartidoController@controlarTecnicos')->name('partidos.controlarTecnicos');
 
+    Route::get('/reassign/{id}', 'TecnicoController@reasignar')->name('tecnicos.reasignar');
+    Route::put('saveReassign', 'TecnicoController@guardarReasignar');
+
     Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');
 

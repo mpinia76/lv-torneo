@@ -116,6 +116,7 @@
                                 <button class="btn btn-danger m-1">Eliminar</button>
                             </form>
                         @elseif($personaSimilares->tecnico)
+                                <a href="{{route('tecnicos.reasignar', $personaSimilares->tecnico->id)}}" class="btn btn-info m-1">Reasignar</a>
                             <a href="{{route('tecnicos.edit', $personaSimilares->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
                         @elseif($personaSimilares->arbitro)
                             <a href="{{route('arbitros.edit', $personaSimilares->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>

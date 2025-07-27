@@ -1007,5 +1007,60 @@ WHERE (tecnicos.id = ".$id.")";
         return redirect()->route('tecnicos.index')->with($respuestaID, $respuestaMSJ);
     }
 
+    public function reasignar($id)
+    {
+        $tecnico=Tecnico::findOrFail($id);
+
+        return view('tecnicos.reasignar', compact('tecnico'));
+    }
+
+    public function guardarReasignar(Request $request)
+    {
+        // Validar los datos de entrada
+        $request->validate([
+            'tecnicoId' => 'required|integer|exists:tecnicos,id',
+            'reasignarId' => 'required|integer|exists:jugadors,id|different:jugadorId',
+        ]);
+
+        $tecnicoId = $request->input('tecnicoId');
+        $jugadorNuevoId = $request->input('reasignarId');
+
+        try {
+            // Inicia una transacción para garantizar que todas las actualizaciones se completen
+            DB::beginTransaction();
+
+            $tecnico = Tecnico::findOrFail($tecnicoId);
+            $jugadorNuevo = Jugador::findOrFail($jugadorNuevoId);
+            $personaNueva = Persona::findOrFail($jugadorNuevo->persona_id);
+
+            // Guardar persona anterior antes de sobrescribir
+            $personaAnterior = Persona::find($tecnico->persona_id);
+
+            // Reasignar persona al técnico
+            $tecnico->persona_id = $personaNueva->id;
+            $tecnico->save();
+
+            // Eliminar persona anterior (opcional: verificar relaciones primero)
+            if ($personaAnterior) {
+                // Eliminar la foto si existe
+                if ($personaAnterior->foto && file_exists(public_path('images/' . $personaAnterior->foto))) {
+                    // unlink(public_path('images/' . $personaAnterior->foto)); // Descomenta si deseas eliminarla
+                }
+
+                $personaAnterior->delete();
+            }
+
+            DB::commit();
+
+            // Redirigir con un mensaje de éxito
+            return redirect()->route('jugadores.verificarPersonas')->with('success', 'Técnico reasignado exitosamente.');
+        } catch (\Exception $e) {
+            // Revertir los cambios si hay algún error
+            DB::rollBack();
+
+            // Regresar con un mensaje de error
+            return redirect()->back()->withErrors(['error' => 'Hubo un problema al reasignar el jugador.']);
+        }
+    }
 
 }
