@@ -503,13 +503,12 @@ class FechaController extends Controller
 
 // Combinar fecha y hora
                                 $fechaHora = DateTime::createFromFormat('Y-m-d H:i', $fechaFormateada . ' ' . $hora);
-                                Log::channel('mi_log')->info('fecha hora: '.$fechaHora,[]);
-                                Log::channel('mi_log')->info('url: '.$url2,[]);
+
 // Si no es de arg.worldfootball.net, restamos 4 horas
                                 if (strpos($url2, 'arg.worldfootball.net') === false && $fechaHora) {
                                     $fechaHora->modify('-4 hours');
                                 }
-                                Log::channel('mi_log')->info('fecha hora despues: '.$fechaHora,[]);
+
 // Almacenar el partido con la nueva fecha y hora (ya modificada si corresponde)
                                 $partidos[] = [
                                     'fecha' => $fechaHora ? $fechaHora->format('Y-m-d') : $fechaFormateada,
@@ -539,50 +538,44 @@ class FechaController extends Controller
                                     $textoColumna = trim($col->textContent);
 
                                     if (strpos($textoColumna, 'I:') === 0) {
-
-                                        $fechaHora = substr($textoColumna, 3); // Extraemos la fecha de ida
-                                        // Separar fecha y hora
-                                        //list($fecha, $hora) = explode(' ', $fechaHora);
+                                        $fechaHora = substr($textoColumna, 3);
                                         $partes = explode(' ', $fechaHora);
                                         $fecha = $partes[0] ?? null;
-                                        $hora = $partes[1] ?? '00:00'; // Si no hay hora, asignamos "00:00"
+                                        $hora = $partes[1] ?? '00:00';
 
-// Separar los componentes de la fecha (dd.mm.yyyy)
                                         list($dia, $mes, $anio) = explode('.', $fecha);
-
-// Crear la variable para la fecha en el formato "yyyy-mm-dd"
                                         $fechaFormateada = "$anio-$mes-$dia";
 
-// Ahora tenemos la fecha y la hora separadas
-                                        $horaFormateada = $hora;
+                                        $fechaHoraObj = DateTime::createFromFormat('Y-m-d H:i', $fechaFormateada . ' ' . $hora);
 
-                                        $partidos[count($partidos) - 2]['fecha'] = $fechaFormateada;
-                                        $partidos[count($partidos) - 2]['hora'] = $horaFormateada;
+                                        if (strpos($url2, 'https://arg.worldfootball.net/') === false && $fechaHoraObj) {
+                                            $fechaHoraObj->modify('-4 hours');
+                                        }
+
+                                        $partidos[count($partidos) - 2]['fecha'] = $fechaHoraObj ? $fechaHoraObj->format('Y-m-d') : $fechaFormateada;
+                                        $partidos[count($partidos) - 2]['hora'] = $fechaHoraObj ? $fechaHoraObj->format('H:i') : $hora;
                                     }
-                                    if (strpos($textoColumna, 'V:') === 0) {
 
-                                        $fechaHora = substr($textoColumna, 3); // Extraemos la fecha de ida
-                                        // Separar fecha y hora
-                                        //list($fecha, $hora) = explode(' ', $fechaHora);
+                                    if (strpos($textoColumna, 'V:') === 0) {
+                                        $fechaHora = substr($textoColumna, 3);
                                         $partes = explode(' ', $fechaHora);
                                         $fecha = $partes[0] ?? null;
-                                        $hora = $partes[1] ?? '00:00'; // Si no hay hora, asignamos "00:00"
+                                        $hora = $partes[1] ?? '00:00';
 
-// Separar los componentes de la fecha (dd.mm.yyyy)
                                         list($dia, $mes, $anio) = explode('.', $fecha);
-
-// Crear la variable para la fecha en el formato "yyyy-mm-dd"
                                         $fechaFormateada = "$anio-$mes-$dia";
 
-// Ahora tenemos la fecha y la hora separadas
-                                        $horaFormateada = $hora;
+                                        $fechaHoraObj = DateTime::createFromFormat('Y-m-d H:i', $fechaFormateada . ' ' . $hora);
 
-                                        $partidos[count($partidos) - 1]['fecha'] = $fechaFormateada;
-                                        $partidos[count($partidos) - 1]['hora'] = $horaFormateada;
+                                        if (strpos($url2, 'https://arg.worldfootball.net/') === false && $fechaHoraObj) {
+                                            $fechaHoraObj->modify('-4 hours');
+                                        }
+
+                                        $partidos[count($partidos) - 1]['fecha'] = $fechaHoraObj ? $fechaHoraObj->format('Y-m-d') : $fechaFormateada;
+                                        $partidos[count($partidos) - 1]['hora'] = $fechaHoraObj ? $fechaHoraObj->format('H:i') : $hora;
                                     }
 
                                 }
-                            }
                         }
                     }
                 }
