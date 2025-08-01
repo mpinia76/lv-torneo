@@ -576,6 +576,7 @@ class FechaController extends Controller
                                     }
 
                                 }
+                            }
                         }
                     }
                 }
