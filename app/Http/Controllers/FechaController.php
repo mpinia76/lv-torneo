@@ -503,12 +503,13 @@ class FechaController extends Controller
 
 // Combinar fecha y hora
                                 $fechaHora = DateTime::createFromFormat('Y-m-d H:i', $fechaFormateada . ' ' . $hora);
-
+                                Log::channel('mi_log')->info('fecha hora: '.$fechaHora,[]);
+                                Log::channel('mi_log')->info('url: '.$url2,[]);
 // Si no es de arg.worldfootball.net, restamos 4 horas
-                                if (strpos($url2, 'https://arg.worldfootball.net/') === false && $fechaHora) {
+                                if (strpos($url2, 'arg.worldfootball.net') === false && $fechaHora) {
                                     $fechaHora->modify('-4 hours');
                                 }
-
+                                Log::channel('mi_log')->info('fecha hora despues: '.$fechaHora,[]);
 // Almacenar el partido con la nueva fecha y hora (ya modificada si corresponde)
                                 $partidos[] = [
                                     'fecha' => $fechaHora ? $fechaHora->format('Y-m-d') : $fechaFormateada,
@@ -517,7 +518,7 @@ class FechaController extends Controller
                                     'equipo2' => $equipo2,
                                     'marcador' => $marcador,
                                 ];
-
+FF
                             }
                             if ($cols->length == 6) { // Fila con información del partido (equipos y fecha/hora)
 
