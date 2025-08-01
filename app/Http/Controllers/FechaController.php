@@ -518,7 +518,6 @@ class FechaController extends Controller
                                     'equipo2' => $equipo2,
                                     'marcador' => $marcador,
                                 ];
-FF
                             }
                             if ($cols->length == 6) { // Fila con información del partido (equipos y fecha/hora)
 
