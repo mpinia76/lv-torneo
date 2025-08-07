@@ -1125,7 +1125,7 @@ class PlantillaController extends Controller
                     //$error = 'No se encontró la URL: ' . $urlJugador;
                     //$success .= 'No se encontró la URL: ' . $urlJugador.'<br>';
                 }
-                if ($htmlContentJugador) {
+                if ($htmlContentJugador && $persona) {
                     $data2 = array(
                         'plantilla_id' => $id,
                         'jugador_id' => $persona->jugador->id,
