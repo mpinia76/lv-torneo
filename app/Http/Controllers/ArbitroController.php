@@ -270,7 +270,7 @@ class ArbitroController extends Controller
                 // Obtener el contenido de la URL
                 //$htmlContent = file_get_contents($url);
                 $htmlContent =  HttpHelper::getHtmlContent($url, true);
-                Log::channel('mi_log')->debug("HTML capturado: " . substr($htmlContent, 0, 5000));
+            //Log::channel('mi_log')->debug("HTML capturado: " . substr($htmlContent, 0, 5000));
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
