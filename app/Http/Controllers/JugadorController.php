@@ -1366,8 +1366,8 @@ WHERE (alineacions.jugador_id = ".$id.")";
                     $xpath = new \DOMXPath($dom);
                 } else {
                     // Podés loguear o seguir normalmente
-
-                    $success .= 'HTML vacío para la URL: '.$url.'<br>';
+                    $ok=0;
+                    $error = 'HTML vacío para la URL: '.$url;
                 }
             }
         } catch (Exception $ex) {
