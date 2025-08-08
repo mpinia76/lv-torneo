@@ -1357,13 +1357,18 @@ WHERE (alineacions.jugador_id = ".$id.")";
                 //$htmlContent = file_get_contents($url);
                 $htmlContent =  HttpHelper::getHtmlContent($url);
                 // Crear un nuevo DOMDocument
-                $dom = new \DOMDocument();
-                libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                $dom->loadHTML($htmlContent);
-                libxml_clear_errors();
+                if (!empty($htmlContent)) {
+                    $dom = new \DOMDocument();
+                    libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                    $dom->loadHTML($htmlContent);
+                    libxml_clear_errors();
 
-                // Crear un nuevo objeto XPath
-                $xpath = new \DOMXPath($dom);
+                    $xpath = new \DOMXPath($dom);
+                } else {
+                    // Podés loguear o seguir normalmente
+
+                    $success .= 'HTML vacío para la URL: '.$url.'<br>';
+                }
             }
         } catch (Exception $ex) {
             $html = '';
