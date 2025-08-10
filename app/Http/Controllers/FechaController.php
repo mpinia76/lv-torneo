@@ -709,6 +709,7 @@ class FechaController extends Controller
                                             $guardarPartido = true;
                                             $verificado=$request->get('verificado');
                                             if ($verificado) {
+                                                $guardarPartido = false;
                                                 // Verificar si ambos equipos están en el mismo grupo
                                                 $plantillaLocalGrupo = Plantilla::where('grupo_id', $grupo_id)
                                                     ->where('equipo_id', $idLocal)
@@ -726,6 +727,7 @@ class FechaController extends Controller
                                                     ($plantillaLocalGrupo && !$plantillaVisitanteGrupo) ||
                                                     (!$plantillaLocalGrupo && $plantillaVisitanteGrupo)
                                                 ) {
+                                                    //Log::channel('mi_log')->info('1 equipo del grupo: ' . $strEquipoL . ' - ' . $strEquipoV, []);
                                                     // ✅ Solo uno de los dos es del grupo
                                                     $partidoExistente = Partido::whereDate('dia', $dia)
                                                         ->where(function ($q) use ($idLocal, $idVisitante) {
