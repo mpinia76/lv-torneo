@@ -706,38 +706,45 @@ class FechaController extends Controller
                                                 'penalesv'=>$penalesV,
                                                 'neutral' => $torneo->neutral,
                                             );
-                                            // Verificar si ambos equipos están en el mismo grupo
-                                            $plantillaLocalGrupo = Plantilla::where('grupo_id', $grupo_id)
-                                                ->where('equipo_id', $idLocal)
-                                                ->exists();
-
-                                            $plantillaVisitanteGrupo = Plantilla::where('grupo_id', $grupo_id)
-                                                ->where('equipo_id', $idVisitante)
-                                                ->exists();
-
-                                            if ($plantillaLocalGrupo && $plantillaVisitanteGrupo) {
-                                                Log::channel('mi_log')->info('Equipos del grupo: '.$strEquipoL . ' - ' . $strEquipoV,[]);
-                                                // ✅ Caso 1: ambos equipos son del grupo actual → se guarda normalmente
-                                                $guardarPartido = true;
-                                            } else {
-                                                // ✅ Caso 2: uno de los dos equipos está en otro grupo
-                                                // Verificar si ya existe ese partido en otra fecha/grupo
-                                                $partidoExistente = Partido::whereDate('dia', $dia)
-                                                    ->where(function ($q) use ($idLocal, $idVisitante) {
-                                                        $q->where(function ($q2) use ($idLocal, $idVisitante) {
-                                                            $q2->where('equipol_id', $idLocal)
-                                                                ->where('equipov_id', $idVisitante);
-                                                        })
-                                                            ->orWhere(function ($q2) use ($idLocal, $idVisitante) {
-                                                                $q2->where('equipol_id', $idVisitante)
-                                                                    ->where('equipov_id', $idLocal);
-                                                            });
-                                                    })
+                                            $guardarPartido = true;
+                                            $verificado=$request->get('verificado');
+                                            if ($verificado) {
+                                                // Verificar si ambos equipos están en el mismo grupo
+                                                $plantillaLocalGrupo = Plantilla::where('grupo_id', $grupo_id)
+                                                    ->where('equipo_id', $idLocal)
                                                     ->exists();
-                                                Log::channel('mi_log')->info('Equipos NO del grupo: '.$strEquipoL . ' - ' . $strEquipoV,[]);
-                                                $guardarPartido = !$partidoExistente; // Solo guardar si no existe
-                                            }
 
+                                                $plantillaVisitanteGrupo = Plantilla::where('grupo_id', $grupo_id)
+                                                    ->where('equipo_id', $idVisitante)
+                                                    ->exists();
+
+                                                if ($plantillaLocalGrupo && $plantillaVisitanteGrupo) {
+                                                    //Log::channel('mi_log')->info('Equipos del grupo: ' . $strEquipoL . ' - ' . $strEquipoV, []);
+                                                    // ✅ Caso 1: ambos equipos son del grupo actual → se guarda normalmente
+                                                    $guardarPartido = true;
+                                                } elseif (
+                                                    ($plantillaLocalGrupo && !$plantillaVisitanteGrupo) ||
+                                                    (!$plantillaLocalGrupo && $plantillaVisitanteGrupo)
+                                                ) {
+                                                    // ✅ Solo uno de los dos es del grupo
+                                                    $partidoExistente = Partido::whereDate('dia', $dia)
+                                                        ->where(function ($q) use ($idLocal, $idVisitante) {
+                                                            $q->where(function ($q2) use ($idLocal, $idVisitante) {
+                                                                $q2->where('equipol_id', $idLocal)
+                                                                    ->where('equipov_id', $idVisitante);
+                                                            })
+                                                                ->orWhere(function ($q2) use ($idLocal, $idVisitante) {
+                                                                    $q2->where('equipol_id', $idVisitante)
+                                                                        ->where('equipov_id', $idLocal);
+                                                                });
+                                                        })
+                                                        ->exists();
+
+                                                    if (!$partidoExistente) {
+                                                        $guardarPartido = true;
+                                                    }
+                                                }
+                                            }
                                             if ($guardarPartido) {
                                                 //Log::debug(print_r($data2, true));
                                                 $partido = Partido::where('fecha_id', '=', "$lastid")->where('equipol_id', '=', "$idLocal")->where('equipov_id', '=', "$idVisitante")->first();

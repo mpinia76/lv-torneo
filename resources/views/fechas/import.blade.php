@@ -48,6 +48,14 @@
                 {{ Form::label('url2', 'URL') }}
                 {{ Form::text('url2', '', ['class' => 'form-control']) }}
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('verificado', 'Verificar grupo', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label>
+                        {{ Form::checkbox('verificado', 1, false) }}
+                    </label>
+                </div>
+            </div>
 
 
         </div>
