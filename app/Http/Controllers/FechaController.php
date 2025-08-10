@@ -716,6 +716,7 @@ class FechaController extends Controller
                                                 ->exists();
 
                                             if ($plantillaLocalGrupo && $plantillaVisitanteGrupo) {
+                                                Log::channel('mi_log')->info('Equipos del grupo: '.$strEquipoL . ' - ' . $strEquipoV,[]);
                                                 // ✅ Caso 1: ambos equipos son del grupo actual → se guarda normalmente
                                                 $guardarPartido = true;
                                             } else {
@@ -733,7 +734,7 @@ class FechaController extends Controller
                                                             });
                                                     })
                                                     ->exists();
-
+                                                Log::channel('mi_log')->info('Equipos NO del grupo: '.$strEquipoL . ' - ' . $strEquipoV,[]);
                                                 $guardarPartido = !$partidoExistente; // Solo guardar si no existe
                                             }
 
