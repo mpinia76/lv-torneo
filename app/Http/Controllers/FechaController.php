@@ -706,28 +706,63 @@ class FechaController extends Controller
                                                 'penalesv'=>$penalesV,
                                                 'neutral' => $torneo->neutral,
                                             );
-                                            //Log::debug(print_r($data2, true));
-                                            $partido=Partido::where('fecha_id','=',"$lastid")->where('equipol_id','=',"$idLocal")->where('equipov_id','=',"$idVisitante")->first();
-                                            try {
-                                                if (!empty($partido)){
+                                            // Verificar si ambos equipos están en el mismo grupo
+                                            $plantillaLocalGrupo = Plantilla::where('grupo_id', $grupo_id)
+                                                ->where('equipo_id', $idLocal)
+                                                ->exists();
 
-                                                    $partido->update($data2);
+                                            $plantillaVisitanteGrupo = Plantilla::where('grupo_id', $grupo_id)
+                                                ->where('equipo_id', $idVisitante)
+                                                ->exists();
+
+                                            if ($plantillaLocalGrupo && $plantillaVisitanteGrupo) {
+                                                // ✅ Caso 1: ambos equipos son del grupo actual → se guarda normalmente
+                                                $guardarPartido = true;
+                                            } else {
+                                                // ✅ Caso 2: uno de los dos equipos está en otro grupo
+                                                // Verificar si ya existe ese partido en otra fecha/grupo
+                                                $partidoExistente = Partido::whereDate('dia', $dia)
+                                                    ->where(function ($q) use ($idLocal, $idVisitante) {
+                                                        $q->where(function ($q2) use ($idLocal, $idVisitante) {
+                                                            $q2->where('equipol_id', $idLocal)
+                                                                ->where('equipov_id', $idVisitante);
+                                                        })
+                                                            ->orWhere(function ($q2) use ($idLocal, $idVisitante) {
+                                                                $q2->where('equipol_id', $idVisitante)
+                                                                    ->where('equipov_id', $idLocal);
+                                                            });
+                                                    })
+                                                    ->exists();
+
+                                                $guardarPartido = !$partidoExistente; // Solo guardar si no existe
+                                            }
+
+                                            if ($guardarPartido) {
+                                                //Log::debug(print_r($data2, true));
+                                                $partido = Partido::where('fecha_id', '=', "$lastid")->where('equipol_id', '=', "$idLocal")->where('equipov_id', '=', "$idVisitante")->first();
+                                                try {
+                                                    if (!empty($partido)) {
+
+                                                        $partido->update($data2);
+                                                    } else {
+                                                        $partido = Partido::create($data2);
+                                                    }
+
+
+                                                } catch (QueryException $ex) {
+                                                    if ($ex->errorInfo[1] == 1062) { // Código de error para "Duplicate entry"
+                                                        $success .= "Equipo repetido en partido " . $strEquipoL . ' - ' . $strEquipoV . "<br>";
+                                                        $ok = 1;
+                                                    } else {
+                                                        $error = $ex->getMessage();
+                                                        $ok = 0;
+                                                    }
+
+                                                    continue;
                                                 }
-                                                else{
-                                                    $partido=Partido::create($data2);
-                                                }
-
-
-                                            } catch (QueryException $ex) {
-                                                if ($ex->errorInfo[1] == 1062) { // Código de error para "Duplicate entry"
-                                                    $success .= "Equipo repetido en partido ".$strEquipoL.' - '.$strEquipoV."<br>";
-                                                    $ok = 1;
-                                                } else {
-                                                    $error = $ex->getMessage();
-                                                    $ok = 0;
-                                                }
-
-                                                continue;
+                                            }
+                                            else{
+                                                $success .= "No se guardo el partido " . $strEquipoL . ' - ' . $strEquipoV . "<br>";
                                             }
 
 
