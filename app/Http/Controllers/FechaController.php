@@ -593,8 +593,10 @@ class FechaController extends Controller
                     foreach ($partidos as $index => $partido) {
                         $dia =$partido['fecha'].' '.$partido['hora'];
                         $strEquipoL = trim($partido['equipo1']);
-                        $golesL = intval($partido['marcador']['gl']);
-                        $golesV = intval($partido['marcador']['gv']);
+                        /*$golesL = intval($partido['marcador']['gl']);
+                        $golesV = intval($partido['marcador']['gv']);*/
+                        $golesL = isset($partido['marcador']['gl']) ? ($partido['marcador']['gl'] === null ? null : intval($partido['marcador']['gl'])) : null;
+                        $golesV = isset($partido['marcador']['gv']) ? ($partido['marcador']['gv'] === null ? null : intval($partido['marcador']['gv'])) : null;
                         $penalesL = isset($partido['marcador']['pl']) ? ($partido['marcador']['pl'] === null ? null : intval($partido['marcador']['pl'])) : null;
                         $penalesV = isset($partido['marcador']['pv']) ? ($partido['marcador']['pv'] === null ? null : intval($partido['marcador']['pv'])) : null;
 
