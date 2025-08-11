@@ -1384,6 +1384,27 @@ class PlantillaController extends Controller
     }
 
 
+    public function buscarPorTorneo(Request $request, Torneo $torneo)
+    {
+        $nombre = $request->get('buscarpor');
+
+        $plantillas = Plantilla::with(['equipo', 'grupo'])
+            ->whereHas('grupo', function($q) use ($torneo) {
+                $q->where('torneo_id', $torneo->id);
+            })
+            ->whereHas('equipo', function($q) use ($nombre) {
+                if ($nombre) {
+                    $q->where('nombre', 'LIKE', "%$nombre%");
+                }
+            })
+            ->get()
+            ->sortBy(function($p) {
+                return $p->equipo->nombre;
+            });
+
+
+        return view('plantillas.buscar', compact('plantillas', 'torneo', 'nombre'));
+    }
 
 
 }

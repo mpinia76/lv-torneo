@@ -59,6 +59,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('importarPartidoProcess', 'FechaController@importarPartidoProcess');
     Route::get('importfechas', 'FechaController@import')->name('fechas.import');
     Route::post('importprocess', 'FechaController@importprocess');
+    Route::get('torneos/{torneo}/plantillas-buscar', 'PlantillaController@buscarPorTorneo')->name('plantillas.buscarPorTorneo');
+
     Route::get('importplantillas', 'PlantillaController@import')->name('plantillas.import');
     Route::post('importplantillaprocess', 'PlantillaController@importprocess');
     Route::get('importarplantilla', 'PlantillaController@importar')->name('plantilla.importar');

@@ -58,7 +58,10 @@
         <h1 class="display-6">Grupos</h1>
 
         <hr/>
-
+        <form method="GET" action="{{ route('plantillas.buscarPorTorneo', $torneo->id) }}" class="form-inline mb-3">
+            <input type="text" name="buscarpor" class="form-control mr-2" placeholder="Buscar equipo en el torneo">
+            <button class="btn btn-primary">Buscar</button>
+        </form>
 
 
         <table class="table">
