@@ -74,12 +74,13 @@
                     <td>{{$equipo->golesv}}</td>
                     <td>{{$equipo->diferencia}}</td>
 
-                    <td>{{ ROUND(
-                (
-                $equipo->puntaje
-                * 100/($equipo->jugados*3) ),
-                2
-                )}}%</td>
+                    <td>
+                        @if($equipo->jugados > 0)
+                            {{ round(($equipo->puntaje * 100) / ($equipo->jugados * 3), 2) }}%
+                        @else
+                            0%
+                        @endif
+                    </td>
 
                     <td>{{$equipo->titulos}}</td>
                 </tr>
