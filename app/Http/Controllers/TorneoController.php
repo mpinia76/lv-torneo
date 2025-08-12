@@ -1352,7 +1352,7 @@ from (
 group by equipo, pais, foto, equipo_id
 
 order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
-
+        Log::channel('mi_log')->info('Sql pos: '.$sql,[]);
                 $posiciones = DB::select(DB::raw($sql));
 
         $page = $request->query('page', 1);
