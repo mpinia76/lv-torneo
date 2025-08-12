@@ -1344,7 +1344,7 @@ from (
     FROM incidencias
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     INNER JOIN torneos ON incidencias.torneo_id = torneos.id
-    WHERE 1=1';
+    WHERE 1=1'.$nombreFiltro;;
         $sql .=($tipo)?' AND torneos.tipo = \''.$tipo.'\'':'';
         $sql .=($ambito)?' AND torneos.ambito = \''.$ambito.'\'':'';
         $sql .=' GROUP BY equipos.nombre, equipos.pais, equipos.escudo, equipos.id, incidencias.puntos';
@@ -1352,7 +1352,7 @@ from (
 group by equipo, pais, foto, equipo_id
 
 order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
-        Log::channel('mi_log')->info('Sql pos: '.$sql,[]);
+       // Log::channel('mi_log')->info('Sql pos: '.$sql,[]);
                 $posiciones = DB::select(DB::raw($sql));
 
         $page = $request->query('page', 1);
