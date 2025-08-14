@@ -296,3 +296,26 @@ WHERE alineacions.jugador_id = @jugador_id AND alineacions.equipo_id = @equipo_i
 
 #################Actualizar URL de fechas #############################
 UPDATE `fechas` set url_nombre='grupo-4' WHERE id>=2265 AND id <= 2270
+
+########################## modificar equipo repetido ##########################
+UPDATE alineacions
+SET alineacions.equipo_id=423
+WHERE alineacions.equipo_id = 350 ;
+
+UPDATE partido_tecnicos
+SET partido_tecnicos.equipo_id=423
+WHERE partido_tecnicos.equipo_id = 350 ;
+
+UPDATE partidos
+SET partidos.equipol_id=423
+WHERE partidos.equipol_id = 350 ;
+
+UPDATE partidos
+SET partidos.equipov_id=423
+WHERE partidos.equipov_id = 350 ;
+
+UPDATE plantillas SET plantillas.equipo_id=423 WHERE plantillas.equipo_id = 350;
+
+UPDATE posicion_torneos
+SET posicion_torneos.equipo_id=423
+WHERE posicion_torneos.equipo_id = 350 ;

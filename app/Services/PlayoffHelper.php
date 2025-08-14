@@ -159,44 +159,72 @@ class PlayoffHelper
 
     private static function calcularResultadoDelCruce($cruce, $tabla, $torneo_id)
     {
-        // Buscar partido correspondiente a este cruce
+        // Buscar fecha de playoffs
         $fechaPlayoffs = Grupo::where('torneo_id', $torneo_id)
             ->where('nombre', 'Playoffs')
             ->first();
 
         if (!$fechaPlayoffs) return null;
 
-        //Log::info(print_r($cruce,true));
-
+        // Buscar la fecha correspondiente a esta fase
         $fecha = Fecha::where('grupo_id', $fechaPlayoffs->id)
             ->where('numero', $cruce->fase)
             ->first();
 
         if (!$fecha) return null;
 
-        $partido = Partido::where('fecha_id', $fecha->id)
-            ->where('orden', $cruce->orden)
-            ->first();
+        // Buscar todos los partidos de ida y vuelta de este cruce (puede haber 1 o 2)
+        $partidos = Partido::where('fecha_id', $fecha->id)
+            ->where(function ($q) use ($cruce) {
+                $q->where(function ($q2) use ($cruce) {
+                    $q2->where('equipol_id', $cruce->equipo1)
+                        ->where('equipov_id', $cruce->equipo2);
+                })->orWhere(function ($q2) use ($cruce) {
+                    $q2->where('equipol_id', $cruce->equipo2)
+                        ->where('equipov_id', $cruce->equipo1);
+                });
+            })->get();
 
-        if (!$partido) return null;
+        if ($partidos->isEmpty()) return null;
 
-        // Determinar ganador y perdedor
-        if ($partido->golesl > $partido->golesv) {
-            return ['ganador' => $partido->equipol_id, 'perdedor' => $partido->equipov_id];
-        } elseif ($partido->golesv > $partido->golesl) {
-            return ['ganador' => $partido->equipov_id, 'perdedor' => $partido->equipol_id];
-        }
+        // Inicializar goles y penales
+        $goles = ['equipo1' => 0, 'equipo2' => 0];
+        $penales = ['equipo1' => 0, 'equipo2' => 0];
 
-        // En empate, resolver por penales si están cargados
-        if (!is_null($partido->penalesl) && !is_null($partido->penalesv)) {
-            if ($partido->penalesl > $partido->penalesv) {
-                return ['ganador' => $partido->equipol_id, 'perdedor' => $partido->equipov_id];
-            } elseif ($partido->penalesv > $partido->penalesl) {
-                return ['ganador' => $partido->equipov_id, 'perdedor' => $partido->equipol_id];
+        foreach ($partidos as $partido) {
+            if ($partido->equipol_id == $cruce->equipo1) {
+                $goles['equipo1'] += $partido->golesl;
+                $goles['equipo2'] += $partido->golesv;
+                $penales['equipo1'] += $partido->penalesl ?? 0;
+                $penales['equipo2'] += $partido->penalesv ?? 0;
+            } else {
+                $goles['equipo1'] += $partido->golesv;
+                $goles['equipo2'] += $partido->golesl;
+                $penales['equipo1'] += $partido->penalesv ?? 0;
+                $penales['equipo2'] += $partido->penalesl ?? 0;
             }
         }
+
+        // Determinar ganador global
+        if ($goles['equipo1'] > $goles['equipo2']) {
+            return ['ganador' => $cruce->equipo1, 'perdedor' => $cruce->equipo2];
+        } elseif ($goles['equipo2'] > $goles['equipo1']) {
+            return ['ganador' => $cruce->equipo2, 'perdedor' => $cruce->equipo1];
+        }
+
+        // En empate global, decidir por penales si existen
+        if ($penales['equipo1'] > 0 || $penales['equipo2'] > 0) {
+            if ($penales['equipo1'] > $penales['equipo2']) {
+                return ['ganador' => $cruce->equipo1, 'perdedor' => $cruce->equipo2];
+            } elseif ($penales['equipo2'] > $penales['equipo1']) {
+                return ['ganador' => $cruce->equipo2, 'perdedor' => $cruce->equipo1];
+            }
+        }
+
+        // Si sigue empate y no hay penales, devolver null
         return null;
     }
+
 }
 
 
