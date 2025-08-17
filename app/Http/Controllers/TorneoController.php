@@ -1421,7 +1421,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         $i=$offSet+1;
 
 
-        return view('torneos.posiciones', compact('posiciones','i'));
+        return view('torneos.posiciones', compact('posiciones','i','argentinos'));
     }
 
     public function estadisticasTorneo(Request $request)
