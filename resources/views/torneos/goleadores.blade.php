@@ -104,7 +104,7 @@
                                 <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
                                     <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
                                 </a>
-                                Goles {{$escudoArr[2]}} <br>
+                                ({{$escudoArr[2]}})
                             @endif
                         @endforeach
                     @endif
