@@ -1280,6 +1280,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$tarjeta->id. " GROUP BY
 
         }
 
+        $argentinos= ($request->query('argentinos'))?1:0;
                 $sql='SELECT
     foto,
     equipo,
@@ -1348,10 +1349,15 @@ from (
         $sql .=($tipo)?' AND torneos.tipo = \''.$tipo.'\'':'';
         $sql .=($ambito)?' AND torneos.ambito = \''.$ambito.'\'':'';
         $sql .=' GROUP BY equipos.nombre, equipos.pais, equipos.escudo, equipos.id, incidencias.puntos';
-        $sql .=') a
-group by equipo, pais, foto, equipo_id
+        $sql .= ') a WHERE 1=1 ';
 
-order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
+// 🔹 Aplico el filtro de argentinos aquí
+        if ($argentinos) {
+            $sql .= " AND pais = 'Argentina' ";
+        }
+
+        $sql .= ' group by equipo, pais, foto, equipo_id
+order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
        // Log::channel('mi_log')->info('Sql pos: '.$sql,[]);
                 $posiciones = DB::select(DB::raw($sql));
 
@@ -1409,7 +1415,7 @@ order by  puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC'
 
         }
 
-        $posiciones->setPath(route('torneos.posiciones',array('tipo'=>$tipo,'ambito'=>$ambito,'buscarpor'=>$nombre)));
+        $posiciones->setPath(route('torneos.posiciones',array('argentinos'=>$argentinos,'tipo'=>$tipo,'ambito'=>$ambito,'buscarpor'=>$nombre)));
 
 
         $i=$offSet+1;
@@ -2859,7 +2865,7 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
 
 
 
-        $posiciones->setPath(route('torneos.titulos',array('order'=>$order,'tipoOrder'=>$tipoOrder)));
+        $posiciones->setPath(route('torneos.titulos',array('order'=>$order,'tipoOrder'=>$tipoOrder,'argentinos'=>$argentinos)));
 
 
         $i=$offSet+1;

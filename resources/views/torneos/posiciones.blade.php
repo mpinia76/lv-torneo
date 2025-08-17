@@ -26,6 +26,9 @@
 
 
             </input>
+            <input type="checkbox" class="form-control" id="argentinos" name="argentinos" @if ($argentinos == 1) checked @endif onchange="enviarForm()">
+
+            <strong>Argentinos</strong>
             <nav class="navbar navbar-light float-right">
                 <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_equipo') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
