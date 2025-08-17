@@ -116,7 +116,7 @@
                                     <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
                                         <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
                                     </a>
-                                    ({{$escudoArr[2]}} pts.) ({{$escudoArr[3]}}%)
+                                    ({{$escudoArr[2]}} pts.) ({{$escudoArr[3]}})
                                     @if(isset($escudoArr[4]) && $escudoArr[4] != '')
                                         <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
                                         {{  $escudoArr[4] }}
