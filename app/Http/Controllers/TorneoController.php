@@ -2835,7 +2835,7 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
 
 // 🔹 Si pidió solo argentinos, agregamos el filtro
         if ($argentinos) {
-            $sql .= " AND equipos.pais = 'Argentina' ";
+            $sql .= " AND pais = 'Argentina' ";
         }
 
         $sql .= "
