@@ -2865,7 +2865,7 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
         $i=$offSet+1;
 
 
-        return view('torneos.titulos', compact('posiciones','i','order','tipoOrder'));
+        return view('torneos.titulos', compact('posiciones','i','order','tipoOrder','argentinos'));
     }
 
     public function plantillas(Request $request)
