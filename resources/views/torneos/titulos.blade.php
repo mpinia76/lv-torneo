@@ -11,7 +11,20 @@
             $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
         @endphp
+        <form class="form-inline" id="formulario">
 
+            <input type="hidden" id="tipoOrder" name="tipoOrder" value="{{$tipoOrder}}">
+            <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
+
+            <input type="checkbox" class="form-control" id="argentinos" name="argentinos" @if ($argentinos == 1) checked @endif onchange="enviarForm()">
+
+            <strong>Argentinos</strong>
+            </input>
+
+
+
+        </form>
+        <br>
         <table class="table">
             <thead>
             <th style="width: 1%;">#</th>
@@ -59,6 +72,13 @@
             <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
+    <script>
 
+
+        function enviarForm() {
+            $('#tipoOrder').val('DESC');
+            $('#formulario').submit();
+        }
+    </script>
 
 @endsection

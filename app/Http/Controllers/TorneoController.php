@@ -2806,34 +2806,42 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
 
         $order= ($request->query('order'))?$request->query('order'):'Titulos';
         $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        $argentinos= ($request->query('argentinos'))?1:0;
+        $sql = "
+    SELECT id, escudo, nombre, pais,
+           SUM(titulos) titulos, SUM(ligas) ligas, SUM(copas) copas, SUM(internacionales) internacionales
+    FROM (
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 1 AS titulos, 0 AS ligas, 0 AS copas, 0 AS internacionales
+        FROM equipos
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+        UNION ALL
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 1 AS ligas, 0 AS copas, 0 AS internacionales
+        FROM equipos
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = 'Liga' AND torneos.ambito = 'Nacional'
+        UNION ALL
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 0 AS ligas, 1 AS copas , 0 AS internacionales
+        FROM equipos
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = 'Copa' AND torneos.ambito = 'Nacional'
+        UNION ALL
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 0 AS ligas, 0 AS copas , 1 AS internacionales
+        FROM equipos
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.ambito = 'Internacional'
+    ) a
+    WHERE 1=1
+";
 
-        $sql='SELECT id, escudo, nombre, pais,
-       sum(titulos) titulos, sum(ligas) ligas, sum(copas) copas, sum(internacionales) internacionales
+// 🔹 Si pidió solo argentinos, agregamos el filtro
+        if ($argentinos) {
+            $sql .= " AND equipos.pais = 'Argentina' ";
+        }
 
-from (
-       SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 1 AS titulos, 0 AS ligas, 0 AS copas, 0 AS internacionales
-FROM equipos
-INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-UNION ALL
-SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 1 AS ligas, 0 AS copas, 0 AS internacionales
-FROM equipos
-INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = \'Liga\' AND torneos.ambito = \'Nacional\'
-UNION ALL
-SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 0 AS ligas, 1 AS copas , 0 AS internacionales
-FROM equipos
-INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = \'Copa\' AND torneos.ambito = \'Nacional\'
-UNION ALL
-SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 0 AS ligas, 0 AS copas , 1 AS internacionales
-FROM equipos
-INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.ambito = \'Internacional\'
-) a
-group by nombre, pais, escudo, id
-
-order by  '.$order.' '.$tipoOrder.',internacionales DESC,ligas DESC, copas DESC, nombre ASC';
-        //dd($sql);
+        $sql .= "
+    GROUP BY nombre, pais, escudo, id
+    ORDER BY $order $tipoOrder, internacionales DESC, ligas DESC, copas DESC, nombre ASC
+";
 
         $posiciones = DB::select(DB::raw($sql));
 
