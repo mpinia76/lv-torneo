@@ -34,7 +34,7 @@
                 $response = curl_exec($ch);
 
                 if (curl_errno($ch)) {
-                    //Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
+                    Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
                     return false;
                 }
 
@@ -42,12 +42,12 @@
                 curl_close($ch);
 
                 if ($httpCode >= 400) {
-                    //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
+                    Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
                     return false;
                 }
 
                 if (empty($response)) {
-                    //Log::channel('mi_log')->warning("Scraper remoto devolvió HTML vacío para: $urlOriginal");
+                    Log::channel('mi_log')->warning("Scraper remoto devolvió HTML vacío para: $urlOriginal");
                 }
 
                 return $response;
@@ -61,12 +61,12 @@
                 $response = curl_exec($ch);
 
                 if (curl_errno($ch)) {
-                    //Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
+                    Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
                     return false;
                 }
 
                 if ($response === false) {
-                    //Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $urlOriginal);
+                    Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $urlOriginal);
                     curl_close($ch);
                     return false;
                 }
@@ -75,7 +75,7 @@
                 curl_close($ch);
 
                 if ($httpCode == 404) {
-                    //Log::channel('mi_log')->warning('PÃ¡gina no encontrada (404) para la URL: ' . $urlOriginal);
+                    Log::channel('mi_log')->warning('PÃ¡gina no encontrada (404) para la URL: ' . $urlOriginal);
                     return false;
                 }
 

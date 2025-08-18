@@ -6217,7 +6217,7 @@ return $string;
 
         }
         catch (Exception $ex) {
-            //Log::channel('mi_log')->error('Error en la ejecución del scraper: ' . $ex->getMessage());
+            Log::channel('mi_log')->error('Error en la ejecución del scraper: ' . $ex->getMessage());
             $html2='';
         }
         if ($html2) {
