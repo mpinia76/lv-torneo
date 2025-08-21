@@ -121,7 +121,7 @@
                                         <!-- Mostrar datos adicionales de $escudoArr[2] aquí -->
                                         {{  $escudoArr[4] }}
                                     @endif
-
+                                    <br>
                                 @endif
                             @endforeach
                         @endif
