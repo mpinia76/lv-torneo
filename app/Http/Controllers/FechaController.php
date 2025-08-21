@@ -434,7 +434,7 @@ class FechaController extends Controller
 
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                $html2 =  HttpHelper::getHtmlContent($url2,true);
+                $html2 =  HttpHelper::getHtmlContent($url2);
             }
 
 
@@ -6198,7 +6198,7 @@ return $string;
                 //Log::channel('mi_log')->info('Partido ' .$partido->equipol->nombre.' VS '.$partido->equipov->nombre, []);
 
                 //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
-                $html2 = HttpHelper::getHtmlContent($url2, true);
+                $html2 = HttpHelper::getHtmlContent($url2);
                 // Ejecutar el script Node.js y capturar la salida
                 //$scriptPath = escapeshellarg(base_path('scripts/scrape.js'));
                 //$escapedUrl = escapeshellarg($url2);
