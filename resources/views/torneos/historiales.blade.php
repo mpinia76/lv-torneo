@@ -71,7 +71,7 @@
                                         @if($partido->fotoLocal)<img id="original" src="{{ url('images/'.$partido->fotoLocal) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->local}} <img id="original" src="{{ url('images/'.$partido->paisLocal.'.gif') }}" alt="{{ $partido->paisLocal }}">
+                                {{$partido->local}} <img id="original" src="{{ url('images/'.removeAccents($partido->paisLocal).'.gif') }}" alt="{{ $partido->paisLocal }}">
                                 @endif
                             </td>
                             <td>{{$partido->golesl}}
@@ -90,7 +90,7 @@
                                         @if($partido->fotoVisitante)<img id="original" src="{{ url('images/'.$partido->fotoVisitante) }}" height="20">
                                         @endif
                                 </a>
-                                {{$partido->visitante}} <img id="original" src="{{ url('images/'.$partido->paisVisitante.'.gif') }}" alt="{{ $partido->paisVisitante }}">
+                                {{$partido->visitante}} <img id="original" src="{{ url('images/'.removeAccents($partido->paisVisitante).'.gif') }}" alt="{{ $partido->paisVisitante }}">
                                 @endif
                             </td>
                             <td style="text-align: center">
