@@ -4,35 +4,63 @@
 
 @section('content')
     <div class="container">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">🏆 Títulos Histórico</h1>
+
+                <form class="form-inline mb-3 d-flex justify-content-between align-items-center" id="formulario">
 
 
-        @php
-            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
-            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
+                    <div class="d-flex align-items-center">
 
-        @endphp
-        <form class="form-inline" id="formulario">
 
-            <input type="hidden" id="tipoOrder" name="tipoOrder" value="{{$tipoOrder}}">
-            <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
+                        <div class="form-check" >
+                            <input type="checkbox" class="form-check-input" id="argentinos" name="argentinos" @if ($argentinos == 1) checked @endif onchange="enviarForm()">
+                            <label class="form-check-label" for="argentinos">Argentinos</label>
+                        </div>
 
-            <input type="checkbox" class="form-control" id="argentinos" name="argentinos" @if ($argentinos == 1) checked @endif onchange="enviarForm()">
-
-            <strong>Argentinos</strong>
-            </input>
+                    </div>
 
 
 
-        </form>
-        <br>
-        <table class="table">
-            <thead>
-            <th style="width: 1%;">#</th>
-            <th style="width: 40%;">Equipo</th>
-            <th style="width: 10%;"><a href="{{route('torneos.titulos', array('order'=>'titulos','tipoOrder'=>$tipoOrder))}}" > Titulos @if($order=='titulos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th style="width: 10%;"><a href="{{route('torneos.titulos', array('order'=>'internacionales','tipoOrder'=>$tipoOrder))}}" > Internacionales @if($order=='internacionales') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th style="width: 10%;"><a href="{{route('torneos.titulos', array('order'=>'ligas','tipoOrder'=>$tipoOrder))}}" > Ligas @if($order=='ligas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-            <th ><a href="{{route('torneos.titulos', array('order'=>'copas','tipoOrder'=>$tipoOrder))}}" > Copas @if($order=='copas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+
+                </form>
+
+
+
+
+
+
+
+        <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+            <thead class="table-dark">
+            <th>#</th>
+            <th>Equipo</th>
+
+            @php
+                $columns = [
+
+                    'titulos' => 'Títulos',
+                    'internacionales' => 'Internacionales',
+                    'ligas' => 'Ligas',
+                    'copas' => 'Copas',
+
+                ];
+            @endphp
+            @foreach($columns as $key => $label)
+                <th>
+                    <a href="{{ route('torneos.titulos', [
+                            'order' => $key,
+                            'tipoOrder' => ($order==$key && $tipoOrder=='ASC') ? 'DESC' : 'ASC',
+                            'argentinos' => $argentinos
+                        ]) }}" class="text-decoration-none text-white">
+                        {{ $label }}
+                        @if($order==$key)
+                            <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
+                        @endif
+                    </a>
+                </th>
+            @endforeach
 
             </thead>
             <tbody>
@@ -72,6 +100,9 @@
             <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
+        </div>
+    </div>
+
     <script>
 
 

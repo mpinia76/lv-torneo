@@ -4,122 +4,128 @@
 
 @section('content')
     <div class="container">
-        <hr/>
-
-        <form class="form-inline">
-            <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
-            <select class="form-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
-                @foreach($fechas as $f)
-                    <option value="{{ $f->numero }}" @if($f->numero == $fecha->numero) selected @endif>
-                        @if(is_numeric($f->numero))
-                            Fecha {{ $f->numero }}
-                        @else
-                            {{ $f->numero }}
-                        @endif
-                    </option>
-
-                @endforeach
-            </select>
-        </form>
-
-        <br>
-
-        <div class="row">
-            <div class="form-group col-md-12">
-                <table class="table {{ $hayIdaVuelta ? 'table-full-width' : '' }}" style="{{ $hayIdaVuelta ? 'width: 100%' : 'width: 70%' }}">
-                    <tbody>
-                    @php
-                        $lastDate = null;
-                    @endphp
-                    @foreach($partidosAgrupados as $partidos)
-
-                            @if($partidos->count() == 1)
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
 
 
-                                @foreach($partidos as $partido)
-                                    @php
-                                        $currentDate = $partido->dia ? date('Y-m-d', strtotime($partido->dia)) : 'sin_fecha';
-                                    @endphp
+                {{-- Navegación de fechas --}}
+                <form class="mb-4" id="formFechas" method="GET" action="">
+                    <div class="d-flex justify-content-center align-items-center flex-wrap gap-2">
 
-                                    @if ($currentDate != $lastDate)
-                                        <tr><td colspan="6" style="text-align: center;">
-                                                {{ $currentDate != 'sin_fecha' ? strftime('%A %d de %B de %Y', strtotime($currentDate)) : 'Sin Fecha' }}
-                                            </td></tr>
-                                    @endif
-                                    <tr><td>{{ $partido->dia ? date(' H:i', strtotime($partido->dia)) : '' }}</td>
-                                    <td>
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
-                                            @if($partido->equipol)
-                                                @if($partido->equipol->escudo)
-                                                    <img src="{{ url('images/' . $partido->equipol->escudo) }}" height="20">
-                                                @endif
-                                            @endif
-                                        </a>
-                                        {{ $partido->equipol->nombre }} <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}">
-                                    </td>
-                                    <td>{{ $partido->golesl }}@if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
-                                    <td>{{ $partido->golesv }}@if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
-                                    <td>
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
-                                            @if($partido->equipov)
-                                                @if($partido->equipov->escudo)
-                                                    <img src="{{ url('images/' . $partido->equipov->escudo) }}" height="20">
-                                                @endif
-                                            @endif
-                                        </a>
-                                        {{ $partido->equipov->nombre }} <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}">
-                                    </td>
-                                    <td>
-                                        <div class="d-flex">
-                                            <a href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}" class="btn btn-success m-1">Detalles</a>
-                                        </div>
-                                    </td></tr>
-                                    @php
-                                        $lastDate = $currentDate;
-                                    @endphp
-                                @endforeach
-                            @else
+
+                        {{-- Selección de número de fecha --}}
+                        <select class="form-control js-example-basic-single ms-2" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
+                            @foreach($fechas as $f)
+                                <option value="{{ $f->numero }}" @if($f->numero == $fecha->numero) selected @endif>
+                                    {{ is_numeric($f->numero) ? "Fecha $f->numero" : $f->numero }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
+                    </div>
+                </form>
+
+                {{-- Tabla de partidos --}}
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle text-center">
+                        <tbody>
+                        @php
+                            use Carbon\Carbon;
+                            $lastDate = null;
+                            $lastFecha = null;
+                        @endphp
+
+                        @foreach($partidosAgrupados as $partidos)
+                            @foreach($partidos as $partido)
+                                @php
+                                    $currentDate = $partido->dia
+                                        ? Carbon::parse($partido->dia)->locale('es')->isoFormat('dddd D [de] MMMM [de] YYYY')
+                                        : '📌 Sin Fecha';
+                                @endphp
+
+                                {{-- Fila de fecha --}}
+                                @if($currentDate != $lastDate)
+                                    <tr class="table-light">
+                                        <td colspan="6" class="fw-semibold">{{ $currentDate }}</td>
+                                    </tr>
+                                    @php $lastDate = $currentDate; @endphp
+                                @endif
+
+                                {{-- Fila de número de fecha --}}
+                                @if($partido->fecha->numero != $lastFecha)
+                                    <tr class="table-secondary">
+                                        <td colspan="6" class="fw-bold">
+                                            {{ is_numeric($partido->fecha->numero) ? "Fecha {$partido->fecha->numero}" : $partido->fecha->numero }}
+
+                                        </td>
+                                    </tr>
+                                    @php $lastFecha = $partido->fecha->numero; @endphp
+                                @endif
+
+                                {{-- Partido --}}
                                 <tr>
-                                @foreach($partidos as $partido)
-                                    <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                                    <td>
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
-                                            @if($partido->equipol)
+                                    <td class="text-muted">{{ $partido->dia ? Carbon::parse($partido->dia)->format('H:i') : '' }}</td>
+
+                                    <td class="text-end">
+                                        @if($partido->equipol)
+                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}" class="text-decoration-none">
                                                 @if($partido->equipol->escudo)
-                                                    <img src="{{ url('images/' . $partido->equipol->escudo) }}" height="20">
+                                                    <img src="{{ url('images/' . $partido->equipol->escudo) }}" height="20" class="me-1">
                                                 @endif
-                                            @endif
-                                        </a>
-                                        {{ $partido->equipol->nombre }} <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}">
+                                                {{ $partido->equipol->nombre }}
+                                            </a>
+                                            <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" height="15">
+                                        @endif
                                     </td>
-                                    <td>{{ $partido->golesl }}@if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
-                                    <td>{{ $partido->golesv }}@if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
-                                    <td>
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
-                                            @if($partido->equipov)
+
+                                    <td class="fw-bold">{{ $partido->golesl }}@if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
+                                    <td class="fw-bold">{{ $partido->golesv }}@if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
+
+                                    <td class="text-start">
+                                        @if($partido->equipov)
+                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none">
                                                 @if($partido->equipov->escudo)
-                                                    <img src="{{ url('images/' . $partido->equipov->escudo) }}" height="20">
+                                                    <img src="{{ url('images/' . $partido->equipov->escudo) }}" height="20" class="me-1">
                                                 @endif
-                                            @endif
-                                        </a>
-                                        {{ $partido->equipov->nombre }} <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}">
+                                                {{ $partido->equipov->nombre }}
+                                            </a>
+                                            <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" height="15">
+                                        @endif
                                     </td>
+
                                     <td>
-                                        <div class="d-flex">
-                                            <a href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}" class="btn btn-success m-1">Detalles</a>
-                                        </div>
+                                        <a href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}" class="btn btn-success btn-sm">Detalles</a>
                                     </td>
-                                @endforeach
-                            @endif
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
+                                </tr>
+                            @endforeach
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex mt-3">
+                    <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success">Volver</a>
+                </div>
             </div>
         </div>
-
-        <div class="d-flex">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">Volver</a>
-        </div>
     </div>
+
+    {{-- Scripts --}}
+    <script>
+        function enviarFormulario() {
+            document.getElementById('formFechas').submit();
+        }
+
+        function actualizarFecha(dias) {
+            let fechaHoy = document.getElementById('dia').value;
+            let fecha = new Date(fechaHoy);
+            fecha.setDate(fecha.getDate() + dias);
+            let dia = String(fecha.getDate()).padStart(2, '0');
+            let mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            let anio = fecha.getFullYear();
+            let nuevaFecha = anio + '-' + mes + '-' + dia;
+            document.getElementById('dia').value = nuevaFecha;
+            enviarFormulario();
+        }
+    </script>
 @endsection

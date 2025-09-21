@@ -3,18 +3,19 @@
 <head>
     @include('layouts.partials.meta')
 </head>
+<body class="d-flex flex-column min-vh-100">
+<div class="wrapper d-flex flex-column flex-grow-1">
 
-<body>
-<div class="wrapper">
-@include('layouts.partials.headerPublic')
+    @include('layouts.partials.headerPublic')
 
-<div class="container">
-    @yield('content')
-</div>
+    <main class="container flex-grow-1">
+        @yield('content')
+    </main>
 
-@include('layouts.partials.footer')
+    @include('layouts.partials.footer')
 
-@yield('scripts')
+    @yield('scripts')
+
 </div>
 </body>
 </html>

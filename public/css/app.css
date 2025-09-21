@@ -570,4 +570,11 @@
  }
 
 
+a {
+    text-decoration: none; /* Quita subrayado */
+    color: inherit; /* Mantiene el color original del texto */
+}
 
+a:hover {
+    text-decoration: none; /* Evita subrayado al pasar el mouse */
+}

@@ -4,92 +4,110 @@
 
 @section('content')
     <div class="container">
-        @php
-            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
-            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">⚽ Goleadores</h1>
 
-        @endphp
+                {{-- Barra de búsqueda --}}
+                <form class="d-flex justify-content-center mb-4">
+                    <input type="hidden" name="torneoId" value="{{ $torneo->id }}">
+                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="Buscar jugador"
+                           value="{{ request()->get('buscarpor', session('nombre_filtro_jugador')) }}" style="width: 250px;">
+                    <button class="btn btn-success" type="submit">Buscar</button>
+                </form>
 
-        <nav class="navbar navbar-light float-right">
-            <form class="form-inline">
-                <input type="hidden" id="torneoId" name="torneoId" value="{{$torneo->id}}">
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
-                <button class="btn btn-success m-1" type="submit">Buscar</button>
-            </form>
-        </nav>
+                {{-- Tabla de goleadores --}}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                        <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Jugador</th>
+                            <th>Equipos</th>
+                            @php
+                                $columns = [
+                                    'goles' => 'Goles',
+                                    'Jugada' => 'Jugada',
+                                    'Cabeza' => 'Cabeza',
+                                    'Penal' => 'Penal',
+                                    'Tiro_Libre' => 'Tiro Libre',
+                                    'jugados' => 'Jugados',
+                                    'promedio' => 'Prom.'
+                                ];
+                            @endphp
 
-    <table class="table">
-        <thead>
-        <th>#</th>
-        <th>Jugador</th>
-        <th>Equipos</th>
-        <th><a href="{{route('grupos.goleadoresPublic', array('torneoId' => $torneo->id,'order'=>'Goles','tipoOrder'=>$tipoOrder))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('grupos.goleadoresPublic', array('torneoId' => $torneo->id,'order'=>'Jugada','tipoOrder'=>$tipoOrder))}}" > Jugada @if($order=='Jugada') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('grupos.goleadoresPublic', array('torneoId' => $torneo->id,'order'=>'Cabeza','tipoOrder'=>$tipoOrder))}}" >Cabeza @if($order=='Cabeza')<img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('grupos.goleadoresPublic', array('torneoId' => $torneo->id,'order'=>'Penal','tipoOrder'=>$tipoOrder))}}" > Penal @if($order=='Penal') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('grupos.goleadoresPublic', array('torneoId' => $torneo->id,'order'=>'Tiro_Libre','tipoOrder'=>$tipoOrder))}}" > Tiro Libre @if($order=='Tiro_Libre') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th>Jugados</th>
-        <th>Prom.</th>
-        </thead>
-        <tbody>
-
-        @foreach($goleadores as $jugador)
-            <tr>
-                <td>{{$i++}}</td>
-                <td>
-                    <a href="{{route('jugadores.ver', array('jugadorId' => $jugador->id))}}" >
-                        @if($jugador->foto)
-                            <img id="original" class="imgCircle" src="{{ url('images/'.$jugador->foto) }}" >
-                        @else
-                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                        @endif
-                    </a>
-                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
-                <td>@if($jugador->escudo)
-                        @php
-                            $escudos = explode(',',$jugador->escudo);
-                        @endphp
-                        @foreach($escudos as $escudo)
-
-                            @if($escudo!='')
-                                @php
-                                    $escudoArr = explode('_',$escudo);
-                                @endphp
-                                <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
-                                    <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
-                                </a>
-                            @endif
+                            @foreach($columns as $key => $label)
+                                <th>
+                                    @if($key != 'promedio') {{-- Promedio no se ordena --}}
+                                    <a href="{{ route('grupos.goleadoresPublic', [
+                                            'torneoId' => $torneo->id,
+                                            'order' => $key,
+                                            'tipoOrder' => ($order==$key && $tipoOrder=='ASC') ? 'DESC' : 'ASC'
+                                        ]) }}" class="text-decoration-none text-white">
+                                        {{ $label }}
+                                        @if($order==$key)
+                                            <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
+                                        @endif
+                                    </a>
+                                    @else
+                                        {{ $label }}
+                                    @endif
+                                </th>
+                            @endforeach
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($goleadores as $jugador)
+                            <tr>
+                                <td>{{ $loop->iteration }}</td>
+                                <td class="d-flex align-items-center gap-2">
+                                    <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">
+                                        <img class="imgCircle" src="{{ url('images/'.($jugador->foto ?? 'sin_foto.png')) }}" width="35" height="35" alt="Foto">
+                                    </a>
+                                    {{ $jugador->jugador }}
+                                    <img src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}">
+                                </td>
+                                <td>
+                                    @if($jugador->escudo)
+                                        @foreach(explode(',', $jugador->escudo) as $escudo)
+                                            @if($escudo)
+                                                @php $escudoArr = explode('_', $escudo); @endphp
+                                                <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
+                                                    <img src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                                </a>
+                                            @endif
+                                        @endforeach
+                                    @endif
+                                </td>
+                                <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->id]) }}">{{ $jugador->goles }}</a></td>
+                                <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->id,'tipo'=>'Jugada']) }}">{{ $jugador->Jugada }}</a></td>
+                                <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->id,'tipo'=>'Cabeza']) }}">{{ $jugador->Cabeza }}</a></td>
+                                <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->id,'tipo'=>'Penal']) }}">{{ $jugador->Penal }}</a></td>
+                                <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->id,'tipo'=>'Tiro Libre']) }}">{{ $jugador->Tiro_Libre }}</a></td>
+                                <td><a href="{{ route('jugadores.jugados', ['jugadorId'=>$jugador->id]) }}">{{ $jugador->jugados }}</a></td>
+                                <td>{{ $jugador->jugados ? round($jugador->goles / $jugador->jugados, 2) : 0 }}</td>
+                            </tr>
                         @endforeach
-                    @endif
+                        </tbody>
+                    </table>
+                </div>
 
-                    </td>
-                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >{{$jugador->goles}}</a></td>
-                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Jugada'))}}" >{{$jugador->Jugada}}</a></td>
-                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Cabeza'))}}" >{{$jugador->Cabeza}}</a></td>
-                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Penal'))}}" >{{$jugador->Penal}}</a></td>
-                <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id,'tipo'=>'Tiro Libre'))}}" >{{$jugador->Tiro_Libre}}</a></td>
-                <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id,'torneoId' => $torneo->id))}}" >{{$jugador->jugados}}</a></td>
-                <td>{{round($jugador->goles / $jugador->jugados,2)}}</td>
-            </tr>
-        @endforeach
-        </tbody>
-    </table>
+                {{-- Paginación y total --}}
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        {{ $goleadores->links() }}
+                    </div>
+                    <div>
+                        <strong>Total: {{ $goleadores->total() }}</strong>
+                    </div>
+                </div>
 
-        <div class="row">
-            <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                {{ $goleadores->links() }}
+                {{-- Botón volver --}}
+                <div class="d-flex mt-3">
+                    <a href="{{ route('torneos.ver', ['torneoId'=>$torneo->id]) }}" class="btn btn-success">Volver</a>
+                </div>
             </div>
-
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                <strong>Total: {{ $goleadores->total() }}</strong>
-            </div>
-        </div>
-        <div class="d-flex">
-
-            <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id)) }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
-
-
 @endsection

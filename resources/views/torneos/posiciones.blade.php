@@ -3,45 +3,57 @@
 @section('pageTitle', 'Tabla histórica')
 
 @section('content')
+    <style>
+        .select2-container {
+            margin-right: 20px;
+        }
+    </style>
     <div class="container">
-        <form class="form-inline" id="formulario">
-
-
-            <select class="form-control" id="tipo" name="tipo" onchange="enviarForm()">
-
-
-                    <option value=""/>Todos</option>
-                <option value="liga" {{ (isset($_GET['tipo'])&&$_GET['tipo']=='liga')?'selected':''}}/>Ligas nacionales</option>
-                <option value="copa" {{ (isset($_GET['tipo'])&&$_GET['tipo']=='copa')?'selected':''}}/>Copas nacionales</option>
-
-            </select>
-            <select class="form-control" id="ambito" name="ambito" onchange="enviarForm()">
-
-
-                <option value=""/>Todos</option>
-                <option value="nacional" {{ (isset($_GET['ambito'])&&$_GET['ambito']=='nacional')?'selected':''}}/>Nacionales</option>
-                <option value="internacional" {{ (isset($_GET['ambito'])&&$_GET['ambito']=='internacional')?'selected':''}}/>Internacional</option>
-
-            </select>
-
-
-            </input>
-            <input type="checkbox" class="form-control" id="argentinos" name="argentinos" @if ($argentinos == 1) checked @endif onchange="enviarForm()">
-
-            <strong>Argentinos</strong>
-            <nav class="navbar navbar-light float-right">
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_equipo') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
-
-                <button class="btn btn-success m-1" type="button" onClick="enviarForm()">Buscar</button>
-            </nav>
-
-
-        </form>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">🏆 Posiciones Histórico</h1>
 
 
 
-        <table class="table">
-            <thead>
+                <form class="form-inline mb-3 d-flex justify-content-between align-items-center" id="formulario">
+
+
+                    <div class="d-flex align-items-center">
+                        <select class="form-control js-example-basic-single mr-3" id="tipo" name="tipo" onchange="enviarForm()">
+
+
+                            <option value=""/>Todos</option>
+                            <option value="liga" {{ (isset($_GET['tipo'])&&$_GET['tipo']=='liga')?'selected':''}}/>Ligas nacionales</option>
+                            <option value="copa" {{ (isset($_GET['tipo'])&&$_GET['tipo']=='copa')?'selected':''}}/>Copas nacionales</option>
+
+                        </select>
+                        <select class="form-control js-example-basic-single mr-3" id="ambito" name="ambito" onchange="enviarForm()" style="margin-right: 20px;margin-left: 20px;">
+
+
+                            <option value=""/>Todos</option>
+                            <option value="nacional" {{ (isset($_GET['ambito'])&&$_GET['ambito']=='nacional')?'selected':''}}/>Nacionales</option>
+                            <option value="internacional" {{ (isset($_GET['ambito'])&&$_GET['ambito']=='internacional')?'selected':''}}/>Internacional</option>
+
+                        </select>
+
+                        <div class="form-check" style="margin-right: 20px;margin-left: 20px;">
+                            <input type="checkbox" class="form-check-input" id="argentinos" name="argentinos" @if ($argentinos == 1) checked @endif onchange="enviarForm()">
+                            <label class="form-check-label" for="argentinos">Argentinos</label>
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="d-flex align-items-center">
+                        <input type="search" name="buscarpor" class="form-control mr-2" placeholder="Buscar" value="{{ request('buscarpor', session('nombre_filtro_jugador')) }}">
+                        <button class="btn btn-success" type="button" onclick="enviarForm()">Buscar</button>
+                    </div>
+
+                </form>
+
+                <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                    <thead class="table-dark">
             <th>#</th>
             <th>Equipo</th>
             <th>Punt.</th>
@@ -104,7 +116,8 @@
             <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
-
+        </div>
+    </div>
     <script>
 
 

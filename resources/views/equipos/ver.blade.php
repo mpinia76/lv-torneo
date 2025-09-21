@@ -1,88 +1,142 @@
 @extends('layouts.appPublic')
 
 @section('pageTitle', 'Ver equipo')
+
 <style>
-    /* Estilos personalizados para resaltar la pestaña activa */
-    .nav-link.active {
-        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
-        color: #fff; /* Cambia el color del texto de la pestaña activa */
-        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
+    /* --- General --- */
+    a {
+        text-decoration: none;
+        color: inherit;
+    }
+    a:hover {
+        color: #007bff;
     }
 
-    /* Agrega un espacio entre las pestañas y el contenido */
+    /* --- Tabs --- */
+    .nav-tabs .nav-link {
+        border: 1px solid transparent;
+        border-radius: 0.375rem 0.375rem 0 0;
+        margin-right: 4px;
+        padding: 0.5rem 1rem;
+        transition: 0.3s;
+    }
+    .nav-tabs .nav-link:hover {
+        background-color: #e9f2ff;
+    }
+    .nav-tabs .nav-link.active {
+        background-color: #007bff;
+        color: #fff;
+        border-color: #007bff #007bff #fff;
+        font-weight: bold;
+    }
+
+    /* --- Tab content --- */
     .tab-content {
-        margin: 20px; /* Ajusta el margen superior del contenido */
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 0.375rem 0.375rem;
+        background-color: #f8f9fa;
+    }
+
+    /* --- Tables --- */
+    .table {
+        background-color: #fff;
+        border-radius: 0.375rem;
+        border: 1px solid #dee2e6;
+    }
+    .table th, .table td {
+        vertical-align: middle;
+    }
+    .table th {
+        background-color: #e9f2ff;
+    }
+    .table tbody tr:hover {
+        background-color: #f1f7ff;
+    }
+
+    /* --- Imágenes de jugadores y escudos --- */
+    .imgCircle {
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        object-fit: cover;
+        margin-right: 8px;
+    }
+    /*#original {
+        max-width: 100%;
+        height: auto;
+    }*/
+
+    /* --- Equipo info --- */
+    dd img {
+        margin-left: 5px;
+        vertical-align: middle;
+    }
+
+    /* --- Botones --- */
+    .btn-success {
+        border-radius: 0.375rem;
     }
 </style>
+
 @section('content')
     <div class="container">
 
-
-        <div class="row">
-            <!-- Div para los datos del equipo -->
-            <div class="col-xs-12 col-sm-6 col-md-8">
+        <div class="row mb-4">
+            <div class="col-md-8">
                 <div class="row">
-                    <div class="form-group col-md-6">
+                    <div class="col-md-6 mb-2">
                         <dt>Nombre</dt>
-                        <dd>{{$equipo->nombre}} <img id="original" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}"></dd>
+                        <dd>{{$equipo->nombre}} <img src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}"></dd>
                     </div>
-
-                    <div class="form-group col-md-6">
+                    <div class="col-md-6 mb-2">
                         <dt>Socios</dt>
                         <dd>{{$equipo->socios}}</dd>
                     </div>
-
-                    <div class="form-group col-md-6">
+                    <div class="col-md-6 mb-2">
                         <dt>Fundación</dt>
                         <dd>{{date('d/m/Y', strtotime($equipo->fundacion))}} - {{Carbon::parse($equipo->fundacion)->age}} años</dd>
                     </div>
-
-                    <div class="form-group col-md-6">
+                    <div class="col-md-6 mb-2">
                         <dt>Estadio</dt>
                         <dd>{{$equipo->estadio}}</dd>
                     </div>
                 </div>
             </div>
 
-            <!-- Div para el escudo del equipo -->
-            <div class="col-xs-12 col-sm-6 col-md-4 d-flex justify-content-center align-items-center">
-                <div class="form-group">
-                    @if($equipo->escudo)
-                        <img id="original" src="{{ url('images/'.$equipo->escudo) }}" height="200">
-                    @endif
-                </div>
+            <div class="col-md-4 d-flex justify-content-center align-items-center">
+                @if($equipo->escudo)
+                    <img src="{{ url('images/'.$equipo->escudo) }}" style="width: 200px" class="img-fluid">
+                @endif
             </div>
         </div>
 
-
-
-
+        <!-- Tabs -->
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             <li class="nav-item">
-                <a class="nav-link {{ request()->get('pestActiva') == 'jugadores' ? '' : 'active' }}" id="historia-tab" data-toggle="tab" href="#historia" role="tab" aria-controls="historia" aria-selected="{{ request()->get('pestActiva') == 'jugadores' ? 'false' : 'true' }}">Historia</a>
+                <a class="nav-link {{ request()->get('pestActiva') == 'jugadores' ? '' : 'active' }}" id="historia-tab" data-bs-toggle="tab" href="#historia" role="tab">Historia</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="titulos-tab" data-toggle="tab" href="#titulos" role="tab" aria-controls="titulos" aria-selected="false">Títulos</a>
+                <a class="nav-link" id="titulos-tab" data-bs-toggle="tab" href="#titulos" role="tab">Títulos</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="tabla-tab" data-toggle="tab" href="#tabla" role="tab" aria-controls="tabla" aria-selected="false">Torneos</a>
+                <a class="nav-link" id="tabla-tab" data-bs-toggle="tab" href="#tabla" role="tab">Torneos</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ request()->get('pestActiva') == 'jugadores' ? 'active' : '' }}" id="jugadores-tab" data-toggle="tab" href="#jugadores" role="tab" aria-controls="jugadores" aria-selected="{{ request()->get('pestActiva') == 'jugadores' ? 'true' : 'false' }}">Jugadores</a>
+                <a class="nav-link {{ request()->get('pestActiva') == 'jugadores' ? 'active' : '' }}" id="jugadores-tab" data-bs-toggle="tab" href="#jugadores" role="tab">Jugadores</a>
             </li>
         </ul>
 
-
         <div class="tab-content" id="myTabContent">
-            <div role="tabpanel" class="tab-pane {{ request()->get('pestActiva') == 'jugadores' ? '' : 'active' }}" id="historia">
-                <div class="row">
-                    <div class="form-group col-xs-12 col-sm-6 col-md-12">
-
-                        <dd>{!! nl2br(e($equipo->historia)) !!}</dd>
-                    </div>
-                </div>
+            <!-- Historia -->
+            <div class="tab-pane fade {{ request()->get('pestActiva') == 'jugadores' ? '' : 'show active' }}" id="historia" role="tabpanel">
+                <dd>{!! nl2br(e($equipo->historia)) !!}</dd>
             </div>
-            <div role="tabpanel" class="tab-pane" id="titulos">
+
+            <!-- Títulos -->
+            <div class="tab-pane fade" id="titulos" role="tabpanel">
                 <div class="row">
                     <div class="form-group col-xs-12 col-sm-6 col-md-3">
                         <dt>Total</dt>
@@ -101,8 +155,10 @@
                         <dd>{{$titulosInternacional}}</dd>
                     </div>
                 </div>
-                <table class="table" style="font-size: 14px;">
-                    <thead>
+
+              <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                <thead class="table-dark">
+
                     <th>#</th>
                     <th>Torneo</th>
                     <th>Punt.</th>
@@ -123,7 +179,7 @@
 
                     @endphp
                     @foreach($torneosTitulos as $torneoTitulo)
-                        <?php //dd($torneoTitulo);?>
+                            <?php //dd($torneoTitulo);?>
                         <tr>
                             <td>{{$j++}}</td>
                             <td>@if($torneoTitulo->escudoTorneo)
@@ -148,9 +204,11 @@
                     </tbody>
                 </table>
             </div>
-            <div role="tabpanel" class="tab-pane" id="tabla">
-                <table class="table" style="font-size: 14px;">
-                    <thead>
+
+            <!-- Torneos -->
+            <div class="tab-pane fade" id="tabla" role="tabpanel">
+                <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                    <thead class="table-dark">
                     <th>#</th>
                     <th>Torneo</th>
                     <th>Punt.</th>
@@ -163,7 +221,7 @@
                     <th>Dif.</th>
 
                     <th>Prom.</th>
-                    <th>Posición</th>
+                    <th>PosiciÃ³n</th>
                     </thead>
                     <tbody>
                     @php
@@ -231,83 +289,86 @@
                     </tbody>
                 </table>
             </div>
-            <div role="tabpanel" class="tab-pane {{ request()->get('pestActiva') == 'jugadores' ? 'active' : '' }}" id="jugadores">
+
+            <!-- Jugadores -->
+            <div class="tab-pane fade {{ request()->get('pestActiva') == 'jugadores' ? 'show active' : '' }}" id="jugadores" role="tabpanel">
                 @php
                     $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
                     $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
                 @endphp
-                <table class="table" style="font-size: 14px;">
+                <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                    <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Jugador</th>
+                        @php
+                            $columns = [
+                                'jugados' => 'Jugados',
+                                'titulos' => 'Títulos',
+                                'Goles' => 'Goles',
+                                'amarillas' => 'Amarillas',
+                                'rojas' => 'Rojas',
+                                'recibidos' => 'Arq. Recibidos',
+                                'invictas' => 'Arq. V. Invictas',
+                            ];
+                        @endphp
 
-
-                    <thead>
-                    <th>#</th>
-                    <th>Jugador</th>
-
-
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'jugados','tipoOrder'=>$tipoOrder))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'titulos','tipoOrder'=>$tipoOrder))}}" > Títulos @if($order=='titulos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'Goles','tipoOrder'=>$tipoOrder))}}" > Goles @if($order=='Goles') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'amarillas','tipoOrder'=>$tipoOrder))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'rojas','tipoOrder'=>$tipoOrder))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'recibidos','tipoOrder'=>$tipoOrder))}}" >Arq. Recibidos @if($order=='recibidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-                    <th><a href="{{route('equipos.ver', array('equipoId' => $equipo->id,'pestActiva'=>'jugadores','order'=>'invictas','tipoOrder'=>$tipoOrder))}}" > Arq. V. Invictas @if($order=='invictas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-
+                        @foreach($columns as $key => $label)
+                            <th>
+                                <a href="{{ route('equipos.ver', [
+                        'equipoId' => $equipo->id,
+                        'pestActiva' => 'jugadores',
+                        'order' => $key,
+                        'tipoOrder' => ($order==$key && $tipoOrder=='ASC') ? 'DESC' : 'ASC'
+                    ]) }}" class="text-decoration-none text-white">
+                                    {{ $label }}
+                                    @if($order==$key)
+                                        <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }} text-white"></i>
+                                    @endif
+                                </a>
+                            </th>
+                        @endforeach
+                    </tr>
                     </thead>
                     <tbody>
-
                     @foreach($jugadores as $jugador)
                         <tr>
                             <td>{{$iterator++}}</td>
-                            <td>
-                                <a href="{{route('jugadores.ver', array('jugadorId' => $jugador->jugador_id))}}" >
-                                    @if($jugador->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$jugador->foto) }}" >
-                                    @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                    @endif
+                            <td class="d-flex align-items-center gap-2">
+                                <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->jugador_id]) }}">
+                                    <img class="imgCircle" src="{{ url('images/'.($jugador->foto ?? 'sin_foto.png')) }}" width="35" height="35" alt="Foto">
                                 </a>
-                                {{$jugador->jugador}}</td>
-
-
-                            <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->jugados}} </a></td>
-                            <td><a href="{{route('jugadores.titulos', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->titulos}}</a></td>
-                            <td><a href="{{route('jugadores.goles', array('jugadorId' => $jugador->jugador_id))}}" >{{$jugador->goles}}</a></td>
-                            <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->jugador_id,'tipo'=>'Amarillas'))}}" >{{$jugador->amarillas}}</a></td>
-
-                            <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->jugador_id,'tipo'=>'Rojas'))}}" >{{$jugador->rojas}}</a></td>
-                            <td>{{$jugador->recibidos}} (@if($jugador->jugados){{round($jugador->recibidos / $jugador->jugados,2)}} @else 0 @endif)</td>
-                            <td>{{$jugador->invictas}} (@if($jugador->jugados){{round($jugador->invictas / $jugador->jugados,2)}} @else 0 @endif)</td>
-
+                                {{$jugador->jugador}}
+                            </td>
+                            <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->jugador_id]) }}">{{$jugador->jugados}}</a></td>
+                            <td><a href="{{ route('jugadores.titulos', ['jugadorId' => $jugador->jugador_id]) }}">{{$jugador->titulos}}</a></td>
+                            <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->jugador_id]) }}">{{$jugador->goles}}</a></td>
+                            <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->jugador_id, 'tipo'=>'Amarillas']) }}">{{$jugador->amarillas}}</a></td>
+                            <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->jugador_id, 'tipo'=>'Rojas']) }}">{{$jugador->rojas}}</a></td>
+                            <td>{{$jugador->recibidos}} (@if($jugador->jugados){{ round($jugador->recibidos / $jugador->jugados,2) }}@else 0 @endif)</td>
+                            <td>{{$jugador->invictas}} (@if($jugador->jugados){{ round($jugador->invictas / $jugador->jugados,2) }}@else 0 @endif)</td>
                         </tr>
                     @endforeach
                     </tbody>
                 </table>
-                <div class="row">
-                    <div class="form-group col-xs-12 col-sm-6 col-md-9">
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
                         {{ $jugadores->links() }}
                     </div>
-
-                    <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                    <div>
                         <strong>Total: {{ $jugadores->total() }}</strong>
                     </div>
                 </div>
+
+
             </div>
         </div>
 
-
-
-
-
-
-
-        <div class="d-flex">
-
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+        <div class="d-flex mt-3 mb-5">
+            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
         </div>
+
     </div>
-
 @endsection
-
-
-

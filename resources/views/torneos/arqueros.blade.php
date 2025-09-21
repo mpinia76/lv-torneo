@@ -4,132 +4,127 @@
 
 @section('content')
     <div class="container">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+        <h1 class="h3 mb-4 text-center text-primary">🧤 Arqueros</h1>
 
-        @php
-            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
-            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
-
-        @endphp
-        <form class="form-inline" id="formulario">
-
-        <input type="hidden" id="tipoOrder" name="tipoOrder" value="{{$tipoOrder}}">
-        <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
-        <select class="orm-control js-example-basic-single" id="torneoId" name="torneoId" onchange="enviarForm()">
-            @foreach($torneos as $torneo)
-
-                <option value="{{$torneo->id}}" @if($torneo->id==$torneoId)
-                    selected
-
-                    @endif />{{$torneo->nombre}} - {{$torneo->year}}</option>
-            @endforeach
-
-        </select>
-        <input type="checkbox" class="form-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
-
-        <strong>Jugando</strong>
-        </input>
-            <nav class="navbar navbar-light float-right">
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
-
-                <button class="btn btn-success m-1" type="button" onClick="enviarForm()">Buscar</button>
-            </nav>
+                <form class="form-inline mb-3 d-flex justify-content-between align-items-center" id="formulario">
 
 
-        </form>
-        <br>
+                    <div class="d-flex align-items-center">
+                        <select class="form-control js-example-basic-single mr-3" id="torneoId" name="torneoId" onchange="enviarForm()">
+                            @foreach($torneos as $torneo)
+                                <option value="{{ $torneo->id }}" @if($torneo->id==$torneoId) selected @endif>
+                                    {{ $torneo->nombre }} - {{ $torneo->year }}
+                                </option>
+                            @endforeach
+                        </select>
 
-    <table class="table" style="width: 100%">
-        <thead>
-        <th>#</th>
-        <th>Jugador</th>
-        <th>Actual</th>
-        <th><a href="{{route('torneos.arqueros', array('order'=>'jugados','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Jugados @if($order=='jugados') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.arqueros', array('order'=>'recibidos','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Goles @if($order=='recibidos') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.arqueros', array('order'=>'invictas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales, 'torneoId'=>$torneoId))}}" > Vallas invictas @if($order=='invictas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+                        <div class="form-check" style="margin-right: 20px;margin-left: 20px;">
+                            <input type="checkbox" class="form-check-input" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
+                            <label class="form-check-label" for="actuales">Jugando</label>
+                        </div>
+                    </div>
 
-        <th>Equipos</th>
-        </thead>
-        <tbody>
 
-        @foreach($arqueros as $jugador)
+
+                    <div class="d-flex align-items-center">
+                        <input type="search" name="buscarpor" class="form-control mr-2" placeholder="Buscar" value="{{ request('buscarpor', session('nombre_filtro_jugador')) }}">
+                        <button class="btn btn-success" type="button" onclick="enviarForm()">Buscar</button>
+                    </div>
+
+                </form>
+
+
+                <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                    <thead class="table-dark">
             <tr>
-                <td>{{$i++}}</td>
-                <td>
-                    <a href="{{route('jugadores.ver', array('jugadorId' => $jugador->id))}}" >
-                        @if($jugador->foto)
-                            <img id="original" class="imgCircle" src="{{ url('images/'.$jugador->foto) }}" >
-                        @else
-                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                        @endif
-                    </a>
-                    {{$jugador->jugador}} <img id="original" src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
-
-                <td>@if($jugador->jugando)
-                        @php
-                            $escs = explode(',',$jugador->jugando);
-                        @endphp
-                        @foreach($escs as $esc)
-
-                            @if($esc!='')
-                                @php
-                                    $escArr = explode('_',$esc);
-                                @endphp
-                                <a href="{{route('equipos.ver', array('equipoId' => $escArr[1]))}}" >
-                                    <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25">
-                                </a>
+                <th>#</th>
+                <th>Jugador</th>
+                <th>Actual</th>
+                @php
+                    $columns = [
+                        'jugados' => 'Jugados',
+                        'recibidos' => 'Goles',
+                        'invictas' => 'Vallas invictas'
+                    ];
+                @endphp
+                @foreach($columns as $key => $label)
+                    <th>
+                        <a href="{{ route('torneos.arqueros', [
+                            'torneoId' => $torneoId,
+                            'order' => $key,
+                            'tipoOrder' => ($order==$key && $tipoOrder=='ASC') ? 'DESC' : 'ASC',
+                            'actuales' => $actuales
+                        ]) }}" class="text-decoration-none text-white">
+                            {{ $label }}
+                            @if($order==$key)
+                                <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
                             @endif
-                        @endforeach
-
-                    @endif</td>
-
-                <td><a href="{{route('jugadores.jugados', array('jugadorId' => $jugador->id))}}" >{{$jugador->jugados}}</a> </td>
-                <td>{{$jugador->recibidos}} ({{round($jugador->recibidos / $jugador->jugados,2)}})</td>
-                <td>{{$jugador->invictas}} ({{round($jugador->invictas / $jugador->jugados,2)}})</td>
-                <td>@if($jugador->escudo)
-                        @php
-                            $escudos = explode(',',$jugador->escudo);
-                        @endphp
-                        @foreach($escudos as $escudo)
-
-                            @if($escudo!='')
-                                @php
-                                    $escudoArr = explode('_',$escudo);
-                                @endphp
-                                <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
-                                    <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
-                                </a>
-                                ({{$escudoArr[2]}}) ({{$escudoArr[3]}})
-                            @endif
-                        @endforeach
-                    @endif
-
-                </td>
-
-
+                        </a>
+                    </th>
+                @endforeach
+                <th>Equipos</th>
             </tr>
-        @endforeach
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+            @foreach($arqueros as $i => $jugador)
+                <tr>
+                    <td>{{ $i + 1 }}</td>
+                    <td>
+                        <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">
+                            <img src="{{ $jugador->foto ? url('images/'.$jugador->foto) : url('images/sin_foto.png') }}" class="imgCircle" height="40">
+                        </a>
+                        {{ $jugador->jugador }}
+                        <img src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}">
+                    </td>
+                    <td>
+                        @if($jugador->jugando)
+                            @foreach(explode(',', $jugador->jugando) as $esc)
+                                @if($esc)
+                                    @php $escArr = explode('_',$esc); @endphp
+                                    <a href="{{ route('equipos.ver', ['equipoId' => $escArr[1]]) }}">
+                                        <img src="{{ url('images/'.$escArr[0]) }}" height="25">
+                                    </a>
+                                @endif
+                            @endforeach
+                        @endif
+                    </td>
+                    <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id]) }}">{{ $jugador->jugados }}</a></td>
+                    <td>{{ $jugador->recibidos }} ({{ $jugador->jugados ? round($jugador->recibidos / $jugador->jugados,2) : 0 }})</td>
+                    <td>{{ $jugador->invictas }} ({{ $jugador->jugados ? round($jugador->invictas / $jugador->jugados,2) : 0 }})</td>
+                    <td>
+                        @if($jugador->escudo)
+                            @foreach(explode(',', $jugador->escudo) as $escudo)
+                                @if($escudo)
+                                    @php $escudoArr = explode('_',$escudo); @endphp
+                                    <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
+                                        <img src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                    </a>
+                                    ({{ $escudoArr[2] ?? '' }}) ({{ $escudoArr[3] ?? '' }})
+                                @endif
+                            @endforeach
+                        @endif
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
 
-        <div class="row">
-            <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                {{ $arqueros->links() }}
-            </div>
-
-            <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                <strong>Total: {{ $arqueros->total() }}</strong>
-            </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>{{ $arqueros->links() }}</div>
+            <strong>Total: {{ $arqueros->total() }}</strong>
         </div>
-        <div class="d-flex">
 
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+        <div class="mt-3">
+            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+        </div>
+            </div>
         </div>
     </div>
+
     <script>
-
-
         function enviarForm() {
-            $('#tipoOrder').val('DESC');
             $('#formulario').submit();
         }
     </script>

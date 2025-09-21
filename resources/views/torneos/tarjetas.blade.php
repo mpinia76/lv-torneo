@@ -5,48 +5,64 @@
 @section('content')
     <div class="container">
 
-        @php
-            $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
-            $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
-
-        @endphp
-        <form class="form-inline" id="formulario">
-
-            <input type="hidden" id="tipoOrder" name="tipoOrder" value="{{$tipoOrder}}">
-            <input type="hidden" name="imgOrder" value="{{$imgOrder}}">
-            <select class="orm-control js-example-basic-single" id="torneoId" name="torneoId" onchange="enviarForm()">
-                @foreach($torneos as $torneo)
-
-                    <option value="{{$torneo->id}}" @if($torneo->id==$torneoId)
-                        selected
-
-                        @endif />{{$torneo->nombre}} - {{$torneo->year}}</option>
-                @endforeach
-
-            </select>
-            <input type="checkbox" class="form-control" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
-
-            <strong>Jugando</strong>
-            </input>
-            <nav class="navbar navbar-light float-right">
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
-
-                <button class="btn btn-success m-1" type="button" onClick="enviarForm()">Buscar</button>
-            </nav>
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">🟨🟥 Tarjetas</h1>
+                <form class="form-inline mb-3 d-flex justify-content-between align-items-center" id="formulario">
 
 
-        </form>
-        <br>
+                    <div class="d-flex align-items-center">
+                        <select class="form-control js-example-basic-single mr-3" id="torneoId" name="torneoId" onchange="enviarForm()">
+                            @foreach($torneos as $torneo)
+                                <option value="{{ $torneo->id }}" @if($torneo->id==$torneoId) selected @endif>
+                                    {{ $torneo->nombre }} - {{ $torneo->year }}
+                                </option>
+                            @endforeach
+                        </select>
 
-    <table class="table" style="width: 100%">
-        <thead>
+                        <div class="form-check" style="margin-right: 20px;margin-left: 20px;">
+                            <input type="checkbox" class="form-check-input" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
+                            <label class="form-check-label" for="actuales">Jugando</label>
+                        </div>
+                    </div>
+
+
+
+                    <div class="d-flex align-items-center">
+                        <input type="search" name="buscarpor" class="form-control mr-2" placeholder="Buscar" value="{{ request('buscarpor', session('nombre_filtro_jugador')) }}">
+                        <button class="btn btn-success" type="button" onclick="enviarForm()">Buscar</button>
+                    </div>
+
+                </form>
+
+                <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                    <thead class="table-dark">
         <th>#</th>
         <th>Jugador</th>
         <th>Actual</th>
-        <th><a href="{{route('torneos.tarjetas', array('order'=>'amarillas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Amarillas @if($order=='amarillas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
-        <th><a href="{{route('torneos.tarjetas', array('order'=>'rojas','tipoOrder'=>$tipoOrder, 'actuales'=>$actuales,'torneoId'=>$torneoId))}}" > Rojas @if($order=='rojas') <img id="original"  src="{{ url('images/'.$imgOrder.'.png') }}" height="15">@endif</a></th>
+        @php
+            $columns = [
 
+                'amarillas' => 'Amarillas',
+                'rojas' => 'Rojas',
 
+            ];
+        @endphp
+        @foreach($columns as $key => $label)
+            <th>
+                <a href="{{ route('torneos.tarjetas', [
+                            'torneoId' => $torneoId,
+                            'order' => $key,
+                            'tipoOrder' => ($order==$key && $tipoOrder=='ASC') ? 'DESC' : 'ASC',
+                            'actuales' => $actuales
+                        ]) }}" class="text-decoration-none text-white">
+                    {{ $label }}
+                    @if($order==$key)
+                        <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
+                    @endif
+                </a>
+            </th>
+        @endforeach
         <th>Jugados</th>
         <th>Prom. A</th>
         <th>Prom. R</th>

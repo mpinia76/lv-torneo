@@ -8,8 +8,8 @@
 
 
 
-    <table class="table">
-        <thead>
+        <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+            <thead class="table-dark">
         <th>#</th>
         <th>Equipo</th>
         <th>Punt.</th>

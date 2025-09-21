@@ -1,100 +1,176 @@
 @extends('layouts.appPublic')
 
 @section('pageTitle', 'Detalle Fecha')
-<style>
-    /* Estilos personalizados para resaltar la pestaña activa */
-    .nav-link.active {
-        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
-        color: #fff; /* Cambia el color del texto de la pestaña activa */
-        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
-    }
 
-    /* Agrega un espacio entre las pestañas y el contenido */
-    .tab-content {
-        margin: 20px; /* Ajusta el margen superior del contenido */
-    }
-</style>
 @section('content')
+    <style>
+        /* General */
+        h1.display-6 {
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #0d6efd;
+        }
+
+        .card-custom {
+            border-radius: 15px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        /* Tab Navigation */
+        .nav-tabs .nav-link {
+            font-weight: 500;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.3s;
+        }
+
+        .nav-tabs .nav-link.active {
+            background: #0d6efd;
+            color: #fff !important;
+        }
+
+        .tab-content {
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-top: 0;
+            background: #fff;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Tablas */
+        table.table {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table.table thead {
+            background: #f1f5f9;
+            font-weight: bold;
+        }
+
+        table.table td {
+            vertical-align: middle;
+        }
+
+        /* Jugadores */
+        .imgCircle {
+            border-radius: 50%;
+            height: 35px;
+            width: 35px;
+            object-fit: cover;
+            margin-right: 6px;
+            border: 2px solid #dee2e6;
+        }
+
+        .player-name {
+            font-weight: 600;
+        }
+
+        .event-icon {
+            margin-left: 6px;
+        }
+
+        /* Botón Volver */
+        .btn-success {
+            border-radius: 30px;
+            padding: 8px 25px;
+            font-weight: 500;
+        }
+
+
+    </style>
+
     <div class="container">
 
-        <h1 class="display-6">
+        <h1 class="display-6 text-center">
             @if(is_numeric($partido->fecha->numero))
                 Fecha {{ $partido->fecha->numero }}
             @else
                 {{ $partido->fecha->numero }}
             @endif
-             de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}</h1>
+            de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}
+        </h1>
 
-
-        <div class="row">
-
-            <div class="form-group col-md-12">
-
-                <table class="table" style="font-size: 14px;">
-                    <thead>
+        <div class="card card-custom p-3">
+            <table class="table table-sm text-center align-middle">
+                <thead>
+                <tr>
                     <th>Fecha</th>
                     <th>Local</th>
                     <th>GL</th>
                     <th>GV</th>
                     <th>Visitante</th>
-
-                    </thead>
-
-                    <tr>
-                        <td>{{($partido->dia)?date('d/m/Y H:i', strtotime($partido->dia)):''}}</td>
-                        <td>
-                            <a href="{{route('equipos.ver', array('equipoId' => $partido->equipol->id))}}" >
-                            @if($partido->equipol)
-                                @if($partido->equipol->escudo)<img id="original" src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td>{{ ($partido->dia) ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
+                    <td>
+                        @if($partido->equipol)
+                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
+                                @if($partido->equipol->escudo)
+                                    <img src="{{ url('images/'.$partido->equipol->escudo) }}" height="25" class="me-2">
                                 @endif
+                                <span class="fw-bold">{{ $partido->equipol->nombre }}</span>
+                                <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" height="16" class="ms-1">
                             </a>
-                                {{$partido->equipol->nombre}} <img id="original" src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}">
-                            @endif
-                        </td>
-                        <td>{{$partido->golesl}}
-                            @if($partido->penalesl)
-                                ({{$partido->penalesl}})
-                            @endif
-                        </td>
-                        <td>{{$partido->golesv}}
-                            @if($partido->penalesv)
-                                ({{$partido->penalesv}})
-                            @endif
-                        </td>
-                        <td>
-                            <a href="{{route('equipos.ver', array('equipoId' => $partido->equipov->id))}}" >
-                            @if($partido->equipov)
-                                @if($partido->equipov->escudo)<img id="original" src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
+                        @endif
+                    </td>
+                    <td>{{ $partido->golesl }} @if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
+                    <td>{{ $partido->golesv }} @if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
+                    <td>
+                        @if($partido->equipov)
+                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
+                                @if($partido->equipov->escudo)
+                                    <img src="{{ url('images/'.$partido->equipov->escudo) }}" height="25" class="me-2">
                                 @endif
+                                <span class="fw-bold">{{ $partido->equipov->nombre }}</span>
+                                <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" height="16" class="ms-1">
                             </a>
-                                {{$partido->equipov->nombre}} <img id="original" src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}">
-                            @endif
-                        </td>
-
-                    </tr>
-                </table>
-            </div>
+                        @endif
+                    </td>
+                </tr>
+                </tbody>
+            </table>
         </div>
-                <ul class="nav nav-tabs" id="myTab" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="alineaciones-tab" data-toggle="tab" href="#alineaciones" role="tab" aria-controls="alineaciones" aria-selected="true">Alineaciones</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="goles-tab" data-toggle="tab" href="#goles" role="tab" aria-controls="goles" aria-selected="false">Goles</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tarjetas-tab" data-toggle="tab" href="#tarjetas" role="tab" aria-controls="tarjetas" aria-selected="false">Tarjetas</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="cambios-tab" data-toggle="tab" href="#cambios" role="tab" aria-controls="cambios" aria-selected="false">Cambios</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="arbitros-tab" data-toggle="tab" href="#arbitros" role="tab" aria-controls="arbitros" aria-selected="false">Arbitros</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="incidencias-tab" data-toggle="tab" href="#incidencias" role="tab" aria-controls="incidencias" aria-selected="false">Incidencias</a>
-                    </li>
-                </ul>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs justify-content-center mb-3" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="alineaciones-tab" data-bs-toggle="tab" data-bs-target="#alineaciones" type="button" role="tab" aria-controls="alineaciones" aria-selected="true">
+                    Alineaciones
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="goles-tab" data-bs-toggle="tab" data-bs-target="#goles" type="button" role="tab" aria-controls="goles" aria-selected="false">
+                    Goles
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tarjetas-tab" data-bs-toggle="tab" data-bs-target="#tarjetas" type="button" role="tab" aria-controls="tarjetas" aria-selected="false">
+                    Tarjetas
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="cambios-tab" data-bs-toggle="tab" data-bs-target="#cambios" type="button" role="tab" aria-controls="cambios" aria-selected="false">
+                    Cambios
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="arbitros-tab" data-bs-toggle="tab" data-bs-target="#arbitros" type="button" role="tab" aria-controls="arbitros" aria-selected="false">
+                    Árbitros
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="incidencias-tab" data-bs-toggle="tab" data-bs-target="#incidencias" type="button" role="tab" aria-controls="incidencias" aria-selected="false">
+                    Incidencias
+                </button>
+            </li>
+        </ul>
+
+
         <div class="tab-content" id="myTabContent">
             <div role="tabpanel" class="tab-pane active" id="alineaciones">
                 <div class="row">
@@ -715,9 +791,9 @@
                 </div>
             </div>
         </div>
-        <div class="d-flex">
 
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+        <div class="text-center mt-4 mb-5">
+            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
         </div>
     </div>
 @endsection

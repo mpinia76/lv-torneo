@@ -14,8 +14,8 @@
             @if(count($arrPosiciones)>1)
             Grupo {{$nombre}}
             @endif
-            <table class="table">
-                <thead>
+            <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
+                <thead class="table-dark">
                 <th>#</th>
                 <th style="width: 300px;">Equipo</th>
                 <th>Punt.</th>
