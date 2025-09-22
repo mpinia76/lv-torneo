@@ -221,7 +221,7 @@
                     <th>Dif.</th>
 
                     <th>Prom.</th>
-                    <th>PosiciÃ³n</th>
+                    <th>Posición</th>
                     </thead>
                     <tbody>
                     @php
