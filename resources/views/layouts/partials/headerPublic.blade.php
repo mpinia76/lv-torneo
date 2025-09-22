@@ -1,6 +1,12 @@
 {{-- Bootstrap CSS --}}
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
+
+{{-- <link href="{{ elixir('css/app.css') }}" rel="stylesheet"> --}}
+<link href="{{ asset('css/app.css') }}" rel="stylesheet">
+<link href="{{asset('css/components.min.css')}}" rel="stylesheet" type="text/css">
 <header>
     {{-- Navbar principal --}}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
