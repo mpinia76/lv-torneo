@@ -1826,7 +1826,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $estadisticasResumen = [];
 
         $todosTorneos = DB::select(DB::raw("
-    SELECT t.id, t.nombre AS nombreTorneo, t.year
+    SELECT t.id, t.nombre AS nombreTorneo, t.year, t.escudo AS escudoTorneo
     FROM torneos t
     ORDER BY t.year DESC
 "));
@@ -1877,6 +1877,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             $estadisticasResumen[] = [
                 'nombreTorneo' => $torneo->nombreTorneo,
                 'year' => $torneo->year,
+                'escudoTorneo' => $torneo->escudoTorneo,
                 'partidos' => $totales->partidos ?? 0,
                 'goles' => $totales->goles ?? 0,
                 'promedio_goles' => $totales->promedio_goles ?? 0,
