@@ -696,83 +696,108 @@ group by tecnico_id
         $id = $request->query('jugadorId');
         $jugador = Jugador::findOrFail($id);
 
-        $idTorneo = $request->query('torneoId') ?? null;
-
+        $idTorneo = $request->query('torneoId') ?? '';
         $torneo = $idTorneo ? Torneo::findOrFail($idTorneo) : null;
 
         $tipo = $request->query('tipo') ?? '';
 
-        // --- 1️⃣ Base query de partidos donde jugó ---
-        $partidosQuery = Partido::query()
-            ->select('partidos.*')
-            ->join('alineacions', 'alineacions.partido_id', '=', 'partidos.id')
-            ->leftJoin('cambios', function($join) use ($id) {
-                $join->on('cambios.partido_id', '=', 'partidos.id')
-                    ->where('cambios.jugador_id', '=', $id)
-                    ->where('cambios.tipo', '=', 'Entra');
-            })
-            ->when($idTorneo, function($q) use ($idTorneo) {
-                $q->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
-                    ->join('grupos', 'fechas.grupo_id', '=', 'grupos.id')
-                    ->where('grupos.torneo_id', $idTorneo);
-            })
-            ->where(function($q) use ($id) {
-                $q->where('alineacions.jugador_id', $id)
-                    ->orWhereNotNull('cambios.id');
-            })
-            ->with(['alineacions', 'local', 'visitante', 'fecha.grupo.torneo'])
-            ->orderBy('partidos.dia', 'desc');
+        // --- Estadísticas globales (jugados, ganados, empatados, perdidos) ---
+        $sql = "
+        SELECT
+            COUNT(*) as jugados,
+            COUNT(CASE WHEN golesl > golesv THEN 1 END) as ganados,
+            COUNT(CASE WHEN golesv > golesl THEN 1 END) as perdidos,
+            COUNT(CASE WHEN golesl = golesv THEN 1 END) as empatados
+        FROM (
+            SELECT alineacions.jugador_id, golesl, golesv
+            FROM partidos
+            INNER JOIN equipos ON partidos.equipol_id = equipos.id
+            INNER JOIN alineacions ON partidos.id = alineacions.partido_id AND equipos.id = alineacions.equipo_id
+            LEFT JOIN cambios ON cambios.partido_id = partidos.id AND cambios.jugador_id = alineacions.jugador_id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON fechas.grupo_id = grupos.id
+            WHERE golesl IS NOT NULL AND golesv IS NOT NULL
+              AND ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = $id)
+                OR (cambios.tipo = 'Entra' AND cambios.jugador_id = $id))
+              " . ($idTorneo ? " AND grupos.torneo_id = $idTorneo" : "") . "
 
-        // --- 2️⃣ Filtrar por tipo (Ganados, Empatados, Perdidos) ---
+            UNION ALL
+
+            SELECT alineacions.jugador_id, golesv AS golesl, golesl AS golesv
+            FROM partidos
+            INNER JOIN equipos ON partidos.equipov_id = equipos.id
+            INNER JOIN alineacions ON partidos.id = alineacions.partido_id AND equipos.id = alineacions.equipo_id
+            LEFT JOIN cambios ON cambios.partido_id = partidos.id AND cambios.jugador_id = alineacions.jugador_id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON fechas.grupo_id = grupos.id
+            WHERE golesl IS NOT NULL AND golesv IS NOT NULL
+              AND ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = $id)
+                OR (cambios.tipo = 'Entra' AND cambios.jugador_id = $id))
+              " . ($idTorneo ? " AND grupos.torneo_id = $idTorneo" : "") . "
+        ) a
+    ";
+
+        $jugados = DB::selectOne(DB::raw($sql));
+
+        $totalJugados   = $jugados->jugados ?? 0;
+        $totalGanados   = $jugados->ganados ?? 0;
+        $totalEmpatados = $jugados->empatados ?? 0;
+        $totalPerdidos  = $jugados->perdidos ?? 0;
+
+        // --- Listado de partidos ---
+        $sqlPartidos = "
+        SELECT
+            torneos.nombre AS nombreTorneo,
+            torneos.escudo AS escudoTorneo,
+            torneos.year,
+            fechas.numero,
+            partidos.dia,
+            e1.id AS equipol_id,
+            e1.escudo AS fotoLocal,
+            e1.nombre AS local,
+            e2.id AS equipov_id,
+            e2.escudo AS fotoVisitante,
+            e2.nombre AS visitante,
+            partidos.golesl,
+            partidos.golesv,
+            partidos.penalesl,
+            partidos.penalesv,
+            partidos.id as partido_id,
+            alineacions.equipo_id as equipoJugador
+        FROM partidos
+        INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+        INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+        INNER JOIN grupos ON fechas.grupo_id = grupos.id
+        INNER JOIN torneos ON grupos.torneo_id = torneos.id
+        INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+        LEFT JOIN cambios ON cambios.partido_id = partidos.id AND cambios.jugador_id = alineacions.jugador_id
+        WHERE ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = $id)
+            OR (cambios.tipo = 'Entra' AND cambios.jugador_id = $id))
+            " . ($idTorneo ? " AND grupos.torneo_id = $idTorneo" : "") . "
+    ";
+
+        // Filtros por tipo
         if ($tipo === 'Ganados') {
-            $partidosQuery->where(function($q) use ($id) {
-                $q->where(function($q2) use ($id) {
-                    $q2->whereColumn('alineacions.equipo_id', 'partidos.equipol_id')
-                        ->whereColumn('partidos.golesl', '>', 'partidos.golesv');
-                })->orWhere(function($q2) use ($id) {
-                    $q2->whereColumn('alineacions.equipo_id', 'partidos.equipov_id')
-                        ->whereColumn('partidos.golesv', '>', 'partidos.golesl');
-                });
-            });
+            $sqlPartidos .= " AND ((alineacions.equipo_id = e1.id AND partidos.golesl > partidos.golesv)
+                          OR (alineacions.equipo_id = e2.id AND partidos.golesv > partidos.golesl))";
         } elseif ($tipo === 'Empatados') {
-            $partidosQuery->whereColumn('partidos.golesl', 'partidos.golesv');
+            $sqlPartidos .= " AND partidos.golesl = partidos.golesv";
         } elseif ($tipo === 'Perdidos') {
-            $partidosQuery->where(function($q) use ($id) {
-                $q->where(function($q2) use ($id) {
-                    $q2->whereColumn('alineacions.equipo_id', 'partidos.equipol_id')
-                        ->whereColumn('partidos.golesl', '<', 'partidos.golesv');
-                })->orWhere(function($q2) use ($id) {
-                    $q2->whereColumn('alineacions.equipo_id', 'partidos.equipov_id')
-                        ->whereColumn('partidos.golesv', '<', 'partidos.golesl');
-                });
-            });
+            $sqlPartidos .= " AND ((alineacions.equipo_id = e1.id AND partidos.golesl < partidos.golesv)
+                          OR (alineacions.equipo_id = e2.id AND partidos.golesv < partidos.golesl))";
         }
 
-        // --- 3️⃣ Obtener partidos con paginación ---
-        $partidos = $partidosQuery->distinct()->paginate(15)->appends($request->query());
+        $sqlPartidos .= " ORDER BY partidos.dia DESC";
 
-        // --- 4️⃣ Estadísticas globales ---
-        $totalJugados = $partidosQuery->count();
-
-        $totalGanados = $partidosQuery->get()->filter(function($p) use ($id) {
-            $alineacion = $p->alineacions->first(function($a) use ($id) {
-                return $a->jugador_id == $id;
-            });
-
-            if (!$alineacion) return false;
-
-            return ($alineacion->equipo_id == $p->equipol_id && $p->golesl > $p->golesv)
-                || ($alineacion->equipo_id == $p->equipov_id && $p->golesv > $p->golesl);
-        })->count();
-
-
-        $totalEmpatados = $partidosQuery->get()->where('golesl', '=', $partidosQuery->get()->pluck('golesv'))->count();
-        $totalPerdidos = $totalJugados - $totalGanados - $totalEmpatados;
+        // Usar paginación nativa
+        $partidos = DB::table(DB::raw("($sqlPartidos) as sub"))
+            ->paginate(15)
+            ->appends($request->query());
 
         return view('jugadores.jugados', compact(
-            'torneo',
             'jugador',
-            'idTorneo',
+            'torneo',
             'totalJugados',
             'totalGanados',
             'totalEmpatados',
@@ -781,9 +806,6 @@ group by tecnico_id
             'tipo'
         ));
     }
-
-
-
 
 
     public function goles(Request $request)
