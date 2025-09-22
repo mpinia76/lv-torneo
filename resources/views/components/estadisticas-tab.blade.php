@@ -37,11 +37,11 @@
 
                         @if(!empty($row->escudoTorneo))
                             <img src="{{ url('images/'.$row->escudoTorneo) }}"
-                                 alt="escudoTorneo {{ $row->nombre }}"
+                                 alt="escudoTorneo {{ $row->nombreTorneo }}"
                                  width="24" height="24"
                                  class="me-2 img-fluid d-inline">
                         @endif
-                        {{ $row->nombreTorneo }}
+                        {{ $row->nombreTorneo }} {{ $row->year }}
 
                     @else
                         {{ $row->$field }}

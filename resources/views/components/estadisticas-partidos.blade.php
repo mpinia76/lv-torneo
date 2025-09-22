@@ -1,6 +1,7 @@
 @props([
     'data',       // colección de partidos
-    'showNeutral' => false // si mostrar columna "Neutrales" o no
+    'showNeutral' => false, // si mostrar columna "Neutrales" o no
+    'showTorneo' => false // si mostrar columna "Torneo (Año)"
 ])
 
 @php $i = 1; @endphp
@@ -9,6 +10,9 @@
     <thead class="table-dark">
     <tr>
         <th>#</th>
+        @if($showTorneo)
+            <th>Torneo</th>
+        @endif
         <th>Fecha</th>
         <th>Día</th>
         <th>Local</th>
@@ -22,6 +26,17 @@
     @foreach($data as $partido)
         <tr>
             <td>{{ $i++ }}</td>
+            @if($showTorneo)
+                <td>
+                    @if(!empty($partido->escudoTorneo))
+                        <img src="{{ url('images/'.$partido->escudoTorneo) }}"
+                             alt="Escudo {{ $partido->nombreTorneo }}"
+                             width="24" height="24"
+                             class="me-2 d-inline img-fluid">
+                    @endif
+                    {{ $partido->nombreTorneo }} {{ $partido->year }}
+                </td>
+            @endif
             <td>
                 @if(is_numeric($partido->numero))
                     Fecha {{ $partido->numero }}

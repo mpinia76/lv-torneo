@@ -44,7 +44,7 @@
                     @endif
                     <x-estadisticas-tab :data="$estadisticas[$key]" :columns="[
                         'Torneo' => 'nombreTorneo',
-                        'Año' => 'year',
+
                         'Goles' => 'goles',
                         'Promedio' => 'promedio',
                         'Partidos' => 'partidos',
@@ -65,7 +65,7 @@
                     @endif
                     <x-estadisticas-tab :data="$estadisticas[$key]" :columns="[
                         'Torneo' => 'nombreTorneo',
-                        'Año' => 'year',
+
                         'Fecha' => 'numero',
                         'Goles' => 'goles',
                         'Promedio' => 'promedio',
@@ -85,7 +85,7 @@
                     @if($title)
                         <h5>{{ $title }}</h5>
                     @endif
-                    <x-estadisticas-partidos :data="$estadisticas[$key]"/>
+                    <x-estadisticas-partidos :data="$estadisticas[$key]" :showTorneo="true"/>
                 @endforeach
             </div>
 
@@ -93,7 +93,7 @@
             <div class="tab-pane fade" id="resumen" role="tabpanel" aria-labelledby="resumen-tab">
                 <x-estadisticas-tab :data="$estadisticasResumen" :columns="[
                     'Torneo' => 'nombreTorneo',
-                    'Año' => 'year',
+
                     'Partidos' => 'partidos',
                     'Goles' => 'goles',
                     'Promedio' => 'promedio_goles',

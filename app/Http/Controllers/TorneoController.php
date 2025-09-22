@@ -1695,7 +1695,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $getPartidosQuery = function ($condition) {
             return DB::select(DB::raw("
             SELECT
-                torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia,
+                torneos.nombre AS nombreTorneo, torneos.year,torneos.escudo AS escudoTorneo, fechas.numero, partidos.dia,
                 e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local,
                 e2.id AS equipov_id, e2.escudo AS fotoVisitante, e2.nombre AS visitante,
                 partidos.golesl, partidos.golesv, partidos.penalesl, partidos.penalesv,
@@ -1724,9 +1724,9 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         // Helper para fechas con más goles
         $getFechaMasGoles = function ($columna, $neutralCondition) {
             return DB::select(DB::raw("
-            SELECT t.nombreTorneo, t.year, t.numero, t.partidos, t.goles, t.promedio
+            SELECT t.nombreTorneo, t.year, t.escudoTorneo, t.numero, t.partidos, t.goles, t.promedio
             FROM (
-                SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero,
+                SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo, fechas.numero,
                        SUM(partidos.$columna) AS goles, COUNT(*) AS partidos,
                        (SUM(partidos.$columna)/COUNT(*)) AS promedio
                 FROM partidos
@@ -1738,12 +1738,12 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 WHERE $neutralCondition
                 AND partidos.golesl IS NOT NULL
                 AND partidos.golesv IS NOT NULL
-                GROUP BY torneos.nombre, torneos.year, fechas.numero
+                GROUP BY torneos.nombre, torneos.year, torneos.escudo, fechas.numero
             ) AS t
             WHERE t.goles = (
                 SELECT MAX(t.goles)
                 FROM (
-                    SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero,
+                    SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo, fechas.numero,
                            SUM(partidos.$columna) AS goles
                     FROM partidos
                     INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
@@ -1754,7 +1754,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                     WHERE $neutralCondition
                     AND partidos.golesl IS NOT NULL
                     AND partidos.golesv IS NOT NULL
-                    GROUP BY torneos.nombre, torneos.year, fechas.numero
+                    GROUP BY torneos.nombre, torneos.year, torneos.escudo, fechas.numero
                 ) AS t
             )
         "));
@@ -1768,9 +1768,9 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         // Helper para torneos con más goles
         $getTorneoMasGoles = function ($columna, $neutralCondition) {
             return DB::select(DB::raw("
-        SELECT t.nombreTorneo, t.year, t.partidos, t.goles, t.promedio
+        SELECT t.nombreTorneo, t.year, t.escudoTorneo, t.partidos, t.goles, t.promedio
         FROM (
-            SELECT torneos.nombre AS nombreTorneo, torneos.year,
+            SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo,
                    SUM(partidos.$columna) AS goles, COUNT(*) AS partidos,
                    (SUM(partidos.$columna)/COUNT(*)) AS promedio
             FROM partidos
@@ -1782,12 +1782,12 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             WHERE $neutralCondition
             AND partidos.golesl IS NOT NULL
             AND partidos.golesv IS NOT NULL
-            GROUP BY torneos.nombre, torneos.year
+            GROUP BY torneos.nombre, torneos.year, torneos.escudo
         ) AS t
         WHERE t.goles = (
             SELECT MAX(t.goles)
             FROM (
-                SELECT torneos.nombre AS nombreTorneo, torneos.year,
+                SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo,
                        SUM(partidos.$columna) AS goles
                 FROM partidos
                 INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
@@ -1798,7 +1798,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 WHERE $neutralCondition
                 AND partidos.golesl IS NOT NULL
                 AND partidos.golesv IS NOT NULL
-                GROUP BY torneos.nombre, torneos.year
+                GROUP BY torneos.nombre, torneos.year, torneos.escudo
             ) AS t
         )
     "));
