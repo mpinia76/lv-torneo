@@ -21,4 +21,8 @@ class Equipo extends Model
         return file_exists(public_path($path)) ? url($path) : url('images/sinBandera.gif');
     }
 
+    public function alineacions()
+    {
+        return $this->hasMany(Alineacion::class, 'equipo_id', 'id');
+    }
 }
