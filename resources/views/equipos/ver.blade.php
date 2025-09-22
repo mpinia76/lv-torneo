@@ -292,11 +292,7 @@
 
             <!-- Jugadores -->
             <div class="tab-pane fade {{ request()->get('pestActiva') == 'jugadores' ? 'show active' : '' }}" id="jugadores" role="tabpanel">
-                @php
-                    $tipoOrder = ($tipoOrder=='ASC')?'DESC':'ASC';
-                    $imgOrder = ($tipoOrder=='ASC')?'entra':'sale';
 
-                @endphp
                 <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
                     <thead class="table-dark">
                     <tr>
