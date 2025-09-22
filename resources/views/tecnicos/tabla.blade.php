@@ -70,10 +70,10 @@
                 @endif
             </td>
             <td>{{$torneo->puntaje}}</td>
-            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo])}}">{{$torneo->jugados}}</a></td>
-            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados'])}}">{{$torneo->ganados}}</a></td>
-            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados'])}}">{{$torneo->empatados}}</a></td>
-            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Perdidos'])}}">{{$torneo->perdidos}}</a></td>
+            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'torneoId'=>$torneo->idTorneo])}}">{{$torneo->jugados}}</a></td>
+            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados'])}}">{{$torneo->ganados}}</a></td>
+            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados'])}}">{{$torneo->empatados}}</a></td>
+            <td><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'torneoId'=>$torneo->idTorneo,'tipo'=>'Perdidos'])}}">{{$torneo->perdidos}}</a></td>
             <td>{{$torneo->favor}}</td>
             <td>{{$torneo->contra}}</td>
             <td>{{$torneo->favor - $torneo->contra}}</td>
@@ -83,10 +83,10 @@
     <!-- Totales -->
     <tr>
         <td></td><td></td><td><strong>Totales</strong></td>
-        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico])}}">{{$totalJugados}}</a></strong></td>
-        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'tipo'=>'Ganados'])}}">{{$totalGanados}}</a></strong></td>
-        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'tipo'=>'Empatados'])}}">{{$totalEmpatados}}</a></strong></td>
-        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$torneo->idTecnico,'tipo'=>'Perdidos'])}}">{{$totalPerdidos}}</a></strong></td>
+        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id])}}">{{$totalJugados}}</a></strong></td>
+        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'tipo'=>'Ganados'])}}">{{$totalGanados}}</a></strong></td>
+        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'tipo'=>'Empatados'])}}">{{$totalEmpatados}}</a></strong></td>
+        <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'tipo'=>'Perdidos'])}}">{{$totalPerdidos}}</a></strong></td>
         <td><strong>{{$totalFavor}}</strong></td>
         <td><strong>{{$totalContra}}</strong></td>
         <td><strong>{{$totalFavor-$totalContra}}</strong></td>
