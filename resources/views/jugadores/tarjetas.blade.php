@@ -43,22 +43,30 @@
                     {{-- Cards de tarjetas --}}
                     @php
                         $opciones = [
-                            '' => ['label' => 'Todas', 'total' => $totalTodos],
-                            'Rojas' => ['label' => 'Rojas', 'total' => $totalRojas],
-                            'Amarillas' => ['label' => 'Amarillas', 'total' => $totalAmarillas],
+                            '' => ['label' => 'Todas', 'valorDB' => ''],
+                            'Rojas' => ['label' => 'Rojas', 'valorDB' => 'Roja'],
+                            'Amarillas' => ['label' => 'Amarillas', 'valorDB' => 'Amarilla'],
                         ];
                     @endphp
 
                     @foreach($opciones as $tipoClave => $opcion)
                         <div class="col-6 col-md-3 mb-2">
                             <a href="{{ route('jugadores.tarjetas', array_filter([
-                                'jugadorId' => $jugador->id,
-                                'torneoId' => $torneo->id ?? null,
-                                'tipo' => $tipoClave ?: null
-                            ])) }}">
-                                <div class="p-2 rounded {{ $tipo == $tipoClave ? 'bg-success text-white' : 'bg-light' }}">
+                                            'jugadorId' => $jugador->id,
+                                            'torneoId' => $torneo->id ?? null,
+                                            'tipo' => $opcion['valorDB'] ?: null
+                                        ])) }}">
+                                <div class="p-2 rounded {{ $tipo == $opcion['valorDB'] ? 'bg-success text-white' : 'bg-light' }}">
                                     <div>{{ $opcion['label'] }}</div>
-                                    <strong>{{ $opcion['total'] }}</strong>
+                                    <strong>
+                                        @if($tipoClave == '')
+                                            {{ $totalTodos }}
+                                        @elseif($tipoClave == 'Rojas')
+                                            {{ $totalRojas }}
+                                        @else
+                                            {{ $totalAmarillas }}
+                                        @endif
+                                    </strong>
                                 </div>
                             </a>
                         </div>

@@ -19,4 +19,12 @@ class Alineacion extends Model
     public function equipo() {
         return $this->belongsTo('App\Equipo');
     }
+
+    // App/Alineacion.php
+    public function cambios()
+    {
+        return $this->hasMany(Cambio::class, 'jugador_id', 'jugador_id')
+            ->whereColumn('partido_id', 'alineacions.partido_id');
+    }
+
 }

@@ -70,12 +70,13 @@
             @endphp
             @foreach($torneosJugador as $torneo)
                 @php
+
                     $totalJugados += $torneo->jugados;
                     $totalGoles += $torneo->goles;
                     $totalAmarillas += $torneo->amarillas;
                     $totalRojas += $torneo->rojas;
-                    $totalRecibidos += $torneo->recibidos;
-                    $totalInvictas += $torneo->invictas;
+                    $totalRecibidos += $torneo->recibidos ?? 0;
+                    $totalInvictas += $torneo->invictas ?? 0;
                     $jugo = $torneo->jugados > 0;
                 @endphp
                 <tr>
@@ -108,8 +109,9 @@
                     <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo]) }}">{{ $torneo->goles }} ({{ $jugo ? round($torneo->goles / $torneo->jugados,2) : 0 }})</a></td>
                     <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Amarillas']) }}">{{ $torneo->amarillas }} ({{ $jugo ? round($torneo->amarillas / $torneo->jugados,2) : 0 }})</a></td>
                     <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Rojas']) }}">{{ $torneo->rojas }} ({{ $jugo ? round($torneo->rojas / $torneo->jugados,2) : 0 }})</a></td>
-                    <td>{{ $torneo->recibidos }} ({{ $jugo ? round($torneo->recibidos / $torneo->jugados,2) : 0 }})</td>
-                    <td>{{ $torneo->invictas }} ({{ $jugo ? round($torneo->invictas / $torneo->jugados,2) : 0 }})</td>
+                    <td>{{ $torneo->recibidos ?? 0 }} ({{ $torneo->jugados > 0 ? round(($torneo->recibidos ?? 0) / $torneo->jugados, 2) : 0 }})</td>
+                    <td>{{ $torneo->invictas ?? 0 }} ({{ $torneo->jugados > 0 ? round(($torneo->invictas ?? 0) / $torneo->jugados, 2) : 0 }})</td>
+
                 </tr>
             @endforeach
             {{-- Totales --}}

@@ -51,4 +51,31 @@ class Partido extends Model
         return $this->goles_recibidos_por_equipo($equipo_id) == 0 ? 1 : 0;
     }
 
+    // App/Partido.php
+
+// Relación con equipo local
+    public function local()
+    {
+        return $this->belongsTo(Equipo::class, 'equipol_id');
+    }
+
+// Relación con equipo visitante
+    public function visitante()
+    {
+        return $this->belongsTo(Equipo::class, 'equipov_id');
+    }
+
+// Relación con alineaciones
+    public function alineacions()
+    {
+        return $this->hasMany(Alineacion::class, 'partido_id');
+    }
+
+// Opcional: relación con cambios
+    public function cambios()
+    {
+        return $this->hasMany(Cambio::class, 'partido_id');
+    }
+
+
 }
