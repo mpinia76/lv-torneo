@@ -1834,10 +1834,11 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         foreach($todosTorneos as $torneo) {
             $torneoId = $torneo->id;
 
-            // Total de goles y partidos
+            // Totales (partidos y goles)
             $totales = DB::selectOne(DB::raw("
         SELECT COUNT(*) AS partidos,
                SUM(p.golesl + p.golesv) AS goles,
+               SUM(p.golesl) AS goles_local,
                (SUM(p.golesl + p.golesv) * 1.0 / COUNT(*)) AS promedio_goles
         FROM partidos p
         INNER JOIN fechas f ON p.fecha_id = f.id
@@ -1845,7 +1846,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         WHERE g.torneo_id = :torneoId
     "), ['torneoId' => $torneoId]);
 
-            // Máximo de goles en un partido
+            // Máximo de goles
             $maxGoles = DB::selectOne(DB::raw("
         SELECT MAX(p.golesl + p.golesv) AS max_goles
         FROM partidos p
@@ -1864,8 +1865,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
           AND p.golesl = p.golesv
     "), ['torneoId' => $torneoId]);
 
-
-            // Goles de visitante
+            // Goles visitante
             $golesVisitante = DB::selectOne(DB::raw("
         SELECT SUM(p.golesv) AS goles_visitante
         FROM partidos p
@@ -1874,23 +1874,57 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         WHERE g.torneo_id = :torneoId
     "), ['torneoId' => $torneoId]);
 
+            // Tarjetas
+            $tarjetas = DB::selectOne(DB::raw("
+        SELECT
+            SUM(CASE WHEN t.tipo = 'Amarilla' THEN 1 ELSE 0 END) AS amarillas,
+            SUM(CASE WHEN t.tipo = 'Roja' THEN 1 ELSE 0 END) AS rojas
+        FROM tarjetas t
+        INNER JOIN partidos p ON t.partido_id = p.id
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId
+    "), ['torneoId' => $torneoId]);
+
+            // Arqueros (invictas y recibidos)
+            $arqueros = DB::selectOne(DB::raw("
+        SELECT
+            SUM(CASE WHEN (p.golesv = 0 AND a.equipo_id = p.equipol_id)
+                      OR (p.golesl = 0 AND a.equipo_id = p.equipov_id) THEN 1 ELSE 0 END) AS invictas,
+            SUM(CASE WHEN a.equipo_id = p.equipol_id THEN p.golesv ELSE p.golesl END) AS recibidos
+        FROM partidos p
+        INNER JOIN alineacions a ON a.partido_id = p.id
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId
+          AND a.tipo = 'Arquero'
+    "), ['torneoId' => $torneoId]);
+
             $estadisticasResumen[] = [
                 'nombreTorneo' => $torneo->nombreTorneo,
                 'year' => $torneo->year,
                 'escudoTorneo' => $torneo->escudoTorneo,
                 'partidos' => $totales->partidos ?? 0,
                 'goles' => $totales->goles ?? 0,
+                'goles_local' => $totales->goles_local ?? 0,
                 'promedio_goles' => $totales->promedio_goles ?? 0,
                 'max_goles' => $maxGoles->max_goles ?? 0,
                 'empates' => $empates->empates ?? 0,
                 'goles_visitante' => $golesVisitante->goles_visitante ?? 0,
+                'amarillas' => $tarjetas->amarillas ?? 0,
+                'rojas' => $tarjetas->rojas ?? 0,
+                'invictas' => $arqueros->invictas ?? 0,
+                'recibidos' => $arqueros->recibidos ?? 0,
             ];
-            $estadisticasResumen = collect($estadisticasResumen)->map(function($item) {
-                return (object) $item;
-            })->all();
-
-
         }
+
+        $estadisticasResumen = collect($estadisticasResumen)->map(function($item) {
+            return (object) $item;
+        })->all();
+
+
+
+
 
         return view('torneos.estadisticasOtras', compact('estadisticas','estadisticasResumen'));
     }

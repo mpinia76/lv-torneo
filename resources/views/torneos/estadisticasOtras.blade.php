@@ -98,9 +98,13 @@
                     'Goles' => 'goles',
                     'Promedio' => 'promedio_goles',
                     'Max Goles' => 'max_goles',
-                    'Empates' => 'empates',
-
+                     'Goles Local' => 'goles_local',
                     'Goles Visitante' => 'goles_visitante',
+                    'Amarillas' => 'amarillas',
+                    'Rojas' => 'rojas',
+
+                    'Invictas' => 'invictas',
+                    'Recibidos' => 'recibidos',
                 ]"/>
             </div>
 
