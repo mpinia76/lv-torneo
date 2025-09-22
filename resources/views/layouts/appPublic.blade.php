@@ -12,7 +12,7 @@
         @yield('content')
     </main>
 
-    @include('layouts.partials.footer')
+    @include('layouts.partials.footerPublic')
 
     @yield('scripts')
 
