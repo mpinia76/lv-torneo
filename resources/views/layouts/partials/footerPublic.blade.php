@@ -36,6 +36,9 @@
     function baseUrl(url) {
         return '{{url('')}}/' + url;
     }
+    $(document).ready(function() {
 
+        $('.js-example-basic-single').select2();
+    })
 
 </script>
