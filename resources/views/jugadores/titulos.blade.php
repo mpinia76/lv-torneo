@@ -4,7 +4,9 @@
 
 @section('content')
     <div class="container">
-
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">🏆 Títulos</h1>
         {{-- Info del jugador --}}
         <div class="row mb-4">
             <div class="col-md-3 text-center">
@@ -107,7 +109,7 @@
                     </td>
                     <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo]) }}">{{ $torneo->jugados }}</a></td>
                     <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo]) }}">{{ $torneo->goles }} ({{ $jugo ? round($torneo->goles / $torneo->jugados,2) : 0 }})</a></td>
-                    <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Amarillas']) }}">{{ $torneo->amarillas }} ({{ $jugo ? round($torneo->amarillas / $torneo->jugados,2) : 0 }})</a></td>
+                    <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Amarilla']) }}">{{ $torneo->amarillas }} ({{ $jugo ? round($torneo->amarillas / $torneo->jugados,2) : 0 }})</a></td>
                     <td><a href="{{ route('jugadores.tarjetas', ['jugadorId' => $jugador->id,'torneoId' => $torneo->idTorneo,'tipo'=>'Rojas']) }}">{{ $torneo->rojas }} ({{ $jugo ? round($torneo->rojas / $torneo->jugados,2) : 0 }})</a></td>
                     <td>{{ $torneo->recibidos ?? 0 }} ({{ $torneo->jugados > 0 ? round(($torneo->recibidos ?? 0) / $torneo->jugados, 2) : 0 }})</td>
                     <td>{{ $torneo->invictas ?? 0 }} ({{ $torneo->jugados > 0 ? round(($torneo->invictas ?? 0) / $torneo->jugados, 2) : 0 }})</td>
@@ -121,7 +123,7 @@
                 <td>Totales</td>
                 <td><a href="{{ route('jugadores.jugados',['jugadorId' => $jugador->id]) }}">{{ $totalJugados }}</a></td>
                 <td><a href="{{ route('jugadores.goles',['jugadorId' => $jugador->id]) }}">{{ $totalGoles }} ({{ $totalJugados ? round($totalGoles/$totalJugados,2) : 0 }})</a></td>
-                <td><a href="{{ route('jugadores.tarjetas',['jugadorId' => $jugador->id,'tipo'=>'Amarillas']) }}">{{ $totalAmarillas }} ({{ $totalJugados ? round($totalAmarillas/$totalJugados,2) : 0 }})</a></td>
+                <td><a href="{{ route('jugadores.tarjetas',['jugadorId' => $jugador->id,'tipo'=>'Amarilla']) }}">{{ $totalAmarillas }} ({{ $totalJugados ? round($totalAmarillas/$totalJugados,2) : 0 }})</a></td>
                 <td><a href="{{ route('jugadores.tarjetas',['jugadorId' => $jugador->id,'tipo'=>'Rojas']) }}">{{ $totalRojas }} ({{ $totalJugados ? round($totalRojas/$totalJugados,2) : 0 }})</a></td>
                 <td>{{ $totalRecibidos }} ({{ $totalJugados ? round($totalRecibidos/$totalJugados,2) : 0 }})</td>
                 <td>{{ $totalInvictas }} ({{ $totalJugados ? round($totalInvictas/$totalJugados,2) : 0 }})</td>
@@ -230,6 +232,8 @@
         {{-- Volver --}}
         <div class="d-flex mt-4">
             <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+        </div>
+    </div>
         </div>
     </div>
 @endsection
