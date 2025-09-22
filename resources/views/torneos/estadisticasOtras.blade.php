@@ -4,7 +4,9 @@
 
 @section('content')
     <div class="container">
-
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-warning">📈 Estadísticas Generales</h1>
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             @php
                 $tabs = [
@@ -111,6 +113,7 @@
         <div class="d-flex mt-3">
             <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
         </div>
-
+            </div>
+        </div>
     </div>
 @endsection
