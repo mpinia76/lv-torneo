@@ -11,6 +11,7 @@
                     'torneos' => 'Torneos',
                     'fechas' => 'Fechas',
                     'partidos' => 'Partidos',
+                     'resumen' => 'Resumen General'
                 ];
             @endphp
             @foreach($tabs as $id => $label)
@@ -87,6 +88,22 @@
                     <x-estadisticas-partidos :data="$estadisticas[$key]"/>
                 @endforeach
             </div>
+
+            {{-- Resumen General --}}
+            <div class="tab-pane fade" id="resumen" role="tabpanel" aria-labelledby="resumen-tab">
+                <x-estadisticas-tab :data="$estadisticasResumen" :columns="[
+                    'Torneo' => 'nombreTorneo',
+                    'Año' => 'year',
+                    'Partidos' => 'partidos',
+                    'Goles' => 'goles',
+                    'Promedio' => 'promedio_goles',
+                    'Max Goles' => 'max_goles',
+                    'Empates' => 'empates',
+
+                    'Goles Visitante' => 'goles_visitante',
+                ]"/>
+            </div>
+
         </div>
 
         <div class="d-flex mt-3">

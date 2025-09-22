@@ -1432,6 +1432,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         $estadisticas = DB::select(DB::raw("
     SELECT
         torneos.nombre AS nombreTorneo,
+        torneos.escudo AS escudoTorneo,
         torneos.year,
 
         COUNT(*) AS total_partidos,
@@ -1505,6 +1506,39 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         $estadisticas['fechaMinGolesVisitantes']=$fechaMinGolesVisitantes;
         $estadisticas['fechaMasGolesNeutrales']=$fechaMasGolesNeutrales;
         $estadisticas['fechaMinGolesNeutrales']=$fechaMinGolesNeutrales;
+
+        $promedioEquipo = DB::select(DB::raw("
+    SELECT
+        e.nombre AS nombre,
+         e.escudo AS escudo,
+         e.pais AS pais,
+        COUNT(p.id) AS partidos,
+        SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl ELSE p.golesv END) AS goles_favor,
+        SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv ELSE p.golesl END) AS goles_contra,
+        (SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl ELSE p.golesv END) -
+         SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv ELSE p.golesl END)) AS diferencia,
+        ROUND(
+            (SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl ELSE p.golesv END) * 1.0) / NULLIF(COUNT(p.id),0),
+            2
+        ) AS promedio_favor,
+        ROUND(
+            (SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv ELSE p.golesl END) * 1.0) / NULLIF(COUNT(p.id),0),
+            2
+        ) AS promedio_contra
+    FROM equipos e
+    INNER JOIN partidos p ON (p.equipol_id = e.id OR p.equipov_id = e.id)
+    INNER JOIN fechas f ON p.fecha_id = f.id
+    INNER JOIN grupos g ON f.grupo_id = g.id
+    INNER JOIN torneos t ON g.torneo_id = t.id
+    WHERE t.id = :torneo_id
+      AND p.golesl IS NOT NULL
+      AND p.golesv IS NOT NULL
+    GROUP BY e.nombre
+    ORDER BY promedio_favor DESC
+"), ['torneo_id' => $torneo_id]);
+
+        $estadisticas['promedioEquipo'] = $promedioEquipo;
+
 
 
         return view('torneos.estadisticasTorneo', compact('estadisticas'));
@@ -1789,8 +1823,75 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $estadisticas['fechaMasGolesVisitantes']=$fechaMasGolesVisitantes;
         $estadisticas['fechaMasGolesNeutrales']=$fechaMasGolesNeutrales;
 
+        $estadisticasResumen = [];
 
-        return view('torneos.estadisticasOtras', compact('estadisticas'));
+        $todosTorneos = DB::select(DB::raw("
+    SELECT t.id, t.nombre AS nombreTorneo, t.year
+    FROM torneos t
+    ORDER BY t.year DESC
+"));
+
+        foreach($todosTorneos as $torneo) {
+            $torneoId = $torneo->id;
+
+            // Total de goles y partidos
+            $totales = DB::selectOne(DB::raw("
+        SELECT COUNT(*) AS partidos,
+               SUM(p.golesl + p.golesv) AS goles,
+               (SUM(p.golesl + p.golesv) * 1.0 / COUNT(*)) AS promedio_goles
+        FROM partidos p
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId
+    "), ['torneoId' => $torneoId]);
+
+            // Máximo de goles en un partido
+            $maxGoles = DB::selectOne(DB::raw("
+        SELECT MAX(p.golesl + p.golesv) AS max_goles
+        FROM partidos p
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId
+    "), ['torneoId' => $torneoId]);
+
+            // Empates
+            $empates = DB::selectOne(DB::raw("
+        SELECT COUNT(*) AS empates
+        FROM partidos p
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId
+          AND p.golesl = p.golesv
+    "), ['torneoId' => $torneoId]);
+
+
+            // Goles de visitante
+            $golesVisitante = DB::selectOne(DB::raw("
+        SELECT SUM(p.golesv) AS goles_visitante
+        FROM partidos p
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId
+    "), ['torneoId' => $torneoId]);
+
+            $estadisticasResumen[] = [
+                'nombreTorneo' => $torneo->nombreTorneo,
+                'year' => $torneo->year,
+                'partidos' => $totales->partidos ?? 0,
+                'goles' => $totales->goles ?? 0,
+                'promedio_goles' => $totales->promedio_goles ?? 0,
+                'max_goles' => $maxGoles->max_goles ?? 0,
+                'empates' => $empates->empates ?? 0,
+                'goles_visitante' => $golesVisitante->goles_visitante ?? 0,
+            ];
+            $estadisticasResumen = collect($estadisticasResumen)->map(function($item) {
+                return (object) $item;
+            })->all();
+
+
+        }
+
+        return view('torneos.estadisticasOtras', compact('estadisticas','estadisticasResumen'));
     }
 
 

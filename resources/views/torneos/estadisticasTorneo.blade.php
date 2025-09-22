@@ -12,7 +12,8 @@
                     'fechaMasGol' => 'Fechas con más goles',
                     'fechaMenosGol' => 'Fechas con menos goles',
                     'partidoMasGol' => 'Partidos con más goles',
-                    'partidoMenosGol' => 'Partidos con menos goles'
+                    'partidoMenosGol' => 'Partidos con menos goles',
+                    'promedioEquipo' => 'Promedio por equipo',
                 ];
             @endphp
             @foreach($tabs as $id => $label)
@@ -98,6 +99,19 @@
                     <x-estadisticas-partidos :data="$estadisticas[$key]"/>
                 @endforeach
             </div>
+
+            {{-- Promedio por equipo --}}
+            <div class="tab-pane fade" id="promedioEquipo" role="tabpanel" aria-labelledby="promedioEquipo-tab">
+                <x-estadisticas-tab :data="$estadisticas['promedioEquipo']" :columns="[
+        'Equipo' => 'nombre',
+        'GF' => 'goles_favor',
+        'GC' => 'goles_contra',
+        'Dif' => 'diferencia',
+        'Prom. GF' => 'promedio_favor',
+        'Prom. GC' => 'promedio_contra',
+    ]"/>
+            </div>
+
         </div>
 
         <div class="d-flex mt-3">

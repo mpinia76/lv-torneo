@@ -1,5 +1,3 @@
-@props(['data', 'columns'])
-
 @php
     $i = 1;
 @endphp
@@ -25,6 +23,26 @@
                         @else
                             {{ $row->numero }}
                         @endif
+                    @elseif($field === 'nombre')
+
+                        @if(!empty($row->escudo))
+                            <img src="{{ url('images/'.$row->escudo) }}"
+                                 alt="escudo {{ $row->nombre }}"
+                                 width="24" height="24"
+                                 class="me-2 img-fluid d-inline">
+                        @endif
+                        {{ $row->nombre }}
+                            @if($row->pais)<img src="{{ url('images/'.removeAccents($row->pais).'.gif') }}" >@endif
+                    @elseif($field === 'nombreTorneo')
+
+                        @if(!empty($row->escudoTorneo))
+                            <img src="{{ url('images/'.$row->escudoTorneo) }}"
+                                 alt="escudoTorneo {{ $row->nombre }}"
+                                 width="24" height="24"
+                                 class="me-2 img-fluid d-inline">
+                        @endif
+                        {{ $row->nombreTorneo }}
+
                     @else
                         {{ $row->$field }}
                     @endif
