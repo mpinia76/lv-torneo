@@ -103,8 +103,6 @@
                     'Amarillas' => 'amarillas',
                     'Rojas' => 'rojas',
 
-                    'Invictas' => 'invictas',
-                    'Recibidos' => 'recibidos',
                 ]"/>
             </div>
 

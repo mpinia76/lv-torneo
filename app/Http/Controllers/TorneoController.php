@@ -1886,19 +1886,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         WHERE g.torneo_id = :torneoId
     "), ['torneoId' => $torneoId]);
 
-            // Arqueros (invictas y recibidos)
-            $arqueros = DB::selectOne(DB::raw("
-        SELECT
-            SUM(CASE WHEN (p.golesv = 0 AND a.equipo_id = p.equipol_id)
-                      OR (p.golesl = 0 AND a.equipo_id = p.equipov_id) THEN 1 ELSE 0 END) AS invictas,
-            SUM(CASE WHEN a.equipo_id = p.equipol_id THEN p.golesv ELSE p.golesl END) AS recibidos
-        FROM partidos p
-        INNER JOIN alineacions a ON a.partido_id = p.id
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId
-          AND a.tipo = 'Arquero'
-    "), ['torneoId' => $torneoId]);
+
 
             $estadisticasResumen[] = [
                 'nombreTorneo' => $torneo->nombreTorneo,
@@ -1913,8 +1901,6 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 'goles_visitante' => $golesVisitante->goles_visitante ?? 0,
                 'amarillas' => $tarjetas->amarillas ?? 0,
                 'rojas' => $tarjetas->rojas ?? 0,
-                'invictas' => $arqueros->invictas ?? 0,
-                'recibidos' => $arqueros->recibidos ?? 0,
             ];
         }
 
