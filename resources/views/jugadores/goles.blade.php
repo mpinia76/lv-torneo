@@ -6,7 +6,9 @@
     <script src="{{ asset('js/echarts.min.js') }}"></script>
 
     <div class="container">
-
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">⚽ Goles</h1>
         {{-- Info del torneo y jugador --}}
         <div class="row mb-4">
             <div class="col-md-4">
@@ -147,7 +149,8 @@
 
         <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
     </div>
-
+        </div>
+    </div>
     {{-- Gráfico de torta --}}
     <script>
         var pie_basic_element = document.getElementById('pie_basic');

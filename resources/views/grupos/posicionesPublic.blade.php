@@ -4,7 +4,9 @@
 
 @section('content')
     <div class="container">
-
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h1 class="h3 mb-4 text-center text-primary">🏆 Tabla de Posiciones</h1>
 
 
         @foreach($arrPosiciones as $nombre => $posiciones)
@@ -76,6 +78,7 @@
             <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Volver</a>
         </div>
     </div>
-
+        </div>
+    </div>
 
 @endsection

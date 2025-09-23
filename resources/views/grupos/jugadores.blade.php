@@ -93,7 +93,7 @@
                         </td>
                         <td><a href="{{ route('jugadores.jugados', ['jugadorId'=>$jugador->jugador_id,'torneoId'=>$torneo->id]) }}">{{ $jugador->jugados }}</a></td>
                         <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->jugador_id,'torneoId'=>$torneo->id]) }}">{{ $jugador->goles }}</a></td>
-                        <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Amarillas']) }}">{{ $jugador->amarillas }}</a></td>
+                        <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Amarilla']) }}">{{ $jugador->amarillas }}</a></td>
                         <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Rojas']) }}">{{ $jugador->rojas }}</a></td>
                         <td>{{ $jugador->recibidos }} (@if($jugador->jugados){{ round($jugador->recibidos / $jugador->jugados, 2) }}@else 0 @endif)</td>
                         <td>{{ $jugador->invictas }} (@if($jugador->jugados){{ round($jugador->invictas / $jugador->jugados, 2) }}@else 0 @endif)</td>
