@@ -12,6 +12,7 @@ use App\Plantilla;
 use App\PlantillaJugador;
 use App\PosicionTorneo;
 use App\Torneo;
+use App\TorneoClasificacion;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use App\Grupo;
@@ -242,6 +243,7 @@ class TorneoController extends Controller
         $noBorrar='';
         $noBorrarAcumulado='';
         $noBorrarGrupos='';
+        $noBorrarClasificacion='';
         if($request->promedioTorneo_id)  {
 
                 foreach ($request->promedioTorneo_id as $anterior_id){
@@ -262,6 +264,14 @@ class TorneoController extends Controller
 
             foreach ($request->grupo_id as $grupo_id){
                 $noBorrarGrupos .=$grupo_id.',';
+            }
+
+
+        }
+        if($request->clasificacion_id)  {
+
+            foreach ($request->clasificacion_id as $clasificacion_id){
+                $noBorrarClasificacion .=$clasificacion_id.',';
             }
 
 
@@ -386,6 +396,23 @@ class TorneoController extends Controller
                     }
                 }
             }
+            if ($request->nombreClasificacion) {
+                foreach ($request->nombreClasificacion as $item => $nombre) {
+                    $cantidad = $request->cantidadClasificacion[$item] ?? 0;
+                    $data = [
+                        'torneo_id' => $id,
+                        'nombre'    => $nombre,
+                        'cantidad'  => $cantidad
+                    ];
+                    if (!empty($request->clasificacion_id[$item])) {
+                        $clasificacion = TorneoClasificacion::find($request->clasificacion_id[$item]);
+                        $clasificacion->update($data);
+                    } else {
+                        $clasificacion=TorneoClasificacion::create($data);
+                    }
+                    $noBorrarClasificacion .=$clasificacion->id.',';
+                }
+            }
         }catch(Exception $e){
             //if email or phone exist before in db redirect with error messages
             $ok=0;
@@ -394,6 +421,7 @@ class TorneoController extends Controller
             PromedioTorneo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrar))->delete();
             AcumuladoTorneo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrarAcumulado))->delete();
             Grupo::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrarGrupos))->delete();
+            TorneoClasificacion::where('torneo_id',"$id")->whereNotIn('id', explode(',', $noBorrarClasificacion))->delete();
         }
         catch(QueryException $ex){
             $error = $ex->getMessage();
@@ -833,6 +861,89 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             //echo $sql;
             $acumulado = DB::select(DB::raw($sql));
         }
+        else {
+            // Solo torneo actual
+            $sql = "
+        SELECT escudo as foto, nombre as equipo,
+           COUNT(CASE WHEN fecha_id IS NOT NULL THEN 1 END) AS jugados,
+           COUNT(CASE WHEN fecha_id IS NOT NULL AND golesl > golesv THEN 1 END) AS ganados,
+           COUNT(CASE WHEN fecha_id IS NOT NULL AND golesv > golesl THEN 1 END) AS perdidos,
+           COUNT(CASE WHEN fecha_id IS NOT NULL AND golesl = golesv THEN 1 END) AS empatados,
+           SUM(golesl) AS golesl,
+           SUM(golesv) AS golesv,
+           SUM(golesl) - SUM(golesv) AS diferencia,
+           SUM(CASE WHEN fecha_id IS NOT NULL AND golesl > golesv THEN 3
+                    WHEN fecha_id IS NOT NULL AND golesl = golesv THEN 1
+                    ELSE 0 END) AS puntaje,
+           (SUM(CASE WHEN fecha_id IS NOT NULL AND golesl > golesv THEN 3
+                     WHEN fecha_id IS NOT NULL AND golesl = golesv THEN 1
+                     ELSE 0 END) / NULLIF(COUNT(CASE WHEN fecha_id IS NOT NULL THEN 1 END),0)) AS promedio,
+           equipos.id as equipo_id
+        FROM partidos
+        INNER JOIN equipos ON (equipos.id = partidos.equipol_id OR equipos.id = partidos.equipov_id)
+        INNER JOIN fechas ON fechas.id = partidos.fecha_id
+        WHERE equipos.id IN (" . implode(',', $equipos->keys()->toArray()) . ")
+        GROUP BY nombre, foto, equipos.id
+        ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC
+    ";
+            $acumulado = DB::select(DB::raw($sql));
+        }
+
+        // Obtener torneos involucrados en el acumulado
+        $torneosAnterioresIds = $acumuladoTorneos->pluck('torneoAnterior_id')->toArray();
+
+// Buscar los campeones
+        $campeones = PosicionTorneo::whereIn('torneo_id', $torneosAnterioresIds)
+            ->where('posicion', 1)
+            ->pluck('equipo_id')
+            ->toArray();
+
+
+        $descenso = $torneo->descenso ?? 0; // default 2 si no está definido
+        $totalEquipos = count($acumulado);
+
+// Ordenamos las clasificaciones por ID ascendente
+        $clasificaciones = $torneo->clasificaciones->sortBy('id')->mapWithKeys(function($c) {
+            return [$c->nombre => $c->cantidad];
+        })->toArray();
+
+        $zonaPrimera = array_key_first($clasificaciones); // ID más bajo = primera zona (ej: Libertadores)
+
+        $equiposClasificados = EquipoClasificado::where('torneo_id', $torneo->id)
+            ->with('clasificacion')
+            ->get()
+            ->keyBy('equipo_id');
+
+        foreach ($acumulado as $index => $equipo) {
+            $pos = $index + 1;
+            $equipo->zona = 'Ninguna';
+
+            // Campeones de torneos previos van a la zona de ID más bajo
+            if (in_array($equipo->equipo_id, $campeones)) {
+                $equipo->zona = $zonaPrimera;
+                continue;
+            }
+
+            if(isset($equiposClasificados[$equipo->equipo_id])) {
+                $equipo->zona = $equiposClasificados[$equipo->equipo_id]->clasificacion->nombre;
+            }
+
+            $inicio = 1;
+            foreach ($clasificaciones as $nombre => $cantidad) {
+                $fin = $inicio + $cantidad - 1;
+                if ($pos >= $inicio && $pos <= $fin) {
+                    $equipo->zona = $nombre;
+                    break; // asignamos solo una zona
+                }
+                $inicio = $fin + 1;
+            }
+
+            // Descenso al final
+            if ($pos > $totalEquipos - $descenso) {
+                $equipo->zona = 'Descenso';
+            }
+        }
+
 
 
         //dd($promedios);
@@ -3408,5 +3519,46 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
         return redirect()->route('torneos.show', $torneo_id)->with($respuestaID,$respuestaMSJ);
     }
+
+    public function clasificados(Torneo $torneo)
+    {
+        // Obtener todas las clasificaciones del torneo
+        $clasificaciones = $torneo->clasificaciones;
+
+        // Todos los equipos del torneo
+        $grupos = $torneo->grupos()->with('plantillas.equipo')->get();
+        $equipos = collect();
+        foreach ($grupos as $grupo) {
+            foreach ($grupo->plantillas as $plantilla) {
+                $equipos->put($plantilla->equipo->id, $plantilla->equipo->nombre);
+            }
+        }
+
+        // Equipos ya asignados por clasificación
+        $equiposClasificados = \DB::table('equipo_clasificados')->get()->groupBy('torneo_clasificacion_id');
+
+        return view('torneos.clasificados', compact('torneo', 'clasificaciones', 'equipos', 'equiposClasificados'));
+    }
+
+    public function updateClasificados(Request $request, Torneo $torneo)
+    {
+        $data = $request->input('clasificados', []);
+
+        foreach ($torneo->clasificaciones as $clasificacion) {
+            \DB::table('equipo_clasificados')->where('torneo_clasificacion_id', $clasificacion->id)->delete();
+            if (!empty($data[$clasificacion->id])) {
+                foreach ($data[$clasificacion->id] as $equipo_id) {
+                    \DB::table('equipo_clasificados')->insert([
+                        'torneo_clasificacion_id' => $clasificacion->id,
+                        'equipo_id' => $equipo_id,
+                        'torneo_id' => $torneo->id
+                    ]);
+                }
+            }
+        }
+
+        return redirect()->route('torneos.clasificados', $torneo->id)->with('success', 'Clasificados actualizados');
+    }
+
 
 }

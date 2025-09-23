@@ -14,6 +14,7 @@
                     'partidoMasGol' => 'Partidos con más goles',
                     'partidoMenosGol' => 'Partidos con menos goles',
                     'promedioEquipo' => 'Promedio por equipo',
+                    'graficos' => 'Gráficos',
                 ];
             @endphp
             @foreach($tabs as $id => $label)
@@ -111,6 +112,37 @@
         'Prom. GC' => 'promedio_contra',
     ]"/>
             </div>
+            {{-- Gráficos --}}
+            <div class="tab-pane fade" id="graficos" role="tabpanel" aria-labelledby="graficos-tab">
+                <h1 class="h3 mb-4 text-center text-success">📊 Estadísticas en Gráficos</h1>
+
+                <div class="row">
+                    {{-- 1. Goles por Equipo --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow p-3">
+                            <h5 class="text-center text-primary">Goles por Equipo</h5>
+                            <canvas id="golesPorEquipo"></canvas>
+                        </div>
+                    </div>
+
+                    {{-- 2. Promedio de Goles (Favor vs Contra) --}}
+                    <div class="col-md-6 mb-4">
+                        <div class="card shadow p-3">
+                            <h5 class="text-center text-warning">Promedio de Goles (Favor vs Contra)</h5>
+                            <canvas id="promediosGoles"></canvas>
+                        </div>
+                    </div>
+
+                    {{-- 3. Distribución de Goles (Locales vs Visitantes) --}}
+                    <div class="col-md-12 mb-4">
+                        <div class="card shadow p-3">
+                            <h5 class="text-center text-danger">Distribución Locales vs Visitantes</h5>
+                            <canvas id="localesVsVisitantes"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
         </div>
 

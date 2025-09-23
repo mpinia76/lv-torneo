@@ -105,6 +105,10 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('importpollprocess', 'PollController@importpollprocess');
     Route::get('plantillasearch', 'PlantillaController@search')
         ->name('plantilla.search');
+
+    Route::get('torneos/{torneo}/clasificados', 'TorneoController@clasificados')->name('torneos.clasificados');
+    Route::post('torneos/{torneo}/clasificados', 'TorneoController@updateClasificados')->name('torneos.updateClasificados');
+
 });
 
 

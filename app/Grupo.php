@@ -12,4 +12,10 @@ class Grupo extends Model
 	public function torneo() {
         return $this->belongsTo('App\Torneo');
     }
+
+    public function plantillas()
+    {
+        return $this->hasMany(Plantilla::class);
+    }
+
 }

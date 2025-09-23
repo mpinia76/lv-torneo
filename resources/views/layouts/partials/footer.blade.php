@@ -528,6 +528,30 @@
 
     });
 
+    $('.addRowClasificacion').on('click',function(e){
+        e.preventDefault();
+        addRowClasificacion();
+    });
+    function addRowClasificacion()
+    {
+        var tr='<tr>'+
+            '<td></td><td>'+'{{ Form::text('nombreClasificacion[]', '', ['class'=>'form-control','style'=>'width:250px']) }}'+'</td>'+
+
+            '<td>'+'{{ Form::number('cantidadClasificacion[]', '', ['class'=>'form-control','style'=>'width:60px']) }}'+'</td>'+
+
+            '<td><a href="#" class="btn btn-danger removeClasificacion"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpoClasificacion').append(tr);
+
+    };
+    $('body').on('click', '.removeClasificacion', function(e){
+        e.preventDefault();
+
+        $(this).parent().parent().remove();
+
+
+    });
+
 
     $('.addRowGrupo').on('click',function(e){
         e.preventDefault();

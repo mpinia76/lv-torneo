@@ -62,7 +62,7 @@
                     <div class="d-flex">
                         <a href="{{route('torneos.show', $torneo->id)}}" class="btn btn-info m-1">Ver</a>
                         <a href="{{route('torneos.edit', $torneo->id)}}" class="btn btn-primary m-1">Editar</a>
-
+                        <a href="{{route('torneos.clasificados', $torneo->id)}}" class="btn btn-warning m-1">Clasificados</a>
                         <form action="{{ route('torneos.destroy', $torneo->id) }}" method="POST" onsubmit="return  ConfirmDelete()">
                             <input type="hidden" name="_method" value="DELETE">
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">

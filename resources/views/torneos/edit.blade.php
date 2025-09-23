@@ -74,6 +74,10 @@
                     </label>
                 </div>
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('descenso', 'Nro. de descensos')}}
+                {{Form::number('descenso', $torneo->descenso, ['class' => 'form-control'])}}
+            </div>
 
         </div>
         <div class="row">
@@ -204,6 +208,30 @@
 
 
 
+            </table>
+        </div>
+        <!-- Clasificaciones a copas -->
+        <div class="form-group col-md-12">
+            <h1 class="display-6">Clasificaciones a copas</h1>
+            <table class="table" style="width: 50%">
+                <thead>
+                <tr>
+                    <th></th>
+                    <th>Nombre</th>
+                    <th>Cantidad</th>
+                    <th><a href="#" class="addRowClasificacion"><i class="glyphicon glyphicon-plus"></i></a></th>
+                </tr>
+                </thead>
+                <tbody id="cuerpoClasificacion">
+                @foreach($torneo->clasificaciones ?? [] as $clasificacion)
+                    <tr>
+                        <td>{{ Form::hidden('clasificacion_id[]', $clasificacion->id) }}</td>
+                        <td>{{ Form::text('nombreClasificacion[]', $clasificacion->nombre, ['class'=>'form-control','style'=>'width:250px']) }}</td>
+                        <td>{{ Form::number('cantidadClasificacion[]', $clasificacion->cantidad, ['class'=>'form-control','style'=>'width:60px']) }}</td>
+                        <td><a href="#" class="btn btn-danger removeClasificacion"><i class="glyphicon glyphicon-remove"></i></a></td>
+                    </tr>
+                @endforeach
+                </tbody>
             </table>
         </div>
 
