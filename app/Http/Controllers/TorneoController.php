@@ -1031,10 +1031,10 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
 
             // Descenso al final
-            /*if ($pos > $totalEquipos - $descenso) {
+            if ($pos > $totalEquipos - $descenso) {
                 $equipo->zona = 'Descenso';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
-            }*/
+            }
 
             // Descenso por promedio
             if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
@@ -1042,22 +1042,6 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
 
-        }
-        // --- 3. Completar descensos por acumulado ---
-        $descensoRestante = $descenso - count($descendidosAcumulado);
-        if ($descensoRestante > 0) {
-            for ($i = $totalEquipos - 1; $i >= 0 && $descensoRestante > 0; $i--) {
-                $equipo = $acumulado[$i];
-
-                // Si ya descendió por promedio, no lo cuento
-                if (isset($descendidosAcumulado[$equipo->equipo_id])) {
-                    continue;
-                }
-
-                $equipo->zona = 'Descenso';
-                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
-                $descensoRestante--;
-            }
         }
         //dd($promediosADescender);
 
