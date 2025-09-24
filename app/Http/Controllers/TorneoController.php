@@ -979,7 +979,6 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // 2. Recorrer acumulado y asignar zonas normales, campeones y descensos finales
         $descendidosAcumulado = [];
         $totalEquipos = count($acumulado);
-        $descensoRestante = ($descenso ?? 0);
 
 // Ordenamos las clasificaciones por ID ascendente
         $clasificaciones = $torneo->clasificaciones->sortBy('id')->mapWithKeys(function($c) {
@@ -993,11 +992,13 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             ->get()
             ->keyBy('equipo_id');
 
-        // 1. Crear array con IDs de descenso por promedio
-        $promediosADescenderIds = [];
+        // 1. Marcar equipos de promedio como Descenso
+        $promediosADescender = [];
         if (!empty($promedios)) {
             foreach ($promedios as $p) {
-                $promediosADescenderIds[] = $p->equipo_id;
+                //dd($p);
+
+                $promediosADescender[$p->equipo_id] = $p;
             }
         }
 
@@ -1028,20 +1029,36 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
 
 
+
+
+            // Descenso al final
+            if ($pos > $totalEquipos - $descenso) {
+                $equipo->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+            }
+
             // Descenso por promedio
-            if (in_array($equipo->equipo_id, $promediosADescenderIds)) {
+            if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
                 $equipo->zona = 'Descenso';
-                $descensoRestante--;
-                continue; // ya está marcado, no necesita mirar por posición
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
+        }
 
-            // Descensos por posición si aún quedan cupos
-            if ($pos > $totalEquipos - $descenso && $descensoRestante > 0) {
+// 2. Luego completar los descensos por posición si quedan cupos
+        $descensoRestante = $descenso - count($descendidosAcumulado);
+        foreach ($acumulado as $index => $equipo) {
+            if ($descensoRestante <= 0) break;
+
+            $pos = $index + 1;
+
+            // Ignorar si ya es descenso por promedio
+            if (isset($descendidosAcumulado[$equipo->equipo_id])) continue;
+
+            if ($pos > $totalEquipos - $descenso) {
                 $equipo->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
                 $descensoRestante--;
             }
-
-
         }
         //dd($promediosADescender);
 
