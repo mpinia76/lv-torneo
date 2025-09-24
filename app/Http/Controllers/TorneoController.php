@@ -1044,17 +1044,11 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         }
 
-        // 3. Marcar descenso por posición, saltando los equipos ya descendidos por promedio
-
-        $descensoRestante = $descenso - count($descendidosAcumulado);
-
-        if ($descensoRestante > 0) {
-            $ultimosEquipos = array_slice($acumulado, -$descensoRestante, null, true);
-            foreach ($ultimosEquipos as $equipo) {
-                if ($equipo->zona !== 'Descenso') {
-                    $equipo->zona = 'Descenso';
-                    $descendidosAcumulado[$equipo->equipo_id] = $equipo;
-                }
+        $posicionParaDescenso = array_slice($acumulado, $totalEquipos - $descenso);
+        foreach ($posicionParaDescenso as $equipo) {
+            if (!isset($descendidosAcumulado[$equipo->equipo_id])) {
+                $equipo->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
         }
         //dd($promediosADescender);
