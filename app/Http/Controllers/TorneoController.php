@@ -1024,7 +1024,8 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
 // 3️⃣ Resto de equipos: campeones y zonas
         foreach ($acumulado as $index => $equipo) {
-            if ($equipo->zona === 'Descenso') continue;
+            if (!empty($equipo->zona) && $equipo->zona === 'Descenso') continue;
+
 
             $pos = $index + 1;
             $equipo->zona = 'Ninguna';
