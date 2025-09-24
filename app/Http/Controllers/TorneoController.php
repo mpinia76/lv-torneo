@@ -975,7 +975,9 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             ->toArray();
 
 
-
+        $descenso = $torneo->descenso ?? 0; // default 2 si no está definido
+        // 2. Recorrer acumulado y asignar zonas normales, campeones y descensos finales
+        $descendidosAcumulado = [];
         $totalEquipos = count($acumulado);
 
 // Ordenamos las clasificaciones por ID ascendente
@@ -998,11 +1000,6 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $promediosADescender[$p->equipo_id] = $p;
             }
         }
-
-        $descenso = $torneo->descenso ?? 0; // default 2 si no está definido
-        $descensoRestante = max(0, $descenso - count($promediosADescender));
-        // 2. Recorrer acumulado y asignar zonas normales, campeones y descensos finales
-        $descendidosAcumulado = [];
 
         foreach ($acumulado as $index => $equipo) {
 
@@ -1033,16 +1030,14 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
 
 
-
-
-            // Descenso por promedio
-            if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
+            // Descenso al final
+            if ($pos > $totalEquipos - $descenso) {
                 $equipo->zona = 'Descenso';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
 
-            // Descenso al final
-            if ($pos > $totalEquipos - $descensoRestante) {
+            // Descenso por promedio
+            if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
                 $equipo->zona = 'Descenso';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
