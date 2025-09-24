@@ -979,6 +979,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // 2. Recorrer acumulado y asignar zonas normales, campeones y descensos finales
         $descendidosAcumulado = [];
         $totalEquipos = count($acumulado);
+        $descensoRestante = ($descenso ?? 0);
 
 // Ordenamos las clasificaciones por ID ascendente
         $clasificaciones = $torneo->clasificaciones->sortBy('id')->mapWithKeys(function($c) {
@@ -992,13 +993,11 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             ->get()
             ->keyBy('equipo_id');
 
-        // 1. Marcar equipos de promedio como Descenso
-        $promediosADescender = [];
+        // 1. Crear array con IDs de descenso por promedio
+        $promediosADescenderIds = [];
         if (!empty($promedios)) {
             foreach ($promedios as $p) {
-                //dd($p);
-
-                $promediosADescender[$p->equipo_id] = $p;
+                $promediosADescenderIds[] = $p->equipo_id;
             }
         }
 
@@ -1029,19 +1028,19 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
 
 
-
-
-            // Descenso al final
-            if ($pos > $totalEquipos - $descenso) {
-                $equipo->zona = 'Descenso';
-                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
-            }
-
             // Descenso por promedio
-            if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
+            if (in_array($equipo->equipo_id, $promediosADescenderIds)) {
                 $equipo->zona = 'Descenso';
-                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+                $descensoRestante--;
+                continue; // ya está marcado, no necesita mirar por posición
             }
+
+            // Descensos por posición si aún quedan cupos
+            if ($pos > $totalEquipos - $descenso && $descensoRestante > 0) {
+                $equipo->zona = 'Descenso';
+                $descensoRestante--;
+            }
+
 
         }
         //dd($promediosADescender);
