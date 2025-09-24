@@ -137,7 +137,7 @@
 
                     {{-- 3. Distribución de Goles (Locales vs Visitantes) --}}
                     <div class="col-md-12 mb-4">
-                        <div class="card shadow p-3">
+                        <div class="card shadow p-3 d-flex justify-content-center align-items-center" style="height:400px;">
                             <h5 class="text-center text-danger">Distribución Locales vs Visitantes</h5>
                             <canvas id="localesVsVisitantes"></canvas>
                         </div>
