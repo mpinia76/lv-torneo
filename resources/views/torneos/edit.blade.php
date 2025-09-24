@@ -55,7 +55,7 @@
     </div>
         <div class="row">
 
-            <div class="form-group col-xs-12 col-sm-6 col-md-4">
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 <div class="form-group">
                     Escudo
                     @if($torneo->escudo)
@@ -75,8 +75,12 @@
                 </div>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                {{Form::label('descenso', 'Nro. de descensos')}}
+                {{Form::label('descenso', 'Descensos Gral.')}}
                 {{Form::number('descenso', $torneo->descenso, ['class' => 'form-control'])}}
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{Form::label('descenso_promedio', 'Descensos Promedio')}}
+                {{Form::number('descenso_promedio', $torneo->descenso_promedio, ['class' => 'form-control'])}}
             </div>
 
         </div>

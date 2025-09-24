@@ -8,6 +8,7 @@ use App\Partido;
 use App\Jugador;
 use App\Tecnico;
 use App\PartidoTecnico;
+use App\EquipoClasificado;
 use App\Plantilla;
 use App\PlantillaJugador;
 use App\PosicionTorneo;
@@ -713,8 +714,83 @@ order by promedio desc, puntaje desc, equipo ASC';
 
         $equipos = Plantilla::with('equipo')->wherein('grupo_id',explode(',', $arrgrupos))->get()->pluck('equipo.nombre', 'equipo_id');
 
+        $descenso_promedio = $torneo->descenso_promedio ?? 0;
+        if ($descenso_promedio > 0) {
+            $promedioTorneos = PromedioTorneo::where('torneo_id', '=', "$torneo_id")->orderBy('id', 'ASC')->get();
+            $promedios = array();
+            if (count($promedioTorneos) > 0) {
+                $sql = 'SELECT equipo_id, equipo, (sum(
+                 case when golesl > golesv then 3 else 0 end
+               + case when golesl = golesv then 1 else 0 end
+           )/count(*)) promedio,
+           count(*) jugados,
 
-        //print_r($equipos);
+           sum(
+                 case when golesl > golesv then 3 else 0 end
+               + case when golesl = golesv then 1 else 0 end
+           ) puntaje
+    from ( ';
+
+                //print_r($promedioTorneos[0]);
+                //echo $promedioTorneos[0]->torneoAnterior_id;
+                //foreach ($promedioTorneos as $promedioTorneo){
+                for ($i = 0; $i < count($promedioTorneos); $i++) {
+                    $sql .= 'select  equipos.nombre equipo, golesl, golesv, equipos.id equipo_id
+             from partidos
+             INNER JOIN equipos ON partidos.equipol_id = equipos.id
+             INNER JOIN fechas ON partidos.fecha_id = fechas.id
+             INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+             INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = ' . $torneo_id . '
+             INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = ' . $promedioTorneos[$i]->torneoAnterior_id . '
+             WHERE golesl is not null AND golesv is not null ';
+                    $sql .= ($i + 1 == count($promedioTorneos)) ? '' : ' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = ' . $promedioTorneos[$i + 1]->torneoAnterior_id . ')';
+                    $sql .= ' union all
+           select equipos.nombre equipo, golesv, golesl, equipos.id equipo_id
+             from partidos
+             INNER JOIN equipos ON partidos.equipov_id = equipos.id
+             INNER JOIN fechas ON partidos.fecha_id = fechas.id
+             INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+             INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = ' . $torneo_id . '
+             INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = ' . $promedioTorneos[$i]->torneoAnterior_id . '
+             WHERE golesl is not null AND golesv is not null';
+                    $sql .= ($i + 1 == count($promedioTorneos)) ? '' : ' AND EXISTS (SELECT p2.id FROM plantillas p2 INNER JOIN grupos G2 ON p2.grupo_id = G2.id WHERE plantillas.equipo_id = p2.equipo_id AND G2.torneo_id = ' . $promedioTorneos[$i + 1]->torneoAnterior_id . ')';
+                    $sql .= ' union all ';
+                }
+
+                $sql .= 'select  equipos.nombre equipo, golesl, golesv, equipos.id equipo_id
+             from partidos
+             INNER JOIN equipos ON partidos.equipol_id = equipos.id
+             INNER JOIN fechas ON partidos.fecha_id = fechas.id
+             INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+             INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = ' . $torneo_id . '
+             INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = ' . $torneo_id . '
+             WHERE golesl is not null AND golesv is not null
+
+         union all
+           select equipos.nombre equipo, golesv, golesl, equipos.id equipo_id
+             from partidos
+             INNER JOIN equipos ON partidos.equipov_id = equipos.id
+             INNER JOIN fechas ON partidos.fecha_id = fechas.id
+             INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+             INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.promedios = 1 AND grupos.torneo_id = ' . $torneo_id . '
+             INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.promedios = 1 AND G1.torneo_id = ' . $torneo_id . '
+             WHERE golesl is not null AND golesv is not null) a
+    group by equipo, equipo_id
+
+    order by promedio desc, puntaje desc, equipo ASC';
+
+
+                //echo $sql;
+                $promedios = DB::select(DB::raw($sql));
+                // Ordenar en PHP por promedio ascendente
+                usort($promedios, function($a, $b) {
+                    return $a->promedio <=> $b->promedio; // menor promedio primero
+                });
+
+// Tomar los que van a descenso
+                $promedios = array_slice($promedios, 0, $descenso_promedio);
+            }
+        }
 
 
         $acumuladoTorneos = AcumuladoTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','DESC')->get();
@@ -900,6 +976,8 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
 
         $descenso = $torneo->descenso ?? 0; // default 2 si no está definido
+        // 2. Recorrer acumulado y asignar zonas normales, campeones y descensos finales
+        $descendidosAcumulado = [];
         $totalEquipos = count($acumulado);
 
 // Ordenamos las clasificaciones por ID ascendente
@@ -914,7 +992,17 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             ->get()
             ->keyBy('equipo_id');
 
+        // 1. Marcar equipos de promedio como Descenso
+        $promediosADescender = [];
+        if (!empty($promedios)) {
+            foreach ($promedios as $p) {
+                //dd($p);
+                $promediosADescender[$p->equipo_id] = $p;
+            }
+        }
+
         foreach ($acumulado as $index => $equipo) {
+
             $pos = $index + 1;
             $equipo->zona = 'Ninguna';
 
@@ -926,6 +1014,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
             if(isset($equiposClasificados[$equipo->equipo_id])) {
                 $equipo->zona = $equiposClasificados[$equipo->equipo_id]->clasificacion->nombre;
+                continue;
             }
 
             $inicio = 1;
@@ -938,12 +1027,23 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $inicio = $fin + 1;
             }
 
+
+
+
             // Descenso al final
             if ($pos > $totalEquipos - $descenso) {
                 $equipo->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
-        }
 
+            // Descenso por promedio
+            if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
+                $equipo->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+            }
+
+        }
+        //dd($promediosADescender);
 
 
         //dd($promedios);

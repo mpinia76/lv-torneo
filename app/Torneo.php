@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Torneo extends Model
 {
-     protected $fillable = ['nombre', 'year', 'equipos','grupos','tipo','ambito', 'url_nombre','escudo','neutral', 'descenso'];
+     protected $fillable = ['nombre', 'year', 'equipos','grupos','tipo','ambito', 'url_nombre','escudo','neutral', 'descenso', 'descenso_promedio'];
 
     public function grupoDetalle() {
         return $this->hasMany('App\Grupo');
