@@ -997,18 +997,14 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         if (!empty($promedios)) {
             foreach ($promedios as $p) {
                 //dd($p);
-                $p->zona = 'Descenso';
+
                 $promediosADescender[$p->equipo_id] = $p;
             }
         }
-        $descensoRestante = ($descenso ?? 0) - count($promediosADescender);
+
         foreach ($acumulado as $index => $equipo) {
 
             $pos = $index + 1;
-
-            // Si ya descendió por promedio, no hacemos nada
-            if (isset($descendidosAcumulado[$equipo->equipo_id])) continue;
-
             $equipo->zona = 'Ninguna';
 
             // Campeones de torneos previos van a la zona de ID más bajo
@@ -1035,12 +1031,18 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
 
 
-            // Descensos por posición si aún quedan cupos
-            if ($pos > $totalEquipos - $descenso && $descensoRestante > 0) {
+            // Descenso al final
+            if ($pos > $totalEquipos - $descenso) {
                 $equipo->zona = 'Descenso';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
-                $descensoRestante--;
             }
+
+            // Descenso por promedio
+            if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
+                $equipo->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+            }
+
         }
         //dd($promediosADescender);
 
