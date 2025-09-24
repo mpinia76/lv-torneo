@@ -1043,18 +1043,35 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
 
         }
-        for ($i = $totalEquipos - 1; $i >= 0; $i--) {
+
+
+        $descensosPorPosicion = 0;
+
+// Contar cuántos descensos hay que asignar por posición, ignorando el último descendido por promedio si coincide con el último del acumulado
+        $ultimoAcumulado = end($acumulado); // último equipo de acumulado
+        if (!isset($promediosADescender[$ultimoAcumulado->equipo_id])) {
+            // Si el último de acumulado NO descendió por promedio
+            $descensosPorPosicion = $descenso - count($descendidosAcumulado);
+        } else {
+            // Si sí descendió por promedio, necesitamos asignar 1 más al anterior
+            $descensosPorPosicion = 1;
+        }
+
+// Recorrer desde el final del acumulado
+        for ($i = $totalEquipos - 1; $i >= 0 && $descensosPorPosicion > 0; $i--) {
             $equipo = $acumulado[$i];
 
-            // Si ya completamos los descensos, salimos
-            if (count($descendidosAcumulado) >= $descenso) break;
-
-            // Saltar si ya está descendido por promedio
             if (isset($descendidosAcumulado[$equipo->equipo_id])) continue;
 
             $equipo->zona = 'Descenso';
             $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+            $descensosPorPosicion--;
         }
+
+
+
+
+
         //dd($promediosADescender);
 
 
