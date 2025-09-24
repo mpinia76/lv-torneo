@@ -1044,11 +1044,12 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         }
 
-        $posicionParaDescenso = array_slice($acumulado, $totalEquipos - $descenso);
-        foreach ($posicionParaDescenso as $equipo) {
+        // 2. Descenso por posición en acumulado
+        for ($i = $totalEquipos - $descenso; $i < $totalEquipos; $i++) {
+            $equipo = $acumulado[$i];
             if (!isset($descendidosAcumulado[$equipo->equipo_id])) {
-                $equipo->zona = 'Descenso';
-                $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+                $acumulado[$i]->zona = 'Descenso';
+                $descendidosAcumulado[$equipo->equipo_id] = $acumulado[$i];
             }
         }
         //dd($promediosADescender);
