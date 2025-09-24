@@ -154,4 +154,63 @@
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // --- 1. Goles por Equipo ---
+        new Chart(document.getElementById('golesPorEquipo'), {
+            type: 'bar',
+            data: {
+                labels: @json(collect($estadisticas['promedioEquipo'])->pluck('nombre')),
+                datasets: [{
+                    label: 'Goles a Favor',
+                    data: @json(collect($estadisticas['promedioEquipo'])->pluck('goles_favor')),
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+
+        // --- 2. Promedio Goles Favor vs Contra ---
+        new Chart(document.getElementById('promediosGoles'), {
+            type: 'bar',
+            data: {
+                labels: @json(collect($estadisticas['promedioEquipo'])->pluck('nombre')),
+                datasets: [
+                    {
+                        label: 'Prom. GF',
+                        data: @json(collect($estadisticas['promedioEquipo'])->pluck('promedio_favor')),
+                        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                    },
+                    {
+                        label: 'Prom. GC',
+                        data: @json(collect($estadisticas['promedioEquipo'])->pluck('promedio_contra')),
+                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } } }
+        });
+
+        // --- 3. Locales vs Visitantes ---
+        new Chart(document.getElementById('localesVsVisitantes'), {
+            type: 'pie',
+            data: {
+                labels: ['Goles Local', 'Goles Visitante', 'Goles Neutrales'],
+                datasets: [{
+                    data: [
+                        {{ collect($estadisticas['goles'])->pluck('goles_local')->sum() }},
+                        {{ collect($estadisticas['goles'])->pluck('goles_visitante')->sum() }},
+                        {{ collect($estadisticas['goles'])->pluck('goles_neutral')->sum() }},
+                    ],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                    ]
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } } }
+        });
+    </script>
+
 @endsection
