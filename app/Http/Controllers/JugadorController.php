@@ -527,6 +527,7 @@ ORDER BY torneos.year DESC';
 
 
         $torneosTecnico = DB::select(DB::raw($sql));
+
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
@@ -565,8 +566,8 @@ ORDER BY torneos.year DESC';
                     })
                     ->orderBy('dia', 'DESC')
                     ->first();
-                $consultarTecnico = Tecnico::where('persona_id', '=', $jugador->persona_id)->first();
-                $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$consultarTecnico->id)->first();
+                $tecnico = Tecnico::where('persona_id', '=', $jugador->persona_id)->first();
+                $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$tecnico->id)->first();
                 //print_r($partidoTecnico);
                 if(!empty($partidoTecnico)) {
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
@@ -610,8 +611,8 @@ ORDER BY partidos.dia ASC';
                         })
                         ->orderBy('dia', 'DESC')
                         ->first();
-                    $consultarTecnico = Tecnico::where('persona_id', '=', $jugador->persona_id)->first();
-                    $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$consultarTecnico->id)->first();
+                    $tecnico = Tecnico::where('persona_id', '=', $jugador->persona_id)->first();
+                    $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$tecnico->id)->first();
 
                     if(!empty($partidoTecnico)) {
                         $strPosicion = (!empty($posicionTorneo)) ? (
@@ -688,7 +689,7 @@ group by tecnico_id
 
 
 
-        return view('jugadores.ver', compact('jugador','torneosJugador','torneosTecnico','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
+        return view('jugadores.ver', compact('jugador','torneosJugador','torneosTecnico','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional','tecnico'));
     }
 
     public function jugados(Request $request)
