@@ -2109,7 +2109,7 @@ group by tecnico_id
         }
 
         // Obtener personas para similares y paginar resultados
-        $personas = $personasQuery->paginate(50);
+        $personas = $personasQuery->paginate(500);
 
         // --- Buscar similares de manera eficiente ---
         $idsPersonas = $personas->pluck('id')->toArray();
