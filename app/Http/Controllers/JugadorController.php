@@ -2098,24 +2098,23 @@ group by tecnico_id
 
     public function verificarPersonas_new(Request $request)
     {
-        set_time_limit(0); // Solo para pruebas
+        set_time_limit(0);
         $verificados = $request->query('verificados') ? 1 : 0;
         $total = $request->query('total') ? 1 : 0;
 
-        // Traer solo personas sin verificar
+        // Personas a verificar
         $personasQuery = Persona::orderBy('apellido', 'ASC');
         if (!$verificados) {
             $personasQuery->where('verificado', false);
         }
 
-        // Obtener personas para similares y paginar resultados
-        $personas = $personasQuery->paginate(1000);
+        $personas = $personasQuery->paginate(50);
 
-        // --- Buscar similares de manera eficiente ---
+        // IDs de las personas de la página
         $idsPersonas = $personas->pluck('id')->toArray();
 
-        // Usar join para traer similares de golpe
-        $personasSimilares = DB::table('personas as p1')
+        // Traer todos los pares de similares en una sola consulta
+        $similaresQuery = DB::table('personas as p1')
             ->join('personas as p2', function ($join) use ($idsPersonas) {
                 $join->on('p1.id', '!=', 'p2.id')
                     ->whereIn('p1.id', $idsPersonas);
@@ -2130,12 +2129,13 @@ group by tecnico_id
             ->select('p1.*', 'p2.id as simil_id')
             ->get();
 
-        // Mapear resultado a colección de Personas con campo simil_id
-        $personasSimilares = $personasSimilares->map(function ($item) {
-            $persona = Persona::find($item->id);
-            $persona->simil_id = $item->simil_id;
-            return $persona;
-        });
+        // Construir colección de Eloquent con todos los similares
+        $personasSimilares = collect();
+        foreach ($similaresQuery as $fila) {
+            $persona = Persona::find($fila->id);
+            $persona->simil_id = $fila->simil_id;
+            $personasSimilares->push($persona);
+        }
 
         // Personas sin nombre/apellido
         $personasSinNombreApellido = Persona::whereNull('nombre')
@@ -2148,8 +2148,8 @@ group by tecnico_id
         // Personas sin bandera
         $personasSinBandera = $personas->filter(function ($persona) {
             $nacionalidadSinAcentos = str_replace(
-                ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
-                ['a', 'e', 'i', 'o', 'u', 'n', 'A', 'E', 'I', 'O', 'U', 'N'],
+                ['á','é','í','ó','ú','ñ','Á','É','Í','Ó','Ú','Ñ'],
+                ['a','e','i','o','u','n','A','E','I','O','U','N'],
                 $persona->nacionalidad
             );
             $path = public_path('images/' . $nacionalidadSinAcentos . '.gif');
@@ -2166,7 +2166,8 @@ group by tecnico_id
         ]);
     }
 
-        public function verificarPersonas(Request $request)
+
+    public function verificarPersonas(Request $request)
         {
             set_time_limit(0); // Aumentamos tiempo solo para pruebas
             $verificados= ($request->query('verificados'))?1:0;
