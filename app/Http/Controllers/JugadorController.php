@@ -2096,7 +2096,7 @@ group by tecnico_id
         return $coincideApellido && $coincideNombre;
     }
 
-    public function verificarPersonas(Request $request)
+    public function verificarPersonas_new(Request $request)
     {
         set_time_limit(0); // Solo para pruebas
         $verificados = $request->query('verificados') ? 1 : 0;
@@ -2166,7 +2166,7 @@ group by tecnico_id
         ]);
     }
 
-        public function verificarPersonas_old(Request $request)
+        public function verificarPersonas(Request $request)
         {
             set_time_limit(0); // Aumentamos tiempo solo para pruebas
             $verificados= ($request->query('verificados'))?1:0;
@@ -2179,7 +2179,7 @@ group by tecnico_id
                 $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
             }*/
 
-            $personas = Persona::orderBy('apellido','ASC')->paginate(300);
+            $personas = Persona::orderBy('apellido','ASC')->paginate(1000);
 
             // Separar personas con y sin fecha de nacimiento
             /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
