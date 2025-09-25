@@ -2096,8 +2096,77 @@ group by tecnico_id
         return $coincideApellido && $coincideNombre;
     }
 
+    public function verificarPersonas(Request $request)
+    {
+        set_time_limit(0); // Solo para pruebas
+        $verificados = $request->query('verificados') ? 1 : 0;
+        $total = $request->query('total') ? 1 : 0;
 
-        public function verificarPersonas(Request $request)
+        // Traer solo personas sin verificar
+        $personasQuery = Persona::orderBy('apellido', 'ASC');
+        if (!$verificados) {
+            $personasQuery->where('verificado', false);
+        }
+
+        // Obtener personas para similares y paginar resultados
+        $personas = $personasQuery->paginate(50);
+
+        // --- Buscar similares de manera eficiente ---
+        $idsPersonas = $personas->pluck('id')->toArray();
+
+        // Usar join para traer similares de golpe
+        $personasSimilares = DB::table('personas as p1')
+            ->join('personas as p2', function ($join) use ($idsPersonas) {
+                $join->on('p1.id', '!=', 'p2.id')
+                    ->whereIn('p1.id', $idsPersonas);
+            })
+            ->whereRaw("p1.nombre LIKE CONCAT('%', p2.nombre, '%')")
+            ->whereRaw("p1.apellido LIKE CONCAT('%', p2.apellido, '%')")
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('personas_verificadas')
+                    ->whereRaw('(persona_id = p1.id AND simil_id = p2.id) OR (persona_id = p2.id AND simil_id = p1.id)');
+            })
+            ->select('p1.*', 'p2.id as simil_id')
+            ->get();
+
+        // Mapear resultado a colección de Personas con campo simil_id
+        $personasSimilares = $personasSimilares->map(function ($item) {
+            $persona = Persona::find($item->id);
+            $persona->simil_id = $item->simil_id;
+            return $persona;
+        });
+
+        // Personas sin nombre/apellido
+        $personasSinNombreApellido = Persona::whereNull('nombre')
+            ->orWhere('nombre', '')
+            ->orWhereNull('apellido')
+            ->orWhere('apellido', '')
+            ->orderBy('apellido', 'ASC')
+            ->get();
+
+        // Personas sin bandera
+        $personasSinBandera = $personas->filter(function ($persona) {
+            $nacionalidadSinAcentos = str_replace(
+                ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+                ['a', 'e', 'i', 'o', 'u', 'n', 'A', 'E', 'I', 'O', 'U', 'N'],
+                $persona->nacionalidad
+            );
+            $path = public_path('images/' . $nacionalidadSinAcentos . '.gif');
+            return !file_exists($path);
+        });
+
+        return view('jugadores.verificarPersona', [
+            'verificados' => $verificados,
+            'total' => $total,
+            'similaresNombreApellido' => $personasSimilares,
+            'personas' => $personas,
+            'personasSinNombreApellido' => $personasSinNombreApellido,
+            'personasSinBandera' => $personasSinBandera
+        ]);
+    }
+
+        public function verificarPersonas_old(Request $request)
         {
             set_time_limit(0); // Aumentamos tiempo solo para pruebas
             $verificados= ($request->query('verificados'))?1:0;
