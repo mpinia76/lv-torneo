@@ -12,7 +12,7 @@
                 {{-- Barra de búsqueda --}}
                 <form class="d-flex justify-content-center mb-4">
                     <input type="hidden" name="torneoId" value="{{ $torneo_id }}">
-                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="Buscar jugador"
+                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="Buscar técnico"
                            value="{{ request()->get('buscarpor', session('nombre_filtro_jugador')) }}" style="width: 250px;">
                     <button class="btn btn-success" type="submit">Buscar</button>
                 </form>
