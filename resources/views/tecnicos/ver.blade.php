@@ -93,27 +93,24 @@
         </div>
 
         {{-- Pestañas Técnico / Jugador --}}
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item">
-                <a class="nav-link active" id="tecnico-tab" data-toggle="tab" href="#tecnico" role="tab" aria-controls="tecnico" aria-selected="true">Técnico</a>
+        <ul class="nav nav-tabs mb-3" id="tecnicoTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tecnico-tab" data-bs-toggle="tab" data-bs-target="#tecnico" type="button" role="tab">Técnico</button>
             </li>
             @if(count($torneosJugador) > 0)
-                <li class="nav-item">
-                    <a class="nav-link" id="jugador-tab" data-toggle="tab" href="#jugador" role="tab" aria-controls="jugador" aria-selected="false">Jugador</a>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="jugador-tab" data-bs-toggle="tab" data-bs-target="#jugador" type="button" role="tab">Jugador</button>
                 </li>
             @endif
         </ul>
 
-        <div class="tab-content" id="myTabContent">
-            {{-- Técnico --}}
-            <div role="tabpanel" class="tab-pane active" id="tecnico">
-
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tecnico" role="tabpanel">
                 @include('tecnicos.tabla')
             </div>
 
-            {{-- Jugador --}}
             @if(count($torneosJugador) > 0)
-                <div role="tabpanel" class="tab-pane" id="jugador">
+                <div class="tab-pane fade" id="jugador" role="tabpanel">
                     @include('jugadores.tabla')
                 </div>
             @endif
