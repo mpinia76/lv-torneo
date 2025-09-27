@@ -102,7 +102,11 @@
                         <tbody>
                         @foreach($partidos as $partido)
                             <tr>
-                                <td>{{ $partido->nombreTorneo }} {{ $partido->year }}</td>
+                                <td>
+                                    @if($partido->escudoTorneo)
+                                        <img src="{{ url('images/'.$partido->escudoTorneo) }}" alt="Escudo {{ $partido->nombreTorneo }}" height="20" class="me-1">
+                                    @endif
+                                    {{ $partido->nombreTorneo }} {{ $partido->year }}</td>
                                 <td>
                                     @if(is_numeric($partido->numero))
                                         Fecha {{ $partido->numero }}

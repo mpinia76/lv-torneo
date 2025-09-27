@@ -852,6 +852,7 @@ group by tecnico_id
         $sqlPartidos = "
         SELECT DISTINCT
             torneos.nombre AS nombreTorneo,
+            torneos.escudo AS escudoTorneo,
             torneos.year,
             fechas.numero,
             partidos.dia,
