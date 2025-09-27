@@ -147,7 +147,7 @@
 
                 <ul class="nav nav-pills ms-3">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ route('fechas.ver', Session::get('codigoTorneo')) }}">Fixture</a>
+                        <a class="nav-link" href="{{ route('fechas.ver', array('torneoId' => Session::get('codigoTorneo'))) }}">Fixture</a>
                     </li>
                     @if(Session::has('sessionPosiciones'))
                         <li class="nav-item dropdown">
