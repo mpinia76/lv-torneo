@@ -44,9 +44,13 @@ class ArbitroController extends Controller
 
         }
 
+        // Página actual
+        $page = $request->get('page', session('arbitros_page', 1));
+        $request->session()->put('arbitros_page', $page);
+
         //$arbitros=Arbitro::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
-        $arbitros=Arbitro::SELECT('arbitros.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
+        $arbitros=Arbitro::SELECT('arbitros.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','arbitros.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate(15, ['*'], 'page', $page);
 
         return view('arbitros.index', compact('arbitros','arbitros'));
     }

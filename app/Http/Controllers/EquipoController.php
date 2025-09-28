@@ -43,7 +43,11 @@ class EquipoController extends Controller
 
         }
 
-        $equipos=Equipo::orwhere('nombre','like',"%$nombre%")->orWhere('siglas','like',"%$nombre%")->orWhere('socios','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,fundacion,CURDATE())'),'=',"$nombre")->orderBy('nombre','ASC')->paginate();
+        // Página actual
+        $page = $request->get('page', session('equipos_page', 1));
+        $request->session()->put('equipos_page', $page);
+
+        $equipos=Equipo::orwhere('nombre','like',"%$nombre%")->orWhere('siglas','like',"%$nombre%")->orWhere('socios','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,fundacion,CURDATE())'),'=',"$nombre")->orderBy('nombre','ASC')->paginate(15, ['*'], 'page', $page);
 
 
         //

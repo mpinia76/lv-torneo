@@ -52,10 +52,14 @@ class TecnicoController extends Controller
 
         }
 
+        // Página actual
+        $page = $request->get('page', session('tecnicos_page', 1));
+        $request->session()->put('tecnicos_page', $page);
+
         //$tecnicos=Tecnico::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
 
-        $tecnicos=Tecnico::SELECT('tecnicos.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
+        $tecnicos=Tecnico::SELECT('tecnicos.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.email','personas.foto')->Join('personas','personas.id','=','tecnicos.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate(15, ['*'], 'page', $page);
 
         return view('tecnicos.index', compact('tecnicos'));
     }

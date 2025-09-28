@@ -59,10 +59,15 @@ class JugadorController extends Controller
 
         }
 
+        // Página actual
+        $page = $request->get('page', session('jugadores_page', 1));
+        $request->session()->put('jugadores_page', $page);
+
 
         //$jugadores=Jugador::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
 
-        $jugadores=Jugador::SELECT('jugadors.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.ciudad','personas.nacionalidad','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->orderBy('nombre','ASC')->paginate();
+        $jugadores=Jugador::SELECT('jugadors.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.ciudad','personas.nacionalidad','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->orderBy('nombre','ASC')->paginate(15, ['*'], 'page', $page)
+            ->appends($data);
 
         //$jugadores=Jugador::where('persona_id','like',"%4914%")->paginate();
 

@@ -58,7 +58,11 @@ class TorneoController extends Controller
 
         }
 
-        $torneos1=Torneo::where('nombre','like',"%$nombre%")->orWhere('year','like',"%$nombre%")->orderBy('year','DESC')->orderBy('id','DESC')->paginate();
+        // Página actual
+        $page = $request->get('page', session('torneos_page', 1));
+        $request->session()->put('torneos_page', $page);
+
+        $torneos1=Torneo::where('nombre','like',"%$nombre%")->orWhere('year','like',"%$nombre%")->orderBy('year','DESC')->orderBy('id','DESC')->paginate(15, ['*'], 'page', $page);
 
         return view('torneos.index', compact('torneos1'));
     }
