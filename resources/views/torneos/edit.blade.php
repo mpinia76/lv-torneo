@@ -108,7 +108,7 @@
                 <th>Promedios</th>
                 <th>Acumulado</th>
                 <th>Penales</th>
-
+                <th>Clasificados</th>
                 <th><a href="#" class="addRowGrupo"><i class="glyphicon glyphicon-plus"></i></a></th>
 
                 </thead>
