@@ -322,7 +322,8 @@ class TorneoController extends Controller
                         'promedios'=>$promedios,
                         'acumulado'=>$acumulado,
                         'penales'=>$penales,
-                        'agrupacion'=>$request->agrupacionGrupo[$item]
+                        'agrupacion'=>$request->agrupacionGrupo[$item],
+                        'clasificados'=>$request->clasificadosGrupo[$item]
                     );
                     try {
                         if (!empty($request->grupo_id[$item])){

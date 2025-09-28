@@ -571,6 +571,7 @@
             '<td><input type="checkbox" name="promediosGrupo[]" value="'+$cant+'"></td>'+
             '<td><input type="checkbox" name="acumuladoGrupo[]" value="'+$cant+'"></td>'+
             '<td><input type="checkbox" name="penalesGrupo[]" value="'+$cant+'"></td>'+
+            '<td>'+'{{ Form::number('clasificadosGrupo[]', '',['class' => 'form-control', 'style' => 'width: 60px']) }}'+'</td>'+
             '<td><a href="#" class="btn btn-danger removeGrupo"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
         $('#cuerpoGrupo').append(tr);

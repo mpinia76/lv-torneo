@@ -133,6 +133,7 @@
                         <td>{{ Form::checkbox('promediosGrupo[]', $i,$grupo->promedios) }}</td>
                         <td>{{ Form::checkbox('acumuladoGrupo[]', $i,$grupo->acumulado) }}</td>
                         <td>{{ Form::checkbox('penalesGrupo[]', $i,$grupo->penales) }}</td>
+                        <td>{{ Form::number('clasificadosGrupo[]', $grupo->clasificados ?? 0, ['class' => 'form-control', 'style' => 'width: 60px']) }}</td>
 
 
                         <td><a href="#" class="btn btn-danger removeGrupo"><i class="glyphicon glyphicon-remove"></i></a></td>

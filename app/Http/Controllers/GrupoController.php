@@ -250,7 +250,13 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
 
                 $posiciones = DB::select(DB::raw($sql));
 
-                $arrPosiciones[$grupo->nombre]=$posiciones;
+                // Agregamos la cantidad de clasificados por grupo
+                $numClasificados = $grupo->clasificados ?? 0;
+
+                $arrPosiciones[$grupo->nombre] = [
+                    'equipos' => $posiciones,
+                    'clasificados' => $numClasificados,
+                ];
             }
 
         }
