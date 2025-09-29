@@ -4716,7 +4716,7 @@ return $string;
                                 //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                 //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                $html2 = $this->getHtmlContent($urlJugador);
+                                $html2 = HttpHelper::getHtmlContent($urlJugador);
 
                             }
                             catch (Exception $ex) {
@@ -4730,7 +4730,7 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                         //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = $this->getHtmlContent($urlJugador);
+                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
                                     }
 
                                 }
@@ -4746,7 +4746,7 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                         //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = $this->getHtmlContent($urlJugador);
+                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
                                     }
 
                                 }
@@ -4762,7 +4762,7 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                         //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = $this->getHtmlContent($urlJugador);
+                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
 
                                     }
 
@@ -5056,13 +5056,13 @@ return $string;
                                     //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                     //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                    $html2 = $this->getHtmlContent($urlJugador);
+                                    $html2 = HttpHelper::getHtmlContent($urlJugador);
                                     if (!$html2){
                                         $urlJugador = 'http://www.futbol360.com.ar/jugadores/'  .$nombre3;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
 
                                         //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = $this->getHtmlContent($urlJugador);
+                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
                                     }
 
                                 }
@@ -5154,7 +5154,7 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlCabeza, []);
 
                                         //$htmlCabeza = HtmlDomParser::file_get_html($urlCabeza, false, null, 0);
-                                        $htmlCabeza = $this->getHtmlContent($urlCabeza);
+                                        $htmlCabeza = HttpHelper::getHtmlContent($urlCabeza);
                                         //Log::channel('mi_log')->info('OJO!! URL cabeza: '.$htmlCabeza,[]);
 
                                         //$success .='Url cabeza: ' . $urlCabeza.'<br>';
@@ -5292,7 +5292,7 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlLibres, []);
 
                                         //$htmlLibre = HtmlDomParser::file_get_html($urlLibres, false, null, 0);
-                                        $htmlLibre = $this->getHtmlContent($urlLibres);
+                                        $htmlLibre = HttpHelper::getHtmlContent($urlLibres);
                                         //Log::channel('mi_log')->info('OJO!! URL Libre: '.$htmlLibre,[]);
 
                                         //$success .='Url tiro libre: ' . $urlLibres.'<br>';
@@ -5426,7 +5426,7 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! - '.$urlPenales, []);
 
                                         //$htmlPenal = HtmlDomParser::file_get_html($urlPenales, false, null, 0);
-                                        $htmlPenal = $this->getHtmlContent($urlPenales);
+                                        $htmlPenal = HttpHelper::getHtmlContent($urlPenales);
                                         //Log::channel('mi_log')->info('OJO!! URL Penal: '.$htmlPenal,[]);
 
                                         //$success .='Url penal: ' . $urlPenales.'<br>';
