@@ -66,7 +66,7 @@ class FechaController extends Controller
         $grupo=Grupo::findOrFail($grupo_id);
 
 
-        $fechas=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','like',"%$nombre%")->orderBy('numero','ASC')->get();
+        $fechas=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','like',"%$nombre%")->orderBy('orden','ASC')->get();
 
         //dd($fechas);
 
