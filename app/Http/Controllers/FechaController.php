@@ -5289,7 +5289,7 @@ return $string;
                                     }
                                     try {
                                         $urlLibres = 'http://www.futbol360.com.ar/detalles/matches-goals.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=free_shot';
-                                        Log::channel('mi_log')->info('OJO!!! - '.$urlLibres, []);
+                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlLibres, []);
 
                                         //$htmlLibre = HtmlDomParser::file_get_html($urlLibres, false, null, 0);
                                         $htmlLibre = HttpHelper::getHtmlContent($urlLibres);
@@ -5303,6 +5303,7 @@ return $string;
                                         $htmlLibre='';
                                     }
                                     if ($htmlLibre){
+
                                         // Crear un nuevo DOMDocument y cargar el HTML
                                         $dom = new \DOMDocument();
                                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
@@ -5326,6 +5327,7 @@ return $string;
                                                 foreach ($rows as $row) {
                                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                                     if (trim($row->textContent) != 'No hay resultados') {
+                                                        Log::channel('mi_log')->info('OJO!! URL Libre: '.$htmlLibre,[]);
                                                         // Buscar los encabezados de la fila (th)
                                                         $headerCells = $xpath->query('.//th', $row);
 
