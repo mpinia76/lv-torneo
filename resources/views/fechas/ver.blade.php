@@ -18,15 +18,17 @@
                                 ⬅ Anterior
                             </button>
 
-                            {{-- Mostrar fecha actual --}}
-                            <input type="text"
-                                   readonly
-                                   class="form-control form-control-sm text-center fw-bold"
-                                   style="max-width: 200px;"
-                                   value="{{ is_numeric($fecha->numero) ? 'Fecha ' . $fecha->numero : $fecha->numero }}">
+                            {{-- Select para elegir fecha directamente --}}
+                            <select id="fechaSelect" class="form-control form-control-sm text-center fw-bold" style="max-width: 200px;" onchange="seleccionarFecha()">
+                                @foreach($fechas as $f)
+                                    <option value="{{ $f->orden }}" {{ $f->orden === $fecha->orden ? 'selected' : '' }}>
+                                        {{ is_numeric($f->numero) ? 'Fecha ' . $f->numero : $f->numero }}
+                                    </option>
+                                @endforeach
+                            </select>
 
                             {{-- Campo oculto que viaja en el form --}}
-                            <input type="hidden" id="fechaNumero" name="fechaNumero" value="{{ $fecha->numero }}">
+                            <input type="hidden" id="fechaOrden" name="fechaOrden" value="{{ $fecha->orden }}">
                             <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
 
                             {{-- Botón Siguiente --}}
@@ -46,9 +48,9 @@
                             use Carbon\Carbon;
                             $lastDate = null;
                             $lastFecha = null;
-                            // Array de todos los números disponibles
-                            $fechasArray = $fechas->pluck('numero')->toArray();
-                            $indiceActual = array_search($fecha->numero, $fechasArray);
+                            // Array de todos los órdenes disponibles
+                            $fechasArray = $fechas->pluck('orden')->toArray();
+                            $indiceActual = array_search($fecha->orden, $fechasArray);
                         @endphp
 
                         @foreach($partidosAgrupados as $partidos)
@@ -123,7 +125,7 @@
 
     {{-- Scripts --}}
     <script>
-        const fechasDisponibles = @json($fechas->pluck('numero'));
+        const fechasDisponibles = @json($fechas->pluck('orden'));
         let indiceActual = {{ $indiceActual }};
 
         function cambiarFecha(direccion) {
@@ -131,7 +133,12 @@
             if (indiceActual < 0) indiceActual = 0;
             if (indiceActual >= fechasDisponibles.length) indiceActual = fechasDisponibles.length - 1;
 
-            document.getElementById('fechaNumero').value = fechasDisponibles[indiceActual];
+            document.getElementById('fechaOrden').value = fechasDisponibles[indiceActual];
+            document.getElementById('formFechas').submit();
+        }
+        function seleccionarFecha() {
+            const selected = document.getElementById('fechaSelect').value;
+            document.getElementById('fechaOrden').value = selected;
             document.getElementById('formFechas').submit();
         }
     </script>

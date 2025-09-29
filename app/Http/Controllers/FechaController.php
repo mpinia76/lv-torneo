@@ -6045,85 +6045,86 @@ return $string;
      */
     public function ver(Request $request)
     {
-
-        if($request->query('torneoId')) {
+        // Buscar torneo
+        if ($request->query('torneoId')) {
             $torneo_id = $request->query('torneoId');
             $torneo = Torneo::findOrFail($torneo_id);
-        }
-        else{
-            $torneo=Torneo::orderBy('year','DESC')->first();
+        } else {
+            $torneo = Torneo::orderBy('year', 'DESC')->first();
             $torneo_id = $torneo->id;
         }
 
-        $request->session()->put('nombreTorneo', $torneo->nombre.' '.$torneo->year);
+        // Guardar info del torneo en sesión
+        $request->session()->put('nombreTorneo', $torneo->nombre . ' ' . $torneo->year);
         $request->session()->put('escudoTorneo', $torneo->escudo);
         $request->session()->put('codigoTorneo', $torneo_id);
 
-        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
-        $request->session()->forget('sessionAcumulado');
-        $request->session()->forget('sessionPosiciones');
-        $request->session()->forget('sessionPromedios');
-        $request->session()->forget('sessionPaenza');
-        $arrgrupos='';
-        foreach ($grupos as $grupo){
+        $grupos = Grupo::where('torneo_id', $torneo_id)->get();
 
-            if ($grupo->acumulado){
-                $request->session()->put('sessionAcumulado',1);
+        // Limpiar sesiones
+        $request->session()->forget(['sessionAcumulado', 'sessionPosiciones', 'sessionPromedios', 'sessionPaenza']);
+
+        $arrgrupos = '';
+        foreach ($grupos as $grupo) {
+            if ($grupo->acumulado) {
+                $request->session()->put('sessionAcumulado', 1);
             }
-            if ($grupo->posiciones){
-                $request->session()->put('sessionPosiciones',1);
-                if(count($grupos)==1){
-                    $request->session()->put('sessionPaenza',1);
+            if ($grupo->posiciones) {
+                $request->session()->put('sessionPosiciones', 1);
+                if (count($grupos) == 1) {
+                    $request->session()->put('sessionPaenza', 1);
                 }
             }
-            if ($grupo->promedios){
-                $request->session()->put('sessionPromedios',1);
+            if ($grupo->promedios) {
+                $request->session()->put('sessionPromedios', 1);
             }
-            $arrgrupos .=$grupo->id.',';
+            $arrgrupos .= $grupo->id . ',';
         }
 
-        $fechaNumero= $request->query('fechaNumero');
+        // 🚀 Cambiamos numero por orden
+        $fechaOrden = $request->query('fechaOrden');
 
-        if (empty($fechaNumero)){
-            //$fechaNumero = '01';
-            $ultimaFecha=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','desc')->get();
-            $fechaNumero = $ultimaFecha[0]->numero;
+        if (empty($fechaOrden)) {
+            $ultimaFecha = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
+                ->orderBy('orden', 'desc')
+                ->orderBy('id', 'desc')
+                ->first();
+            $fechaOrden = $ultimaFecha->orden;
         }
 
-        $fechas=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->where('numero','=',$fechaNumero)->get();
-        $arrfechas='';
-        foreach ($fechas as $fecha){
-            $arrfechas .=$fecha->id.',';
-        }
-        $partidos=Partido::wherein('fecha_id',explode(',', $arrfechas))->orderBy('dia','ASC')->get();
+        $fechas = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
+            ->where('orden', '=', $fechaOrden)
+            ->get();
+
+        $fecha = $fechas->first(); // La fecha actual
+
+        // Partidos de esta fecha
+        $arrfechas = $fechas->pluck('id')->toArray();
+        $partidos = Partido::whereIn('fecha_id', $arrfechas)
+            ->orderBy('dia', 'ASC')
+            ->get();
 
         // Agrupar partidos por eliminatoria
         $partidosAgrupados = $partidos->groupBy(function ($partido) {
             return min($partido->equipol_id, $partido->equipov_id) . '-' . max($partido->equipol_id, $partido->equipov_id);
         });
 
-
-        //$fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','DESC')->get();
-
-        $fechas = Fecha::select('numero', 'orden')
+        // Todas las fechas disponibles del torneo (para la navegación)
+        $fechas = Fecha::select('orden', 'numero')
             ->distinct()
             ->whereIn('grupo_id', explode(',', $arrgrupos))
-            ->orderBy('orden', 'DESC')
-            ->orderBy('id','DESC')
+            ->orderBy('orden', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
-
 
         // Determinar si hay partidos de ida y vuelta
         $hayIdaVuelta = $partidosAgrupados->contains(function ($partidos) {
             return $partidos->count() > 1;
         });
 
-        //dd($fechas);
-
-        //print_r($fechas);
-
-        return view('fechas.ver', compact('fechas','torneo','partidos','fecha','partidosAgrupados','hayIdaVuelta'));
+        return view('fechas.ver', compact('fechas', 'torneo', 'partidos', 'fecha', 'partidosAgrupados', 'hayIdaVuelta'));
     }
+
 
     /**
      * Display a listing of the resource.
