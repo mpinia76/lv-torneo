@@ -13,6 +13,7 @@ use App\Incidencia;
 use App\Jugador;
 use App\Partido;
 use App\PartidoArbitro;
+use App\Penal;
 use App\Plantilla;
 use App\PlantillaJugador;
 use App\PartidoTecnico;
@@ -4690,6 +4691,7 @@ return $string;
                     $success .='<span style="color:cyan">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre.' - '.$fecha->numero.'</span><br>';
                     $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
                     $jugadorGolArray = array();
+                    $jugadorPenalArray = array();
                     foreach ($goles as $gol) {
                         //Log::channel('mi_log')->info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
                         //$success .='Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto.'<br>';
@@ -5283,7 +5285,416 @@ return $string;
                                         //Log::channel('mi_log')->info('OJO!!! No se econtró la URL de penales' , []);
                                         $success .='<span style="color:red">No se econtró la URL de penales '.$urlPenales.'</span><br>';
                                     }
+                                    try {
+                                        $urlErrados = 'http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=penal_failed';
+                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlPenales, []);
+
+                                        //$htmlPenal = HtmlDomParser::file_get_html($urlPenales, false, null, 0);
+                                        $htmlErrado = HttpHelper::getHtmlContent($urlErrados);
+                                        //Log::channel('mi_log')->info('OJO!! URL Penal: '.$htmlErrado,[]);
+
+                                        //$success .='Url penal: ' . $urlPenales.'<br>';
+
+
+                                    }
+                                    catch (Exception $ex) {
+                                        $htmlErrado='';
+                                    }
+                                    if ($htmlErrado){
+                                        // Crear un nuevo DOMDocument y cargar el HTML
+                                        $dom = new \DOMDocument();
+                                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                                        $dom->loadHTML($htmlErrado);
+                                        libxml_clear_errors();
+
+                                        // Crear un nuevo objeto XPath
+                                        $xpath = new \DOMXPath($dom);
+
+                                        // Buscar el div con id 'matchesTable'
+                                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+
+                                        foreach ($matchesTableNodes as $div) {
+                                            // Buscar las tablas con clase 'tableStandard'
+                                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                                            foreach ($tables as $table) {
+                                                // Buscar las filas de la tabla
+                                                $rows = $xpath->query('.//tr', $table);
+
+                                                foreach ($rows as $row) {
+                                                    // Verificar que el contenido de la fila no sea "No hay resultados"
+                                                    if (trim($row->textContent) != 'No hay resultados') {
+                                                        // Buscar los encabezados de la fila (th)
+                                                        $headerCells = $xpath->query('.//th', $row);
+
+                                                        foreach ($headerCells as $th) {
+                                                            // Buscar los enlaces dentro del th
+                                                            $links = $xpath->query('.//a', $th);
+
+                                                            foreach ($links as $link) {
+                                                                $urlEncontrada = 0;
+                                                                $href = $link->getAttribute('href');
+                                                                //Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
+                                                                // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
+                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
+                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
+                                                                        // Comparar las posibles combinaciones de URLs
+                                                                        //Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/', []);
+                                                                        if ((
+                                                                                strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFecha . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaIda . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaA . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaB . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaC . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaD . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaE . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaF . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )
+
+                                                                        ) {
+                                                                            $urlEncontrada = 1;
+                                                                            //Log::channel('mi_log')->info('OJO!! encontró gol de penal: ' . $href, []);
+                                                                            $success .='<span style="color:green">Encontró penal errado: ' . $href.'</span><br>';
+
+                                                                            // Crear el array de datos para el jugador y el gol
+                                                                            $data3 = array(
+                                                                                'partido_id' => $partido->id,
+                                                                                'jugador_id' => $gol->jugador->id,
+                                                                                'minuto' => $gol->minuto,
+                                                                                'tipo' => 'Errado',
+                                                                                'url' => $urlErrados,
+                                                                            );
+                                                                            $jugadorPenalArray[$gol->jugador->id][] = $data3;
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                // Si no se encontró la URL, registrar en el log
+                                                                if (!$urlEncontrada) {
+                                                                    //Log::channel('mi_log')->info('no está penal: ' . $href, []);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else{
+                                        fputcsv($handle, [
+
+                                            utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                            utf8_decode($fecha->numero),
+                                            utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                            utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                            utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                            utf8_decode('No se econtró la URL de penales'),
+                                            $urlPenales
+                                        ], "|");
+                                        //Log::channel('mi_log')->info('OJO!!! No se econtró la URL de penales' , []);
+                                        $success .='<span style="color:red">No se econtró la URL de penales '.$urlPenales.'</span><br>';
+                                    }
+                                    try {
+                                        $urlAtajados = 'http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=penal_stopped';
+                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlPenales, []);
+
+                                        //$htmlPenal = HtmlDomParser::file_get_html($urlPenales, false, null, 0);
+                                        $htmlAtajado = HttpHelper::getHtmlContent($urlAtajados);
+                                        //Log::channel('mi_log')->info('OJO!! URL Penal: '.$htmlAtajado,[]);
+
+                                        //$success .='Url penal: ' . $urlPenales.'<br>';
+
+
+                                    }
+                                    catch (Exception $ex) {
+                                        $htmlAtajado='';
+                                    }
+                                    if ($htmlAtajado){
+                                        // Crear un nuevo DOMDocument y cargar el HTML
+                                        $dom = new \DOMDocument();
+                                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                                        $dom->loadHTML($htmlAtajado);
+                                        libxml_clear_errors();
+
+                                        // Crear un nuevo objeto XPath
+                                        $xpath = new \DOMXPath($dom);
+
+                                        // Buscar el div con id 'matchesTable'
+                                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+
+                                        foreach ($matchesTableNodes as $div) {
+                                            // Buscar las tablas con clase 'tableStandard'
+                                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                                            foreach ($tables as $table) {
+                                                // Buscar las filas de la tabla
+                                                $rows = $xpath->query('.//tr', $table);
+
+                                                foreach ($rows as $row) {
+                                                    // Verificar que el contenido de la fila no sea "No hay resultados"
+                                                    if (trim($row->textContent) != 'No hay resultados') {
+                                                        // Buscar los encabezados de la fila (th)
+                                                        $headerCells = $xpath->query('.//th', $row);
+
+                                                        foreach ($headerCells as $th) {
+                                                            // Buscar los enlaces dentro del th
+                                                            $links = $xpath->query('.//a', $th);
+
+                                                            foreach ($links as $link) {
+                                                                $urlEncontrada = 0;
+                                                                $href = $link->getAttribute('href');
+                                                                //Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
+                                                                // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
+                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
+                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
+                                                                        // Comparar las posibles combinaciones de URLs
+                                                                        //Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/', []);
+                                                                        if ((
+                                                                                strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFecha . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaIda . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaA . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaB . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaC . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaD . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaE . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaF . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )
+
+                                                                        ) {
+                                                                            $urlEncontrada = 1;
+                                                                            //Log::channel('mi_log')->info('OJO!! encontró gol de penal: ' . $href, []);
+                                                                            $success .='<span style="color:green">Encontró penal atajado: ' . $href.'</span><br>';
+
+                                                                            // Crear el array de datos para el jugador y el gol
+                                                                            $data3 = array(
+                                                                                'partido_id' => $partido->id,
+                                                                                'jugador_id' => $gol->jugador->id,
+                                                                                'minuto' => $gol->minuto,
+                                                                                'tipo' => 'Atajado',
+                                                                                'url' => $urlAtajados,
+                                                                            );
+                                                                            $jugadorPenalArray[$gol->jugador->id][] = $data3;
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                // Si no se encontró la URL, registrar en el log
+                                                                if (!$urlEncontrada) {
+                                                                    //Log::channel('mi_log')->info('no está penal: ' . $href, []);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else{
+                                        fputcsv($handle, [
+
+                                            utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                            utf8_decode($fecha->numero),
+                                            utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                            utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                            utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                            utf8_decode('No se econtró la URL de penales'),
+                                            $urlPenales
+                                        ], "|");
+                                        //Log::channel('mi_log')->info('OJO!!! No se econtró la URL de penales' , []);
+                                        $success .='<span style="color:red">No se econtró la URL de penales '.$urlPenales.'</span><br>';
+                                    }
+                                    try {
+                                        $urlAtajo = 'http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id='.$id_jugador.'&id_team_for='.$this->dameIdEquipoURL($juegaEn).'&id_team_against='.$this->dameIdEquipoURL($juegaContra).'&id_season=0&search_category=penal_stopped';
+                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlPenales, []);
+
+                                        //$htmlPenal = HtmlDomParser::file_get_html($urlPenales, false, null, 0);
+                                        $htmlAtajo = HttpHelper::getHtmlContent($urlAtajo);
+                                        //Log::channel('mi_log')->info('OJO!! URL Penal: '.$htmlAtajo,[]);
+
+                                        //$success .='Url penal: ' . $urlPenales.'<br>';
+
+
+                                    }
+                                    catch (Exception $ex) {
+                                        $htmlAtajo='';
+                                    }
+                                    if ($htmlAtajo){
+                                        // Crear un nuevo DOMDocument y cargar el HTML
+                                        $dom = new \DOMDocument();
+                                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                                        $dom->loadHTML($htmlAtajo);
+                                        libxml_clear_errors();
+
+                                        // Crear un nuevo objeto XPath
+                                        $xpath = new \DOMXPath($dom);
+
+                                        // Buscar el div con id 'matchesTable'
+                                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+
+                                        foreach ($matchesTableNodes as $div) {
+                                            // Buscar las tablas con clase 'tableStandard'
+                                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                                            foreach ($tables as $table) {
+                                                // Buscar las filas de la tabla
+                                                $rows = $xpath->query('.//tr', $table);
+
+                                                foreach ($rows as $row) {
+                                                    // Verificar que el contenido de la fila no sea "No hay resultados"
+                                                    if (trim($row->textContent) != 'No hay resultados') {
+                                                        // Buscar los encabezados de la fila (th)
+                                                        $headerCells = $xpath->query('.//th', $row);
+
+                                                        foreach ($headerCells as $th) {
+                                                            // Buscar los enlaces dentro del th
+                                                            $links = $xpath->query('.//a', $th);
+
+                                                            foreach ($links as $link) {
+                                                                $urlEncontrada = 0;
+                                                                $href = $link->getAttribute('href');
+                                                                //Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
+                                                                // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
+                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
+                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
+                                                                        // Comparar las posibles combinaciones de URLs
+                                                                        //Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/', []);
+                                                                        if ((
+                                                                                strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFecha . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaIda . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaA . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaB . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaC . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaD . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaE . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+                                                                            )||(
+                                                                                strpos($href, $strTorneoFechaF . '/' . $visitante3 . '-' . $local3 . '/') !== false
+                                                                            )
+
+                                                                        ) {
+                                                                            $urlEncontrada = 1;
+                                                                            //Log::channel('mi_log')->info('OJO!! encontró gol de penal: ' . $href, []);
+                                                                            $success .='<span style="color:green">Encontró penal que atejó: ' . $href.'</span><br>';
+
+                                                                            // Crear el array de datos para el jugador y el gol
+                                                                            $data3 = array(
+                                                                                'partido_id' => $partido->id,
+                                                                                'jugador_id' => $gol->jugador->id,
+                                                                                'minuto' => $gol->minuto,
+                                                                                'tipo' => 'Atajó',
+                                                                                'url' => $urlAtajo,
+                                                                            );
+                                                                            $jugadorPenalArray[$gol->jugador->id][] = $data3;
+                                                                        }
+                                                                    }
+                                                                }
+
+                                                                // Si no se encontró la URL, registrar en el log
+                                                                if (!$urlEncontrada) {
+                                                                    //Log::channel('mi_log')->info('no está penal: ' . $href, []);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else{
+                                        fputcsv($handle, [
+
+                                            utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                            utf8_decode($fecha->numero),
+                                            utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                            utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
+                                            utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                            utf8_decode('No se econtró la URL de penales'),
+                                            $urlPenales
+                                        ], "|");
+                                        //Log::channel('mi_log')->info('OJO!!! No se econtró la URL de penales' , []);
+                                        $success .='<span style="color:red">No se econtró la URL de penales '.$urlPenales.'</span><br>';
+                                    }
                                 }
+
                                 else{
                                     $success .= '<span style="color:red">No se econtró la URL del jugador '.$gol->jugador->persona->nombre.' '.$gol->jugador->persona->apellido.'</span><br>';
                                 }
@@ -5379,6 +5790,46 @@ return $string;
                         }
 
                     }
+                    foreach ($jugadorPenalArray as $jugadorId => $items) {
+                        $jugador = Jugador::findOrFail($jugadorId);
+
+                        foreach ($items as $item) { // en caso de varios penales por jugador
+                            $partidoId = $item['partido_id'];
+                            $minuto     = $item['minuto'];
+                            $tipo       = $item['tipo'];
+
+                            // Buscar penal existente
+                            $penalExistente = Penal::where('partido_id', $partidoId)
+                                ->where('jugador_id', $jugadorId)
+                                ->where('minuto', $minuto)
+                                ->first();
+
+                            if ($penalExistente) {
+                                // Ya existe, no hacemos nada
+                                continue;
+                            }
+
+                            // No existe, creamos
+                            Penal::create([
+                                'partido_id' => $partidoId,
+                                'jugador_id' => $jugadorId,
+                                'minuto'     => $minuto,
+                                'tipo'       => $tipo,
+                            ]);
+
+                            // Escribir en CSV
+                            fputcsv($handle, [
+                                utf8_decode($grupo->torneo->nombre.' '.$grupo->torneo->year),
+                                utf8_decode($fecha->numero),
+                                utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
+                                utf8_decode($jugador->persona->nombre.' - '.$jugador->persona->apellido),
+                                utf8_decode($tipo.' - '.$minuto),
+                                utf8_decode('Penal agregado'),
+                                $item['url']
+                            ], "|");
+                        }
+                    }
+
                 }
 
             }
