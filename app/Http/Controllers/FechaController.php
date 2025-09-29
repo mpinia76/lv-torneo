@@ -4647,7 +4647,7 @@ return $string;
         $downloadLink = '<a href="'.asset($filename).'" download>Descargar CSV</a><br>';
 
 // Agregar el link de descarga a $success
-        $success = '<span style="color:yellow">El archivo CSV ha sido generado. ' . $downloadLink.'</span>';
+        $success = '<span style="color:cyan">El archivo CSV ha sido generado. ' . $downloadLink.'</span>';
 
         /*$fecha=Fecha::findOrFail($id);
 
@@ -4687,7 +4687,7 @@ return $string;
                     $golesLocales = $partido->golesl;
                     $golesVisitantes = $partido->golesv;
                     //Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
-                    $success .='<span style="color:yellow">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre.' - '.$fecha->numero.'</span><br>';
+                    $success .='<span style="color:cyan">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre.' - '.$fecha->numero.'</span><br>';
                     $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
                     $jugadorGolArray = array();
                     foreach ($goles as $gol) {
