@@ -5303,7 +5303,6 @@ return $string;
                                         $htmlLibre='';
                                     }
                                     if ($htmlLibre){
-
                                         // Crear un nuevo DOMDocument y cargar el HTML
                                         $dom = new \DOMDocument();
                                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
@@ -5327,7 +5326,6 @@ return $string;
                                                 foreach ($rows as $row) {
                                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                                     if (trim($row->textContent) != 'No hay resultados') {
-                                                        //Log::channel('mi_log')->info('OJO!! URL Libre: '.$htmlLibre,[]);
                                                         // Buscar los encabezados de la fila (th)
                                                         $headerCells = $xpath->query('.//th', $row);
 
@@ -5338,12 +5336,11 @@ return $string;
                                                             foreach ($links as $link) {
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
-                                                                Log::channel('mi_log')->info('OJO!! URL Libre: '.$href,[]);
+
                                                                 // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
                                                                 foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
                                                                     foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
                                                                         // Comparar las posibles combinaciones de URLs
-                                                                        Log::channel('mi_log')->info('Torneo: '.$strTorneoFecha.' - Local: '.$local3.' - Visitante: '.$visitante3,[]);
                                                                         if ((
                                                                                 strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
                                                                             )||(
