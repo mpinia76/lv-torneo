@@ -249,7 +249,12 @@ class FechaController extends Controller
         $fecha=fecha::find($id);
         $ok=1;
         try {
-            $fecha->update($request->all());
+            $fecha->update([
+                'numero'     => $request->numero,
+                'grupo_id'   => $request->grupo_id,
+                'url_nombre' => $request->url_nombre,
+                'orden'      => $request->orden_fecha, // 👈 distinto nombre
+            ]);
             //Partido::where('fecha_id', '=', "$id")->delete();
             if (is_array($request->fecha) && count($request->fecha) > 0)
             {
@@ -6098,7 +6103,15 @@ return $string;
         });
 
 
-        $fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','DESC')->get();
+        //$fechas=Fecha::select('numero')->distinct()->wherein('grupo_id',explode(',', $arrgrupos))->orderBy('id','DESC')->get();
+
+        $fechas = Fecha::select('numero', 'orden')
+            ->distinct()
+            ->whereIn('grupo_id', explode(',', $arrgrupos))
+            ->orderBy('orden', 'DESC')
+            ->orderBy('id','DESC')
+            ->get();
+
 
         // Determinar si hay partidos de ida y vuelta
         $hayIdaVuelta = $partidosAgrupados->contains(function ($partidos) {

@@ -32,6 +32,10 @@
                 {{Form::text('numero', $fecha->numero, ['class' => 'form-control'])}}
                 {{Form::hidden('grupo_id', (isset($_GET['grupoId']))?$_GET['grupoId']:$fecha->grupo->id )}}
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('orden_fecha', 'Orden') }}
+                {{ Form::number('orden_fecha', $fecha->orden, ['class' => 'form-control']) }}
+            </div>
             <div class="form-group col-md-12">
                 <h1 class="display-6">Partidos</h1>
                 <table class="table">
