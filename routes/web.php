@@ -87,6 +87,7 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('importincidenciasfecha', 'FechaController@importincidenciasfecha')->name('fechas.importincidenciasfecha');
     Route::get('importgolesfecha', 'FechaController@importgolesfecha')->name('fechas.importgolesfecha');
+    Route::get('importpenalesfecha', 'FechaController@importpenalesfecha')->name('fechas.importpenalesfecha');
     Route::get('controlarbitrosfecha', 'FechaController@controlarbitrosfecha')->name('fechas.controlarbitrosfecha');
 
     Route::get('finalizar', 'TorneoController@finalizar')->name('torneos.finalizar');

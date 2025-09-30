@@ -4604,6 +4604,16 @@ $string
 
 return $string;
 }
+
+    public function importpenalesfecha(Request $request)
+    {
+        set_time_limit(0);
+        //Log::channel('mi_log')->info('Entraaaaaa', []);
+
+        $grupo_id = $request->get('grupoId');
+
+        $grupo = Grupo::findOrFail($grupo_id);
+    }
     public function importgolesfecha(Request $request)
     {
         set_time_limit(0);
