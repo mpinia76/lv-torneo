@@ -4605,15 +4605,700 @@ $string
 return $string;
 }
 
-    public function importpenalesfecha(Request $request)
-    {
-        set_time_limit(0);
-        //Log::channel('mi_log')->info('Entraaaaaa', []);
+private function normalizarMinuto(string $texto): int
+{
+    $texto = trim($texto);
 
-        $grupo_id = $request->get('grupoId');
+    preg_match('/(\d+)/', $texto, $matches);
 
-        $grupo = Grupo::findOrFail($grupo_id);
+    if (!isset($matches[1])) {
+        return 0;
     }
+
+    $minuto = (int)$matches[1];
+
+    // Segundo tiempo
+    if (stripos($texto, 'st') !== false || stripos($texto, '2T') !== false) {
+        $minuto += 45;
+    }
+
+    // Tiempo extra (ej. 45+2)
+    if (preg_match('/(\d+)\+(\d+)/', $texto, $extra)) {
+        $minuto = (int)$extra[1] + (int)$extra[2];
+    }
+
+    return $minuto;
+}
+
+public function importpenalesfecha(Request $request)
+{
+    set_time_limit(0);
+
+    $grupo_id = $request->get('grupoId');
+    $grupo = Grupo::findOrFail($grupo_id);
+
+    $plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
+    $ok=1;
+    $error='';
+    $success='';
+    $jugadorPenalArray = array();
+    foreach ($plantillas as $plantilla) {
+        foreach ($plantilla->jugadores as $plantilla_jugador) {
+            $jugador = $plantilla_jugador->jugador;
+            /*$juegaEn = $plantilla->equipo->nombre;
+            $equipo_idexterno = $this->dameIdEquipoURL($juegaEn) ;*/
+            $arrayNombre = explode(' ', $jugador->persona->nombre);
+            $arrayApellido = explode(' ', $jugador->persona->apellido);
+            $nombre = $arrayNombre[0];
+            $apellido = $arrayApellido[0];
+            $nombre2 = '';
+            if (count($arrayNombre) > 1) {
+                $nombre2 = $arrayNombre[1];
+            }
+            $apellido2 = '';
+            if (count($arrayApellido) > 1) {
+                $apellido2 = $arrayApellido[1];
+            }
+            try {
+                $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre));
+                //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                $html2 = HttpHelper::getHtmlContent($urlJugador);
+
+            } catch (Exception $ex) {
+
+                $html2 = '';
+            }
+            if (!$html2) {
+                try {
+                    if ($nombre2) {
+                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2));
+                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                        $html2 = HttpHelper::getHtmlContent($urlJugador);
+                    }
+
+                } catch (Exception $ex) {
+
+                    $html2 = '';
+                }
+            }
+            if (!$html2) {
+                try {
+                    if ($nombre2) {
+                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2));
+                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                        $html2 = HttpHelper::getHtmlContent($urlJugador);
+                    }
+
+                } catch (Exception $ex) {
+
+                    $html2 = '';
+                }
+            }
+            if (!$html2) {
+                try {
+                    if ($apellido2) {
+                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre));
+                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                        $html2 = HttpHelper::getHtmlContent($urlJugador);
+
+                    }
+
+
+                } catch (Exception $ex) {
+
+                    $html2 = '';
+                }
+            }
+            if (!$html2) {
+                try {
+
+                    $nombre3 = $jugador->url_nombre;
+                    $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->nacionalidad))) . '/' . $nombre3;
+                    //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                    //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                    $html2 = HttpHelper::getHtmlContent($urlJugador);
+                    if (!$html2) {
+                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . $nombre3;
+                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+
+                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
+                        $html2 = HttpHelper::getHtmlContent($urlJugador);
+                    }
+
+                } catch (Exception $ex) {
+
+                    $html2 = '';
+                }
+            }
+            if ($html2) {
+                // Crear un nuevo DOMDocument y cargar el HTML
+                $dom = new \DOMDocument();
+                libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                $dom->loadHTML($html2);
+                libxml_clear_errors();
+
+                // Crear un nuevo objeto XPath
+                $xpath = new \DOMXPath($dom);
+
+                // Intentar encontrar el id_jugador dentro de los <script>
+                $id_jugador = '';
+                $scriptNodes = $xpath->query('//script');
+
+                foreach ($scriptNodes as $script) {
+                    if (strpos($script->textContent, 'id_player:') !== false) {
+                        $script_array = explode('id_player', $script->textContent);
+                        $id_jugador = trim(str_replace(':', '', explode('}', $script_array[1])[0]));
+                        //Log::channel('mi_log')->info('OJO!! Id jugador: ' . $id_jugador, []);
+                        //$success .='Id jugador: ' . $id_jugador.'<br>';
+                        break;
+                    }
+                }
+
+                // Si no se encontró en los scripts, buscar en la clase playerStats
+                if (!$id_jugador) {
+                    // Buscar el div con clase 'playerStats'
+                    $playerStatsNodes = $xpath->query('//div[contains(@class, "playerStats")]');
+
+                    foreach ($playerStatsNodes as $div) {
+                        // Buscar las tablas dentro del div
+                        $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                        foreach ($tables as $table) {
+                            // Buscar las filas dentro de la tabla
+                            $rows = $xpath->query('.//tr', $table);
+
+                            foreach ($rows as $row) {
+                                // Buscar las celdas dentro de las filas
+                                $cells = $xpath->query('.//td', $row);
+
+                                foreach ($cells as $cell) {
+                                    // Buscar los enlaces dentro de las celdas
+                                    $links = $xpath->query('.//a[contains(@href, "item=player&id=")]', $cell);
+
+                                    foreach ($links as $link) {
+                                        $href = $link->getAttribute('href');
+                                        if (strpos($href, 'item=player&id=') !== false) {
+                                            $arrIdJugador = explode('item=player&id=', $href);
+                                            $id_jugador = intval($arrIdJugador[1]);
+                                            //Log::channel('mi_log')->info('OJO!! ALT Id jugador: ' . $id_jugador, []);
+                                            //$success .='ALT Id jugador: ' . $id_jugador.'<br>';
+                                            break 4; // Salir de los bucles anidados
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if ($id_jugador) {
+
+
+                    try {
+
+                        $urlErrado = "http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id={$id_jugador}&id_team=0&id_season=0&search_category=penal_failed";
+
+                        $htmlErrado = HttpHelper::getHtmlContent($urlErrado);
+
+
+                    } catch (Exception $ex) {
+                        $htmlErrado = '';
+                    }
+                    if ($htmlErrado) {
+
+                        // Crear un nuevo DOMDocument y cargar el HTML
+                        $dom = new \DOMDocument();
+                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                        $dom->loadHTML($htmlErrado);
+                        libxml_clear_errors();
+
+                        // Crear un nuevo objeto XPath
+                        $xpath = new \DOMXPath($dom);
+
+                        // Buscar el div con id 'matchesTable'
+                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+
+                        foreach ($matchesTableNodes as $div) {
+                            // Buscar las tablas con clase 'tableStandard'
+                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                            foreach ($tables as $table) {
+                                // Buscar las filas de la tabla
+                                $rows = $xpath->query('.//tr', $table);
+
+                                foreach ($rows as $row) {
+                                    // Verificar que el contenido de la fila no sea "No hay resultados"
+                                    if (trim($row->textContent) != 'No hay resultados') {
+                                        // Buscar los encabezados de la fila (th)
+                                        //Log::channel('mi_log')->info('encontro errado', []);
+                                        $cols = $xpath->query('./th', $row);
+
+                                        if ($cols->length >= 5) {
+                                            //$equipoLocal = trim($cols->item(0)->textContent);
+                                            $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
+                                            /*$equipoVisitante = trim($cols->item(2)->textContent);
+                                            $fechaPartido = trim($cols->item(3)->textContent);*/
+                                            $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
+                                            $torneoTexto = trim($cols->item(4)->textContent);
+
+                                            // 🔎 filtro: comparar contra url_nombre del torneo en tu DB
+                                            $torneoGrupoUrl = strtolower($grupo->torneo->url_nombre);
+                                            if (strpos(strtolower($torneoLink), $torneoGrupoUrl) === false) {
+                                                continue; // no pertenece al torneo actual, lo salteamos
+                                            }
+                                            $parts = explode('/', $partidoLink);
+                                            Log::channel('mi_log')->info('Link '.$partidoLink, []);
+                                            $urlFecha    = $parts[3] ?? null; // ej: 32-de-final
+                                            $urlPartido  = $parts[4] ?? null; // ej: river-cd-de-bolivar
+                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Partido '.$urlPartido, []);
+                                            if ($urlFecha && $urlPartido) {
+
+                                                $fecha = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->first();
+
+                                                if (!empty($fecha)) {
+                                                    // Equipos (separados por "-")
+                                                    [$equipoLocalSlug, $equipoVisitanteSlug] = explode('-', $urlPartido, 2);
+
+                                                    // Buscar equipos en la DB por url_nombre
+                                                    $equipoLocal = Equipo::where('url_nombre', $equipoLocalSlug)->first();
+                                                    if (empty($equipoLocal)) {
+                                                        Log::channel('mi_log')->info('Falta equipo: ' . $equipoLocalSlug, []);
+                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoLocalSlug . '</span><br>';
+
+                                                        continue;
+                                                    }
+                                                    $equipoVisitante = Equipo::where('url_nombre', $equipoVisitanteSlug)->first();
+                                                    if (empty($equipoVisitante)) {
+                                                        Log::channel('mi_log')->info('Falta equipo: ' . $equipoVisitanteSlug, []);
+                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoVisitanteSlug . '</span><br>';
+                                                        continue;
+                                                    }
+                                                    if ($equipoLocal && $equipoVisitante) {
+                                                        // Buscar partido exacto en la fecha
+                                                        $partido = Partido::where('fecha_id', $fecha->id)
+                                                            ->where('equipol_id', $equipoLocal->id)
+                                                            ->where('equipov_id', $equipoVisitante->id)
+                                                            ->first();
+                                                        if (!$partido) {
+                                                            // Probar invertido
+                                                            $partidoInvertido = Partido::where('fecha_id', $fecha->id)
+                                                                ->where('equipol_id', $equipoVisitante->id)
+                                                                ->where('equipov_id', $equipoLocal->id)
+                                                                ->first();
+
+                                                            if ($partidoInvertido && $partidoInvertido->neutral == 1) {
+                                                                $partido = $partidoInvertido;
+                                                            }
+                                                        }
+                                                        if ($partido) {
+                                                            // Si pasa el filtro, procesamos
+                                                            $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
+                                                            //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
+                                                            $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
+
+                                                            foreach ($htmlPartido->find('tr') as $r) {
+                                                                $jugadorLink = $r->find('a', 0);
+                                                                if ($jugadorLink && strpos($jugadorLink->href, $jugador->url_nombre) !== false) {
+                                                                    $recordTd = $r->find('td.record', 0);
+                                                                    if ($recordTd && strpos($recordTd->innertext, 'PenaltyFailed') !== false) {
+                                                                        // 🎯 sacar el minuto
+                                                                        $texto = $recordTd->plaintext;
+                                                                        $minuto = $this->normalizarMinuto($texto);
+
+                                                                        $jugadorPenalArray[$jugador->id][] = [
+                                                                            'partido_id' => $partido->id,
+                                                                            'jugador_id' => $jugador->id,
+                                                                            'minuto' => $minuto,
+                                                                            'tipo' => 'Errado',
+                                                                            'url' => $partidoUrl
+                                                                        ];
+                                                                        Log::channel('mi_log')->info('Erró penal en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl, []);
+                                                                        $success .= "<span style='color:green'>Erró penal en $torneoTexto ($equipoLocal vs $equipoVisitante) el $fecha->numero → $partidoUrl</span><br>";
+                                                                    }
+                                                                }
+                                                            }
+                                                            // acá ya podés usar $partido->id para grabar el penal errado
+                                                        } else {
+                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$equipoLocalSlug} vs {$equipoVisitanteSlug} (fecha {$urlFecha})</span><br>";
+                                                        }
+                                                    }
+                                                }
+                                                else{
+                                                    $success .= '<span style="color:red">Falta fecha: ' . $urlFecha . '</span><br>';
+                                                }
+
+                                            }
+
+                                        }
+                                    }
+
+
+                                }
+
+                            }
+                        }
+                    } else {
+
+                        $success .= '<span style="color:red">No se econtró la URL de errados ' . $urlErrado . '</span><br>';
+                    }
+                    try {
+
+                        $urlAtajado = "http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id={$id_jugador}&id_team=0&id_season=0&search_category=penal_stopped";
+
+                        $htmlAtajado = HttpHelper::getHtmlContent($urlAtajado);
+
+
+                    } catch (Exception $ex) {
+                        $htmlAtajado = '';
+                    }
+                    if ($htmlAtajado) {
+
+                        // Crear un nuevo DOMDocument y cargar el HTML
+                        $dom = new \DOMDocument();
+                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                        $dom->loadHTML($htmlAtajado);
+                        libxml_clear_errors();
+
+                        // Crear un nuevo objeto XPath
+                        $xpath = new \DOMXPath($dom);
+
+                        // Buscar el div con id 'matchesTable'
+                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+
+                        foreach ($matchesTableNodes as $div) {
+                            // Buscar las tablas con clase 'tableStandard'
+                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                            foreach ($tables as $table) {
+                                // Buscar las filas de la tabla
+                                $rows = $xpath->query('.//tr', $table);
+
+                                foreach ($rows as $row) {
+                                    // Verificar que el contenido de la fila no sea "No hay resultados"
+                                    if (trim($row->textContent) != 'No hay resultados') {
+                                        // Buscar los encabezados de la fila (th)
+                                        //Log::channel('mi_log')->info('encontro Atajado', []);
+                                        $cols = $xpath->query('./th', $row);
+
+                                        if ($cols->length >= 5) {
+                                            //$equipoLocal = trim($cols->item(0)->textContent);
+                                            $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
+                                            /*$equipoVisitante = trim($cols->item(2)->textContent);
+                                            $fechaPartido = trim($cols->item(3)->textContent);*/
+                                            $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
+                                            $torneoTexto = trim($cols->item(4)->textContent);
+
+                                            // 🔎 filtro: comparar contra url_nombre del torneo en tu DB
+                                            $torneoGrupoUrl = strtolower($grupo->torneo->url_nombre);
+                                            if (strpos(strtolower($torneoLink), $torneoGrupoUrl) === false) {
+                                                continue; // no pertenece al torneo actual, lo salteamos
+                                            }
+                                            $parts = explode('/', $partidoLink);
+                                            Log::channel('mi_log')->info('Link '.$partidoLink, []);
+                                            $urlFecha    = $parts[3] ?? null; // ej: 32-de-final
+                                            $urlPartido  = $parts[4] ?? null; // ej: river-cd-de-bolivar
+                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Partido '.$urlPartido, []);
+
+                                            if ($urlFecha && $urlPartido) {
+
+                                                $fecha = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->first();
+
+                                                if (!empty($fecha)) {
+                                                    // Equipos (separados por "-")
+                                                    [$equipoLocalSlug, $equipoVisitanteSlug] = explode('-', $urlPartido, 2);
+
+                                                    // Buscar equipos en la DB por url_nombre
+                                                    $equipoLocal = Equipo::where('url_nombre', $equipoLocalSlug)->first();
+                                                    if (empty($equipoLocal)) {
+                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoLocalSlug . '</span><br>';
+                                                        continue;
+                                                    }
+                                                    $equipoVisitante = Equipo::where('url_nombre', $equipoVisitanteSlug)->first();
+                                                    if (empty($equipoVisitante)) {
+                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoVisitanteSlug . '</span><br>';
+                                                        continue;
+                                                    }
+                                                    if ($equipoLocal && $equipoVisitante) {
+                                                        // Buscar partido exacto en la fecha
+                                                        $partido = Partido::where('fecha_id', $fecha->id)
+                                                            ->where('equipol_id', $equipoLocal->id)
+                                                            ->where('equipov_id', $equipoVisitante->id)
+                                                            ->first();
+                                                        if (!$partido) {
+                                                            // Probar invertido
+                                                            $partidoInvertido = Partido::where('fecha_id', $fecha->id)
+                                                                ->where('equipol_id', $equipoVisitante->id)
+                                                                ->where('equipov_id', $equipoLocal->id)
+                                                                ->first();
+
+                                                            if ($partidoInvertido && $partidoInvertido->neutral == 1) {
+                                                                $partido = $partidoInvertido;
+                                                            }
+                                                        }
+                                                        if ($partido) {
+                                                            // Si pasa el filtro, procesamos
+                                                            $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
+                                                            //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
+                                                            $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
+
+                                                            foreach ($htmlPartido->find('tr') as $r) {
+                                                                $jugadorLink = $r->find('a', 0);
+                                                                if ($jugadorLink && strpos($jugadorLink->href, $jugador->url_nombre) !== false) {
+                                                                    $recordTd = $r->find('td.record', 0);
+                                                                    if ($recordTd && strpos($recordTd->innertext, 'PenaltyFailed') !== false) {
+                                                                        // 🎯 sacar el minuto
+                                                                        $texto = $recordTd->plaintext;
+                                                                        $minuto = $this->normalizarMinuto($texto);
+
+                                                                        $jugadorPenalArray[$jugador->id][] = [
+                                                                            'partido_id' => $partido->id,
+                                                                            'jugador_id' => $jugador->id,
+                                                                            'minuto' => $minuto,
+                                                                            'tipo' => 'Atajado',
+                                                                            'url' => $partidoUrl
+                                                                        ];
+                                                                        Log::channel('mi_log')->info('Le atajaron penal en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl, []);
+                                                                        $success .= "<span style='color:green'>Le atajaron penal en $torneoTexto ($equipoLocal vs $equipoVisitante) el $fecha->numero → $partidoUrl</span><br>";
+                                                                    }
+                                                                }
+                                                            }
+                                                            // acá ya podés usar $partido->id para grabar el penal errado
+                                                        } else {
+                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$equipoLocalSlug} vs {$equipoVisitanteSlug} (fecha {$urlFecha})</span><br>";
+                                                        }
+                                                    }
+                                                }
+                                                else{
+                                                    $success .= '<span style="color:red">Falta fecha: ' . $urlFecha . '</span><br>';
+                                                }
+
+                                            }
+
+                                        }
+                                    }
+
+
+                                }
+
+                            }
+                        }
+                    } else {
+
+                        $success .= '<span style="color:red">No se econtró la URL de Atajados ' . $urlAtajado . '</span><br>';
+                    }
+                    try {
+
+                        $urlAtajo = "http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id={$id_jugador}&search_category=penal_stopped&received=1";
+
+                        $htmlAtajo = HttpHelper::getHtmlContent($urlAtajo);
+
+
+                    } catch (Exception $ex) {
+                        $htmlAtajo = '';
+                    }
+                    if ($htmlAtajo) {
+
+                        // Crear un nuevo DOMDocument y cargar el HTML
+                        $dom = new \DOMDocument();
+                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                        $dom->loadHTML($htmlAtajo);
+                        libxml_clear_errors();
+
+                        // Crear un nuevo objeto XPath
+                        $xpath = new \DOMXPath($dom);
+
+                        // Buscar el div con id 'matchesTable'
+                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+
+                        foreach ($matchesTableNodes as $div) {
+                            // Buscar las tablas con clase 'tableStandard'
+                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+
+                            foreach ($tables as $table) {
+                                // Buscar las filas de la tabla
+                                $rows = $xpath->query('.//tr', $table);
+
+                                foreach ($rows as $row) {
+                                    // Verificar que el contenido de la fila no sea "No hay resultados"
+                                    if (trim($row->textContent) != 'No hay resultados') {
+                                        // Buscar los encabezados de la fila (th)
+                                        //Log::channel('mi_log')->info('encontro Atajado', []);
+                                        $cols = $xpath->query('./th', $row);
+
+                                        if ($cols->length >= 5) {
+                                            //$equipoLocal = trim($cols->item(0)->textContent);
+                                            $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
+                                            /*$equipoVisitante = trim($cols->item(2)->textContent);
+                                            $fechaPartido = trim($cols->item(3)->textContent);*/
+                                            $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
+                                            $torneoTexto = trim($cols->item(4)->textContent);
+
+                                            // 🔎 filtro: comparar contra url_nombre del torneo en tu DB
+                                            $torneoGrupoUrl = strtolower($grupo->torneo->url_nombre);
+                                            if (strpos(strtolower($torneoLink), $torneoGrupoUrl) === false) {
+                                                continue; // no pertenece al torneo actual, lo salteamos
+                                            }
+                                            $parts = explode('/', $partidoLink);
+                                            Log::channel('mi_log')->info('Link '.$partidoLink, []);
+                                            $urlFecha    = $parts[3] ?? null; // ej: 32-de-final
+                                            $urlPartido  = $parts[4] ?? null; // ej: river-cd-de-bolivar
+                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Partido '.$urlPartido, []);
+
+                                            if ($urlFecha && $urlPartido) {
+
+                                                $fecha = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->first();
+
+                                                if (!empty($fecha)) {
+                                                    // Equipos (separados por "-")
+                                                    [$equipoLocalSlug, $equipoVisitanteSlug] = explode('-', $urlPartido, 2);
+
+                                                    // Buscar equipos en la DB por url_nombre
+                                                    $equipoLocal = Equipo::where('url_nombre', $equipoLocalSlug)->first();
+                                                    if (empty($equipoLocal)) {
+                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoLocalSlug . '</span><br>';
+                                                        continue;
+                                                    }
+                                                    $equipoVisitante = Equipo::where('url_nombre', $equipoVisitanteSlug)->first();
+                                                    if (empty($equipoVisitante)) {
+                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoVisitanteSlug . '</span><br>';
+                                                        continue;
+                                                    }
+                                                    if ($equipoLocal && $equipoVisitante) {
+                                                        // Buscar partido exacto en la fecha
+                                                        $partido = Partido::where('fecha_id', $fecha->id)
+                                                            ->where('equipol_id', $equipoLocal->id)
+                                                            ->where('equipov_id', $equipoVisitante->id)
+                                                            ->first();
+                                                        if (!$partido) {
+                                                            // Probar invertido
+                                                            $partidoInvertido = Partido::where('fecha_id', $fecha->id)
+                                                                ->where('equipol_id', $equipoVisitante->id)
+                                                                ->where('equipov_id', $equipoLocal->id)
+                                                                ->first();
+
+                                                            if ($partidoInvertido && $partidoInvertido->neutral == 1) {
+                                                                $partido = $partidoInvertido;
+                                                            }
+                                                        }
+                                                        if ($partido) {
+                                                            // Si pasa el filtro, procesamos
+                                                            $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
+                                                            //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
+                                                            $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
+
+                                                            foreach ($htmlPartido->find('tr') as $r) {
+                                                                $jugadorLink = $r->find('a', 0);
+                                                                if ($jugadorLink && strpos($jugadorLink->href, $jugador->url_nombre) !== false) {
+                                                                    $recordTd = $r->find('td.record', 0);
+                                                                    if ($recordTd && strpos($recordTd->innertext, 'PenaltyStopped') !== false) {
+                                                                        // 🎯 sacar el minuto
+                                                                        $texto = $recordTd->plaintext;
+                                                                        $minuto = $this->normalizarMinuto($texto);
+
+                                                                        $jugadorPenalArray[$jugador->id][] = [
+                                                                            'partido_id' => $partido->id,
+                                                                            'jugador_id' => $jugador->id,
+                                                                            'minuto' => $minuto,
+                                                                            'tipo' => 'Atajó',
+                                                                            'url' => $partidoUrl
+                                                                        ];
+                                                                        Log::channel('mi_log')->info('Atajó penal en en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl, []);
+                                                                        $success .= "<span style='color:green'>Atajó penal en $torneoTexto ($equipoLocal vs $equipoVisitante) el $fecha->numero → $partidoUrl</span><br>";
+                                                                    }
+                                                                }
+                                                            }
+                                                            // acá ya podés usar $partido->id para grabar el penal errado
+                                                        } else {
+                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$equipoLocalSlug} vs {$equipoVisitanteSlug} (fecha {$urlFecha})</span><br>";
+                                                        }
+                                                    }
+                                                }
+                                                else{
+                                                    $success .= '<span style="color:red">Falta fecha: ' . $urlFecha . '</span><br>';
+                                                }
+
+                                            }
+
+                                        }
+                                    }
+
+
+                                }
+
+                            }
+                        }
+                    } else {
+
+                        $success .= '<span style="color:red">No se econtró la URL de Atajó ' . $urlAtajo . '</span><br>';
+                    }
+                } else {
+                    $success .= '<span style="color:red">No se econtró la URL del jugador ' . $jugador->persona->nombre . ' ' . $jugador->persona->apellido . '</span><br>';
+                }
+            }
+        }
+    }
+    foreach ($jugadorPenalArray as $jugadorId => $penales) {
+        foreach ($penales as $penal) {
+            $existe = Penal::where('partido_id', $penal['partido_id'])
+                ->where('jugador_id', $jugadorId)
+                ->where('tipo', $penal['tipo'])
+                ->where('minuto', $penal['minuto'])
+                ->exists();
+
+            if ($existe) {
+                // Si ya está, no hacemos nada
+                continue;
+            }
+            try {
+                Penal::create([
+                    'partido_id' => $penal['partido_id'],
+                    'jugador_id' => $jugadorId,
+                    'minuto' => $penal['minuto'],
+                    'tipo' => $penal['tipo']
+                ]);
+
+                //$success .= '<span style="color:green">Penal errado agregado: ' . $jugador->persona->nombre . ' - ' . $minuto . '\'</span><br>';
+            } catch (QueryException $ex) {
+                $error = $ex->getMessage();
+                $ok = 0;
+                continue;
+            }
+        }
+
+
+
+
+
+
+    }
+    if ($ok) {
+
+
+        DB::commit();
+        $respuestaID = 'success';
+        $respuestaMSJ = $success;
+    } else {
+        DB::rollback();
+        $respuestaID = 'error';
+        $respuestaMSJ = $error . '<br>' . $success;
+    }
+
+    //
+    return redirect()->route('fechas.index', array('grupoId' => $grupo->id))->with($respuestaID, $respuestaMSJ);
+}
+
+
     public function importgolesfecha(Request $request)
     {
         set_time_limit(0);
@@ -4698,11 +5383,11 @@ return $string;
                     $golesLocales = $partido->golesl;
                     $golesVisitantes = $partido->golesv;
                     //Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
-                    $success .= '<span style="color:cyan">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' - ' . $fecha->numero . '</span><br>';
+                    $success .= '<span style="color:orange">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' - ' . $fecha->numero . '</span><br>';
                     $goles = Gol::where('partido_id', '=', "$partido->id")->orderBy('minuto', 'ASC')->get();
 
                     $jugadorGolArray = array();
-                    $jugadorPenalArray = array();
+
                     foreach ($goles as $gol) {
                         //Log::channel('mi_log')->info('Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto, []);
                         //$success .='Gol ' . $gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido.' - '.$gol->tipo.' - '.$gol->minuto.'<br>';
@@ -4996,9 +5681,9 @@ return $string;
 
 
                                                                 // Si no se encontró la URL, registrar en el log
-                                                                if (!$urlEncontrada) {
+                                                                /*if (!$urlEncontrada) {
                                                                     //Log::channel('mi_log')->info('no está cabeza: ' . $href, []);
-                                                                }
+                                                                }*/
                                                             }
                                                         }
                                                     }
