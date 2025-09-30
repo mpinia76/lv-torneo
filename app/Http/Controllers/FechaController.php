@@ -4653,6 +4653,7 @@ return $string;
         /*$fecha=Fecha::findOrFail($id);
 
         $grupo=Grupo::findOrFail($fecha->grupo->id);*/
+        $success = '';
         DB::beginTransaction();
         foreach ($fechas as $fecha) {
             $id = $fecha->id;
