@@ -5839,7 +5839,7 @@ return $string;
                                 $dataGol = array(
                                     'partido_id' => $item[0]['partido_id'],
                                     'jugador_id' => $key,
-                                    'minuto' => $item[0]['minuto'],
+                                    //'minuto' => $item[0]['minuto'],
 
                                     'tipo' => $item[0]['tipo']
                                 );
