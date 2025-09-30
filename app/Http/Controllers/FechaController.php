@@ -4691,7 +4691,7 @@ return $string;
                     //Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                     $success .='<span style="color:cyan">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre.' - '.$fecha->numero.'</span><br>';
                    // $goles=Gol::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
-                    $alineaciones=Alineacion::where('partido_id','=',"$partido->id")->orderBy('minuto','ASC')->get();
+                    $alineaciones=Alineacion::where('partido_id','=',"$partido->id")->get();
                     $jugadorGolArray = array();
                     $jugadorPenalArray = array();
                     foreach ($alineaciones as $alineacion) {
