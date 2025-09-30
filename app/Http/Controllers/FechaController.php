@@ -5320,7 +5320,7 @@ return $string;
                             } else {
 
                                 //Log::channel('mi_log')->info('OJO!!! un solo gol de: '.$key.' => '.$item[0]['tipo'].' - '.$item[0]['minuto'] , []);
-                                $success .= '<span style="color:green">Un solo gol de: ' . $key . ' => ' . $item[0]['tipo'] . ' - ' . $item[0]['minuto'] . '</span><br>';
+                                //$success .= '<span style="color:green">Un solo gol de: ' . $key . ' => ' . $item[0]['tipo'] . ' - ' . $item[0]['minuto'] . '</span><br>';
                                 $golesJugador = Gol::where('partido_id', '=', $item[0]['partido_id'])->where('jugador_id', '=', $key)->get();
                                 if (count($golesJugador) == 1) {
 
