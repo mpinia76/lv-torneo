@@ -5081,18 +5081,21 @@ private function normalizarMinuto(string $texto): int
 
                                                                     // Buscar todas las filas <tr>
                                                                     $rows = $xpath->query('//tr');
-                                                                    Log::channel('mi_log')->info('Rows: '.print_r($rows, true));
+                                                                    Log::channel('mi_log')->info('Total rows: ' . $rows->length);
+
                                                                     foreach ($rows as $r) {
+                                                                        Log::channel('mi_log')->info('Row HTML: ' . $dom->saveHTML($r));
+
                                                                         // Buscar todos los <a> que son jugadores
                                                                         $playerLinks = [];
                                                                         foreach ($xpath->query('.//a', $r) as $a) {
                                                                             $href = $a->getAttribute('href');
                                                                             if (strpos($href, '/jugadores/') !== false) {
-                                                                                $playerLinks[] = $a;
+                                                                                $playerLinks[] = trim($a->textContent);
                                                                             }
                                                                         }
 
-                                                                        Log::channel('mi_log')->info(print_r($playerLinks, true));
+                                                                        Log::channel('mi_log')->info('Players: ' . json_encode($playerLinks));
                                                                         $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
