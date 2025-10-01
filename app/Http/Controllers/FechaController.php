@@ -33,6 +33,7 @@ use App\Services\HttpHelper;
 
 use Illuminate\Support\Carbon;
 use DateTime;
+use Illuminate\Support\Facades\Http;
 
 class FechaController extends Controller
 {
