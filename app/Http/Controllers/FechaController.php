@@ -5104,10 +5104,12 @@ private function normalizarMinuto(string $texto): int
 
                                                                             foreach ($playerLinks as $i => $linkNode) {
                                                                                 $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                                Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                                Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
-                                                                                if ($jugadorSlugWeb === $slugJugador) {
+
+                                                                                if (trim($jugadorSlugWeb) === trim($slugJugador)) {
+                                                                                    Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
+                                                                                    Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
                                                                                     $recordTd = $recordTds->item($i);
+                                                                                    Log::channel('mi_log')->info('Evento: ' . $recordTd->textContent, []);
                                                                                     if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
                                                                                         $texto = $recordTd->textContent;
                                                                                         $minuto = $this->normalizarMinuto($texto);
