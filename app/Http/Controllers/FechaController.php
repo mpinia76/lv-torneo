@@ -5069,6 +5069,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                 if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+                                                                    Log::channel('mi_log')->info('HTML recibido: ' . substr($htmlPartido, 0, 1000));
 
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                     $dom = new \DOMDocument();
