@@ -5070,72 +5070,14 @@ private function normalizarMinuto(string $texto): int
                                                                 if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
-                                                                    $response = Http::withHeaders([
-                                                                        'Accept' => 'text/javascript, text/html, application/xml, text/xml, */*',
-                                                                        'Content-Type' => 'application/x-www-form-urlencoded; charset=UTF-8',
-                                                                        'X-Requested-With' => 'XMLHttpRequest',
-                                                                        'X-Prototype-Version' => '1.6.0.1',
-                                                                        'Origin' => 'http://www.futbol360.com.ar',
-                                                                        'Referer' => 'http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/grupo-a/independiente-nacional-potosi/',
-                                                                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0',
-                                                                        'Cookie' => '_ga_TKH3JN9CRK=GS2.1.s1759322586$o9$g1$t1759322587$j59$l0$h0; _ga=GA1.1.1207607675.1759169895; cf_clearance=v8SiVaG.6AqTWwAymvPI_UjE6mBtPTdR4XJUdzsKVuo-1759322593-1.2.1.1-kdsda9lcPtfV2Ivua0eg.9IjwdASKWag.ExudEUmuC.6jOYV4Or.OEUgG27c8R_8qyJ_Xi4r74cX.0w1xtS1.byD9Q2Ojp_w8uX2YS7OkkjSFJ4nVbRsrQydxv5N.M19dKLuf54TCavK..5KbY.hxuLJNt_uDvKYL7ByvfA7AG5BuXbLGoR.NNRiv2MvLkBpOdXJBiKUwzK5gKC6xgpSWa3ykyxsQitrIlNex1..fx0; PHPSESSID=0b9c70a6571d61e98fa34d210b10ab22'
-                                                                    ])->post('http://www.futbol360.com.ar/ajax/ajaxGetViewMatchContent.php', [
-                                                                        'url' => '/partidos/sudamerica/sudamericana-2025/grupo-a/independiente-nacional-potosi/inc/partido-independiente-nacional-potosi-28-05-2025.php.inc'
-                                                                    ]);
+                                                                    $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/grupo-a/independiente-nacional-potosi/inc/partido-independiente-nacional-potosi-28-05-2025.php.inc";
 
-                                                                    $htmlAjax = $response->body();
-                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlAjax);
+                                                                    $response = Http::get($urlInc);
 
-// Ahora $htmlAjax contiene todo el HTML cargado vía AJAX
-// Podés parsearlo con DOMDocument / XPath como antes
-                                                                    $dom = new \DOMDocument();
-                                                                    libxml_use_internal_errors(true);
-                                                                    $dom->loadHTML(mb_convert_encoding($htmlAjax, 'HTML-ENTITIES', 'ISO-8859-1'));
-                                                                    libxml_clear_errors();
-
-                                                                    $xpath = new \DOMXPath($dom);
-
-                                                                    // Buscar todas las filas <tr>
-                                                                    $rows = $xpath->query('//tr');
-
-                                                                    foreach ($rows as $r) {
-                                                                        // Buscar todos los <a> que son jugadores
-                                                                        $playerLinks = [];
-                                                                        foreach ($xpath->query('.//a', $r) as $a) {
-                                                                            $href = $a->getAttribute('href');
-                                                                            if (strpos($href, '/jugadores/') !== false) {
-                                                                                $playerLinks[] = $a;
-                                                                            }
-                                                                        }
-
-                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
-
-                                                                        foreach ($playerLinks as $i => $linkNode) {
-                                                                            $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
-                                                                            if ($jugadorSlugWeb === $slugJugador) {
-                                                                                $recordTd = $recordTds->item($i);
-                                                                                if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
-                                                                                    $texto = $recordTd->textContent;
-                                                                                    $minuto = $this->normalizarMinuto($texto);
-                                                                                    $jugadorPenalArray[$jugador->id][] = [
-                                                                                        'partido_id' => $partido->id,
-                                                                                        'jugador_id' => $jugador->id,
-                                                                                        'minuto' => $minuto,
-                                                                                        'tipo' => 'Atajado',
-                                                                                        'url' => $partidoUrl
-                                                                                    ];
-
-                                                                                    /*Log::channel('mi_log')->info(
-                                                                                        'Le atajaron penal en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl,
-                                                                                        []
-                                                                                    );*/
-
-                                                                                    $success .= "<span style='color:green'>Le atajaron penal en $torneoTexto ($equipoLocal vs $equipoVisitante) el $fecha->numero → $partidoUrl</span><br>";
-                                                                                }
-                                                                            }
-                                                                        }
+                                                                    if ($response->successful()) {
+                                                                        $htmlInc = $response->body();
+                                                                        Log::info("HTML .inc recibido: " . substr($htmlInc, 0, 500));
+                                                                        // después parseás con DOMDocument o lo que necesites
                                                                     }
                                                                 }
 
