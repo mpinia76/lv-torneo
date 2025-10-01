@@ -5077,7 +5077,7 @@ private function normalizarMinuto(string $texto): int
                                                                     $response = Http::get($urlInc);
 
                                                                     if ($response->successful()) {
-
+                                                                        $htmlPartido = $response->body();
                                                                         // Crear un nuevo DOMDocument y cargar el HTML
                                                                         $dom = new \DOMDocument();
                                                                         libxml_use_internal_errors(true);
