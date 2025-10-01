@@ -4884,15 +4884,21 @@ private function normalizarMinuto(string $texto): int
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
-                                                                $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
+                                                                $htmlPartidoErrado = HttpHelper::getHtmlContent($partidoUrl);
 
-                                                                if ($htmlPartido) {
+                                                                if ($htmlPartidoErrado) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+                                                                    // Guardarlo en un archivo para revisarlo completo
+                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlPartidoErrado);
 
+                                                                    // También loguear tamaño y primeros caracteres para ver que algo llegó
+                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl);
+                                                                    Log::channel('mi_log')->info('HTML size: ' . strlen($htmlPartidoErrado));
+                                                                    Log::channel('mi_log')->info('HTML preview: ' . substr($htmlPartidoErrado, 0, 2000));
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                     $domPartidoErrado = new \DOMDocument();
                                                                     libxml_use_internal_errors(true);
-                                                                    $domPartidoErrado->loadHTML($htmlPartido);
+                                                                    $domPartidoErrado->loadHTML($htmlPartidoErrado);
                                                                     libxml_clear_errors();
 
                                                                     // Crear objeto XPath
@@ -5065,15 +5071,21 @@ private function normalizarMinuto(string $texto): int
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
-                                                                $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
+                                                                $htmlPartidoAtajado = HttpHelper::getHtmlContent($partidoUrl);
 
-                                                                if ($htmlPartido) {
+                                                                if ($htmlPartidoAtajado) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
+// Guardarlo en un archivo para revisarlo completo
+                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlPartidoAtajado);
 
+                                                                    // También loguear tamaño y primeros caracteres para ver que algo llegó
+                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl);
+                                                                    Log::channel('mi_log')->info('HTML size: ' . strlen($htmlPartidoAtajado));
+                                                                    Log::channel('mi_log')->info('HTML preview: ' . substr($htmlPartidoAtajado, 0, 2000));
                                                                     $domPartidoAtajado = new \DOMDocument();
                                                                     libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                                                                    $domPartidoAtajado->loadHTML($htmlPartido);
+                                                                    $domPartidoAtajado->loadHTML($htmlPartidoAtajado);
                                                                     libxml_clear_errors();
 
                                                                     // Crear un nuevo objeto XPath
@@ -5248,15 +5260,21 @@ private function normalizarMinuto(string $texto): int
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
-                                                                $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
+                                                                $htmlPartidoAtajo = HttpHelper::getHtmlContent($partidoUrl);
 
-                                                                if ($htmlPartido) {
+                                                                if ($htmlPartidoAtajo) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+// Guardarlo en un archivo para revisarlo completo
+                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlPartidoAtajo);
 
+                                                                    // También loguear tamaño y primeros caracteres para ver que algo llegó
+                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl);
+                                                                    Log::channel('mi_log')->info('HTML size: ' . strlen($htmlPartidoAtajo));
+                                                                    Log::channel('mi_log')->info('HTML preview: ' . substr($htmlPartidoAtajo, 0, 2000));
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                     $domPartidoAtajo = new \DOMDocument();
                                                                     libxml_use_internal_errors(true);
-                                                                    $domPartidoAtajo->loadHTML($htmlPartido);
+                                                                    $domPartidoAtajo->loadHTML($htmlPartidoAtajo);
                                                                     libxml_clear_errors();
 
                                                                     // Crear objeto XPath
