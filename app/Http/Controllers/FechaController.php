@@ -5063,7 +5063,7 @@ private function normalizarMinuto(string $texto): int
                                                             if ($partido) {
                                                                 $encotro=1;
 
-                                                                Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+                                                                //Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
                                                                 // Normalizar fecha
                                                                 $fechaSTR = DateTime::createFromFormat('d/m/Y', $fechaPartido);
@@ -5119,7 +5119,7 @@ private function normalizarMinuto(string $texto): int
                                                                                         'jugador_id' => $jugador->id,
                                                                                         'minuto' => $minuto,
                                                                                         'tipo' => 'Atajado',
-                                                                                        'url' => $partidoUrl
+                                                                                        'url' => $urlInc
                                                                                     ];
 
                                                                                     /*Log::channel('mi_log')->info(
