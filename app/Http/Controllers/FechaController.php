@@ -4638,7 +4638,6 @@ private function normalizarMinuto(string $texto): int
      * @return array|null [Equipo $local, Equipo $visitante] o null si no encuentra
      */
     function splitEquiposFromUrlToModels($urlPartido, $slugsDB) {
-        Log::channel('mi_log')->info('Slugs DB: ' . print_r($slugsDB, true));
         $parts = explode('-', $urlPartido);
         $totalParts = count($parts);
 
@@ -4646,19 +4645,13 @@ private function normalizarMinuto(string $texto): int
         for ($i = 1; $i < $totalParts; $i++) {
             $localSlug = implode('-', array_slice($parts, 0, $i));
             $visitanteSlug = implode('-', array_slice($parts, $i));
-
-            Log::channel('mi_log')->info("Probando combinación: Local='$localSlug', Visitante='$visitanteSlug'");
-
             if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
-                Log::channel('mi_log')->info("¡Coincidencia encontrada! Local='$localSlug', Visitante='$visitanteSlug'");
                 return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
             }
         }
 
-        Log::channel('mi_log')->warning("No se encontró combinación para: $urlPartido");
         return null; // no encontró combinación
     }
-
 
 
 
@@ -4672,7 +4665,15 @@ private function normalizarMinuto(string $texto): int
     $grupo_id = $request->get('grupoId');
     $grupo = Grupo::findOrFail($grupo_id);
 
-    $plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
+    $grupos = Grupo::where('torneo_id', '=',$grupo->torneo_id)->get();
+    $arrgrupos='';
+    foreach ($grupos as $grupo){
+        $arrgrupos .=$grupo->id.',';
+    }
+    $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+
+    //$plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
     // Crear array de slugs de los equipos existentes, sólo si equipo existe
     $slugsDB = [];
     foreach ($plantillas as $plantilla) {
