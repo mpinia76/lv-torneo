@@ -4837,19 +4837,13 @@ private function normalizarMinuto(string $texto): int
 
                                                 if (!empty($fecha)) {
                                                     // Equipos (separados por "-")
-                                                    [$equipoLocalSlug, $equipoVisitanteSlug] = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);;
+                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);
 
-                                                    // Buscar equipos en la DB por url_nombre
-                                                    $equipoLocal = Equipo::where('url_nombre', $equipoLocalSlug)->first();
-                                                    if (empty($equipoLocal)) {
-                                                        //Log::channel('mi_log')->info('Falta equipo: ' . $equipoLocalSlug, []);
-                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoLocalSlug . '</span><br>';
-                                                    }
-                                                    $equipoVisitante = Equipo::where('url_nombre', $equipoVisitanteSlug)->first();
-                                                    if (empty($equipoVisitante)) {
-                                                        //Log::channel('mi_log')->info('Falta equipo: ' . $equipoVisitanteSlug, []);
-                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoVisitanteSlug . '</span><br>';
+                                                    if ($result) {
+                                                        [$equipoLocal, $equipoVisitante] = $result;
 
+                                                    } else {
+                                                        $success .= "<span style='color:red'>No se pudo encontrar el partido con slug: {$urlPartido}</span><br>";
                                                     }
                                                     if ($equipoLocal && $equipoVisitante) {
                                                         // Buscar partido exacto en la fecha
@@ -5018,18 +5012,13 @@ private function normalizarMinuto(string $texto): int
 
                                                 if (!empty($fecha)) {
                                                     // Equipos (separados por "-")
-                                                    [$equipoLocalSlug, $equipoVisitanteSlug] = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);;
+                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);
 
-                                                    // Buscar equipos en la DB por url_nombre
-                                                    $equipoLocal = Equipo::where('url_nombre', $equipoLocalSlug)->first();
-                                                    if (empty($equipoLocal)) {
-                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoLocalSlug . '</span><br>';
+                                                    if ($result) {
+                                                        [$equipoLocal, $equipoVisitante] = $result;
 
-                                                    }
-                                                    $equipoVisitante = Equipo::where('url_nombre', $equipoVisitanteSlug)->first();
-                                                    if (empty($equipoVisitante)) {
-                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoVisitanteSlug . '</span><br>';
-
+                                                    } else {
+                                                        $success .= "<span style='color:red'>No se pudo encontrar el partido con slug: {$urlPartido}</span><br>";
                                                     }
 
                                                     if ($equipoLocal && $equipoVisitante) {
@@ -5199,17 +5188,13 @@ private function normalizarMinuto(string $texto): int
                                                 $fecha = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->first();
 
                                                 if (!empty($fecha)) {
-                                                    // Equipos (separados por "-")
-                                                    [$equipoLocalSlug, $equipoVisitanteSlug] = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);;
+                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);
 
-                                                    // Buscar equipos en la DB por url_nombre
-                                                    $equipoLocal = Equipo::where('url_nombre', $equipoLocalSlug)->first();
-                                                    if (empty($equipoLocal)) {
-                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoLocalSlug . '</span><br>';
-                                                    }
-                                                    $equipoVisitante = Equipo::where('url_nombre', $equipoVisitanteSlug)->first();
-                                                    if (empty($equipoVisitante)) {
-                                                        $success .= '<span style="color:red">Falta equipo: ' . $equipoVisitanteSlug . '</span><br>';
+                                                    if ($result) {
+                                                        [$equipoLocal, $equipoVisitante] = $result;
+
+                                                    } else {
+                                                        $success .= "<span style='color:red'>No se pudo encontrar el partido con slug: {$urlPartido}</span><br>";
                                                     }
 
                                                     if ($equipoLocal && $equipoVisitante) {
