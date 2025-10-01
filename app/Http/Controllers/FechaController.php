@@ -5273,7 +5273,7 @@ private function normalizarMinuto(string $texto): int
                                                 }
                                                 $fechas = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->get();
 
-                                                if (!empty($fecha)) {
+                                                if (!empty($fechas)) {
                                                     $encotro=0;
                                                     foreach ($fechas as $fecha) {
                                                         if ($equipoLocal && $equipoVisitante) {
