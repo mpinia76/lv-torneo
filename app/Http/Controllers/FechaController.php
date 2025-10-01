@@ -4825,9 +4825,9 @@ private function normalizarMinuto(string $texto): int
                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                     if (trim($row->textContent) != 'No hay resultados') {
                                         // Buscar los encabezados de la fila (th)
-                                        //Log::channel('mi_log')->info('encontro errado', []);
+                                        Log::channel('mi_log')->info('encontro errado', []);
                                         $cols = $xpath->query('./th', $row);
-                                        //Log::channel('mi_log')->info('Errado col - '.$cols->length.' - '.$slugJugador, []);
+                                        Log::channel('mi_log')->info('Errado col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
                                             $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
@@ -4842,11 +4842,11 @@ private function normalizarMinuto(string $texto): int
                                                 continue; // no pertenece al torneo actual, lo salteamos
                                             }
                                             $parts = explode('/', $partidoLink);
-                                            //Log::channel('mi_log')->info('Link '.$partidoLink, []);
+                                            Log::channel('mi_log')->info('Link '.$partidoLink, []);
                                             $urlFecha    = $parts[4] ?? null; // ej: 32-de-final
                                             $urlPartido  = $parts[5] ?? null; // ej: river-cd-de-bolivar
-                                            //Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
-                                            //Log::channel('mi_log')->info('Partido '.$urlPartido, []);
+                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Partido '.$urlPartido, []);
                                             if ($urlFecha && $urlPartido) {
                                                 $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB) ;
 
@@ -4887,7 +4887,7 @@ private function normalizarMinuto(string $texto): int
                                                                 $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
 
                                                                 if ($htmlPartido) {
-                                                                    //Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                     $dom = new \DOMDocument();
@@ -4915,8 +4915,8 @@ private function normalizarMinuto(string $texto): int
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                            //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                            //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
+                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
+                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
                                                                             if ($jugadorSlugWeb === $slugJugador) {
                                                                                 $recordTd = $recordTds->item($i);
                                                                                 if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
@@ -5003,9 +5003,9 @@ private function normalizarMinuto(string $texto): int
                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                     if (trim($row->textContent) != 'No hay resultados') {
                                         // Buscar los encabezados de la fila (th)
-                                        //Log::channel('mi_log')->info('encontro Atajado', []);
+                                        Log::channel('mi_log')->info('encontro Atajado', []);
                                         $cols = $xpath->query('./th', $row);
-                                        //Log::channel('mi_log')->info('Atajado col - '.$cols->length.' - '.$slugJugador, []);
+                                        Log::channel('mi_log')->info('Atajado col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
                                             $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
@@ -5020,11 +5020,11 @@ private function normalizarMinuto(string $texto): int
                                                 continue; // no pertenece al torneo actual, lo salteamos
                                             }
                                             $parts = explode('/', $partidoLink);
-                                            //Log::channel('mi_log')->info('Link '.$partidoLink, []);
+                                            Log::channel('mi_log')->info('Link '.$partidoLink, []);
                                             $urlFecha    = $parts[4] ?? null; // ej: 32-de-final
                                             $urlPartido  = $parts[5] ?? null; // ej: river-cd-de-bolivar
-                                            //Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
-                                            //Log::channel('mi_log')->info('Partido '.$urlPartido, []);
+                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Partido '.$urlPartido, []);
 
                                             if ($urlFecha && $urlPartido) {
                                                 $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB);
@@ -5068,7 +5068,7 @@ private function normalizarMinuto(string $texto): int
                                                                 $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
 
                                                                 if ($htmlPartido) {
-                                                                    //Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                     $dom = new \DOMDocument();
@@ -5096,8 +5096,8 @@ private function normalizarMinuto(string $texto): int
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                            //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                            //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
+                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
+                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
                                                                             if ($jugadorSlugWeb === $slugJugador) {
                                                                                 $recordTd = $recordTds->item($i);
                                                                                 if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
@@ -5185,9 +5185,9 @@ private function normalizarMinuto(string $texto): int
                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                     if (trim($row->textContent) != 'No hay resultados') {
                                         // Buscar los encabezados de la fila (th)
-                                        //Log::channel('mi_log')->info('encontro Atajado', []);
+                                        Log::channel('mi_log')->info('encontro atajo', []);
                                         $cols = $xpath->query('./th', $row);
-                                        //Log::channel('mi_log')->info('Atajó col - '.$cols->length.' - '.$slugJugador, []);
+                                        Log::channel('mi_log')->info('Atajó col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
                                             $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
@@ -5202,11 +5202,11 @@ private function normalizarMinuto(string $texto): int
                                                 continue; // no pertenece al torneo actual, lo salteamos
                                             }
                                             $parts = explode('/', $partidoLink);
-                                            //Log::channel('mi_log')->info('Link '.$partidoLink, []);
+                                            Log::channel('mi_log')->info('Link '.$partidoLink, []);
                                             $urlFecha    = $parts[4] ?? null; // ej: 32-de-final
                                             $urlPartido  = $parts[5] ?? null; // ej: river-cd-de-bolivar
-                                            //Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
-                                            //Log::channel('mi_log')->info('Partido '.$urlPartido, []);
+                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Partido '.$urlPartido, []);
 
                                             if ($urlFecha && $urlPartido) {
                                                 $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB) ;
@@ -5247,7 +5247,7 @@ private function normalizarMinuto(string $texto): int
                                                                 $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
 
                                                                 if ($htmlPartido) {
-                                                                    //Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
+                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                     $dom = new \DOMDocument();
@@ -5275,8 +5275,8 @@ private function normalizarMinuto(string $texto): int
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                            //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                            //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
+                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
+                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
                                                                             if ($jugadorSlugWeb === $slugJugador) {
                                                                                 $recordTd = $recordTds->item($i);
                                                                                 if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
