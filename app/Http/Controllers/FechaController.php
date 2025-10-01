@@ -5075,6 +5075,7 @@ private function normalizarMinuto(string $texto): int
                                                                     ]);
 
                                                                     $htmlAjax = $response->body();
+                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlAjax);
 
 // Ahora $htmlAjax contiene todo el HTML cargado vía AJAX
 // Podés parsearlo con DOMDocument / XPath como antes
