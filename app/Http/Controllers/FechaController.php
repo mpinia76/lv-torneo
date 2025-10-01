@@ -4858,6 +4858,7 @@ private function normalizarMinuto(string $texto): int
                                                 }
                                                 $fechas = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->get();
                                                 if(!empty($fechas)) {
+                                                    $encotro=0;
                                                     foreach ($fechas as $fecha) {
                                                         // Equipos (separados por "-")
 
@@ -4879,6 +4880,7 @@ private function normalizarMinuto(string $texto): int
                                                                 }
                                                             }
                                                             if ($partido) {
+                                                                $encotro=1;
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
@@ -4940,10 +4942,11 @@ private function normalizarMinuto(string $texto): int
                                                                     }
                                                                 }
 
-                                                            } else {
-                                                                $success .= "<span style='color:red'>No se encontró  partido en DB para {$fecha->id} - { $equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                             }
                                                         }
+                                                    }
+                                                    if(!$encotro) {
+                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                     }
                                                 }
                                                 else{
@@ -5035,6 +5038,7 @@ private function normalizarMinuto(string $texto): int
                                                 $fechas = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->get();
 
                                                 if (!empty($fechas)) {
+                                                    $encotro=0;
                                                     foreach ($fechas as $fecha) {
                                                         // Equipos (separados por "-")
 
@@ -5057,6 +5061,7 @@ private function normalizarMinuto(string $texto): int
                                                                 }
                                                             }
                                                             if ($partido) {
+                                                                $encotro=1;
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
@@ -5119,10 +5124,11 @@ private function normalizarMinuto(string $texto): int
                                                                 }
 
                                                                 // acá ya podés usar $partido->id para grabar el penal errado
-                                                            } else {
-                                                                $success .= "<span style='color:red'>No se encontró  partido en DB para {$fecha->id} - { $equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                             }
                                                         }
+                                                    }
+                                                    if(!$encotro) {
+                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                     }
                                                 }
                                                 else{
@@ -5214,7 +5220,7 @@ private function normalizarMinuto(string $texto): int
                                                 $fechas = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->get();
 
                                                 if (!empty($fecha)) {
-
+                                                    $encotro=0;
                                                     foreach ($fechas as $fecha) {
                                                         if ($equipoLocal && $equipoVisitante) {
                                                             // Buscar partido exacto en la fecha
@@ -5234,6 +5240,7 @@ private function normalizarMinuto(string $texto): int
                                                                 }
                                                             }
                                                             if ($partido) {
+                                                                $encotro=1;
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
@@ -5296,10 +5303,11 @@ private function normalizarMinuto(string $texto): int
                                                                 }
 
                                                                 // acá ya podés usar $partido->id para grabar el penal errado
-                                                            } else {
-                                                                $success .= "<span style='color:red'>No se encontró  partido en DB para {$fecha->id} - { $equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                             }
                                                         }
+                                                    }
+                                                    if (!$encotro) {
+                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                     }
                                                 }
                                                 else{
