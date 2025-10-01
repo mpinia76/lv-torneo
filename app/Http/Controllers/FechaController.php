@@ -5106,29 +5106,44 @@ private function normalizarMinuto(string $texto): int
                                                                                 $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
 
                                                                                 if (trim($jugadorSlugWeb) === trim($slugJugador)) {
-                                                                                    Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                                    Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
+                                                                                    Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                    Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
+
                                                                                     $recordTd = $recordTds->item($i);
-                                                                                    Log::channel('mi_log')->info('Evento: ' . $recordTd->textContent, []);
-                                                                                    if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
-                                                                                        $texto = $recordTd->textContent;
-                                                                                        $minuto = $this->normalizarMinuto($texto);
-                                                                                        $jugadorPenalArray[$jugador->id][] = [
-                                                                                            'partido_id' => $partido->id,
-                                                                                            'jugador_id' => $jugador->id,
-                                                                                            'minuto' => $minuto,
-                                                                                            'tipo' => 'Atajado',
-                                                                                            'url' => $urlInc
-                                                                                        ];
 
-                                                                                        /*Log::channel('mi_log')->info(
-                                                                                            'Atajó penal en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl,
-                                                                                            []
-                                                                                        );*/
+                                                                                    if ($recordTd) {
+                                                                                        foreach ($recordTd->childNodes as $child) {
+                                                                                            if ($child->nodeName === 'img') {
+                                                                                                $evento = $child->getAttribute('alt'); // Ej: Penal errado, Gol convertido
+                                                                                            } elseif ($child->nodeType === XML_TEXT_NODE) {
+                                                                                                $texto = trim($child->textContent); // Ej: 25pt, 26pt, 8st
+                                                                                                if (!empty($texto) && isset($evento)) {
+                                                                                                    Log::channel('mi_log')->info("Evento: $evento en minuto $texto");
 
-                                                                                        $success .= "<span style='color:green'>Atajó penal en ".$torneoTexto ."(".$equipoLocal." vs ".$equipoVisitante.") el ".$fecha->numero." → ".$partidoUrl."</span><br>";
+                                                                                                    if (stripos($evento, 'Penal errado') !== false) {
+                                                                                                        $minuto = $this->normalizarMinuto($texto);
+
+                                                                                                        $jugadorPenalArray[$jugador->id][] = [
+                                                                                                            'partido_id' => $partido->id,
+                                                                                                            'jugador_id' => $jugador->id,
+                                                                                                            'minuto' => $minuto,
+                                                                                                            'tipo' => 'Atajado',
+                                                                                                            'url' => $urlInc
+                                                                                                        ];
+
+                                                                                                        $success .= "<span style='color:green'>
+                                                                                                                        Atajó penal en $torneoTexto ($equipoLocal vs $equipoVisitante)
+                                                                                                                        el $fecha->numero → $partidoUrl
+                                                                                                                    </span><br>";
+                                                                                                    }
+
+                                                                                                    unset($evento); // reseteo para no mezclar eventos
+                                                                                                }
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 }
+
                                                                             }
                                                                         }
                                                                     }
