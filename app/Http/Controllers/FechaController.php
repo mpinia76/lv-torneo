@@ -5092,6 +5092,7 @@ private function normalizarMinuto(string $texto): int
                                                                             }
                                                                         }
 
+                                                                        Log::channel('mi_log')->info(print_r($playerLinks, true));
                                                                         $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
