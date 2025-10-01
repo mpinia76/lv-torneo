@@ -4854,7 +4854,7 @@ private function normalizarMinuto(string $texto): int
                                                 if (!empty($fecha)) {
                                                     // Equipos (separados por "-")
                                                     $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB) ;
-                                                    dd($result);
+
                                                     if ($result) {
                                                         [$equipoLocal, $equipoVisitante] = $result;
 
@@ -4941,7 +4941,7 @@ private function normalizarMinuto(string $texto): int
                                                             }
 
                                                         } else {
-                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$equipoLocalSlug} vs {$equipoVisitanteSlug} (fecha {$urlFecha})</span><br>";
+                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$urlPartido}</span><br>";
                                                         }
                                                     }
                                                 }
@@ -5118,7 +5118,7 @@ private function normalizarMinuto(string $texto): int
 
                                                             // acá ya podés usar $partido->id para grabar el penal errado
                                                         } else {
-                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$equipoLocalSlug} vs {$equipoVisitanteSlug} (fecha {$urlFecha})</span><br>";
+                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$urlPartido}</span><br>";
                                                         }
                                                     }
                                                 }
@@ -5294,7 +5294,7 @@ private function normalizarMinuto(string $texto): int
 
                                                             // acá ya podés usar $partido->id para grabar el penal errado
                                                         } else {
-                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$equipoLocalSlug} vs {$equipoVisitanteSlug} (fecha {$urlFecha})</span><br>";
+                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$urlPartido}</span><br>";
                                                         }
                                                     }
                                                 }
