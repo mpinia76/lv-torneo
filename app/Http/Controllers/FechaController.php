@@ -4641,23 +4641,10 @@ private function normalizarMinuto(string $texto): int
         $parts = explode('-', $urlPartido);
         $totalParts = count($parts);
 
-
-
-        // Probar todas las divisiones posibles
+        // Probar todas las combinaciones posibles
         for ($i = 1; $i < $totalParts; $i++) {
             $localSlug = implode('-', array_slice($parts, 0, $i));
             $visitanteSlug = implode('-', array_slice($parts, $i));
-
-            if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
-                return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
-            }
-        }
-
-        // Probar inversa
-        for ($i = 1; $i < $totalParts; $i++) {
-            $visitanteSlug = implode('-', array_slice($parts, 0, $i));
-            $localSlug = implode('-', array_slice($parts, $i));
-
             if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
                 return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
             }
@@ -4665,6 +4652,7 @@ private function normalizarMinuto(string $texto): int
 
         return null; // no encontró combinación
     }
+
 
 
 
