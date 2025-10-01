@@ -34,7 +34,6 @@ use App\Services\HttpHelper;
 use Illuminate\Support\Carbon;
 use DateTime;
 use Illuminate\Support\Facades\Http;
-
 class FechaController extends Controller
 {
     /**
@@ -5071,52 +5070,62 @@ private function normalizarMinuto(string $texto): int
                                                                 if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
-                                                                    // El itemId que aparece en el HTML de la página del partido
-                                                                    $itemId = 109511; // Cambialo según corresponda
-
-// URL completa del AJAX
-                                                                    $ajaxUrl = 'http://www.futbol360.com.ar/ajax/ajaxGetViewMatchContent.php';
-
-// Hacer la petición GET simulando el AJAX
-                                                                    $response = Http::asForm()->get($ajaxUrl, [
-                                                                        'itemId' => $itemId,
-                                                                        'type'   => 2, // generalmente '2' significa partido
+                                                                    $response = Http::asForm()->post('http://www.futbol360.com.ar/ajax/ajaxGetViewMatchContent.php', [
+                                                                        'url' => 'http://www.futbol360.com.ar//partidos/sudamerica/sudamericana-2025/grupo-a/independiente-nacional-potosi/inc/partido-independiente-nacional-potosi-28-05-2025.php.inc'
                                                                     ]);
 
-                                                                    if ($response->ok()) {
-                                                                        $htmlAjax = $response->body();
+                                                                    $htmlAjax = $response->body();
 
-                                                                        // Guardamos para debug
-                                                                        file_put_contents('debug_ajax_partido.html', $htmlAjax);
+// Ahora $htmlAjax contiene todo el HTML cargado vía AJAX
+// Podés parsearlo con DOMDocument / XPath como antes
+                                                                    $dom = new \DOMDocument();
+                                                                    libxml_use_internal_errors(true);
+                                                                    $dom->loadHTML(mb_convert_encoding($htmlAjax, 'HTML-ENTITIES', 'ISO-8859-1'));
+                                                                    libxml_clear_errors();
 
-                                                                        // Crear DOMDocument para parsear los eventos
-                                                                        $dom = new \DOMDocument();
-                                                                        libxml_use_internal_errors(true);
-                                                                        $dom->loadHTML(mb_convert_encoding($htmlAjax, 'HTML-ENTITIES', 'ISO-8859-1'));
-                                                                        libxml_clear_errors();
+                                                                    $xpath = new \DOMXPath($dom);
 
-                                                                        $xpath = new \DOMXPath($dom);
+                                                                    // Buscar todas las filas <tr>
+                                                                    $rows = $xpath->query('//tr');
 
-                                                                        // Buscar todos los eventos
-                                                                        $eventNodes = $xpath->query('//div[contains(@class, "event")]'); // ajusta según el HTML
-                                                                        foreach ($eventNodes as $event) {
-                                                                            $tipoNode = $xpath->query('.//span[contains(@class, "eventType")]', $event)->item(0);
-                                                                            $tipo = $tipoNode ? trim($tipoNode->textContent) : '';
-
-                                                                            $minutoNode = $xpath->query('.//span[contains(@class, "eventMinute")]', $event)->item(0);
-                                                                            $minuto = $minutoNode ? trim($minutoNode->textContent) : '';
-
-                                                                            $jugadorNode = $xpath->query('.//span[contains(@class, "eventPlayer")]', $event)->item(0);
-                                                                            $jugador = $jugadorNode ? trim($jugadorNode->textContent) : '';
-
-                                                                            // Filtramos penales errados
-                                                                            if (stripos($tipo, 'penal errado') !== false || stripos($tipo, 'penal fallado') !== false) {
-                                                                                Log::info("Penal errado: $jugador, minuto: $minuto");
+                                                                    foreach ($rows as $r) {
+                                                                        // Buscar todos los <a> que son jugadores
+                                                                        $playerLinks = [];
+                                                                        foreach ($xpath->query('.//a', $r) as $a) {
+                                                                            $href = $a->getAttribute('href');
+                                                                            if (strpos($href, '/jugadores/') !== false) {
+                                                                                $playerLinks[] = $a;
                                                                             }
                                                                         }
 
-                                                                    } else {
-                                                                        Log::error("No se pudo obtener el AJAX: " . $response->status());
+                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
+
+                                                                        foreach ($playerLinks as $i => $linkNode) {
+                                                                            $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
+                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
+                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
+                                                                            if ($jugadorSlugWeb === $slugJugador) {
+                                                                                $recordTd = $recordTds->item($i);
+                                                                                if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
+                                                                                    $texto = $recordTd->textContent;
+                                                                                    $minuto = $this->normalizarMinuto($texto);
+                                                                                    $jugadorPenalArray[$jugador->id][] = [
+                                                                                        'partido_id' => $partido->id,
+                                                                                        'jugador_id' => $jugador->id,
+                                                                                        'minuto' => $minuto,
+                                                                                        'tipo' => 'Atajado',
+                                                                                        'url' => $partidoUrl
+                                                                                    ];
+
+                                                                                    /*Log::channel('mi_log')->info(
+                                                                                        'Le atajaron penal en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl,
+                                                                                        []
+                                                                                    );*/
+
+                                                                                    $success .= "<span style='color:green'>Le atajaron penal en $torneoTexto ($equipoLocal vs $equipoVisitante) el $fecha->numero → $partidoUrl</span><br>";
+                                                                                }
+                                                                            }
+                                                                        }
                                                                     }
                                                                 }
 
