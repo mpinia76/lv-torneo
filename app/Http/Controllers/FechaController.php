@@ -4645,13 +4645,19 @@ private function normalizarMinuto(string $texto): int
         for ($i = 1; $i < $totalParts; $i++) {
             $localSlug = implode('-', array_slice($parts, 0, $i));
             $visitanteSlug = implode('-', array_slice($parts, $i));
+
+            Log::channel('mi_log')->info("Probando combinación: Local='$localSlug', Visitante='$visitanteSlug'");
+
             if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
+                Log::channel('mi_log')->info("¡Coincidencia encontrada! Local='$localSlug', Visitante='$visitanteSlug'");
                 return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
             }
         }
 
+        Log::channel('mi_log')->warning("No se encontró combinación para: $urlPartido");
         return null; // no encontró combinación
     }
+
 
 
 
