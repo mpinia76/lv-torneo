@@ -5071,25 +5071,24 @@ private function normalizarMinuto(string $texto): int
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
 
-                                                                    // Crear un nuevo DOMDocument y cargar el HTML
-                                                                   $dom = new \DOMDocument();
-                                                                    libxml_use_internal_errors(true);
-                                                                    $dom->loadHTML(mb_convert_encoding($htmlPartido, 'HTML-ENTITIES', 'ISO-8859-1'));
+                                                                    $domAtajado = new \DOMDocument();
+                                                                    libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                                                                    $domAtajado->loadHTML($htmlPartido);
                                                                     libxml_clear_errors();
 
-                                                                    $xpath = new \DOMXPath($dom);
+                                                                    // Crear un nuevo objeto XPath
+                                                                    $xpathAtajado = new \DOMXPath($domAtajado);
 
-                                                                    // Buscar todas las filas de la tabla principal de formación
-                                                                    $rows = $xpath->query('//div[@id="laFicha"]//table[1]//tr');
-                                                                    Log::channel('mi_log')->info('Total rows en la ficha: ' . $rows->length);
+                                                                    // Buscar todas las filas <tr>
+                                                                    $rowsAtajado = $xpathAtajado->query('//tr');
+                                                                    Log::channel('mi_log')->info('Total rows: ' . $rowsAtajado->length);
 
-
-                                                                    foreach ($rows as $r) {
-                                                                        Log::channel('mi_log')->info('Row HTML: ' . $dom->saveHTML($r));
+                                                                    foreach ($rowsAtajado as $r) {
+                                                                        //Log::channel('mi_log')->info('Row HTML: ' . $dom->saveHTML($r));
 
                                                                         // Buscar todos los <a> que son jugadores
                                                                         $playerLinks = [];
-                                                                        foreach ($xpath->query('.//a', $r) as $a) {
+                                                                        foreach ($xpathAtajado->query('.//a', $r) as $a) {
                                                                             $href = $a->getAttribute('href');
                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                 $playerLinks[] = trim($a->textContent);
@@ -5097,7 +5096,7 @@ private function normalizarMinuto(string $texto): int
                                                                         }
 
                                                                         Log::channel('mi_log')->info('Players: ' . json_encode($playerLinks));
-                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
+                                                                        $recordTds = $xpathAtajado->query('.//td[contains(@class, "record")]', $r);
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
