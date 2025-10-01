@@ -5069,19 +5069,21 @@ private function normalizarMinuto(string $texto): int
 
                                                                 if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
-                                                                    Log::channel('mi_log')->info('HTML recibido: ' . substr($htmlPartido, 0, 1000));
 
-                                                                    // Crear un nuevo DOMDocument y cargar el HTML
+
+                                                                    // Crear un nuevo DOMDocument y cargar el HTML con encoding correcto
                                                                     $dom = new \DOMDocument();
                                                                     libxml_use_internal_errors(true);
-                                                                    $dom->loadHTML($htmlPartido);
+
+                                                                    // Convertir ISO-8859-1 → entidades HTML para DOMDocument
+                                                                    $dom->loadHTML(mb_convert_encoding($htmlPartido, 'HTML-ENTITIES', 'ISO-8859-1'));
+
                                                                     libxml_clear_errors();
 
-                                                                    // Crear objeto XPath
                                                                     $xpath = new \DOMXPath($dom);
 
-                                                                    // Buscar todas las filas <tr>
-                                                                    $rows = $xpath->query('//tr');
+                                                                    // Buscar todas las filas en la tabla de formación
+                                                                    $rows = $xpath->query('//table[@class="matchRecord"]//tr');
                                                                     Log::channel('mi_log')->info('Total rows: ' . $rows->length);
 
                                                                     foreach ($rows as $r) {
