@@ -4656,9 +4656,20 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
+        // También probar la inversa (por si el visitante está primero)
+        for ($i = 1; $i < $totalParts; $i++) {
+            $visitanteSlug = implode('-', array_slice($parts, 0, $i));
+            $localSlug = implode('-', array_slice($parts, $i));
+
+            if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
+                return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
+            }
+        }
+
         // No encontró combinación válida
         return null;
     }
+
 
 
 
