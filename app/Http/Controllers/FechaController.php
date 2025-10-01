@@ -4665,15 +4665,7 @@ private function normalizarMinuto(string $texto): int
     $grupo_id = $request->get('grupoId');
     $grupo = Grupo::findOrFail($grupo_id);
 
-    $grupos = Grupo::where('torneo_id', '=',$grupo->torneo_id)->get();
-    $arrgrupos='';
-    foreach ($grupos as $grupo){
-        $arrgrupos .=$grupo->id.',';
-    }
-    $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->get();
-
-
-    //$plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
+    $plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
     // Crear array de slugs de los equipos existentes, sólo si equipo existe
     $slugsDB = [];
     foreach ($plantillas as $plantilla) {
