@@ -5099,9 +5099,14 @@ private function normalizarMinuto(string $texto): int
                                                                         // Buscar todos los eventos
                                                                         $eventNodes = $xpath->query('//div[contains(@class, "event")]'); // ajusta según el HTML
                                                                         foreach ($eventNodes as $event) {
-                                                                            $tipo = trim($xpath->query('.//span[contains(@class, "eventType")]', $event)->item(0)?->textContent ?? '');
-                                                                            $minuto = trim($xpath->query('.//span[contains(@class, "eventMinute")]', $event)->item(0)?->textContent ?? '');
-                                                                            $jugador = trim($xpath->query('.//span[contains(@class, "eventPlayer")]', $event)->item(0)?->textContent ?? '');
+                                                                            $tipoNode = $xpath->query('.//span[contains(@class, "eventType")]', $event)->item(0);
+                                                                            $tipo = $tipoNode ? trim($tipoNode->textContent) : '';
+
+                                                                            $minutoNode = $xpath->query('.//span[contains(@class, "eventMinute")]', $event)->item(0);
+                                                                            $minuto = $minutoNode ? trim($minutoNode->textContent) : '';
+
+                                                                            $jugadorNode = $xpath->query('.//span[contains(@class, "eventPlayer")]', $event)->item(0);
+                                                                            $jugador = $jugadorNode ? trim($jugadorNode->textContent) : '';
 
                                                                             // Filtramos penales errados
                                                                             if (stripos($tipo, 'penal errado') !== false || stripos($tipo, 'penal fallado') !== false) {
