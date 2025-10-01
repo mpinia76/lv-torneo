@@ -4641,15 +4641,14 @@ private function normalizarMinuto(string $texto): int
         $parts = explode('-', $urlPartido);
         $totalParts = count($parts);
 
+
+
         // Probar todas las divisiones posibles
         for ($i = 1; $i < $totalParts; $i++) {
             $localSlug = implode('-', array_slice($parts, 0, $i));
             $visitanteSlug = implode('-', array_slice($parts, $i));
 
-            Log::channel('mi_log')->info("Prueba normal: Local='$localSlug' Visitante='$visitanteSlug'");
-
             if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
-                Log::channel('mi_log')->info("✅ Coincidencia encontrada: Local='$localSlug' Visitante='$visitanteSlug'");
                 return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
             }
         }
@@ -4659,18 +4658,13 @@ private function normalizarMinuto(string $texto): int
             $visitanteSlug = implode('-', array_slice($parts, 0, $i));
             $localSlug = implode('-', array_slice($parts, $i));
 
-            Log::channel('mi_log')->info("Prueba inversa: Local='$localSlug' Visitante='$visitanteSlug'");
-
             if (isset($slugsDB[$localSlug]) && isset($slugsDB[$visitanteSlug])) {
-                Log::channel('mi_log')->info("✅ Coincidencia inversa encontrada: Local='$localSlug' Visitante='$visitanteSlug'");
                 return [$slugsDB[$localSlug], $slugsDB[$visitanteSlug]];
             }
         }
 
-        Log::channel('mi_log')->warning("❌ No se encontró combinación para slug: '$urlPartido'");
         return null; // no encontró combinación
     }
-
 
 
 
@@ -4947,7 +4941,7 @@ private function normalizarMinuto(string $texto): int
                                                             }
 
                                                         } else {
-                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$urlPartido}</span><br>";
+                                                            $success .= "<span style='color:red'>No se encontró  partido en DB para {$fecha->id} - { $equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                         }
                                                     }
                                                 }
@@ -5124,7 +5118,7 @@ private function normalizarMinuto(string $texto): int
 
                                                             // acá ya podés usar $partido->id para grabar el penal errado
                                                         } else {
-                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$urlPartido}</span><br>";
+                                                            $success .= "<span style='color:red'>No se encontró  partido en DB para {$fecha->id} - { $equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                         }
                                                     }
                                                 }
@@ -5300,7 +5294,7 @@ private function normalizarMinuto(string $texto): int
 
                                                             // acá ya podés usar $partido->id para grabar el penal errado
                                                         } else {
-                                                            $success .= "<span style='color:red'>No se encontró partido en DB para {$urlPartido}</span><br>";
+                                                            $success .= "<span style='color:red'>No se encontró  partido en DB para {$fecha->id} - { $equipoLocal->id} - {$equipoVisitante->id}</span><br>";
                                                         }
                                                     }
                                                 }
