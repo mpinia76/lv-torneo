@@ -4665,13 +4665,24 @@ private function normalizarMinuto(string $texto): int
     $grupo_id = $request->get('grupoId');
     $grupo = Grupo::findOrFail($grupo_id);
 
-    $plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
+    //$plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
+
+    $grupos = Grupo::where('torneo_id', '=',$grupo->torneo_id)->get();
+    $arrgrupos='';
+    foreach ($grupos as $grupo){
+        $arrgrupos .=$grupo->id.',';
+    }
+
+    $plantillas = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+
+
     // Crear array de slugs de los equipos existentes, sólo si equipo existe
     $slugsDB = [];
     foreach ($plantillas as $plantilla) {
         if ($plantilla->equipo) {
             $slug = strtolower($plantilla->equipo->url_nombre);
-            $slugsDB[$slug] = $plantilla->equipo->nombre;
+            $slugsDB[$slug] = $plantilla->equipo->id;
         }
     }
     $ok=1;
@@ -4853,14 +4864,14 @@ private function normalizarMinuto(string $texto): int
                                                         if ($equipoLocal && $equipoVisitante) {
                                                             // Buscar partido exacto en la fecha
                                                             $partido = Partido::where('fecha_id', $fecha->id)
-                                                                ->where('equipol_id', $equipoLocal->id)
-                                                                ->where('equipov_id', $equipoVisitante->id)
+                                                                ->where('equipol_id', $equipoLocal)
+                                                                ->where('equipov_id', $equipoVisitante)
                                                                 ->first();
                                                             if (!$partido) {
                                                                 // Probar invertido
                                                                 $partidoInvertido = Partido::where('fecha_id', $fecha->id)
-                                                                    ->where('equipol_id', $equipoVisitante->id)
-                                                                    ->where('equipov_id', $equipoLocal->id)
+                                                                    ->where('equipol_id', $equipoVisitante)
+                                                                    ->where('equipov_id', $equipoLocal)
                                                                     ->first();
 
                                                                 if ($partidoInvertido && $partidoInvertido->neutral == 1) {
@@ -4937,7 +4948,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                             'url' => $urlInc
                                                                                                         ];
 
-                                                                                                        $success .= "<span style='color:green'>".$slugJugador." erró penal en ".$equipoLocal->nombre." vs ".$equipoVisitante->nombre."</span><br>";
+                                                                                                        $success .= "<span style='color:green'>".$slugJugador." erró penal en ".$equipoLocal." vs ".$equipoVisitante."</span><br>";
                                                                                                     }
 
                                                                                                     unset($evento); // reseteo para no mezclar eventos
@@ -5059,14 +5070,14 @@ private function normalizarMinuto(string $texto): int
                                                         if ($equipoLocal && $equipoVisitante) {
                                                             // Buscar partido exacto en la fecha
                                                             $partido = Partido::where('fecha_id', $fecha->id)
-                                                                ->where('equipol_id', $equipoLocal->id)
-                                                                ->where('equipov_id', $equipoVisitante->id)
+                                                                ->where('equipol_id', $equipoLocal)
+                                                                ->where('equipov_id', $equipoVisitante)
                                                                 ->first();
                                                             if (!$partido) {
                                                                 // Probar invertido
                                                                 $partidoInvertido = Partido::where('fecha_id', $fecha->id)
-                                                                    ->where('equipol_id', $equipoVisitante->id)
-                                                                    ->where('equipov_id', $equipoLocal->id)
+                                                                    ->where('equipol_id', $equipoVisitante)
+                                                                    ->where('equipov_id', $equipoLocal)
                                                                     ->first();
 
                                                                 if ($partidoInvertido && $partidoInvertido->neutral == 1) {
@@ -5144,7 +5155,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                             'url' => $urlInc
                                                                                                         ];
 
-                                                                                                        $success .= "<span style='color:green'>".$slugJugador." le atajaron penal en ".$equipoLocal->nombre." vs ".$equipoVisitante->nombre."</span><br>";
+                                                                                                        $success .= "<span style='color:green'>".$slugJugador." le atajaron penal en ".$equipoLocal." vs ".$equipoVisitante."</span><br>";
                                                                                                     }
 
                                                                                                     unset($evento); // reseteo para no mezclar eventos
@@ -5267,14 +5278,14 @@ private function normalizarMinuto(string $texto): int
                                                         if ($equipoLocal && $equipoVisitante) {
                                                             // Buscar partido exacto en la fecha
                                                             $partido = Partido::where('fecha_id', $fecha->id)
-                                                                ->where('equipol_id', $equipoLocal->id)
-                                                                ->where('equipov_id', $equipoVisitante->id)
+                                                                ->where('equipol_id', $equipoLocal)
+                                                                ->where('equipov_id', $equipoVisitante)
                                                                 ->first();
                                                             if (!$partido) {
                                                                 // Probar invertido
                                                                 $partidoInvertido = Partido::where('fecha_id', $fecha->id)
-                                                                    ->where('equipol_id', $equipoVisitante->id)
-                                                                    ->where('equipov_id', $equipoLocal->id)
+                                                                    ->where('equipol_id', $equipoVisitante)
+                                                                    ->where('equipov_id', $equipoLocal)
                                                                     ->first();
 
                                                                 if ($partidoInvertido && $partidoInvertido->neutral == 1) {
@@ -5348,7 +5359,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                             'url' => $urlInc
                                                                                                         ];
 
-                                                                                                        $success .= "<span style='color:green'>".$slugJugador." atajó penal en ".$equipoLocal->nombre." vs ".$equipoVisitante->nombre."</span><br>";
+                                                                                                        $success .= "<span style='color:green'>".$slugJugador." atajó penal en ".$equipoLocal." vs ".$equipoVisitante."</span><br>";
                                                                                                     }
 
                                                                                                     unset($evento); // reseteo para no mezclar eventos
