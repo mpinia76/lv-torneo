@@ -5009,8 +5009,8 @@ private function normalizarMinuto(string $texto): int
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
                                             $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
-                                            /*$equipoVisitante = trim($cols->item(2)->textContent);
-                                            $fechaPartido = trim($cols->item(3)->textContent);*/
+                                            /*$equipoVisitante = trim($cols->item(2)->textContent);*/
+                                            $fechaPartido = trim($cols->item(3)->textContent);
                                             $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
                                             $torneoTexto = trim($cols->item(4)->textContent);
 
@@ -5023,7 +5023,7 @@ private function normalizarMinuto(string $texto): int
                                             Log::channel('mi_log')->info('Link '.$partidoLink, []);
                                             $urlFecha    = $parts[4] ?? null; // ej: 32-de-final
                                             $urlPartido  = $parts[5] ?? null; // ej: river-cd-de-bolivar
-                                            Log::channel('mi_log')->info('Fecha '.$urlFecha, []);
+                                            Log::channel('mi_log')->info('Fecha '.$fechaPartido, []);
                                             Log::channel('mi_log')->info('Partido '.$urlPartido, []);
 
                                             if ($urlFecha && $urlPartido) {
@@ -5070,7 +5070,10 @@ private function normalizarMinuto(string $texto): int
                                                                 if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
-                                                                    $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/grupo-a/independiente-nacional-potosi/inc/partido-independiente-nacional-potosi-28-05-2025.php.inc";
+                                                                    $baseUrl = "http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/grupo-a/independiente-nacional-potosi/inc/";
+                                                                    $fileName = "partido-independiente-nacional-potosi-28-05-2025.php.inc";
+
+                                                                    $urlInc = $baseUrl . $fileName;
 
                                                                     $response = Http::get($urlInc);
 
