@@ -4638,6 +4638,7 @@ private function normalizarMinuto(string $texto): int
      * @return array|null [Equipo $local, Equipo $visitante] o null si no encuentra
      */
     function splitEquiposFromUrlToModels($urlPartido, $slugsDB) {
+        Log::channel('mi_log')->info('Slugs DB: ' . print_r($slugsDB, true));
         $parts = explode('-', $urlPartido);
         $totalParts = count($parts);
 
