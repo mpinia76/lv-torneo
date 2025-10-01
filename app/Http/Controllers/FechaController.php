@@ -4637,14 +4637,11 @@ private function normalizarMinuto(string $texto): int
      * @param \Illuminate\Database\Eloquent\Collection $plantillas Plantillas del grupo (contienen equipos)
      * @return array|null [Equipo $local, Equipo $visitante] o null si no encuentra
      */
-    function splitEquiposFromUrlToModels($urlPartido, $plantillas) {
+    function splitEquiposFromUrlToModels($urlPartido, $slugsDB) {
         $parts = explode('-', $urlPartido);
         $totalParts = count($parts);
 
-        // Crear array de slugs de los equipos existentes
-        $slugsDB = $plantillas->mapWithKeys(function($plantilla) {
-            return [strtolower($plantilla->equipo->url_nombre) => $plantilla->equipo];
-        })->toArray();
+
 
         // Probar todas las divisiones posibles
         for ($i = 1; $i < $totalParts; $i++) {
@@ -4656,7 +4653,7 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
-        // También probar la inversa (por si el visitante está primero)
+        // Probar inversa
         for ($i = 1; $i < $totalParts; $i++) {
             $visitanteSlug = implode('-', array_slice($parts, 0, $i));
             $localSlug = implode('-', array_slice($parts, $i));
@@ -4666,9 +4663,9 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
-        // No encontró combinación válida
-        return null;
+        return null; // no encontró combinación
     }
+
 
 
 
@@ -4681,6 +4678,14 @@ private function normalizarMinuto(string $texto): int
     $grupo = Grupo::findOrFail($grupo_id);
 
     $plantillas = Plantilla::where('grupo_id','=',$grupo_id)->get();
+    // Crear array de slugs de los equipos existentes, sólo si equipo existe
+    $slugsDB = [];
+    foreach ($plantillas as $plantilla) {
+        if ($plantilla->equipo) {
+            $slug = strtolower($plantilla->equipo->url_nombre);
+            $slugsDB[$slug] = $plantilla->equipo;
+        }
+    }
     $ok=1;
     $error='';
     $success='';
@@ -4848,8 +4853,8 @@ private function normalizarMinuto(string $texto): int
 
                                                 if (!empty($fecha)) {
                                                     // Equipos (separados por "-")
-                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);
-
+                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB) ;
+                                                    dd($result);
                                                     if ($result) {
                                                         [$equipoLocal, $equipoVisitante] = $result;
 
@@ -5023,7 +5028,7 @@ private function normalizarMinuto(string $texto): int
 
                                                 if (!empty($fecha)) {
                                                     // Equipos (separados por "-")
-                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);
+                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB) ;
 
                                                     if ($result) {
                                                         [$equipoLocal, $equipoVisitante] = $result;
@@ -5199,7 +5204,7 @@ private function normalizarMinuto(string $texto): int
                                                 $fecha = Fecha::where('url_nombre', $urlFecha)->where('grupo_id', $grupo_id)->first();
 
                                                 if (!empty($fecha)) {
-                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $plantillas);
+                                                    $result = $this->splitEquiposFromUrlToModels($urlPartido, $slugsDB) ;
 
                                                     if ($result) {
                                                         [$equipoLocal, $equipoVisitante] = $result;
