@@ -4971,7 +4971,7 @@ private function normalizarMinuto(string $texto): int
                                                         }
                                                     }
                                                     if(!$encotro) {
-                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$equipoLocal->id} - {$equipoVisitante->id}</span><br>";
+                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$urlPartido}</span><br>";
                                                     }
                                                 }
                                                 else{
@@ -5182,7 +5182,7 @@ private function normalizarMinuto(string $texto): int
                                                         }
                                                     }
                                                     if(!$encotro) {
-                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$equipoLocal->id} - {$equipoVisitante->id}</span><br>";
+                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$urlPartido}</span><br>";
                                                     }
                                                 }
                                                 else{
@@ -5241,7 +5241,7 @@ private function normalizarMinuto(string $texto): int
                                         // Buscar los encabezados de la fila (th)
                                         //Log::channel('mi_log')->info('encontro atajo', []);
                                         $cols = $xpath->query('./th', $row);
-                                        Log::channel('mi_log')->info('Atajó col - '.$cols->length.' - '.$slugJugador, []);
+                                        //Log::channel('mi_log')->info('Atajó col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
                                             $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
@@ -5334,8 +5334,6 @@ private function normalizarMinuto(string $texto): int
 
                                                                             foreach ($playerLinks as $i => $linkNode) {
                                                                                 $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                                Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
-                                                                                Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
                                                                                 if (trim($jugadorSlugWeb) === trim($slugJugador)) {
                                                                                     //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
                                                                                     //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
@@ -5349,7 +5347,7 @@ private function normalizarMinuto(string $texto): int
                                                                                             } elseif ($child->nodeType === XML_TEXT_NODE) {
                                                                                                 $texto = trim($child->textContent); // Ej: 25pt, 26pt, 8st
                                                                                                 if (!empty($texto) && isset($evento)) {
-                                                                                                    Log::channel('mi_log')->info("Evento: $evento en minuto $texto");
+                                                                                                    //Log::channel('mi_log')->info("Evento: $evento en minuto $texto");
 
                                                                                                     if (stripos($evento, 'Penal atajado') !== false) {
                                                                                                         $minuto = $this->normalizarMinuto($texto);
@@ -5385,7 +5383,7 @@ private function normalizarMinuto(string $texto): int
                                                         }
                                                     }
                                                     if (!$encotro) {
-                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$equipoLocal->id} - {$equipoVisitante->id}</span><br>";
+                                                        $success .= "<span style='color:red'>No se encontró  partido en DB para {$urlFecha} - {$urlPartido}</span><br>";
                                                     }
                                                 }
                                                 else{
