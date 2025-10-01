@@ -4671,7 +4671,7 @@ private function normalizarMinuto(string $texto): int
     foreach ($plantillas as $plantilla) {
         if ($plantilla->equipo) {
             $slug = strtolower($plantilla->equipo->url_nombre);
-            $slugsDB[$slug] = $plantilla->equipo;
+            $slugsDB[$slug] = $plantilla->equipo->nombre;
         }
     }
     $ok=1;
