@@ -4802,38 +4802,38 @@ private function normalizarMinuto(string $texto): int
                     if ($htmlErrado) {
 
                         // Crear un nuevo DOMDocument y cargar el HTML
-                        $domErrado = new \DOMDocument();
+                        $dom = new \DOMDocument();
                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                        $domErrado->loadHTML($htmlErrado);
+                        $dom->loadHTML($htmlErrado);
                         libxml_clear_errors();
 
                         // Crear un nuevo objeto XPath
-                        $xpathErrrado = new \DOMXPath($domErrado);
+                        $xpath = new \DOMXPath($dom);
 
                         // Buscar el div con id 'matchesTable'
-                        $matchesTableNodes = $xpathErrrado->query('//div[@id="matchesTable"]');
+                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
 
                         foreach ($matchesTableNodes as $div) {
                             // Buscar las tablas con clase 'tableStandard'
-                            $tables = $xpathErrrado->query('.//table[contains(@class, "tableStandard")]', $div);
+                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
 
                             foreach ($tables as $table) {
                                 // Buscar las filas de la tabla
-                                $rows = $xpathErrrado->query('.//tr', $table);
+                                $rows = $xpath->query('.//tr', $table);
 
                                 foreach ($rows as $row) {
                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                     if (trim($row->textContent) != 'No hay resultados') {
                                         // Buscar los encabezados de la fila (th)
                                         Log::channel('mi_log')->info('encontro errado', []);
-                                        $cols = $xpathErrrado->query('./th', $row);
+                                        $cols = $xpath->query('./th', $row);
                                         Log::channel('mi_log')->info('Errado col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
-                                            $partidoLink = $xpathErrrado->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
+                                            $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
                                             /*$equipoVisitante = trim($cols->item(2)->textContent);
                                             $fechaPartido = trim($cols->item(3)->textContent);*/
-                                            $torneoLink = $xpathErrrado->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
+                                            $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
                                             $torneoTexto = trim($cols->item(4)->textContent);
 
                                             // 🔎 filtro: comparar contra url_nombre del torneo en tu DB
@@ -4884,40 +4884,34 @@ private function normalizarMinuto(string $texto): int
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
-                                                                $htmlPartidoErrado = HttpHelper::getHtmlContent($partidoUrl);
+                                                                $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
 
-                                                                if ($htmlPartidoErrado) {
+                                                                if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
-                                                                    // Guardarlo en un archivo para revisarlo completo
-                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlPartidoErrado);
 
-                                                                    // También loguear tamaño y primeros caracteres para ver que algo llegó
-                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl);
-                                                                    Log::channel('mi_log')->info('HTML size: ' . strlen($htmlPartidoErrado));
-                                                                    Log::channel('mi_log')->info('HTML preview: ' . substr($htmlPartidoErrado, 0, 2000));
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
-                                                                    $domPartidoErrado = new \DOMDocument();
+                                                                    $dom = new \DOMDocument();
                                                                     libxml_use_internal_errors(true);
-                                                                    $domPartidoErrado->loadHTML($htmlPartidoErrado);
+                                                                    $dom->loadHTML($htmlPartido);
                                                                     libxml_clear_errors();
 
                                                                     // Crear objeto XPath
-                                                                    $xpathPartidoErrrado = new \DOMXPath($domPartidoErrado);
+                                                                    $xpath = new \DOMXPath($dom);
 
                                                                     // Buscar todas las filas <tr>
-                                                                    $rows = $xpathPartidoErrrado->query('//tr');
+                                                                    $rows = $xpath->query('//tr');
 
                                                                     foreach ($rows as $r) {
                                                                         // Buscar todos los <a> que son jugadores
                                                                         $playerLinks = [];
-                                                                        foreach ($xpathPartidoErrrado->query('.//a', $r) as $a) {
+                                                                        foreach ($xpath->query('.//a', $r) as $a) {
                                                                             $href = $a->getAttribute('href');
                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                 $playerLinks[] = $a;
                                                                             }
                                                                         }
 
-                                                                        $recordTds = $xpathPartidoErrrado->query('.//td[contains(@class, "record")]', $r);
+                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
@@ -4986,38 +4980,38 @@ private function normalizarMinuto(string $texto): int
                     if ($htmlAtajado) {
 
                         // Crear un nuevo DOMDocument y cargar el HTML
-                        $domAtajado = new \DOMDocument();
+                        $dom = new \DOMDocument();
                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                        $domAtajado->loadHTML($htmlAtajado);
+                        $dom->loadHTML($htmlAtajado);
                         libxml_clear_errors();
 
                         // Crear un nuevo objeto XPath
-                        $xpathAtajado = new \DOMXPath($domAtajado);
+                        $xpath = new \DOMXPath($dom);
 
                         // Buscar el div con id 'matchesTable'
-                        $matchesTableNodes = $xpathAtajado->query('//div[@id="matchesTable"]');
+                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
 
                         foreach ($matchesTableNodes as $div) {
                             // Buscar las tablas con clase 'tableStandard'
-                            $tables = $xpathAtajado->query('.//table[contains(@class, "tableStandard")]', $div);
+                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
 
                             foreach ($tables as $table) {
                                 // Buscar las filas de la tabla
-                                $rows = $xpathAtajado->query('.//tr', $table);
+                                $rows = $xpath->query('.//tr', $table);
 
                                 foreach ($rows as $row) {
                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                     if (trim($row->textContent) != 'No hay resultados') {
                                         // Buscar los encabezados de la fila (th)
                                         Log::channel('mi_log')->info('encontro Atajado', []);
-                                        $cols = $xpathAtajado->query('./th', $row);
+                                        $cols = $xpath->query('./th', $row);
                                         Log::channel('mi_log')->info('Atajado col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
-                                            $partidoLink = $xpathAtajado->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
+                                            $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
                                             /*$equipoVisitante = trim($cols->item(2)->textContent);
                                             $fechaPartido = trim($cols->item(3)->textContent);*/
-                                            $torneoLink = $xpathAtajado->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
+                                            $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
                                             $torneoTexto = trim($cols->item(4)->textContent);
 
                                             // 🔎 filtro: comparar contra url_nombre del torneo en tu DB
@@ -5071,71 +5065,52 @@ private function normalizarMinuto(string $texto): int
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
-                                                                $htmlPartidoAtajado = HttpHelper::getHtmlContent($partidoUrl);
+                                                                $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
 
-                                                                if ($htmlPartidoAtajado) {
+                                                                if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
-// Guardarlo en un archivo para revisarlo completo
-                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlPartidoAtajado);
+                                                                    // El itemId que aparece en el HTML de la página del partido
+                                                                    $itemId = 109511; // Cambialo según corresponda
 
-                                                                    // También loguear tamaño y primeros caracteres para ver que algo llegó
-                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl);
-                                                                    Log::channel('mi_log')->info('HTML size: ' . strlen($htmlPartidoAtajado));
-                                                                    Log::channel('mi_log')->info('HTML preview: ' . substr($htmlPartidoAtajado, 0, 2000));
-                                                                    $domPartidoAtajado = new \DOMDocument();
-                                                                    libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                                                                    $domPartidoAtajado->loadHTML($htmlPartidoAtajado);
-                                                                    libxml_clear_errors();
+// URL completa del AJAX
+                                                                    $ajaxUrl = 'http://www.futbol360.com.ar/ajax/ajaxGetViewMatchContent.php';
 
-                                                                    // Crear un nuevo objeto XPath
-                                                                    $xpathPartidoAtajadoAtajado = new \DOMXPath($domPartidoAtajado);
+// Hacer la petición GET simulando el AJAX
+                                                                    $response = Http::asForm()->get($ajaxUrl, [
+                                                                        'itemId' => $itemId,
+                                                                        'type'   => 2, // generalmente '2' significa partido
+                                                                    ]);
 
-                                                                    // Buscar todas las filas <tr>
-                                                                    $rowsAtajado = $xpathPartidoAtajadoAtajado->query('//tr');
-                                                                    Log::channel('mi_log')->info('Total rows: ' . $rowsAtajado->length);
+                                                                    if ($response->ok()) {
+                                                                        $htmlAjax = $response->body();
 
-                                                                    foreach ($rowsAtajado as $r) {
-                                                                        //Log::channel('mi_log')->info('Row HTML: ' . $dom->saveHTML($r));
+                                                                        // Guardamos para debug
+                                                                        file_put_contents('debug_ajax_partido.html', $htmlAjax);
 
-                                                                        // Buscar todos los <a> que son jugadores
-                                                                        $playerLinks = [];
-                                                                        foreach ($xpathPartidoAtajadoAtajado->query('.//a', $r) as $a) {
-                                                                            $href = $a->getAttribute('href');
-                                                                            if (strpos($href, '/jugadores/') !== false) {
-                                                                                $playerLinks[] = trim($a->textContent);
+                                                                        // Crear DOMDocument para parsear los eventos
+                                                                        $dom = new \DOMDocument();
+                                                                        libxml_use_internal_errors(true);
+                                                                        $dom->loadHTML(mb_convert_encoding($htmlAjax, 'HTML-ENTITIES', 'ISO-8859-1'));
+                                                                        libxml_clear_errors();
+
+                                                                        $xpath = new \DOMXPath($dom);
+
+                                                                        // Buscar todos los eventos
+                                                                        $eventNodes = $xpath->query('//div[contains(@class, "event")]'); // ajusta según el HTML
+                                                                        foreach ($eventNodes as $event) {
+                                                                            $tipo = trim($xpath->query('.//span[contains(@class, "eventType")]', $event)->item(0)?->textContent ?? '');
+                                                                            $minuto = trim($xpath->query('.//span[contains(@class, "eventMinute")]', $event)->item(0)?->textContent ?? '');
+                                                                            $jugador = trim($xpath->query('.//span[contains(@class, "eventPlayer")]', $event)->item(0)?->textContent ?? '');
+
+                                                                            // Filtramos penales errados
+                                                                            if (stripos($tipo, 'penal errado') !== false || stripos($tipo, 'penal fallado') !== false) {
+                                                                                Log::info("Penal errado: $jugador, minuto: $minuto");
                                                                             }
                                                                         }
 
-                                                                        Log::channel('mi_log')->info('Players: ' . json_encode($playerLinks));
-                                                                        $recordTds = $xpathPartidoAtajadoAtajado->query('.//td[contains(@class, "record")]', $r);
-
-                                                                        foreach ($playerLinks as $i => $linkNode) {
-                                                                            $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb, []);
-                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador, []);
-                                                                            if ($jugadorSlugWeb === $slugJugador) {
-                                                                                $recordTd = $recordTds->item($i);
-                                                                                if ($recordTd && strpos($recordTd->textContent, 'PenaltyFailed') !== false) {
-                                                                                    $texto = $recordTd->textContent;
-                                                                                    $minuto = $this->normalizarMinuto($texto);
-                                                                                    $jugadorPenalArray[$jugador->id][] = [
-                                                                                        'partido_id' => $partido->id,
-                                                                                        'jugador_id' => $jugador->id,
-                                                                                        'minuto' => $minuto,
-                                                                                        'tipo' => 'Atajado',
-                                                                                        'url' => $partidoUrl
-                                                                                    ];
-
-                                                                                    /*Log::channel('mi_log')->info(
-                                                                                        'Le atajaron penal en '.$torneoTexto.' ('.$equipoLocal.' vs '.$equipoVisitante.') el '.$fecha->numero.' → '.$partidoUrl,
-                                                                                        []
-                                                                                    );*/
-
-                                                                                    $success .= "<span style='color:green'>Le atajaron penal en $torneoTexto ($equipoLocal vs $equipoVisitante) el $fecha->numero → $partidoUrl</span><br>";
-                                                                                }
-                                                                            }
-                                                                        }
+                                                                    } else {
+                                                                        Log::error("No se pudo obtener el AJAX: " . $response->status());
                                                                     }
                                                                 }
 
@@ -5178,38 +5153,38 @@ private function normalizarMinuto(string $texto): int
                     if ($htmlAtajo) {
 
                         // Crear un nuevo DOMDocument y cargar el HTML
-                        $domAtajo = new \DOMDocument();
+                        $dom = new \DOMDocument();
                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                        $domAtajo->loadHTML($htmlAtajo);
+                        $dom->loadHTML($htmlAtajo);
                         libxml_clear_errors();
 
                         // Crear un nuevo objeto XPath
-                        $xpathAtajo = new \DOMXPath($domAtajo);
+                        $xpath = new \DOMXPath($dom);
 
                         // Buscar el div con id 'matchesTable'
-                        $matchesTableNodes = $xpathAtajo->query('//div[@id="matchesTable"]');
+                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
 
                         foreach ($matchesTableNodes as $div) {
                             // Buscar las tablas con clase 'tableStandard'
-                            $tables = $xpathAtajo->query('.//table[contains(@class, "tableStandard")]', $div);
+                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
 
                             foreach ($tables as $table) {
                                 // Buscar las filas de la tabla
-                                $rows = $xpathAtajo->query('.//tr', $table);
+                                $rows = $xpath->query('.//tr', $table);
 
                                 foreach ($rows as $row) {
                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                     if (trim($row->textContent) != 'No hay resultados') {
                                         // Buscar los encabezados de la fila (th)
                                         Log::channel('mi_log')->info('encontro atajo', []);
-                                        $cols = $xpathAtajo->query('./th', $row);
+                                        $cols = $xpath->query('./th', $row);
                                         Log::channel('mi_log')->info('Atajó col - '.$cols->length.' - '.$slugJugador, []);
                                         if ($cols->length >= 5) {
                                             //$equipoLocal = trim($cols->item(0)->textContent);
-                                            $partidoLink = $xpathAtajo->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
+                                            $partidoLink = $xpath->query('.//a', $cols->item(1))->item(0)->getAttribute('href');
                                             /*$equipoVisitante = trim($cols->item(2)->textContent);
                                             $fechaPartido = trim($cols->item(3)->textContent);*/
-                                            $torneoLink = $xpathAtajo->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
+                                            $torneoLink = $xpath->query('.//a', $cols->item(4))->item(0)->getAttribute('href');
                                             $torneoTexto = trim($cols->item(4)->textContent);
 
                                             // 🔎 filtro: comparar contra url_nombre del torneo en tu DB
@@ -5260,40 +5235,34 @@ private function normalizarMinuto(string $texto): int
                                                                 // Si pasa el filtro, procesamos
                                                                 $partidoUrl = "http://www.futbol360.com.ar" . $partidoLink;
                                                                 //$success .= "✔ Partido encontrado en DB: {$equipoLocal->nombre} vs {$equipoVisitante->nombre}, ID={$partido->id}<br>";
-                                                                $htmlPartidoAtajo = HttpHelper::getHtmlContent($partidoUrl);
+                                                                $htmlPartido = HttpHelper::getHtmlContent($partidoUrl);
 
-                                                                if ($htmlPartidoAtajo) {
+                                                                if ($htmlPartido) {
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
-// Guardarlo en un archivo para revisarlo completo
-                                                                    file_put_contents(storage_path('logs/debug_partido.html'), $htmlPartidoAtajo);
 
-                                                                    // También loguear tamaño y primeros caracteres para ver que algo llegó
-                                                                    Log::channel('mi_log')->info('Partido: ' . $partidoUrl);
-                                                                    Log::channel('mi_log')->info('HTML size: ' . strlen($htmlPartidoAtajo));
-                                                                    Log::channel('mi_log')->info('HTML preview: ' . substr($htmlPartidoAtajo, 0, 2000));
                                                                     // Crear un nuevo DOMDocument y cargar el HTML
-                                                                    $domPartidoAtajo = new \DOMDocument();
+                                                                    $dom = new \DOMDocument();
                                                                     libxml_use_internal_errors(true);
-                                                                    $domPartidoAtajo->loadHTML($htmlPartidoAtajo);
+                                                                    $dom->loadHTML($htmlPartido);
                                                                     libxml_clear_errors();
 
                                                                     // Crear objeto XPath
-                                                                    $xpathPartidoAtajo = new \DOMXPath($domPartidoAtajo);
+                                                                    $xpath = new \DOMXPath($dom);
 
                                                                     // Buscar todas las filas <tr>
-                                                                    $rows = $xpathPartidoAtajo->query('//tr');
+                                                                    $rows = $xpath->query('//tr');
 
                                                                     foreach ($rows as $r) {
                                                                         // Buscar todos los <a> que son jugadores
                                                                         $playerLinks = [];
-                                                                        foreach ($xpathPartidoAtajo->query('.//a', $r) as $a) {
+                                                                        foreach ($xpath->query('.//a', $r) as $a) {
                                                                             $href = $a->getAttribute('href');
                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                 $playerLinks[] = $a;
                                                                             }
                                                                         }
 
-                                                                        $recordTds = $xpathPartidoAtajo->query('.//td[contains(@class, "record")]', $r);
+                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
 
                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
