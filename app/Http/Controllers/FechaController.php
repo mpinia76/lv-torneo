@@ -5071,20 +5071,18 @@ private function normalizarMinuto(string $texto): int
                                                                     Log::channel('mi_log')->info('Partido: ' . $partidoUrl, []);
 
 
-                                                                    // Crear un nuevo DOMDocument y cargar el HTML con encoding correcto
-                                                                    $dom = new \DOMDocument();
+                                                                    // Crear un nuevo DOMDocument y cargar el HTML
+                                                                   $dom = new \DOMDocument();
                                                                     libxml_use_internal_errors(true);
-
-                                                                    // Convertir ISO-8859-1 → entidades HTML para DOMDocument
                                                                     $dom->loadHTML(mb_convert_encoding($htmlPartido, 'HTML-ENTITIES', 'ISO-8859-1'));
-
                                                                     libxml_clear_errors();
 
                                                                     $xpath = new \DOMXPath($dom);
 
-                                                                    // Buscar todas las filas en la tabla de formación
-                                                                    $rows = $xpath->query('//table[@class="matchRecord"]//tr');
-                                                                    Log::channel('mi_log')->info('Total rows: ' . $rows->length);
+                                                                    // Buscar todas las filas de la tabla principal de formación
+                                                                    $rows = $xpath->query('//div[@id="laFicha"]//table[1]//tr');
+                                                                    Log::channel('mi_log')->info('Total rows en la ficha: ' . $rows->length);
+
 
                                                                     foreach ($rows as $r) {
                                                                         Log::channel('mi_log')->info('Row HTML: ' . $dom->saveHTML($r));
