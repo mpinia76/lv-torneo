@@ -5542,6 +5542,7 @@ private function normalizarMinuto(string $texto): int
                                 });
                         })
                         ->get();
+
                     $jugadorPenalArray = array();
 
                     foreach ($alineaciones as $alineacion) {
