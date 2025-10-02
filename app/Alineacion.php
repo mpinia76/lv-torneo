@@ -21,10 +21,17 @@ class Alineacion extends Model
     }
 
     // App/Alineacion.php
-    public function cambios()
+    /*public function cambios()
     {
         return $this->hasMany(Cambio::class, 'jugador_id', 'jugador_id')
             ->whereColumn('partido_id', 'alineacions.partido_id');
+    }*/
+
+    public function cambios()
+    {
+        return $this->hasMany(Cambio::class, 'jugador_id', 'jugador_id');
     }
+
+
 
 }

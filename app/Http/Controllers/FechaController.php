@@ -5491,6 +5491,9 @@ private function normalizarMinuto(string $texto): int
             $sigo = 1;
             //Log::channel('mi_log')->info('Fecha ' . $fecha->numero, []);
             foreach ($partidos as $partido) {
+
+
+
                 $strLocal = $partido->equipol->nombre;
                 $strVisitante = $partido->equipov->nombre;
                 if (!$this->dameIdEquipoURL($strLocal)) {
@@ -5531,16 +5534,18 @@ private function normalizarMinuto(string $texto): int
                     $success .= '<span style="color:orange">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' - ' . $fecha->numero . '</span><br>';
 
                     //$alineaciones = Alineacion::where('partido_id', '=', "$partido->id")->get();
-                    $alineaciones = Alineacion::with(['cambios' => function($q) {
-                        $q->where('tipo', 'Entra');
-                    }])
-                        ->where('partido_id', $partido->id)
-                        ->where(function ($q) {
+                    $alineaciones = Alineacion::where('partido_id', $partido->id)
+                        ->where(function ($q) use ($partido) { // <--- agregamos use($partido)
                             $q->where('tipo', 'Titular')
-                                ->orWhereHas('cambios', function ($q) {
-                                    $q->where('tipo', 'Entra');
+                                ->orWhereHas('cambios', function ($q2) use ($partido) {
+                                    $q2->where('tipo', 'Entra')
+                                        ->where('partido_id', $partido->id);
                                 });
                         })
+                        ->with(['cambios' => function ($q) use ($partido) {
+                            $q->where('tipo', 'Entra')
+                                ->where('partido_id', $partido->id);
+                        }])
                         ->get();
 
                     $jugadorPenalArray = array();
