@@ -5792,7 +5792,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                                 if (stripos($evento, 'Penal errado') !== false) {
                                                                                                                     $minuto = $this->normalizarMinuto($texto);
 
-                                                                                                                    $jugadorPenalArray[$jugador->id][] = [
+                                                                                                                    $jugadorPenalArray[$alineacion->jugador->id][] = [
                                                                                                                         'partido_id' => $partido->id,
                                                                                                                         'jugador_id' => $alineacion->jugador->id,
                                                                                                                         'minuto' => $minuto,
@@ -5991,7 +5991,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                                 if (stripos($evento, 'Penal errado') !== false) {
                                                                                                                     $minuto = $this->normalizarMinuto($texto);
 
-                                                                                                                    $jugadorPenalArray[$jugador->id][] = [
+                                                                                                                    $jugadorPenalArray[$alineacion->jugador->id][] = [
                                                                                                                         'partido_id' => $partido->id,
                                                                                                                         'jugador_id' => $alineacion->jugador->id,
                                                                                                                         'minuto' => $minuto,
@@ -6190,7 +6190,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                                 if (stripos($evento, 'Penal atajado') !== false) {
                                                                                                                     $minuto = $this->normalizarMinuto($texto);
 
-                                                                                                                    $jugadorPenalArray[$jugador->id][] = [
+                                                                                                                    $jugadorPenalArray[$alineacion->jugador->id][] = [
                                                                                                                         'partido_id' => $partido->id,
                                                                                                                         'jugador_id' => $alineacion->jugador->id,
                                                                                                                         'minuto' => $minuto,
