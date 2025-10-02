@@ -4660,6 +4660,7 @@ private function normalizarMinuto(string $texto): int
 
     public function importpenalesfecha_old(Request $request)
 {
+
     set_time_limit(0);
 
     $grupo_id = $request->get('grupoId');
@@ -5462,18 +5463,19 @@ private function normalizarMinuto(string $texto): int
 
     public function importpenalesfecha(Request $request)
     {
+
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
 
         $fecha_id = $request->get('fechaId');
 
-        $fecha = Grupo::findOrFail($fecha_id);
+        $fecha = Fecha::findOrFail($fecha_id);
 
 
 
 
 
-        $success = '';
+        $success = $fecha->numero.'<br>';
 
         DB::beginTransaction();
 
@@ -5540,7 +5542,7 @@ private function normalizarMinuto(string $texto): int
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre)),
-                            $jugador->url_nombre
+                            $alineacion->jugador->url_nombre
                         ];
 
                         foreach ($intentos as $slug) {
@@ -6300,7 +6302,7 @@ private function normalizarMinuto(string $texto): int
         }
 
         //
-        return redirect()->route('fecha.edit', $fecha->id)->with($respuestaID, $respuestaMSJ);
+        return redirect()->route('fechas.index', array('grupoId' => $fecha->grupo->id))->with($respuestaID, $respuestaMSJ);
 
         //return view('fechas.index', compact('grupo'));
     }
