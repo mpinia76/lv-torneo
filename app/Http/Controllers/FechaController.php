@@ -5520,7 +5520,7 @@ private function normalizarMinuto(string $texto): int
                     }
 
 // Si es neutral, agregar combinación invertida
-                    if ($neutral) {
+                    if ($partido->neutral) {
                         foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
                             foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
                                 $combinaciones[] = [$visitante3, $local3];
