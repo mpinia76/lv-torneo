@@ -5485,7 +5485,8 @@ private function normalizarMinuto(string $texto): int
             $year = (count($arrYear) > 1) ? $arrYear[1] : $arrYear[0];
             $partidos = Partido::where('fecha_id', '=', "$id")->get();
 
-
+            $arrTorneo = explode('-', $fecha->grupo->torneo->url_nombre);
+            $torneoSTR = $arrTorneo[0];
             $ok = 1;
             $sigo = 1;
             //Log::channel('mi_log')->info('Fecha ' . $fecha->numero, []);
@@ -5740,7 +5741,7 @@ private function normalizarMinuto(string $texto): int
                                                                             if ($fechaFormato && $urlPartido) {
 
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$fecha->grupo->torneo->nombre}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$torneoSTR}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                                 $response = Http::get($urlInc);
@@ -5793,7 +5794,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                                                     $jugadorPenalArray[$jugador->id][] = [
                                                                                                                         'partido_id' => $partido->id,
-                                                                                                                        'jugador_id' => $jugador->id,
+                                                                                                                        'jugador_id' => $alineacion->jugador->id,
                                                                                                                         'minuto' => $minuto,
                                                                                                                         'tipo' => 'Errado',
                                                                                                                         'url' => $urlInc
@@ -5939,7 +5940,7 @@ private function normalizarMinuto(string $texto): int
                                                                             if ($fechaFormato && $urlPartido) {
 
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$fecha->grupo->torneo->nombre}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$torneoSTR}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                                 $response = Http::get($urlInc);
@@ -5992,7 +5993,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                                                     $jugadorPenalArray[$jugador->id][] = [
                                                                                                                         'partido_id' => $partido->id,
-                                                                                                                        'jugador_id' => $jugador->id,
+                                                                                                                        'jugador_id' => $alineacion->jugador->id,
                                                                                                                         'minuto' => $minuto,
                                                                                                                         'tipo' => 'Atajado',
                                                                                                                         'url' => $urlInc
@@ -6138,7 +6139,7 @@ private function normalizarMinuto(string $texto): int
                                                                             if ($fechaFormato && $urlPartido) {
 
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$fecha->grupo->torneo->nombre}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$torneoSTR}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                                 $response = Http::get($urlInc);
@@ -6191,7 +6192,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                                                     $jugadorPenalArray[$jugador->id][] = [
                                                                                                                         'partido_id' => $partido->id,
-                                                                                                                        'jugador_id' => $jugador->id,
+                                                                                                                        'jugador_id' => $alineacion->jugador->id,
                                                                                                                         'minuto' => $minuto,
                                                                                                                         'tipo' => 'Atajó',
                                                                                                                         'url' => $urlInc
@@ -6419,83 +6420,29 @@ private function normalizarMinuto(string $texto): int
                             if (count($arrayApellido) > 1) {
                                 $apellido2 = $arrayApellido[1];
                             }
-                            try {
-                                $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre));
-                                //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
+                            $html2 = '';
+                            $slugJugador = ''; // Aquí guardamos el slug final
 
-                                //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                $html2 = HttpHelper::getHtmlContent($urlJugador);
+                            $intentos = [
+                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
+                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
+                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
+                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre)),
+                                $gol->jugador->url_nombre
+                            ];
 
-                            } catch (Exception $ex) {
+                            foreach ($intentos as $slug) {
+                                if (!$slug) continue;
 
-                                $html2 = '';
-                            }
-                            if (!$html2) {
+                                $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . $slug;
+
                                 try {
-                                    if ($nombre2) {
-                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2));
-                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
-
-                                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
-                                    }
-
-                                } catch (Exception $ex) {
-
-                                    $html2 = '';
-                                }
-                            }
-                            if (!$html2) {
-                                try {
-                                    if ($nombre2) {
-                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2));
-                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
-
-                                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
-                                    }
-
-                                } catch (Exception $ex) {
-
-                                    $html2 = '';
-                                }
-                            }
-                            if (!$html2) {
-                                try {
-                                    if ($apellido2) {
-                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre));
-                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
-
-                                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
-
-                                    }
-
-
-                                } catch (Exception $ex) {
-
-                                    $html2 = '';
-                                }
-                            }
-                            if (!$html2) {
-                                try {
-
-                                    $nombre3 = $gol->jugador->url_nombre;
-                                    $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . $nombre3;
-                                    //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
-
-                                    //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
                                     $html2 = HttpHelper::getHtmlContent($urlJugador);
-                                    if (!$html2) {
-                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . $nombre3;
-                                        //Log::channel('mi_log')->info('OJO!!! - '.$urlJugador, []);
-
-                                        //$html2 = HtmlDomParser::file_get_html($urlJugador, false, null, 0);
-                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
+                                    if ($html2) {
+                                        $slugJugador = $slug; // Guardamos el slug válido
+                                        break; // Salimos del bucle, ya tenemos el jugador correcto
                                     }
-
                                 } catch (Exception $ex) {
-
                                     $html2 = '';
                                 }
                             }
