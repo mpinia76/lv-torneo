@@ -36,6 +36,7 @@
                 {{ Form::label('orden_fecha', 'Orden') }}
                 {{ Form::number('orden_fecha', $fecha->orden, ['class' => 'form-control']) }}
             </div>
+            <a href="{{route('fechas.importpenalesfecha',  array('fechaId' => $fecha->id))}}" class="btn btn-info m-1">Importar penales</a>
             <div class="form-group col-md-12">
                 <h1 class="display-6">Partidos</h1>
                 <table class="table">
