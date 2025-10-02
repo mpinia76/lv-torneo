@@ -6243,6 +6243,7 @@ private function normalizarMinuto(string $texto): int
 
                                 if ($existe) {
                                     // Si ya está, no hacemos nada
+                                    $success .= "<span style='color:green'>Penal YA cargado {$penal['partido_id']} - {$jugadorId} - {$penal['tipo']}</span><br>";
                                     continue;
                                 }
                                 try {
