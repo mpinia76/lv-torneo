@@ -5681,7 +5681,7 @@ private function normalizarMinuto(string $texto): int
                                                         }
                                                         foreach ($headerCells as $th) {
                                                             // Buscar los enlaces dentro del th
-                                                            $links = $xpath->query('.//a', $th);
+                                                            $links = $th->getElementsByTagName('a');
 
                                                             foreach ($links as $link) {
                                                                 $urlEncontrada = 0;
@@ -6079,7 +6079,7 @@ private function normalizarMinuto(string $texto): int
                                                         }
                                                         foreach ($headerCells as $th) {
                                                             // Buscar los enlaces dentro del th
-                                                            $links = $xpath->query('.//a', $th);
+                                                            $links = $th->getElementsByTagName('a');
 
                                                             foreach ($links as $link) {
                                                                 $urlEncontrada = 0;
