@@ -5531,14 +5531,17 @@ private function normalizarMinuto(string $texto): int
                     $success .= '<span style="color:orange">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' - ' . $fecha->numero . '</span><br>';
 
                     //$alineaciones = Alineacion::where('partido_id', '=', "$partido->id")->get();
-                    $alineaciones = Alineacion::where('partido_id', $partido->id)
-                        ->where('tipo', 'Titular')
-                        ->with(['cambios' => function($q) {
-                            // opcional: filtrar por tipo si es necesario
-                            $q->whereIn('tipo', ['Entra']);
-                        }])
+                    $alineaciones = Alineacion::with(['cambios' => function($q) {
+                        $q->where('tipo', 'Entra');
+                    }])
+                        ->where('partido_id', $partido->id)
+                        ->where(function ($q) {
+                            $q->where('tipo', 'Titular')
+                                ->orWhereHas('cambios', function ($q) {
+                                    $q->where('tipo', 'Entra');
+                                });
+                        })
                         ->get();
-
                     $jugadorPenalArray = array();
 
                     foreach ($alineaciones as $alineacion) {
