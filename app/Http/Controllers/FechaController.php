@@ -6232,7 +6232,7 @@ private function normalizarMinuto(string $texto): int
                                 $success .= '<span style="color:red">No se econtró la URL del jugador ' . $urlJugador . '</span><br>';
                             }
                             // }
-
+dd($jugadorPenalArray);
                         foreach ($jugadorPenalArray as $jugadorId => $penales) {
                             foreach ($penales as $penal) {
                                 $existe = Penal::where('partido_id', $penal['partido_id'])
@@ -6243,7 +6243,7 @@ private function normalizarMinuto(string $texto): int
 
                                 if ($existe) {
                                     // Si ya está, no hacemos nada
-                                    $success .= "<span style='color:green'>Penal YA cargado {$penal['partido_id']} - {$jugadorId} - {$penal['tipo']}</span><br>";
+                                    //$success .= "<span style='color:green'>Penal YA cargado {$penal['partido_id']} - {$jugadorId} - {$penal['tipo']}</span><br>";
                                     continue;
                                 }
                                 try {
@@ -6374,6 +6374,26 @@ private function normalizarMinuto(string $texto): int
                     $sigo = 0;
                 }
                 if ($sigo) {
+
+
+                    $combinaciones = [];
+
+// Generar combinaciones normales
+                    foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
+                        foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
+                            $combinaciones[] = [$local3, $visitante3];
+                        }
+                    }
+
+// Si es neutral, agregar combinación invertida
+                    if ($partido->neutral) {
+                        foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
+                            foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
+                                $combinaciones[] = [$visitante3, $local3];
+                            }
+                        }
+                    }
+
                     $golesTotales = $partido->golesl + $partido->golesv;
                     $golesLocales = $partido->golesl;
                     $golesVisitantes = $partido->golesv;
@@ -6562,48 +6582,38 @@ private function normalizarMinuto(string $texto): int
 
 
                                                                 // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
-                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
-                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
-                                                                        // Comparar las posibles combinaciones de URLs
-                                                                        if ((
-                                                                                strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFecha . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaIda . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaA . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaB . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaC . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaD . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaE . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaF . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            )
-                                                                        ) {
-                                                                            $urlEncontrada = 1;
+                                                                foreach ($combinaciones as [$local3, $visitante3]) {
+                                                                    // Comparar las posibles combinaciones de URLs
+                                                                    if ((
+                                                                            strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )
+                                                                    ) {
+                                                                        $urlEncontrada = 1;
                                                                             //Log::channel('mi_log')->info('OJO!! encontró gol cabeza: ' . $href, []);
                                                                             $success .= '<span style="color:green">Encontró gol cabeza: ' . $href . '</span><br>';
 
@@ -6618,7 +6628,7 @@ private function normalizarMinuto(string $texto): int
                                                                             $jugadorGolArray[$gol->jugador->id][] = $data3;
                                                                         }
                                                                     }
-                                                                }
+
 
 
                                                                 // Si no se encontró la URL, registrar en el log
@@ -6694,49 +6704,38 @@ private function normalizarMinuto(string $texto): int
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
 
-                                                                // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
-                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
-                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
-                                                                        // Comparar las posibles combinaciones de URLs
-                                                                        if ((
-                                                                                strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFecha . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaIda . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaA . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaB . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaC . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaD . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaE . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaF . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            )
-                                                                        ) {
-                                                                            $urlEncontrada = 1;
+                                                                foreach ($combinaciones as [$local3, $visitante3]) {
+                                                                    // Comparar las posibles combinaciones de URLs
+                                                                    if ((
+                                                                            strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )
+                                                                    ) {
+                                                                        $urlEncontrada = 1;
                                                                             //Log::channel('mi_log')->info('OJO!! encontró gol tiro libre: ' . $href, []);
                                                                             $success .= '<span style="color:green">Encontró gol tiro libre: ' . $href . '</span><br>';
 
@@ -6751,12 +6750,9 @@ private function normalizarMinuto(string $texto): int
                                                                             $jugadorGolArray[$gol->jugador->id][] = $data3;
                                                                         }
                                                                     }
-                                                                }
 
-                                                                // Si no se encontró la URL, registrar en el log
-                                                                if (!$urlEncontrada) {
-                                                                    //Log::channel('mi_log')->info('no está libres: ' . $href, []);
-                                                                }
+
+
                                                             }
                                                         }
                                                     }
@@ -6827,50 +6823,38 @@ private function normalizarMinuto(string $texto): int
                                                                 $href = $link->getAttribute('href');
                                                                 //Log::channel('mi_log')->info('OJO!! URL penal: ' . $href, []);
                                                                 // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
-                                                                foreach ($this->dameNombreEquipoURL3($strLocal) as $local3) {
-                                                                    foreach ($this->dameNombreEquipoURL3($strVisitante) as $visitante3) {
-                                                                        // Comparar las posibles combinaciones de URLs
-                                                                        //Log::channel('mi_log')->info('OJO!! URL penal con equipos: ' . $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/', []);
-                                                                        if ((
-                                                                                strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFecha . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaIda . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaVuelta . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaA . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaB . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaC . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaD . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaE . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
-                                                                            ) || (
-                                                                                strpos($href, $strTorneoFechaF . '/' . $visitante3 . '-' . $local3 . '/') !== false
-                                                                            )
+                                                                foreach ($combinaciones as [$local3, $visitante3]) {
+                                                                    // Comparar las posibles combinaciones de URLs
+                                                                    if ((
+                                                                            strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
-                                                                        ) {
-                                                                            $urlEncontrada = 1;
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaIda . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaVuelta . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaA . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaB . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaC . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaD . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaE . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )
+                                                                    ) {
+                                                                        $urlEncontrada = 1;
                                                                             //Log::channel('mi_log')->info('OJO!! encontró gol de penal: ' . $href, []);
                                                                             $success .= '<span style="color:green">Encontró gol de penal: ' . $href . '</span><br>';
 
@@ -6885,12 +6869,9 @@ private function normalizarMinuto(string $texto): int
                                                                             $jugadorGolArray[$gol->jugador->id][] = $data3;
                                                                         }
                                                                     }
-                                                                }
 
-                                                                // Si no se encontró la URL, registrar en el log
-                                                                if (!$urlEncontrada) {
-                                                                    //Log::channel('mi_log')->info('no está penal: ' . $href, []);
-                                                                }
+
+
                                                             }
                                                         }
                                                     }
