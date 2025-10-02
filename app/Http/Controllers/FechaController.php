@@ -5548,7 +5548,7 @@ private function normalizarMinuto(string $texto): int
                         foreach ($intentos as $slug) {
                             if (!$slug) continue;
 
-                            $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->nacionalidad))) . '/' . $slug;
+                            $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad))) . '/' . $slug;
 
                             try {
                                 $html2 = HttpHelper::getHtmlContent($urlJugador);
