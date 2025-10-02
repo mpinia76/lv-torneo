@@ -6232,42 +6232,44 @@ private function normalizarMinuto(string $texto): int
                                 $success .= '<span style="color:red">No se econtró la URL del jugador ' . $urlJugador . '</span><br>';
                             }
                             // }
-dd($jugadorPenalArray);
-                        foreach ($jugadorPenalArray as $jugadorId => $penales) {
-                            foreach ($penales as $penal) {
-                                $existe = Penal::where('partido_id', $penal['partido_id'])
-                                    ->where('jugador_id', $jugadorId)
-                                    ->where('tipo', $penal['tipo'])
-                                    ->where('minuto', $penal['minuto'])
-                                    ->exists();
 
-                                if ($existe) {
-                                    // Si ya está, no hacemos nada
-                                    //$success .= "<span style='color:green'>Penal YA cargado {$penal['partido_id']} - {$jugadorId} - {$penal['tipo']}</span><br>";
-                                    continue;
-                                }
-                                try {
-                                    Penal::create([
-                                        'partido_id' => $penal['partido_id'],
-                                        'jugador_id' => $jugadorId,
-                                        'minuto' => $penal['minuto'],
-                                        'tipo' => $penal['tipo']
-                                    ]);
 
-                                    //$success .= '<span style="color:green">Penal errado agregado: ' . $jugador->persona->nombre . ' - ' . $minuto . '\'</span><br>';
-                                } catch (QueryException $ex) {
-                                    $error = $ex->getMessage();
-                                    $ok = 0;
-                                    continue;
-                                }
+
+
+                    }
+                    foreach ($jugadorPenalArray as $jugadorId => $penales) {
+                        //dd($penales);
+                        foreach ($penales as $penal) {
+                            $existe = Penal::where('partido_id', $penal['partido_id'])
+                                ->where('jugador_id', $jugadorId)
+                                ->where('tipo', $penal['tipo'])
+                                ->where('minuto', $penal['minuto'])
+                                ->exists();
+
+                            if ($existe) {
+                                // Si ya está, no hacemos nada
+                                $success .= "<span style='color:green'>Penal YA cargado {$penal['partido_id']} - {$jugadorId} - {$penal['tipo']}</span><br>";
+                                continue;
                             }
+                            try {
+                                Penal::create([
+                                    'partido_id' => $penal['partido_id'],
+                                    'jugador_id' => $jugadorId,
+                                    'minuto' => $penal['minuto'],
+                                    'tipo' => $penal['tipo']
+                                ]);
 
-
-
-
-
-
+                                //$success .= '<span style="color:green">Penal errado agregado: ' . $jugador->persona->nombre . ' - ' . $minuto . '\'</span><br>';
+                            } catch (QueryException $ex) {
+                                $error = $ex->getMessage();
+                                $ok = 0;
+                                continue;
+                            }
                         }
+
+
+
+
 
 
                     }
