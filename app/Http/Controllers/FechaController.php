@@ -5579,34 +5579,36 @@ private function normalizarMinuto(string $texto): int
                             $alineacion->jugador->url_nombre
                         ];
 
+                        $slugJugador = null;
+
                         foreach ($intentos as $slug) {
                             if (!$slug) continue;
 
-                            // Opción con nacionalidad
-                            $urlJugadorConNacionalidad = 'http://www.futbol360.com.ar/jugadores/'
+                            // Primero probamos con nacionalidad
+                            $urlJugador = 'http://www.futbol360.com.ar/jugadores/'
                                 . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad)))
                                 . '/' . $slug;
 
-                            // Opción sin nacionalidad
-                            $urlJugadorSinNacionalidad = 'http://www.futbol360.com.ar/jugadores/' . $slug;
-
                             try {
-                                // Primero probamos con nacionalidad
-                                $html2 = HttpHelper::getHtmlContent($urlJugadorConNacionalidad);
+                                $html2 = HttpHelper::getHtmlContent($urlJugador);
 
-                                // Si no encontramos contenido, probamos sin nacionalidad
+                                // Si no encontramos contenido, probamos solo con el slug
                                 if (!$html2) {
-                                    $html2 = HttpHelper::getHtmlContent($urlJugadorSinNacionalidad);
+                                    $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . $slug;
+                                    $html2 = HttpHelper::getHtmlContent($urlJugador);
                                 }
 
                                 if ($html2) {
                                     $slugJugador = $slug; // Guardamos el slug válido
-                                    break; // Salimos del bucle, ya tenemos el jugador correcto
+                                    break; // Salimos del bucle
                                 }
                             } catch (Exception $ex) {
                                 $html2 = '';
                             }
                         }
+
+// Aquí $urlJugador ya tiene la URL válida (con o sin nacionalidad)
+
 
                         if ($html2) {
 
@@ -6470,34 +6472,36 @@ private function normalizarMinuto(string $texto): int
                                 $alineacion->jugador->url_nombre
                             ];
 
+                            $slugJugador = null;
+
                             foreach ($intentos as $slug) {
                                 if (!$slug) continue;
 
-                                // Opción con nacionalidad
-                                $urlJugadorConNacionalidad = 'http://www.futbol360.com.ar/jugadores/'
+                                // Primero probamos con nacionalidad
+                                $urlJugador = 'http://www.futbol360.com.ar/jugadores/'
                                     . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad)))
                                     . '/' . $slug;
 
-                                // Opción sin nacionalidad
-                                $urlJugadorSinNacionalidad = 'http://www.futbol360.com.ar/jugadores/' . $slug;
-
                                 try {
-                                    // Primero probamos con nacionalidad
-                                    $html2 = HttpHelper::getHtmlContent($urlJugadorConNacionalidad);
+                                    $html2 = HttpHelper::getHtmlContent($urlJugador);
 
-                                    // Si no encontramos contenido, probamos sin nacionalidad
+                                    // Si no encontramos contenido, probamos solo con el slug
                                     if (!$html2) {
-                                        $html2 = HttpHelper::getHtmlContent($urlJugadorSinNacionalidad);
+                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . $slug;
+                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
                                     }
 
                                     if ($html2) {
                                         $slugJugador = $slug; // Guardamos el slug válido
-                                        break; // Salimos del bucle, ya tenemos el jugador correcto
+                                        break; // Salimos del bucle
                                     }
                                 } catch (Exception $ex) {
                                     $html2 = '';
                                 }
                             }
+
+// Aquí $urlJugador ya tiene la URL válida (con o sin nacionalidad)
+
 
                             if ($html2) {
                                 // Crear un nuevo DOMDocument y cargar el HTML
