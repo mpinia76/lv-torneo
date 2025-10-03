@@ -44,11 +44,11 @@
 
                     @php
                         $opciones = [
-                            '' => ['label' => 'Todas', 'valorDB' => ''],
+                            '' => ['label' => 'Todos', 'valorDB' => ''],
                             'Convertidos' => ['label' => 'Convertidos', 'valorDB' => 'Convertido'],
                             'Errados' => ['label' => 'Errados', 'valorDB' => 'Errado'],
                             'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
-                            'Atajos' => ['label' => 'Atajos', 'valorDB' => 'Atajo'],
+                            'Atajos' => ['label' => 'Atajó', 'valorDB' => 'Atajo'],
                         ];
                     @endphp
 
