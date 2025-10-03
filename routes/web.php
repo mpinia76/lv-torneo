@@ -137,6 +137,7 @@ Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');
 Route::get('jugadorJugados', 'JugadorController@jugados')->name('jugadores.jugados');
 Route::get('jugadorGoles', 'JugadorController@goles')->name('jugadores.goles');
 Route::get('jugadorTarjetas', 'JugadorController@tarjetas')->name('jugadores.tarjetas');
+Route::get('jugadorPenals', 'JugadorController@Penals')->name('jugadores.penals');
 Route::get('jugadorTitulos', 'JugadorController@titulos')->name('jugadores.titulos');
 Route::get('verEquipo', 'EquipoController@ver')->name('equipos.ver');
 Route::get('equipoJugados', 'EquipoController@jugados')->name('equipos.jugados');

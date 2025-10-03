@@ -18,4 +18,27 @@ class Jugador extends Model
     {
         return $this->persona->getFullNameAgeAttribute().' ('.$this->tipoJugador.')';
     }
+
+    // NUEVAS RELACIONES
+
+    public function alineacions()
+    {
+        return $this->hasMany('App\Alineacion', 'jugador_id');
+    }
+
+    public function gols()
+    {
+        return $this->hasMany('App\Gol', 'jugador_id');
+    }
+
+    public function tarjetas()
+    {
+        return $this->hasMany('App\Tarjeta', 'jugador_id');
+    }
+
+    public function penals()
+    {
+        return $this->hasMany('App\Penal', 'jugador_id');
+    }
+
 }

@@ -1011,7 +1011,7 @@ AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE '%$nombre%' OR personas.nombre LIKE '%$nombre%') ";
+            $nombreFiltro = " AND (personas.name LIKE '%$nombre%') ";
 
         }
 

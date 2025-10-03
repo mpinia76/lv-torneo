@@ -35,7 +35,7 @@ class JugadorController extends Controller
      */
     public function __construct()
     {
-        $this->middleware('auth')->except(['ver','jugados','goles','tarjetas','titulos']);
+        $this->middleware('auth')->except(['ver','jugados','goles','tarjetas','titulos','penals']);
     }
 
     /**
@@ -1026,6 +1026,113 @@ group by tecnico_id
             'totalTodos',
             'totalRojas',
             'totalAmarillas',
+            'partidos',
+            'tipo'
+        ));
+    }
+
+    public function penals(Request $request)
+    {
+        $id = $request->query('jugadorId');
+        $jugador = Jugador::findOrFail($id);
+
+        $idTorneo = $request->query('torneoId') ?? '';
+        $torneo = $idTorneo ? Torneo::findOrFail($idTorneo) : null;
+
+        $tipo = $request->query('tipo') ?? '';
+
+        // Estadísticas totales del jugador
+        $sqlStats = "
+        SELECT
+            COUNT(CASE WHEN tipo = 'Errado' THEN 1 END) AS totalErrados,
+            COUNT(CASE WHEN tipo = 'Atajado' THEN 1 END) AS totalAtajados,
+            COUNT(CASE WHEN tipo = 'Atajo' THEN 1 END) AS totalAtajo,
+        FROM penals
+        INNER JOIN jugadors ON penals.jugador_id = jugadors.id
+        INNER JOIN partidos ON penals.partido_id = partidos.id
+        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+        INNER JOIN grupos ON fechas.grupo_id = grupos.id
+        WHERE jugadors.id = :jugadorId
+        " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
+    ";
+
+        $bindingsStats = ['jugadorId' => $id];
+        if ($idTorneo) $bindingsStats['torneoId'] = $idTorneo;
+
+        $penalStats = DB::selectOne(DB::raw($sqlStats), $bindingsStats);
+
+        $totalErrados = $penalStats->totalErrados ?? 0;
+        $totalAtajados = $penalStats->totalAtajados ?? 0;
+        $totalAtajos = $penalStats->totalAtajos ?? 0;
+        $totalTodos = $totalErrados + $totalAtajados;
+
+        // Lista de partidos donde recibió penals
+        $sqlPartidos = "
+        SELECT DISTINCT
+            torneos.nombre AS nombreTorneo,
+            torneos.escudo AS escudoTorneo,
+            torneos.year,
+            fechas.numero,
+            partidos.dia,
+            e1.id AS equipol_id,
+            e1.escudo AS fotoLocal,
+            e1.nombre AS local,
+            e2.id AS equipov_id,
+            e2.escudo AS fotoVisitante,
+            e2.nombre AS visitante,
+            partidos.golesl,
+            partidos.golesv,
+            partidos.penalesl,
+            partidos.penalesv,
+            partidos.id AS partido_id,
+            penals.tipo AS tipoPenal
+        FROM partidos
+        INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+        INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+        INNER JOIN grupos ON fechas.grupo_id = grupos.id
+        INNER JOIN torneos ON grupos.torneo_id = torneos.id
+        INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+        INNER JOIN penals ON penals.partido_id = partidos.id AND penals.jugador_id = alineacions.jugador_id
+        WHERE alineacions.jugador_id = :jugadorId
+        " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
+        " . ($tipo ? " AND penals.tipo = :tipoPenal" : "") . "
+        ORDER BY partidos.dia DESC
+    ";
+
+        $bindingsPartidos = ['jugadorId' => $id];
+        if ($idTorneo) $bindingsPartidos['torneoId'] = $idTorneo;
+        if ($tipo) $bindingsPartidos['tipoPenal'] = $tipo;
+
+        $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
+
+        // Paginación manual
+        $page = $request->query('page', 1);
+        $paginate = 15;
+        $offSet = ($page * $paginate) - $paginate;
+        $itemsForCurrentPage = array_slice($partidosRaw, $offSet, $paginate, true);
+
+        $partidos = new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsForCurrentPage,
+            count($partidosRaw),
+            $paginate,
+            $page
+        );
+
+        // Mantener query params en la paginación
+        $arrayParam = ['jugadorId' => $id];
+        if ($idTorneo) $arrayParam['torneoId'] = $idTorneo;
+        if ($tipo) $arrayParam['tipo'] = $tipo;
+
+        $partidos->setPath(route('jugadores.penals', $arrayParam));
+
+        return view('jugadores.penals', compact(
+            'jugador',
+            'torneo',
+            'totalTodos',
+            'totalAtajados',
+            'totalErrados',
+            'totalAtajos',
             'partidos',
             'tipo'
         ));
