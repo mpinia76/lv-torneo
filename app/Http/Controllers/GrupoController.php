@@ -1023,7 +1023,7 @@ AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
        sum(rojas) rojas,
        sum(amarillas) amarillas,
        sum(errados) errados,
-       sum(atajados) atajados,
+
        sum(recibidos) recibidos,
        sum(invictas) invictas,
        sum(atajos) atajos
@@ -1031,7 +1031,7 @@ AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
 from
 
 (SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "1" as goles, "0" as  amarillas
-, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" as  errados, "0" as  atajados, "0" as  atajos
+, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" as  errados, "0" as  atajos
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1043,7 +1043,7 @@ WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo_id.' AND grupos.
 
  UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" as  errados, "0" as  atajados, "0" as  atajos
+, ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" as  errados, "0" as  atajos
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1054,8 +1054,8 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 WHERE  grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
 
 UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, ( case when tipo=\'Errado\' then 1 else NULL end) as  errados
-, ( case when tipo=\'Atajado\' then 1 else NULL end) as  atajados, ( case when tipo=\'Atajo\' then 1 else NULL end) as  atajos
+ SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, ( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados
+, ( case when tipo=\'Atajo\' then 1 else NULL end) as  atajos
 FROM penals
 INNER JOIN jugadors ON penals.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1068,7 +1068,7 @@ WHERE  grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombr
 UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
-(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" as  errados, "0" as  atajados, "0" as  atajos
+(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" as  errados, "0" as  atajos
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1081,7 +1081,7 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo_id.' AND g
 UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, "0" AS recibidos,
-"0" AS invictas, "0" as  errados, "0" as  atajados, "0" as  atajos
+"0" AS invictas, "0" as  errados, "0" as  atajos
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador != \'Arquero\'
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1094,7 +1094,7 @@ WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')  AND grupos.
 UNION ALL
 SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
 , "0" as  rojas, "0" AS recibidos,
-"0" AS invictas, "0" as  errados, "0" as  atajados, "0" as  atajos
+"0" AS invictas, "0" as  errados, "0" as  atajos
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
 INNER JOIN personas ON jugadors.persona_id = personas.id
