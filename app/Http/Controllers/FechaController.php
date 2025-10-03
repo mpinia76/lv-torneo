@@ -5582,10 +5582,23 @@ private function normalizarMinuto(string $texto): int
                         foreach ($intentos as $slug) {
                             if (!$slug) continue;
 
-                            $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad))) . '/' . $slug;
+                            // Opción con nacionalidad
+                            $urlJugadorConNacionalidad = 'http://www.futbol360.com.ar/jugadores/'
+                                . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad)))
+                                . '/' . $slug;
+
+                            // Opción sin nacionalidad
+                            $urlJugadorSinNacionalidad = 'http://www.futbol360.com.ar/jugadores/' . $slug;
 
                             try {
-                                $html2 = HttpHelper::getHtmlContent($urlJugador);
+                                // Primero probamos con nacionalidad
+                                $html2 = HttpHelper::getHtmlContent($urlJugadorConNacionalidad);
+
+                                // Si no encontramos contenido, probamos sin nacionalidad
+                                if (!$html2) {
+                                    $html2 = HttpHelper::getHtmlContent($urlJugadorSinNacionalidad);
+                                }
+
                                 if ($html2) {
                                     $slugJugador = $slug; // Guardamos el slug válido
                                     break; // Salimos del bucle, ya tenemos el jugador correcto
@@ -5594,6 +5607,7 @@ private function normalizarMinuto(string $texto): int
                                 $html2 = '';
                             }
                         }
+
                         if ($html2) {
 
                                 // Crear un nuevo DOMDocument y cargar el HTML
@@ -6453,16 +6467,29 @@ private function normalizarMinuto(string $texto): int
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre)),
-                                $gol->jugador->url_nombre
+                                $alineacion->jugador->url_nombre
                             ];
 
                             foreach ($intentos as $slug) {
                                 if (!$slug) continue;
 
-                                $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nacionalidad))) . '/' . $slug;
+                                // Opción con nacionalidad
+                                $urlJugadorConNacionalidad = 'http://www.futbol360.com.ar/jugadores/'
+                                    . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad)))
+                                    . '/' . $slug;
+
+                                // Opción sin nacionalidad
+                                $urlJugadorSinNacionalidad = 'http://www.futbol360.com.ar/jugadores/' . $slug;
 
                                 try {
-                                    $html2 = HttpHelper::getHtmlContent($urlJugador);
+                                    // Primero probamos con nacionalidad
+                                    $html2 = HttpHelper::getHtmlContent($urlJugadorConNacionalidad);
+
+                                    // Si no encontramos contenido, probamos sin nacionalidad
+                                    if (!$html2) {
+                                        $html2 = HttpHelper::getHtmlContent($urlJugadorSinNacionalidad);
+                                    }
+
                                     if ($html2) {
                                         $slugJugador = $slug; // Guardamos el slug válido
                                         break; // Salimos del bucle, ya tenemos el jugador correcto
@@ -6471,6 +6498,7 @@ private function normalizarMinuto(string $texto): int
                                     $html2 = '';
                                 }
                             }
+
                             if ($html2) {
                                 // Crear un nuevo DOMDocument y cargar el HTML
                                 $dom = new \DOMDocument();
