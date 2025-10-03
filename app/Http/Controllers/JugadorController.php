@@ -1046,7 +1046,7 @@ group by tecnico_id
         SELECT
             COUNT(CASE WHEN tipo = 'Errado' THEN 1 END) AS totalErrados,
             COUNT(CASE WHEN tipo = 'Atajado' THEN 1 END) AS totalAtajados,
-            COUNT(CASE WHEN tipo = 'Atajo' THEN 1 END) AS totalAtajo,
+            COUNT(CASE WHEN tipo = 'Atajo' THEN 1 END) AS totalAtajo
         FROM penals
         INNER JOIN jugadors ON penals.jugador_id = jugadors.id
         INNER JOIN partidos ON penals.partido_id = partidos.id
