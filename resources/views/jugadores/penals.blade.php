@@ -184,12 +184,12 @@
         if (pie_basic_element) {
             var pie_basic = echarts.init(pie_basic_element);
             pie_basic.setOption({
-                color: ['#f90a23','#e5cf0d'],
+                color: ['#4caf50', '#f44336', '#2196f3'], // Verde = Convertidos, Rojo = Errados, Azul = Atajados
                 legend: {
                     orient: 'horizontal',
                     bottom: 0,
                     left: 'center',
-                    data: ['Atajados', 'Errados']
+                    data: ['Convertidos', 'Errados', 'Atajados']
                 },
                 tooltip: {
                     trigger: 'item',
@@ -209,4 +209,5 @@
             });
         }
     </script>
+
 @endsection
