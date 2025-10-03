@@ -30,9 +30,10 @@
                             'rojas' => 'Rojas',
                             'errados' => 'P. Errados',
                             'atajados' => 'P. Atajado',
+                            'atajos' => 'Arq. P. Atajados',
                             'recibidos' => 'Arq. Recibidos',
                             'invictas' => 'Arq. V. Invictas',
-                            'atajos' => 'Arq. P. Atajados',
+
                         ];
                     @endphp
 
@@ -85,9 +86,10 @@
                         <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Rojas']) }}">{{ $jugador->rojas }}</a></td>
                         <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Amarilla']) }}">{{ $jugador->errados }}</a></td>
                         <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Rojas']) }}">{{ $jugador->atajados }}</a></td>
+                        <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Rojas']) }}">{{ $jugador->atajos }}</a></td>
                         <td>{{ $jugador->recibidos }} (@if($jugador->jugados){{ round($jugador->recibidos / $jugador->jugados, 2) }}@else 0 @endif)</td>
                         <td>{{ $jugador->invictas }} (@if($jugador->jugados){{ round($jugador->invictas / $jugador->jugados, 2) }}@else 0 @endif)</td>
-                        <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Rojas']) }}">{{ $jugador->atajos }}</a></td>
+
                     </tr>
                 @endforeach
                 </tbody>

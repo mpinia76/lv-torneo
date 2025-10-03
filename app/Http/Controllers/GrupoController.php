@@ -1021,6 +1021,7 @@ AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
 
        sum(goles) goles,
        sum(rojas) rojas,
+       sum(amarillas) amarillas,
        sum(errados) errados,
        sum(atajados) atajados,
        sum(recibidos) recibidos,
