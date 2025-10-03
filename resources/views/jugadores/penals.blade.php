@@ -42,37 +42,49 @@
             <div class="col-xs-12 col-sm-6 col-md-8" id="detalle">
                 <div class="row text-center">
 
-                    {{-- Cards de penals --}}
                     @php
                         $opciones = [
                             '' => ['label' => 'Todas', 'valorDB' => ''],
-                            'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
+                            'Convertidos' => ['label' => 'Convertidos', 'valorDB' => 'Convertido'],
                             'Errados' => ['label' => 'Errados', 'valorDB' => 'Errado'],
+                            'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
+                            'Atajos' => ['label' => 'Atajos', 'valorDB' => 'Atajo'],
                         ];
                     @endphp
 
                     @foreach($opciones as $tipoClave => $opcion)
                         <div class="col-6 col-md-3 mb-2">
                             <a href="{{ route('jugadores.penals', array_filter([
-                                            'jugadorId' => $jugador->id,
-                                            'torneoId' => $torneo->id ?? null,
-                                            'tipo' => $opcion['valorDB'] ?: null
-                                        ])) }}">
+                        'jugadorId' => $jugador->id,
+                        'torneoId' => $torneo->id ?? null,
+                        'tipo' => $opcion['valorDB'] ?: null
+                    ])) }}">
                                 <div class="p-2 rounded {{ $tipo == $opcion['valorDB'] ? 'bg-success text-white' : 'bg-light' }}">
                                     <div>{{ $opcion['label'] }}</div>
                                     <strong>
-                                        @if($tipoClave == '')
-                                            {{ $totalTodos }}
-                                        @elseif($tipoClave == 'Atajados')
-                                            {{ $totalAtajados }}
-                                        @else
-                                            {{ $totalErrados }}
-                                        @endif
+                                        @switch($tipoClave)
+                                            @case('')
+                                                {{ $totalTodos }}
+                                                @break
+                                            @case('Convertidos')
+                                                {{ $totalConvertidos }}
+                                                @break
+                                            @case('Errados')
+                                                {{ $totalErrados }}
+                                                @break
+                                            @case('Atajados')
+                                                {{ $totalAtajados }}
+                                                @break
+                                            @case('Atajos')
+                                                {{ $totalAtajos }}
+                                                @break
+                                        @endswitch
                                     </strong>
                                 </div>
                             </a>
                         </div>
                     @endforeach
+
                 </div>
 
                 {{-- Gráfico --}}
@@ -189,8 +201,10 @@
                     radius: '70%',
                     center: ['50%', '50%'],
                     data: [
+                        {value: {{ $totalConvertidos }}, name: 'Convertidos'},
+                        {value: {{ $totalErrados }}, name: 'Errados'},
                         {value: {{ $totalAtajados }}, name: 'Atajados'},
-                        {value: {{ $totalErrados }}, name: 'Errados'}
+                        {value: {{ $totalAtajos }}, name: 'Atajó'}
                     ]
                 }]
             });
