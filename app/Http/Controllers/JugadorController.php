@@ -1081,88 +1081,59 @@ group by tecnico_id
         $totalAtajos      = $penalStats->totalAtajos ?? 0;
         $totalTodos       = $totalErrados + $totalAtajados + $totalConvertidos;
 
-        // Lista de partidos donde recibió/convirtió penales
+        $bindingsPartidos = ['jugadorId' => $id];
         $sqlPartidos = "
-        (
-            -- Penales fallados / atajados / atajos
-            SELECT DISTINCT
-                t.nombre AS nombreTorneo,
-                t.escudo AS escudoTorneo,
-                t.year,
-                f.numero,
-                pa.dia,
-                e1.id AS equipol_id,
-                e1.escudo AS fotoLocal,
-                e1.nombre AS local,
-                e2.id AS equipov_id,
-                e2.escudo AS fotoVisitante,
-                e2.nombre AS visitante,
-                pa.golesl,
-                pa.golesv,
-                pa.penalesl,
-                pa.penalesv,
-                pa.id AS partido_id,
-                p.tipo AS tipoPenal
-            FROM penals p
-            INNER JOIN alineacions a ON a.jugador_id = p.jugador_id AND a.partido_id = p.partido_id
-            INNER JOIN partidos pa ON p.partido_id = pa.id
-            INNER JOIN fechas f ON pa.fecha_id = f.id
-            INNER JOIN grupos gr ON f.grupo_id = gr.id
-            INNER JOIN torneos t ON gr.torneo_id = t.id
-            INNER JOIN equipos e1 ON pa.equipol_id = e1.id
-            INNER JOIN equipos e2 ON pa.equipov_id = e2.id
-            WHERE p.jugador_id = :jugadorIdPenalPartido
-            " . ($idTorneo ? " AND gr.torneo_id = :torneoIdPenalPartido" : "") . "
-            " . ($tipo ? " AND p.tipo = :tipoPenal" : "") . "
-        )
-        UNION ALL
-        (
-            -- Penales convertidos (goles)
-            SELECT DISTINCT
-                t.nombre AS nombreTorneo,
-                t.escudo AS escudoTorneo,
-                t.year,
-                f.numero,
-                pa.dia,
-                e1.id AS equipol_id,
-                e1.escudo AS fotoLocal,
-                e1.nombre AS local,
-                e2.id AS equipov_id,
-                e2.escudo AS fotoVisitante,
-                e2.nombre AS visitante,
-                pa.golesl,
-                pa.golesv,
-                pa.penalesl,
-                pa.penalesv,
-                pa.id AS partido_id,
-                'Convertido' AS tipoPenal
-            FROM gols g
-            INNER JOIN alineacions a ON a.jugador_id = g.jugador_id AND a.partido_id = g.partido_id
-            INNER JOIN partidos pa ON g.partido_id = pa.id
-            INNER JOIN fechas f ON pa.fecha_id = f.id
-            INNER JOIN grupos gr ON f.grupo_id = gr.id
-            INNER JOIN torneos t ON gr.torneo_id = t.id
-            INNER JOIN equipos e1 ON pa.equipol_id = e1.id
-            INNER JOIN equipos e2 ON pa.equipov_id = e2.id
-            WHERE g.jugador_id = :jugadorIdGolPartido
-              AND g.tipo = 'Penal'
-            " . ($idTorneo ? " AND gr.torneo_id = :torneoIdGolPartido" : "") . "
-            " . ($tipo ? " AND 'Convertido' = :tipoPenal" : "") . "
-        )
-        ORDER BY dia DESC
-    ";
+SELECT DISTINCT
+    t.nombre AS nombreTorneo,
+    t.escudo AS escudoTorneo,
+    t.year,
+    f.numero,
+    pa.dia,
+    e1.id AS equipol_id,
+    e1.escudo AS fotoLocal,
+    e1.nombre AS local,
+    e2.id AS equipov_id,
+    e2.escudo AS fotoVisitante,
+    e2.nombre AS visitante,
+    pa.golesl,
+    pa.golesv,
+    pa.penalesl,
+    pa.penalesv,
+    pa.id AS partido_id,
+    CASE
+        WHEN p.id IS NOT NULL THEN p.tipo
+        WHEN g.id IS NOT NULL THEN 'Convertido'
+    END AS tipoPenal
+FROM partidos pa
+INNER JOIN equipos e1 ON pa.equipol_id = e1.id
+INNER JOIN equipos e2 ON pa.equipov_id = e2.id
+INNER JOIN fechas f ON pa.fecha_id = f.id
+INNER JOIN grupos gr ON f.grupo_id = gr.id
+INNER JOIN torneos t ON gr.torneo_id = t.id
+INNER JOIN alineacions a ON a.partido_id = pa.id AND a.jugador_id = :jugadorId
+LEFT JOIN penals p ON p.partido_id = pa.id AND p.jugador_id = a.jugador_id
+LEFT JOIN gols g ON g.partido_id = pa.id AND g.jugador_id = a.jugador_id AND g.tipo = 'Penal'
+WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
+";
 
-        $bindingsPartidos = [
-            'jugadorIdPenalPartido' => $id,
-            'jugadorIdGolPartido'   => $id
-        ];
         if ($idTorneo) {
-            $bindingsPartidos['torneoIdPenalPartido'] = $idTorneo;
-            $bindingsPartidos['torneoIdGolPartido']   = $idTorneo;
+            $sqlPartidos .= " AND gr.torneo_id = :torneoId";
+            $bindingsPartidos['torneoId'] = $idTorneo;
         }
-        if ($tipo) $bindingsPartidos['tipoPenal'] = $tipo;
+
+        if ($tipo && $tipo !== 'Convertido') {
+            $sqlPartidos .= " AND p.tipo = :tipoPenal";
+            $bindingsPartidos['tipoPenal'] = $tipo;
+        } elseif ($tipo === 'Convertido') {
+            $sqlPartidos .= " AND g.id IS NOT NULL";
+        }
+
+        $sqlPartidos .= " ORDER BY pa.dia DESC";
 
         $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
+
+
+
 
         // Paginación manual
         $page = $request->query('page', 1);
