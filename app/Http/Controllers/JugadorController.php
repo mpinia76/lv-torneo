@@ -1043,116 +1043,123 @@ group by tecnico_id
 
         // Estadísticas totales del jugador
         $sqlStats = "
-    SELECT
-        COUNT(CASE WHEN penals.tipo = 'Errado' THEN 1 END) AS totalErrados,
-        COUNT(CASE WHEN penals.tipo = 'Atajado' THEN 1 END) AS totalAtajados,
-        COUNT(CASE WHEN penals.tipo = 'Atajo' THEN 1 END) AS totalAtajo,
-        (
-            SELECT COUNT(*)
-            FROM gols g
-            INNER JOIN jugadors j2 ON g.jugador_id = j2.id
-            INNER JOIN partidos pa2 ON g.partido_id = pa2.id
-            INNER JOIN fechas f2 ON pa2.fecha_id = f2.id
-            INNER JOIN grupos gr2 ON f2.grupo_id = gr2.id
-            WHERE g.tipo = 'Penal'
-              AND j2.id = :jugadorId
-              " . ($idTorneo ? " AND gr2.torneo_id = :torneoId" : "") . "
-        ) AS totalConvertidos
-    FROM penals
-    INNER JOIN jugadors ON penals.jugador_id = jugadors.id
-    INNER JOIN partidos ON penals.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON fechas.grupo_id = grupos.id
-    WHERE jugadors.id = :jugadorId
-    " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
-";
+        SELECT
+            COUNT(CASE WHEN p.tipo = 'Errado' THEN 1 END) AS totalErrados,
+            COUNT(CASE WHEN p.tipo = 'Atajado' THEN 1 END) AS totalAtajados,
+            COUNT(CASE WHEN p.tipo = 'Atajo' THEN 1 END) AS totalAtajos,
+            (
+                SELECT COUNT(*)
+                FROM gols g
+                INNER JOIN jugadors j2 ON g.jugador_id = j2.id
+                INNER JOIN partidos pa2 ON g.partido_id = pa2.id
+                INNER JOIN fechas f2 ON pa2.fecha_id = f2.id
+                INNER JOIN grupos gr2 ON f2.grupo_id = gr2.id
+                WHERE g.tipo = 'Penal'
+                  AND j2.id = :jugadorIdGol
+                  " . ($idTorneo ? " AND gr2.torneo_id = :torneoIdGol" : "") . "
+            ) AS totalConvertidos
+        FROM penals p
+        INNER JOIN jugadors j ON p.jugador_id = j.id
+        INNER JOIN partidos pa ON p.partido_id = pa.id
+        INNER JOIN fechas f ON pa.fecha_id = f.id
+        INNER JOIN grupos gr ON f.grupo_id = gr.id
+        WHERE j.id = :jugadorIdPenal
+        " . ($idTorneo ? " AND gr.torneo_id = :torneoIdPenal" : "") . "
+    ";
 
-
-        $bindingsStats = ['jugadorId' => $id];
-        if ($idTorneo) $bindingsStats['torneoId'] = $idTorneo;
+        $bindingsStats = ['jugadorIdPenal' => $id, 'jugadorIdGol' => $id];
+        if ($idTorneo) {
+            $bindingsStats['torneoIdPenal'] = $idTorneo;
+            $bindingsStats['torneoIdGol']   = $idTorneo;
+        }
 
         $penalStats = DB::selectOne(DB::raw($sqlStats), $bindingsStats);
 
         $totalConvertidos = $penalStats->totalConvertidos ?? 0;
-        $totalErrados = $penalStats->totalErrados ?? 0;
-        $totalAtajados = $penalStats->totalAtajados ?? 0;
-        $totalAtajos = $penalStats->totalAtajos ?? 0;
-        $totalTodos = $totalErrados + $totalAtajados + $totalConvertidos;
+        $totalErrados     = $penalStats->totalErrados ?? 0;
+        $totalAtajados    = $penalStats->totalAtajados ?? 0;
+        $totalAtajos      = $penalStats->totalAtajos ?? 0;
+        $totalTodos       = $totalErrados + $totalAtajados + $totalConvertidos;
 
-        // Lista de partidos donde recibió penals
+        // Lista de partidos donde recibió/convirtió penales
         $sqlPartidos = "
-(
-    -- Penales fallados / atajados / atajos (tabla penals)
-    SELECT DISTINCT
-        torneos.nombre AS nombreTorneo,
-        torneos.escudo AS escudoTorneo,
-        torneos.year,
-        fechas.numero,
-        partidos.dia,
-        e1.id AS equipol_id,
-        e1.escudo AS fotoLocal,
-        e1.nombre AS local,
-        e2.id AS equipov_id,
-        e2.escudo AS fotoVisitante,
-        e2.nombre AS visitante,
-        partidos.golesl,
-        partidos.golesv,
-        partidos.penalesl,
-        partidos.penalesv,
-        partidos.id AS partido_id,
-        penals.tipo AS tipoPenal
-    FROM partidos
-    INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-    INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON fechas.grupo_id = grupos.id
-    INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    INNER JOIN alineacions ON alineacions.partido_id = partidos.id
-    INNER JOIN penals ON penals.partido_id = partidos.id AND penals.jugador_id = alineacions.jugador_id
-    WHERE alineacions.jugador_id = :jugadorId
-    " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
-    " . ($tipo ? " AND penals.tipo = :tipoPenal" : "") . "
-)
-UNION ALL
-(
-    -- Penales convertidos (tabla gols con tipo = 'Penal')
-    SELECT DISTINCT
-        torneos.nombre AS nombreTorneo,
-        torneos.escudo AS escudoTorneo,
-        torneos.year,
-        fechas.numero,
-        partidos.dia,
-        e1.id AS equipol_id,
-        e1.escudo AS fotoLocal,
-        e1.nombre AS local,
-        e2.id AS equipov_id,
-        e2.escudo AS fotoVisitante,
-        e2.nombre AS visitante,
-        partidos.golesl,
-        partidos.golesv,
-        partidos.penalesl,
-        partidos.penalesv,
-        partidos.id AS partido_id,
-        'Convertido' AS tipoPenal
-    FROM partidos
-    INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-    INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON fechas.grupo_id = grupos.id
-    INNER JOIN torneos ON grupos.torneo_id = torneos.id
-    INNER JOIN alineacions ON alineacions.partido_id = partidos.id
-    INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
-    WHERE alineacions.jugador_id = :jugadorId
-      AND gols.tipo = 'Penal'
-    " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
-    " . ($tipo ? " AND 'Convertido' = :tipoPenal" : "") . "
-)
-ORDER BY dia DESC
-";
+        (
+            -- Penales fallados / atajados / atajos
+            SELECT DISTINCT
+                t.nombre AS nombreTorneo,
+                t.escudo AS escudoTorneo,
+                t.year,
+                f.numero,
+                pa.dia,
+                e1.id AS equipol_id,
+                e1.escudo AS fotoLocal,
+                e1.nombre AS local,
+                e2.id AS equipov_id,
+                e2.escudo AS fotoVisitante,
+                e2.nombre AS visitante,
+                pa.golesl,
+                pa.golesv,
+                pa.penalesl,
+                pa.penalesv,
+                pa.id AS partido_id,
+                p.tipo AS tipoPenal
+            FROM penals p
+            INNER JOIN alineacions a ON a.jugador_id = p.jugador_id AND a.partido_id = p.partido_id
+            INNER JOIN partidos pa ON p.partido_id = pa.id
+            INNER JOIN fechas f ON pa.fecha_id = f.id
+            INNER JOIN grupos gr ON f.grupo_id = gr.id
+            INNER JOIN torneos t ON gr.torneo_id = t.id
+            INNER JOIN equipos e1 ON pa.equipol_id = e1.id
+            INNER JOIN equipos e2 ON pa.equipov_id = e2.id
+            WHERE p.jugador_id = :jugadorIdPenalPartido
+            " . ($idTorneo ? " AND gr.torneo_id = :torneoIdPenalPartido" : "") . "
+            " . ($tipo ? " AND p.tipo = :tipoPenal" : "") . "
+        )
+        UNION ALL
+        (
+            -- Penales convertidos (goles)
+            SELECT DISTINCT
+                t.nombre AS nombreTorneo,
+                t.escudo AS escudoTorneo,
+                t.year,
+                f.numero,
+                pa.dia,
+                e1.id AS equipol_id,
+                e1.escudo AS fotoLocal,
+                e1.nombre AS local,
+                e2.id AS equipov_id,
+                e2.escudo AS fotoVisitante,
+                e2.nombre AS visitante,
+                pa.golesl,
+                pa.golesv,
+                pa.penalesl,
+                pa.penalesv,
+                pa.id AS partido_id,
+                'Convertido' AS tipoPenal
+            FROM gols g
+            INNER JOIN alineacions a ON a.jugador_id = g.jugador_id AND a.partido_id = g.partido_id
+            INNER JOIN partidos pa ON g.partido_id = pa.id
+            INNER JOIN fechas f ON pa.fecha_id = f.id
+            INNER JOIN grupos gr ON f.grupo_id = gr.id
+            INNER JOIN torneos t ON gr.torneo_id = t.id
+            INNER JOIN equipos e1 ON pa.equipol_id = e1.id
+            INNER JOIN equipos e2 ON pa.equipov_id = e2.id
+            WHERE g.jugador_id = :jugadorIdGolPartido
+              AND g.tipo = 'Penal'
+            " . ($idTorneo ? " AND gr.torneo_id = :torneoIdGolPartido" : "") . "
+            " . ($tipo ? " AND 'Convertido' = :tipoPenal" : "") . "
+        )
+        ORDER BY dia DESC
+    ";
 
-
-        $bindingsPartidos = ['jugadorId' => $id];
-        if ($idTorneo) $bindingsPartidos['torneoId'] = $idTorneo;
+        $bindingsPartidos = [
+            'jugadorIdPenalPartido' => $id,
+            'jugadorIdGolPartido'   => $id
+        ];
+        if ($idTorneo) {
+            $bindingsPartidos['torneoIdPenalPartido'] = $idTorneo;
+            $bindingsPartidos['torneoIdGolPartido']   = $idTorneo;
+        }
         if ($tipo) $bindingsPartidos['tipoPenal'] = $tipo;
 
         $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
@@ -1170,7 +1177,6 @@ ORDER BY dia DESC
             $page
         );
 
-        // Mantener query params en la paginación
         $arrayParam = ['jugadorId' => $id];
         if ($idTorneo) $arrayParam['torneoId'] = $idTorneo;
         if ($tipo) $arrayParam['tipo'] = $tipo;
@@ -1189,6 +1195,7 @@ ORDER BY dia DESC
             'tipo'
         ));
     }
+
 
 
     public function importar(Request $request)

@@ -203,8 +203,7 @@
                     data: [
                         {value: {{ $totalConvertidos }}, name: 'Convertidos'},
                         {value: {{ $totalErrados }}, name: 'Errados'},
-                        {value: {{ $totalAtajados }}, name: 'Atajados'},
-                        {value: {{ $totalAtajos }}, name: 'Atajó'}
+                        {value: {{ $totalAtajados }}, name: 'Atajados'}
                     ]
                 }]
             });
