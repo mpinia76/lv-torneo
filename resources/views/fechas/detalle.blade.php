@@ -276,7 +276,7 @@
                                                         <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
                                                     @elseif($p[0]=='Atajado')
                                                         <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
-                                                    @elseif($p[0]=='Atajó')
+                                                    @else
                                                             <img id="original"  src="{{ url('images/iconMatchPenaltyStopped.gif') }}" height="20" title="Penal atajado">
                                                     @endif
                                                     {{$p[1]}}'
