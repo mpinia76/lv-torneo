@@ -192,7 +192,7 @@
                                    $arrayPenales = $penales->toArray();
                                    $arrayTarjetas = $tarjetas->toArray();
                                    $arrayCambios = $cambios->toArray();
-dd($arrayPenales);
+
                                 @endphp
                                 @foreach($titularesL ?? '' as $titularl)
                                     <tr>
@@ -271,6 +271,7 @@ dd($arrayPenales);
                                                 @endforeach
                                             @endif
                                             @if (!empty($incPenales))
+                                                dd($incPenales);
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
                                                         <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
