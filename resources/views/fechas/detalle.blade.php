@@ -189,7 +189,7 @@
                                 @php
 
                                    $arrayGoles = $goles->toArray();
-                                   $arrayPenales = $penal->toArray();
+                                   $arrayPenales = $penales->toArray();
                                    $arrayTarjetas = $tarjetas->toArray();
                                    $arrayCambios = $cambios->toArray();
 
