@@ -192,7 +192,7 @@
                                    $arrayPenales = $penales->toArray();
                                    $arrayTarjetas = $tarjetas->toArray();
                                    $arrayCambios = $cambios->toArray();
-
+dd($arrayPenales);
                                 @endphp
                                 @foreach($titularesL ?? '' as $titularl)
                                     <tr>
