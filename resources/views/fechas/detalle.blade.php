@@ -229,7 +229,7 @@
                                                 $arrayPenal['jugador']=$titularl->jugador->persona->full_name;
                                                 $arrayPenal['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
 
-                                                $arrayPenal['escudo']=$partido->equipov->escudo;
+                                                $arrayPenal['escudo']=$partido->equipol->escudo;
                                             }
                                         }
                                         $tarjetero=array();
@@ -491,7 +491,7 @@
                                                         $arrayPenal['jugador']=$suplentel->jugador->persona->full_name;
                                                         $arrayPenal['foto']=($suplentel->jugador->persona->foto)?$suplentel->jugador->persona->foto:'sin_foto.png';
 
-                                                        $arrayPenal['escudo']=$partido->equipov->escudo;
+                                                        $arrayPenal['escudo']=$partido->equipol->escudo;
                                                     }
                                                 }
                                                 $tarjetero=array();
@@ -885,7 +885,7 @@
                             <span style="font-weight: bold">{{ $arrPenal['jugador'] }}</span>
                             {{
                                 ($arrPenal['tipo'] == 'Errado' || $arrPenal['tipo'] == 'Atajado') ? 'Penal errado' :
-                                ($arrPenal['tipo'] == 'Atajo' ? 'Penal atajado' : $arrPenal['tipo'])
+                                ($arrPenal['tipo'] == 'Atajó' ? 'Penal atajado' : $arrPenal['tipo'])
                             }}
 
                         </div>
