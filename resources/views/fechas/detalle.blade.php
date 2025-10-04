@@ -870,6 +870,27 @@
                 <div class="row">
 
 
+                    @foreach($arrayPenales ?? '' as $arrPenal)
+
+                        <div class="form-group col-xs-12 col-sm-6 col-md-12">
+                            <img id="original" height="20" src="{{ url('images/'.$arrPenal['escudo']) }}" >
+
+                            {{ $arrPenal['minuto']}}'
+                            <a href="{{route('jugadores.ver', array('jugadorId' => $arrPenal['jugador_id']))}}" >
+
+
+                                <img id="original" class="imgCircle" src="{{ url('images/'.$arrPenal['foto']) }}" >
+
+                            </a>
+                            <span style="font-weight: bold"> {{ $arrPenal['jugador']}}</span> {{ $arrPenal['tipo']}}
+                        </div>
+
+                    @endforeach
+
+                </div>
+                <div class="row">
+
+
                     <div class="mt-4">
 
                         <ul>
