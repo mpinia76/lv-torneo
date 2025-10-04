@@ -7522,6 +7522,8 @@ private function normalizarMinuto(string $texto): int
 
         $goles=Gol::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
 
+        $penales=penal::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
+
 
         $titularesL=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('tipo','=',"Titular")->orderBy('orden', 'asc')->get();
 
@@ -7550,7 +7552,7 @@ private function normalizarMinuto(string $texto): int
         $incidencias=Incidencia::where('partido_id',$partido_id)->paginate();
 
         //dd($partido->fecha->grupo->torneo->nombre);
-        return view('fechas.detalle', compact('goles','partido', 'tarjetas','cambios','titularesL','suplentesL','titularesV','suplentesV','tecnicosL','tecnicosV','arbitros','incidencias'));
+        return view('fechas.detalle', compact('goles','penales','partido', 'tarjetas','cambios','titularesL','suplentesL','titularesV','suplentesV','tecnicosL','tecnicosV','arbitros','incidencias'));
         //
     }
 

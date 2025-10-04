@@ -41,12 +41,11 @@
                     <th>GV</th>
                     <th>Visitante</th>
                     <th>Cancha Neutral</th>
-                    <th>Acciones</th>
                 </tr>
                 </thead>
                 <tbody>
                 @foreach($partidos as $partido)
-                    <tr>
+                    <tr style="cursor:pointer;" onclick="window.location='{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}'">
                         <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
                         <td>{{ is_numeric($partido->numero) ? "Fecha $partido->numero" : $partido->numero }}</td>
                         <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
@@ -71,9 +70,6 @@
                             </a>
                         </td>
                         <td>{{$partido->neutral}}</td>
-                        <td>
-                            <a href="{{route('fechas.detalle', ['partidoId' => $partido->partido_id])}}" class="btn btn-sm btn-success">Detalles</a>
-                        </td>
                     </tr>
                 @endforeach
                 </tbody>

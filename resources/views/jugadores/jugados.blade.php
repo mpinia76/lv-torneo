@@ -8,157 +8,151 @@
         <div class="card shadow-sm border-0">
             <div class="card-body">
                 <h1 class="h3 mb-4 text-center text-primary">⚽ Jugados</h1>
-        <div class="row">
-            <div class="col-xs-12 col-sm-6 col-md-3">
 
-                {{-- Torneo --}}
-                @if($torneo)
-                    <div class="mb-3 d-flex align-items-center">
-                        @if($torneo->escudo)
-                            <img src="{{ url('images/'.$torneo->escudo) }}" alt="Escudo {{ $torneo->nombre }}" height="40" class="me-2">
+                <div class="row">
+                    <div class="col-xs-12 col-sm-6 col-md-3">
+
+                        {{-- Torneo --}}
+                        @if($torneo)
+                            <div class="mb-3 d-flex align-items-center">
+                                @if($torneo->escudo)
+                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="Escudo {{ $torneo->nombre }}" height="40" class="me-2">
+                                @endif
+                                <strong>{{ $torneo->getFullNameAttribute() }}</strong>
+                            </div>
                         @endif
-                        <strong>{{ $torneo->getFullNameAttribute() }}</strong>
-                    </div>
-                @endif
 
-                {{-- Foto jugador --}}
-                <div class="mb-3">
-                    <img
-                        src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
-                        alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
-                        class="img-fluid rounded shadow-sm"
-                        height="200">
-                </div>
+                        {{-- Foto jugador --}}
+                        <div class="mb-3">
+                            <img
+                                src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
+                                alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
+                                class="img-fluid rounded shadow-sm"
+                                height="200">
+                        </div>
 
-                {{-- Nombre jugador --}}
-                <div>
-                    <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">
-                        <strong>{{ $jugador->persona->getFullNameAgeAttribute() }}</strong>
-                    </a>
-                </div>
-
-            </div>
-
-            <div class="col-xs-12 col-sm-6 col-md-8" id="detalle">
-                <div class="row text-center">
-
-                    {{-- Cards de Jugados/Ganados/Empatados/Perdidos --}}
-                    @php
-                        $opciones = [
-                            '' => ['label' => 'Jugados', 'total' => $totalJugados],
-                            'Ganados' => ['label' => 'Ganados', 'total' => $totalGanados],
-                            'Empatados' => ['label' => 'Empatados', 'total' => $totalEmpatados],
-                            'Perdidos' => ['label' => 'Perdidos', 'total' => $totalPerdidos],
-                        ];
-                    @endphp
-
-                    @foreach($opciones as $tipoClave => $opcion)
-                        <div class="col-6 col-md-3 mb-2">
-                            <a href="{{ route('jugadores.jugados', array_filter([
-                                'jugadorId' => $jugador->id,
-                                'torneoId' => $torneo->id ?? null,
-                                'tipo' => $tipoClave ?: null
-                            ])) }}">
-                                <div class="p-2 rounded {{ $tipo == $tipoClave ? 'bg-success text-white' : 'bg-light' }}">
-                                    <div>{{ $opcion['label'] }}</div>
-                                    <strong>{{ $opcion['total'] }}</strong>
-                                </div>
+                        {{-- Nombre jugador --}}
+                        <div>
+                            <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">
+                                <strong>{{ $jugador->persona->getFullNameAgeAttribute() }}</strong>
                             </a>
                         </div>
-                    @endforeach
+
+                    </div>
+
+                    <div class="col-xs-12 col-sm-6 col-md-8" id="detalle">
+                        <div class="row text-center">
+
+                            {{-- Cards de Jugados/Ganados/Empatados/Perdidos --}}
+                            @php
+                                $opciones = [
+                                    '' => ['label' => 'Jugados', 'total' => $totalJugados],
+                                    'Ganados' => ['label' => 'Ganados', 'total' => $totalGanados],
+                                    'Empatados' => ['label' => 'Empatados', 'total' => $totalEmpatados],
+                                    'Perdidos' => ['label' => 'Perdidos', 'total' => $totalPerdidos],
+                                ];
+                            @endphp
+
+                            @foreach($opciones as $tipoClave => $opcion)
+                                <div class="col-6 col-md-3 mb-2">
+                                    <a href="{{ route('jugadores.jugados', array_filter([
+                                        'jugadorId' => $jugador->id,
+                                        'torneoId' => $torneo->id ?? null,
+                                        'tipo' => $tipoClave ?: null
+                                    ])) }}">
+                                        <div class="p-2 rounded {{ $tipo == $tipoClave ? 'bg-success text-white' : 'bg-light' }}">
+                                            <div>{{ $opcion['label'] }}</div>
+                                            <strong>{{ $opcion['total'] }}</strong>
+                                        </div>
+                                    </a>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        {{-- Gráfico --}}
+                        @if($tipo=='')
+                            <div class="row mt-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="chart-container">
+                                            <div class="chart has-fixed-height" id="pie_basic"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
-                {{-- Gráfico --}}
-                @if($tipo=='')
-                    <div class="row mt-3">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="chart-container">
-                                    <div class="chart has-fixed-height" id="pie_basic"></div>
-                                </div>
+                {{-- Tabla de partidos --}}
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-dark">
+                            <tr>
+                                <th>Torneo</th>
+                                <th>Fecha</th>
+                                <th>Día</th>
+                                <th>Local</th>
+                                <th>GL</th>
+                                <th>GV</th>
+                                <th>Visitante</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($partidos as $partido)
+                                <tr onclick="window.location='{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}'" style="cursor:pointer;">
+                                    <td>
+                                        @if($partido->escudoTorneo)
+                                            <img src="{{ url('images/'.$partido->escudoTorneo) }}" alt="Escudo {{ $partido->nombreTorneo }}" height="20" class="me-1">
+                                        @endif
+                                        {{ $partido->nombreTorneo }} {{ $partido->year }}
+                                    </td>
+                                    <td>{{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}</td>
+                                    <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
+                                    <td>
+                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol_id]) }}" onclick="event.stopPropagation()">
+                                            @if($partido->fotoLocal)
+                                                <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
+                                            @endif
+                                            {{ $partido->local }}
+                                        </a>
+                                    </td>
+                                    <td>{{ $partido->golesl }} @if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
+                                    <td>{{ $partido->golesv }} @if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
+                                    <td>
+                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov_id]) }}" onclick="event.stopPropagation()">
+                                            @if($partido->fotoVisitante)
+                                                <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
+                                            @endif
+                                            {{ $partido->visitante }}
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+
+                        {{-- Paginación y total --}}
+                        <div class="row">
+                            <div class="col-md-9">
+                                {{ $partidos->links() }}
+                            </div>
+                            <div class="col-md-3 text-end">
+                                <strong>Total: {{ $partidos->total() }}</strong>
                             </div>
                         </div>
                     </div>
-                @endif
-            </div>
-        </div>
+                </div>
 
-        {{-- Tabla de partidos --}}
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <table class="table table-hover align-middle">
-                    <thead class="table-dark">
-                    <tr>
-                        <th>Torneo</th>
-                        <th>Fecha</th>
-                        <th>Día</th>
-                        <th>Local</th>
-                        <th>GL</th>
-                        <th>GV</th>
-                        <th>Visitante</th>
-                        <th>Acción</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @foreach($partidos as $partido)
-                        <tr>
-                            <td>
-                                @if($partido->escudoTorneo)
-                                    <img src="{{ url('images/'.$partido->escudoTorneo) }}" alt="Escudo {{ $partido->nombreTorneo }}" height="20" class="me-1">
-                                @endif
-                                {{ $partido->nombreTorneo }} {{ $partido->year }}
-                            </td>
-                            <td>
-                                {{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}
-                            </td>
-                            <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                            <td>
-                                <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol_id]) }}">
-                                    @if($partido->fotoLocal)
-                                        <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
-                                    @endif
-                                    {{ $partido->local }}
-                                </a>
-                            </td>
-                            <td>{{ $partido->golesl }} @if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
-                            <td>{{ $partido->golesv }} @if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
-                            <td>
-                                <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov_id]) }}">
-                                    @if($partido->fotoVisitante)
-                                        <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
-                                    @endif
-                                    {{ $partido->visitante }}
-                                </a>
-                            </td>
-                            <td>
-                                <a href="{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}" class="btn btn-success btn-sm">
-                                    Detalles
-                                </a>
-                            </td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-
-                {{-- Paginación y total --}}
-                <div class="row">
-                    <div class="col-md-9">
-                        {{ $partidos->links() }}
-                    </div>
-                    <div class="col-md-3 text-end">
-                        <strong>Total: {{ $partidos->total() }}</strong>
-                    </div>
+                {{-- Botón volver --}}
+                <div class="d-flex mt-3">
+                    <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
                 </div>
             </div>
         </div>
+    </div>
 
-        {{-- Botón volver --}}
-        <div class="d-flex mt-3">
-            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
-        </div>
-    </div>
-        </div>
-    </div>
     {{-- Script gráfico --}}
     <script type="text/javascript">
         var pie_basic_element = document.getElementById('pie_basic');
@@ -190,4 +184,11 @@
             });
         }
     </script>
+
+    <style>
+        tr[onclick]:hover {
+            background-color: #d1f7d1 !important;
+            transition: background-color 0.2s ease-in-out;
+        }
+    </style>
 @endsection

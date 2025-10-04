@@ -12,7 +12,7 @@
                 <form class="mb-4" id="formFechas" method="GET" action="">
                     <div class="d-flex justify-content-center align-items-center flex-wrap gap-2">
                         <div class="btn-group" role="group" aria-label="Navegación fechas">
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="actualizarFecha(0)">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="actualizarFecha(-1)">
                                 ⬅ Anterior
                             </button>
 
@@ -24,7 +24,7 @@
                                    value="{{ $dia }}"
                                    onchange="enviarFormulario()">
 
-                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="actualizarFecha(2)">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="actualizarFecha(1)">
                                 Siguiente ➡
                             </button>
                         </div>
@@ -79,10 +79,11 @@
                                 @endif
 
                                 {{-- Partido --}}
-                                <tr>
+                                <tr class="clickable-row" data-href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}">
                                     <td class="text-muted">{{ $partido->dia ? date('H:i', strtotime($partido->dia)) : '' }}</td>
+
                                     <td class="text-end">
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}" class="text-decoration-none">
+                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
                                             @if($partido->equipol && $partido->equipol->escudo)
                                                 <img src="{{ url('images/' . $partido->equipol->escudo) }}" height="20" class="me-1">
                                             @endif
@@ -90,10 +91,12 @@
                                         </a>
                                         <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" height="15">
                                     </td>
+
                                     <td class="fw-bold">{{ $partido->golesl }} @if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
                                     <td class="fw-bold">{{ $partido->golesv }} @if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
+
                                     <td class="text-start">
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none">
+                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
                                             @if($partido->equipov && $partido->equipov->escudo)
                                                 <img src="{{ url('images/' . $partido->equipov->escudo) }}" height="20" class="me-1">
                                             @endif
@@ -101,12 +104,8 @@
                                         </a>
                                         <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" height="15">
                                     </td>
-                                    <td>
-                                        <a href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}" class="btn btn-success btn-sm">
-                                            Detalles
-                                        </a>
-                                    </td>
                                 </tr>
+
                                 @php $lastDate = $currentDate; @endphp
                             @endforeach
                         @endforeach
@@ -122,6 +121,7 @@
         function enviarFormulario() {
             document.getElementById('formFechas').submit();
         }
+
         function actualizarFecha(dias) {
             let fechaHoy = document.getElementById('dia').value;
             let fecha = new Date(fechaHoy);
@@ -133,5 +133,24 @@
             document.getElementById('dia').value = nuevaFecha;
             enviarFormulario();
         }
+
+        // Redirección al hacer clic en la fila
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.clickable-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    window.location = row.dataset.href;
+                });
+            });
+        });
     </script>
+
+    <style>
+        .clickable-row {
+            cursor: pointer;
+            transition: background-color 0.15s ease-in-out;
+        }
+        .clickable-row:hover {
+            background-color: #e6ffe6 !important;
+        }
+    </style>
 @endsection

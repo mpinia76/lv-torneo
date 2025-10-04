@@ -38,8 +38,8 @@
                     @foreach($stats as $key => $label)
                         <div class="col-6 col-md-3 mb-3">
                             <a href="{{ $torneo
-                            ? route('equipos.jugados', ['equipoId'=>$equipo->id, 'torneoId'=>$torneo->id, 'tipo'=>$key])
-                            : route('equipos.jugados', ['equipoId'=>$equipo->id, 'tipo'=>$key]) }}"
+                                ? route('equipos.jugados', ['equipoId'=>$equipo->id, 'torneoId'=>$torneo->id, 'tipo'=>$key])
+                                : route('equipos.jugados', ['equipoId'=>$equipo->id, 'tipo'=>$key]) }}"
                                class="text-decoration-none">
                                 <div class="card {{ $tipo==$key ? 'bg-success text-white' : '' }}">
                                     <div class="card-body p-2">
@@ -64,54 +64,52 @@
 
         <div class="row">
             <div class="col-12">
-                <table class="table table-striped table-hover table-responsive-sm">
-                    <thead class="thead-dark">
-                    <tr>
-                        <th>Torneo</th>
-                        <th>Fecha</th>
-                        <th>Día</th>
-                        <th>Local</th>
-                        <th>GL</th>
-                        <th>GV</th>
-                        <th>Visitante</th>
-                        <th>Acción</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    @foreach($partidos as $partido)
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle text-center">
+                        <thead class="table-dark">
                         <tr>
-                            <td>{{ $partido->nombreTorneo }} {{ $partido->year }}</td>
-                            <td>{{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}</td>
-                            <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                            <td>
-                                @if($partido->local)
-                                    <a href="{{ route('equipos.ver', ['equipoId'=>$partido->equipol_id]) }}">
+                            <th>Torneo</th>
+                            <th>Fecha</th>
+                            <th>Día</th>
+                            <th>Local</th>
+                            <th>GL</th>
+                            <th>GV</th>
+                            <th>Visitante</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($partidos as $partido)
+                            <tr class="clickable-row"
+                                data-href="{{ route('fechas.detalle', ['partidoId'=>$partido->partido_id]) }}"
+                                style="cursor:pointer;">
+                                <td>{{ $partido->nombreTorneo }} {{ $partido->year }}</td>
+                                <td>{{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}</td>
+                                <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
+                                <td class="text-end">
+                                    @if($partido->local)
                                         @if($partido->fotoLocal)
                                             <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
                                         @endif
                                         {{ $partido->local }}
-                                    </a>
-                                @endif
-                            </td>
-                            <td>{{ $partido->golesl }}@if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
-                            <td>{{ $partido->golesv }}@if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
-                            <td>
-                                @if($partido->visitante)
-                                    <a href="{{ route('equipos.ver', ['equipoId'=>$partido->equipov_id]) }}">
+                                        <img src="{{ url('images/'.removeAccents($partido->paisLocal).'.gif') }}" alt="{{ $partido->paisLocal }}" height="15">
+                                    @endif
+                                </td>
+                                <td class="fw-bold">{{ $partido->golesl }}@if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
+                                <td class="fw-bold">{{ $partido->golesv }}@if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
+                                <td class="text-start">
+                                    @if($partido->visitante)
                                         @if($partido->fotoVisitante)
                                             <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
                                         @endif
                                         {{ $partido->visitante }}
-                                    </a>
-                                @endif
-                            </td>
-                            <td>
-                                <a href="{{ route('fechas.detalle', ['partidoId'=>$partido->partido_id]) }}" class="btn btn-success btn-sm">Detalles</a>
-                            </td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
+                                        <img src="{{ url('images/'.removeAccents($partido->paisVisitante).'.gif') }}" alt="{{ $partido->paisVisitante }}" height="15">
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
                 <div class="d-flex justify-content-between align-items-center mt-3">
                     <div>{{ $partidos->links() }}</div>
@@ -126,6 +124,7 @@
 
     </div>
 
+    {{-- Script de ECharts --}}
     <script>
         var pie_basic_element = document.getElementById('pie_basic');
         if (pie_basic_element) {
@@ -149,5 +148,14 @@
                 }]
             });
         }
+
+        // Filas clickeables
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.clickable-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    window.location.href = row.dataset.href;
+                });
+            });
+        });
     </script>
 @endsection

@@ -189,6 +189,7 @@
                                 @php
 
                                    $arrayGoles = $goles->toArray();
+                                   $arrayPenales = $penal->toArray();
                                    $arrayTarjetas = $tarjetas->toArray();
                                    $arrayCambios = $cambios->toArray();
 
@@ -218,6 +219,17 @@
                                                 $arrayGol['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
 
                                                 $arrayGol['escudo']=($arrayGol['tipo']=='En Contra')?$partido->equipov->escudo:$partido->equipol->escudo;
+                                            }
+                                        }
+                                        $incPenales=array();
+                                        foreach ($arrayPenales as &$arrayPenal){
+                                            if ($titularl->jugador->id==$arrayPenal['jugador_id']){
+                                                $incPenales[]=array($arrayPenal['tipo'],$arrayPenal['minuto']);
+                                                $arrayPenal['dorsal']=$titularl->dorsal;
+                                                $arrayPenal['jugador']=$titularl->jugador->persona->full_name;
+                                                $arrayPenal['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
+
+                                                $arrayPenal['escudo']=$partido->equipov->escudo;
                                             }
                                         }
                                         $tarjetero=array();
@@ -256,6 +268,18 @@
                                                         <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
                                                     @endif
                                                     {{$g[1]}}'
+                                                @endforeach
+                                            @endif
+                                            @if (!empty($incPenales))
+                                                @foreach($incPenales as $p)
+                                                    @if($p[0]=='Errado')
+                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                    @elseif($p[0]=='Atajado')
+                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                    @elseif($p[0]=='Atajó')
+                                                            <img id="original"  src="{{ url('images/iconMatchPenaltyStopped.gif') }}" height="20" title="Penal atajado">
+
+                                                    {{$p[1]}}'
                                                 @endforeach
                                             @endif
                                             @if (!empty($tarjetero))

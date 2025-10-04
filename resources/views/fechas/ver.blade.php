@@ -27,7 +27,7 @@
                                 @endforeach
                             </select>
 
-                            {{-- Campo oculto que viaja en el form --}}
+                            {{-- Campos ocultos --}}
                             <input type="hidden" id="fechaOrden" name="fechaOrden" value="{{ $fecha->orden }}">
                             <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
 
@@ -48,7 +48,6 @@
                             use Carbon\Carbon;
                             $lastDate = null;
                             $lastFecha = null;
-                            // Array de todos los órdenes disponibles
                             $fechasArray = $fechas->pluck('orden')->toArray();
                             $indiceActual = array_search($fecha->orden, $fechasArray);
                         @endphp
@@ -80,11 +79,12 @@
                                 @endif
 
                                 {{-- Partido --}}
-                                <tr>
+                                <tr class="clickable-row"
+                                    data-href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}">
                                     <td class="text-muted">{{ $partido->dia ? Carbon::parse($partido->dia)->format('H:i') : '' }}</td>
                                     <td class="text-end">
                                         @if($partido->equipol)
-                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}" class="text-decoration-none">
+                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
                                                 @if($partido->equipol->escudo)
                                                     <img src="{{ url('images/' . $partido->equipol->escudo) }}" height="20" class="me-1">
                                                 @endif
@@ -93,11 +93,21 @@
                                             <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" height="15">
                                         @endif
                                     </td>
-                                    <td class="fw-bold">{{ $partido->golesl }}@if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
-                                    <td class="fw-bold">{{ $partido->golesv }}@if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
+                                    <td class="fw-bold">
+                                        {{ $partido->golesl }}
+                                        @if($partido->penalesl)
+                                            ({{ $partido->penalesl }})
+                                        @endif
+                                    </td>
+                                    <td class="fw-bold">
+                                        {{ $partido->golesv }}
+                                        @if($partido->penalesv)
+                                            ({{ $partido->penalesv }})
+                                        @endif
+                                    </td>
                                     <td class="text-start">
                                         @if($partido->equipov)
-                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none">
+                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
                                                 @if($partido->equipov->escudo)
                                                     <img src="{{ url('images/' . $partido->equipov->escudo) }}" height="20" class="me-1">
                                                 @endif
@@ -105,9 +115,6 @@
                                             </a>
                                             <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" height="15">
                                         @endif
-                                    </td>
-                                    <td>
-                                        <a href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}" class="btn btn-success btn-sm">Detalles</a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -136,10 +143,30 @@
             document.getElementById('fechaOrden').value = fechasDisponibles[indiceActual];
             document.getElementById('formFechas').submit();
         }
+
         function seleccionarFecha() {
             const selected = document.getElementById('fechaSelect').value;
             document.getElementById('fechaOrden').value = selected;
             document.getElementById('formFechas').submit();
         }
+
+        // Redirigir al hacer clic en fila
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.clickable-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    window.location = row.dataset.href;
+                });
+            });
+        });
     </script>
+
+    <style>
+        .clickable-row {
+            cursor: pointer;
+            transition: background-color 0.15s ease-in-out;
+        }
+        .clickable-row:hover {
+            background-color: #e6ffe6 !important;
+        }
+    </style>
 @endsection
