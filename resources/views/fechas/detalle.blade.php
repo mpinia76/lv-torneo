@@ -882,7 +882,12 @@
                                 <img id="original" class="imgCircle" src="{{ url('images/'.$arrPenal['foto']) }}" >
 
                             </a>
-                            <span style="font-weight: bold"> {{ $arrPenal['jugador']}}</span> {{ $arrPenal['tipo']}}
+                            <span style="font-weight: bold">{{ $arrPenal['jugador'] }}</span>
+                            {{
+                                ($arrPenal['tipo'] == 'Errado' || $arrPenal['tipo'] == 'Atajado') ? 'Penal errado' :
+                                ($arrPenal['tipo'] == 'Atajo' ? 'Penal atajado' : $arrPenal['tipo'])
+                            }}
+
                         </div>
 
                     @endforeach
