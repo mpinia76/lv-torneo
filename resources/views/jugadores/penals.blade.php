@@ -11,7 +11,6 @@
 
                 <div class="row">
                     <div class="col-xs-12 col-sm-6 col-md-3">
-
                         {{-- Torneo --}}
                         @if($torneo)
                             <div class="mb-3 d-flex align-items-center">
@@ -24,11 +23,10 @@
 
                         {{-- Foto jugador --}}
                         <div class="mb-3">
-                            <img
-                                src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
-                                alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
-                                class="img-fluid rounded shadow-sm"
-                                height="200">
+                            <img src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
+                                 alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
+                                 class="img-fluid rounded shadow-sm"
+                                 height="200">
                         </div>
 
                         {{-- Nombre jugador --}}
@@ -37,12 +35,11 @@
                                 <strong>{{ $jugador->persona->getFullNameAgeAttribute() }}</strong>
                             </a>
                         </div>
-
                     </div>
 
                     <div class="col-xs-12 col-sm-6 col-md-8" id="detalle">
                         <div class="row text-center">
-
+                            {{-- Estadísticas --}}
                             @php
                                 $opciones = [
                                     '' => ['label' => 'Todos', 'valorDB' => ''],
@@ -56,10 +53,10 @@
                             @foreach($opciones as $tipoClave => $opcion)
                                 <div class="col-6 col-md-3 mb-2">
                                     <a href="{{ route('jugadores.penals', array_filter([
-                                        'jugadorId' => $jugador->id,
-                                        'torneoId' => $torneo->id ?? null,
-                                        'tipo' => $opcion['valorDB'] ?: null
-                                    ])) }}">
+                                    'jugadorId' => $jugador->id,
+                                    'torneoId' => $torneo->id ?? null,
+                                    'tipo' => $opcion['valorDB'] ?: null
+                                ])) }}">
                                         <div class="p-2 rounded {{ $tipo == $opcion['valorDB'] ? 'bg-success text-white' : 'bg-light' }}">
                                             <div>{{ $opcion['label'] }}</div>
                                             <strong>
@@ -77,7 +74,7 @@
                             @endforeach
                         </div>
 
-                        {{-- Gráfico --}}
+                        {{-- Gráfico jugador --}}
                         @if($tipo == '')
                             <div class="row mt-3">
                                 <div class="card">
@@ -89,6 +86,19 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- Gráfico arqueros --}}
+                        <div class="row mt-4">
+                            <div class="col-md-6 offset-md-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-center">Penales al arquero</h5>
+                                        <div id="pie_arqueros" style="height: 300px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -141,14 +151,9 @@
                             </tbody>
                         </table>
 
-                        {{-- Paginación y total --}}
                         <div class="row">
-                            <div class="col-md-9">
-                                {{ $partidos->links() }}
-                            </div>
-                            <div class="col-md-3 text-end">
-                                <strong>Total: {{ $partidos->total() }}</strong>
-                            </div>
+                            <div class="col-md-9">{{ $partidos->links() }}</div>
+                            <div class="col-md-3 text-end"><strong>Total: {{ $partidos->total() }}</strong></div>
                         </div>
                     </div>
                 </div>
@@ -163,21 +168,14 @@
 
     {{-- Script gráfico --}}
     <script type="text/javascript">
+        // Gráfico jugador
         var pie_basic_element = document.getElementById('pie_basic');
         if (pie_basic_element) {
             var pie_basic = echarts.init(pie_basic_element);
             pie_basic.setOption({
-                color: ['#4caf50', '#f44336', '#2196f3'], // Verde = Convertidos, Rojo = Errados, Azul = Atajados
-                legend: {
-                    orient: 'horizontal',
-                    bottom: 0,
-                    left: 'center',
-                    data: ['Convertidos', 'Errados', 'Atajados']
-                },
-                tooltip: {
-                    trigger: 'item',
-                    formatter: "{b}: {c} ({d}%)"
-                },
+                color: ['#4caf50', '#f44336', '#2196f3'],
+                legend: { orient: 'horizontal', bottom: 0, left: 'center', data: ['Convertidos', 'Errados', 'Atajados'] },
+                tooltip: { trigger: 'item', formatter: "{b}: {c} ({d}%)" },
                 series: [{
                     name: 'Penales',
                     type: 'pie',
@@ -187,6 +185,27 @@
                         {value: {{ $totalConvertidos }}, name: 'Convertidos'},
                         {value: {{ $totalErrados }}, name: 'Errados'},
                         {value: {{ $totalAtajados }}, name: 'Atajados'}
+                    ]
+                }]
+            });
+        }
+
+        // Gráfico arqueros
+        var pie_arqueros_element = document.getElementById('pie_arqueros');
+        if (pie_arqueros_element) {
+            var pie_arqueros = echarts.init(pie_arqueros_element);
+            pie_arqueros.setOption({
+                color: ['#4caf50', '#f44336'],
+                legend: { orient: 'horizontal', bottom: 0, left: 'center', data: ['Atajó', 'Convertido'] },
+                tooltip: { trigger: 'item', formatter: "{b}: {c} ({d}%)" },
+                series: [{
+                    name: 'Penales al arquero',
+                    type: 'pie',
+                    radius: '70%',
+                    center: ['50%', '50%'],
+                    data: [
+                        {value: {{ $totalAtajos ?? 0 }}, name: 'Atajó'},
+                        {value: {{ $totalConvirtieron ?? 0 }}, name: 'Convertido'}
                     ]
                 }]
             });

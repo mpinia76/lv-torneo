@@ -1047,6 +1047,7 @@ group by tecnico_id
             COUNT(CASE WHEN p.tipo = 'Errado' THEN 1 END) AS totalErrados,
             COUNT(CASE WHEN p.tipo = 'Atajado' THEN 1 END) AS totalAtajados,
             COUNT(CASE WHEN p.tipo = 'Atajo' THEN 1 END) AS totalAtajos,
+            COUNT(CASE WHEN p.tipo = 'Convertido' THEN 1 END) AS totalConvirtieron,
             (
                 SELECT COUNT(*)
                 FROM gols g
@@ -1079,7 +1080,10 @@ group by tecnico_id
         $totalErrados     = $penalStats->totalErrados ?? 0;
         $totalAtajados    = $penalStats->totalAtajados ?? 0;
         $totalAtajos      = $penalStats->totalAtajos ?? 0;
+        $totalConvirtieron = $penalStats->totalConvirtieron ?? 0;
         $totalTodos       = $totalErrados + $totalAtajados + $totalConvertidos;
+        $totalTodosArquero       = $totalAtajos + $totalConvirtieron;
+
 
         $bindingsPartidos = ['jugadorId' => $id];
         $sqlPartidos = "
@@ -1158,7 +1162,9 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             'jugador',
             'torneo',
             'totalTodos',
+            'totalTodosArquero',
             'totalAtajados',
+            'totalConvirtieron',
             'totalErrados',
             'totalConvertidos',
             'totalAtajos',
