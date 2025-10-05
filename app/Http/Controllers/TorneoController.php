@@ -3720,6 +3720,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
     public function controlarPenales(Request $request)
     {
+        set_time_limit(0);
         $golesPenales = Gol::with(['partido', 'jugador'])->where('tipo', 'penal')->get();
         $penalesCargados = collect();
 
@@ -3727,6 +3728,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             // Evitar duplicados
             $existe = Penal::where('partido_id', $gol->partido_id)
                 ->where('minuto', $gol->minuto)
+                ->where('tipo', 'Convertido')
                 ->first();
             if ($existe) continue;
 
