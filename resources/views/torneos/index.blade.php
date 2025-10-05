@@ -28,6 +28,7 @@
         <a class="btn btn-info m-1" href="{{route('partidos.controlarCambios')}}">Controlar cambios</a>
         <a class="btn btn-info m-1" href="{{route('partidos.controlarArbitros')}}">Controlar arbitros</a>
         <a class="btn btn-info m-1" href="{{route('partidos.controlarTecnicos')}}">Controlar técnicos</a>
+        <a class="btn btn-info m-1" href="{{route('torneos.controlarPenales')}}">Controlar penales</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

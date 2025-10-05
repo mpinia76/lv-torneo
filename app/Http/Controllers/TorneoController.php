@@ -19,7 +19,10 @@ use Illuminate\Http\Request;
 use App\Grupo;
 use App\PromedioTorneo;
 use App\Equipo;
-
+use App\Gol;
+use App\Penal;
+use App\Alineacion;
+use App\Cambio;
 use Illuminate\Support\Facades\Log;
 use function GuzzleHttp\Promise\iter_for;
 
@@ -3713,6 +3716,92 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
         return redirect()->route('torneos.clasificados', $torneo->id)->with('success', 'Clasificados actualizados');
     }
+
+
+    public function controlarPenales(Request $request)
+    {
+        $golesPenales = Gol::with(['partido', 'jugador'])->where('tipo', 'penal')->get();
+        $penalesCargados = collect();
+
+        foreach ($golesPenales as $gol) {
+            // Evitar duplicados
+            $existe = Penal::where('partido_id', $gol->partido_id)
+                ->where('minuto', $gol->minuto)
+                ->first();
+            if ($existe) continue;
+
+            // Buscar el equipo del jugador que hizo el gol
+            $alineacionGol = Alineacion::where('partido_id', $gol->partido_id)
+                ->where('jugador_id', $gol->jugador_id)
+                ->first();
+
+            if (!$alineacionGol) continue;
+
+            $equipoGolId = $alineacionGol->equipo_id;
+
+            // Buscar el equipo rival
+            $equipoRivalId = Alineacion::where('partido_id', $gol->partido_id)
+                ->where('equipo_id', '!=', $equipoGolId)
+                ->value('equipo_id');
+
+            if (!$equipoRivalId) continue;
+
+            // Buscar arquero titular del equipo rival
+            $arqueroTitular = Alineacion::where('partido_id', $gol->partido_id)
+                ->where('equipo_id', $equipoRivalId)
+                ->whereHas('jugador', function ($q) {
+                    $q->where('tipoJugador', 'Arquero');
+                })
+                ->orderBy('orden', 'asc')
+                ->first();
+
+            if (!$arqueroTitular) continue;
+            $arqueroFinal = $arqueroTitular;
+
+            // Buscar si entró otro arquero antes del penal
+            $cambioArquero = Cambio::where('partido_id', $gol->partido_id)
+                ->where('minuto', '<=', $gol->minuto)
+                ->where('tipo', 'Entra')
+                ->whereHas('jugador', function ($q) {
+                    $q->where('tipoJugador', 'Arquero');
+                })
+                ->orderBy('minuto', 'desc')
+                ->first();
+
+            if ($cambioArquero) {
+                $alineacionCambio = Alineacion::where('partido_id', $gol->partido_id)
+                    ->where('jugador_id', $cambioArquero->jugador_id)
+                    ->where('equipo_id', $equipoRivalId)
+                    ->first();
+
+                if ($alineacionCambio) {
+                    $arqueroFinal = $alineacionCambio;
+                }
+            }
+
+            // Crear registro en penals
+            $penal = Penal::create([
+                'partido_id' => $gol->partido_id,
+                'jugador_id' => $arqueroFinal->jugador_id,
+                'minuto' => $gol->minuto,
+                'tipo' => 'Convertido',
+            ]);
+
+            // Guardar info para la vista
+            $partido = $gol->partido;
+            $penalesCargados->push([
+                'partido' => $partido,
+                'arquero' => $arqueroFinal->jugador,
+                'minuto' => $gol->minuto,
+                'ejecutor' => $gol->jugador
+
+            ]);
+        }
+
+        return view('torneos.controlarPenales', compact('penalesCargados'));
+    }
+
+
 
 
 }

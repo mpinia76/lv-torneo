@@ -79,6 +79,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('controlarArbitros', 'PartidoController@controlarArbitros')->name('partidos.controlarArbitros');
     Route::get('controlarTecnicos', 'PartidoController@controlarTecnicos')->name('partidos.controlarTecnicos');
 
+
     Route::get('/reassign/{id}', 'TecnicoController@reasignar')->name('tecnicos.reasignar');
     Route::put('saveReassign', 'TecnicoController@guardarReasignar');
 
@@ -89,6 +90,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('importgolesfecha', 'FechaController@importgolesfecha')->name('fechas.importgolesfecha');
     Route::get('importpenalesfecha', 'FechaController@importpenalesfecha')->name('fechas.importpenalesfecha');
     Route::get('controlarbitrosfecha', 'FechaController@controlarbitrosfecha')->name('fechas.controlarbitrosfecha');
+
+    Route::get('controlarPenales', 'TorneoController@controlarPenales')->name('torneos.controlarPenales');
 
     Route::get('finalizar', 'TorneoController@finalizar')->name('torneos.finalizar');
     Route::put('guardarFinalizar', 'TorneoController@guardarFinalizar');
