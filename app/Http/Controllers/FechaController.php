@@ -6008,7 +6008,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                     // Buscar todas las filas <tr>
                                                                                     $rows = $xpath->query('//tr');
-
+                                                                                    Log::debug(print_r($rows, true));
                                                                                     foreach ($rows as $r) {
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
