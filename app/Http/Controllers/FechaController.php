@@ -5991,11 +5991,11 @@ private function normalizarMinuto(string $texto): int
 
                                                                                 $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
-
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/grupo-d/gremio-sp-luqueno/inc/partido-gremio-sp-luqueno-29-05-2025.php.inc";
                                                                                 $response = Http::get($urlInc);
 
                                                                                 if ($response->successful()) {
-                                                                                    Log::channel('mi_log')->info('Link: ' . $urlInc);
+                                                                                    //Log::channel('mi_log')->info('Link: ' . $urlInc);
                                                                                     $htmlPartido = $response->body();
 
                                                                                     if (trim($htmlPartido) === '') {
@@ -6004,10 +6004,12 @@ private function normalizarMinuto(string $texto): int
                                                                                         Log::channel('mi_log')->info("Contenido recibido para $urlInc: " . substr($htmlPartido, 0, 500));
                                                                                     }
 
+
+                                                                                    $htmlLimpio = preg_replace('/<\?php.*?\?>/s', '', $htmlPartido);
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                                     $dom = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
-                                                                                    $dom->loadHTML($htmlPartido);
+                                                                                    $dom->loadHTML($htmlLimpio);
                                                                                     libxml_clear_errors();
 
                                                                                     // Crear objeto XPath
@@ -6015,7 +6017,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                     // Buscar todas las filas <tr>
                                                                                     $rows = $xpath->query('//tr');
-                                                                                    Log::debug(print_r($rows, true));
+                                                                                    Log::channel('mi_log')->info("Filas encontradas: " . $rows->length);
                                                                                     foreach ($rows as $r) {
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
