@@ -6018,25 +6018,26 @@ private function normalizarMinuto(string $texto): int
                                                                                     $rows = $xpathJugadorAtajado->query('//tr');
                                                                                     //Log::channel('mi_log')->info("Filas encontradas: " . $rows->length);
                                                                                     foreach ($rows as $r) {
-                                                                                        Log::debug(print_r($r, true));
+                                                                                        //Log::debug(print_r($r, true));
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
                                                                                         foreach ($xpathJugadorAtajado->query('.//a', $r) as $a) {
 
                                                                                             $href = $a->getAttribute('href');
-                                                                                            Log::channel('mi_log')->info("Jugador: " . $href);
+                                                                                            //Log::channel('mi_log')->info("Jugador: " . $href);
                                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                                 $playerLinks[] = $a;
                                                                                             }
                                                                                         }
-                                                                                        Log::debug(print_r($playerLinks, true));
+                                                                                        //Log::debug(print_r($playerLinks, true));
                                                                                         $recordTds = $xpathJugadorAtajado->query('.//td[contains(@class, "record")]', $r);
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
+                                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
                                                                                             if (trim($jugadorSlugWeb) === trim($slugJugador)) {
-                                                                                                Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
-                                                                                                Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
+
 
                                                                                                 $recordTd = $recordTds->item($i);
 
