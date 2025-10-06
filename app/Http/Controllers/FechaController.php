@@ -5573,11 +5573,12 @@ private function normalizarMinuto(string $texto): int
                         $slugJugador = ''; // Aquí guardamos el slug final
 
                         $intentos = [
+                            $alineacion->jugador->url_nombre,
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
-                            strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre)),
-                            $alineacion->jugador->url_nombre
+                            strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre))
+
                         ];
 
                         $slugJugador = null;
