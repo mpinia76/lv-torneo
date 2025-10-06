@@ -4704,11 +4704,12 @@ private function normalizarMinuto(string $texto): int
             $slugJugador = ''; // Aquí guardamos el slug final
 
             $intentos = [
+                $jugador->jugador->url_nombre,
+                str_replace(' ', '-', strtolower($this->sanear_string($jugador->jugador->persona->name))),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
-                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre)),
-                $jugador->url_nombre
+                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre))
             ];
 
             foreach ($intentos as $slug) {
@@ -5574,6 +5575,7 @@ private function normalizarMinuto(string $texto): int
 
                         $intentos = [
                             $alineacion->jugador->url_nombre,
+                            str_replace(' ', '-', strtolower($this->sanear_string($alineacion->jugador->persona->name))),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
@@ -6524,11 +6526,12 @@ private function normalizarMinuto(string $texto): int
                             $slugJugador = ''; // Aquí guardamos el slug final
 
                             $intentos = [
+                                $gol->jugador->url_nombre,
+                                str_replace(' ', '-', strtolower($this->sanear_string($gol->jugador->persona->name))),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
-                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre)),
-                                $alineacion->jugador->url_nombre
+                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre))
                             ];
 
                             $slugJugador = null;
