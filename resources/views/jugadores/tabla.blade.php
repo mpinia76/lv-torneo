@@ -20,7 +20,7 @@
     </thead>
     <tbody>
     @php
-        $i=1; $totalJugados=$totalGoles=$totalAmarillas=$totalRojas=$totalRecibidos=$totalInvictas=0;
+        $i=1; $totalJugados=$totalGoles=$totalAmarillas=$totalRojas=$totalAtajados=$totalErrados=$totalRecibidos=$totalInvictas=0;
     @endphp
     @foreach($torneosJugador as $torneo)
         @php
