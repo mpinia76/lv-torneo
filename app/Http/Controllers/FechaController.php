@@ -5683,6 +5683,8 @@ private function normalizarMinuto(string $texto): int
                                     $strTorneoFechaD = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre, 'd');
                                     $strTorneoFechaE = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre, 'e');
                                     $strTorneoFechaF = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre, 'f');
+                                    $strTorneoFechaG = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre, 'g');
+                                    $strTorneoFechaH = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre, 'h');
                                     if ($juegaEn == $strLocal) {
                                         $juegaContra = $strVisitante;
                                     }
@@ -5769,6 +5771,13 @@ private function normalizarMinuto(string $texto): int
 
                                                                             ) || (
                                                                                 strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                            ) || (
+                                                                                strpos($href, $strTorneoFechaG . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                            )
+                                                                            || (
+                                                                                strpos($href, $strTorneoFechaH . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
                                                                             )
                                                                         ) {
@@ -5930,6 +5939,11 @@ private function normalizarMinuto(string $texto): int
                                                                 // Comparar la URL con las generadas por dameNombreEquipoURL3 y dameNombreTorneoURL
                                                                 foreach ($combinaciones as [$local3, $visitante3]) {
                                                                     // Comparar las posibles combinaciones de URLs
+                                                                    Log::channel('mi_log')->info('href: ' . $href);
+                                                                    Log::channel('mi_log')->info('Fecha: ' . $strTorneoFecha.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaVuelta.' - '.$strTorneoFechaA.' - '.$strTorneoFechaB.' - '.$strTorneoFechaC.' - '.$strTorneoFechaD.' - '.$strTorneoFechaE.' - '.$strTorneoFechaF.' - '.$strTorneoFechaG.' - '.$strTorneoFechaH);
+                                                                    Log::channel('mi_log')->info('Local: ' . $local3);
+                                                                    Log::channel('mi_log')->info('Visitante: ' . $visitante3);
+
                                                                     if ((
                                                                             strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
@@ -5957,6 +5971,13 @@ private function normalizarMinuto(string $texto): int
                                                                         ) || (
                                                                             strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
+                                                                        )|| (
+                                                                            strpos($href, $strTorneoFechaG . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )
+                                                                        || (
+                                                                            strpos($href, $strTorneoFechaH . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
                                                                         )
                                                                     ) {
                                                                         $urlEncontrada = 1;
@@ -5970,7 +5991,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                 $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
-
+                                                                                Log::channel('mi_log')->info('Link: ' . $urlInc);
                                                                                 $response = Http::get($urlInc);
 
                                                                                 if ($response->successful()) {
@@ -6144,6 +6165,13 @@ private function normalizarMinuto(string $texto): int
 
                                                                         ) || (
                                                                             strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )|| (
+                                                                            strpos($href, $strTorneoFechaG . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )
+                                                                        || (
+                                                                            strpos($href, $strTorneoFechaH . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
                                                                         )
                                                                     ) {
@@ -6575,6 +6603,8 @@ private function normalizarMinuto(string $texto): int
                                     $strTorneoFechaD = $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, 'd');
                                     $strTorneoFechaE = $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, 'e');
                                     $strTorneoFechaF = $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, 'f');
+                                    $strTorneoFechaG = $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, 'g');
+                                    $strTorneoFechaH = $this->dameNombreTorneoURL(strtolower($grupo->torneo->url_nombre), $fecha->url_nombre, 'h');
                                     if ($juegaEn == $strLocal) {
                                         $juegaContra = $strVisitante;
                                     }
@@ -6663,7 +6693,14 @@ private function normalizarMinuto(string $texto): int
                                                                         ) || (
                                                                             strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaG . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaH . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
                                                                         )
+
                                                                     ) {
                                                                         $urlEncontrada = 1;
                                                                             //Log::channel('mi_log')->info('OJO!! encontró gol cabeza: ' . $href, []);
@@ -6785,6 +6822,12 @@ private function normalizarMinuto(string $texto): int
                                                                         ) || (
                                                                             strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
+                                                                        )|| (
+                                                                            strpos($href, $strTorneoFechaG . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaH . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
                                                                         )
                                                                     ) {
                                                                         $urlEncontrada = 1;
@@ -6903,6 +6946,12 @@ private function normalizarMinuto(string $texto): int
 
                                                                         ) || (
                                                                             strpos($href, $strTorneoFechaF . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        )|| (
+                                                                            strpos($href, $strTorneoFechaG . '/' . $local3 . '-' . $visitante3 . '/') !== false
+
+                                                                        ) || (
+                                                                            strpos($href, $strTorneoFechaH . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
                                                                         )
                                                                     ) {
