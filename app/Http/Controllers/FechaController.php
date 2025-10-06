@@ -5996,6 +5996,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                 if ($response->successful()) {
                                                                                     //Log::channel('mi_log')->info('Link: ' . $urlInc);
+                                                                                    $success .='Partido encontrado: '.$urlInc;
                                                                                     $htmlPartido = $response->body();
 
                                                                                     if (trim($htmlPartido) === '') {
@@ -6015,12 +6016,14 @@ private function normalizarMinuto(string $texto): int
 
                                                                                     // Buscar todas las filas <tr>
                                                                                     $rows = $xpathJugadorAtajado->query('//tr');
-                                                                                    Log::channel('mi_log')->info("Filas encontradas: " . $rows->length);
+                                                                                    //Log::channel('mi_log')->info("Filas encontradas: " . $rows->length);
                                                                                     foreach ($rows as $r) {
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
                                                                                         foreach ($xpathJugadorAtajado->query('.//a', $r) as $a) {
+
                                                                                             $href = $a->getAttribute('href');
+                                                                                            Log::channel('mi_log')->info("Jugador: " . $href);
                                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                                 $playerLinks[] = $a;
                                                                                             }
