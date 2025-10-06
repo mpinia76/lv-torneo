@@ -5891,30 +5891,28 @@ private function normalizarMinuto(string $texto): int
                                     if ($htmlAtajado) {
 
                                         // Crear un nuevo DOMDocument y cargar el HTML
-                                        $dom = new \DOMDocument();
-                                        libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                                        $dom->loadHTML($htmlAtajado);
+                                        $domAtajado = new \DOMDocument();
+                                        libxml_use_internal_errors(true);
+                                        $domAtajado->loadHTML($htmlAtajado);
                                         libxml_clear_errors();
 
-                                        // Crear un nuevo objeto XPath
-                                        $xpath = new \DOMXPath($dom);
+                                        $xpathAtajado = new \DOMXPath($domAtajado);
 
-                                        // Buscar el div con id 'matchesTable'
-                                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+                                        $matchesTableNodes = $xpathAtajado->query('//div[@id="matchesTable"]');
 
                                         foreach ($matchesTableNodes as $div) {
                                             // Buscar las tablas con clase 'tableStandard'
-                                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+                                            $tables = $xpathAtajado->query('.//table[contains(@class, "tableStandard")]', $div);
 
                                             foreach ($tables as $table) {
                                                 // Buscar las filas de la tabla
-                                                $rows = $xpath->query('.//tr', $table);
+                                                $rows = $xpathAtajado->query('.//tr', $table);
 
                                                 foreach ($rows as $row) {
                                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                                     if (trim($row->textContent) != 'No hay resultados') {
                                                         // Buscar los encabezados de la fila (th)
-                                                        $headerCells = $xpath->query('.//th', $row);
+                                                        $headerCells = $xpathAtajado->query('.//th', $row);
                                                         if ($headerCells->length >= 5) {
                                                             $fechaPartido = trim($headerCells->item(3)->textContent);
                                                         }
