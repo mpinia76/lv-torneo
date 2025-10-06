@@ -6121,30 +6121,30 @@ private function normalizarMinuto(string $texto): int
                                     if ($htmlAtajo) {
 
                                         // Crear un nuevo DOMDocument y cargar el HTML
-                                        $dom = new \DOMDocument();
+                                        $domAtajo = new \DOMDocument();
                                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                                        $dom->loadHTML($htmlAtajo);
+                                        $domAtajo->loadHTML($htmlAtajo);
                                         libxml_clear_errors();
 
                                         // Crear un nuevo objeto XPath
-                                        $xpath = new \DOMXPath($dom);
+                                        $xpathAtajo = new \DOMXPath($domAtajo);
 
                                         // Buscar el div con id 'matchesTable'
-                                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+                                        $matchesTableNodes = $xpathAtajo->query('//div[@id="matchesTable"]');
 
                                         foreach ($matchesTableNodes as $div) {
                                             // Buscar las tablas con clase 'tableStandard'
-                                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+                                            $tables = $xpathAtajo->query('.//table[contains(@class, "tableStandard")]', $div);
 
                                             foreach ($tables as $table) {
                                                 // Buscar las filas de la tabla
-                                                $rows = $xpath->query('.//tr', $table);
+                                                $rows = $xpathAtajo->query('.//tr', $table);
 
                                                 foreach ($rows as $row) {
                                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                                     if (trim($row->textContent) != 'No hay resultados') {
                                                         // Buscar los encabezados de la fila (th)
-                                                        $headerCells = $xpath->query('.//th', $row);
+                                                        $headerCells = $xpathAtajo->query('.//th', $row);
                                                         if ($headerCells->length >= 5) {
                                                             $fechaPartido = trim($headerCells->item(3)->textContent);
                                                         }
@@ -6162,10 +6162,10 @@ private function normalizarMinuto(string $texto): int
 
                                                                 foreach ($combinaciones as [$local3, $visitante3]) {
                                                                     // Comparar las posibles combinaciones de URLs
-                                                                    Log::channel('mi_log')->info('href: ' . $href);
+                                                                    /*Log::channel('mi_log')->info('href: ' . $href);
                                                                     Log::channel('mi_log')->info('Fecha: ' . $strTorneoFecha.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaVuelta.' - '.$strTorneoFechaA.' - '.$strTorneoFechaB.' - '.$strTorneoFechaC.' - '.$strTorneoFechaD.' - '.$strTorneoFechaE.' - '.$strTorneoFechaF.' - '.$strTorneoFechaG.' - '.$strTorneoFechaH);
                                                                     Log::channel('mi_log')->info('Local: ' . $local3);
-                                                                    Log::channel('mi_log')->info('Visitante: ' . $visitante3);
+                                                                    Log::channel('mi_log')->info('Visitante: ' . $visitante3);*/
                                                                     if ((
                                                                             strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
@@ -6224,28 +6224,28 @@ private function normalizarMinuto(string $texto): int
                                                                                         Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
                                                                                     }
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
-                                                                                    $dom = new \DOMDocument();
+                                                                                    $domPartidoAtajo = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
-                                                                                    $dom->loadHTML($htmlPartido);
+                                                                                    $domPartidoAtajo->loadHTML($htmlPartido);
                                                                                     libxml_clear_errors();
 
                                                                                     // Crear objeto XPath
-                                                                                    $xpath = new \DOMXPath($dom);
+                                                                                    $xpathPartidoAtajo = new \DOMXPath($domPartidoAtajo);
 
                                                                                     // Buscar todas las filas <tr>
-                                                                                    $rows = $xpath->query('//tr');
+                                                                                    $rows = $xpathPartidoAtajo->query('//tr');
 
                                                                                     foreach ($rows as $r) {
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
-                                                                                        foreach ($xpath->query('.//a', $r) as $a) {
+                                                                                        foreach ($xpathPartidoAtajo->query('.//a', $r) as $a) {
                                                                                             $href = $a->getAttribute('href');
                                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                                 $playerLinks[] = $a;
                                                                                             }
                                                                                         }
 
-                                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
+                                                                                        $recordTds = $xpathPartidoAtajo->query('.//td[contains(@class, "record")]', $r);
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
