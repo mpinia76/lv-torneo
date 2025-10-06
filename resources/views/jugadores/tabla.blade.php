@@ -14,7 +14,7 @@
     <th>Amarillas</th>
     <th>Rojas</th>
     <th>P. Errados</th>
-    <th>P.atajados</th>
+    <th>P. Atajados</th>
     <th>Arq. Recibidos</th>
     <th>Arq. V. Invictas</th>
     </thead>
