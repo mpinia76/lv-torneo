@@ -6018,7 +6018,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                 $playerLinks[] = $a;
                                                                                             }
                                                                                         }
-
+                                                                                        Log::debug(print_r($playerLinks, true));
                                                                                         $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
