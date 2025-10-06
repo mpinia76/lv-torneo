@@ -6151,7 +6151,7 @@ private function normalizarMinuto(string $texto): int
                                                             $links = $th->getElementsByTagName('a');
 
                                                             foreach ($links as $link) {
-                                                                Log::channel('mi_log')->info('Link: ' . print_r($link,true));
+                                                                //Log::channel('mi_log')->info('Link: ' . print_r($link,true));
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
                                                                 $parts = explode('/', $href);
@@ -6197,7 +6197,10 @@ private function normalizarMinuto(string $texto): int
                                                                         )
                                                                     ) {
                                                                         $urlEncontrada = 1;
-
+                                                                        Log::channel('mi_log')->info('href: ' . $href);
+                                                                        Log::channel('mi_log')->info('Fecha: ' . $strTorneoFecha.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaVuelta.' - '.$strTorneoFechaA.' - '.$strTorneoFechaB.' - '.$strTorneoFechaC.' - '.$strTorneoFechaD.' - '.$strTorneoFechaE.' - '.$strTorneoFechaF.' - '.$strTorneoFechaG.' - '.$strTorneoFechaH);
+                                                                        Log::channel('mi_log')->info('Local: ' . $local3);
+                                                                        Log::channel('mi_log')->info('Visitante: ' . $visitante3);
                                                                             $fechaSTR = DateTime::createFromFormat('d/m/Y', $fechaPartido);
                                                                             $fechaFormato = $fechaSTR ? $fechaSTR->format('d-m-Y') : null;
 
