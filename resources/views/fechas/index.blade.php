@@ -23,8 +23,12 @@
         @endif
         <a class="btn btn-success m-1" href="{{route('fechas.create',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">Nuevo</a>
         <a class="btn btn-info m-1" href="{{route('fechas.import',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}">Importar datos</a>
-        <a href="{{route('fechas.importgolesfecha',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}" class="btn btn-info m-1">Importar goles</a>
 
+        <a href="{{ route('fechas.importgolesfecha', array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}"
+           class="btn btn-info m-1"
+           onclick="return confirmarImportacion({{ $grupo->goles_importados ? 'true' : 'false' }}, {{ $grupo->id }})">
+            Importar goles
+        </a>
         <!--<a href="{{route('fechas.controlarbitrosfecha',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}" class="btn btn-info m-1">Controlar arbitros</a>-->
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
@@ -79,6 +83,12 @@
         function confirmarImportacion(importada, fechaId) {
             if (importada) {
                 return confirm('⚠️ Esta fecha ya tiene penales importados. ¿Deseas reprocesarla?');
+            }
+            return true;
+        }
+        function confirmarImportacionGoles(importada, grupoId) {
+            if (importada) {
+                return confirm('⚠️ Este grupo ya tiene goles importados. ¿Deseas reprocesarlo?');
             }
             return true;
         }

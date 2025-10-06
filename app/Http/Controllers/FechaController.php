@@ -7048,7 +7048,8 @@ private function normalizarMinuto(string $texto): int
             //fclose($handle);
             if ($ok) {
 
-
+                $grupo->goles_importados = true;
+                $grupo->save();
                 DB::commit();
                 $respuestaID = 'success';
                 $respuestaMSJ = $success;
