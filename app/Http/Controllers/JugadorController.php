@@ -495,6 +495,25 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
                 $torneo->rojas += $tarjeta->rojas;
             }
 
+            $sqlPenals = 'SELECT count( case when tipo=\'Atajó\' then 1 else NULL end) as  atajados
+, count( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados
+FROM penals
+
+INNER JOIN partidos ON penals.partido_id = partidos.id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+
+WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND penals.jugador_id = '.$id;
+
+
+            $penals = DB::select(DB::raw($sqlPenals));
+
+            foreach ($penals as $penal){
+                //Log::info('Penals: '.$torneo->amarillas.' -> '.$penal->amarillas);
+                $torneo->errados += $penal->errados;
+                $torneo->atajados += $penal->atajados;
+            }
+
             $sqlArqueros = 'SELECT case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END AS recibidos,
 case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END AS invictas, personas.foto, "" escudo
 FROM alineacions

@@ -13,6 +13,8 @@
     <th>Goles</th>
     <th>Amarillas</th>
     <th>Rojas</th>
+    <th>P. Errados</th>
+    <th>P.atajados</th>
     <th>Arq. Recibidos</th>
     <th>Arq. V. Invictas</th>
     </thead>
@@ -26,6 +28,8 @@
             $totalGoles+=$torneo->goles;
             $totalAmarillas+=$torneo->amarillas;
             $totalRojas+=$torneo->rojas;
+            $totalErrados+=$torneo->errados;
+            $totalAtajados+=$torneo->atajados;
             $totalRecibidos+=$torneo->recibidos;
             $totalInvictas+=$torneo->invictas;
             $jugo = $torneo->jugados>0?1:0;
@@ -50,6 +54,8 @@
             <td>{{$torneo->goles}} ({{$jugo?round($torneo->goles/$torneo->jugados,2):0}})</td>
             <td>{{$torneo->amarillas}} ({{$jugo?round($torneo->amarillas/$torneo->jugados,2):0}})</td>
             <td>{{$torneo->rojas}} ({{$jugo?round($torneo->rojas/$torneo->jugados,2):0}})</td>
+            <td>{{$torneo->errados}} </td>
+            <td>{{$torneo->atajados}} </td>
             <td>{{$torneo->recibidos}} ({{$jugo?round($torneo->recibidos/$torneo->jugados,2):0}})</td>
             <td>{{$torneo->invictas}} ({{$jugo?round($torneo->invictas/$torneo->jugados,2):0}})</td>
         </tr>
@@ -61,6 +67,8 @@
         <td>{{$totalGoles}} ({{round($totalGoles/$totalJugados,2)}})</td>
         <td>{{$totalAmarillas}} ({{round($totalAmarillas/$totalJugados,2)}})</td>
         <td>{{$totalRojas}} ({{round($totalRojas/$totalJugados,2)}})</td>
+        <td>{{$totalErrados}}</td>
+        <td>{{$totalAtajados}}</td>
         <td>{{$totalRecibidos}} ({{round($totalRecibidos/$totalJugados,2)}})</td>
         <td>{{$totalInvictas}} ({{round($totalInvictas/$totalJugados,2)}})</td>
     </tr>
