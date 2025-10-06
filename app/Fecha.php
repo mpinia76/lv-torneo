@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Fecha extends Model
 {
-    protected $fillable = ['numero', 'grupo_id', 'url_nombre', 'orden'];
+    protected $fillable = ['numero', 'grupo_id', 'url_nombre', 'orden','penales_importados'];
 
     public function grupo() {
         return $this->belongsTo('App\Grupo');

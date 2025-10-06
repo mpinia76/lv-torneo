@@ -5469,6 +5469,7 @@ private function normalizarMinuto(string $texto): int
 
         $fecha_id = $request->get('fechaId');
 
+
         $fecha = Fecha::findOrFail($fecha_id);
 
 
@@ -6313,7 +6314,9 @@ private function normalizarMinuto(string $texto): int
         //fclose($handle);
         if ($ok) {
 
-
+// ✅ Marcar como importada
+            $fecha->penales_importados = true;
+            $fecha->save();
             DB::commit();
             $respuestaID = 'success';
             $respuestaMSJ = $success;

@@ -58,7 +58,12 @@
                         <a href="{{route('fechas.show', $fecha->id)}}" class="btn btn-success m-1">Datos complementarios</a>
                         <!--<a href="{{route('fechas.importincidenciasfecha', array('fechaId' =>$fecha->id))}}" class="btn btn-info m-1">Importar incidencias</a>
                         <a href="{{route('fechas.importgolesfecha', array('fechaId' =>$fecha->id))}}" class="btn btn-info m-1">Importar goles</a>-->
-                        <a href="{{route('fechas.importpenalesfecha',  array('fechaId' =>$fecha->id))}}" class="btn btn-info m-1">Importar penales</a>
+                        <a href="{{ route('fechas.importpenalesfecha', ['fechaId' => $fecha->id]) }}"
+                           class="btn btn-info m-1"
+                           onclick="return confirmarImportacion({{ $fecha->penales_importados ? 'true' : 'false' }}, {{ $fecha->id }})">
+                            Importar penales
+                        </a>
+
                     </div>
 
                 </td>
@@ -71,7 +76,12 @@
         </div>
     </div>
     <script>
-
+        function confirmarImportacion(importada, fechaId) {
+            if (importada) {
+                return confirm('⚠️ Esta fecha ya tiene penales importados. ¿Deseas reprocesarla?');
+            }
+            return true;
+        }
         function ConfirmDelete()
         {
             var x = confirm("Está seguro?");
