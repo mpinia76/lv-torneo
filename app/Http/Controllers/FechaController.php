@@ -5832,6 +5832,8 @@ private function normalizarMinuto(string $texto): int
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
+                                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
                                                                                             if (trim($jugadorSlugWeb) === trim($slugJugador)) {
                                                                                                 //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
                                                                                                 //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
