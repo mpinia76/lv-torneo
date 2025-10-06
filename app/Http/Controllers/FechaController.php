@@ -5798,6 +5798,12 @@ private function normalizarMinuto(string $texto): int
 
                                                                                 if ($response->successful()) {
                                                                                     $htmlPartido = $response->body();
+                                                                                    $success .='Partido encontrado: '.$urlInc.'<br>';
+                                                                                    $htmlPartido = $response->body();
+
+                                                                                    if (trim($htmlPartido) === '') {
+                                                                                        Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
+                                                                                    }
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                                     $dom = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
@@ -5997,7 +6003,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                 if ($response->successful()) {
                                                                                     //Log::channel('mi_log')->info('Link: ' . $urlInc);
-                                                                                    $success .='Partido encontrado: '.$urlInc;
+                                                                                    $success .='Partido encontrado: '.$urlInc.'<br>';
                                                                                     $htmlPartido = $response->body();
 
                                                                                     if (trim($htmlPartido) === '') {
@@ -6204,7 +6210,12 @@ private function normalizarMinuto(string $texto): int
                                                                                 $response = Http::get($urlInc);
 
                                                                                 if ($response->successful()) {
+                                                                                    $success .='Partido encontrado: '.$urlInc.'<br>';
                                                                                     $htmlPartido = $response->body();
+
+                                                                                    if (trim($htmlPartido) === '') {
+                                                                                        Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
+                                                                                    }
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                                     $dom = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
