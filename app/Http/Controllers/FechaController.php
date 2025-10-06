@@ -6041,11 +6041,11 @@ private function normalizarMinuto(string $texto): int
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
-                                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
+
                                                                                             if (trim($jugadorSlugWeb) === trim($slugJugador)) {
 
-
+                                                                                                //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                                //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
                                                                                                 $recordTd = $recordTds->item($i);
 
                                                                                                 if ($recordTd) {
@@ -6151,6 +6151,7 @@ private function normalizarMinuto(string $texto): int
                                                             $links = $th->getElementsByTagName('a');
 
                                                             foreach ($links as $link) {
+                                                                Log::channel('mi_log')->info('Link: ' . $link);
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
                                                                 $parts = explode('/', $href);
