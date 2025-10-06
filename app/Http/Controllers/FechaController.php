@@ -4552,8 +4552,8 @@ class FechaController extends Controller
         $string = trim($string);
 
 $string = str_replace(
-        array('á', 'à', 'ä', 'â', 'ª', 'Á', 'À', 'Â', 'Ä'),
-        array('a', 'a', 'a', 'a', 'a', 'A', 'A', 'A', 'A'),
+        array('á', 'à', 'ä', 'â', 'ã', 'ª', 'Á', 'À', 'Â', 'Ä'),
+        array('a', 'a', 'a', 'a' , 'a', 'a', 'A', 'A', 'A', 'A'),
         $string
 );
 
