@@ -4705,7 +4705,7 @@ private function normalizarMinuto(string $texto): int
 
             $intentos = [
                 $jugador->jugador->url_nombre,
-                str_replace(' ', '-', strtolower($this->sanear_string($jugador->persona->name))),
+                strtolower($this->sanear_string(str_replace(' ', '-', $jugador->persona->name))),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
@@ -5575,7 +5575,7 @@ private function normalizarMinuto(string $texto): int
 
                         $intentos = [
                             $alineacion->jugador->url_nombre,
-                            str_replace(' ', '-', strtolower($this->sanear_string($alineacion->jugador->persona->name))),
+                            strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->name))),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
@@ -6110,7 +6110,7 @@ private function normalizarMinuto(string $texto): int
                                     try {
 
                                         $urlAtajo = "http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id={$id_jugador}&search_category=penal_stopped&received=1";
-                                        Log::channel('mi_log')->info('urlAtajó: ' . $urlAtajo);
+                                        //Log::channel('mi_log')->info('urlAtajó: ' . $urlAtajo);
                                         $htmlAtajo = HttpHelper::getHtmlContent($urlAtajo);
 
 
@@ -6527,7 +6527,7 @@ private function normalizarMinuto(string $texto): int
 
                             $intentos = [
                                 $gol->jugador->url_nombre,
-                                str_replace(' ', '-', strtolower($this->sanear_string($gol->jugador->persona->name))),
+                                strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->name))),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
