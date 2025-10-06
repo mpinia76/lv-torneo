@@ -88,29 +88,47 @@
                                 </div>
                             </div>
                         @endif
+                        <h5 class="card-title text-center">🧤 Penales al arquero</h5>
+                        <div class="row text-center">
+                            @php
+                                $opciones = [
+                                    '' => ['label' => 'Todos', 'valorDB' => ''],
+                                    'Convirtieron' => ['label' => 'Convirtieron', 'valorDB' => 'Convirtieron'],
 
+                                    'Atajó' => ['label' => 'Atajó', 'valorDB' => 'Atajado'],
+                                ];
+                            @endphp
+
+                            @foreach($opciones as $tipoClave => $opcion)
+                                <div class="col-6 col-md-3 mb-2">
+                                    <a href="{{ route('jugadores.penals', array_filter([
+                                        'jugadorId' => $jugador->id,
+                                        'torneoId' => $torneo->id ?? null,
+                                        'tipo' => $opcion['valorDB'] ?: null
+                                    ])) }}">
+                                        <div class="p-2 rounded {{ $tipo == $opcion['valorDB'] ? 'bg-success text-white' : 'bg-light' }}">
+                                            <div>{{ $opcion['label'] }}</div>
+                                            <strong>
+                                                @switch($tipoClave)
+                                                    @case('') {{ $totalTodosArquero }} @break
+                                                    @case('Convirtieron') {{ $totalConvirtieron }} @break
+
+                                                    @case('Atajó') {{ $totalAtajó }} @break
+                                                @endswitch
+                                            </strong>
+                                        </div>
+                                    </a>
+                                </div>
+                            @endforeach
+                        </div>
                         {{-- Gráfico de penales al arquero --}}
                         <div class="row mt-4">
                             <div class="col-md-8 offset-md-2">
                                 <div class="card">
                                     <div class="card-body">
-                                        <h5 class="card-title text-center">🧤 Penales al arquero</h5>
 
-                                        <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
-                                            <a href="{{ route('jugadores.penals', ['jugadorId' => $jugador->id, 'torneoId' => $torneo->id ?? null, 'tipo' => 'Atajo']) }}">
-                                                <div class="p-2 rounded {{ $tipo == 'Atajo' ? 'bg-success text-white' : 'bg-light' }}">
-                                                    <div>Atajó</div>
-                                                    <strong>{{ $totalAtajos ?? 0 }}</strong>
-                                                </div>
-                                            </a>
 
-                                            <a href="{{ route('jugadores.penals', ['jugadorId' => $jugador->id, 'torneoId' => $torneo->id ?? null, 'tipo' => 'Convertido']) }}">
-                                                <div class="p-2 rounded {{ $tipo == 'Convertido' ? 'bg-danger text-white' : 'bg-light' }}">
-                                                    <div>Convertido</div>
-                                                    <strong>{{ $totalConvirtieron ?? 0 }}</strong>
-                                                </div>
-                                            </a>
-                                        </div>
+
 
                                         <div id="pie_arqueros" style="height: 300px;"></div>
                                     </div>
