@@ -89,6 +89,7 @@
                                 <a href="{{route('tarjetas.index', array('partidoId' => $partido->id))}}" class="btn btn-primary m-1">Tarjetas</a>
                                 <a href="{{route('partidos.arbitros', array('partidoId' => $partido->id))}}" class="btn btn-success m-1">Jueces</a>
                                 <a href="{{route('cambios.index', array('partidoId' => $partido->id))}}" class="btn btn-primary m-1">Sustituciones</a>
+                                <a href="{{route('penales.index', array('partidoId' => $partido->id))}}" class="btn btn-warning m-1">Penales</a>
                                 <a href="{{route('fechas.importarPartido', array('partidoId' => $partido->id))}}" class="btn btn-info m-1">Importar</a>
                             </div>
 

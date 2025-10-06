@@ -281,6 +281,34 @@
         }
 
     });
+
+    $('.addRowPenal').on('click',function(e){
+        e.preventDefault();
+        addRowPenal();
+    });
+    function addRowPenal()
+    {
+        var tr='<tr>'+
+            '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
+            '<td>'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
+            '<td>'+'{{ Form::select('tipo[]',['Errado'=>'Errado','Atajado'=>'Atajado','Atajó'=>'Atajó','Convirtieron'=>'Convirtieron'], '',['class' => 'form-control']) }}'+'</td>'+
+            '<td><a href="#" class="btn btn-danger removepenal"><i class="glyphicon glyphicon-remove"></i></a></td>'+
+            '</tr>';
+        $('#cuerpopenal').append(tr);
+        $('.js-example-basic-single').select2();
+    };
+    $('body').on('click', '.removepenal', function(e){
+        e.preventDefault();
+        var last=$('tbody tr').length;
+        if(last==1){
+            alert("No se puede borrar");
+        }
+        else{
+            $(this).parent().parent().remove();
+        }
+
+    });
+
     $('.addRowTarjeta').on('click',function(e){
         e.preventDefault();
         addRowTarjeta();
