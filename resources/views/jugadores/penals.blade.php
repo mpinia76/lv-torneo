@@ -47,6 +47,7 @@
                                     'Errados' => ['label' => 'Errados', 'valorDB' => 'Errado'],
                                     'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
                                     'Atajos' => ['label' => 'Atajó', 'valorDB' => 'Atajo'],
+                                    'Atajos' => ['label' => 'Conviertieron', 'valorDB' => 'Conviertieron'],
                                 ];
                             @endphp
 
@@ -66,6 +67,7 @@
                                                     @case('Errados') {{ $totalErrados }} @break
                                                     @case('Atajados') {{ $totalAtajados }} @break
                                                     @case('Atajos') {{ $totalAtajos }} @break
+                                                    @case('Convirtieron') {{ $totalConviertieron }} @break
                                                 @endswitch
                                             </strong>
                                         </div>
