@@ -6108,7 +6108,7 @@ private function normalizarMinuto(string $texto): int
                                     try {
 
                                         $urlAtajo = "http://www.futbol360.com.ar/detalles/matches-penalties.php?item=player&id={$id_jugador}&search_category=penal_stopped&received=1";
-
+                                        Log::channel('mi_log')->info('urlAtajó: ' . $urlAtajo);
                                         $htmlAtajo = HttpHelper::getHtmlContent($urlAtajo);
 
 
