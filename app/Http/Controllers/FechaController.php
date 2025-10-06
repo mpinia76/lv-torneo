@@ -5997,6 +5997,13 @@ private function normalizarMinuto(string $texto): int
                                                                                 if ($response->successful()) {
                                                                                     Log::channel('mi_log')->info('Link: ' . $urlInc);
                                                                                     $htmlPartido = $response->body();
+
+                                                                                    if (trim($htmlPartido) === '') {
+                                                                                        Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
+                                                                                    } else {
+                                                                                        Log::channel('mi_log')->info("Contenido recibido para $urlInc: " . substr($htmlPartido, 0, 500));
+                                                                                    }
+
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                                     $dom = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
