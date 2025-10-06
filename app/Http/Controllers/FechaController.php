@@ -5991,7 +5991,7 @@ private function normalizarMinuto(string $texto): int
 
                                                                                 $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/grupo-d/gremio-sp-luqueno/inc/partido-gremio-sp-luqueno-29-05-2025.php.inc";
+
                                                                                 $response = Http::get($urlInc);
 
                                                                                 if ($response->successful()) {
@@ -6000,35 +6000,33 @@ private function normalizarMinuto(string $texto): int
 
                                                                                     if (trim($htmlPartido) === '') {
                                                                                         Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
-                                                                                    } else {
-                                                                                        Log::channel('mi_log')->info("Contenido recibido para $urlInc: " . substr($htmlPartido, 0, 500));
                                                                                     }
 
 
                                                                                     $htmlLimpio = preg_replace('/<\?php.*?\?>/s', '', $htmlPartido);
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
-                                                                                    $dom = new \DOMDocument();
+                                                                                    $domJugadorAtajado = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
-                                                                                    $dom->loadHTML($htmlLimpio);
+                                                                                    $domJugadorAtajado->loadHTML($htmlLimpio);
                                                                                     libxml_clear_errors();
 
                                                                                     // Crear objeto XPath
-                                                                                    $xpath = new \DOMXPath($dom);
+                                                                                    $xpathJugadorAtajado = new \DOMXPath($domJugadorAtajado);
 
                                                                                     // Buscar todas las filas <tr>
-                                                                                    $rows = $xpath->query('//tr');
+                                                                                    $rows = $xpathJugadorAtajado->query('//tr');
                                                                                     Log::channel('mi_log')->info("Filas encontradas: " . $rows->length);
                                                                                     foreach ($rows as $r) {
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
-                                                                                        foreach ($xpath->query('.//a', $r) as $a) {
+                                                                                        foreach ($xpathJugadorAtajado->query('.//a', $r) as $a) {
                                                                                             $href = $a->getAttribute('href');
                                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                                 $playerLinks[] = $a;
                                                                                             }
                                                                                         }
                                                                                         Log::debug(print_r($playerLinks, true));
-                                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
+                                                                                        $recordTds = $xpathJugadorAtajado->query('.//td[contains(@class, "record")]', $r);
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
