@@ -4705,7 +4705,7 @@ private function normalizarMinuto(string $texto): int
 
             $intentos = [
                 $jugador->jugador->url_nombre,
-                str_replace(' ', '-', strtolower($this->sanear_string($jugador->jugador->persona->name))),
+                str_replace(' ', '-', strtolower($this->sanear_string($jugador->persona->name))),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
@@ -5592,7 +5592,7 @@ private function normalizarMinuto(string $texto): int
                             $urlJugador = 'http://www.futbol360.com.ar/jugadores/'
                                 . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad)))
                                 . '/' . $slug;
-
+                            Log::channel('mi_log')->info('urlJugador: ' . $urlJugador, []);
                             try {
                                 $html2 = HttpHelper::getHtmlContent($urlJugador);
 
