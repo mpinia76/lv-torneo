@@ -6018,6 +6018,7 @@ private function normalizarMinuto(string $texto): int
                                                                                     $rows = $xpathJugadorAtajado->query('//tr');
                                                                                     //Log::channel('mi_log')->info("Filas encontradas: " . $rows->length);
                                                                                     foreach ($rows as $r) {
+                                                                                        Log::debug(print_r($r, true));
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
                                                                                         foreach ($xpathJugadorAtajado->query('.//a', $r) as $a) {
