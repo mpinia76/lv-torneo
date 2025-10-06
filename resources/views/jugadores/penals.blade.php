@@ -113,7 +113,7 @@
                                                     @case('') {{ $totalTodosArquero }} @break
                                                     @case('Convirtieron') {{ $totalConvirtieron }} @break
 
-                                                    @case('Atajó') {{ $totalAtajo }} @break
+                                                    @case('Atajó') {{ $totalAtajos }} @break
                                                 @endswitch
                                             </strong>
                                         </div>
