@@ -6160,6 +6160,10 @@ private function normalizarMinuto(string $texto): int
 
                                                                 foreach ($combinaciones as [$local3, $visitante3]) {
                                                                     // Comparar las posibles combinaciones de URLs
+                                                                    Log::channel('mi_log')->info('href: ' . $href);
+                                                                    Log::channel('mi_log')->info('Fecha: ' . $strTorneoFecha.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaVuelta.' - '.$strTorneoFechaA.' - '.$strTorneoFechaB.' - '.$strTorneoFechaC.' - '.$strTorneoFechaD.' - '.$strTorneoFechaE.' - '.$strTorneoFechaF.' - '.$strTorneoFechaG.' - '.$strTorneoFechaH);
+                                                                    Log::channel('mi_log')->info('Local: ' . $local3);
+                                                                    Log::channel('mi_log')->info('Visitante: ' . $visitante3);
                                                                     if ((
                                                                             strpos($href, $strTorneoFecha . '/' . $local3 . '-' . $visitante3 . '/') !== false
 
@@ -6197,10 +6201,7 @@ private function normalizarMinuto(string $texto): int
                                                                         )
                                                                     ) {
                                                                         $urlEncontrada = 1;
-                                                                        Log::channel('mi_log')->info('href: ' . $href);
-                                                                        Log::channel('mi_log')->info('Fecha: ' . $strTorneoFecha.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaIda.' - '.$strTorneoFechaVuelta.' - '.$strTorneoFechaA.' - '.$strTorneoFechaB.' - '.$strTorneoFechaC.' - '.$strTorneoFechaD.' - '.$strTorneoFechaE.' - '.$strTorneoFechaF.' - '.$strTorneoFechaG.' - '.$strTorneoFechaH);
-                                                                        Log::channel('mi_log')->info('Local: ' . $local3);
-                                                                        Log::channel('mi_log')->info('Visitante: ' . $visitante3);
+
                                                                             $fechaSTR = DateTime::createFromFormat('d/m/Y', $fechaPartido);
                                                                             $fechaFormato = $fechaSTR ? $fechaSTR->format('d-m-Y') : null;
 
