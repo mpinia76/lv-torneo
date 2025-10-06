@@ -6151,7 +6151,7 @@ private function normalizarMinuto(string $texto): int
                                                             $links = $th->getElementsByTagName('a');
 
                                                             foreach ($links as $link) {
-                                                                Log::channel('mi_log')->info('Link: ' . $link);
+                                                                Log::channel('mi_log')->info('Link: ' . print_r($link,true));
                                                                 $urlEncontrada = 0;
                                                                 $href = $link->getAttribute('href');
                                                                 $parts = explode('/', $href);
