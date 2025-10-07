@@ -5571,7 +5571,7 @@ private function normalizarMinuto(string $texto): int
 
                         $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                         $slugJugador = Cache::get($cacheKey);
-                        $html2='';
+
                         if (!$slugJugador) {
 
                             // Función local para limpiar nombres
@@ -5612,9 +5612,20 @@ private function normalizarMinuto(string $texto): int
                                 }
                             }
 
-                        } /*else {
-                            Log::channel('mi_log')->info("Slug cacheado: " . $slugJugador);
-                        }*/
+                        } else {
+                            // Si el slug está cacheado, construimos directamente la URL y descargamos el HTML
+                            $nacionalidadSlug = strtolower($this->sanear_string(str_replace(' ', '-', $persona->nacionalidad)));
+
+                            // Probamos primero con nacionalidad (igual que cuando se generó)
+                            $urlJugador = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slugJugador}";
+                            $html2 = HttpHelper::getHtmlContent($urlJugador);
+
+                            // Si no devuelve nada, probamos sin nacionalidad
+                            if (!$html2) {
+                                $urlJugador = "http://www.futbol360.com.ar/jugadores/{$slugJugador}";
+                                $html2 = HttpHelper::getHtmlContent($urlJugador);
+                            }
+                        }
 
 // Aquí $urlJugador ya tiene la URL válida (con o sin nacionalidad)
 
