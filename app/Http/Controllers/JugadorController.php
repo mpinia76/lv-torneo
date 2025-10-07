@@ -24,6 +24,7 @@ use DB;
 use GuzzleHttp\Client;
 use Carbon\Carbon;
 use App\Services\HttpHelper;
+use Illuminate\Support\Facades\Cache;
 
 use Illuminate\Pagination\LengthAwarePaginator;
 class JugadorController extends Controller
