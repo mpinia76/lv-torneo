@@ -6528,59 +6528,72 @@ private function normalizarMinuto(string $texto): int
 
                         if ($gol->tipo == 'Jugada') {
 
-                            $arrayNombre = explode(' ', $gol->jugador->persona->nombre);
-                            $arrayApellido = explode(' ', $gol->jugador->persona->apellido);
-                            $nombre = $arrayNombre[0];
-                            $apellido = $arrayApellido[0];
-                            $nombre2 = '';
-                            if (count($arrayNombre) > 1) {
-                                $nombre2 = $arrayNombre[1];
-                            }
-                            $apellido2 = '';
-                            if (count($arrayApellido) > 1) {
-                                $apellido2 = $arrayApellido[1];
-                            }
-                            $html2 = '';
-                            $slugJugador = ''; // Aquí guardamos el slug final
+                            $persona = $gol->jugador->persona;
 
-                            $intentos = [
-                                $gol->jugador->url_nombre,
-                                strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->name))),
-                                strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->apellido))),
-                                strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->nombre))),
-                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
-                                strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($apellido)),
-                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
-                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
-                                strtolower($this->sanear_string($nombre2)) . '-' . strtolower($this->sanear_string($apellido)),
-                                strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre))
-                            ];
+// Extraer nombres
+                            $nombreParts = explode(' ', trim($persona->nombre));
+                            $apellidoParts = explode(' ', trim($persona->apellido));
 
-                            $slugJugador = null;
+                            $nombre = isset($nombreParts[0]) ? $nombreParts[0] : '';
+                            $nombre2 = isset($nombreParts[1]) ? $nombreParts[1] : '';
+                            $apellido = isset($apellidoParts[0]) ? $apellidoParts[0] : '';
+                            $apellido2 = isset($apellidoParts[1]) ? $apellidoParts[1] : '';
 
-                            foreach ($intentos as $slug) {
-                                if (!$slug) continue;
+                            $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
+                            $slugJugador = Cache::get($cacheKey);
 
-                                // Primero probamos con nacionalidad
-                                $urlJugador = 'http://www.futbol360.com.ar/jugadores/'
-                                    . strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->nacionalidad)))
-                                    . '/' . $slug;
+                            if (!$slugJugador) {
 
-                                try {
+                                // Función local para limpiar nombres
+                                $sanear = function ($txt) {
+                                    return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
+                                };
+
+                                // Combinaciones más probables primero
+                                $intentos = array_filter([
+                                    $alineacion->jugador->url_nombre,
+                                    $sanear($apellido) . '-' . $sanear($nombre),
+                                    $sanear($nombre) . '-' . $sanear($apellido),
+                                    $sanear($apellido) . '-' . $sanear($nombre2),
+                                    $sanear($persona->apellido),
+                                    $sanear($persona->nombre),
+                                ]);
+
+                                // Generar URLs
+                                $urls = [];
+                                $nacionalidadSlug = strtolower($this->sanear_string(str_replace(' ', '-', $persona->nacionalidad)));
+
+                                foreach ($intentos as $slug) {
+                                    $urls[] = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}";
+                                    $urls[] = "http://www.futbol360.com.ar/jugadores/{$slug}";
+                                }
+
+                                // Probar URLs hasta encontrar una válida
+                                foreach ($urls as $urlJugador) {
+                                    //Log::channel('mi_log')->info("Probando: " . $urlJugador);
+
                                     $html2 = HttpHelper::getHtmlContent($urlJugador);
 
-                                    // Si no encontramos contenido, probamos solo con el slug
-                                    if (!$html2) {
-                                        $urlJugador = 'http://www.futbol360.com.ar/jugadores/' . $slug;
-                                        $html2 = HttpHelper::getHtmlContent($urlJugador);
-                                    }
-
                                     if ($html2) {
-                                        $slugJugador = $slug; // Guardamos el slug válido
-                                        break; // Salimos del bucle
+                                        $slugJugador = basename($urlJugador);
+                                        Cache::put($cacheKey, $slugJugador, now()->addDays(30));
+                                        //Log::channel('mi_log')->info("Slug encontrado: " . $slugJugador);
+                                        break;
                                     }
-                                } catch (Exception $ex) {
-                                    $html2 = '';
+                                }
+
+                            } else {
+                                // Si el slug está cacheado, construimos directamente la URL y descargamos el HTML
+                                $nacionalidadSlug = strtolower($this->sanear_string(str_replace(' ', '-', $persona->nacionalidad)));
+
+                                // Probamos primero con nacionalidad (igual que cuando se generó)
+                                $urlJugador = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slugJugador}";
+                                $html2 = HttpHelper::getHtmlContent($urlJugador);
+
+                                // Si no devuelve nada, probamos sin nacionalidad
+                                if (!$html2) {
+                                    $urlJugador = "http://www.futbol360.com.ar/jugadores/{$slugJugador}";
+                                    $html2 = HttpHelper::getHtmlContent($urlJugador);
                                 }
                             }
 
