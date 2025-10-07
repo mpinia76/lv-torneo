@@ -5571,7 +5571,7 @@ private function normalizarMinuto(string $texto): int
 
                         $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                         $slugJugador = Cache::get($cacheKey);
-
+                        Log::info('Cache get', ['key' => $cacheKey, 'slug' => $slugJugador]);
                         if (!$slugJugador) {
 
                             // Función local para limpiar nombres
@@ -5606,35 +5606,23 @@ private function normalizarMinuto(string $texto): int
 
                                 if ($html2) {
                                     $slugJugador = basename($urlJugador);
-                                    $urlConNacionalidad = str_contains($urlJugador, "/{$nacionalidadSlug}/");
-
-                                    Cache::put($cacheKey, [
-                                        'slug' => $slugJugador,
-                                        'con_nacionalidad' => $urlConNacionalidad,
-                                    ], now()->addDays(30));
-
+                                    Log::info('Cache put', ['key' => $cacheKey, 'slug' => $slugJugador]);
+                                    Cache::put($cacheKey, $slugJugador, now()->addDays(30));
+                                    //Log::channel('mi_log')->info("Slug encontrado: " . $slugJugador);
                                     break;
                                 }
                             }
 
                         } else {
-                            $cacheData = Cache::get($cacheKey);
-
-                            if (is_array($cacheData)) {
-                                $slugJugador = $cacheData['slug'];
-                                $usaNacionalidad = $cacheData['con_nacionalidad'] ?? false;
-                            } else {
-                                // Compatibilidad con caches viejos (solo string)
-                                $slugJugador = $cacheData;
-                                $usaNacionalidad = true; // default
-                            }
-
+                            // Si el slug está cacheado, construimos directamente la URL y descargamos el HTML
                             $nacionalidadSlug = strtolower($this->sanear_string(str_replace(' ', '-', $persona->nacionalidad)));
 
-                            if ($usaNacionalidad) {
-                                $urlJugador = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slugJugador}";
-                                $html2 = HttpHelper::getHtmlContent($urlJugador);
-                            } else {
+                            // Probamos primero con nacionalidad (igual que cuando se generó)
+                            $urlJugador = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slugJugador}";
+                            $html2 = HttpHelper::getHtmlContent($urlJugador);
+
+                            // Si no devuelve nada, probamos sin nacionalidad
+                            if (!$html2) {
                                 $urlJugador = "http://www.futbol360.com.ar/jugadores/{$slugJugador}";
                                 $html2 = HttpHelper::getHtmlContent($urlJugador);
                             }
