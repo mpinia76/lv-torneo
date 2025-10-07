@@ -6328,7 +6328,7 @@ private function normalizarMinuto(string $texto): int
                             } else {
 
                                 //Log::channel('mi_log')->info('OJO!!! No se econtró la URL del jugador' , []);
-                                $success .= '<span style="color:red">No se econtró la URL del jugador ' . $urlJugador . '</span><br>';
+                                $success .= '<span style="color:red">No se econtró la URL del jugador ' . $alineacion->jugador->persona->name . '</span><br>';
                             }
                             // }
 
