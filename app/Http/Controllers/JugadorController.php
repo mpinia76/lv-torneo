@@ -277,6 +277,8 @@ class JugadorController extends Controller
         $jugador=jugador::find($id);
         $jugador->update($updateJ);
         $jugador->persona()->update($update);
+        // 💡 Invalida la cache del slug del jugador
+        Cache::forget('slug_jugador_' . $jugador->id);
 
         return redirect()->route('jugadores.index')->with('success','Registro actualizado satisfactoriamente');
 
