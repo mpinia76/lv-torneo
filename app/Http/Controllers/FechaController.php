@@ -5577,8 +5577,10 @@ private function normalizarMinuto(string $texto): int
                             $alineacion->jugador->url_nombre,
                             strtolower($this->sanear_string(str_replace(' ', '-', $alineacion->jugador->persona->name))),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
+                            strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($apellido)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
+                            strtolower($this->sanear_string($nombre2)) . '-' . strtolower($this->sanear_string($apellido)),
                             strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre))
 
                         ];
@@ -6531,8 +6533,10 @@ private function normalizarMinuto(string $texto): int
                                 $gol->jugador->url_nombre,
                                 strtolower($this->sanear_string(str_replace(' ', '-', $gol->jugador->persona->name))),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)),
+                                strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($apellido)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre)) . '-' . strtolower($this->sanear_string($nombre2)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($nombre2)),
+                                strtolower($this->sanear_string($nombre2)) . '-' . strtolower($this->sanear_string($apellido)),
                                 strtolower($this->sanear_string($apellido)) . '-' . strtolower($this->sanear_string($apellido2)) . '-' . strtolower($this->sanear_string($nombre))
                             ];
 
