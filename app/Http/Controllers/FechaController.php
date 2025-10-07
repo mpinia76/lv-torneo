@@ -5465,7 +5465,7 @@ private function normalizarMinuto(string $texto): int
 
     public function importpenalesfecha(Request $request)
     {
-        //Cache::flush();
+        Cache::flush();
 
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
@@ -5607,12 +5607,13 @@ private function normalizarMinuto(string $texto): int
                             }
 
                             foreach ($urls as $urlJugador) {
+                                Log::info('Url procesada '. $urlJugador);
                                 $html2 = HttpHelper::getHtmlContent($urlJugador);
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
                                     $slugJugador = basename($urlJugador);
-                                    //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
+                                    Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                     break;
                                 }
                             }
