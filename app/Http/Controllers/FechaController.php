@@ -5572,7 +5572,7 @@ private function normalizarMinuto(string $texto): int
 
                         $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                         $cachedUrl = Cache::get($cacheKey);
-                        Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
+                        //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
                         $html2 = null;
 
@@ -5609,7 +5609,7 @@ private function normalizarMinuto(string $texto): int
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
-                                    Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
+                                    //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                     break;
                                 }
                             }
@@ -6525,22 +6525,28 @@ private function normalizarMinuto(string $texto): int
                             $nombreParts = explode(' ', trim($persona->nombre));
                             $apellidoParts = explode(' ', trim($persona->apellido));
 
-                            $nombre = isset($nombreParts[0]) ? $nombreParts[0] : '';
-                            $nombre2 = isset($nombreParts[1]) ? $nombreParts[1] : '';
-                            $apellido = isset($apellidoParts[0]) ? $apellidoParts[0] : '';
-                            $apellido2 = isset($apellidoParts[1]) ? $apellidoParts[1] : '';
+                            $nombre = $nombreParts[0] ?? '';
+                            $nombre2 = $nombreParts[1] ?? '';
+                            $apellido = $apellidoParts[0] ?? '';
+                            $apellido2 = $apellidoParts[1] ?? '';
 
                             $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
-                            $slugJugador = Cache::get($cacheKey);
+                            $cachedUrl = Cache::get($cacheKey);
+                            //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
-                            if (!$slugJugador) {
+                            $html2 = null;
 
+                            if ($cachedUrl) {
+                                // Ya tenemos la URL válida en cache
+                                $html2 = HttpHelper::getHtmlContent($cachedUrl);
+                            }
+
+                            if (!$html2) {
                                 // Función local para limpiar nombres
                                 $sanear = function ($txt) {
                                     return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
                                 };
 
-                                // Combinaciones más probables primero
                                 $intentos = array_filter([
                                     $alineacion->jugador->url_nombre,
                                     $sanear($apellido) . '-' . $sanear($nombre),
@@ -6550,41 +6556,22 @@ private function normalizarMinuto(string $texto): int
                                     $sanear($persona->nombre),
                                 ]);
 
-                                // Generar URLs
-                                $urls = [];
-                                $nacionalidadSlug = strtolower($this->sanear_string(str_replace(' ', '-', $persona->nacionalidad)));
+                                $nacionalidadSlug = $sanear($persona->nacionalidad);
 
+                                $urls = [];
                                 foreach ($intentos as $slug) {
                                     $urls[] = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}";
                                     $urls[] = "http://www.futbol360.com.ar/jugadores/{$slug}";
                                 }
 
-                                // Probar URLs hasta encontrar una válida
                                 foreach ($urls as $urlJugador) {
-                                    //Log::channel('mi_log')->info("Probando: " . $urlJugador);
-
                                     $html2 = HttpHelper::getHtmlContent($urlJugador);
-
                                     if ($html2) {
-                                        $slugJugador = basename($urlJugador);
-                                        Cache::put($cacheKey, $slugJugador, now()->addDays(30));
-                                        //Log::channel('mi_log')->info("Slug encontrado: " . $slugJugador);
+                                        // Guardamos la URL completa en cache
+                                        Cache::put($cacheKey, $urlJugador, now()->addDays(30));
+                                        //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                         break;
                                     }
-                                }
-
-                            } else {
-                                // Si el slug está cacheado, construimos directamente la URL y descargamos el HTML
-                                $nacionalidadSlug = strtolower($this->sanear_string(str_replace(' ', '-', $persona->nacionalidad)));
-
-                                // Probamos primero con nacionalidad (igual que cuando se generó)
-                                $urlJugador = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slugJugador}";
-                                $html2 = HttpHelper::getHtmlContent($urlJugador);
-
-                                // Si no devuelve nada, probamos sin nacionalidad
-                                if (!$html2) {
-                                    $urlJugador = "http://www.futbol360.com.ar/jugadores/{$slugJugador}";
-                                    $html2 = HttpHelper::getHtmlContent($urlJugador);
                                 }
                             }
 
