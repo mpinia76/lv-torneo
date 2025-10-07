@@ -5465,7 +5465,7 @@ private function normalizarMinuto(string $texto): int
 
     public function importpenalesfecha(Request $request)
     {
-        Cache::flush();
+        //Cache::flush();
 
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
