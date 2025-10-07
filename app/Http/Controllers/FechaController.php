@@ -5716,30 +5716,30 @@ private function normalizarMinuto(string $texto): int
                                     if ($htmlErrado) {
 
                                         // Crear un nuevo DOMDocument y cargar el HTML
-                                        $dom = new \DOMDocument();
+                                        $domErrado = new \DOMDocument();
                                         libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
-                                        $dom->loadHTML($htmlErrado);
+                                        $domErrado->loadHTML($htmlErrado);
                                         libxml_clear_errors();
 
                                         // Crear un nuevo objeto XPath
-                                        $xpath = new \DOMXPath($dom);
+                                        $xpathErrado = new \DOMXPath($domErrado);
 
                                         // Buscar el div con id 'matchesTable'
-                                        $matchesTableNodes = $xpath->query('//div[@id="matchesTable"]');
+                                        $matchesTableNodes = $xpathErrado->query('//div[@id="matchesTable"]');
 
                                         foreach ($matchesTableNodes as $div) {
                                             // Buscar las tablas con clase 'tableStandard'
-                                            $tables = $xpath->query('.//table[contains(@class, "tableStandard")]', $div);
+                                            $tables = $xpathErrado->query('.//table[contains(@class, "tableStandard")]', $div);
 
                                             foreach ($tables as $table) {
                                                 // Buscar las filas de la tabla
-                                                $rows = $xpath->query('.//tr', $table);
+                                                $rows = $xpathErrado->query('.//tr', $table);
 
                                                 foreach ($rows as $row) {
                                                     // Verificar que el contenido de la fila no sea "No hay resultados"
                                                     if (trim($row->textContent) != 'No hay resultados') {
                                                         // Buscar los encabezados de la fila (th)
-                                                        $headerCells = $xpath->query('.//th', $row);
+                                                        $headerCells = $xpathErrado->query('.//th', $row);
                                                         if ($headerCells->length >= 5) {
                                                             $fechaPartido = trim($headerCells->item(3)->textContent);
                                                         }
@@ -5816,28 +5816,28 @@ private function normalizarMinuto(string $texto): int
                                                                                         Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
                                                                                     }
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
-                                                                                    $dom = new \DOMDocument();
+                                                                                    $domPartidoErrado = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
-                                                                                    $dom->loadHTML($htmlPartido);
+                                                                                    $domPartidoErrado->loadHTML($htmlPartido);
                                                                                     libxml_clear_errors();
 
                                                                                     // Crear objeto XPath
-                                                                                    $xpath = new \DOMXPath($dom);
+                                                                                    $xpathPartidoErrado = new \DOMXPath($domPartidoErrado);
 
                                                                                     // Buscar todas las filas <tr>
-                                                                                    $rows = $xpath->query('//tr');
+                                                                                    $rows = $xpathPartidoErrado->query('//tr');
 
                                                                                     foreach ($rows as $r) {
                                                                                         // Buscar todos los <a> que son jugadores
                                                                                         $playerLinks = [];
-                                                                                        foreach ($xpath->query('.//a', $r) as $a) {
+                                                                                        foreach ($xpathPartidoErrado->query('.//a', $r) as $a) {
                                                                                             $href = $a->getAttribute('href');
                                                                                             if (strpos($href, '/jugadores/') !== false) {
                                                                                                 $playerLinks[] = $a;
                                                                                             }
                                                                                         }
 
-                                                                                        $recordTds = $xpath->query('.//td[contains(@class, "record")]', $r);
+                                                                                        $recordTds = $xpathPartidoErrado->query('.//td[contains(@class, "record")]', $r);
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
