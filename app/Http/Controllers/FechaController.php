@@ -5589,7 +5589,7 @@ private function normalizarMinuto(string $texto): int
                             };
 
                             $intentos = array_filter([
-                                $persona->url_nombre,
+                                $alineacion->jugador->url_nombre,
                                 $persona->name,
                                 $sanear($apellido) . '-' . $sanear($nombre),
                                 $sanear($nombre) . '-' . $sanear($apellido),
@@ -6552,7 +6552,7 @@ private function normalizarMinuto(string $texto): int
                                 };
 
                                 $intentos = array_filter([
-                                    $persona->url_nombre,
+                                    $gol->jugador->url_nombre,
                                     $persona->name,
                                     $sanear($apellido) . '-' . $sanear($nombre),
                                     $sanear($nombre) . '-' . $sanear($apellido),
