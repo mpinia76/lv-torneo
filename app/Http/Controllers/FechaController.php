@@ -5578,6 +5578,7 @@ private function normalizarMinuto(string $texto): int
 
                         if ($cachedUrl) {
                             // Ya tenemos la URL válida en cache
+                            $slugJugador = basename($cachedUrl);
                             $html2 = HttpHelper::getHtmlContent($cachedUrl);
                         }
 
@@ -5609,6 +5610,7 @@ private function normalizarMinuto(string $texto): int
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
+                                    $slugJugador = basename($urlJugador);
                                     //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                     break;
                                 }
@@ -5867,7 +5869,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                                         'url' => $urlInc
                                                                                                                     ];
 
-                                                                                                                    $success .= "<span style='color:green'>".$slugJugador." erró penal en ".$strLocal." vs ".$strVisitante."</span><br>";
+                                                                                                                    $success .= "<span style='color:green'>".$persona->name." erró penal en ".$strLocal." vs ".$strVisitante."</span><br>";
                                                                                                                 }
 
                                                                                                                 unset($evento); // reseteo para no mezclar eventos
@@ -6079,7 +6081,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                                         'url' => $urlInc
                                                                                                                     ];
 
-                                                                                                                    $success .= "<span style='color:green'>".$slugJugador." le atajaron penal en ".$strLocal." vs ".$strVisitante."</span><br>";
+                                                                                                                    $success .= "<span style='color:green'>".$persona->name." le atajaron penal en ".$strLocal." vs ".$strVisitante."</span><br>";
                                                                                                                 }
 
                                                                                                                 unset($evento); // reseteo para no mezclar eventos
@@ -6284,7 +6286,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                                         'url' => $urlInc
                                                                                                                     ];
 
-                                                                                                                    $success .= "<span style='color:green'>".$slugJugador." atajó penal en ".$strLocal." vs ".$strVisitante."</span><br>";
+                                                                                                                    $success .= "<span style='color:green'>".$persona->name." atajó penal en ".$strLocal." vs ".$strVisitante."</span><br>";
                                                                                                                 }
 
                                                                                                                 unset($evento); // reseteo para no mezclar eventos
