@@ -7612,7 +7612,7 @@ private function normalizarMinuto(string $texto): int
 
         $goles=Gol::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
 
-        $penales=penal::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
+        $penales=penal::where('partido_id','=',"$partido_id")->where('tipo','!=','Convirtieron')->orderBy('minuto','ASC')->get();
 
 
         $titularesL=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('tipo','=',"Titular")->orderBy('orden', 'asc')->get();
