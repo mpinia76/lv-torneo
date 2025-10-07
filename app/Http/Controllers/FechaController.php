@@ -5571,7 +5571,7 @@ private function normalizarMinuto(string $texto): int
 
                         $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                         $slugJugador = Cache::get($cacheKey);
-
+                        $html2='';
                         if (!$slugJugador) {
 
                             // Función local para limpiar nombres
