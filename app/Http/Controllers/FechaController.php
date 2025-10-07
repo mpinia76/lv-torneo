@@ -5571,7 +5571,7 @@ private function normalizarMinuto(string $texto): int
 
                         $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                         $cachedUrl = Cache::get($cacheKey);
-                        //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
+                        Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
                         $html2 = null;
 
@@ -5608,7 +5608,7 @@ private function normalizarMinuto(string $texto): int
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
-                                    //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
+                                    Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                     break;
                                 }
                             }
