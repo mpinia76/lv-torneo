@@ -3752,7 +3752,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             // Evitar duplicados
             $existe = Penal::where('partido_id', $gol->partido_id)
                 ->where('minuto', $gol->minuto)
-                ->where('tipo', 'Convertido')
+                ->where('tipo', 'Convirtieron')
                 ->first();
             if ($existe) continue;
 
@@ -3810,7 +3810,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                 'partido_id' => $gol->partido_id,
                 'jugador_id' => $arqueroFinal->jugador_id,
                 'minuto' => $gol->minuto,
-                'tipo' => 'Convertido',
+                'tipo' => 'Convirtieron',
             ]);
 
             // Guardar info para la vista

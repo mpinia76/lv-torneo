@@ -5465,7 +5465,7 @@ private function normalizarMinuto(string $texto): int
 
     public function importpenalesfecha(Request $request)
     {
-        Cache::flush();
+        //Cache::flush();
 
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
@@ -5607,13 +5607,13 @@ private function normalizarMinuto(string $texto): int
                             }
 
                             foreach ($urls as $urlJugador) {
-                                Log::info('Url procesada '. $urlJugador);
+                                //Log::info('Url procesada '. $urlJugador);
                                 $html2 = HttpHelper::getHtmlContent($urlJugador);
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
                                     $slugJugador = basename($urlJugador);
-                                    Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
+                                    //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                     break;
                                 }
                             }
@@ -5814,9 +5814,9 @@ private function normalizarMinuto(string $texto): int
                                                                                     $success .='Partido encontrado: '.$urlInc.'<br>';
                                                                                     $htmlPartido = $response->body();
 
-                                                                                    if (trim($htmlPartido) === '') {
+                                                                                    /*if (trim($htmlPartido) === '') {
                                                                                         Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
-                                                                                    }
+                                                                                    }*/
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                                     $domPartidoErrado = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
@@ -6021,9 +6021,9 @@ private function normalizarMinuto(string $texto): int
                                                                                     $success .='Partido encontrado: '.$urlInc.'<br>';
                                                                                     $htmlPartido = $response->body();
 
-                                                                                    if (trim($htmlPartido) === '') {
+                                                                                    /*if (trim($htmlPartido) === '') {
                                                                                         Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
-                                                                                    }
+                                                                                    }*/
 
 
                                                                                     $htmlLimpio = preg_replace('/<\?php.*?\?>/s', '', $htmlPartido);
@@ -6233,9 +6233,9 @@ private function normalizarMinuto(string $texto): int
                                                                                     $success .='Partido encontrado: '.$urlInc.'<br>';
                                                                                     $htmlPartido = $response->body();
 
-                                                                                    if (trim($htmlPartido) === '') {
+                                                                                    /*if (trim($htmlPartido) === '') {
                                                                                         Log::channel('mi_log')->warning("El archivo INC está vacío: $urlInc");
-                                                                                    }
+                                                                                    }*/
                                                                                     // Crear un nuevo DOMDocument y cargar el HTML
                                                                                     $domPartidoAtajo = new \DOMDocument();
                                                                                     libxml_use_internal_errors(true);
