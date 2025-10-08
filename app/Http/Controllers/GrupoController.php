@@ -1042,8 +1042,8 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
 
  UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tarjetas.tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, ( case when tarjetas.tipo=\'Roja\' or tarjetas.tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" as  errados, "0" as  atajos
+ SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+, ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" as  errados, "0" as  atajos
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1054,8 +1054,8 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 WHERE  grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
 
 UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, ( case when penals.tipo=\'Errado\' or penals.tipo=\'Atajado\' then 1 else NULL end) as  errados
-, ( case when penals.tipo=\'Atajo\' then 1 else NULL end) as  atajos
+ SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, ( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados
+, ( case when tipo=\'Atajo\' then 1 else NULL end) as  atajos
 FROM penals
 INNER JOIN jugadors ON penals.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
