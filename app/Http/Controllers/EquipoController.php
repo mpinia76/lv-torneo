@@ -397,7 +397,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id';
 
         $sql .=' UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, ( case when penals.tipo=\'Errado\' or penals.tipo=\'Atajado\' then 1 else NULL end) as  errados
+ SELECT jugadors.id AS jugador_id, personas.foto,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS titulos, ( case when penals.tipo=\'Errado\' or penals.tipo=\'Atajado\' then 1 else NULL end) as  errados
 , ( case when penals.tipo=\'Atajo\' then 1 else NULL end) as  atajos
 FROM penals
 INNER JOIN jugadors ON penals.jugador_id = jugadors.id
