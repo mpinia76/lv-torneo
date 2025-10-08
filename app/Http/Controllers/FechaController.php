@@ -4891,7 +4891,7 @@ private function normalizarMinuto(string $texto): int
 
 // Construir URL .inc
                                                                 if ($fechaFormato && $urlPartido) {
-                                                                    $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/sudamericana-2025/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                    $urlInc = "http://www.futbol360.com.ar/partidos/{$region}/sudamericana-2025/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                     $response = Http::get($urlInc);
@@ -5474,12 +5474,27 @@ private function normalizarMinuto(string $texto): int
 
 
         $fecha = Fecha::findOrFail($fecha_id);
-
-
-
-
-
+        $ok = 1;
+        $sigo = 1;
         $success = $fecha->numero.'<br>';
+        if (!$fecha->grupo->torneo->region) {
+            $success .= '<span style="color:red">Falta región del torneo</span><br>';
+            $sigo=0;
+        }
+        else{
+            $region=$fecha->grupo->torneo->region;
+        }
+        if (!$fecha->grupo->torneo->url_nombre) {
+            $success .= '<span style="color:red">Falta url del torneo</span><br>';
+            $sigo=0;
+        }
+        if (!$fecha->url_nombre) {
+            $success .= '<span style="color:red">Falta url de la fecha</span><br>';
+            $sigo=0;
+        }
+
+
+
 
         DB::beginTransaction();
 
@@ -5491,8 +5506,7 @@ private function normalizarMinuto(string $texto): int
 
             /*$arrTorneo = explode('-', $fecha->grupo->torneo->url_nombre);
             $torneoSTR = $arrTorneo[0];*/
-            $ok = 1;
-            $sigo = 1;
+
             //Log::channel('mi_log')->info('Fecha ' . $fecha->numero, []);
             foreach ($partidos as $partido) {
 
@@ -5804,7 +5818,7 @@ private function normalizarMinuto(string $texto): int
                                                                             if ($fechaFormato && $urlPartido) {
 
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$region}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                                 $response = Http::get($urlInc);
@@ -6011,7 +6025,7 @@ private function normalizarMinuto(string $texto): int
                                                                             if ($fechaFormato && $urlPartido) {
 
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$region}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                                 $response = Http::get($urlInc);
@@ -6224,7 +6238,7 @@ private function normalizarMinuto(string $texto): int
                                                                             if ($fechaFormato && $urlPartido) {
 
 
-                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/sudamerica/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
+                                                                                $urlInc = "http://www.futbol360.com.ar/partidos/{$region}/{$fecha->grupo->torneo->url_nombre}/{$urlFecha}/{$urlPartido}/inc/partido-{$urlPartido}-{$fechaFormato}.php.inc";
 
 
                                                                                 $response = Http::get($urlInc);

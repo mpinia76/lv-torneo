@@ -79,6 +79,10 @@
             <fieldset>
                 <legend>futbol360.com.ar</legend>
                 <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                    {{Form::label('region', 'Región')}}
+                    {{Form::text('region', '', ['class' => 'form-control'])}}
+                </div>
+                <div class="form-group col-xs-12 col-sm-6 col-md-5">
                     {{Form::label('url_nombre', 'Nombre/s')}}
                     {{Form::text('url_nombre', '', ['class' => 'form-control'])}}
                 </div>
