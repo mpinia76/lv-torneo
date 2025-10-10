@@ -63,7 +63,7 @@
                                 {{-- Fila de fecha --}}
                                 @if($currentDate != $lastDate)
                                     <tr class="table-light">
-                                        <td colspan="6" class="fw-semibold">{{ $currentDate }}</td>
+                                        <td colspan="5" class="fw-semibold">{{ $currentDate }}</td>
                                     </tr>
                                     @php $lastDate = $currentDate; @endphp
                                 @endif
@@ -71,7 +71,7 @@
                                 {{-- Fila de número de fecha --}}
                                 @if($partido->fecha->numero != $lastFecha)
                                     <tr class="table-secondary">
-                                        <td colspan="6" class="fw-bold">
+                                        <td colspan="5" class="fw-bold">
                                             {{ is_numeric($partido->fecha->numero) ? "Fecha {$partido->fecha->numero}" : $partido->fecha->numero }}
                                         </td>
                                     </tr>
