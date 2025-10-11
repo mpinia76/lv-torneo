@@ -168,5 +168,17 @@
         .clickable-row:hover {
             background-color: #e6ffe6 !important;
         }
+        .table tbody tr td:nth-child(1) { /* Hora */
+            width: 10%;
+        }
+        .table tbody tr td:nth-child(2), /* Local */
+        .table tbody tr td:nth-child(5) { /* Visitante */
+            width: 35%;
+        }
+        .table tbody tr td:nth-child(3), /* Goles local */
+        .table tbody tr td:nth-child(4) { /* Goles visitante */
+            width: 10%;
+            text-align: center;
+        }
     </style>
 @endsection
