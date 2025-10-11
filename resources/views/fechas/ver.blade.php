@@ -173,7 +173,7 @@
         }
         .table tbody tr td:nth-child(2){ /* Local */
 
-            width: 20%;
+            width: 30%;
         }
 
         .table tbody tr td:nth-child(5) { /* Visitante */
