@@ -63,7 +63,7 @@
                                 {{-- Fila de fecha --}}
                                 @if($currentDate != $lastDate)
                                     <tr class="table-light">
-                                        <td colspan="5" class="fw-semibold">{{ $currentDate }}</td>
+                                        <td colspan="6" class="fw-semibold">{{ $currentDate }}</td>
                                     </tr>
                                     @php $lastDate = $currentDate; @endphp
                                 @endif
@@ -71,7 +71,7 @@
                                 {{-- Fila de número de fecha --}}
                                 @if($partido->fecha->numero != $lastFecha)
                                     <tr class="table-secondary">
-                                        <td colspan="5" class="fw-bold">
+                                        <td colspan="6" class="fw-bold">
                                             {{ is_numeric($partido->fecha->numero) ? "Fecha {$partido->fecha->numero}" : $partido->fecha->numero }}
                                         </td>
                                     </tr>
@@ -93,19 +93,45 @@
                                             <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" height="15">
                                         @endif
                                     </td>
-                                    <td class="fw-bold">
+                                <tr class="clickable-row" data-href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}">
+                                    <td class="text-muted">{{ $partido->dia ? Carbon::parse($partido->dia)->format('H:i') : '' }}</td>
+                                    <td class="text-end">
+                                        @if($partido->equipol)
+                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
+                                                @if($partido->equipol->escudo)
+                                                    <img src="{{ url('images/' . $partido->equipol->escudo) }}" height="20" class="me-1">
+                                                @endif
+                                                {{ $partido->equipol->nombre }}
+                                            </a>
+                                        @endif
+                                    </td>
+
+                                    {{-- Resultado centrado --}}
+                                    <td class="fw-bold text-center" colspan="2">
                                         {{ $partido->golesl }}
                                         @if($partido->penalesl)
                                             ({{ $partido->penalesl }})
                                         @endif
-                                    </td>
-                                    <td class="fw-bold">
+                                        -
                                         {{ $partido->golesv }}
                                         @if($partido->penalesv)
                                             ({{ $partido->penalesv }})
                                         @endif
                                     </td>
+
                                     <td class="text-start">
+                                        @if($partido->equipov)
+                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
+                                                @if($partido->equipov->escudo)
+                                                    <img src="{{ url('images/' . $partido->equipov->escudo) }}" height="20" class="me-1">
+                                                @endif
+                                                {{ $partido->equipov->nombre }}
+                                            </a>
+                                        @endif
+                                    </td>
+                                </tr>
+
+                                <td class="text-start">
                                         @if($partido->equipov)
                                             <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}" class="text-decoration-none" onclick="event.stopPropagation();">
                                                 @if($partido->equipov->escudo)
