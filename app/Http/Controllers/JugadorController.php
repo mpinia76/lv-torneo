@@ -2557,6 +2557,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             // Redirigir con un mensaje de éxito
             return redirect()->route('jugadores.verificarPersonas')->with('success', 'Jugador reasignado exitosamente.');
         } catch (\Exception $e) {
+            Log::info('Error: ' . $e->getMessage(), []);
             // Revertir los cambios si hay algún error
             DB::rollBack();
 
