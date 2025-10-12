@@ -2542,6 +2542,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             DB::update('UPDATE gols SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
             DB::update('UPDATE cambios SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
             DB::update('UPDATE tarjetas SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
+            DB::update('UPDATE penals SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
 
             $jugador = Jugador::find($jugadorActual);
             $persona = Persona::find($jugador->persona_id);
