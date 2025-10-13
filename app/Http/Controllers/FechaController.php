@@ -5522,14 +5522,14 @@ private function normalizarMinuto(string $texto): int
                     $success .= '<span style="color:red">Falta equipo: ' . $strVisitante . '</span><br>';
                     $sigo = 0;
                 }
-                if (!$this->dameNombreEquipoURL3($strLocal)) {
+                /*if (!$this->dameNombreEquipoURL3($strLocal)) {
                     $success .= '<span style="color:red">No está: ' . $strLocal . '</span><br>';
                     $sigo = 0;
                 }
                 if (!$this->dameNombreEquipoURL3($strVisitante)) {
                     $success .= '<span style="color:red">No está: ' . $strVisitante . '</span><br>';
                     $sigo = 0;
-                }
+                }*/
                 if ($sigo) {
                     $combinaciones = [];
 
