@@ -63,14 +63,30 @@
     <!-- Totales -->
     <tr>
         <td></td><td></td><td><strong>Totales</strong></td>
-        <td>{{$totalJugados}}</td>
-        <td>{{$totalGoles}} ({{round($totalGoles/$totalJugados,2)}})</td>
-        <td>{{$totalAmarillas}} ({{round($totalAmarillas/$totalJugados,2)}})</td>
-        <td>{{$totalRojas}} ({{round($totalRojas/$totalJugados,2)}})</td>
-        <td>{{$totalErrados}}</td>
-        <td>{{$totalAtajados}}</td>
-        <td>{{$totalRecibidos}} ({{round($totalRecibidos/$totalJugados,2)}})</td>
-        <td>{{$totalInvictas}} ({{round($totalInvictas/$totalJugados,2)}})</td>
+        <td>{{ $totalJugados }}</td>
+        <td>
+            {{ $totalGoles }}
+            ({{ $totalJugados > 0 ? round($totalGoles / $totalJugados, 2) : 0 }})
+        </td>
+        <td>
+            {{ $totalAmarillas }}
+            ({{ $totalJugados > 0 ? round($totalAmarillas / $totalJugados, 2) : 0 }})
+        </td>
+        <td>
+            {{ $totalRojas }}
+            ({{ $totalJugados > 0 ? round($totalRojas / $totalJugados, 2) : 0 }})
+        </td>
+        <td>{{ $totalErrados }}</td>
+        <td>{{ $totalAtajados }}</td>
+        <td>
+            {{ $totalRecibidos }}
+            ({{ $totalJugados > 0 ? round($totalRecibidos / $totalJugados, 2) : 0 }})
+        </td>
+        <td>
+            {{ $totalInvictas }}
+            ({{ $totalJugados > 0 ? round($totalInvictas / $totalJugados, 2) : 0 }})
+        </td>
     </tr>
+
     </tbody>
 </table>
