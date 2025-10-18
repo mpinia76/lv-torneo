@@ -2351,7 +2351,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                 $personas = Persona::where('verificado', false)->orderBy('apellido','ASC')->get();
             }*/
 
-            $personas = Persona::orderBy('apellido','ASC')->paginate(1000);
+            $personas = Persona::orderBy('apellido','ASC')->paginate(300);
 
             // Separar personas con y sin fecha de nacimiento
             /*$personasConFechaNacimiento = $personas->filter(function ($persona) {
