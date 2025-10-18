@@ -2431,36 +2431,33 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
 
 
-                foreach ($personas as $persona) {
-                    // Filtramos personas por apellido y nombre similares
-                    $similares = Persona::where(function ($query) use ($persona) {
-                        $query->where('apellido', 'LIKE', '%' . $persona->apellido . '%')
-                            ->where('nombre', 'LIKE', '%' . $persona->nombre . '%')
-                            ->where('id', '!=', $persona->id); // Evitar que se compare la persona consigo misma
+            foreach ($personas as $persona) {
+                $nombreCompleto1 = strtolower(trim($persona->nombre . ' ' . $persona->apellido));
+                $nombreCompleto2 = strtolower(trim($persona->apellido . ' ' . $persona->nombre));
+
+                $similares = Persona::where('id', '!=', $persona->id)
+                    ->where(function ($query) use ($nombreCompleto1, $nombreCompleto2) {
+                        $query->whereRaw("LOWER(CONCAT(nombre, ' ', apellido)) LIKE ?", ["%$nombreCompleto1%"])
+                            ->orWhereRaw("LOWER(CONCAT(nombre, ' ', apellido)) LIKE ?", ["%$nombreCompleto2%"]);
                     })
-                        ->whereNotExists(function ($query) use ($persona) {
-                            // Evitar personas ya verificadas
-                            $query->select(DB::raw(1))
-                                ->from('personas_verificadas')
-                                ->whereRaw('(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)', [$persona->id, $persona->id]);
-                        })
-                        ->get();
+                    ->whereNotExists(function ($query) use ($persona) {
+                        $query->select(DB::raw(1))
+                            ->from('personas_verificadas')
+                            ->whereRaw('(persona_id = personas.id AND simil_id = ?) OR (persona_id = ? AND simil_id = personas.id)', [$persona->id, $persona->id]);
+                    })
+                    ->get();
 
-                    // Si se encuentran personas similares, agregamos a los resultados
-                    if ($similares->isNotEmpty()) {
-                        $personasSimilares = $personasSimilares->merge([$persona]); // Agregar la persona principal
-
-                        $similares = $similares->map(function ($simil) use ($persona) {
-                            // Agregar el campo simil_id a cada objeto Persona
-                            $simil->simil_id = $persona->id;
-                            return $simil;
-                        });
-
-                        $personasSimilares = $personasSimilares->merge($similares); // Agregar los similares con estructura adecuada
-                    }
+                if ($similares->isNotEmpty()) {
+                    $personasSimilares = $personasSimilares->merge([$persona]);
+                    $similares = $similares->map(function ($simil) use ($persona) {
+                        $simil->simil_id = $persona->id;
+                        return $simil;
+                    });
+                    $personasSimilares = $personasSimilares->merge($similares);
                 }
+            }
 
-                // Eliminar duplicados de la colección de resultados
+            // Eliminar duplicados de la colección de resultados
                 //$personasSimilares = $personasSimilares->unique('id');
             /*}
             else{
