@@ -27,7 +27,46 @@
                 @endforeach
             </select>
         </form>
-
+        <!-- Tabla de posiciones -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover text-center">
+                <thead class="thead-light">
+                <tr>
+                    <th>Equipo</th>
+                    <th>Punt.</th>
+                    <th>J</th>
+                    <th>G</th>
+                    <th>E</th>
+                    <th>P</th>
+                    <th>GF</th>
+                    <th>GC</th>
+                    <th>Dif.</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach($posiciones as $equipo)
+                    <tr>
+                        <td class="text-left">
+                            <a href="{{route('equipos.ver', ['equipoId' => $equipo->equipo_id])}}">
+                                @if($equipo->foto)
+                                    <img src="{{ url('images/'.$equipo->foto) }}" height="25" class="mr-1">
+                                @endif
+                                {{$equipo->equipo}}
+                            </a>
+                        </td>
+                        <td>{{$equipo->puntaje}}</td>
+                        <td>{{$equipo->jugados}}</td>
+                        <td>{{$equipo->ganados}}</td>
+                        <td>{{$equipo->empatados}}</td>
+                        <td>{{$equipo->perdidos}}</td>
+                        <td>{{$equipo->golesl}}</td>
+                        <td>{{$equipo->golesv}}</td>
+                        <td>{{$equipo->diferencia}}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
         <!-- Tabla de partidos -->
         <div class="table-responsive mb-4">
             <table class="table table-bordered table-hover">
@@ -76,46 +115,7 @@
             </table>
         </div>
 
-        <!-- Tabla de posiciones -->
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover text-center">
-                <thead class="thead-light">
-                <tr>
-                    <th>Equipo</th>
-                    <th>Punt.</th>
-                    <th>J</th>
-                    <th>G</th>
-                    <th>E</th>
-                    <th>P</th>
-                    <th>GF</th>
-                    <th>GC</th>
-                    <th>Dif.</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($posiciones as $equipo)
-                    <tr>
-                        <td class="text-left">
-                            <a href="{{route('equipos.ver', ['equipoId' => $equipo->equipo_id])}}">
-                                @if($equipo->foto)
-                                    <img src="{{ url('images/'.$equipo->foto) }}" height="25" class="mr-1">
-                                @endif
-                                {{$equipo->equipo}}
-                            </a>
-                        </td>
-                        <td>{{$equipo->puntaje}}</td>
-                        <td>{{$equipo->jugados}}</td>
-                        <td>{{$equipo->ganados}}</td>
-                        <td>{{$equipo->empatados}}</td>
-                        <td>{{$equipo->perdidos}}</td>
-                        <td>{{$equipo->golesl}}</td>
-                        <td>{{$equipo->golesv}}</td>
-                        <td>{{$equipo->diferencia}}</td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-        </div>
+
 
         <div class="d-flex justify-content-start mt-3">
             <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
