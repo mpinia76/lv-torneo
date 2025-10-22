@@ -7085,7 +7085,7 @@ private function normalizarMinuto(string $texto): int
                             $jugador = Jugador::findOrFail($key);
                             if (count($item) > 1) {
                                 //Log::channel('mi_log')->info('OJO!!! más de un gol de '.$key , []);
-                                $success .= '<span style="color:red">Más de un gol de ' . $key . '</span><br>';
+                                $success .= '<span style="color:red">Más de un gol de ' . $jugador->persona->name . '</span><br>';
                                 /*foreach ($item as $value){
                                     fputcsv($handle, [
 
