@@ -5606,20 +5606,16 @@ private function normalizarMinuto(string $texto): int
                                 return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
                             };
 
-                            $nombreSlug = $sanear($nombreCompleto);
-                            $apellidoSlug = $sanear($apellidoCompleto);
-                            $nacionalidadSlug = $sanear($persona->nacionalidad);
-
-                            // Variantes de nombres/apellidos compuestos
                             $intentos = array_filter([
                                 $alineacion->jugador->url_nombre,
                                 $sanear($persona->name),
-                                "{$apellidoSlug}-{$nombreSlug}",
-                                "{$nombreSlug}-{$apellidoSlug}",
-                                "{$apellidoSlug}-{$nombre}",
-                                "{$nombre}-{$apellidoSlug}",
-                                "{$apellido}-{$nombreSlug}",
-                                "{$nombreSlug}-{$apellido}",
+                                $sanear($apellidoCompleto) . '-' . $sanear($nombre),
+                                $sanear($nombre) . '-' . $sanear($apellidoCompleto),
+                                $sanear($apellido) . '-' . $sanear($nombreCompleto),
+                                $sanear($nombreCompleto) . '-' . $sanear($apellido),
+                                $sanear($apellido) . '-' . $sanear($nombre),
+                                $sanear($nombre) . '-' . $sanear($apellido),
+                                $sanear($apellido) . '-' . $sanear($nombre2),
                                 $sanear($persona->apellido),
                                 $sanear($persona->nombre),
                             ]);
@@ -6581,20 +6577,17 @@ private function normalizarMinuto(string $texto): int
                                     return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
                                 };
 
-                                $nombreSlug = $sanear($nombreCompleto);
-                                $apellidoSlug = $sanear($apellidoCompleto);
-                                $nacionalidadSlug = $sanear($persona->nacionalidad);
-
-                                // Variantes de nombres/apellidos compuestos
+                                // Intentos principales, incluyendo casos de apellidos compuestos
                                 $intentos = array_filter([
                                     $gol->jugador->url_nombre,
                                     $sanear($persona->name),
-                                    "{$apellidoSlug}-{$nombreSlug}",
-                                    "{$nombreSlug}-{$apellidoSlug}",
-                                    "{$apellidoSlug}-{$nombre}",
-                                    "{$nombre}-{$apellidoSlug}",
-                                    "{$apellido}-{$nombreSlug}",
-                                    "{$nombreSlug}-{$apellido}",
+                                    $sanear($apellidoCompleto) . '-' . $sanear($nombre),
+                                    $sanear($nombre) . '-' . $sanear($apellidoCompleto),
+                                    $sanear($apellido) . '-' . $sanear($nombreCompleto),
+                                    $sanear($nombreCompleto) . '-' . $sanear($apellido),
+                                    $sanear($apellido) . '-' . $sanear($nombre),
+                                    $sanear($nombre) . '-' . $sanear($apellido),
+                                    $sanear($apellido) . '-' . $sanear($nombre2),
                                     $sanear($persona->apellido),
                                     $sanear($persona->nombre),
                                 ]);
