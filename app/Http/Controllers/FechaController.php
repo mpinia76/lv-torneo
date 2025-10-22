@@ -5579,7 +5579,8 @@ private function normalizarMinuto(string $texto): int
                         $nombreParts = explode(' ', trim($persona->nombre));
                         $apellidoParts = explode(' ', trim($persona->apellido));
 
-                        // Detectar si el apellido es compuesto (más de una palabra)
+                        // Detectar si nombre o apellido son compuestos
+                        $nombreCompleto = implode(' ', $nombreParts);
                         $apellidoCompleto = implode(' ', $apellidoParts);
 
                         $nombre = $nombreParts[0] ?? '';
@@ -5605,13 +5606,20 @@ private function normalizarMinuto(string $texto): int
                                 return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
                             };
 
+                            $nombreSlug = $sanear($nombreCompleto);
+                            $apellidoSlug = $sanear($apellidoCompleto);
+                            $nacionalidadSlug = $sanear($persona->nacionalidad);
+
+                            // Variantes de nombres/apellidos compuestos
                             $intentos = array_filter([
                                 $alineacion->jugador->url_nombre,
                                 $sanear($persona->name),
-                                $sanear($apellidoCompleto) . '-' . $sanear($nombre),
-                                $sanear($apellido) . '-' . $sanear($nombre),
-                                $sanear($nombre) . '-' . $sanear($apellido),
-                                $sanear($apellido) . '-' . $sanear($nombre2),
+                                "{$apellidoSlug}-{$nombreSlug}",
+                                "{$nombreSlug}-{$apellidoSlug}",
+                                "{$apellidoSlug}-{$nombre}",
+                                "{$nombre}-{$apellidoSlug}",
+                                "{$apellido}-{$nombreSlug}",
+                                "{$nombreSlug}-{$apellido}",
                                 $sanear($persona->apellido),
                                 $sanear($persona->nombre),
                             ]);
@@ -6547,7 +6555,8 @@ private function normalizarMinuto(string $texto): int
                             $nombreParts = explode(' ', trim($persona->nombre));
                             $apellidoParts = explode(' ', trim($persona->apellido));
 
-// Detectar si el apellido es compuesto (más de una palabra)
+// Detectar si nombre o apellido son compuestos
+                            $nombreCompleto = implode(' ', $nombreParts);
                             $apellidoCompleto = implode(' ', $apellidoParts);
 
 // Asignar primeros nombres
@@ -6572,15 +6581,20 @@ private function normalizarMinuto(string $texto): int
                                     return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
                                 };
 
-                                // Intentos principales, incluyendo casos de apellidos compuestos
+                                $nombreSlug = $sanear($nombreCompleto);
+                                $apellidoSlug = $sanear($apellidoCompleto);
+                                $nacionalidadSlug = $sanear($persona->nacionalidad);
+
+                                // Variantes de nombres/apellidos compuestos
                                 $intentos = array_filter([
                                     $gol->jugador->url_nombre,
                                     $sanear($persona->name),
-                                    $sanear($apellidoCompleto) . '-' . $sanear($nombre),
-                                    $sanear($nombre) . '-' . $sanear($apellidoCompleto),
-                                    $sanear($apellido) . '-' . $sanear($nombre),
-                                    $sanear($nombre) . '-' . $sanear($apellido),
-                                    $sanear($apellido) . '-' . $sanear($nombre2),
+                                    "{$apellidoSlug}-{$nombreSlug}",
+                                    "{$nombreSlug}-{$apellidoSlug}",
+                                    "{$apellidoSlug}-{$nombre}",
+                                    "{$nombre}-{$apellidoSlug}",
+                                    "{$apellido}-{$nombreSlug}",
+                                    "{$nombreSlug}-{$apellido}",
                                     $sanear($persona->apellido),
                                     $sanear($persona->nombre),
                                 ]);
