@@ -5579,6 +5579,9 @@ private function normalizarMinuto(string $texto): int
                         $nombreParts = explode(' ', trim($persona->nombre));
                         $apellidoParts = explode(' ', trim($persona->apellido));
 
+                        // Detectar si el apellido es compuesto (más de una palabra)
+                        $apellidoCompleto = implode(' ', $apellidoParts);
+
                         $nombre = $nombreParts[0] ?? '';
                         $nombre2 = $nombreParts[1] ?? '';
                         $apellido = $apellidoParts[0] ?? '';
@@ -5605,6 +5608,7 @@ private function normalizarMinuto(string $texto): int
                             $intentos = array_filter([
                                 $alineacion->jugador->url_nombre,
                                 $sanear($persona->name),
+                                $sanear($apellidoCompleto) . '-' . $sanear($nombre),
                                 $sanear($apellido) . '-' . $sanear($nombre),
                                 $sanear($nombre) . '-' . $sanear($apellido),
                                 $sanear($apellido) . '-' . $sanear($nombre2),
@@ -6539,10 +6543,14 @@ private function normalizarMinuto(string $texto): int
 
                             $persona = $gol->jugador->persona;
 
-// Extraer nombres
+// Extraer nombres y apellidos
                             $nombreParts = explode(' ', trim($persona->nombre));
                             $apellidoParts = explode(' ', trim($persona->apellido));
 
+// Detectar si el apellido es compuesto (más de una palabra)
+                            $apellidoCompleto = implode(' ', $apellidoParts);
+
+// Asignar primeros nombres
                             $nombre = $nombreParts[0] ?? '';
                             $nombre2 = $nombreParts[1] ?? '';
                             $apellido = $apellidoParts[0] ?? '';
@@ -6550,7 +6558,6 @@ private function normalizarMinuto(string $texto): int
 
                             $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                             $cachedUrl = Cache::get($cacheKey);
-                            //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
                             $html2 = null;
 
@@ -6565,9 +6572,12 @@ private function normalizarMinuto(string $texto): int
                                     return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
                                 };
 
+                                // Intentos principales, incluyendo casos de apellidos compuestos
                                 $intentos = array_filter([
                                     $gol->jugador->url_nombre,
                                     $sanear($persona->name),
+                                    $sanear($apellidoCompleto) . '-' . $sanear($nombre),
+                                    $sanear($nombre) . '-' . $sanear($apellidoCompleto),
                                     $sanear($apellido) . '-' . $sanear($nombre),
                                     $sanear($nombre) . '-' . $sanear($apellido),
                                     $sanear($apellido) . '-' . $sanear($nombre2),
@@ -6586,9 +6596,7 @@ private function normalizarMinuto(string $texto): int
                                 foreach ($urls as $urlJugador) {
                                     $html2 = HttpHelper::getHtmlContent($urlJugador);
                                     if ($html2) {
-                                        // Guardamos la URL completa en cache
                                         Cache::put($cacheKey, $urlJugador, now()->addDays(30));
-                                        //Log::info('Cache put', ['key' => $cacheKey, 'url' => $urlJugador]);
                                         break;
                                     }
                                 }
