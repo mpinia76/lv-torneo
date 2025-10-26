@@ -4588,19 +4588,9 @@ $string = str_replace(
         $string
 );
 
-//Esta parte se encarga de eliminar cualquier caracter extraño
-$string = str_replace(
-        array("\\", "¨", "º", "~",
-             "#", "@", "|", "!", "\"",
-             "·", "$", "%", "&", "/",
-             "(", ")", "?", "'", "¡",
-             "¿", "[", "^", "<code>", "]",
-             "+", "}", "{", "¨", "´",
-             ">", "< ", ";", ",", ":",
-             ".", " "),
-'',
-$string
-);
+// Esta parte elimina cualquier carácter extraño, pero conserva guiones
+        $string = preg_replace('/[^A-Za-z0-9\-]/', '', $string);
+
 
 
 return $string;
