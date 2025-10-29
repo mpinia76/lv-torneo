@@ -5458,6 +5458,7 @@ private function normalizarMinuto(string $texto): int
         //Cache::flush();
 
         set_time_limit(0);
+        ini_set('memory_limit', '-1');
         //Log::channel('mi_log')->info('Entraaaaaa', []);
 
         $fecha_id = $request->get('fechaId');
