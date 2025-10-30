@@ -5493,14 +5493,15 @@ private function normalizarMinuto(string $texto): int
             $arrYear = explode('/', $fecha->grupo->torneo->year);
             $years = str_replace('/', '-', $fecha->grupo->torneo->year);
             $year = (count($arrYear) > 1) ? $arrYear[1] : $arrYear[0];
-            $partidos = Partido::where('fecha_id', '=', "$id")->get();
+            //$partidos = Partido::where('fecha_id', '=', "$id")->get();
+
 
             /*$arrTorneo = explode('-', $fecha->grupo->torneo->url_nombre);
             $torneoSTR = $arrTorneo[0];*/
 
             //Log::channel('mi_log')->info('Fecha ' . $fecha->numero, []);
-            foreach ($partidos as $partido) {
-
+            //foreach ($partidos as $partido) {
+        foreach (Partido::where('fecha_id', $fecha->id)->cursor() as $partido) {
 
 
                 $strLocal = $partido->equipol->nombre;
