@@ -123,16 +123,18 @@
         }
 
         function actualizarFecha(dias) {
-            let fechaHoy = document.getElementById('dia').value;
-            let fecha = new Date(fechaHoy);
-            fecha.setDate(fecha.getDate() + dias);
-            let dia = String(fecha.getDate()).padStart(2, '0');
-            let mes = String(fecha.getMonth() + 1).padStart(2, '0');
-            let anio = fecha.getFullYear();
-            let nuevaFecha = anio + '-' + mes + '-' + dia;
+            const fechaHoy = document.getElementById('dia').value;
+            if (!fechaHoy) return;
+
+            let [anio, mes, dia] = fechaHoy.split('-').map(Number);
+            const fecha = new Date(Date.UTC(anio, mes - 1, dia)); // fuerza UTC
+            fecha.setUTCDate(fecha.getUTCDate() + dias);
+
+            const nuevaFecha = fecha.toISOString().slice(0, 10); // YYYY-MM-DD
             document.getElementById('dia').value = nuevaFecha;
             enviarFormulario();
         }
+
 
         // Redirección al hacer clic en la fila
         document.addEventListener('DOMContentLoaded', function() {
