@@ -1069,7 +1069,7 @@ group by tecnico_id
             COUNT(CASE WHEN p.tipo = 'Errado' THEN 1 END) AS totalErrados,
             COUNT(CASE WHEN p.tipo = 'Atajado' THEN 1 END) AS totalAtajados,
             COUNT(CASE WHEN p.tipo = 'Atajo' THEN 1 END) AS totalAtajos,
-            COUNT(CASE WHEN p.tipo = 'Convertido' THEN 1 END) AS totalConvirtieron,
+            COUNT(CASE WHEN p.tipo = 'Convirtieron' THEN 1 END) AS totalConvirtieron,
             (
                 SELECT COUNT(*)
                 FROM gols g
@@ -1128,7 +1128,7 @@ SELECT DISTINCT
     pa.id AS partido_id,
     CASE
         WHEN p.id IS NOT NULL THEN p.tipo
-        WHEN g.id IS NOT NULL THEN 'Convertido'
+        WHEN g.id IS NOT NULL THEN 'Convirtieron'
     END AS tipoPenal
 FROM partidos pa
 INNER JOIN equipos e1 ON pa.equipol_id = e1.id
@@ -1147,10 +1147,10 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             $bindingsPartidos['torneoId'] = $idTorneo;
         }
 
-        if ($tipo && $tipo !== 'Convertido') {
+        if ($tipo && $tipo !== 'Convirtieron') {
             $sqlPartidos .= " AND p.tipo = :tipoPenal";
             $bindingsPartidos['tipoPenal'] = $tipo;
-        } elseif ($tipo === 'Convertido') {
+        } elseif ($tipo === 'Convirtieron') {
             $sqlPartidos .= " AND g.id IS NOT NULL";
         }
 
