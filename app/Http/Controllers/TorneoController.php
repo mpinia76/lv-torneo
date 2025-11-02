@@ -1276,7 +1276,8 @@ INNER JOIN partidos ON alineacions.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-WHERE grupos.torneo_id = '.$torneoId.' AND jugadors.id = '.$goleador->id;
+INNER JOIN torneos ON torneos.id = grupos.torneo_id
+WHERE torneos.year LIKE %\''.$year.'\'% AND jugadors.id = '.$goleador->id;
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
