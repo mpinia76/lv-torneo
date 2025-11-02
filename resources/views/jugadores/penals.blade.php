@@ -49,7 +49,7 @@
                                     '' => ['label' => 'Todos', 'valorDB' => ''],
                                     'Convertidos' => ['label' => 'Convertidos', 'valorDB' => 'Convertido'],
                                     'Errados' => ['label' => 'Errados', 'valorDB' => 'Errado'],
-                                    'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajó'],
+                                    'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
                                 ];
                             @endphp
 

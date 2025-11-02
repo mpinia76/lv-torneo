@@ -1128,7 +1128,7 @@ SELECT DISTINCT
     pa.id AS partido_id,
     CASE
         WHEN p.id IS NOT NULL THEN p.tipo
-        WHEN g.id IS NOT NULL THEN 'Convirtieron'
+        WHEN g.id IS NOT NULL THEN 'Convertido'
     END AS tipoPenal
 FROM partidos pa
 INNER JOIN equipos e1 ON pa.equipol_id = e1.id
