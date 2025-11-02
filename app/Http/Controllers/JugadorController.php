@@ -1155,6 +1155,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
         }
 
         $sqlPartidos .= " ORDER BY pa.dia DESC";
+        Log::error("Sql: " . $sqlPartidos);
 
         $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
 
