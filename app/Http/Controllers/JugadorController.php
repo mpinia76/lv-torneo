@@ -1147,10 +1147,10 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             $bindingsPartidos['torneoId'] = $idTorneo;
         }
 
-        if ($tipo && $tipo !== 'Convirtieron') {
+        if ($tipo && $tipo !== 'Convertido') {
             $sqlPartidos .= " AND p.tipo = :tipoPenal";
             $bindingsPartidos['tipoPenal'] = $tipo;
-        } elseif ($tipo === 'Convirtieron') {
+        } elseif ($tipo === 'Convertido') {
             $sqlPartidos .= " AND g.id IS NOT NULL";
         }
 
