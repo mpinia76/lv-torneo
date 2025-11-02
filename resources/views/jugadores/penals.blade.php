@@ -49,7 +49,7 @@
                                     '' => ['label' => 'Todos', 'valorDB' => ''],
                                     'Convertidos' => ['label' => 'Convertidos', 'valorDB' => 'Convertido'],
                                     'Errados' => ['label' => 'Errados', 'valorDB' => 'Errado'],
-                                    'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
+                                    'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajó'],
                                 ];
                             @endphp
 
@@ -95,7 +95,7 @@
                                     '' => ['label' => 'Todos', 'valorDB' => ''],
                                     'Convirtieron' => ['label' => 'Convirtieron', 'valorDB' => 'Convirtieron'],
 
-                                    'Atajó' => ['label' => 'Atajó', 'valorDB' => 'Atajado'],
+                                    'Atajó' => ['label' => 'Atajó', 'valorDB' => 'Atajó'],
                                 ];
                             @endphp
 
