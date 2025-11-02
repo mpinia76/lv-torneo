@@ -13,13 +13,13 @@
 
 
                     <div class="d-flex align-items-center">
-                        <select class="form-control js-example-basic-single mr-3" id="torneoId" name="torneoId" onchange="enviarForm()">
+                        <!--<select class="form-control js-example-basic-single mr-3" id="torneoId" name="torneoId" onchange="enviarForm()">
                             @foreach($torneos as $torneo)
                                 <option value="{{ $torneo->id }}" @if($torneo->id==$torneoId) selected @endif>
                                     {{ $torneo->nombre }} - {{ $torneo->year }}
                                 </option>
                             @endforeach
-                        </select>
+                        </select>-->
 
                         <div class="form-check" style="margin-right: 20px;margin-left: 20px;">
                             <input type="checkbox" class="form-check-input" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">

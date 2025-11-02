@@ -1398,7 +1398,8 @@ INNER JOIN partidos ON tarjetas.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 WHERE 1=1'.$nombreFiltro;
-        $sql .=($actuales)?' WHERE EXISTS (
+        $year = date('Y');
+        $sql .=($actuales)?" WHERE EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -1406,10 +1407,10 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+        WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id".$nombreFiltro2."
 
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+)":'';
 
 $sql .=' GROUP BY jugadors.id, jugador, foto, nacionalidad
 ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC';
@@ -1430,7 +1431,7 @@ ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC';
 
 
         foreach ($tarjetas as $tarjeta){
-            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+            $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1438,7 +1439,8 @@ INNER JOIN partidos ON alineacions.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-WHERE grupos.torneo_id = '.$torneoId.' AND jugadors.id = '.$tarjeta->id;
+INNER JOIN torneos ON torneos.id = grupos.torneo_id
+WHERE torneos.year LIKE '%".$year."%' AND jugadors.id = ".$tarjeta->id;
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
@@ -2249,7 +2251,8 @@ from (
 		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 		 INNER JOIN personas ON personas.id = tecnicos.persona_id
 		 WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $year = date('Y');
+        $sql .=($actuales)?" AND EXISTS (
         SELECT PT1.id
 FROM partido_tecnicos PT1
 INNER JOIN tecnicos T1 ON PT1.tecnico_id = T1.id
@@ -2257,10 +2260,11 @@ INNER JOIN personas P2 ON T1.persona_id = P2.id
 INNER JOIN partidos ON PT1.partido_id = partidos.id
 INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+        WHERE T1.year LIKE '%".$year."%' AND T1.id = tecnicos.id".$nombreFiltro2."
 
-WHERE G1.torneo_id = '.$torneoId.' AND T1.id = tecnicos.id'.$nombreFiltro2.'
 
-        )':'';
+        )":"";
         $sql .=($campeones)?' AND EXISTS (
         SELECT PT2.id
 FROM partido_tecnicos PT2
@@ -2284,7 +2288,7 @@ INNER JOIN posicion_torneos ON posicion_torneos.torneo_id = G2.torneo_id AND pos
 		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 		 INNER JOIN personas ON personas.id = tecnicos.persona_id
 		 WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $sql .=($actuales)?" AND EXISTS (
         SELECT PT1.id
 FROM partido_tecnicos PT1
 INNER JOIN tecnicos T1 ON PT1.tecnico_id = T1.id
@@ -2292,10 +2296,11 @@ INNER JOIN personas P2 ON T1.persona_id = P2.id
 INNER JOIN partidos ON PT1.partido_id = partidos.id
 INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+        WHERE T1.year LIKE '%".$year."%' AND T1.id = tecnicos.id".$nombreFiltro2."
 
-WHERE G1.torneo_id = '.$torneoId.' AND T1.id = tecnicos.id'.$nombreFiltro2.'
 
-        )':'';
+        )":"";
         $sql .=($campeones)?' AND EXISTS (
         SELECT PT2.id
 FROM partido_tecnicos PT2
@@ -2349,6 +2354,7 @@ INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
+
 WHERE tecnicos.id = '.$goleador->tecnico_id;
 
             $torneosJugados = DB::select(DB::raw($sqlTorneos));
@@ -2436,7 +2442,7 @@ WHERE tecnicos.id = '.$goleador->tecnico_id;
 
             //print_r($titulosTecnicoLigaEquipo);
 
-            $sqlJugando = 'SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id
+            $sqlJugando = "SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id
 FROM partido_tecnicos
 INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
 INNER JOIN personas ON tecnicos.persona_id = personas.id
@@ -2444,7 +2450,9 @@ INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
-WHERE grupos.torneo_id = '.$torneoId.' AND tecnicos.id = '.$goleador->tecnico_id;
+INNER JOIN torneos ON torneos.id = grupos.torneo_id
+WHERE torneos.year LIKE '%".$year."%' AND tecnicos.id = ".$goleador->tecnico_id;
+
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
@@ -2583,7 +2591,8 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')'.$nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $year = date('Y');
+        $sql .=($actuales)?" AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2591,10 +2600,11 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+        WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
 
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
 
-)':'';
+)":"";
 
 $sql .=' GROUP BY jugadors.id, jugador, foto, nacionalidad
 ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC';
@@ -2633,7 +2643,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC';
 
         foreach ($arqueros as $arquero){
 
-            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+            $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2641,7 +2651,8 @@ INNER JOIN partidos ON alineacions.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-WHERE grupos.torneo_id = '.$torneoId.' AND jugadors.id = '.$arquero->id;
+INNER JOIN torneos ON torneos.id = grupos.torneo_id
+WHERE torneos.year LIKE '%".$year."%' AND jugadors.id = ".$arquero->id;
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
@@ -2760,8 +2771,8 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE gols.tipo <> \'En contra\''. $nombreFiltro;
-
-        $sql .=($actuales)?' AND EXISTS (
+        $year = date('Y');
+        $sql .=($actuales)?" AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2770,9 +2781,9 @@ INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+        WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
 
  $sql .=' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
@@ -2784,7 +2795,7 @@ LEFT JOIN partidos ON tarjetas.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id'. $nombreFiltro;
 
-        $sql .=($actuales)?' WHERE EXISTS (
+        $sql .=($actuales)?" WHERE EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2792,10 +2803,9 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
         $sql .=' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, ( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados, ( case when tipo=\'Atajó\' then 1 else NULL end) as  atajos
 
@@ -2806,7 +2816,7 @@ LEFT JOIN partidos ON penals.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id'. $nombreFiltro;
 
-        $sql .=($actuales)?' WHERE EXISTS (
+        $sql .=($actuales)?" WHERE EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2814,10 +2824,9 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
 
 
 $sql .=' UNION ALL
@@ -2832,7 +2841,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE  alineacions.tipo = \'Titular\''. $nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $sql .=($actuales)?" AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2840,10 +2849,9 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
 
 $sql .= ' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
@@ -2857,7 +2865,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')'. $nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $sql .=($actuales)?" AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2865,10 +2873,9 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
 
 $sql .=' UNION ALL
  SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
@@ -2882,7 +2889,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE  (cambios.tipo = \'Entra\')'. $nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $sql .=($actuales)?" AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2890,10 +2897,9 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
         $sql.='UNION ALL
 SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as amarillas , "0" as rojas, "0" AS recibidos,
 "0" AS invictas, "0" AS jugando, count(DISTINCT posicion_torneos.id) AS titulos, "0" as  errados, "0" as  atajos
@@ -2905,7 +2911,7 @@ INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
 INNER JOIN grupos ON grupos.id = plantillas.grupo_id
 INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND posicion_torneos.equipo_id = plantillas.equipo_id AND posicion_torneos.posicion=1
 WHERE 1=1 ' . $nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $sql .=($actuales)?" AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -2913,10 +2919,9 @@ INNER JOIN personas P2 ON J1.persona_id = P2.id
 INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
 INNER JOIN fechas F1 ON P1.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-
-WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
-
-)':'';
+INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id". $nombreFiltro2."
+)":"";
         $sql .=' GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre,personas.nacionalidad';
 $sql .=' ) a
 
@@ -2942,7 +2947,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
         foreach ($jugadores as $jugador){
 
-            $sqlJugando = 'SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+            $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2950,7 +2955,8 @@ INNER JOIN partidos ON alineacions.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-WHERE grupos.torneo_id = '.$torneoId.' AND jugadors.id = '.$jugador->jugador_id;
+INNER JOIN torneos ON torneos.id = grupos.torneo_id
+WHERE torneos.year LIKE '%".$year."%' AND jugadors.id = ".$jugador->jugador_id;
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
