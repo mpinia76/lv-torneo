@@ -1218,7 +1218,8 @@ INNER JOIN partidos ON gols.partido_id = partidos.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
 
 WHERE gols.tipo <> \'En contra\''.$nombreFiltro;
-        $sql .=($actuales)?' AND EXISTS (
+        $year = date('Y');
+        /*$sql .=($actuales)?' AND EXISTS (
 SELECT DISTINCT J1.id
 FROM alineacions
 INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
@@ -1229,12 +1230,23 @@ INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 
 WHERE G1.torneo_id = '.$torneoId.' AND J1.id = jugadors.id'. $nombreFiltro2.'
 
-)':'';
+)':'';*/
+        $sql .=($actuales)?" AND EXISTS (
+        SELECT DISTINCT J1.id
+        FROM alineacions
+        INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+        INNER JOIN personas P2 ON J1.persona_id = P2.id
+        INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+        INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+        INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+        INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+        WHERE T1.year LIKE '%".$year."%' AND J1.id = jugadors.id".$nombreFiltro2."
+    )":"";
 
 $sql .=' GROUP BY jugadors.id,jugador, foto, nacionalidad
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
-
+//echo $sql;
 
 
         $goleadores = DB::select(DB::raw($sql));
