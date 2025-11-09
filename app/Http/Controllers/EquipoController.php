@@ -11,7 +11,7 @@ use App\Torneo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
-
+use Illuminate\Pagination\LengthAwarePaginator;
 class EquipoController extends Controller
 {
     /**
@@ -473,28 +473,87 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
         //echo $sql;
 
 
-        $page = $request->query('page', 1);
-
+        // Paginación jugadores
+        $pageJugadores = $request->query('pageJugadores', 1);
         $paginate = 15;
-
-        $offSet = ($page * $paginate) - $paginate;
-
+        $offSet = ($pageJugadores * $paginate) - $paginate;
         $itemsForCurrentPage = array_slice($jugadores, $offSet, $paginate, true);
 
-
-
-        $jugadores = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($jugadores), $paginate, $page);
-
-
-
-        $jugadores->setPath(route('equipos.ver',  array('equipoId'=>$id,'order'=>$order,'tipoOrder'=>$tipoOrder,'pestActiva'=>'jugadores')));
+        $jugadores = new LengthAwarePaginator(
+            $itemsForCurrentPage,
+            count($jugadores),
+            $paginate,
+            $pageJugadores,
+            [
+                'path' => route('equipos.ver', [
+                    'equipoId' => $id,
+                    'order' => $order,
+                    'tipoOrder' => $tipoOrder,
+                    'pestActiva' => 'jugadores'
+                ]),
+                'pageName' => 'pageJugadores'  // <- importantísimo
+            ]
+        );
 
 
 
         $iterator=$offSet+1;
 
+        $sqlPartidos = "
+        SELECT
+            torneos.id AS torneo_id,
+            torneos.nombre AS nombreTorneo,
+            torneos.escudo AS escudoTorneo,
+            torneos.year,
+            fechas.numero,
+            partidos.dia,
+            e1.id AS equipol_id,
+            e1.escudo AS fotoLocal,
+            e1.nombre AS local,
+            e2.id AS equipov_id,
+            e2.escudo AS fotoVisitante,
+            e2.nombre AS visitante,
+            partidos.golesl,
+            partidos.golesv,
+            partidos.penalesl,
+            partidos.penalesv,
+            partidos.id AS partido_id
+        FROM partidos
+        INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+        INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+        INNER JOIN grupos ON fechas.grupo_id = grupos.id
+        INNER JOIN torneos ON grupos.torneo_id = torneos.id
+        WHERE partidos.equipol_id = :equipoId1 OR partidos.equipov_id = :equipoId2
+        ORDER BY partidos.dia DESC
+    ";
 
-        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga','torneosTitulos','jugadores','order','tipoOrder','iterator','titulosInternacional'));
+        $partidosRaw = DB::select(DB::raw($sqlPartidos), [
+            'equipoId1' => $id,
+            'equipoId2' => $id,
+        ]);
+
+        // Paginación partidos
+        $pagePartidos = $request->query('pagePartidos', 1);
+        $offSet = ($pagePartidos * $paginate) - $paginate;
+        $itemsForCurrentPage = array_slice($partidosRaw, $offSet, $paginate, true);
+
+        $partidos = new LengthAwarePaginator(
+            $itemsForCurrentPage,
+            count($partidosRaw),
+            $paginate,
+            $pagePartidos,
+            [
+                'path' => route('equipos.ver', [
+                    'equipoId' => $id,
+                    'pestActiva' => 'partidos'
+                ]),
+                'pageName' => 'pagePartidos'  // <- importantísimo
+            ]
+        );
+
+
+        return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga','torneosTitulos','jugadores','order','tipoOrder','iterator','titulosInternacional','partidos'));
     }
 
     public function jugados(Request $request)
