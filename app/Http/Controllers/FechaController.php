@@ -7722,6 +7722,7 @@ private function normalizarMinuto(string $texto): int
     }
 
 
+
     function parsePlayers($nodes, $xpath, $golesConTipo) {
         $players = [];
 
@@ -7732,43 +7733,80 @@ private function normalizarMinuto(string $texto): int
             // ⚽ Goles
             $goals = [];
             foreach ($xpath->query(".//div[contains(@class, 'match_event-goal')]//div[contains(@class, 'goal')]", $event) as $goalNode) {
-                $minute = (int) str_replace('.', '', trim($goalNode->textContent));
-                $class = $goalNode->getAttribute('class');
-                $type = 'normal'; // gol normal
-                if (strpos($class, 'own-goal') !== false) {
-                    $type = 'own-goal';
+                // Base minute
+                preg_match('/\d+/', $goalNode->textContent, $matches);
+                $minute = isset($matches[0]) ? (int)$matches[0] : 0;
+
+                // Extra minute
+                $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $goalNode);
+                if ($extraNode->length) {
+                    $minute += (int) str_replace('+','', $extraNode->item(0)->textContent);
                 }
+
+                $class = $goalNode->getAttribute('class');
+                $type = strpos($class, 'own-goal') !== false ? 'own-goal' : 'normal';
+
                 $goals[] = [
                     'type' => $type,
-                    'minute' => $minute
+                    'minute' => $minute,
+                    'player_name' => $name,
                 ];
             }
 
             // 🔗 Enriquecer con tipos de gol detectados globalmente
             foreach ($goals as &$g) {
-                $golExtra = collect($golesConTipo)->first(function ($extra) use ($name, $g) {
-                    return (
-                        mb_stripos($extra['jugador'], $name) !== false &&
-                        abs($extra['minuto'] - $g['minute']) <= 1 // margen de error de minuto
-                    );
+                //Log::debug("Buscando tipo de gol para {$g['player_name']} minuto {$g['minute']}");
+
+                $golExtra = collect($golesConTipo)->first(function ($extra) use ($g) {
+                    $extraMin = (int) filter_var($extra['minuto'], FILTER_SANITIZE_NUMBER_INT);
+                    $gMin = (int) filter_var($g['minute'], FILTER_SANITIZE_NUMBER_INT);
+                    $nombreCoincide = mb_stripos($extra['jugador'], $g['player_name']) !== false;
+                    $minutoCoincide = abs($extraMin - $gMin) <= 1;
+
+                    //Log::debug("Comparando {$g['player_name']} minuto {$g['minute']} con {$extra['jugador']} minuto {$extra['minuto']} => nombre: ".($nombreCoincide ? 'sí' : 'no').", minuto: ".($minutoCoincide ? 'sí' : 'no'));
+
+                    return $nombreCoincide && $minutoCoincide;
                 });
 
                 if ($golExtra) {
+                    //Log::debug("¡Tipo encontrado! Cambiando de {$g['type']} a {$golExtra['tipo']}");
                     $g['type'] = $golExtra['tipo'];
                 }
             }
 
             // 🔁 Sustituciones
             $subInNode = $xpath->query(".//div[contains(@class, 'substitute-in')]", $event);
-            $subIn = $subInNode->length ? (int) str_replace('.', '', trim($subInNode->item(0)->textContent)) : null;
+            $subIn = null;
+            if ($subInNode->length) {
+                preg_match('/\d+/', $subInNode->item(0)->textContent, $matches);
+                $subIn = isset($matches[0]) ? (int)$matches[0] : null;
+                $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $subInNode->item(0));
+                if ($extraNode->length) {
+                    $subIn += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                }
+            }
 
             $subOutNode = $xpath->query(".//div[contains(@class, 'substitute-out')]", $event);
-            $subOut = $subOutNode->length ? (int) str_replace('.', '', trim($subOutNode->item(0)->textContent)) : null;
+            $subOut = null;
+            if ($subOutNode->length) {
+                preg_match('/\d+/', $subOutNode->item(0)->textContent, $matches);
+                $subOut = isset($matches[0]) ? (int)$matches[0] : null;
+                $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $subOutNode->item(0));
+                if ($extraNode->length) {
+                    $subOut += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                }
+            }
 
             // 🟨🟥 Tarjetas
             $cards = [];
             foreach ($xpath->query(".//div[contains(@class, 'match_event-card')]//div[contains(@class,'card')]", $event) as $cardNode) {
-                $minute = (int) str_replace('.', '', trim($cardNode->textContent));
+                preg_match('/\d+/', $cardNode->textContent, $matches);
+                $minute = isset($matches[0]) ? (int)$matches[0] : 0;
+                $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $cardNode);
+                if ($extraNode->length) {
+                    $minute += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                }
+
                 $class = $cardNode->getAttribute('class');
                 $type = 'unknown';
                 if (strpos($class, 'yellow-red') !== false) {
@@ -7778,12 +7816,12 @@ private function normalizarMinuto(string $texto): int
                 } elseif (strpos($class, 'yellow') !== false) {
                     $type = 'yellow';
                 }
+
                 $cards[] = [
                     'type' => $type,
                     'minute' => $minute
                 ];
             }
-
 
             $players[] = [
                 'number' => $number,
@@ -7797,6 +7835,7 @@ private function normalizarMinuto(string $texto): int
 
         return $players;
     }
+
 
     private function getGolesConTipo(\DOMXPath $xpath)
     {
@@ -7821,8 +7860,14 @@ private function normalizarMinuto(string $texto): int
             }
 
             // Minuto
-            $minuto = trim($xpath->evaluate("string(.//div[contains(@class,'match_event-minute')])", $node));
-            $minuto = (int) preg_replace('/[^0-9]/', '', $minuto);
+            $minuteRaw = trim($xpath->evaluate("string(.)", $node)); // todo el contenido del div.goal
+            preg_match('/(\d+)(?:\+(\d+))?/', $minuteRaw, $matches);
+            $minuto = isset($matches[1]) ? (int)$matches[1] : 0;
+            if (isset($matches[2])) {
+                $minuto += (int)$matches[2];
+            }
+
+
 
             // Jugador y asistente
             $jugador = trim($xpath->evaluate("string(.//div[contains(@class,'person-name')]//a)", $node));
@@ -7830,7 +7875,7 @@ private function normalizarMinuto(string $texto): int
 
             // Equipo (local / visitante)
             $local = strpos($clases, 'none_home') !== false;
-
+            //Log::debug("Gol detectado: {$jugador}, minuto: {$minuto}, tipo: {$tipo}");
             $goles[] = [
                 'jugador'   => $jugador,
                 'asistente' => $asistente ?: null,
@@ -8021,7 +8066,7 @@ private function normalizarMinuto(string $texto): int
                             PartidoArbitro::create($data);
                         }
                     } catch (QueryException $ex) {
-                        Log::channel('mi_log')->error('Error guardando juez: ' . $ex->getMessage());
+                        //Log::channel('mi_log')->error('Error guardando juez: ' . $ex->getMessage());
                         $ok = 0;
                     }
                 }
@@ -8041,6 +8086,7 @@ private function normalizarMinuto(string $texto): int
                 $nodesAwayBench = $xpath->query("//div[contains(@class,'hs-lineup--bench') and contains(@class,'away')]//div[contains(@class,'event') and contains(@class,'bench')]");
 
                 $golesConTipo = $this->getGolesConTipo($xpath);
+                //dd($golesConTipo);
 // Parsear cada grupo
                 $localTitulares = $this->parsePlayers($nodesHomeStarter, $xpath, $golesConTipo);
                 //dd($localTitulares);
