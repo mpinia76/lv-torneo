@@ -8116,18 +8116,29 @@ private function normalizarMinuto(string $texto): int
                                     $gType = isset($g['type']) ? $g['type'] : 'normal';
                                     $minute = isset($g['minute']) ? intval($g['minute']) : 0;
                                 } else {
-                                    // formato antiguo: solo minutos
                                     $gType = 'normal';
                                     $minute = intval($g);
                                 }
 
-                                if ($gType === 'own-goal') {
-                                    $incidencias[] = ['Gol en propia meta', $minute];
-                                } else {
-                                    $incidencias[] = ['Gol', $minute];
+                                switch ($gType) {
+                                    case 'own-goal':
+                                        $incidencias[] = ['Gol en propia meta', $minute];
+                                        break;
+                                    case 'Cabeza':
+                                        $incidencias[] = ['Cabeza', $minute];
+                                        break;
+                                    case 'Penal':
+                                        $incidencias[] = ['Penal', $minute];
+                                        break;
+                                    case 'Tiro libre':
+                                        $incidencias[] = ['Tiro libre', $minute];
+                                        break;
+                                    default:
+                                        $incidencias[] = ['Gol', $minute]; // normal/jugada
                                 }
                             }
                         }
+
 
                         // tarjetas
                         if (!empty($p['cards'])) {
