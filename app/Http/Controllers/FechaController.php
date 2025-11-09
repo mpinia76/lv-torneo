@@ -8361,10 +8361,7 @@ private function normalizarMinuto(string $texto): int
 
                                 if (!empty($jugador['dorsal'])) {
 
-                                    $plantillaJugador = PlantillaJugador::whereIn('plantilla_id', explode(',', $arrplantillas))
-                                        ->where('equipo_id', $equipo->id)  // FILTRO CLAVE: equipo correcto
-                                        ->where('dorsal', '=', $jugador['dorsal'])
-                                        ->first();
+                                    $plantillaJugador = PlantillaJugador::wherein('plantilla_id', explode(',', $arrplantillas))->distinct()->where('dorsal', '=', $jugador['dorsal'])->first();
                                     $sinDorsal = ' OJO!!! ';
                                 } else {
                                     //print_r($jugador);
