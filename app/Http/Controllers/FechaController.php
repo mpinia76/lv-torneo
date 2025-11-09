@@ -7690,8 +7690,39 @@ private function normalizarMinuto(string $texto): int
         return view('fechas.importarPartido', compact('partido'));
     }
 
+    private function normalizarTipoGol(string $clases, string $texto = ''): string
+    {
+        $clases = strtolower($clases);
+        $texto = strtolower($texto);
 
-    function parsePlayers($nodes, $xpath) {
+        // Basado en las clases CSS del evento
+        if (str_contains($clases, 'own-goal')) {
+            return 'En Contra';
+        } elseif (str_contains($clases, 'header') || str_contains($clases, 'head')) {
+            return 'Cabeza';
+        } elseif (str_contains($clases, 'penalty')) {
+            return 'Penal';
+        } elseif (str_contains($clases, 'direct-free-kick')) {
+            return 'Tiro Libre';
+        }
+
+        // Basado en el texto visible (por seguridad)
+        if (str_contains($texto, 'propia puerta')) {
+            return 'En Contra';
+        } elseif (str_contains($texto, 'cabezazo')) {
+            return 'Cabeza';
+        } elseif (str_contains($texto, 'penal')) {
+            return 'Penal';
+        } elseif (str_contains($texto, 'tiro libre')) {
+            return 'Tiro Libre';
+        }
+
+        // Si no encaja en ningún caso
+        return 'Jugada';
+    }
+
+
+    function parsePlayers($nodes, $xpath, $golesConTipo) {
         $players = [];
 
         foreach ($nodes as $event) {
@@ -7711,6 +7742,20 @@ private function normalizarMinuto(string $texto): int
                     'type' => $type,
                     'minute' => $minute
                 ];
+            }
+
+            // 🔗 Enriquecer con tipos de gol detectados globalmente
+            foreach ($goals as &$g) {
+                $golExtra = collect($golesConTipo)->first(function ($extra) use ($name, $g) {
+                    return (
+                        mb_stripos($extra['jugador'], $name) !== false &&
+                        abs($extra['minuto'] - $g['minute']) <= 1 // margen de error de minuto
+                    );
+                });
+
+                if ($golExtra) {
+                    $g['type'] = $golExtra['tipo'];
+                }
             }
 
             // 🔁 Sustituciones
@@ -7753,6 +7798,50 @@ private function normalizarMinuto(string $texto): int
         return $players;
     }
 
+    private function getGolesConTipo(\DOMXPath $xpath)
+    {
+        $goles = [];
+
+        // Buscar todos los <li> de goles
+        $goalNodes = $xpath->query("//li[contains(@class,'event') and contains(@class,'goal')]");
+
+        foreach ($goalNodes as $node) {
+            $clases = $node->getAttribute('class');
+
+            // Determinar tipo
+            $tipo = 'Jugada';
+            if (strpos($clases, 'own-goal') !== false) {
+                $tipo = 'En Contra';
+            } elseif (strpos($clases, 'head') !== false) {
+                $tipo = 'Cabeza';
+            } elseif (strpos($clases, 'penalty') !== false) {
+                $tipo = 'Penal';
+            } elseif (strpos($clases, 'direct-free-kick') !== false) {
+                $tipo = 'Tiro Libre';
+            }
+
+            // Minuto
+            $minuto = trim($xpath->evaluate("string(.//div[contains(@class,'match_event-minute')])", $node));
+            $minuto = (int) preg_replace('/[^0-9]/', '', $minuto);
+
+            // Jugador y asistente
+            $jugador = trim($xpath->evaluate("string(.//div[contains(@class,'person-name')]//a)", $node));
+            $asistente = trim($xpath->evaluate("string(.//div[contains(@class,'person-additional')]//a)", $node));
+
+            // Equipo (local / visitante)
+            $local = strpos($clases, 'none_home') !== false;
+
+            $goles[] = [
+                'jugador'   => $jugador,
+                'asistente' => $asistente ?: null,
+                'minuto'    => $minuto,
+                'tipo'      => $tipo,
+                'local'     => $local,
+            ];
+        }
+
+        return $goles;
+    }
 
     // Función para extraer DT de un nodo hs-lineup--coaches
     function getDT($xpath, $coachClass) {
@@ -7778,6 +7867,40 @@ private function normalizarMinuto(string $texto): int
         return $dt;
     }
 
+
+
+    private function getJueces(\DOMXPath $xpath)
+    {
+        $jueces = [
+            'arbitro' => null,
+            'linea1'  => null,
+            'linea2'  => null,
+        ];
+
+        $nodes = $xpath->query("//li[contains(@class,'entry') and contains(@class,'match_person-name-')]");
+
+        foreach ($nodes as $node) {
+            $labelNode  = $xpath->query(".//span[contains(@class,'match_person-name')]", $node)->item(0);
+            $nombreNode = $xpath->query(".//span[contains(@class,'person-name')]//a", $node)->item(0);
+
+            if (!$labelNode || !$nombreNode) continue;
+
+            $label  = trim($labelNode->textContent);
+            $nombre = trim($nombreNode->textContent);
+
+            if (stripos($label, 'Árbitro') === 0 && stripos($label, 'asistente') === false) {
+                $jueces['arbitro'] = $nombre;
+            } elseif (stripos($label, 'asistente') !== false) {
+                if (!$jueces['linea1']) {
+                    $jueces['linea1'] = $nombre;
+                } elseif (!$jueces['linea2']) {
+                    $jueces['linea2'] = $nombre;
+                }
+            }
+        }
+
+        return $jueces;
+    }
 
 
 
@@ -7836,6 +7959,75 @@ private function normalizarMinuto(string $texto): int
             // Intenta cargar el HTML recuperado
             if ($dom->loadHTML($html2)) {
                 $xpath = new \DOMXPath($dom);
+                //dd($xpath);
+                $jueces = $this->getJueces($xpath);
+                //dd($jueces);
+                $jueces = $this->getJueces($xpath);
+
+                foreach ($jueces as $tipo => $nombreCompleto) {
+
+                    if (empty($nombreCompleto)) continue; // Si está vacío, saltar
+
+                    $partesNombre = explode(' ', $nombreCompleto);
+
+                    // Buscar el árbitro por nombre y apellido
+                    $arbitro = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                        ->where(function ($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function ($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
+                                });
+                            }
+                        })
+                        ->select('arbitros.id as arbitro_id', 'personas.*')
+                        ->first();
+
+                    if (!$arbitro) {
+                        $success .= ucfirst($tipo) . " NO encontrado: " . $nombreCompleto . '<br>';
+                        continue;
+                    }
+
+                    // Determinar tipo de juez según la clave
+                    switch ($tipo) {
+                        case 'arbitro':
+                            $tipoJuez = 'Principal';
+                            break;
+                        case 'linea1':
+                            $tipoJuez = 'Línea 1';
+                            break;
+                        case 'linea2':
+                            $tipoJuez = 'Línea 2';
+                            break;
+                        default:
+                            $tipoJuez = 'Desconocido';
+                    }
+
+                    $data = [
+                        'partido_id' => $partido->id,
+                        'arbitro_id' => $arbitro->arbitro_id,
+                        'tipo'       => $tipoJuez,
+                    ];
+
+                    $partido_arbitro = PartidoArbitro::where('partido_id', $partido->id)
+                        ->where('arbitro_id', $arbitro->id ?? $arbitro->arbitro_id)
+                        ->first();
+
+                    try {
+                        if ($partido_arbitro) {
+                            $partido_arbitro->update($data);
+                        } else {
+                            PartidoArbitro::create($data);
+                        }
+                    } catch (QueryException $ex) {
+                        Log::channel('mi_log')->error('Error guardando juez: ' . $ex->getMessage());
+                        $ok = 0;
+                    }
+                }
+
+
+
                 // Titulares locales
                 $nodesHomeStarter = $xpath->query("//div[contains(@class,'hs-lineup--starter') and contains(@class,'home')]//div[contains(@class,'event') and contains(@class,'lineup')]");
 
@@ -7848,13 +8040,14 @@ private function normalizarMinuto(string $texto): int
 // Suplentes visitantes
                 $nodesAwayBench = $xpath->query("//div[contains(@class,'hs-lineup--bench') and contains(@class,'away')]//div[contains(@class,'event') and contains(@class,'bench')]");
 
+                $golesConTipo = $this->getGolesConTipo($xpath);
 // Parsear cada grupo
-                $localTitulares = $this->parsePlayers($nodesHomeStarter, $xpath);
+                $localTitulares = $this->parsePlayers($nodesHomeStarter, $xpath, $golesConTipo);
                 //dd($localTitulares);
-                $visitanteTitulares = $this->parsePlayers($nodesAwayStarter, $xpath);
-                $localSuplentes = $this->parsePlayers($nodesHomeBench, $xpath);
+                $visitanteTitulares = $this->parsePlayers($nodesAwayStarter, $xpath, $golesConTipo);
+                $localSuplentes = $this->parsePlayers($nodesHomeBench, $xpath, $golesConTipo);
 
-                $visitanteSuplentes = $this->parsePlayers($nodesAwayBench, $xpath);
+                $visitanteSuplentes = $this->parsePlayers($nodesAwayBench, $xpath, $golesConTipo);
                 //dd($visitanteSuplentes);
 
                 $localDT = $this->getDT($xpath, 'home');
