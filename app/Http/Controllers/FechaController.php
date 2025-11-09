@@ -7725,7 +7725,7 @@ private function normalizarMinuto(string $texto): int
 
     function parsePlayers($nodes, $xpath, $golesConTipo) {
         $players = [];
-
+        //dd($golesConTipo);
         foreach ($nodes as $event) {
             $number = trim($xpath->evaluate("string(.//div[contains(@class, 'team_person-shirtnumber')])", $event));
             $name = trim($xpath->evaluate("string(.//div[contains(@class, 'person-name')]//a)", $event));
@@ -7859,15 +7859,13 @@ private function normalizarMinuto(string $texto): int
                 $tipo = 'Tiro Libre';
             }
 
-            // Minuto
-            $minuteRaw = trim($xpath->evaluate("string(.)", $node)); // todo el contenido del div.goal
+            // Minuto REAL
+            $minuteRaw = trim($xpath->evaluate("string(.//div[contains(@class,'match_event-minute')])", $node));
             preg_match('/(\d+)(?:\+(\d+))?/', $minuteRaw, $matches);
             $minuto = isset($matches[1]) ? (int)$matches[1] : 0;
             if (isset($matches[2])) {
                 $minuto += (int)$matches[2];
             }
-
-
 
             // Jugador y asistente
             $jugador = trim($xpath->evaluate("string(.//div[contains(@class,'person-name')]//a)", $node));
@@ -7875,7 +7873,7 @@ private function normalizarMinuto(string $texto): int
 
             // Equipo (local / visitante)
             $local = strpos($clases, 'none_home') !== false;
-            //Log::debug("Gol detectado: {$jugador}, minuto: {$minuto}, tipo: {$tipo}");
+
             $goles[] = [
                 'jugador'   => $jugador,
                 'asistente' => $asistente ?: null,
@@ -7887,6 +7885,7 @@ private function normalizarMinuto(string $texto): int
 
         return $goles;
     }
+
 
     // Función para extraer DT de un nodo hs-lineup--coaches
     function getDT($xpath, $coachClass) {
@@ -8264,6 +8263,28 @@ private function normalizarMinuto(string $texto): int
 
                 procesarTecnicos($strEntrenadorLocal, $partido->equipol, $partido, $success, $error, $ok);
                 procesarTecnicos($strEntrenadorVisitante, $partido->equipov, $partido, $success, $error, $ok);
+
+
+                // ------------------------------------------------------------
+// ⚠️ Revisar goles de $golesConTipo que no fueron asignados a ningún jugador
+                $golAsignado = [];
+                foreach ($equipos as $eq) {
+                    foreach ($eq['jugadores'] as $jugador) {
+                        foreach ($jugador['goals'] ?? [] as $g) {
+                            // Crear clave jugador-minuto
+                            $golAsignado[] = $g['player_name'].'-'.intval($g['minute']);
+                        }
+                    }
+                }
+
+// Revisar cada gol de $golesConTipo
+                foreach ($golesConTipo as $golExtra) {
+                    $key = $golExtra['jugador'].'-'.intval($golExtra['minuto']);
+                    if (!in_array($key, $golAsignado)) {
+                        $success .= "⚠️ Gol NO asignado: {$golExtra['jugador']} minuto {$golExtra['minuto']} tipo {$golExtra['tipo']}<br>";
+                    }
+                }
+
 
                 $golesLocalesCargados = 0;
                 $golesVisitantesCargados = 0;
