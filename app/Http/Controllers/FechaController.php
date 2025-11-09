@@ -8281,20 +8281,24 @@ private function normalizarMinuto(string $texto): int
                 $golAsignado = [];
                 foreach ($equipos as $eq) {
                     foreach ($eq['jugadores'] as $jugador) {
-                        foreach ($jugador['goals'] ?? [] as $g) {
-                            // Crear clave jugador-minuto
-                            $golAsignado[] = $g['player_name'].'-'.intval($g['minute']);
+                        foreach ($jugador['incidencias'] ?? [] as $inc) {
+                            $tipo = $inc[0] ?? '';
+                            $minuto = intval($inc[1] ?? 0);
+                            // Solo consideramos goles
+                            if (in_array($tipo, ['Gol', 'Cabeza', 'Penal', 'Tiro libre', 'Gol en propia meta'])) {
+                                $golAsignado[] = $jugador['nombre'] . '-' . $minuto;
+                            }
                         }
                     }
                 }
 
-// Revisar cada gol de $golesConTipo
                 foreach ($golesConTipo as $golExtra) {
                     $key = $golExtra['jugador'].'-'.intval($golExtra['minuto']);
                     if (!in_array($key, $golAsignado)) {
                         $success .= "⚠️ Gol NO asignado: {$golExtra['jugador']} minuto {$golExtra['minuto']} tipo {$golExtra['tipo']}<br>";
                     }
                 }
+
 
 
                 $golesLocalesCargados = 0;
