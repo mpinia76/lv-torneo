@@ -8240,6 +8240,19 @@ private function normalizarMinuto(string $texto): int
                             ->first();
 
                         if ($entrenador) {
+
+                            // 🟩 Verificar si ya dirigió a este equipo en este campeonato
+                            $yaDirigio = PartidoTecnico::join('partidos', 'partidos.id', '=', 'partido_tecnicos.partido_id')
+                                ->where('partido_tecnicos.equipo_id', $equipo->id)
+                                ->where('partido_tecnicos.tecnico_id', $entrenador->tecnico_id)
+                                ->where('partidos.campeonato_id', $partido->campeonato_id)
+                                ->where('partido_tecnicos.partido_id', '!=', $partido->id)
+                                ->exists();
+
+                            if (!$yaDirigio) {
+                                $success .= "Nunca lo dirigió: {$nombreTecnico} ({$equipo->nombre})<br>";
+                            }
+
                             $data3 = [
                                 'partido_id' => $partido->id,
                                 'equipo_id' => $equipo->id,
@@ -8256,7 +8269,7 @@ private function normalizarMinuto(string $texto): int
                                     $partido_tecnico->update($data3);
                                 } else {
                                     PartidoTecnico::create($data3);
-                                    $success .= "DT agregado: {$nombreTecnico} ({$equipo->nombre})<br>";
+                                    //$success .= "DT agregado: {$nombreTecnico} ({$equipo->nombre})<br>";
                                 }
                             } catch (QueryException $ex) {
                                 $error .= $ex->getMessage();
@@ -8267,6 +8280,7 @@ private function normalizarMinuto(string $texto): int
                         }
                     }
                 }
+
 
 // ---- LLAMADAS ----
                 $strEntrenadorLocal = is_array($dtLocal) ? trim(implode(' ', $dtLocal)) : trim($dtLocal);
