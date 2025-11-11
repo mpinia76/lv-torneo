@@ -465,6 +465,330 @@ class FechaController extends Controller
             // Intenta cargar el HTML recuperado
             if ($dom->loadHTML($html2)) {
                 $xpath = new \DOMXPath($dom);
+                // Todos los partidos
+                $matches = $xpath->query("//div[contains(@class,'match ')]");
+
+                $partidos = [];
+
+                foreach ($matches as $match) {
+                    $home = trim($xpath->evaluate("string(.//div[contains(@class,'team-name-home')]/a)", $match));
+                    $away = trim($xpath->evaluate("string(.//div[contains(@class,'team-name-away')]/a)", $match));
+                    $score = trim($xpath->evaluate("string(.//div[contains(@class,'match-result')]/a)", $match));
+                    $status = trim($xpath->evaluate("string(.//div[contains(@class,'match-status')])", $match));
+                    $fecha = $match->getAttribute("data-datetime");
+                    $id = $match->getAttribute("data-match_id");
+
+                    $partidos[] = [
+                        'id' => $id,
+                        'fecha' => $fecha,
+                        'local' => $home,
+                        'visitante' => $away,
+                        'resultado' => $score,
+                        'estado' => $status,
+                    ];
+                }
+                dd($partidos);
+                // Buscar el `option` que tiene el atributo `selected`
+                $selectedOption = $xpath->query('//select[@name="phase"]/option[@selected]');
+
+                if ($selectedOption->length > 0) {
+                    $numero = trim($selectedOption[0]->textContent);
+
+
+                } else {
+                    // Buscar el `option` que tiene el atributo `selected`
+                    $selectedOption = $xpath->query('//select[@name="runde"]/option[@selected]');
+                    $numero = trim($selectedOption[0]->textContent);
+                }
+                $matches = $xpath->query('//table[@class="standard_tabelle"]');
+
+                $pattern = '/([IV]):\s*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/'; // Expresión regular para extraer las fechas
+
+// Array para almacenar los partidos
+                $partidos = [];
+
+
+
+                $golesL = null;
+                $golesV = null;
+                /*echo "<pre>";
+                print_r($partidos);
+                echo "</pre>";*/
+                //$grupo_id=intval($importData[1]);
+                $grupoId = $request->get('grupoSelect_id');
+                if($numero){
+                    foreach ($partidos as $index => $partido) {
+                        $dia =$partido['fecha'].' '.$partido['hora'];
+                        $strEquipoL = trim($partido['equipo1']);
+                        /*$golesL = intval($partido['marcador']['gl']);
+                        $golesV = intval($partido['marcador']['gv']);*/
+                        $golesL = isset($partido['marcador']['gl']) ? ($partido['marcador']['gl'] === null ? null : intval($partido['marcador']['gl'])) : null;
+                        $golesV = isset($partido['marcador']['gv']) ? ($partido['marcador']['gv'] === null ? null : intval($partido['marcador']['gv'])) : null;
+                        $penalesL = isset($partido['marcador']['pl']) ? ($partido['marcador']['pl'] === null ? null : intval($partido['marcador']['pl'])) : null;
+                        $penalesV = isset($partido['marcador']['pv']) ? ($partido['marcador']['pv'] === null ? null : intval($partido['marcador']['pv'])) : null;
+
+                        $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->get();
+
+                        if ($equipol->isEmpty()) {
+                            //Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL,[]);
+                            $error .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
+                            $ok=0;
+                        }
+                        else{
+
+                            $grupo=Grupo::findOrFail($grupoId);
+                            $grupos = Grupo::where('torneo_id', '=', $grupo->torneo->id)->pluck('id')->toArray();
+                            $torneo=Torneo::findOrFail($grupo->torneo->id);
+                            $plantilla = Plantilla::whereIn('grupo_id', $grupos)
+                                ->whereIn('equipo_id', $equipol->pluck('id')->toArray())
+                                ->first();
+
+
+                            if (!$plantilla) {
+
+                                $error .='Equipo sin plantilla: '.$strEquipoL.'<br>';
+                                $ok=0;
+                            }
+                            else{
+                                $idLocal = $plantilla->equipo->id;
+                                //$grupo_id = $plantilla->grupo->id;
+                                $grupo_id = $grupoId;
+                                $strEquipoV = trim($partido['equipo2']);
+                                //$equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
+                                $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->get();
+
+                                if ($equipoV->isEmpty()) {
+                                    //Log::channel('mi_log')->info('Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV,[]);
+                                    $error .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoV.'<br>';
+                                    $ok=0;
+                                }
+                                else{
+                                    // Solo calcular la jornada si $numero contiene "Grupo"
+                                    $fechaNumero = $numero;
+                                    if (str_contains($numero, 'Grupo')) {
+
+                                        // Obtener la cantidad de equipos en el grupo
+                                        $cantidadEquipos = Plantilla::where('grupo_id', $grupo_id)->count();
+
+
+                                        if ($cantidadEquipos > 0) {
+                                            // En cada jornada juegan la mitad de los equipos
+                                            $partidosPorJornada = $cantidadEquipos / 2;
+
+                                            // Si la cantidad de equipos es impar, ajustar
+                                            if ($cantidadEquipos % 2 != 0) {
+                                                $partidosPorJornada = ($cantidadEquipos - 1) / 2;
+                                            }
+
+                                            $fechaNumero = intval($index / $partidosPorJornada) + 1;
+
+                                        }
+                                    }
+                                    //$plantilla = Plantilla::wherein('grupo_id',explode(',', $arrgrupos))->where('equipo_id','=',$equipoV->id)->first();
+
+                                    $plantilla = Plantilla::whereIn('grupo_id', $grupos)
+                                        ->whereIn('equipo_id', $equipoV->pluck('id')->toArray())
+                                        ->first();
+
+
+                                    //dd($plantilla);
+                                    if (!$plantilla) {
+
+                                        $error .='Equipo sin plantilla: '.$strEquipoV.'<br>';
+                                        $ok=0;
+                                    }
+                                    else{
+                                        $idVisitante = $plantilla->equipo->id;
+                                        $nro = str_replace('. Jornada', '', $fechaNumero); // Elimina ". Jornada"
+                                        $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
+
+                                        $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
+
+                                        try {
+
+                                            if(!$fecha){
+
+                                                $data1=array(
+
+                                                    'numero'=>$nro,
+                                                    'grupo_id'=>$grupo_id
+                                                );
+                                                //Log::debug(print_r($data1),[]);
+                                                //Log::debug(print_r($data1, true));
+                                                $fecha = fecha::create($data1);
+
+
+                                            }
+                                            $lastid=$fecha->id;
+
+
+                                            $data2=array(
+                                                'fecha_id'=>$lastid,
+                                                'dia'=>$dia,
+                                                'equipol_id'=>$idLocal,
+                                                'equipov_id'=>$idVisitante,
+                                                'golesl'=>$golesL,
+                                                'golesv'=>$golesV,
+                                                'penalesl'=>$penalesL,
+                                                'penalesv'=>$penalesV,
+                                                'neutral' => $torneo->neutral,
+                                            );
+                                            $guardarPartido = true;
+                                            $verificado=$request->get('verificado');
+                                            if ($verificado) {
+                                                $guardarPartido = false;
+                                                // Verificar si ambos equipos están en el mismo grupo
+                                                $plantillaLocalGrupo = Plantilla::where('grupo_id', $grupo_id)
+                                                    ->where('equipo_id', $idLocal)
+                                                    ->exists();
+
+                                                $plantillaVisitanteGrupo = Plantilla::where('grupo_id', $grupo_id)
+                                                    ->where('equipo_id', $idVisitante)
+                                                    ->exists();
+
+                                                if ($plantillaLocalGrupo && $plantillaVisitanteGrupo) {
+                                                    //Log::channel('mi_log')->info('Equipos del grupo: ' . $strEquipoL . ' - ' . $strEquipoV, []);
+                                                    // ✅ Caso 1: ambos equipos son del grupo actual → se guarda normalmente
+                                                    $guardarPartido = true;
+                                                } elseif (
+                                                    ($plantillaLocalGrupo && !$plantillaVisitanteGrupo) ||
+                                                    (!$plantillaLocalGrupo && $plantillaVisitanteGrupo)
+                                                ) {
+                                                    //Log::channel('mi_log')->info('1 equipo del grupo: ' . $strEquipoL . ' - ' . $strEquipoV, []);
+                                                    // ✅ Solo uno de los dos es del grupo
+                                                    $partidoExistente = Partido::whereDate('dia', $dia)
+                                                        ->where(function ($q) use ($idLocal, $idVisitante) {
+                                                            $q->where(function ($q2) use ($idLocal, $idVisitante) {
+                                                                $q2->where('equipol_id', $idLocal)
+                                                                    ->where('equipov_id', $idVisitante);
+                                                            })
+                                                                ->orWhere(function ($q2) use ($idLocal, $idVisitante) {
+                                                                    $q2->where('equipol_id', $idVisitante)
+                                                                        ->where('equipov_id', $idLocal);
+                                                                });
+                                                        })
+                                                        ->exists();
+
+                                                    if (!$partidoExistente) {
+                                                        $guardarPartido = true;
+                                                    }
+                                                }
+                                            }
+                                            if ($guardarPartido) {
+                                                //Log::debug(print_r($data2, true));
+                                                $partido = Partido::where('fecha_id', '=', "$lastid")->where('equipol_id', '=', "$idLocal")->where('equipov_id', '=', "$idVisitante")->first();
+                                                try {
+                                                    if (!empty($partido)) {
+
+                                                        $partido->update($data2);
+                                                    } else {
+                                                        $partido = Partido::create($data2);
+                                                    }
+
+
+                                                } catch (QueryException $ex) {
+                                                    if ($ex->errorInfo[1] == 1062) { // Código de error para "Duplicate entry"
+                                                        $success .= "Equipo repetido en partido " . $strEquipoL . ' - ' . $strEquipoV . "<br>";
+                                                        $ok = 1;
+                                                    } else {
+                                                        $error = $ex->getMessage();
+                                                        $ok = 0;
+                                                    }
+
+                                                    continue;
+                                                }
+                                            }
+                                            else{
+                                                $success .= "No se guardo el partido " . $strEquipoL . ' - ' . $strEquipoV . "<br>";
+                                            }
+
+
+
+                                        }catch(Exception $e){
+
+                                            $error = $ex->getMessage();
+                                            $ok=0;
+                                            continue;
+                                        }
+                                    }
+
+
+                                }
+                            }
+
+
+
+
+
+                        }
+                    }
+
+
+
+
+
+                }
+
+
+
+            }
+        }
+        if ($ok){
+
+
+
+            DB::commit();
+            $respuestaID='success';
+            $respuestaMSJ=$success;
+        }
+        else{
+            DB::rollback();
+            $respuestaID='error';
+            $respuestaMSJ=$error;
+        }
+
+        //
+        return redirect()->route('fechas.index', array('grupoId' => $grupoId))->with($respuestaID,$respuestaMSJ);
+    }
+
+    public function importprocess_new_old
+    (Request $request)
+    {
+        $url2 = $request->get('url2');
+        $ok=1;
+        DB::beginTransaction();
+        $error='';
+        $success='';
+        $html2='';
+        try {
+            if ($url2){
+
+
+                //$html2 = HtmlDomParser::file_get_html($url2, false, null, 0);
+                $html2 =  HttpHelper::getHtmlContent($url2);
+            }
+
+
+        }
+        catch (Exception $ex) {
+            $html2='';
+        }
+        if ($html2) {
+            // Crea un nuevo DOMDocument
+            $dom = new \DOMDocument();
+
+            // Evita advertencias de HTML mal formado
+            libxml_use_internal_errors(true);
+
+            // Carga el HTML en el DOMDocument
+            $dom->loadHTML($html2);
+
+            // Restaura la gestión de errores de libxml
+            libxml_clear_errors();
+
+            // Intenta cargar el HTML recuperado
+            if ($dom->loadHTML($html2)) {
+                $xpath = new \DOMXPath($dom);
 
                 // Buscar el `option` que tiene el atributo `selected`
                 $selectedOption = $xpath->query('//select[@name="phase"]/option[@selected]');
