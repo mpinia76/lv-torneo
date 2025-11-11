@@ -8241,16 +8241,21 @@ private function normalizarMinuto(string $texto): int
 
                         if ($entrenador) {
 
-                            // 🟩 Verificar si ya dirigió a este equipo en este campeonato
-                            $yaDirigio = PartidoTecnico::join('partidos', 'partidos.id', '=', 'partido_tecnicos.partido_id')
-                                ->where('partido_tecnicos.equipo_id', $equipo->id)
-                                ->where('partido_tecnicos.tecnico_id', $entrenador->tecnico_id)
-                                ->where('partidos.campeonato_id', $partido->campeonato_id)
-                                ->where('partido_tecnicos.partido_id', '!=', $partido->id)
-                                ->exists();
+                            // 🔍 Verificar si ya dirigió a este equipo en el mismo TORNEO
+                            $torneoId = optional($partido->fecha->grupo)->torneo_id; // sigue la cadena Partido → Fecha → Grupo → Torneo
+                            if ($torneoId) {
+                                $yaDirigio = PartidoTecnico::join('partidos', 'partidos.id', '=', 'partido_tecnicos.partido_id')
+                                    ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+                                    ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+                                    ->where('partido_tecnicos.equipo_id', $equipo->id)
+                                    ->where('partido_tecnicos.tecnico_id', $entrenador->tecnico_id)
+                                    ->where('grupos.torneo_id', $torneoId)
+                                    ->where('partido_tecnicos.partido_id', '!=', $partido->id)
+                                    ->exists();
 
-                            if (!$yaDirigio) {
-                                $success .= "Nunca lo dirigió: {$nombreTecnico} ({$equipo->nombre})<br>";
+                                if (!$yaDirigio) {
+                                    $success .= "Nunca lo dirigió: {$nombreTecnico} ({$equipo->nombre})<br>";
+                                }
                             }
 
                             $data3 = [
