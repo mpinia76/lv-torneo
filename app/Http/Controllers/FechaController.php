@@ -550,7 +550,8 @@ class FechaController extends Controller
                 $grupoId = $request->get('grupoSelect_id');
                 if($numero){
                     foreach ($partidos as $index => $partido) {
-                        $dia =$partido['fecha'].' '.$partido['hora'];
+                        //$dia =$partido['fecha'].' '.$partido['hora'];
+                        $dia = $partido['fecha'];
                         $strEquipoL = trim($partido['equipo1']);
                         /*$golesL = intval($partido['marcador']['gl']);
                         $golesV = intval($partido['marcador']['gv']);*/
