@@ -475,42 +475,74 @@ class FechaController extends Controller
                     $away = trim($xpath->evaluate("string(.//div[contains(@class,'team-name-away')]/a)", $match));
                     $score = trim($xpath->evaluate("string(.//div[contains(@class,'match-result')]/a)", $match));
                     $status = trim($xpath->evaluate("string(.//div[contains(@class,'match-status')])", $match));
-                    $fecha = $match->getAttribute("data-datetime");
+                    $fechaUtc = $match->getAttribute("data-datetime"); // ej: 2025-11-14T23:00:00Z
                     $id = $match->getAttribute("data-match_id");
+
+                    // ✅ Convertir la fecha UTC a hora Argentina
+                    if ($fechaUtc) {
+                        try {
+                            $fechaObj = new \DateTime($fechaUtc, new \DateTimeZone('UTC'));
+                            $fechaObj->setTimezone(new \DateTimeZone('America/Argentina/Buenos_Aires'));
+                            $fechaLocal = $fechaObj->format('Y-m-d H:i:s');
+                        } catch (Exception $e) {
+                            $fechaLocal = null;
+                        }
+                    } else {
+                        $fechaLocal = null;
+                    }
+
+                    // --- Procesar resultado ---
+                    $golesL = null;
+                    $golesV = null;
+                    $penalesL = null;
+                    $penalesV = null;
+
+                    if (preg_match('/(\d+):(\d+)/', $score, $m)) {
+                        $golesL = (int)$m[1];
+                        $golesV = (int)$m[2];
+                    }
+
+                    if (preg_match('/\((\d+):(\d+)\s*pen\.\)/i', $score, $m)) {
+                        $penalesL = (int)$m[1];
+                        $penalesV = (int)$m[2];
+                    }
 
                     $partidos[] = [
                         'id' => $id,
-                        'fecha' => $fecha,
+                        'fecha' => $fechaLocal,
                         'local' => $home,
                         'visitante' => $away,
                         'resultado' => $score,
                         'estado' => $status,
+                        'marcador' => [
+                            'gl' => $golesL,
+                            'gv' => $golesV,
+                            'pl' => $penalesL,
+                            'pv' => $penalesV,
+                        ],
                     ];
                 }
                 dd($partidos);
-                // Buscar el `option` que tiene el atributo `selected`
-                $selectedOption = $xpath->query('//select[@name="phase"]/option[@selected]');
+                // Buscar el div que contiene la jornada o fase
+                $jornadaNode = $xpath->query('//div[contains(@class,"hs-head--round")]');
+                if ($jornadaNode->length > 0) {
+                    $jornadaText = trim($jornadaNode[0]->textContent);
 
-                if ($selectedOption->length > 0) {
-                    $numero = trim($selectedOption[0]->textContent);
-
-
+                    if (preg_match('/(\d+)/', $jornadaText, $m)) {
+                        $numero = $m[1];
+                    } else {
+                        $numero = $jornadaText; // Ej: "Octavos de final"
+                    }
                 } else {
-                    // Buscar el `option` que tiene el atributo `selected`
-                    $selectedOption = $xpath->query('//select[@name="runde"]/option[@selected]');
-                    $numero = trim($selectedOption[0]->textContent);
+                    $numero = null;
                 }
-                $matches = $xpath->query('//table[@class="standard_tabelle"]');
-
-                $pattern = '/([IV]):\s*(\d{2}\.\d{2}\.\d{4})\s*(\d{2}:\d{2})/'; // Expresión regular para extraer las fechas
-
-// Array para almacenar los partidos
-                $partidos = [];
 
 
 
-                $golesL = null;
-                $golesV = null;
+
+
+
+
                 /*echo "<pre>";
                 print_r($partidos);
                 echo "</pre>";*/
