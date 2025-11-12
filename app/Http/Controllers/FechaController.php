@@ -666,7 +666,7 @@ class FechaController extends Controller
                                                 'penalesv'=>$penalesV,
                                                 'neutral' => $torneo->neutral,
                                             );
-                                            dd($data2);
+                                            //dd($data2);
                                             $guardarPartido = true;
                                             $verificado=$request->get('verificado');
                                             if ($verificado) {
