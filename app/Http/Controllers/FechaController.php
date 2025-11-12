@@ -522,7 +522,7 @@ class FechaController extends Controller
                         ],
                     ];
                 }
-                dd($partidos);
+                //dd($partidos);
                 // Buscar el div que contiene la jornada o fase
                 $jornadaNode = $xpath->query('//div[contains(@class,"hs-head--round")]');
                 if ($jornadaNode->length > 0) {
