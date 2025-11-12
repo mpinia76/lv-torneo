@@ -552,7 +552,7 @@ class FechaController extends Controller
                     foreach ($partidos as $index => $partido) {
                         //$dia =$partido['fecha'].' '.$partido['hora'];
                         $dia = $partido['fecha'];
-                        $strEquipoL = trim($partido['equipo1']);
+                        $strEquipoL = trim($partido['local']);
                         /*$golesL = intval($partido['marcador']['gl']);
                         $golesV = intval($partido['marcador']['gv']);*/
                         $golesL = isset($partido['marcador']['gl']) ? ($partido['marcador']['gl'] === null ? null : intval($partido['marcador']['gl'])) : null;
@@ -586,7 +586,7 @@ class FechaController extends Controller
                                 $idLocal = $plantilla->equipo->id;
                                 //$grupo_id = $plantilla->grupo->id;
                                 $grupo_id = $grupoId;
-                                $strEquipoV = trim($partido['equipo2']);
+                                $strEquipoV = trim($partido['visitante']);
                                 //$equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->first();
                                 $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->get();
 
@@ -666,6 +666,7 @@ class FechaController extends Controller
                                                 'penalesv'=>$penalesV,
                                                 'neutral' => $torneo->neutral,
                                             );
+                                            dd($data2);
                                             $guardarPartido = true;
                                             $verificado=$request->get('verificado');
                                             if ($verificado) {
