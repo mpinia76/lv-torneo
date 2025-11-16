@@ -106,6 +106,7 @@
             {{-- Promedio por equipo --}}
             <div class="tab-pane fade" id="promedioEquipo" role="tabpanel" aria-labelledby="promedioEquipo-tab">
                 <x-estadisticas-tab :data="$estadisticas['promedioEquipo']" :columns="[
+        '#' => 'index',
         'Equipo' => 'nombre',
         'GF' => 'goles_favor',
         'GC' => 'goles_contra',
