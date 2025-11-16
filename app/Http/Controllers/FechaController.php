@@ -8425,6 +8425,7 @@ private function normalizarMinuto(string $texto): int
                         }
                     } catch (QueryException $ex) {
                         //Log::channel('mi_log')->error('Error guardando juez: ' . $ex->getMessage());
+                        $error .='Error guardando juez: ' . $ex->getMessage();
                         $ok = 0;
                     }
                 }
@@ -9093,8 +9094,8 @@ private function normalizarMinuto(string $texto): int
             continue;*/
         }
 
-        Log::debug('GRUPO FINAL: ', ['grupo' => $grupo]);
-        Log::debug('OK FINAL: ', ['ok' => $ok, 'error' => $error]);
+        /*Log::debug('GRUPO FINAL: ', ['grupo' => $grupo]);
+        Log::debug('OK FINAL: ', ['ok' => $ok, 'error' => $error]);*/
 
         //$ok=0;
         if ($ok){
