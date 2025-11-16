@@ -8718,9 +8718,9 @@ private function normalizarMinuto(string $texto): int
                         }
 
                         foreach ($eq['jugadores'] as $jugador) {
-                            Log::channel('mi_log')->info(json_encode($jugador), []);
+                            //Log::channel('mi_log')->info(json_encode($jugador), []);
                             $jugador_id = 0;
-                            Log::channel('mi_log')->info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
+                            //Log::channel('mi_log')->info('Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo, []);
                             $grupos = Grupo::where('torneo_id', '=', $grupo->torneo->id)->get();
                             $arrgrupos = '';
                             foreach ($grupos as $grupo) {
