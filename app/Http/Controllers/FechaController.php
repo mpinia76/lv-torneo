@@ -449,6 +449,7 @@ class FechaController extends Controller
         catch (Exception $ex) {
             $html2='';
         }
+        //dd($html2);
         if ($html2) {
             // Crea un nuevo DOMDocument
             $dom = new \DOMDocument();
@@ -8361,7 +8362,7 @@ private function normalizarMinuto(string $texto): int
             // Intenta cargar el HTML recuperado
             if ($dom->loadHTML($html2)) {
                 $xpath = new \DOMXPath($dom);
-                //dd($xpath);
+                dd($xpath);
                 $jueces = $this->getJueces($xpath);
                 //dd($jueces);
                 $jueces = $this->getJueces($xpath);
