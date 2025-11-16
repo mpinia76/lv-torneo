@@ -8362,7 +8362,7 @@ private function normalizarMinuto(string $texto): int
             // Intenta cargar el HTML recuperado
             if ($dom->loadHTML($html2)) {
                 $xpath = new \DOMXPath($dom);
-                dd($xpath);
+                //dd($xpath);
                 $jueces = $this->getJueces($xpath);
                 //dd($jueces);
                 $jueces = $this->getJueces($xpath);
@@ -8458,7 +8458,7 @@ private function normalizarMinuto(string $texto): int
                 $awayDT = $this->getDT($xpath, 'away');
 
                 // ---- Reemplazar dd($localDT, $awayDT); por este bloque ----
-
+                dd($localTitulares,$visitanteTitulares,$localSuplentes,$visitanteSuplentes,$localDT,$awayDT);
 // Helper: convierte el resultado de parsePlayers a la estructura esperada
                 $mapPlayerToEquipo = function(array $players, $tipoJugador) {
                     $out = [];
