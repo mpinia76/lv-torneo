@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
         setlocale(LC_TIME, 'es_ES.utf8');
 
-            DB::listen(function ($query) {
+            /*DB::listen(function ($query) {
                 Log::debug("DB: " . $query->sql . "[".  implode(",",$query->bindings). "]");
             });
         DB::statement("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));");

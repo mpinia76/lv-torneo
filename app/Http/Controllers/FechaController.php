@@ -9093,7 +9093,8 @@ private function normalizarMinuto(string $texto): int
             continue;*/
         }
 
-
+        Log::debug('GRUPO FINAL: ', ['grupo' => $grupo]);
+        Log::debug('OK FINAL: ', ['ok' => $ok, 'error' => $error]);
 
         //$ok=0;
         if ($ok){
