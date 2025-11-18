@@ -15,6 +15,7 @@ use App\Tecnico;
 use App\Torneo;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
+use GuzzleHttp\TransferStats;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
@@ -775,6 +776,262 @@ WHERE (tecnicos.id = ".$id.")";
     }
 
     public function importarProcess(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = $request->get('url');
+        $ok = 1;
+        DB::beginTransaction();
+        $success='';
+        $html = '';
+        try {
+            if ($url) {
+                // Obtener el contenido de la URL
+                //$htmlContent = file_get_contents($url);
+                $htmlContent =  HttpHelper::getHtmlContent($url);
+                //Log::channel('mi_log')->debug("HTML capturado: " . substr($htmlContent, 0, 5000));
+                // Crear un nuevo DOMDocument
+                $dom = new \DOMDocument();
+                libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
+                $dom->loadHTML($htmlContent);
+                libxml_clear_errors();
+
+                // Crear un nuevo objeto XPath
+                $xpath = new \DOMXPath($dom);
+            }
+        } catch (Exception $ex) {
+            $html = '';
+        }
+
+        if ($htmlContent) {
+
+            // Buscar el bloque lateral donde están los datos
+            $sidebar = $xpath->query('//aside[@id="hs-sidebar"]')->item(0);
+
+            $datos = [
+                'nombre' => '',
+                'cumpleanos' => '',
+                'nacido_en' => '',
+                'nacionalidad' => '',
+                'peso' => ''
+            ];
+
+            if ($sidebar) {
+                $imgNode = $xpath->query('.//div[contains(@class, "person-image")]//img', $sidebar)->item(0);
+                $imageUrl = $imgNode ? $imgNode->getAttribute('src') : null;
+                if ($imageUrl) {
+                    try {
+                        $finalUrl = null;
+                        $client = new Client([
+                            'allow_redirects' => true,
+                            'timeout' => 10,
+                            'on_stats' => function (TransferStats $stats) use (&$finalUrl) {
+                                $finalUrl = (string) $stats->getEffectiveUri(); // URL final después de redirecciones
+                            },
+                        ]);
+
+                        $response = $client->get($imageUrl);
+
+                        if ($response->getStatusCode() === 200) {
+                            // Si termina en /0.png → es genérica
+                            if (str_contains($finalUrl, '/0.png')) {
+                                $imageUrl = null;
+                            }
+                        } else {
+                            $imageUrl = null;
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Error al verificar imagen: " . $e->getMessage());
+                        $imageUrl = null;
+                    }
+                }
+
+                $datos['foto'] = $imageUrl;
+                // Buscar todos los pares dt/dd dentro del aside
+                $dtNodes = $xpath->query('.//dt', $sidebar);
+                foreach ($dtNodes as $dtNode) {
+                    $label = trim($dtNode->textContent);
+                    $ddNode = $dtNode->nextSibling;
+
+                    // Buscar el siguiente dd (ignorando nodos vacíos o texto)
+                    while ($ddNode && $ddNode->nodeName !== 'dd') {
+                        $ddNode = $ddNode->nextSibling;
+                    }
+
+                    $value = $ddNode ? trim($ddNode->textContent) : '';
+
+                    switch (mb_strtolower($label)) {
+                        case 'nombre':
+                            $datos['nombre'] = $value;
+                            break;
+                        case 'cumpleaños':
+                            $datos['cumpleanos'] = $value;
+                            break;
+                        case 'nacido en':
+                            $datos['nacido_en'] = $value;
+                            break;
+                        case 'nacionalidad':
+                            $datos['nacionalidad'] = $value;
+                            break;
+                        case 'peso':
+                            $datos['peso'] = $value;
+                            break;
+                    }
+                }
+            }
+
+            //dd($datos);
+
+            // Descarga y guarda la imagen si no es el avatar por defecto
+            if (!empty($imageUrl) && !str_contains($imageUrl, 'avatar-player.jpg')) {
+                try {
+                    $client = new Client();
+
+                    //$response = $client->get($imageUrl);
+                    // Intentar obtener la imagen con reintentos y asegurarnos de que Guzzle lanza excepciones en caso de error HTTP
+                    $response = $client->get($imageUrl, [
+                        'http_errors' => false,  // No lanzar excepción en errores HTTP (como 404)
+                        'timeout' => 10, // Tiempo máximo de espera
+                    ]);
+
+                    if ($response->getStatusCode() === 200) {
+                        $imageData = $response->getBody()->getContents();
+                        $parsedUrl = parse_url($imageUrl);
+                        $pathInfo = pathinfo($parsedUrl['path']);
+                        $nombreArchivo = $pathInfo['filename'];
+                        $extension = $pathInfo['extension'];
+
+                        if (strrchr($nombreArchivo, '.') === '.') {
+                            $nombreArchivo = substr($nombreArchivo, 0, -1);
+                        }
+
+                        // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
+                        $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                        //Log::info('URL de la foto: ' . $localFilePath, []);
+                        $insert['foto'] = "$nombreArchivo.$extension";
+
+                        file_put_contents($localFilePath, $imageData);
+                        //Log::info('Foto subida', []);
+                    } else {
+                        //Log::info('Foto no subida: ' . $imageUrl, []);
+                        $success .='Foto no subida: ' . $imageUrl.'<br>';
+                    }
+                } catch (RequestException $e) {
+                    // Capturar la excepción y continuar con el flujo
+                    Log::error('Error al intentar obtener la imagen: ' . $e->getMessage(), []);
+                    $insert['foto'] = null;
+                }
+            } else {
+                Log::info('No tiene foto: ' . $imageUrl, []);
+                $success .='No tiene foto: ' . $imageUrl.'<br>';
+            }
+            // ---------------------------------------------------
+            // 🧾 Asignar variables a tu estructura de inserción
+            // ---------------------------------------------------
+            $name = $datos['nombre'];
+            $apellido = $datos['nombre']; // o separar nombre/apellido si querés
+            $ciudad = $datos['nacido_en'];
+            $nacionalidad = $datos['nacionalidad'];
+            $nacimiento = null;
+            $fallecimiento = null;
+
+            if (!empty($datos['cumpleanos'])) {
+                try {
+                    $nacimiento = Carbon::createFromFormat('d.m.Y', $datos['cumpleanos'])->format('Y-m-d');
+                } catch (\Exception $e) {
+                    Log::warning("Fecha inválida: " . $datos['cumpleanos']);
+                }
+            }
+            //dd($name,$imageUrl,$apellido,$nacimiento,$fallecimiento,$ciudad,$nacionalidad);
+            // Insertar los datos de la persona
+            if ($name) {
+                $insert['name'] = $name;
+            } else {
+                Log::info('Falta el name', []);
+                $success .='Falta el name <br>';
+            }
+            /*if ($nombre) {
+                $insert['nombre'] = $nombre;
+            } else {
+                Log::info('Falta el nombre', []);
+                $success .='Falta el nombre <br>';
+            }*/
+
+            if ($apellido) {
+                $insert['apellido'] = $apellido;
+            } else {
+                Log::info('Falta el apellido', []);
+                $success .='Falta el apellido <br>';
+            }
+
+            if ($ciudad) {
+                $insert['ciudad'] = $ciudad;
+            }
+            if ($nacionalidad) {
+                $insert['nacionalidad'] = $nacionalidad;
+            } else {
+                Log::info('Falta la nacionalidad', []);
+                $success .='Falta la nacionalidad <br>';
+            }
+
+            if ($nacimiento) {
+                $insert['nacimiento'] = $nacimiento;
+            } else {
+                Log::info('Falta la fecha de nacimiento', []);
+                $success .='Falta la fecha de nacimiento <br>';
+            }
+            if ($fallecimiento) {
+                $insert['fallecimiento'] = $fallecimiento;
+            }
+
+
+            $request->session()->put('nombre_filtro_tecnico', $apellido);
+            //log::info(print_r($insert, true));
+            try {
+                $persona = Persona::create($insert);
+                $persona->tecnico()->create($insert);
+            } catch (QueryException $ex) {
+                try {
+                    $persona = Persona::where('nombre', '=', $insert['nombre'])
+                        ->where('apellido', '=', $insert['apellido'])
+                        ->where('nacimiento', '=', $insert['nacimiento'])
+                        ->first();
+
+                    if (!empty($persona)) {
+                        if (!empty($persona->nacionalidad)) {
+                            unset($insert['nacionalidad']);
+                        }
+                        $persona->update($insert);
+                        $persona->tecnico()->create($insert);
+                    }
+                } catch (QueryException $ex) {
+                    //$ok = 0;
+                    $errorCode = $ex->errorInfo[1];
+
+                    if ($errorCode == 1062) {
+                        $success .= 'Tecnico repetido';
+                    }
+                }
+            }
+        } else {
+            Log::info('No se encontró la URL: ' . $url, []);
+            $error = 'No se encontró la URL: ' . $url;
+        }
+
+        if ($ok) {
+            DB::commit();
+            $respuestaID = 'success';
+            $respuestaMSJ = $success;
+        } else {
+            DB::rollback();
+            $respuestaID = 'error';
+            $respuestaMSJ=$error.'<br>'.$success;
+        }
+
+        return redirect()->route('tecnicos.index')->with($respuestaID, $respuestaMSJ);
+    }
+
+    public function importarProcess_old(Request $request)
     {
         set_time_limit(0);
 
