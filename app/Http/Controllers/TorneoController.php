@@ -3870,7 +3870,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
                 // Llamada a SofaScore usando round = número de la fecha o el slug
                 $url = "https://www.sofascore.com/api/v1/unique-tournament/{$torneo->sofa_tournament_id}/season/{$torneo->sofa_season_id}/events/round/{$slugFecha}";
-                $html = HttpHelper::getHtmlContent($url, true); // usar scraper remoto
+                $html = HttpHelper::getHtmlContent($url); // usar scraper remoto
                 dd($html);
                 if (!$html) {
                     return []; // no se pudo obtener la info
