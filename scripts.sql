@@ -319,3 +319,13 @@ UPDATE plantillas SET plantillas.equipo_id=423 WHERE plantillas.equipo_id = 350;
 UPDATE posicion_torneos
 SET posicion_torneos.equipo_id=423
 WHERE posicion_torneos.equipo_id = 350 ;
+
+###################################### 19/11/2025 #######################################################
+
+alter table `torneos` add `sofa_tournament_id` bigint null, add `sofa_season_id` bigint null, add `sofa_slug` varchar(191) null, add `sofa_category_id` bigint null, add `sofa_category_slug` varchar(191) null;
+
+ALTER TABLE `torneos`
+    ADD COLUMN `goles_importados` TINYINT(1) NULL DEFAULT '0' AFTER `sofa_category_slug`;
+
+ALTER TABLE `fechas`
+    ADD COLUMN `sofa_slug` VARCHAR(50) NULL DEFAULT NULL AFTER `url_nombre`;

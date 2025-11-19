@@ -84,9 +84,10 @@
             </div>
 
         </div>
+        <fieldset>
+            <legend>futbol360.com.ar</legend>
         <div class="row">
-            <fieldset>
-                <legend>futbol360.com.ar</legend>
+
                 <div class="form-group col-xs-12 col-sm-6 col-md-5">
                     {{Form::label('region', 'Región')}}
                     {{Form::text('region', $torneo->region, ['class' => 'form-control'])}}
@@ -97,8 +98,36 @@
                 </div>
 
 
-            </fieldset>
+
         </div>
+        </fieldset>
+        <fieldset>
+            <legend>sofascore.com</legend>
+            <div class="row">
+                <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                    {{Form::label('sofa_category_slug', 'Región')}}
+                    {{Form::text('sofa_category_slug', $torneo->sofa_category_slug, ['class' => 'form-control'])}}
+                </div>
+                <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                    {{Form::label('sofa_slug', 'Nombre/s')}}
+                    {{Form::text('sofa_slug', $torneo->sofa_slug, ['class' => 'form-control'])}}
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-xs-12 col-sm-4 col-md-3">
+                    {{Form::label('sofa_category_id', 'Id Región')}}
+                    {{Form::text('sofa_category_id', $torneo->sofa_category_id, ['class' => 'form-control'])}}
+                </div>
+                <div class="form-group col-xs-12 col-sm-4 col-md-3">
+                    {{Form::label('sofa_tournament_id', 'Id Torneo')}}
+                    {{Form::text('sofa_tournament_id', $torneo->sofa_tournament_id, ['class' => 'form-control'])}}
+                </div>
+                <div class="form-group col-xs-12 col-sm-4 col-md-3">
+                    {{Form::label('sofa_season_id', 'Id Temporada')}}
+                    {{Form::text('sofa_season_id', $torneo->sofa_season_id, ['class' => 'form-control'])}}
+                </div>
+            </div>
+        </fieldset>
         <div class="form-group col-md-12">
             <h1 class="display-6">Grupos</h1>
 

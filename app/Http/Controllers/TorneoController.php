@@ -25,7 +25,8 @@ use App\Alineacion;
 use App\Cambio;
 use Illuminate\Support\Facades\Log;
 use function GuzzleHttp\Promise\iter_for;
-
+use Illuminate\Support\Facades\Http;
+use App\Services\HttpHelper;
 use DB;
 
 class TorneoController extends Controller
@@ -3846,6 +3847,149 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
         return view('torneos.controlarPenales', compact('penalesCargados'));
     }
 
+
+    public function importargoles(Request $request)
+    {
+        set_time_limit(0);
+
+        $torneoId = $request->get('torneoId');
+        $torneo = Torneo::findOrFail($torneoId);
+
+        //dd($torneo);
+        $mensajes = [];
+// Traer todos los partidos de la temporada de SofaScore
+
+        foreach ($torneo->grupoDetalle as $grupo) {
+            foreach ($grupo->fechas as $fecha) {
+                $mensajes[] = "<strong>Fecha {$fecha->numero}</strong>";
+
+                // Obtenemos el slug de la fecha (si existe en SofaScore)
+                $slugFecha = $fecha->sofa_slug ?? $fecha->numero; // fallback al número si no hay slug
+
+                $mensajes[] = "<strong>Fecha {$fecha->numero} (slug: {$slugFecha})</strong>";
+
+                // Llamada a SofaScore usando round = número de la fecha o el slug
+                $url = "https://www.sofascore.com/api/v1/unique-tournament/{$torneo->sofa_tournament_id}/season/{$torneo->sofa_season_id}/events/round/{$slugFecha}";
+                $html = HttpHelper::getHtmlContent($url, true); // usar scraper remoto
+                dd($html);
+                if (!$html) {
+                    return []; // no se pudo obtener la info
+                }
+
+                $data = json_decode($html, true);
+                dd($data);
+                if (empty($data['events'])) {
+                    return [];
+                }
+                foreach ($fecha->partidos as $partido) {
+                    $strLocal = $partido->equipol->nombre;
+                    $strVisitante = $partido->equipov->nombre;
+
+                    $mensajes[] = "Partido: {$strLocal} vs {$strVisitante}";
+
+                    // Goles en DB
+                    $dbGoles = Gol::where('partido_id', $partido->id)
+                        ->orderBy('minuto', 'ASC')
+                        ->get();
+
+                    // Goles desde SofaScore
+                    $sofaGoles = $this->obtenerGolesSofa($partido->sofa_id); // método que implementes
+
+                    if ($dbGoles->isEmpty() && empty($sofaGoles)) {
+                        $mensajes[] = "<span style='color:orange'>No hay goles registrados en ninguno de los sistemas</span>";
+                        continue;
+                    }
+
+                    // Mostrar goles de DB
+                    foreach ($dbGoles as $gol) {
+                        $alineacion = Alineacion::where('partido_id', $partido->id)
+                            ->where('jugador_id', $gol->jugador->id)
+                            ->first();
+
+                        $juegaEn = ($alineacion && $alineacion->equipo) ? $alineacion->equipo->nombre : 'Desconocido';
+
+                        $mensajes[] = "DB - Jugador: {$gol->jugador->persona->nombre} {$gol->jugador->persona->apellido} | Equipo: {$juegaEn} | Tipo: {$gol->tipo} | Minuto: {$gol->minuto}";
+                    }
+
+                    // Mostrar goles de SofaScore
+                    foreach ($sofaGoles as $gol) {
+                        $mensajes[] = "SofaScore - Jugador: {$gol['jugador']} | Equipo: {$gol['equipo']} | Tipo: {$gol['tipo']} | Minuto: {$gol['minuto']}";
+                    }
+
+                    // Comparación simple
+                    $coinciden = count($dbGoles) == count($sofaGoles);
+                    $mensajes[] = $coinciden
+                        ? "<span style='color:green'>Coinciden la cantidad de goles</span>"
+                        : "<span style='color:red'>No coinciden la cantidad de goles</span>";
+
+                    $mensajes[] = "<hr>";
+                }
+            }
+        }
+
+        return redirect()->back()->with('success', implode('<br>', $mensajes));
+    }
+
+
+
+
+    /**
+     * Método de ejemplo para obtener goles de SofaScore
+     */
+    private function obtenerGolesSofa($partidoSofaId)
+    {
+        if (!$partidoSofaId) {
+            return [];
+        }
+
+        $url = "https://api.sofascore.com/api/v1/event/{$partidoSofaId}/incidents";
+
+        try {
+            $response = Http::get($url);
+
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $data = $response->json();
+
+            $goles = [];
+
+            if (!isset($data['incidents']) || !is_array($data['incidents'])) {
+                return [];
+            }
+
+            foreach ($data['incidents'] as $incident) {
+                // Solo goles
+                if ($incident['type'] === 'goal') {
+
+                    // Nombre del jugador (algunos vienen sin apellido)
+                    $jugador = trim(($incident['player']['name'] ?? '') . ' ' . ($incident['player']['surname'] ?? ''));
+
+                    // Equipo: local o visitante según ID
+                    $equipo = ($incident['team']['id'] ?? null) == ($data['homeTeam']['id'] ?? null)
+                        ? ($data['homeTeam']['name'] ?? 'Local')
+                        : ($data['awayTeam']['name'] ?? 'Visitante');
+
+                    $tipo = $incident['detail'] ?? 'Gol';
+                    $minuto = $incident['minute'] ?? 0;
+
+                    $goles[] = [
+                        'jugador' => $jugador,
+                        'equipo' => $equipo,
+                        'tipo' => $tipo,
+                        'minuto' => $minuto
+                    ];
+                }
+            }
+
+            return $goles;
+
+        } catch (\Exception $e) {
+            // En caso de error de conexión o JSON mal formado
+            return [];
+        }
+    }
 
 
 

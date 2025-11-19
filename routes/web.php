@@ -114,6 +114,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('torneos/{torneo}/clasificados', 'TorneoController@clasificados')->name('torneos.clasificados');
     Route::post('torneos/{torneo}/clasificados', 'TorneoController@updateClasificados')->name('torneos.updateClasificados');
 
+    Route::get('importargoles', 'TorneoController@importargoles')->name('torneos.importargoles');
+
 });
 
 
