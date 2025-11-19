@@ -58,6 +58,10 @@
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
+                // Evita el 403 añadiendo User-Agent tipo navegador
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36');
+
+
                 $response = curl_exec($ch);
 
                 if (curl_errno($ch)) {
