@@ -101,7 +101,7 @@
 
         </div>
         </fieldset>
-        <fieldset>
+        <!--<fieldset>
             <legend>sofascore.com</legend>
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-5">
@@ -127,7 +127,7 @@
                     {{Form::text('sofa_season_id', $torneo->sofa_season_id, ['class' => 'form-control'])}}
                 </div>
             </div>
-        </fieldset>
+        </fieldset>-->
         <div class="form-group col-md-12">
             <h1 class="display-6">Grupos</h1>
 
