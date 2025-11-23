@@ -370,32 +370,13 @@ ORDER BY torneos.year DESC';
             }
 
 
-            // Recorremos los torneos relacionados a este título
-            foreach ($tituloExtra->torneos as $torneoRelacionado) {
+            $idsTorneosRelacionados = $tituloExtra->torneos->pluck('id')->implode(',');
 
-                $grupos = Grupo::where('torneo_id', '=',$torneoRelacionado->id)->get();
-                $arrgrupos='';
-                foreach ($grupos as $grupo){
-                    $arrgrupos .=$grupo->id.',';
-                }
-                $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
 
-                $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
-
-                $arrfechas='';
-                foreach ($fechas as $fecha){
-                    $arrfechas .=$fecha->id.',';
-                }
-                $arrfechas = substr($arrfechas, 0, -1);//quito última coma
-
-                $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
-
-                $arrpartidos='';
-                foreach ($partidos as $partido){
-                    $arrpartidos .=$partido->id.',';
-                }
-                $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
-
+            // GRUPOS
+            $arrgrupos = Grupo::whereIn('torneo_id', explode(',', $idsTorneosRelacionados))
+                ->pluck('id')
+                ->implode(',');
 
 
                 $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
@@ -423,7 +404,7 @@ ORDER BY torneos.year DESC';
                  INNER JOIN fechas ON partidos.fecha_id = fechas.id
                  INNER JOIN grupos ON fechas.grupo_id = grupos.id
 
-                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneoRelacionado->id." AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
+                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id IN (".$idsTorneosRelacionados.") AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
              union all
                select DISTINCT partidos.equipov_id equipo_id, golesv, golesl, fechas.id fecha_id
                  from partidos
@@ -432,33 +413,33 @@ ORDER BY torneos.year DESC';
                  INNER JOIN fechas ON partidos.fecha_id = fechas.id
                  INNER JOIN grupos ON fechas.grupo_id = grupos.id
 
-                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneoRelacionado->id." AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
+                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id IN (".$idsTorneosRelacionados.")AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
         ) a
         group by equipo_id
         ";
-                $torneoRelacionado->nombreTorneo = $torneoRelacionado->nombre.' '.$torneoRelacionado->year;
+                $tituloExtra->nombreTorneo = $tituloExtra->nombre.' '.$tituloExtra->year;
                 $jugados = DB::select(DB::raw($sqlJugados));
 
                 // Construimos un objeto tipo torneo, igual que en tu foreach
                 foreach ($jugados as $jugado) {
 
-                    $torneoRelacionado->jugados  = $jugado->jugados;
-                    $torneoRelacionado->ganados  = $jugado->ganados;
-                    $torneoRelacionado->empatados = $jugado->empatados;
-                    $torneoRelacionado->perdidos = $jugado->perdidos;
-                    $torneoRelacionado->favor    = $jugado->golesl;
-                    $torneoRelacionado->contra   = $jugado->golesv;
-                    $torneoRelacionado->puntaje  = $jugado->puntaje;
-                    $torneoRelacionado->porcentaje = $jugado->porcentaje;
+                    $tituloExtra->jugados  = $jugado->jugados;
+                    $tituloExtra->ganados  = $jugado->ganados;
+                    $tituloExtra->empatados = $jugado->empatados;
+                    $tituloExtra->perdidos = $jugado->perdidos;
+                    $tituloExtra->favor    = $jugado->golesl;
+                    $tituloExtra->contra   = $jugado->golesv;
+                    $tituloExtra->puntaje  = $jugado->puntaje;
+                    $tituloExtra->porcentaje = $jugado->porcentaje;
 
                     // Para títulos extras NO hay posición
-                    $torneoRelacionado->posicion = '<span class="text-success">Título Extra</span>';
+                    $tituloExtra->posicion = '<span class="text-success">Título Extra</span>';
 
                     // Agregamos al array final de títulos mostrados
-                    $torneosTitulos[] = $torneoRelacionado;
+                    $torneosTitulos[] = $tituloExtra;
                 }
             }
-        }
+
 
         set_time_limit(0);
         //dd($request);
