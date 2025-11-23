@@ -70,12 +70,10 @@
                                 @if($escudo != '')
                                     @php $escudoArr = explode('_', $escudo); @endphp
                                     <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
-                                        <img src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                        <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" title="{{$escudoArr[4]}}" alt="{{$escudoArr[4]}}">
                                     </a>
                                     Puntaje {{$escudoArr[2] ?? ''}} - Porcentaje {{$escudoArr[3] ?? ''}}
-                                    @if(isset($escudoArr[4]) && $escudoArr[4] != '')
-                                        {{  $escudoArr[4] }}
-                                    @endif
+
                                     <br>
                                 @endif
                             @endforeach

@@ -104,7 +104,7 @@
                                         $escArr = explode('_',$esc);
                                     @endphp
                                     <a href="{{route('equipos.ver', array('equipoId' => $escArr[1]))}}">
-                                        <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25" title="{{$escArr[0]}}" alt="{{$escArr[0]}}">
+                                        <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25" title="{{$escArr[2]}}" alt="{{$escArr[2]}}">
                                     </a>
                                 @endif
                             @endforeach

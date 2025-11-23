@@ -1320,7 +1320,7 @@ order by puntaje desc, diferencia DESC, golesl DESC';
 
             foreach ($escudos as $escudo){
 
-                    $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.',';
+                    $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.'_'.$escudo->equipo.',';
 
 
 
