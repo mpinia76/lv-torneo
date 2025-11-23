@@ -3231,27 +3231,76 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
     SELECT id, escudo, nombre, pais,
            SUM(titulos) titulos, SUM(ligas) ligas, SUM(copas) copas, SUM(internacionales) internacionales
     FROM (
-        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 1 AS titulos, 0 AS ligas, 0 AS copas, 0 AS internacionales
+        -- ========================
+        -- TITULOS REALES
+        -- ========================
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               1 AS titulos, 0 AS ligas, 0 AS copas, 0 AS internacionales
         FROM equipos
-        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id
+        WHERE posicion_torneos.posicion = 1
+
         UNION ALL
-        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 1 AS ligas, 0 AS copas, 0 AS internacionales
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               0 AS titulos, 1 AS ligas, 0 AS copas, 0 AS internacionales
         FROM equipos
-        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = 'Liga' AND torneos.ambito = 'Nacional'
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id
+        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id
+        WHERE posicion_torneos.posicion = 1
+          AND torneos.tipo = 'Liga'
+          AND torneos.ambito = 'Nacional'
+
         UNION ALL
-        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 0 AS ligas, 1 AS copas , 0 AS internacionales
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               0 AS titulos, 0 AS ligas, 1 AS copas, 0 AS internacionales
         FROM equipos
-        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.tipo = 'Copa' AND torneos.ambito = 'Nacional'
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id
+        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id
+        WHERE posicion_torneos.posicion = 1
+          AND torneos.tipo = 'Copa'
+          AND torneos.ambito = 'Nacional'
+
         UNION ALL
-        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo, 0 AS titulos, 0 AS ligas, 0 AS copas , 1 AS internacionales
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               0 AS titulos, 0 AS ligas, 0 AS copas, 1 AS internacionales
         FROM equipos
-        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id AND posicion_torneos.posicion=1
-        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id AND torneos.ambito = 'Internacional'
+        INNER JOIN posicion_torneos ON equipos.id = posicion_torneos.equipo_id
+        INNER JOIN torneos ON torneos.id = posicion_torneos.torneo_id
+        WHERE posicion_torneos.posicion = 1
+          AND torneos.ambito = 'Internacional'
+
+
+        -- ========================
+        -- TITULOS EXTRAS
+        -- ========================
+
+        -- Liga
+        UNION ALL
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               1 AS titulos, 1 AS ligas, 0 AS copas, 0 AS internacionales
+        FROM equipos
+        INNER JOIN titulos ON equipos.id = titulos.equipo_id
+        WHERE titulos.tipo = 'Liga'
+
+        -- Copa
+        UNION ALL
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               1 AS titulos, 0 AS ligas, 1 AS copas, 0 AS internacionales
+        FROM equipos
+        INNER JOIN titulos ON equipos.id = titulos.equipo_id
+        WHERE titulos.tipo = 'Copa'
+
+        -- Internacional
+        UNION ALL
+        SELECT equipos.id, equipos.nombre, equipos.pais, equipos.escudo,
+               1 AS titulos, 0 AS ligas, 0 AS copas, 1 AS internacionales
+        FROM equipos
+        INNER JOIN titulos ON equipos.id = titulos.equipo_id
+        WHERE titulos.tipo = 'Internacional'
     ) a
     WHERE 1=1
 ";
+
 
 // 🔹 Si pidió solo argentinos, agregamos el filtro
         if ($argentinos) {
