@@ -6,6 +6,7 @@ use App\AcumuladoTorneo;
 use App\Fecha;
 use App\Partido;
 use App\Jugador;
+use App\Titulo;
 use App\Tecnico;
 use App\PartidoTecnico;
 use App\EquipoClasificado;
