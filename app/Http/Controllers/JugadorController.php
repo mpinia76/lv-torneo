@@ -2292,6 +2292,102 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             }
         }
 
+        // --------------------------------------------------
+// TÍTULOS EXTRAS (tabla titulos + titulo_torneos)
+// --------------------------------------------------
+
+        $countedTorneos = [];
+        $titulosExtras = Titulo::with('torneos')->get();
+
+        foreach ($titulosExtras as $tituloExtra) {
+
+            $equipoId = $tituloExtra->equipo_id;
+
+            foreach ($tituloExtra->torneos as $torneoRelacionado) {
+
+                // evitar duplicados
+                if (in_array($torneoRelacionado->id, $countedTorneos)) {
+                    continue;
+                }
+
+                // buscar último partido del EQUIPO campeón en ESE torneo
+                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function($q) use ($torneoRelacionado) {
+                    $q->where('torneo_id', $torneoRelacionado->id);
+                })
+                    ->where(function ($q) use ($equipoId) {
+                        $q->where('equipol_id', $equipoId)
+                            ->orWhere('equipov_id', $equipoId);
+                    })
+                    ->orderBy('dia', 'DESC')
+                    ->first();
+
+                if (empty($ultimoPartidoEquipo)) {
+                    continue;
+                }
+
+                // -----------------------------
+                // COMO TÉCNICO
+                // -----------------------------
+                $tecnicoId = Tecnico::where('persona_id', $jugador->persona_id)->value('id');
+
+                if (!empty($tecnicoId)) {
+                    $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
+                        ->where('tecnico_id', $tecnicoId)
+                        ->where('equipo_id', $equipoId)
+                        ->exists();
+
+                    if ($dirigio) {
+                        if ($torneoRelacionado->ambito == 'Nacional') {
+                            if ($torneoRelacionado->tipo == 'Copa') {
+                                $titulosTecnicoCopa++;
+                            } else {
+                                $titulosTecnicoLiga++;
+                            }
+                        } else {
+                            $titulosTecnicoInternacional++;
+                        }
+
+                        $countedTorneos[] = $torneoRelacionado->id;
+                    }
+                }
+
+                // -----------------------------
+                // COMO JUGADOR
+                // -----------------------------
+
+                // busco jugador asociado a la persona
+                $jugadorAsociado = Jugador::where('persona_id', $jugador->persona_id)->first();
+
+                if ($jugadorAsociado) {
+
+                    // verificar si jugó ese último partido
+                    $alineacionJugador = Alineacion::where('partido_id', $ultimoPartidoEquipo->id)
+                        ->where('equipo_id', $equipoId)
+                        ->where('jugador_id', $jugadorAsociado->id)
+                        ->exists();
+
+                    if ($alineacionJugador) {
+
+                        if ($torneoRelacionado->ambito == 'Nacional') {
+                            if ($torneoRelacionado->tipo == 'Copa') {
+                                $titulosJugadorCopa++;
+                            } else {
+                                $titulosJugadorLiga++;
+                            }
+                        } else {
+                            $titulosJugadorInternacional++;
+                        }
+
+                        $countedTorneos[] = $torneoRelacionado->id;
+                    }
+
+                }
+
+            }
+        }
+
+
+
         return view('jugadores.titulos', compact(
             'jugador',
             'torneosJugador',
