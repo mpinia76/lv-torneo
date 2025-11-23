@@ -226,14 +226,16 @@ class EquipoController extends Controller
         $equipo=Equipo::findOrFail($id);
 
 
-		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
-FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
-INNER JOIN fechas ON grupos.id = fechas.grupo_id
-INNER JOIN partidos ON fechas.id = partidos.fecha_id
+		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos,
+       "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo, torneos.ambito,
+       torneos.escudo as escudoTorneo, torneos.year
+        FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
+        INNER JOIN fechas ON grupos.id = fechas.grupo_id
+        INNER JOIN partidos ON fechas.id = partidos.fecha_id
 
-WHERE partidos.equipol_id = '.$id.' OR partidos.equipov_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
-ORDER BY torneos.year DESC';
+        WHERE partidos.equipol_id = '.$id.' OR partidos.equipov_id = '.$id.'
+        GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
+        ORDER BY torneos.year DESC';
 
         $titulosLiga=0;
         $titulosCopa=0;
@@ -242,30 +244,10 @@ ORDER BY torneos.year DESC';
         $torneosEquipo = DB::select(DB::raw($sql));
         $torneosTitulos=array();
         foreach ($torneosEquipo as $torneo){
-            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
-            $arrgrupos='';
-            foreach ($grupos as $grupo){
-                $arrgrupos .=$grupo->id.',';
-            }
-            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
-
-            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
-
-            $arrfechas='';
-            foreach ($fechas as $fecha){
-                $arrfechas .=$fecha->id.',';
-            }
-            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
-
-            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
-
-            $arrpartidos='';
-            foreach ($partidos as $partido){
-                $arrpartidos .=$partido->id.',';
-            }
-            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
-
-
+            // GRUPOS
+            $arrgrupos = Grupo::where('torneo_id', $torneo->idTorneo)
+                ->pluck('id')
+                ->implode(',');
 
             $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
                count(case when golesv > golesl then 1 end) perdidos,
@@ -440,7 +422,10 @@ ORDER BY torneos.year DESC';
                 }
             }
 
-
+        // Ordenamos los títulos por año DESC
+        $torneosTitulos = collect($torneosTitulos)->sortByDesc(function ($item) {
+            return $item->year;
+        })->values()->all();
         set_time_limit(0);
         //dd($request);
 
