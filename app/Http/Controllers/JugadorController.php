@@ -335,28 +335,20 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosJugadorInternacional=0;
         foreach ($torneosJugador as $torneo){
 
-            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
-            $arrgrupos='';
-            foreach ($grupos as $grupo){
-                $arrgrupos .=$grupo->id.',';
-            }
-            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+            // GRUPOS
+            $arrgrupos = Grupo::where('torneo_id', $torneo->idTorneo)
+                ->pluck('id')
+                ->implode(',');
 
-            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+            // FECHAS
+            $arrfechas = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
+                ->pluck('id')
+                ->implode(',');
 
-            $arrfechas='';
-            foreach ($fechas as $fecha){
-                $arrfechas .=$fecha->id.',';
-            }
-            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+            $arrpartidos = Partido::whereIn('fecha_id', explode(',', $arrfechas))
+                ->pluck('id')
+                ->implode(',');
 
-            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
-
-            $arrpartidos='';
-            foreach ($partidos as $partido){
-                $arrpartidos .=$partido->id.',';
-            }
-            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
 

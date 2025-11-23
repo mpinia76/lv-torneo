@@ -2443,7 +2443,7 @@ WHERE tecnicos.id = '.$goleador->tecnico_id;
 
             //print_r($titulosTecnicoLigaEquipo);
 
-            $sqlJugando = "SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id
+            $sqlJugando = "SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
 FROM partido_tecnicos
 INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
 INNER JOIN personas ON tecnicos.persona_id = personas.id
@@ -2458,7 +2458,7 @@ WHERE torneos.year LIKE '%".$year."%' AND tecnicos.id = ".$goleador->tecnico_id;
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
 
-                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+                $jugando .= $e->escudo.'_'.$e->equipo_id.'_'.$e->nombre.',';
             }
 
             $goleador->jugando = $jugando;
@@ -3848,7 +3848,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
     }
 
 
-    public function importargoles(Request $request)
+    public function importargoles_new(Request $request)
     {
         set_time_limit(0);
 
@@ -3930,6 +3930,86 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
         return redirect()->back()->with('success', implode('<br>', $mensajes));
     }
 
+
+    public function importargoles(Request $request)
+    {
+        set_time_limit(0);
+
+        $torneoId = $request->get('torneoId');
+        $torneo = Torneo::findOrFail($torneoId);
+
+        $mensajes = [];
+
+        $tmSlug  = $torneo->url_nombre; // ej: copa-libertadores
+        $tmCode  = $torneo->sofa_slug;  // ej: CLI
+        $tmYear  = $torneo->year;       // ej: 2024
+
+        foreach ($torneo->grupoDetalle as $grupo) {
+            foreach ($grupo->fechas as $fecha) {
+
+                $spieltag = $fecha->numero;
+
+                // Construimos URL Transfermarkt
+                $url = "https://www.transfermarkt.com/{$tmSlug}/spieltag/pokalwettbewerb/{$tmCode}/plus/0?saison_id={$tmYear}&spieltag={$spieltag}";
+                $mensajes[] = "Scrapeando: $url";
+
+                // Scrapear HTML
+                $html = HttpHelper::getHtmlContent($url);
+
+                $dom = new \DOMDocument();
+                libxml_use_internal_errors(true);
+                $dom->loadHTML($html);
+                libxml_clear_errors();
+
+                $xpath = new \DOMXPath($dom);
+
+                // Extraer partidos
+                $partidos = $this->parsearPartidosTransfermarkt($xpath);
+
+                $mensajes[] = "Partidos encontrados: " . count($partidos);
+            }
+        }
+        return redirect()->back()->with('success', implode('<br>', $mensajes));
+    }
+
+
+    private function parsearPartidosTransfermarkt(\DOMXPath $xpath)
+    {
+        $resultados = [];
+
+        // Filas de partidos
+        $rows = $xpath->query("//tr[contains(@class, 'table-grosse-schrift')]");
+
+        foreach ($rows as $row) {
+
+            // Local
+            $localNode = $xpath->query(".//td/a", $row)->item(0);
+            $local = $localNode ? trim($localNode->nodeValue) : null;
+
+            // Visitante
+            $visitorNode = $xpath->query(".//td/a", $row)->item(1);
+            $visitante = $visitorNode ? trim($visitorNode->nodeValue) : null;
+
+            // URL del partido
+            $urlNode = $xpath->query(".//a[contains(@title, 'Match report')]", $row)->item(0);
+            $url = null;
+
+            if ($urlNode) {
+                $relative = $urlNode->getAttribute("href");
+                $url = "https://www.transfermarkt.com" . $relative;
+            }
+
+            if ($local && $visitante && $url) {
+                $resultados[] = [
+                    "local" => $local,
+                    "visitante" => $visitante,
+                    "url" => $url
+                ];
+            }
+        }
+
+        return $resultados;
+    }
 
 
 

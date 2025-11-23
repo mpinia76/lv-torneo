@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Alineacion;
 use App\Fecha;
 use App\Grupo;
+use App\Titulo;
 use App\Jugador;
 use App\Partido;
 use App\PartidoTecnico;
@@ -338,11 +339,12 @@ ORDER BY torneos.year DESC, torneos.id DESC';
 
 
 
+
             $sqlEscudos='SELECT DISTINCT escudo, equipo_id
-FROM equipos
-INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
-INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
-WHERE partido_tecnicos.tecnico_id = '.$id.' AND partido_tecnicos.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
+                FROM equipos
+                INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
+                INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
+                WHERE partido_tecnicos.tecnico_id = '.$id.' AND partido_tecnicos.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
 
 
 
@@ -379,45 +381,45 @@ WHERE partido_tecnicos.tecnico_id = '.$id.' AND partido_tecnicos.partido_id IN (
             }
 
             $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
-       count(case when golesv > golesl then 1 end) perdidos,
-       count(case when golesl = golesv then 1 end) empatados,
-       sum(golesl) golesl,
-       sum(golesv) golesv,
-       sum(golesl) - sum(golesv) diferencia,
-       sum(
-             case when golesl > golesv then 3 else 0 end
-           + case when golesl = golesv then 1 else 0 end
-       ) puntaje, CONCAT(
-    ROUND(
-      (  sum(
-             case when golesl > golesv then 3 else 0 end
-           + case when golesl = golesv then 1 else 0 end
-       ) * 100/(COUNT(*)*3) ),
-      2
-    ), '%') porcentaje
-    from (
-       select  DISTINCT tecnicos.id tecnico_id, golesl, golesv, fechas.id fecha_id
-		 from partidos
-		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
-		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
-		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
-		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
-		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
-     union all
-       select DISTINCT tecnicos.id tecnico_id, golesv, golesl, fechas.id fecha_id
-		 from partidos
-		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
-		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
-		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
-		 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
-		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
-) a
-group by tecnico_id
-";
+                       count(case when golesv > golesl then 1 end) perdidos,
+                       count(case when golesl = golesv then 1 end) empatados,
+                       sum(golesl) golesl,
+                       sum(golesv) golesv,
+                       sum(golesl) - sum(golesv) diferencia,
+                       sum(
+                             case when golesl > golesv then 3 else 0 end
+                           + case when golesl = golesv then 1 else 0 end
+                       ) puntaje, CONCAT(
+                    ROUND(
+                      (  sum(
+                             case when golesl > golesv then 3 else 0 end
+                           + case when golesl = golesv then 1 else 0 end
+                       ) * 100/(COUNT(*)*3) ),
+                      2
+                    ), '%') porcentaje
+                    from (
+                       select  DISTINCT tecnicos.id tecnico_id, golesl, golesv, fechas.id fecha_id
+                         from partidos
+                         INNER JOIN equipos ON partidos.equipol_id = equipos.id
+                         INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+                         INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                         INNER JOIN grupos ON fechas.grupo_id = grupos.id
+                         INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+                         INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+                         WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
+                     union all
+                       select DISTINCT tecnicos.id tecnico_id, golesv, golesl, fechas.id fecha_id
+                         from partidos
+                         INNER JOIN equipos ON partidos.equipov_id = equipos.id
+                         INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+                         INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                         INNER JOIN grupos ON fechas.grupo_id = grupos.id
+                         INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
+                         INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+                         WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
+                ) a
+                group by tecnico_id
+                ";
 
             //echo $sql3;
 
@@ -437,6 +439,72 @@ group by tecnico_id
 
             }
         }
+
+        // --- Inicializa array para no duplicar conteos por mismo torneo ---
+        $countedTorneos = []; // guardará ids de torneos ya contados para este técnico
+
+// --- 1) (Opcional) si ya contás torneos desde $torneosTecnico dejalo tal cual ---
+// Aquí asumes que ya corriste tu foreach($torneosTecnico as $torneo) y actualizaste:
+/// $titulosTecnicoCopa, $titulosTecnicoLiga, $titulosTecnicoInternacional
+
+// --- 2) Ahora procesamos los "titulos" manuales (tabla titulos) ---
+        $titulosExtras = Titulo::with('torneos')->get(); // podés filtrar por rango de años si querés
+
+        foreach ($titulosExtras as $titulo) {
+            // el equipo del título
+            $equipoId = $titulo->equipo_id;
+
+            // recorremos cada torneo asociado a este título (pivot titulo_torneos)
+            foreach ($titulo->torneos as $torneoRelacionado) {
+
+                // evitamos contar el mismo torneo más de una vez
+                if (in_array($torneoRelacionado->id, $countedTorneos)) {
+                    continue;
+                }
+
+                // buscamos el ÚLTIMO partido DEL EQUIPO dentro de ese torneo
+                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function($q) use ($torneoRelacionado) {
+                    $q->where('torneo_id', $torneoRelacionado->id);
+                })
+                    ->where(function ($q) use ($equipoId) {
+                        $q->where('equipol_id', $equipoId)
+                            ->orWhere('equipov_id', $equipoId);
+                    })
+                    ->orderBy('dia', 'DESC')
+                    ->first();
+
+                // si no hay partido del equipo en ese torneo, no contamos
+                if (empty($ultimoPartidoEquipo)) {
+                    continue;
+                }
+
+                // verificamos si el técnico dirigió ese partido para ese equipo
+                $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
+                    ->where('tecnico_id', $id)          // $id = id del técnico actual en tu método
+                    ->where('equipo_id', $equipoId)
+                    ->exists();
+
+                if ($dirigio) {
+                    // contamos según tipo/ambito del torneo relacionado
+                    if ($torneoRelacionado->ambito == 'Nacional') {
+                        if ($torneoRelacionado->tipo == 'Copa') {
+                            $titulosTecnicoCopa++;
+                        } else {
+                            $titulosTecnicoLiga++;
+                        }
+                    } else {
+                        $titulosTecnicoInternacional++;
+                    }
+
+                    // marcamos que ya contamos este torneo (para evitar duplicados)
+                    $countedTorneos[] = $torneoRelacionado->id;
+
+                    // (Opcional) podés agregar este torneo a un listado para mostrar luego
+                    //$torneosTitulos[] = $torneoRelacionado;
+                }
+            }
+        }
+
 
         $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id

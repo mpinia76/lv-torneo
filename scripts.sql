@@ -329,3 +329,13 @@ ALTER TABLE `torneos`
 
 ALTER TABLE `fechas`
     ADD COLUMN `sofa_slug` VARCHAR(50) NULL DEFAULT NULL AFTER `url_nombre`;
+
+###################################### 22/11/2025 #######################################################
+
+create table `titulos` (`id` bigint unsigned not null auto_increment primary key, `nombre` varchar(191) not null, `equipo_id` bigint unsigned not null, `year` varchar(191) null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
+alter table `titulos` add constraint `titulos_equipo_id_foreign` foreign key (`equipo_id`) references `equipos` (`id`);
+create table `titulo_torneos` (`id` bigint unsigned not null auto_increment primary key, `titulo_id` bigint unsigned not null, `torneo_id` bigint unsigned not null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
+alter table `titulo_torneos` add constraint `titulo_torneos_titulo_id_foreign` foreign key (`titulo_id`) references `titulos` (`id`) on delete cascade;
+alter table `titulo_torneos` add constraint `titulo_torneos_torneo_id_foreign` foreign key (`torneo_id`) references `torneos` (`id`) on delete cascade;
+alter table `titulos` add `tipo` enum('Liga', 'Copa') not null, add `ambito` enum('Nacional', 'Internacional') not null default 'Nacional';
+

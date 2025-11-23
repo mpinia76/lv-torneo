@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Equipo;
 use App\Fecha;
 use App\Grupo;
+use App\Titulo;
 use App\Partido;
 use App\PosicionTorneo;
 use App\Torneo;
@@ -267,43 +268,43 @@ ORDER BY torneos.year DESC';
 
 
             $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
-       count(case when golesv > golesl then 1 end) perdidos,
-       count(case when golesl = golesv then 1 end) empatados,
-       sum(golesl) golesl,
-       sum(golesv) golesv,
-       sum(golesl) - sum(golesv) diferencia,
-       sum(
-             case when golesl > golesv then 3 else 0 end
-           + case when golesl = golesv then 1 else 0 end
-       ) puntaje, CONCAT(
-    ROUND(
-      (  sum(
-             case when golesl > golesv then 3 else 0 end
-           + case when golesl = golesv then 1 else 0 end
-       ) * 100/(COUNT(*)*3) ),
-      2
-    ), '%') porcentaje
-    from (
-       select  DISTINCT partidos.equipol_id equipo_id, golesl, golesv, fechas.id fecha_id
-		 from partidos
-		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
-		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+               count(case when golesv > golesl then 1 end) perdidos,
+               count(case when golesl = golesv then 1 end) empatados,
+               sum(golesl) golesl,
+               sum(golesv) golesv,
+               sum(golesl) - sum(golesv) diferencia,
+               sum(
+                     case when golesl > golesv then 3 else 0 end
+                   + case when golesl = golesv then 1 else 0 end
+               ) puntaje, CONCAT(
+            ROUND(
+              (  sum(
+                     case when golesl > golesv then 3 else 0 end
+                   + case when golesl = golesv then 1 else 0 end
+               ) * 100/(COUNT(*)*3) ),
+              2
+            ), '%') porcentaje
+            from (
+               select  DISTINCT partidos.equipol_id equipo_id, golesl, golesv, fechas.id fecha_id
+                 from partidos
+                 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+                 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+                 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 
-		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
-     union all
-       select DISTINCT partidos.equipov_id equipo_id, golesv, golesl, fechas.id fecha_id
-		 from partidos
-		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
-		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
+             union all
+               select DISTINCT partidos.equipov_id equipo_id, golesv, golesl, fechas.id fecha_id
+                 from partidos
+                 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+                 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+                 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 
-		 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
-) a
-group by equipo_id
-";
+                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
+        ) a
+        group by equipo_id
+        ";
 
             //echo $sql3;
 
@@ -349,6 +350,116 @@ group by equipo_id
                 }
             }
         }
+        // Títulos extras cargados manualmente desde la tabla titulos
+        $titulosExtras = Titulo::where('equipo_id', $id)->get();
+
+        foreach ($titulosExtras as $tituloExtra) {
+            // Si agregaste "tipo" a la tabla, esto es directo:
+            switch ($tituloExtra->tipo) {
+                case 'Liga':
+                    $titulosLiga++;
+                    break;
+
+                case 'Copa':
+                    $titulosCopa++;
+                    break;
+
+                case 'Internacional':
+                    $titulosInternacional++;
+                    break;
+            }
+
+
+            // Recorremos los torneos relacionados a este título
+            foreach ($tituloExtra->torneos as $torneoRelacionado) {
+
+                $grupos = Grupo::where('torneo_id', '=',$torneoRelacionado->id)->get();
+                $arrgrupos='';
+                foreach ($grupos as $grupo){
+                    $arrgrupos .=$grupo->id.',';
+                }
+                $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+
+                $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+
+                $arrfechas='';
+                foreach ($fechas as $fecha){
+                    $arrfechas .=$fecha->id.',';
+                }
+                $arrfechas = substr($arrfechas, 0, -1);//quito última coma
+
+                $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
+
+                $arrpartidos='';
+                foreach ($partidos as $partido){
+                    $arrpartidos .=$partido->id.',';
+                }
+                $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+
+
+
+                $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
+               count(case when golesv > golesl then 1 end) perdidos,
+               count(case when golesl = golesv then 1 end) empatados,
+               sum(golesl) golesl,
+               sum(golesv) golesv,
+               sum(golesl) - sum(golesv) diferencia,
+               sum(
+                     case when golesl > golesv then 3 else 0 end
+                   + case when golesl = golesv then 1 else 0 end
+               ) puntaje, CONCAT(
+            ROUND(
+              (  sum(
+                     case when golesl > golesv then 3 else 0 end
+                   + case when golesl = golesv then 1 else 0 end
+               ) * 100/(COUNT(*)*3) ),
+              2
+            ), '%') porcentaje
+            from (
+               select  DISTINCT partidos.equipol_id equipo_id, golesl, golesv, fechas.id fecha_id
+                 from partidos
+                 INNER JOIN equipos ON partidos.equipol_id = equipos.id
+                 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+                 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+
+                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneoRelacionado->id." AND grupos.id IN (".$arrgrupos.") AND partidos.equipol_id = ".$id."
+             union all
+               select DISTINCT partidos.equipov_id equipo_id, golesv, golesl, fechas.id fecha_id
+                 from partidos
+                 INNER JOIN equipos ON partidos.equipov_id = equipos.id
+                 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+                 INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                 INNER JOIN grupos ON fechas.grupo_id = grupos.id
+
+                 WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneoRelacionado->id." AND grupos.id IN (".$arrgrupos.") AND partidos.equipov_id = ".$id."
+        ) a
+        group by equipo_id
+        ";
+                $torneoRelacionado->nombreTorneo = $torneoRelacionado->nombre.' '.$torneoRelacionado->year;
+                $jugados = DB::select(DB::raw($sqlJugados));
+
+                // Construimos un objeto tipo torneo, igual que en tu foreach
+                foreach ($jugados as $jugado) {
+
+                    $torneoRelacionado->jugados  = $jugado->jugados;
+                    $torneoRelacionado->ganados  = $jugado->ganados;
+                    $torneoRelacionado->empatados = $jugado->empatados;
+                    $torneoRelacionado->perdidos = $jugado->perdidos;
+                    $torneoRelacionado->favor    = $jugado->golesl;
+                    $torneoRelacionado->contra   = $jugado->golesv;
+                    $torneoRelacionado->puntaje  = $jugado->puntaje;
+                    $torneoRelacionado->porcentaje = $jugado->porcentaje;
+
+                    // Para títulos extras NO hay posición
+                    $torneoRelacionado->posicion = '<span class="text-success">Título Extra</span>';
+
+                    // Agregamos al array final de títulos mostrados
+                    $torneosTitulos[] = $torneoRelacionado;
+                }
+            }
+        }
+
         set_time_limit(0);
         //dd($request);
 
@@ -464,6 +575,35 @@ INNER JOIN grupos ON grupos.id = plantillas.grupo_id
 INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND posicion_torneos.equipo_id = plantillas.equipo_id AND posicion_torneos.posicion=1
 WHERE plantillas.equipo_id='.$id.'
 GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre';
+
+        $sql.=' UNION ALL
+SELECT
+    jugadors.id AS jugador_id,
+    personas.foto,
+    "0" AS jugados,
+    personas.name AS jugador,
+    CONCAT(personas.apellido, \', \', personas.nombre) AS completo,
+    "0" AS goles,
+    "0" AS amarillas,
+    "0" AS rojas,
+    "0" AS recibidos,
+    "0" AS invictas,
+    "0" AS jugando,
+    COUNT(DISTINCT titulos.id) AS titulos,
+    "0" AS errados,
+    "0" AS atajos
+FROM plantilla_jugadors
+INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
+INNER JOIN titulos
+    ON titulos.equipo_id = plantillas.equipo_id
+
+INNER JOIN titulo_torneos
+    ON titulo_torneos.titulo_id = titulos.id
+
+WHERE plantillas.equipo_id = '.$id.'
+GROUP BY jugadors.id, personas.foto, personas.apellido, personas.nombre';
         $sql .=' ) as subconsulta
 
 group by jugador_id,jugador, foto

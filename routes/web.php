@@ -116,6 +116,9 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('importargoles', 'TorneoController@importargoles')->name('torneos.importargoles');
 
+    Route::resource('titulos', 'TituloController');
+
+
 });
 
 
