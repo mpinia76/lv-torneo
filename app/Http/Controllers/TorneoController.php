@@ -1667,6 +1667,38 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                     }
                 }
             }
+            // ---- TÍTULOS EXTRAS ----
+            $titulosExtras = Titulo::where('equipo_id', $posicion->equipo_id)->get();
+
+            foreach ($titulosExtras as $te) {
+
+                // 🔹 aplicar filtro de TIPO, si corresponde
+                if ($tipo) {
+                    if (strtolower($tipo) == 'liga' && strtolower($te->tipo) != 'liga') continue;
+                    if (strtolower($tipo) == 'copa' && strtolower($te->tipo) != 'copa') continue;
+                }
+
+                // 🔹 aplicar filtro de ÁMBITO, si corresponde
+                if ($ambito) {
+                    if (strtolower($ambito) != strtolower($te->ambito)) continue;
+                }
+
+                // 🔹 sumar según tipo
+                switch ($te->tipo) {
+                    case 'Liga':
+                        $titulosLiga++;
+                        break;
+
+                    case 'Copa':
+                        $titulosCopa++;
+                        break;
+
+                    case 'Internacional':
+                        $titulosInternacional++;
+                        break;
+                }
+            }
+
             if (($titulosCopa+$titulosLiga+$titulosInternacional)==0){
                 $posicion->titulos='';
             }
@@ -1678,6 +1710,8 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             }
 
         }
+
+
 
         $posiciones->setPath(route('torneos.posiciones',array('argentinos'=>$argentinos,'tipo'=>$tipo,'ambito'=>$ambito,'buscarpor'=>$nombre)));
 
