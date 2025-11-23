@@ -15,6 +15,7 @@ use App\PartidoTecnico;
 use App\Persona;
 use App\PosicionTorneo;
 use App\Tecnico;
+use App\Titulo;
 use App\Torneo;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -379,7 +380,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
 
 
 
-            $sqlEscudos='SELECT DISTINCT escudo, equipo_id
+            $sqlEscudos='SELECT DISTINCT escudo, equipo_id, equipos.nombre
 FROM equipos
 INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
 INNER JOIN partidos ON partidos.id = alineacions.partido_id
@@ -413,7 +414,7 @@ ORDER BY partidos.dia ASC';
 
                 }
 
-                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.',';
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
                 //$torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
             }
 
@@ -551,28 +552,19 @@ ORDER BY torneos.year DESC';
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
         foreach ($torneosTecnico as $torneo){
-            $grupos = Grupo::where('torneo_id', '=',$torneo->idTorneo)->get();
-            $arrgrupos='';
-            foreach ($grupos as $grupo){
-                $arrgrupos .=$grupo->id.',';
-            }
-            $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+            // GRUPOS
+            $arrgrupos = Grupo::where('torneo_id', $torneo->idTorneo)
+                ->pluck('id')
+                ->implode(',');
 
-            $fechas = Fecha::wherein('grupo_id',explode(',', $arrgrupos))->get();
+            // FECHAS
+            $arrfechas = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
+                ->pluck('id')
+                ->implode(',');
 
-            $arrfechas='';
-            foreach ($fechas as $fecha){
-                $arrfechas .=$fecha->id.',';
-            }
-            $arrfechas = substr($arrfechas, 0, -1);//quito última coma
-
-            $partidos = Partido::wherein('fecha_id',explode(',', $arrfechas))->get();
-
-            $arrpartidos='';
-            foreach ($partidos as $partido){
-                $arrpartidos .=$partido->id.',';
-            }
-            $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
+            $arrpartidos = Partido::whereIn('fecha_id', explode(',', $arrfechas))
+                ->pluck('id')
+                ->implode(',');
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
 
@@ -604,7 +596,7 @@ ORDER BY torneos.year DESC';
                 //}
             }
 
-            $sqlEscudos='SELECT DISTINCT escudo, equipo_id
+            $sqlEscudos='SELECT DISTINCT escudo, equipo_id, equipos.nombre
 FROM equipos
 INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
 INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
@@ -643,7 +635,7 @@ ORDER BY partidos.dia ASC';
 
                 }
 
-                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.',';
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
 
             }
 
@@ -706,7 +698,93 @@ group by tecnico_id
             }
         }
 
+        // --- Inicializa array para no duplicar conteos por mismo torneo ---
+        $countedTorneos = []; // guardará ids de torneos ya contados para este técnico
 
+// --- 1) (Opcional) si ya contás torneos desde $torneosTecnico dejalo tal cual ---
+// Aquí asumes que ya corriste tu foreach($torneosTecnico as $torneo) y actualizaste:
+/// $titulosTecnicoCopa, $titulosTecnicoLiga, $titulosTecnicoInternacional
+
+// --- 2) Ahora procesamos los "titulos" manuales (tabla titulos) ---
+        $titulosExtras = Titulo::with('torneos')->get(); // podés filtrar por rango de años si querés
+
+        foreach ($titulosExtras as $titulo) {
+            // el equipo del título
+            $equipoId = $titulo->equipo_id;
+
+            // recorremos cada torneo asociado a este título (pivot titulo_torneos)
+            foreach ($titulo->torneos as $torneoRelacionado) {
+
+                // evitamos contar el mismo torneo más de una vez
+                if (in_array($torneoRelacionado->id, $countedTorneos)) {
+                    continue;
+                }
+
+                // buscamos el ÚLTIMO partido DEL EQUIPO dentro de ese torneo
+                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function($q) use ($torneoRelacionado) {
+                    $q->where('torneo_id', $torneoRelacionado->id);
+                })
+                    ->where(function ($q) use ($equipoId) {
+                        $q->where('equipol_id', $equipoId)
+                            ->orWhere('equipov_id', $equipoId);
+                    })
+                    ->orderBy('dia', 'DESC')
+                    ->first();
+
+                // si no hay partido del equipo en ese torneo, no contamos
+                if (empty($ultimoPartidoEquipo)) {
+                    continue;
+                }
+
+                // verificamos si el técnico dirigió ese partido para ese equipo
+                $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
+                    ->where('tecnico_id', $id)          // $id = id del técnico actual en tu método
+                    ->where('equipo_id', $equipoId)
+                    ->exists();
+
+                if ($dirigio) {
+                    // contamos según tipo/ambito del torneo relacionado
+                    if ($torneoRelacionado->ambito == 'Nacional') {
+                        if ($torneoRelacionado->tipo == 'Copa') {
+                            $titulosTecnicoCopa++;
+                        } else {
+                            $titulosTecnicoLiga++;
+                        }
+                    } else {
+                        $titulosTecnicoInternacional++;
+                    }
+
+                    // marcamos que ya contamos este torneo (para evitar duplicados)
+                    $countedTorneos[] = $torneoRelacionado->id;
+
+                    // (Opcional) podés agregar este torneo a un listado para mostrar luego
+                    //$torneosTitulos[] = $torneoRelacionado;
+                }
+
+
+                $consultarJugador = Jugador::where('persona_id', '=', $jugador->persona_id)->first();
+                $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$equipoId)->where('jugador_id','=',$consultarJugador->id)->first();
+
+
+
+
+                //print_r($partidoTecnico);
+                if(!empty($alineacion)) {
+                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                    if ($torneo->ambito == 'Nacional') {
+                        if ($torneo->tipo == 'Copa') {
+                            $titulosJugadorCopa++;
+                        } else {
+                            $titulosJugadorLiga++;
+                        }
+                    } else {
+                        $titulosJugadorInternacional++;
+                    }
+                }
+
+
+            }
+        }
 
         return view('jugadores.ver', compact('jugador','torneosJugador','torneosTecnico','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional','tecnico'));
     }

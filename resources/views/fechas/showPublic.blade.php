@@ -34,7 +34,7 @@
                                 <td>
                                     <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
                                         @if($partido->equipol && $partido->equipol->escudo)
-                                            <img src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
+                                            <img src="{{ url('images/'.$partido->equipol->escudo) }}" height="20" alt="{{ $partido->equipol->nombre }}">
                                         @endif
                                     </a>
                                     {{ $partido->equipol->nombre }}
@@ -58,7 +58,7 @@
                                 <td>
                                     <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
                                         @if($partido->equipov && $partido->equipov->escudo)
-                                            <img src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
+                                            <img src="{{ url('images/'.$partido->equipov->escudo) }}" height="20" alt="{{ $partido->equipov->nombre }}">
                                         @endif
                                     </a>
                                     {{ $partido->equipov->nombre }}

@@ -51,7 +51,7 @@
                             <td>
                                 @if($partido->equipol)
                                     @if($partido->equipol->escudo)
-                                        <img src="{{ url('images/'.$partido->equipol->escudo) }}" height="20">
+                                        <img src="{{ url('images/'.$partido->equipol->escudo) }}" height="20" alt="{{$partido->equipol->nombre}}">
                                     @endif
                                     {{ $partido->equipol->nombre }}
                                 @endif
@@ -61,7 +61,7 @@
                             <td>
                                 @if($partido->equipov)
                                     @if($partido->equipov->escudo)
-                                        <img src="{{ url('images/'.$partido->equipov->escudo) }}" height="20">
+                                        <img src="{{ url('images/'.$partido->equipov->escudo) }}" height="20" alt="{{$partido->equipov->nombre}}>
                                     @endif
                                     {{ $partido->equipov->nombre }}
                                 @endif

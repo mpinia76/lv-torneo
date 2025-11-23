@@ -43,7 +43,7 @@
                         @if($escudo!='')
                             @php $escudoArr = explode('_',$escudo); @endphp
                             <a href="{{route('equipos.ver', ['equipoId'=>$escudoArr[1]])}}">
-                                <img src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" alt="{{$escudoArr[3]}}" title="{{$escudoArr[3]}}">
                                 @if(isset($escudoArr[2]) && $escudoArr[2]!='') Pos: {!!$escudoArr[2]!!} @endif
                             </a>
                         @endif

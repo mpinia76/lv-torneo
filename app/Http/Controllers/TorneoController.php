@@ -2644,7 +2644,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC';
 
         foreach ($arqueros as $arquero){
 
-            $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+            $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -2658,7 +2658,7 @@ WHERE torneos.year LIKE '%".$year."%' AND jugadors.id = ".$arquero->id;
             $juega = DB::select(DB::raw($sqlJugando));
             foreach ($juega as $e){
 
-                $jugando .= $e->escudo.'_'.$e->equipo_id.',';
+                $jugando .= $e->escudo.'_'.$e->equipo_id.'_'.$e->nombre.',';
             }
 
             $arquero->jugando = $jugando;
