@@ -542,13 +542,13 @@ INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND p
 WHERE plantillas.equipo_id='.$id.'
 GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre';
 
-        $sql.=' UNION ALL
+        $sql .= ' UNION ALL
 SELECT
     j.id AS jugador_id,
     p.foto,
     "0" AS jugados,
     p.name AS jugador,
-    CONCAT(p.apellido, \', \', p.nombre) AS completo,
+    CONCAT(p.apellido, ", ", p.nombre) AS completo,
     "0" AS goles,
     "0" AS amarillas,
     "0" AS rojas,
@@ -560,23 +560,23 @@ SELECT
     "0" AS atajos
 FROM jugadors j
 INNER JOIN personas p ON j.persona_id = p.id
-LEFT JOIN titulo_torneos tt ON 1=1
-LEFT JOIN titulos t ON t.id = tt.titulo_id AND t.equipo_id = '.$id.'
-LEFT JOIN torneos tn ON tn.id = tt.torneo_id
 LEFT JOIN alineacions a ON a.jugador_id = j.id
 LEFT JOIN partidos pa ON pa.id = a.partido_id
 LEFT JOIN fechas f ON f.id = pa.fecha_id
-LEFT JOIN grupos g ON g.id = f.grupo_id AND g.torneo_id = tn.id
+LEFT JOIN grupos g ON g.id = f.grupo_id
+LEFT JOIN titulo_torneos tt ON tt.torneo_id = g.torneo_id
+LEFT JOIN titulos t ON t.id = tt.titulo_id AND t.equipo_id = '.$id.'
 WHERE t.id IS NOT NULL
 AND a.id IS NOT NULL
 GROUP BY j.id, p.foto, p.apellido, p.nombre';
+
         $sql .=' ) as subconsulta
 
 group by jugador_id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 //dd($sql);
         $jugadores = DB::select(DB::raw($sql));
-        //echo $sql;
+        echo $sql;
 
 
         // Paginación jugadores
