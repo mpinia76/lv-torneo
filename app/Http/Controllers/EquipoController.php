@@ -576,7 +576,7 @@ group by jugador_id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 //dd($sql);
         $jugadores = DB::select(DB::raw($sql));
-        echo $sql;
+        //echo $sql;
 
 
         // Paginación jugadores
