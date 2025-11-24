@@ -2377,7 +2377,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 //dd($jugo);
                 if ($jugo) {
 
-                    foreach ($tituloExtra->torneos as $t) {
+                    foreach ($tituloExtra as $t) {
                         if ($t->ambito == 'Nacional') {
                             if ($t->tipo == 'Copa') $titulosJugadorCopa++;
                             else $titulosJugadorLiga++;
