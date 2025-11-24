@@ -1009,53 +1009,60 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        // 🔥 1) Remover del acumulado los equipos marcados manualmente
-        $acumulado = array_values(array_filter($acumulado, function($eq) use ($equiposClasificados) {
-            return !isset($equiposClasificados[$eq->equipo_id]);
-        }));
+        // PREPARAR IDS de clasificados manuales (vienen de EquipoClasificado keyBy)
+        $manualIds = $equiposClasificados->keys()->toArray();
+        $manualsSeen = 0;
+        $totalNonManual = count($acumulado) - count($manualIds);
 
         foreach ($acumulado as $index => $equipo) {
 
-            $pos = $index + 1;
+            $rawPos = $index + 1;           // posición en el array tal cual (1-based)
             $equipo->zona = 'Ninguna';
 
-            // Campeones de torneos previos van a la zona de ID más bajo
+            // 1) Campeones de torneos previos -> primera zona
             if (in_array($equipo->equipo_id, $campeones)) {
                 $equipo->zona = $zonaPrimera;
+                // si está también como manual, contabilizamos que lo vimos
+                if (in_array($equipo->equipo_id, $manualIds)) {
+                    $manualsSeen++;
+                }
                 continue;
             }
 
-            if(isset($equiposClasificados[$equipo->equipo_id])) {
+            // 2) Clasificados manualmente -> respetar y contar como "manual visto"
+            if (isset($equiposClasificados[$equipo->equipo_id])) {
                 $equipo->zona = $equiposClasificados[$equipo->equipo_id]->clasificacion->nombre;
+                $manualsSeen++;
                 continue;
             }
 
+            // 3) POSICIÓN EFECTIVA (ignora manuales que ya aparecieron antes)
+            $pos = $rawPos - $manualsSeen; // ej: si rawPos=12 y ya vimos 1 manual, pos=11
+
+            // 4) Asignar zona según clasificaciones (por posición efectiva)
             $inicio = 1;
             foreach ($clasificaciones as $nombre => $cantidad) {
                 $fin = $inicio + $cantidad - 1;
                 if ($pos >= $inicio && $pos <= $fin) {
                     $equipo->zona = $nombre;
-                    break; // asignamos solo una zona
+                    break;
                 }
                 $inicio = $fin + 1;
             }
 
-
-
-
-            // Descenso al final
-            if ($pos > $totalEquipos - $descenso) {
+            // 5) Descenso por posición: usamos $totalNonManual (puestos por puntos)
+            if ($pos > $totalNonManual - $descenso) {
                 $equipo->zona = 'Descenso';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
 
-            // Descenso por promedio
+            // 6) Descenso por promedio (sin cambios)
             if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
                 $equipo->zona = 'Descenso';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
-
         }
+
 
 
         $descensosPorPosicion = 0;
