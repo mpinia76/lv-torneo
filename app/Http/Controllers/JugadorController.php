@@ -2339,13 +2339,12 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
                 if ($dirigio) {
 
-                    // tomo TODOS los torneos del título, sin iterar partidos
-                    foreach ($tituloExtra as $torneoRelacionado) {
 
 
 
-                        if ($torneoRelacionado->ambito == 'Nacional') {
-                            if ($torneoRelacionado->tipo == 'Copa') {
+
+                        if ($tituloExtra->ambito == 'Nacional') {
+                            if ($tituloExtra->tipo == 'Copa') {
                                 $titulosTecnicoCopa++;
                             } else {
                                 $titulosTecnicoLiga++;
@@ -2354,8 +2353,8 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                             $titulosTecnicoInternacional++;
                         }
 
-                        $countedTorneos[] = $torneoRelacionado->id;
-                    }
+                    $countedTorneos = array_merge($countedTorneos, $torneosIds);
+
                 }
             }
 
@@ -2377,14 +2376,14 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 //dd($jugo);
                 if ($jugo) {
 
-                    foreach ($tituloExtra as $t) {
-                        if ($t->ambito == 'Nacional') {
-                            if ($t->tipo == 'Copa') $titulosJugadorCopa++;
+
+                        if ($tituloExtra->ambito == 'Nacional') {
+                            if ($tituloExtra->tipo == 'Copa') $titulosJugadorCopa++;
                             else $titulosJugadorLiga++;
                         } else {
                             $titulosJugadorInternacional++;
                         }
-                    }
+
 
                     $countedTorneos = array_merge($countedTorneos, $torneosIds);
                 }
