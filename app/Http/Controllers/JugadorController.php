@@ -2340,9 +2340,9 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                 if ($dirigio) {
 
                     // tomo TODOS los torneos del título, sin iterar partidos
-                    foreach ($tituloExtra->torneos as $torneoRelacionado) {
+                    foreach ($tituloExtra as $torneoRelacionado) {
 
-                        if (in_array($torneoRelacionado->id, $countedTorneos)) continue;
+
 
                         if ($torneoRelacionado->ambito == 'Nacional') {
                             if ($torneoRelacionado->tipo == 'Copa') {
