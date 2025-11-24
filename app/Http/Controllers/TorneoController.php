@@ -1000,15 +1000,6 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             ->get()
             ->keyBy('equipo_id');
 
-        // 🔥 Equipos manuales marcados como LIBERTADORES (primera zona)
-        $libertadoresManuales = [];
-
-        foreach ($equiposClasificados as $equipoId => $clasificacion) {
-            if ($clasificacion->clasificacion->nombre == $zonaPrimera) {
-                $libertadoresManuales[] = $equipoId;   // guardar el ID
-            }
-        }
-
         // 1. Marcar equipos de promedio como Descenso
         $promediosADescender = [];
         if (!empty($promedios)) {
@@ -1017,16 +1008,15 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $promediosADescender[$p->equipo_id] = $p;
             }
         }
-        dd($libertadoresManuales);
+
+        // 🔥 Reordenar y reindexar después de meter manuales
+        $acumulado = collect($acumulado)
+            ->sortByDesc('puntaje')
+            ->sortByDesc('diferencia')
+            ->sortByDesc('golesl')
+            ->values();
+
         foreach ($acumulado as $index => $equipo) {
-
-            // 🚫 Si el equipo está marcado manualmente como LIBERTADORES,
-            //    no se toca su zona y pasa al siguiente
-            if (in_array($equipo->equipo_id, $libertadoresManuales)) {
-                $equipo->zona = $zonaPrimera;
-                continue;
-            }
-
 
             $pos = $index + 1;
             $equipo->zona = 'Ninguna';
@@ -1039,10 +1029,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
             if(isset($equiposClasificados[$equipo->equipo_id])) {
                 $equipo->zona = $equiposClasificados[$equipo->equipo_id]->clasificacion->nombre;
-                // 🔥 Si está marcado manualmente como LIBERTADORES, NO cambiar la zona nunca
-                if ($equipo->zona === $zonaPrimera) {
-                    continue; // se saltea toda la lógica de posiciones
-                }
+                continue;
             }
 
             $inicio = 1;
