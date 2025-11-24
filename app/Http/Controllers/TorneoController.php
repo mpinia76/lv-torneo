@@ -2393,15 +2393,15 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             $titulosTecnicoInternacionalEquipo=array();
 
             $sqlTorneos = 'SELECT DISTINCT grupos.torneo_id, partido_tecnicos.equipo_id
-FROM partido_tecnicos
-INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
-INNER JOIN personas ON tecnicos.persona_id = personas.id
-INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
+                        FROM partido_tecnicos
+                        INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+                        INNER JOIN personas ON tecnicos.persona_id = personas.id
+                        INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+                        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                        INNER JOIN grupos ON grupos.id = fechas.grupo_id
+                        INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
 
-WHERE tecnicos.id = '.$goleador->tecnico_id;
+                        WHERE tecnicos.id = '.$goleador->tecnico_id;
 
             $torneosJugados = DB::select(DB::raw($sqlTorneos));
             foreach ($torneosJugados as $tj){
@@ -2475,6 +2475,47 @@ WHERE tecnicos.id = '.$goleador->tecnico_id;
 
             }
 
+            $titulosExtras = Titulo::get();
+
+            foreach ($titulosExtras as $tituloExtra) {
+                $equipoId = $tituloExtra->equipo_id;
+                $torneosIds = $tituloExtra->torneos->pluck('id')->toArray();
+                if (empty($torneosIds)) continue;
+
+                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function($q) use ($torneosIds) {
+                    $q->whereIn('torneo_id', $torneosIds);
+                })
+                    ->where(function ($q) use ($equipoId) {
+                        $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
+                    })
+                    ->orderBy('dia','DESC')
+                    ->first();
+
+                if (!$ultimoPartidoEquipo) continue;
+
+                $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
+                    ->where('equipo_id', $equipoId)
+                    ->where('tecnico_id', $goleador->tecnico_id)
+                    ->exists();
+
+                if ($dirigio) {
+
+                    // Sumar al total de títulos
+                    if ($tituloExtra->ambito == 'Nacional') {
+                        if ($tituloExtra->tipo == 'Copa') {
+                            $titulosTecnicoCopa++;
+                            $titulosTecnicoCopaEquipo[$equipoId] = ($titulosTecnicoCopaEquipo[$equipoId] ?? 0) + 1;
+                        } else {
+                            $titulosTecnicoLiga++;
+                            $titulosTecnicoLigaEquipo[$equipoId] = ($titulosTecnicoLigaEquipo[$equipoId] ?? 0) + 1;
+                        }
+                    } else {
+                        $titulosTecnicoInternacional++;
+                        $titulosTecnicoInternacionalEquipo[$equipoId] = ($titulosTecnicoInternacionalEquipo[$equipoId] ?? 0) + 1;
+                    }
+                }
+            }
+
             if (($titulosTecnicoCopa+$titulosTecnicoLiga+$titulosTecnicoInternacional)==0){
                 $goleador->titulos='';
             }
@@ -2486,18 +2527,20 @@ WHERE tecnicos.id = '.$goleador->tecnico_id;
                 $goleador->titulos=$titulosTecnicoCopa+$titulosTecnicoLiga+$titulosTecnicoInternacional. ' ('.$ligas.' '.$copas.' '.$internacionales.')';
             }
 
+
+
             //print_r($titulosTecnicoLigaEquipo);
 
             $sqlJugando = "SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
-FROM partido_tecnicos
-INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
-INNER JOIN personas ON tecnicos.persona_id = personas.id
-INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
-INNER JOIN torneos ON torneos.id = grupos.torneo_id
-WHERE torneos.year LIKE '%".$year."%' AND tecnicos.id = ".$goleador->tecnico_id;
+                    FROM partido_tecnicos
+                    INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+                    INNER JOIN personas ON tecnicos.persona_id = personas.id
+                    INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+                    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+                    INNER JOIN grupos ON grupos.id = fechas.grupo_id
+                    INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
+                    INNER JOIN torneos ON torneos.id = grupos.torneo_id
+                    WHERE torneos.year LIKE '%".$year."%' AND tecnicos.id = ".$goleador->tecnico_id;
 
             $jugando = '';
             $juega = DB::select(DB::raw($sqlJugando));

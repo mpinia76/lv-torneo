@@ -500,24 +500,27 @@ ORDER BY torneos.year DESC, torneos.id DESC';
 
 
                 $consultarJugador = Jugador::where('persona_id', '=', $tecnico->persona_id)->first();
-                $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$equipoId)->where('jugador_id','=',$consultarJugador->id)->first();
+                if (!empty($consultarJugador)) {
+                    $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$equipoId)->where('jugador_id','=',$consultarJugador->id)->first();
 
 
 
 
-                //print_r($partidoTecnico);
-                if(!empty($alineacion)) {
-                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->ambito == 'Nacional') {
-                        if ($torneo->tipo == 'Copa') {
-                            $titulosJugadorCopa++;
+                    //print_r($partidoTecnico);
+                    if(!empty($alineacion)) {
+                        //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                        if ($torneo->ambito == 'Nacional') {
+                            if ($torneo->tipo == 'Copa') {
+                                $titulosJugadorCopa++;
+                            } else {
+                                $titulosJugadorLiga++;
+                            }
                         } else {
-                            $titulosJugadorLiga++;
+                            $titulosJugadorInternacional++;
                         }
-                    } else {
-                        $titulosJugadorInternacional++;
                     }
                 }
+
 
 
             }
