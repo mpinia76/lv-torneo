@@ -542,7 +542,7 @@ INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND p
 WHERE plantillas.equipo_id='.$id.'
 GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre';
 
-        /*$sql.=' UNION ALL
+        $sql.=' UNION ALL
 SELECT
     jugadors.id AS jugador_id,
     personas.foto,
@@ -565,11 +565,9 @@ INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
 INNER JOIN titulos
     ON titulos.equipo_id = plantillas.equipo_id
 
-INNER JOIN titulo_torneos
-    ON titulo_torneos.titulo_id = titulos.id
 
-WHERE plantillas.equipo_id = '.$id.'
-GROUP BY jugadors.id, personas.foto, personas.apellido, personas.nombre';*/
+WHERE titulos.equipo_id = '.$id.'
+GROUP BY jugadors.id, personas.foto, personas.apellido, personas.nombre';
         $sql .=' ) as subconsulta
 
 group by jugador_id,jugador, foto
