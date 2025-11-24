@@ -8265,7 +8265,6 @@ private function normalizarMinuto(string $texto): int
             // Ejemplo: "Xabi Alonso" o "Juan Pérez García"
             preg_match_all('/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñÁÉÍÓÚÑ]+)+/u', $nombres, $matches);
             $dt = $matches[0];
-            dd($dt);
         }
 
         return $dt;
@@ -8460,7 +8459,7 @@ private function normalizarMinuto(string $texto): int
                 $awayDT = $this->getDT($xpath, 'away');
 
                 // ---- Reemplazar dd($localDT, $awayDT); por este bloque ----
-                dd($localTitulares,$visitanteTitulares,$localSuplentes,$visitanteSuplentes,$localDT,$awayDT);
+                //dd($localTitulares,$visitanteTitulares,$localSuplentes,$visitanteSuplentes,$localDT,$awayDT);
 // Helper: convierte el resultado de parsePlayers a la estructura esperada
                 $mapPlayerToEquipo = function(array $players, $tipoJugador) {
                     $out = [];
@@ -8575,7 +8574,6 @@ private function normalizarMinuto(string $texto): int
                 // ---- GUARDAR DIRECTORES TÉCNICOS ----
                 function procesarTecnicos($textoDT, $equipo, $partido, &$success, &$error, &$ok)
                 {
-                    log::info('DT: '.$textoDT);
                     if (empty($textoDT)) {
                         return;
                     }
@@ -8587,7 +8585,7 @@ private function normalizarMinuto(string $texto): int
 
                     foreach ($tecnicos as $nombreTecnico) {
                         $partesNombre = explode(' ', $nombreTecnico);
-                        log::info(print_r($partesNombre, true));
+
                         $entrenador = Tecnico::join('personas', 'personas.id', '=', 'tecnicos.persona_id')
                             ->where(function ($query) use ($partesNombre) {
                                 foreach ($partesNombre as $parte) {
@@ -8600,7 +8598,7 @@ private function normalizarMinuto(string $texto): int
                             })
                             ->select('tecnicos.id as tecnico_id', 'personas.*')
                             ->first();
-                        log::info(print_r($entrenador, true));
+
                         if ($entrenador) {
 
                             // 🔍 Verificar si ya dirigió a este equipo en el mismo TORNEO
@@ -8636,7 +8634,7 @@ private function normalizarMinuto(string $texto): int
                                     $partido_tecnico->update($data3);
                                 } else {
                                     PartidoTecnico::create($data3);
-                                    $success .= "DT agregado: {$nombreTecnico} ({$equipo->nombre})<br>";
+                                    //$success .= "DT agregado: {$nombreTecnico} ({$equipo->nombre})<br>";
                                 }
                             } catch (QueryException $ex) {
                                 $error .= $ex->getMessage();
