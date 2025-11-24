@@ -2154,7 +2154,8 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                 DB::raw('CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo'),
                 'torneos.escudo AS escudoTorneo',
                 'torneos.tipo',
-                'torneos.ambito'
+                'torneos.ambito',
+                'torneos.year'
             )
             ->orderByDesc('torneos.year')
             ->get();
@@ -2189,7 +2190,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             }
 
             // Escudos y posición en torneo
-            $escudos = Equipo::select('escudo','id as equipo_id')->whereHas('alineacions', function($q) use ($id, $torneo) {
+            $escudos = Equipo::select('escudo','id as equipo_id','nombre')->whereHas('alineacions', function($q) use ($id, $torneo) {
                 $q->where('jugador_id', $id)
                     ->whereHas('partido.fecha.grupo', function($query) use ($torneo) {
                         $query->where('torneo_id', $torneo->idTorneo);
@@ -2206,7 +2207,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                     $strPosicion = $posicion->posicion == 1 ? '<img src="'.asset('images/campeon.png').'" height="20"> Campeón' :
                         ($posicion->posicion == 2 ? '<img src="'.asset('images/subcampeon.png').'" height="20"> Subcampeón' : $posicion->posicion);
                 }
-                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.',';
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
             }
 
             // Partidos jugados, goles, tarjetas y estadísticas de arquero
@@ -2325,6 +2326,11 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                 continue;
             }
 
+
+
+            $tituloExtra->nombreTorneo = $tituloExtra->nombre.' '.$tituloExtra->year;
+            $tituloExtra->year = $tituloExtra->year;
+            $tituloExtra->escudo = $tituloExtra->equipo->escudo.'_'.$tituloExtra->equipo_id.'_<img src="'.asset('images/campeon.png').'" height="20"> Campeón_'.$tituloExtra->equipo->nombre.',';
             // -----------------------------
             // COMO TÉCNICO
             // -----------------------------
@@ -2385,11 +2391,9 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                         ->pluck('id');
 
                     $tituloExtra->jugados = Alineacion::where('jugador_id', $jugadorAsociado->id)
-                            ->where('equipo_id', $equipoId)
                             ->where('tipo','Titular')
                             ->whereIn('partido_id', $partidosIds)->count()
                         + Cambio::where('jugador_id', $jugadorAsociado->id)
-                            ->where('equipo_id', $equipoId)
                             ->where('tipo','Entra')
                             ->whereIn('partido_id', $partidosIds)->count();
 
@@ -2439,6 +2443,9 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
         }
 
+        // Ordenar torneos por year descendente
+        $torneosJugador = $torneosJugador->sortByDesc('year')->values();
+        $torneosTecnico = $torneosTecnico->sortByDesc('year')->values();
 
 
 
