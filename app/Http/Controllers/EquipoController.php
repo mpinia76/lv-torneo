@@ -544,30 +544,32 @@ GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre';
 
         $sql.=' UNION ALL
 SELECT
-    jugadors.id AS jugador_id,
-    personas.foto,
+    j.id AS jugador_id,
+    p.foto,
     "0" AS jugados,
-    personas.name AS jugador,
-    CONCAT(personas.apellido, \', \', personas.nombre) AS completo,
+    p.name AS jugador,
+    CONCAT(p.apellido, \', \', p.nombre) AS completo,
     "0" AS goles,
     "0" AS amarillas,
     "0" AS rojas,
     "0" AS recibidos,
     "0" AS invictas,
     "0" AS jugando,
-    COUNT(DISTINCT titulos.id) AS titulos,
+    COUNT(DISTINCT t.id) AS titulos,
     "0" AS errados,
     "0" AS atajos
-FROM plantilla_jugadors
-INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
-INNER JOIN titulos
-    ON titulos.equipo_id = plantillas.equipo_id
-
-
-WHERE titulos.equipo_id = '.$id.'
-GROUP BY jugadors.id, personas.foto, personas.apellido, personas.nombre';
+FROM jugadors j
+INNER JOIN personas p ON j.persona_id = p.id
+LEFT JOIN titulo_torneos tt ON 1=1
+LEFT JOIN titulos t ON t.id = tt.titulo_id AND t.equipo_id = '.$id.'
+LEFT JOIN torneos tn ON tn.id = tt.torneo_id
+LEFT JOIN alineacions a ON a.jugador_id = j.id
+LEFT JOIN partidos pa ON pa.id = a.partido_id
+LEFT JOIN fechas f ON f.id = pa.fecha_id
+LEFT JOIN grupos g ON g.id = f.grupo_id AND g.torneo_id = tn.id
+WHERE t.id IS NOT NULL
+AND a.id IS NOT NULL
+GROUP BY j.id, p.foto, p.apellido, p.nombre';
         $sql .=' ) as subconsulta
 
 group by jugador_id,jugador, foto
