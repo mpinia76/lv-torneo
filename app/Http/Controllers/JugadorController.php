@@ -2303,40 +2303,47 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
             $equipoId = $tituloExtra->equipo_id;
 
-            foreach ($tituloExtra->torneos as $torneoRelacionado) {
+            $torneosIds = $tituloExtra->torneos->pluck('id')->toArray();
 
-                // evitar duplicados
-                if (in_array($torneoRelacionado->id, $countedTorneos)) {
-                    continue;
-                }
+            if (empty($torneosIds)) {
+                continue;
+            }
 
-                // buscar último partido del EQUIPO campeón en ESE torneo
-                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function($q) use ($torneoRelacionado) {
-                    $q->where('torneo_id', $torneoRelacionado->id);
+
+            // buscar último partido del EQUIPO campeón en CUALQUIERA de esos torneos
+            $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function($q) use ($torneosIds) {
+                $q->whereIn('torneo_id', $torneosIds);
+            })
+                ->where(function ($q) use ($equipoId) {
+                    $q->where('equipol_id', $equipoId)
+                        ->orWhere('equipov_id', $equipoId);
                 })
-                    ->where(function ($q) use ($equipoId) {
-                        $q->where('equipol_id', $equipoId)
-                            ->orWhere('equipov_id', $equipoId);
-                    })
-                    ->orderBy('dia', 'DESC')
-                    ->first();
+                ->orderBy('dia', 'DESC')
+                ->first();
 
-                if (empty($ultimoPartidoEquipo)) {
-                    continue;
-                }
+            if (!$ultimoPartidoEquipo) {
+                continue;
+            }
 
-                // -----------------------------
-                // COMO TÉCNICO
-                // -----------------------------
-                $tecnicoId = Tecnico::where('persona_id', $jugador->persona_id)->value('id');
+            // -----------------------------
+            // COMO TÉCNICO
+            // -----------------------------
+            $tecnicoId = Tecnico::where('persona_id', $jugador->persona_id)->value('id');
 
-                if (!empty($tecnicoId)) {
-                    $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
-                        ->where('tecnico_id', $tecnicoId)
-                        ->where('equipo_id', $equipoId)
-                        ->exists();
+            if (!empty($tecnicoId)) {
 
-                    if ($dirigio) {
+                $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
+                    ->where('tecnico_id', $tecnicoId)
+                    ->where('equipo_id', $equipoId)
+                    ->exists();
+
+                if ($dirigio) {
+
+                    // tomo TODOS los torneos del título, sin iterar partidos
+                    foreach ($tituloExtra->torneos as $torneoRelacionado) {
+
+                        if (in_array($torneoRelacionado->id, $countedTorneos)) continue;
+
                         if ($torneoRelacionado->ambito == 'Nacional') {
                             if ($torneoRelacionado->tipo == 'Copa') {
                                 $titulosTecnicoCopa++;
@@ -2350,41 +2357,42 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                         $countedTorneos[] = $torneoRelacionado->id;
                     }
                 }
+            }
 
-                // -----------------------------
-                // COMO JUGADOR
-                // -----------------------------
+            // -----------------------------
+            // COMO JUGADOR
+            // -----------------------------
 
-                // busco jugador asociado a la persona
-                $jugadorAsociado = Jugador::where('persona_id', $jugador->persona_id)->first();
+            // busco jugador asociado a la persona
+            $jugadorAsociado = Jugador::where('persona_id', $jugador->persona_id)->first();
 
-                if ($jugadorAsociado) {
+            if ($jugadorAsociado) {
 
-                    // verificar si jugó ese último partido
-                    $alineacionJugador = Alineacion::where('partido_id', $ultimoPartidoEquipo->id)
-                        ->where('equipo_id', $equipoId)
-                        ->where('jugador_id', $jugadorAsociado->id)
-                        ->exists();
+                $jugo = Alineacion::where('jugador_id', $jugadorAsociado->id)
+                    ->where('equipo_id', $equipoId)
+                    ->whereHas('partido.fecha.grupo', function($q) use ($torneosIds) {
+                        $q->whereIn('torneo_id', $torneosIds);
+                    })
+                    ->exists();
+//dd($jugo);
+                if ($jugo) {
 
-                    if ($alineacionJugador) {
-
-                        if ($torneoRelacionado->ambito == 'Nacional') {
-                            if ($torneoRelacionado->tipo == 'Copa') {
-                                $titulosJugadorCopa++;
-                            } else {
-                                $titulosJugadorLiga++;
-                            }
+                    foreach ($tituloExtra->torneos as $t) {
+                        if ($t->ambito == 'Nacional') {
+                            if ($t->tipo == 'Copa') $titulosJugadorCopa++;
+                            else $titulosJugadorLiga++;
                         } else {
                             $titulosJugadorInternacional++;
                         }
-
-                        $countedTorneos[] = $torneoRelacionado->id;
                     }
 
+                    $countedTorneos = array_merge($countedTorneos, $torneosIds);
                 }
-
             }
+
+
         }
+
 
 
 

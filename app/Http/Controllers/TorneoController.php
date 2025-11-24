@@ -713,12 +713,10 @@ order by promedio desc, puntaje desc, equipo ASC';
         $torneo=Torneo::findOrFail($torneo_id);
 
 
-        $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
-        $arrgrupos='';
-        foreach ($grupos as $grupo){
-            $arrgrupos .=$grupo->id.',';
-        }
-        $arrgrupos = substr($arrgrupos, 0, -1);//quito última coma
+        // GRUPOS
+        $arrgrupos = Grupo::where('torneo_id', $torneo_id)
+            ->pluck('id')
+            ->implode(',');
 
 
 
@@ -1024,7 +1022,10 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
             if(isset($equiposClasificados[$equipo->equipo_id])) {
                 $equipo->zona = $equiposClasificados[$equipo->equipo_id]->clasificacion->nombre;
-                continue;
+                // 🔥 Si está marcado manualmente como LIBERTADORES, NO cambiar la zona nunca
+                if ($equipo->zona === $zonaPrimera) {
+                    continue; // se saltea toda la lógica de posiciones
+                }
             }
 
             $inicio = 1;

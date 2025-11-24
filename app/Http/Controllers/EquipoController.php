@@ -558,17 +558,24 @@ SELECT
     COUNT(DISTINCT t.id) AS titulos,
     "0" AS errados,
     "0" AS atajos
-FROM jugadors j
+FROM plantilla_jugadors pj
+INNER JOIN plantillas pl ON pj.plantilla_id = pl.id
+INNER JOIN jugadors j ON pj.jugador_id = j.id
 INNER JOIN personas p ON j.persona_id = p.id
-LEFT JOIN alineacions a ON a.jugador_id = j.id
-LEFT JOIN partidos pa ON pa.id = a.partido_id
-LEFT JOIN fechas f ON f.id = pa.fecha_id
-LEFT JOIN grupos g ON g.id = f.grupo_id
-LEFT JOIN titulo_torneos tt ON tt.torneo_id = g.torneo_id
-LEFT JOIN titulos t ON t.id = tt.titulo_id AND t.equipo_id = '.$id.'
-WHERE t.id IS NOT NULL
-AND a.id IS NOT NULL
-GROUP BY j.id, p.foto, p.apellido, p.nombre';
+
+-- el jugador tiene que haber alineado en algún partido del torneo relacionado
+INNER JOIN alineacions a ON a.jugador_id = j.id AND a.equipo_id = pl.equipo_id
+INNER JOIN partidos pa ON pa.id = a.partido_id
+INNER JOIN fechas f ON f.id = pa.fecha_id
+INNER JOIN grupos g ON g.id = f.grupo_id
+
+-- el título debe estar asociado a uno de esos torneos (pivot titulo_torneos)
+INNER JOIN titulo_torneos tt ON tt.torneo_id = g.torneo_id
+INNER JOIN titulos t ON t.id = tt.titulo_id AND t.equipo_id = pl.equipo_id
+
+WHERE pl.equipo_id = '.$id.'
+GROUP BY j.id, p.foto, p.apellido, p.nombre
+';
 
         $sql .=' ) as subconsulta
 
