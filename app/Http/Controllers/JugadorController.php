@@ -2339,7 +2339,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
                 if ($dirigio) {
 
-
+                    $torneosTecnico->push($tituloExtra);
 
 
 
@@ -2376,8 +2376,55 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 //dd($jugo);
                 if ($jugo) {
 
+                    $partidosIds = Partido::whereHas('fecha.grupo', function($q) use ($torneosIds) {
+                        $q->whereIn('torneo_id', $torneosIds);
+                    })
+                        ->where(function($q) use ($equipoId) {
+                            $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
+                        })
+                        ->pluck('id');
 
-                        if ($tituloExtra->ambito == 'Nacional') {
+                    $tituloExtra->jugados = Alineacion::where('jugador_id', $jugadorAsociado->id)
+                            ->where('equipo_id', $equipoId)
+                            ->where('tipo','Titular')
+                            ->whereIn('partido_id', $partidosIds)->count()
+                        + Cambio::where('jugador_id', $jugadorAsociado->id)
+                            ->where('equipo_id', $equipoId)
+                            ->where('tipo','Entra')
+                            ->whereIn('partido_id', $partidosIds)->count();
+
+                    $tituloExtra->goles = Gol::where('jugador_id', $jugadorAsociado->id)
+                        ->whereIn('partido_id', $partidosIds)
+                        ->where('tipo','<>','En contra')
+                        ->count();
+
+                    $tarjetas = Tarjeta::where('jugador_id', $jugadorAsociado->id)
+                        ->whereIn('partido_id', $partidosIds)
+                        ->selectRaw("COUNT(CASE WHEN tipo='Amarilla' THEN 1 END) as amarillas,
+                         COUNT(CASE WHEN tipo='Roja' OR tipo='Doble Amarilla' THEN 1 END) as rojas")
+                        ->first();
+
+                    $tituloExtra->amarillas = $tarjetas->amarillas ?? 0;
+                    $tituloExtra->rojas = $tarjetas->rojas ?? 0;
+
+                    // Arqueros
+                    if ($jugador->tipoJugador === 'Arquero') {
+                        $arqueros = Alineacion::where('jugador_id', $jugadorAsociado->id)
+                            ->where('tipo','Titular')
+                            ->whereIn('partido_id', $partidosIds)
+                            ->with('partido')
+                            ->get();
+
+                        $tituloExtra->recibidos = 0;
+                        $tituloExtra->invictas = 0;
+                        foreach ($arqueros as $arquero) {
+                            $tituloExtra->recibidos += $arquero->partido->goles_recibidos_por_equipo($arquero->equipo_id);
+                            $tituloExtra->invictas += $arquero->partido->fue_invicto($arquero->equipo_id) ? 1 : 0;
+                        }
+                    }
+
+                    $torneosJugador->push($tituloExtra);
+                    if ($tituloExtra->ambito == 'Nacional') {
                             if ($tituloExtra->tipo == 'Copa') $titulosJugadorCopa++;
                             else $titulosJugadorLiga++;
                         } else {
