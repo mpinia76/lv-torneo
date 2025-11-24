@@ -8260,11 +8260,12 @@ private function normalizarMinuto(string $texto): int
         // Buscamos el texto entre "Director técnico" y "Asistente" (o fin del texto)
         if (preg_match('/Director técnico(.*?)(Asistente|$)/i', $text, $m)) {
             $nombres = trim($m[1]);
-            dd($nombres);
+
             // Buscar nombres con mayúscula inicial seguidos de al menos un espacio y otra palabra con mayúscula inicial
             // Ejemplo: "Xabi Alonso" o "Juan Pérez García"
             preg_match_all('/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/', $nombres, $matches);
             $dt = $matches[0];
+            dd($dt);
         }
 
         return $dt;
