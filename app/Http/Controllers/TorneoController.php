@@ -1009,15 +1009,10 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        // 🔥 Reordenar y reindexar después de meter manuales
-        $acumulado = collect($acumulado)
-            ->sortByDesc('puntaje')
-            ->sortByDesc('diferencia')
-            ->sortByDesc('golesl')
-            ->values()
-            ->all(); // <- volvemos a array si tu foreach espera array
-
-
+        // 🔥 1) Remover del acumulado los equipos marcados manualmente
+        $acumulado = array_values(array_filter($acumulado, function($eq) use ($equiposClasificados) {
+            return !isset($equiposClasificados[$eq->equipo_id]);
+        }));
 
         foreach ($acumulado as $index => $equipo) {
 
