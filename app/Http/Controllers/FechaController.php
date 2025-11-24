@@ -8263,7 +8263,7 @@ private function normalizarMinuto(string $texto): int
 
             // Buscar nombres con mayúscula inicial seguidos de al menos un espacio y otra palabra con mayúscula inicial
             // Ejemplo: "Xabi Alonso" o "Juan Pérez García"
-            preg_match_all('/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/', $nombres, $matches);
+            preg_match_all('/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñÁÉÍÓÚÑ]+)+/u', $nombres, $matches);
             $dt = $matches[0];
             dd($dt);
         }
