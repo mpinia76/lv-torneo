@@ -8459,7 +8459,7 @@ private function normalizarMinuto(string $texto): int
                 $awayDT = $this->getDT($xpath, 'away');
 
                 // ---- Reemplazar dd($localDT, $awayDT); por este bloque ----
-                //dd($localTitulares,$visitanteTitulares,$localSuplentes,$visitanteSuplentes,$localDT,$awayDT);
+                dd($localTitulares,$visitanteTitulares,$localSuplentes,$visitanteSuplentes,$localDT,$awayDT);
 // Helper: convierte el resultado de parsePlayers a la estructura esperada
                 $mapPlayerToEquipo = function(array $players, $tipoJugador) {
                     $out = [];
