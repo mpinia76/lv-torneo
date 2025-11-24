@@ -1017,7 +1017,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $promediosADescender[$p->equipo_id] = $p;
             }
         }
-
+        dd($libertadoresManuales);
         foreach ($acumulado as $index => $equipo) {
 
             // 🚫 Si el equipo está marcado manualmente como LIBERTADORES,
