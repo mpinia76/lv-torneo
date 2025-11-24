@@ -1010,11 +1010,12 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         // 🔥 Reordenar y reindexar después de meter manuales
-        $acumulado = collect($acumulado)
+        $acumulado = $acumulado
             ->sortByDesc('puntaje')
             ->sortByDesc('diferencia')
             ->sortByDesc('golesl')
             ->values();
+
 
         foreach ($acumulado as $index => $equipo) {
 
