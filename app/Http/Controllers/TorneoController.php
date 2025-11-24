@@ -1000,6 +1000,15 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             ->get()
             ->keyBy('equipo_id');
 
+        // 🔥 Equipos manuales marcados como LIBERTADORES (primera zona)
+        $libertadoresManuales = [];
+
+        foreach ($equiposClasificados as $equipoId => $clasificacion) {
+            if ($clasificacion->clasificacion->nombre == $zonaPrimera) {
+                $libertadoresManuales[] = $equipoId;   // guardar el ID
+            }
+        }
+
         // 1. Marcar equipos de promedio como Descenso
         $promediosADescender = [];
         if (!empty($promedios)) {
@@ -1010,6 +1019,14 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         foreach ($acumulado as $index => $equipo) {
+
+            // 🚫 Si el equipo está marcado manualmente como LIBERTADORES,
+            //    no se toca su zona y pasa al siguiente
+            if (in_array($equipo->equipo_id, $libertadoresManuales)) {
+                $equipo->zona = $zonaPrimera;
+                continue;
+            }
+
 
             $pos = $index + 1;
             $equipo->zona = 'Ninguna';
