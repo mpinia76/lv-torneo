@@ -133,7 +133,7 @@
                 <td><a href="{{route('jugadores.tarjetas', array('jugadorId' => $jugador->jugador_id,'tipo'=>'Rojas'))}}" >{{$jugador->rojas}}</a></td>
                 <td><a href="{{ route('jugadores.penals', ['jugadorId'=>$jugador->jugador_id]) }}">{{ $jugador->errados }} </a></td>
 
-                <td><a href="{{ route('jugadores.penals', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Atajo']) }}">{{ $jugador->atajos }}</a></td>
+                <td><a href="{{ route('jugadores.penals', ['jugadorId'=>$jugador->jugador_id,'tipo'=>'Atajó']) }}">{{ $jugador->atajos }}</a></td>
                 <td>{{$jugador->recibidos}} (@if($jugador->jugados){{round($jugador->recibidos / $jugador->jugados,2)}} @else 0 @endif)</td>
                 <td>{{$jugador->invictas}} (@if($jugador->jugados){{round($jugador->invictas / $jugador->jugados,2)}} @else 0 @endif)</td>
 
