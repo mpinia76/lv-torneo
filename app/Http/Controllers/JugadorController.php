@@ -47,39 +47,57 @@ class JugadorController extends Controller
      */
     public function index(Request $request)
     {
-
-
         $data = $request->all();
-        if ($request->has('buscarpor')){
+
+        if ($request->has('buscarpor')) {
             $nombre = $request->get('buscarpor');
-
-            $request->session()->put('nombre_filtro_jugador', $request->get('buscarpor'));
-
-        }
-        else{
+            $request->session()->put('nombre_filtro_jugador', $nombre);
+        } else {
             $nombre = $request->session()->get('nombre_filtro_jugador');
-
         }
 
         // Página actual
         $page = $request->get('page', session('jugadores_page', 1));
         $request->session()->put('jugadores_page', $page);
 
+        $jugadores = Jugador::select(
+            'jugadors.*',
+            'personas.name',
+            'personas.nombre',
+            'personas.apellido',
+            'personas.nacimiento',
+            'personas.fallecimiento',
+            'personas.ciudad',
+            'personas.nacionalidad',
+            'personas.foto'
+        )
+            ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
 
-        //$jugadores=Jugador::where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('email','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->paginate();
+            // 🔹 BÚSQUEDA AGRUPADA
+            ->where(function ($q) use ($nombre) {
+                if ($nombre) {
+                    $q->where('personas.nombre', 'like', "%$nombre%")
+                        ->orWhere('personas.apellido', 'like', "%$nombre%")
+                        ->orWhere('personas.name', 'like', "%$nombre%")
+                        ->orWhere('jugadors.tipoJugador', 'like', "%$nombre%")
+                        ->orWhere(DB::raw('TIMESTAMPDIFF(YEAR, personas.nacimiento, CURDATE())'), '=', $nombre);
+                }
+            })
 
-        $jugadores=Jugador::SELECT('jugadors.*','personas.name','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.ciudad','personas.nacionalidad','personas.foto')->Join('personas','personas.id','=','jugadors.persona_id')->where('nombre','like',"%$nombre%")->orWhere('apellido','like',"%$nombre%")->orWhere('name','like',"%$nombre%")->orWhere('tipoJugador','like',"%$nombre%")->orWhere(DB::raw('TIMESTAMPDIFF(YEAR,nacimiento,CURDATE())'),'=',"$nombre")->orderBy('apellido','ASC')->orderBy('nombre','ASC')->paginate(15, ['*'], 'page', $page)
+            // ✅ CHECKBOX: name largo
+            ->when($request->has('name_largo'), function ($q) {
+                $q->whereRaw('LENGTH(personas.name) > 40');
+                // SQL Server → LEN(personas.name) > 40
+            })
+
+            ->orderBy('personas.apellido', 'ASC')
+            ->orderBy('personas.nombre', 'ASC')
+            ->paginate(15, ['*'], 'page', $page)
             ->appends($data);
 
-        //$jugadores=Jugador::where('persona_id','like',"%4914%")->paginate();
-
-        //dd($jugadores);
-        //
-        //$jugadores=Jugador::orderBy('apellido','ASC')->paginate(2);
-        //return view('Jugador.index',compact('jugadores'));
-        //$jugadores = Jugador::all();
-        return view('jugadores.index', compact('jugadores','jugadores', 'data'));
+        return view('jugadores.index', compact('jugadores', 'data'));
     }
+
 
     /**
      * Show the form for creating a new resource.

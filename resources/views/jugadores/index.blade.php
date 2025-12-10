@@ -29,6 +29,20 @@
 
                 <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_jugador') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
 
+                <div class="form-check mr-2">
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="name_largo"
+                        value="1"
+                        {{ request('name_largo') ? 'checked' : '' }}
+                    >
+                    <label class="form-check-label">
+                        Nombre largo
+                    </label>
+                </div>
+
+
                 <button class="btn btn-success m-1" type="submit">Buscar</button>
             </form>
         </nav>
