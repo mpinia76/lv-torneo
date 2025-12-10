@@ -6221,11 +6221,11 @@ private function normalizarMinuto(string $texto): int
                                                                                             //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
                                                                                             //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
                                                                                             if (trim($jugadorSlugWeb) === trim($slugJugador)) {
-                                                                                                Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
-                                                                                                Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
+                                                                                                //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                                //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
 
                                                                                                 $recordTd = $recordTds->item($i);
-                                                                                                Log::channel('mi_log')->info(print_r($recordTd, true));
+                                                                                                //Log::channel('mi_log')->info(print_r($recordTd, true));
                                                                                                 if ($recordTd) {
                                                                                                     foreach ($recordTd->childNodes as $child) {
                                                                                                         if ($child->nodeName === 'img') {
@@ -6233,7 +6233,7 @@ private function normalizarMinuto(string $texto): int
                                                                                                         } elseif ($child->nodeType === XML_TEXT_NODE) {
                                                                                                             $texto = trim($child->textContent); // Ej: 25pt, 26pt, 8st
                                                                                                             if (!empty($texto) && isset($evento)) {
-                                                                                                                Log::channel('mi_log')->info("Evento: $evento en minuto $texto");
+                                                                                                                //Log::channel('mi_log')->info("Evento: $evento en minuto $texto");
 
                                                                                                                 if (stripos($evento, 'Penal errado') !== false) {
                                                                                                                     $minuto = $this->normalizarMinuto($texto);
