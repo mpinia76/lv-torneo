@@ -33,6 +33,12 @@ Route::group(['prefix' => 'admin'], function()
     });
     Route::get('/home', 'TorneoController@index')->name('index');
     Route::resource('torneos', 'TorneoController');
+    Route::get(
+        '/jugadores/name-completo-no-verificado',
+        'JugadorController@nameCompletoNoVerificado'
+    )->name('jugadores.nameCompletoNoVerificado');
+
+
     Route::resource('jugadores', 'JugadorController');
     Route::resource('equipos', 'EquipoController');
     Route::resource('fechas', 'FechaController');
@@ -54,6 +60,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('verificarPersonas', 'JugadorController@verificarPersonas')->name('jugadores.verificarPersonas');
 
     Route::post('verificar-similitud', 'JugadorController@verificarSimilitud')->name('jugadores.verificarSimilitud');
+
 
 
     Route::get('importarPartido', 'FechaController@importarPartido')->name('fechas.importarPartido');
