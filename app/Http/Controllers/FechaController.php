@@ -6218,14 +6218,14 @@ private function normalizarMinuto(string $texto): int
 
                                                                                         foreach ($playerLinks as $i => $linkNode) {
                                                                                             $jugadorSlugWeb = trim(explode('/', $linkNode->getAttribute('href'))[3] ?? '');
-                                                                                            Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
-                                                                                            Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
+                                                                                            //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                            //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
                                                                                             if (trim($jugadorSlugWeb) === trim($slugJugador)) {
-                                                                                                //Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
-                                                                                                //Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
+                                                                                                Log::channel('mi_log')->info('Link: ' . $jugadorSlugWeb);
+                                                                                                Log::channel('mi_log')->info('Jugador DB: ' . $slugJugador);
 
                                                                                                 $recordTd = $recordTds->item($i);
-
+                                                                                                Log::channel('mi_log')->info(print_r($recordTd, true));
                                                                                                 if ($recordTd) {
                                                                                                     foreach ($recordTd->childNodes as $child) {
                                                                                                         if ($child->nodeName === 'img') {
