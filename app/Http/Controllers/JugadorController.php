@@ -86,7 +86,7 @@ class JugadorController extends Controller
 
             // ✅ CHECKBOX: name largo
             ->when($request->has('name_largo'), function ($q) {
-                $q->whereRaw('LENGTH(personas.name) > 40');
+                $q->whereRaw('LENGTH(personas.name) > 20');
                 // SQL Server → LEN(personas.name) > 40
             })
 
