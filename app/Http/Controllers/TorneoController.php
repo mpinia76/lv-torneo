@@ -974,7 +974,9 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         // Obtener torneos involucrados en el acumulado
-        $torneosAnterioresIds = $acumuladoTorneos->pluck('torneoAnterior_id')->toArray();
+        $torneosAnterioresIds = $acumuladoTorneos->pluck('torneoAnterior_id')->push($torneo->id) // 👈 agregamos el torneo actual
+        ->unique()
+            ->toArray();
 
 // Buscar los campeones
         $campeones = PosicionTorneo::whereIn('torneo_id', $torneosAnterioresIds)
