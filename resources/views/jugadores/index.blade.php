@@ -21,13 +21,26 @@
                 </ul>
             </div>
         @endif
-        <a class="btn btn-success m-1" href="{{route('jugadores.create')}}">Nuevo</a>
-        <a class="btn btn-info m-1" href="{{route('jugadores.importar')}}">Importar</a>
-        <a class="btn btn-primary m-1" href="{{route('jugadores.verificarPersonas')}}">Verificar Personas</a>
-        <a class="btn btn-warning m-1"
-           href="{{ route('jugadores.nameCompletoNoVerificado') }}">
-            Verificar nombre largo
-        </a>
+        <div class="d-flex flex-wrap align-items-center mb-2">
+            <a class="btn btn-success m-1" href="{{route('jugadores.create')}}">Nuevo</a>
+            <a class="btn btn-info m-1" href="{{route('jugadores.importar')}}">Importar</a>
+            <a class="btn btn-primary m-1" href="{{route('jugadores.verificarPersonas')}}">Verificar Personas</a>
+            <a class="btn btn-warning m-1"
+               href="{{ route('jugadores.nameCompletoNoVerificado') }}">
+                Verificar nombre largo
+            </a>
+            <form action="{{ route('jugadores.verificarNombreApellidoSimple') }}"
+                  method="POST"
+                  onsubmit="return confirm('¿Verificar automáticamente todos los jugadores con nombre y apellido simples?')"
+                  class="d-inline-block">
+
+                @csrf
+                <button class="btn btn-success m-1">
+                    Verificar nombres simples
+                </button>
+            </form>
+        </div>
+
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

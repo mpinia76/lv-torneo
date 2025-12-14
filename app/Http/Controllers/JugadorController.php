@@ -2829,6 +2829,20 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
     }
 
 
+    public function verificarNombreApellidoSimple()
+    {
+        $cantidad = Persona::where(function ($q) {
+            $q->where('verificado', 0)
+                ->orWhereNull('verificado');
+        })
+            ->whereRaw("TRIM(name) = TRIM(CONCAT(nombre, ' ', apellido))")
+            ->whereRaw("LENGTH(TRIM(name)) - LENGTH(REPLACE(TRIM(name), ' ', '')) = 1")
+            ->update(['verificado' => 1]);
+
+        return redirect()
+            ->back()
+            ->with('success', "Se verificaron automáticamente {$cantidad} personas.");
+    }
 
 
 }
