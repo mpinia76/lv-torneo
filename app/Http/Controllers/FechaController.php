@@ -6702,14 +6702,14 @@ private function normalizarMinuto(string $texto): int
                                     }
 
                                 } else {
-                                    $success .= '<span style="color:red">No se econtró la URL del jugador ' . $alineacion->jugador->persona->nombre . ' ' . $alineacion->jugador->persona->apellido . '</span><br>';
+                                    $success .= '<span style="color:red">No se econtró la URL del jugador ' . $alineacion->dorsal . ' ' .$alineacion->jugador->persona->name . '</span><br>';
                                 }
 
 
                             } else {
 
                                 //Log::channel('mi_log')->info('OJO!!! No se econtró la URL del jugador' , []);
-                                $success .= '<span style="color:red">No se econtró la URL del jugador ' . $alineacion->jugador->persona->name . '</span><br>';
+                                $success .= '<span style="color:red">No se econtró la URL del jugador ' . $alineacion->dorsal . ' ' .$alineacion->jugador->persona->name . '</span><br>';
                             }
                             // }
 
@@ -7428,7 +7428,7 @@ private function normalizarMinuto(string $texto): int
                                     }
 
                                 } else {
-                                    $success .= '<span style="color:red">No se econtró la URL del jugador ' . $gol->jugador->persona->nombre . ' ' . $gol->jugador->persona->apellido . '</span><br>';
+                                    $success .= '<span style="color:red">No se econtró la URL del jugador ' . $gol->jugador->persona->name . '</span><br>';
                                 }
 
 
