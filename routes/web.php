@@ -48,6 +48,10 @@ Route::group(['prefix' => 'admin'], function()
         'JugadorController@confirmarNombreLargo'
     )->name('jugadores.confirmarNombreLargo');
 
+    Route::post(
+        'jugadores/confirmar-nombres-largos',
+        'JugadorController@confirmarNombresLargos'
+    )->name('jugadores.confirmarNombresLargos');
 
 
     Route::resource('jugadores', 'JugadorController');

@@ -3031,5 +3031,23 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             ->with('success', "Se verificaron automáticamente {$cantidad} personas.");
     }
 
+    public function confirmarNombresLargos(Request $request)
+    {
+        $seleccionados = $request->input('personas', []);
+
+        if (empty($seleccionados)) {
+            return back()->with('status', 'No se seleccionó ningún registro.');
+        }
+
+        foreach ($seleccionados as $personaId => $nombre) {
+            Persona::where('id', $personaId)->update([
+                'name'       => $nombre,
+                'verificado' => 1,
+            ]);
+        }
+
+        return back()->with('status', 'Nombres confirmados correctamente.');
+    }
+
 
 }

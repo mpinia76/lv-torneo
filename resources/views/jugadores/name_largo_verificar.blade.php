@@ -13,10 +13,24 @@
                 {{ \Session::get('status') }}
             </div>
         @endif
+        <form method="POST" action="{{ route('jugadores.confirmarNombresLargos') }}">
+            @csrf
+            <button type="button"
+                    class="btn btn-primary mb-2"
+                    id="seleccionarTodos">
+                Seleccionar todos
+            </button>
 
+            <button type="submit"
+                    class="btn btn-success mb-2"
+                    onclick="return confirm('¿Confirmar los nombres seleccionados?')">
+                Confirmar seleccionados
+            </button>
         <table class="table">
             <thead>
-            <th></th>
+            <th>
+                <input type="checkbox" id="checkAll">
+            </th>
             <th>Posición</th>
             <th>Actual</th>
             <th>Apellido</th>
@@ -29,6 +43,13 @@
 
             @foreach($jugadores as $jugador)
                 <tr>
+                    <td>
+                        @if($jugador->nombre_sugerido)
+                            <input type="checkbox"
+                                   name="personas[{{ $jugador->persona_id }}]"
+                                   value="{{ $jugador->nombre_sugerido }}">
+                        @endif
+                    </td>
                     <td>
                         @if($jugador->foto)
                             <img class="imgCircle" src="{{ url('images/'.$jugador->foto) }}">
@@ -93,7 +114,7 @@
                 </tr>
             @endforeach
         </table>
-
+        </form>
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-9">
                 {{ $jugadores->appends($data)->links() }}
@@ -101,4 +122,14 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 <strong>Total: {{ $jugadores->total() }}</strong>
+
+
+                <script>
+                    document.getElementById('seleccionarTodos')?.addEventListener('click', function () {
+                        document
+                            .querySelectorAll('input[type=checkbox][name^="personas"]')
+                            .forEach(cb => cb.checked = true);
+                    });
+                </script>
+
 @endsection
