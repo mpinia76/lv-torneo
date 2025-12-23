@@ -110,7 +110,6 @@ class JugadorController extends Controller
             };
 
             $intentos = array_filter([
-                $alineacion->jugador->url_nombre,
                 $sanear($persona->name),
                 $sanear($apellidoCompleto) . '-' . $sanear($nombre),
                 $sanear($nombre) . '-' . $sanear($apellidoCompleto),
