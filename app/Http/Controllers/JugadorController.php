@@ -99,17 +99,9 @@ class JugadorController extends Controller
         $apellido = $apellidoParts[0] ?? '';
         $apellido2 = $apellidoParts[1] ?? '';
 
-        $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
-        $cachedUrl = Cache::get($cacheKey);
         //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
         $html2 = null;
-
-        if ($cachedUrl) {
-            // Ya tenemos la URL válida en cache
-            $slugJugador = basename($cachedUrl);
-            $html2 = HttpHelper::getHtmlContent($cachedUrl);
-        }
 
         if (!$html2) {
             // Función local para limpiar nombres
