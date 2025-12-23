@@ -158,8 +158,28 @@ class JugadorController extends Controller
         if (!$node) return null;
 
         $partes = array_map('trim', explode('/', $node->textContent));
-        return end($partes) ?: null;
+        $nombreCrudo = end($partes);
+
+        if (!$nombreCrudo) {
+            return null;
+        }
+
+        // 🔹 Normalizar espacios
+        $nombreCrudo = preg_replace('/\s+/', ' ', trim($nombreCrudo));
+
+        // 🔹 Separar palabras
+        $tokens = explode(' ', $nombreCrudo);
+
+        // Si hay al menos 2 palabras, asumimos "Apellido Nombre"
+        if (count($tokens) >= 2) {
+            $apellido = array_shift($tokens);   // primero
+            $nombre   = implode(' ', $tokens);  // resto
+            return trim($nombre . ' ' . $apellido);
+        }
+
+        return $nombreCrudo;
     }
+
 
 
     public function nameCompletoNoVerificado(Request $request)
