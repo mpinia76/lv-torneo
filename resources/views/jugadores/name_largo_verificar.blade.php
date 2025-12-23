@@ -101,3 +101,4 @@
 
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 <strong>Total: {{ $jugadores->total() }}</strong>
+@endsection
