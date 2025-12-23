@@ -87,40 +87,57 @@ class JugadorController extends Controller
             return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
         };
 
-        $apellidoBase = trim(explode(' ', $persona->apellido)[0]);
-        $nombreBase   = trim(explode(' ', $persona->nombre)[0]);
+        $nombreParts = explode(' ', trim($persona->nombre));
+        $apellidoParts = explode(' ', trim($persona->apellido));
 
-        $apellido = $persona->apellido;
-        $nombre   = $persona->nombre;
+        // Detectar si nombre o apellido son compuestos
+        $nombreCompleto = implode(' ', $nombreParts);
+        $apellidoCompleto = implode(' ', $apellidoParts);
 
-        $apellidoCompleto = $persona->apellido;
-        $nombreCompleto   = $persona->nombre;
-        $nombre2          = null; // si lo tenés
+        $nombre = $nombreParts[0] ?? '';
+        $nombre2 = $nombreParts[1] ?? '';
+        $apellido = $apellidoParts[0] ?? '';
+        $apellido2 = $apellidoParts[1] ?? '';
 
-        $intentos = array_filter([
-            optional($alineacion)->jugador->url_nombre ?? null,
-            $sanear($persona->name),
-            $sanear($apellidoBase) . '-' . $sanear($nombreBase),
-            $sanear($nombreBase) . '-' . $sanear($apellidoBase),
-            $sanear($apellidoCompleto) . '-' . $sanear($nombre),
-            $sanear($nombre) . '-' . $sanear($apellidoCompleto),
-            $sanear($apellido) . '-' . $sanear($nombreCompleto),
-            $sanear($nombreCompleto) . '-' . $sanear($apellido),
-            $sanear($apellido) . '-' . $sanear($nombre),
-            $sanear($nombre) . '-' . $sanear($apellido),
-            $sanear($apellido) . '-' . $sanear($nombre2),
-            $sanear($persona->apellido),
-            $sanear($persona->nombre),
-        ]);
+        $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
+        $cachedUrl = Cache::get($cacheKey);
+        //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
-        $nacionalidadSlug = $sanear($persona->nacionalidad);
+        $html2 = null;
 
-        foreach ($intentos as $slug) {
+        if ($cachedUrl) {
+            // Ya tenemos la URL válida en cache
+            $slugJugador = basename($cachedUrl);
+            $html2 = HttpHelper::getHtmlContent($cachedUrl);
+        }
 
-            $urls = [
-                "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}",
-                "http://www.futbol360.com.ar/jugadores/{$slug}",
-            ];
+        if (!$html2) {
+            // Función local para limpiar nombres
+            $sanear = function ($txt) {
+                return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
+            };
+
+            $intentos = array_filter([
+                $alineacion->jugador->url_nombre,
+                $sanear($persona->name),
+                $sanear($apellidoCompleto) . '-' . $sanear($nombre),
+                $sanear($nombre) . '-' . $sanear($apellidoCompleto),
+                $sanear($apellido) . '-' . $sanear($nombreCompleto),
+                $sanear($nombreCompleto) . '-' . $sanear($apellido),
+                $sanear($apellido) . '-' . $sanear($nombre),
+                $sanear($nombre) . '-' . $sanear($apellido),
+                $sanear($apellido) . '-' . $sanear($nombre2),
+                $sanear($persona->apellido),
+                $sanear($persona->nombre),
+            ]);
+
+            $nacionalidadSlug = $sanear($persona->nacionalidad);
+
+            $urls = [];
+            foreach ($intentos as $slug) {
+                $urls[] = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}";
+                $urls[] = "http://www.futbol360.com.ar/jugadores/{$slug}";
+            }
 
             foreach ($urls as $urlJugador) {
                 $html = HttpHelper::getHtmlContent($urlJugador);
