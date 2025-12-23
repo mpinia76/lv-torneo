@@ -29,6 +29,8 @@
                href="{{ route('jugadores.nameCompletoNoVerificado') }}">
                 Verificar nombre largo
             </a>
+
+
             <form action="{{ route('jugadores.verificarNombreApellidoSimple') }}"
                   method="POST"
                   onsubmit="return confirm('¿Verificar automáticamente todos los jugadores con nombre y apellido simples?')"

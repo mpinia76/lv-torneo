@@ -81,12 +81,81 @@ class JugadorController extends Controller
         return view('jugadores.index', compact('jugadores','jugadores', 'data'));
     }
 
+    private function obtenerUrlJugador(Persona $persona, $alineacion = null)
+    {
+        $sanear = function ($txt) {
+            return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
+        };
+
+        $apellido = $persona->apellido;
+        $nombre   = $persona->nombre;
+
+        $apellidoCompleto = $persona->apellido;
+        $nombreCompleto   = $persona->nombre;
+        $nombre2          = null; // si lo tenés
+
+        $intentos = array_filter([
+            optional($alineacion)->jugador->url_nombre ?? null,
+            $sanear($persona->name),
+            $sanear($apellidoCompleto) . '-' . $sanear($nombre),
+            $sanear($nombre) . '-' . $sanear($apellidoCompleto),
+            $sanear($apellido) . '-' . $sanear($nombreCompleto),
+            $sanear($nombreCompleto) . '-' . $sanear($apellido),
+            $sanear($apellido) . '-' . $sanear($nombre),
+            $sanear($nombre) . '-' . $sanear($apellido),
+            $sanear($apellido) . '-' . $sanear($nombre2),
+            $sanear($persona->apellido),
+            $sanear($persona->nombre),
+        ]);
+
+        $nacionalidadSlug = $sanear($persona->nacionalidad);
+
+        foreach ($intentos as $slug) {
+
+            $urls = [
+                "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}",
+                "http://www.futbol360.com.ar/jugadores/{$slug}",
+            ];
+
+            foreach ($urls as $urlJugador) {
+                $html = HttpHelper::getHtmlContent($urlJugador);
+
+                if ($html) {
+                    return [
+                        'url'  => $urlJugador,
+                        'html' => $html,
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function obtenerNombreDesdeHtml($html)
+    {
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        $node = $xpath->query('//div[contains(@class,"route")]')->item(0);
+        if (!$node) return null;
+
+        $partes = array_map('trim', explode('/', $node->textContent));
+        return end($partes) ?: null;
+    }
+
+
     public function nameCompletoNoVerificado(Request $request)
     {
         $data = $request->all();
 
         $jugadores = Jugador::select(
             'jugadors.*',
+            'personas.id as persona_id',
             'personas.name',
             'personas.nombre',
             'personas.apellido',
@@ -99,10 +168,10 @@ class JugadorController extends Controller
         )
             ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
 
-            // ✅ name = nombre + apellido
+            // name = nombre + apellido
             ->whereRaw("TRIM(personas.name) = TRIM(CONCAT(personas.nombre, ' ', personas.apellido))")
 
-            // ✅ NO verificados
+            // no verificados
             ->where(function ($q) {
                 $q->where('personas.verificado', 0)
                     ->orWhereNull('personas.verificado');
@@ -113,8 +182,93 @@ class JugadorController extends Controller
             ->paginate(15)
             ->appends($data);
 
-        return view('jugadores.index', compact('jugadores', 'data'));
+        /**
+         * 🔥 ACÁ agregamos el scraping de sugerencia
+         *    SIN tocar persona
+         */
+        foreach ($jugadores as $jugador) {
+
+            $persona = Persona::find($jugador->persona_id);
+
+            $resultado = $this->obtenerUrlJugador($persona);
+
+            if (!$resultado) {
+                $jugador->nombre_sugerido = null;
+                $jugador->url_sugerida = null;
+                continue;
+            }
+
+            $nombreWeb = $this->obtenerNombreDesdeHtml($resultado['html']);
+
+            $jugador->nombre_sugerido = $nombreWeb;
+            $jugador->url_sugerida    = $resultado['url'];
+
+            // ⚠️ no se guarda nada en DB
+        }
+
+        return view('jugadores.name_largo_verificar', compact('jugadores', 'data'));
     }
+
+    function sanear_string($string)
+    {
+
+        $string = trim($string);
+
+        $string = str_replace(
+            array('á', 'à', 'ä', 'â', 'ã', 'ª', 'Á', 'À', 'Â', 'Ä'),
+            array('a', 'a', 'a', 'a' , 'a', 'a', 'A', 'A', 'A', 'A'),
+            $string
+        );
+
+        $string = str_replace(
+            array('é', 'è', 'ë', 'ê', 'É', 'È', 'Ê', 'Ë'),
+            array('e', 'e', 'e', 'e', 'E', 'E', 'E', 'E'),
+            $string
+        );
+
+        $string = str_replace(
+            array('í', 'ì', 'ï', 'î', 'Í', 'Ì', 'Ï', 'Î'),
+            array('i', 'i', 'i', 'i', 'I', 'I', 'I', 'I'),
+            $string
+        );
+
+        $string = str_replace(
+            array('ó', 'ò', 'ö', 'ô', 'Ó', 'Ò', 'Ö', 'Ô'),
+            array('o', 'o', 'o', 'o', 'O', 'O', 'O', 'O'),
+            $string
+        );
+
+        $string = str_replace(
+            array('ú', 'ù', 'ü', 'û', 'Ú', 'Ù', 'Û', 'Ü'),
+            array('u', 'u', 'u', 'u', 'U', 'U', 'U', 'U'),
+            $string
+        );
+
+        $string = str_replace(
+            array('ñ', 'Ñ', 'ç', 'Ç'),
+            array('n', 'N', 'c', 'C',),
+            $string
+        );
+
+// Esta parte elimina cualquier carácter extraño, pero conserva guiones
+        $string = preg_replace('/[^A-Za-z0-9\-]/', '', $string);
+
+
+
+        return $string;
+    }
+
+    public function confirmarNombreLargo(Request $request, $personaId)
+    {
+        $persona = Persona::findOrFail($personaId);
+
+        $persona->name = $request->name;
+        $persona->verificado = 1;
+        $persona->save();
+
+        return back()->with('status', 'Nombre confirmado');
+    }
+
 
 
     /**

@@ -43,6 +43,13 @@ Route::group(['prefix' => 'admin'], function()
         'JugadorController@verificarNombreApellidoSimple'
     )->name('jugadores.verificarNombreApellidoSimple');
 
+    Route::post(
+        '/jugadores/confirmar-nombre-largo/{persona}',
+        'JugadorController@confirmarNombreLargo'
+    )->name('jugadores.confirmarNombreLargo');
+
+
+
     Route::resource('jugadores', 'JugadorController');
     Route::resource('equipos', 'EquipoController');
     Route::resource('fechas', 'FechaController');
