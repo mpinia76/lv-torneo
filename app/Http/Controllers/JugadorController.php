@@ -87,6 +87,9 @@ class JugadorController extends Controller
             return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
         };
 
+        $apellidoBase = trim(explode(' ', $persona->apellido)[0]);
+        $nombreBase   = trim(explode(' ', $persona->nombre)[0]);
+
         $apellido = $persona->apellido;
         $nombre   = $persona->nombre;
 
@@ -97,6 +100,8 @@ class JugadorController extends Controller
         $intentos = array_filter([
             optional($alineacion)->jugador->url_nombre ?? null,
             $sanear($persona->name),
+            $sanear($apellidoBase) . '-' . $sanear($nombreBase),
+            $sanear($nombreBase) . '-' . $sanear($apellidoBase),
             $sanear($apellidoCompleto) . '-' . $sanear($nombre),
             $sanear($nombre) . '-' . $sanear($apellidoCompleto),
             $sanear($apellido) . '-' . $sanear($nombreCompleto),
