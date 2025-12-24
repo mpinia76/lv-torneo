@@ -31,8 +31,8 @@
             <th>
                 <input type="checkbox" id="checkAll">
             </th>
+            <th></th>
             <th>Posición</th>
-            <th>Tipo</th>
             <th>Actual</th>
             <th>Apellido</th>
             <th>Nombre</th>
