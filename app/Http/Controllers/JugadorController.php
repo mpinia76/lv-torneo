@@ -985,9 +985,29 @@ group by tecnico_id
                 }
 
 
-                $consultarJugador = Jugador::where('persona_id', '=', $jugador->persona_id)->first();
-                $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$equipoId)->where('jugador_id','=',$consultarJugador->id)->first();
+                // === CALCULAR PARTIDOS DEL TORNEO RELACIONADO ===
 
+// GRUPOS
+                $arrgrupos = Grupo::where('torneo_id', $torneoRelacionado->id)
+                    ->pluck('id')
+                    ->toArray();
+
+// FECHAS
+                $arrfechas = Fecha::whereIn('grupo_id', $arrgrupos)
+                    ->pluck('id')
+                    ->toArray();
+
+// PARTIDOS
+                $arrpartidos = Partido::whereIn('fecha_id', $arrfechas)
+                    ->pluck('id')
+                    ->toArray();
+
+
+                $consultarJugador = Jugador::where('persona_id', '=', $jugador->persona_id)->first();
+                $alineacion = Alineacion::whereIn('partido_id', $arrpartidos)
+                    ->where('equipo_id', $equipoId)
+                    ->where('jugador_id', $consultarJugador->id)
+                    ->first();
 
 
 
