@@ -81,8 +81,10 @@ class JugadorController extends Controller
         return view('jugadores.index', compact('jugadores','jugadores', 'data'));
     }
 
-    private function obtenerUrlJugador(Persona $persona, $alineacion = null)
+    private function obtenerUrlJugador(Jugador $jugador, $alineacion = null)
     {
+
+        $persona = Persona::find($jugador->persona_id);
         $sanear = function ($txt) {
             return strtolower($this->sanear_string(str_replace(' ', '-', $txt)));
         };
@@ -110,6 +112,7 @@ class JugadorController extends Controller
             };
 
             $intentos = array_filter([
+                $jugador->url_nombre,
                 $sanear($persona->name),
                 $sanear($apellidoCompleto) . '-' . $sanear($nombre),
                 $sanear($nombre) . '-' . $sanear($apellidoCompleto),
@@ -221,9 +224,7 @@ class JugadorController extends Controller
          */
         foreach ($jugadores as $jugador) {
 
-            $persona = Persona::find($jugador->persona_id);
-
-            $resultado = $this->obtenerUrlJugador($persona);
+            $resultado = $this->obtenerUrlJugador($jugador);
 
             if (!$resultado) {
                 $jugador->nombre_sugerido = null;
