@@ -212,7 +212,7 @@ class JugadorController extends Controller
 
             ->orderBy('personas.apellido', 'ASC')
             ->orderBy('personas.nombre', 'ASC')
-            ->paginate(15)
+            ->paginate(30)
             ->appends($data);
 
         /**

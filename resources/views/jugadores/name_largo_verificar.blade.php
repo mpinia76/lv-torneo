@@ -90,28 +90,28 @@
 
                     <td>
                         @if($jugador->nombre_sugerido)
-                            <div class="d-flex flex-wrap">
 
-                                {{-- Confirmar --}}
-                                <form method="POST"
-                                      action="{{ route('jugadores.confirmarNombreLargo', $jugador->persona_id) }}"
-                                      class="m-1">
-                                    @csrf
-                                    <input type="hidden" name="name" value="{{ $jugador->nombre_sugerido }}">
-                                    <button class="btn btn-success btn-sm">
-                                        ✔ Confirmar
-                                    </button>
-                                </form>
+                            <input type="hidden"
+                                   name="name"
+                                   value="{{ $jugador->nombre_sugerido }}">
 
-                                {{-- Editar persona --}}
+                            <button type="submit"
+                                    class="btn btn-success btn-sm"
+                                    formaction="{{ route('jugadores.confirmarNombreLargo', $jugador->persona_id) }}"
+                                    onclick="return confirm('¿Confirmar este nombre?')">
+                                ✔ Confirmar
+                            </button>
 
-
-                            </div>
                         @else
                             <span class="text-muted">Sin sugerencia</span>
                         @endif
-                            <a href="{{route('jugadores.edit', $jugador->id)}}" class="btn btn-primary m-1">Editar</a>
+
+                        <a href="{{ route('jugadores.edit', $jugador->id) }}"
+                           class="btn btn-primary btn-sm m-1">
+                            Editar
+                        </a>
                     </td>
+
                 </tr>
             @endforeach
         </table>
