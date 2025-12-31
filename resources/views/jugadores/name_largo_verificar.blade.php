@@ -114,6 +114,8 @@
 
                 </tr>
             @endforeach
+
+        </table>
             <button type="button"
                     class="btn btn-primary mb-2"
                     id="seleccionarTodos">
@@ -125,7 +127,6 @@
                     onclick="return confirm('¿Confirmar los nombres seleccionados?')">
                 Confirmar seleccionados
             </button>
-        </table>
         </form>
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-9">
