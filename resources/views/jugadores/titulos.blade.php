@@ -189,7 +189,7 @@
 
                         </td>
                         <td>
-                            @if($torneo->escudo)
+                            @if($torneo->escudo ?? false)
                                 @php $escudos = explode(',',$torneo->escudo); @endphp
                                 @foreach($escudos as $escudo)
                                     @if($escudo!='')
