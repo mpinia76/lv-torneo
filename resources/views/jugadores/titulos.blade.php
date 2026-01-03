@@ -165,6 +165,7 @@
                 @endphp
                 @foreach($torneosTecnico as $torneo)
                     @php
+                    dd($torneo);
                         $totalJugados += $torneo->jugados ?? 0;
                         $totalGanados += $torneo->ganados ?? 0;
                         $totalEmpatados += $torneo->empatados ?? 0;
@@ -205,7 +206,18 @@
                             @endif
                         </td>
                         <td>{{ $torneo->puntaje ?? 0}}</td>
-                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo]) }}">{{ $torneo->jugados ?? 0}}</a></td>
+                        <td>
+                            @if(isset($torneo->idTecnico))
+                                <a href="{{ route('tecnicos.jugados', [
+            'tecnicoId' => $torneo->idTecnico,
+            'torneoId'  => $torneo->idTorneo
+        ]) }}">
+                                    {{ $torneo->jugados ?? 0 }}
+                                </a>
+                            @else
+                                {{ $torneo->jugados ?? 0 }}
+                            @endif
+                        </td>
                         <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados']) }}">{{ $torneo->ganados ?? 0}}</a></td>
                         <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados']) }}">{{ $torneo->empatados ?? 0}}</a></td>
                         <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Perdidos']) }}">{{ $torneo->perdidos ?? 0}}</a></td>
