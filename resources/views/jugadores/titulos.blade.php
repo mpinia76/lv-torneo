@@ -166,12 +166,12 @@
                 @foreach($torneosTecnico as $torneo)
                     @php
                         $totalJugados += $torneo->jugados ?? 0;
-                        $totalGanados += $torneo->ganados;
-                        $totalEmpatados += $torneo->empatados;
-                        $totalPerdidos += $torneo->perdidos;
-                        $totalFavor += $torneo->favor;
-                        $totalContra += $torneo->contra;
-                        $totalPuntaje += $torneo->puntaje;
+                        $totalGanados += $torneo->ganados ?? 0;
+                        $totalEmpatados += $torneo->empatados ?? 0;
+                        $totalPerdidos += $torneo->perdidos ?? 0;
+                        $totalFavor += $torneo->favor ?? 0;
+                        $totalContra += $torneo->contra ?? 0;
+                        $totalPuntaje += $torneo->puntaje ?? 0;
                     @endphp
                     <tr>
                         <td>{{ $i++ }}</td>
