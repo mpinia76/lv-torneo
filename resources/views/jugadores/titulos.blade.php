@@ -162,10 +162,11 @@
                 @php
                     $i = 1;
                     $totalJugados = $totalGanados = $totalEmpatados = $totalPerdidos = $totalFavor = $totalContra = $totalPuntaje = 0;
+                    dd($torneosTecnico);
                 @endphp
                 @foreach($torneosTecnico as $torneo)
                     @php
-                    dd($torneo);
+
                         $totalJugados += $torneo->jugados ?? 0;
                         $totalGanados += $torneo->ganados ?? 0;
                         $totalEmpatados += $torneo->empatados ?? 0;
