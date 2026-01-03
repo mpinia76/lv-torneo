@@ -165,7 +165,7 @@
                 @endphp
                 @foreach($torneosTecnico as $torneo)
                     @php
-                        $totalJugados += $torneo->jugados;
+                        $totalJugados += $torneo->jugados ?? 0;
                         $totalGanados += $torneo->ganados;
                         $totalEmpatados += $torneo->empatados;
                         $totalPerdidos += $torneo->perdidos;
