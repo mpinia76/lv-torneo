@@ -2409,6 +2409,13 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
         $titulosJugadorInternacional = 0;
 
         foreach ($torneosJugador as $torneo) {
+            // 🔒 INICIALIZACIÓN OBLIGATORIA
+            $torneo->jugados    = 0;
+            $torneo->goles      = 0;
+            $torneo->amarillas  = 0;
+            $torneo->rojas      = 0;
+            $torneo->recibidos  = 0;
+            $torneo->invictas   = 0;
             // Verifico si el jugador participó en algún partido del torneo campeón
             $alineacion = Alineacion::whereHas('partido', function($query) use ($torneo) {
                 $query->whereHas('fecha.grupo', function($q) use ($torneo) {
