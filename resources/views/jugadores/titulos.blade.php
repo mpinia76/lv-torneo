@@ -177,11 +177,16 @@
                         <td>{{ $i++ }}</td>
                         <td>
                             <div class="d-flex align-items-center">
-                                @if($torneo->escudoTorneo)
-                                    <img src="{{ url('images/'.$torneo->escudoTorneo) }}" alt="{{ $torneo->nombreTorneo }}" height="25" class="me-2 rounded shadow-sm">
+                                @if($torneo->escudoTorneo ?? false)
+                                    <img src="{{ url('images/'.$torneo->escudoTorneo) }}"
+                                         alt="{{ $torneo->nombreTorneo ?? '' }}"
+                                         height="25"
+                                         class="me-2 rounded shadow-sm">
                                 @endif
-                                <span class="fw-semibold">{{ $torneo->nombreTorneo }}</span>
+
+                                <span class="fw-semibold">{{ $torneo->nombreTorneo ?? '' }}</span>
                             </div>
+
                         </td>
                         <td>
                             @if($torneo->escudo)
