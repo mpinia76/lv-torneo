@@ -204,15 +204,15 @@
                                 @endforeach
                             @endif
                         </td>
-                        <td>{{ $torneo->puntaje }}</td>
-                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo]) }}">{{ $torneo->jugados }}</a></td>
-                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados']) }}">{{ $torneo->ganados }}</a></td>
-                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados']) }}">{{ $torneo->empatados }}</a></td>
-                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Perdidos']) }}">{{ $torneo->perdidos }}</a></td>
-                        <td>{{ $torneo->favor }}</td>
-                        <td>{{ $torneo->contra }}</td>
-                        <td>{{ $torneo->favor - $torneo->contra }}</td>
-                        <td>{{ $torneo->porcentaje }}</td>
+                        <td>{{ $torneo->puntaje ?? 0}}</td>
+                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo]) }}">{{ $torneo->jugados ?? 0}}</a></td>
+                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Ganados']) }}">{{ $torneo->ganados ?? 0}}</a></td>
+                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Empatados']) }}">{{ $torneo->empatados ?? 0}}</a></td>
+                        <td><a href="{{ route('tecnicos.jugados',['tecnicoId'=>$torneo->idTecnico,'torneoId'=>$torneo->idTorneo,'tipo'=>'Perdidos']) }}">{{ $torneo->perdidos ?? 0}}</a></td>
+                        <td>{{ $torneo->favor ?? 0}}</td>
+                        <td>{{ $torneo->contra ?? 0}}</td>
+                        <td>{{ $torneo->favor ?? 0 - $torneo->contra ?? 0}}</td>
+                        <td>{{ $torneo->porcentaje ?? 0}}</td>
                     </tr>
                 @endforeach
                 {{-- Totales --}}
