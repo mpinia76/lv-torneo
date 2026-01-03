@@ -262,7 +262,11 @@
                     <td>{{ $totalContra }}</td>
                     <td>{{ $totalFavor - $totalContra }}</td>
                     <td>{{ $totalPuntaje }}</td>
-                    <td>{{ round(($totalPuntaje * 100 / ($totalJugados*3)),2) }}%</td>
+                    <td>@if($totalJugados > 0)
+                            {{ round(($totalGanados / $totalJugados) * 100, 2) }}%
+                        @else
+                            0%
+                        @endif</td>
                 </tr>
                 </tbody>
             </table>
