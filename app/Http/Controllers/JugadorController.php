@@ -2671,6 +2671,13 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                         }
                     }
 
+                    $tituloExtra->jugados    = $tituloExtra->jugados    ?? 0;
+                    $tituloExtra->goles      = $tituloExtra->goles      ?? 0;
+                    $tituloExtra->amarillas  = $tituloExtra->amarillas  ?? 0;
+                    $tituloExtra->rojas      = $tituloExtra->rojas      ?? 0;
+                    $tituloExtra->recibidos  = $tituloExtra->recibidos  ?? 0;
+                    $tituloExtra->invictas   = $tituloExtra->invictas   ?? 0;
+
                     $torneosJugador->push($tituloExtra);
                     if ($tituloExtra->ambito == 'Nacional') {
                             if ($tituloExtra->tipo == 'Copa') $titulosJugadorCopa++;
