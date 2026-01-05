@@ -97,12 +97,12 @@
                     <td>
                         @if($jugador->nombre_sugerido)
 
-                            <input type="hidden"
-                                   name="name"
-                                   value="{{ $jugador->nombre_sugerido }}">
+
 
                             <button type="submit"
                                     class="btn btn-success btn-sm"
+                                    name="name"
+                                    value="{{ $jugador->nombre_sugerido }}"
                                     formaction="{{ route('jugadores.confirmarNombreLargo', $jugador->persona_id) }}"
                                     onclick="return confirm('¿Confirmar este nombre?')">
                                 ✔ Confirmar
