@@ -42,7 +42,7 @@
             <th>Acciones</th>
             </thead>
 
-            @foreach($jugadores as $jugador)
+            @foreach($personas as $jugador)
                 <tr>
                     <td>
                         @if($jugador->nombre_sugerido)
