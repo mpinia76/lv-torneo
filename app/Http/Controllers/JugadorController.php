@@ -190,57 +190,74 @@ class JugadorController extends Controller
         $data = $request->all();
 
         $jugadores = Jugador::select(
-            'jugadors.*',
-            'personas.id as persona_id',
-            'personas.name',
-            'personas.nombre',
-            'personas.apellido',
-            'personas.nacimiento',
-            'personas.fallecimiento',
-            'personas.ciudad',
-            'personas.nacionalidad',
-            'personas.foto',
-            'personas.verificado'
+            'jugadors.id as modelo_id',
+            'jugadors.persona_id',
+            'personas.*',
+            DB::raw("'jugador' as tipo")
         )
             ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
-
-            // name = nombre + apellido
             ->whereRaw("TRIM(personas.name) = TRIM(CONCAT(personas.nombre, ' ', personas.apellido))")
-
-            // no verificados
             ->where(function ($q) {
                 $q->where('personas.verificado', 0)
                     ->orWhereNull('personas.verificado');
-            })
+            });
 
-            ->orderBy('personas.apellido', 'ASC')
-            ->orderBy('personas.nombre', 'ASC')
+        $tecnicos = Tecnico::select(
+            'tecnicos.id as modelo_id',
+            'tecnicos.persona_id',
+            'personas.*',
+            DB::raw("'tecnico' as tipo")
+        )
+            ->join('personas', 'personas.id', '=', 'tecnicos.persona_id')
+            ->whereRaw("TRIM(personas.name) = TRIM(CONCAT(personas.nombre, ' ', personas.apellido))")
+            ->where(function ($q) {
+                $q->where('personas.verificado', 0)
+                    ->orWhereNull('personas.verificado');
+            });
+
+        $arbitros = Arbitro::select(
+            'arbitros.id as modelo_id',
+            'arbitros.persona_id',
+            'personas.*',
+            DB::raw("'arbitro' as tipo")
+        )
+            ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+            ->whereRaw("TRIM(personas.name) = TRIM(CONCAT(personas.nombre, ' ', personas.apellido))")
+            ->where(function ($q) {
+                $q->where('personas.verificado', 0)
+                    ->orWhereNull('personas.verificado');
+            });
+
+
+        $personas = $jugadores
+            ->unionAll($tecnicos)
+            ->unionAll($arbitros)
+            ->orderBy('apellido')
+            ->orderBy('nombre')
             ->paginate(30)
             ->appends($data);
+
 
         /**
          * 🔥 ACÁ agregamos el scraping de sugerencia
          *    SIN tocar persona
          */
-        foreach ($jugadores as $jugador) {
+        foreach ($personas as $persona) {
 
-            $resultado = $this->obtenerUrlJugador($jugador);
+            $resultado = $this->obtenerUrlJugador($persona);
 
             if (!$resultado) {
-                $jugador->nombre_sugerido = null;
-                $jugador->url_sugerida = null;
+                $persona->nombre_sugerido = null;
+                $persona->url_sugerida = null;
                 continue;
             }
 
-            $nombreWeb = $this->obtenerNombreDesdeHtml($resultado['html']);
-
-            $jugador->nombre_sugerido = $nombreWeb;
-            $jugador->url_sugerida    = $resultado['url'];
-
-            // ⚠️ no se guarda nada en DB
+            $persona->nombre_sugerido = $this->obtenerNombreDesdeHtml($resultado['html']);
+            $persona->url_sugerida    = $resultado['url'];
         }
 
-        return view('jugadores.name_largo_verificar', compact('jugadores', 'data'));
+
+        return view('jugadores.name_largo_verificar', compact('personas', 'data'));
     }
 
     function sanear_string($string)

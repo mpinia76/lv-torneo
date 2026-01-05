@@ -32,7 +32,7 @@
                 <input type="checkbox" id="checkAll">
             </th>
             <th></th>
-            <th>Posición</th>
+            <th>Tipo</th>
             <th>Actual</th>
             <th>Apellido</th>
             <th>Nombre</th>
@@ -62,7 +62,13 @@
                              alt="{{ $jugador->persona->nacionalidad }}">
                     </td>
 
-                    <td>{{ $jugador->tipoJugador }}</td>
+                    <td>
+                        @switch($jugador->tipo)
+                            @case('jugador') 🏃 Jugador @break
+                            @case('tecnico') 🧑‍🏫 Técnico @break
+                            @case('arbitro') 🟨 Árbitro @break
+                        @endswitch
+                    </td>
 
                     <td>
                         <strong>{{ $jugador->name }}</strong>
@@ -106,10 +112,31 @@
                             <span class="text-muted">Sin sugerencia</span>
                         @endif
 
-                        <a href="{{ route('jugadores.edit', $jugador->id) }}"
-                           class="btn btn-primary btn-sm m-1">
-                            Editar
-                        </a>
+                            {{-- 🔥 EDITAR SEGÚN TIPO --}}
+                            @switch($jugador->tipo)
+
+                                @case('jugador')
+                                    <a href="{{ route('jugadores.edit', $jugador->modelo_id) }}"
+                                       class="btn btn-primary btn-sm m-1">
+                                        Editar jugador
+                                    </a>
+                                    @break
+
+                                @case('tecnico')
+                                    <a href="{{ route('tecnicos.edit', $jugador->modelo_id) }}"
+                                       class="btn btn-warning btn-sm m-1">
+                                        Editar técnico
+                                    </a>
+                                    @break
+
+                                @case('arbitro')
+                                    <a href="{{ route('arbitros.edit', $jugador->modelo_id) }}"
+                                       class="btn btn-info btn-sm m-1">
+                                        Editar árbitro
+                                    </a>
+                                    @break
+
+                            @endswitch
                     </td>
 
                 </tr>
