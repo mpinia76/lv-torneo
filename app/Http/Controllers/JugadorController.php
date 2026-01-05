@@ -6,6 +6,7 @@ use App\Alineacion;
 use App\Fecha;
 use App\Grupo;
 use App\Jugador;
+use App\Arbitro;
 use App\Equipo;
 use App\Gol;
 use App\Cambio;
