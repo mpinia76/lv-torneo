@@ -905,49 +905,7 @@ from ( ';
                 $sql .=' union all ';
             }
 
-            $sql .='select  equipos.nombre equipo, golesl, golesv, equipos.escudo foto, equipos.id equipo_id,
-        fechas.id AS fecha_id,
-        0 AS puntos
-		 from partidos
-		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
-		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.acumulado = 1 AND grupos.torneo_id = '.$torneo_id.'
-		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.acumulado = 1 AND G1.torneo_id = '.$torneo_id.'
-		 WHERE golesl is not null AND golesv is not null
 
-     union all
-       select equipos.nombre equipo, golesv, golesl, equipos.escudo foto, equipos.id equipo_id,
-        fechas.id AS fecha_id,
-        0 AS puntos
-		 from partidos
-		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
-		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
-		 INNER JOIN grupos ON plantillas.grupo_id = grupos.id AND grupos.acumulado = 1 AND grupos.torneo_id = '.$torneo_id.'
-		 INNER JOIN grupos G1 ON fechas.grupo_id = G1.id AND G1.acumulado = 1 AND G1.torneo_id = '.$torneo_id.'
-		 WHERE golesl is not null AND golesv is not null
-UNION ALL
-    SELECT
-        equipos.nombre AS equipo,
-
-        0 AS golesv,
-        0 AS golesl,
-        equipos.escudo AS foto,
-
-        equipos.id AS equipo_id,
-        NULL AS fecha_id,
-        SUM(puntos) AS puntos
-    FROM incidencias
-    INNER JOIN equipos ON incidencias.equipo_id = equipos.id
-    WHERE incidencias.torneo_id = '.$torneo_id.'
-    GROUP BY equipo, foto, equipos.id, incidencias.puntos) a
-
-group by equipo, foto, equipo_id
-
-order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
-            //echo $sql;
-            $acumulado = DB::select(DB::raw($sql));
         }
 
 
