@@ -906,6 +906,8 @@ from ( ';
             }
 
 
+            //echo $sql;
+            $acumulado = DB::select(DB::raw($sql));
         }
 
 
