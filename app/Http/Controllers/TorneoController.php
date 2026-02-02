@@ -802,6 +802,10 @@ order by promedio desc, puntaje desc, equipo ASC';
 
 
         $acumuladoTorneos = AcumuladoTorneo::where('torneo_id','=',"$torneo_id")->orderBy('id','DESC')->get();
+        // 👉 SIEMPRE agregar el torneo actual al final
+        $acumuladoTorneos->push((object)[
+            'torneoAnterior_id' => $torneo_id
+        ]);
         $acumulado = array();
         if (count($acumuladoTorneos)>0){
             $sql='SELECT foto, equipo,
@@ -945,33 +949,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             //echo $sql;
             $acumulado = DB::select(DB::raw($sql));
         }
-        else {
-            // Solo torneo actual
-            $sql = "
-        SELECT escudo as foto, nombre as equipo,
-           COUNT(CASE WHEN fecha_id IS NOT NULL THEN 1 END) AS jugados,
-           COUNT(CASE WHEN fecha_id IS NOT NULL AND golesl > golesv THEN 1 END) AS ganados,
-           COUNT(CASE WHEN fecha_id IS NOT NULL AND golesv > golesl THEN 1 END) AS perdidos,
-           COUNT(CASE WHEN fecha_id IS NOT NULL AND golesl = golesv THEN 1 END) AS empatados,
-           SUM(golesl) AS golesl,
-           SUM(golesv) AS golesv,
-           SUM(golesl) - SUM(golesv) AS diferencia,
-           SUM(CASE WHEN fecha_id IS NOT NULL AND golesl > golesv THEN 3
-                    WHEN fecha_id IS NOT NULL AND golesl = golesv THEN 1
-                    ELSE 0 END) AS puntaje,
-           (SUM(CASE WHEN fecha_id IS NOT NULL AND golesl > golesv THEN 3
-                     WHEN fecha_id IS NOT NULL AND golesl = golesv THEN 1
-                     ELSE 0 END) / NULLIF(COUNT(CASE WHEN fecha_id IS NOT NULL THEN 1 END),0)) AS promedio,
-           equipos.id as equipo_id
-        FROM partidos
-        INNER JOIN equipos ON (equipos.id = partidos.equipol_id OR equipos.id = partidos.equipov_id)
-        INNER JOIN fechas ON fechas.id = partidos.fecha_id
-        WHERE equipos.id IN (" . implode(',', $equipos->keys()->toArray()) . ")
-        GROUP BY nombre, foto, equipos.id
-        ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC
-    ";
-            $acumulado = DB::select(DB::raw($sql));
-        }
+
 
         // Obtener torneos involucrados en el acumulado
         $torneosAnterioresIds = $acumuladoTorneos->pluck('torneoAnterior_id')->push($torneo->id) // 👈 agregamos el torneo actual
