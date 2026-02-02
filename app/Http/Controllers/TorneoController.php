@@ -905,7 +905,11 @@ from ( ';
                 //$sql .=' union all ';
             }
 
+            $sql .=') a
 
+group by equipo, foto, equipo_id
+
+order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             //echo $sql;
             $acumulado = DB::select(DB::raw($sql));
         }
