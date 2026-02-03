@@ -2245,13 +2245,13 @@ from (
         $sql .=($actuales)?" AND EXISTS (
         SELECT PT1.id
 FROM partido_tecnicos PT1
-INNER JOIN tecnicos T1 ON PT1.tecnico_id = T1.id
-INNER JOIN personas P2 ON T1.persona_id = P2.id
+INNER JOIN tecnicos TEC ON PT1.tecnico_id = TEC.id
+INNER JOIN personas P2 ON TEC.persona_id = P2.id
 INNER JOIN partidos ON PT1.partido_id = partidos.id
 INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-        WHERE T1.year LIKE '%".$year."%' AND T1.id = tecnicos.id".$nombreFiltro2."
+        WHERE T1.year LIKE '%".$year."%' AND TEC.id = tecnicos.id".$nombreFiltro2."
 
 
         )":"";
@@ -2281,13 +2281,13 @@ INNER JOIN posicion_torneos ON posicion_torneos.torneo_id = G2.torneo_id AND pos
         $sql .=($actuales)?" AND EXISTS (
         SELECT PT1.id
 FROM partido_tecnicos PT1
-INNER JOIN tecnicos T1 ON PT1.tecnico_id = T1.id
-INNER JOIN personas P2 ON T1.persona_id = P2.id
+INNER JOIN tecnicos TEC ON PT1.tecnico_id = TEC.id
+INNER JOIN personas P2 ON TEC.persona_id = P2.id
 INNER JOIN partidos ON PT1.partido_id = partidos.id
 INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
 INNER JOIN grupos G1 ON G1.id = F1.grupo_id
 INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-        WHERE T1.year LIKE '%".$year."%' AND T1.id = tecnicos.id".$nombreFiltro2."
+        WHERE T1.year LIKE '%".$year."%' AND TEC.id = tecnicos.id".$nombreFiltro2."
 
 
         )":"";
