@@ -8082,7 +8082,7 @@ private function normalizarMinuto(string $texto): int
 
 
 
-    function parsePlayers($nodes, $xpath, $golesConTipo) {
+    function parsePlayers($nodes, $xpath, $golesConTipo, $penalesErrados) {
         $players = [];
         //dd($golesConTipo);
         foreach ($nodes as $event) {
@@ -8182,10 +8182,26 @@ private function normalizarMinuto(string $texto): int
                 ];
             }
 
+            $penales = [];
+
+            foreach ($penalesErrados as $penal) {
+                $penalMin = (int) filter_var($penal['minuto'], FILTER_SANITIZE_NUMBER_INT);
+
+                $nombreCoincide = mb_stripos($penal['jugador'], $name) !== false;
+
+                if ($nombreCoincide) {
+                    $penales[] = [
+                        'type' => 'Errado', // o 'errado'
+                        'minute' => $penalMin,
+                    ];
+                }
+            }
+
             $players[] = [
                 'number' => $number,
                 'name' => $name,
                 'goals' => $goals,
+                'penals' => $penales, // 👈 NUEVO
                 'sub_in' => $subIn,
                 'sub_out' => $subOut,
                 'cards' => $cards,
@@ -8195,6 +8211,54 @@ private function normalizarMinuto(string $texto): int
         return $players;
     }
 
+    private function getPenalesErrados(\DOMXPath $xpath)
+    {
+        $penales = [];
+
+        // Buscar TODOS los missed-penalty
+        $nodes = $xpath->query("//li[contains(@class,'event') and contains(@class,'missed-penalty')]");
+
+        foreach ($nodes as $node) {
+            $clases = $node->getAttribute('class');
+
+            // 👉 Siempre "Errado" (como vos definiste)
+            $tipo = 'Errado';
+
+            // Minuto REAL (igual que goles)
+            $minuteRaw = trim($xpath->evaluate("string(.//div[contains(@class,'match_event-minute')])", $node));
+            preg_match('/(\d+)(?:\+(\d+))?/', $minuteRaw, $matches);
+
+            $minuto = isset($matches[1]) ? (int)$matches[1] : 0;
+            if (isset($matches[2])) {
+                $minuto += (int)$matches[2];
+            }
+
+            // Jugador
+            $jugador = trim($xpath->evaluate("string(.//div[contains(@class,'person-name')]//a)", $node));
+
+            // 👉 Sacar ID desde la URL (CLAVE para vos)
+            $jugadorUrl = $xpath->evaluate("string(.//div[contains(@class,'person-name')]//a/@href)", $node);
+
+            $external_id = null;
+            if ($jugadorUrl) {
+                $partes = explode('/', trim($jugadorUrl, '/'));
+                $external_id = $partes[2] ?? null; // pe126471
+            }
+
+            // Equipo (local / visitante)
+            $local = strpos($clases, 'home') !== false;
+
+            $penales[] = [
+                'jugador'     => $jugador,
+                'jugador_id'  => $external_id,
+                'minuto'      => $minuto,
+                'tipo'        => $tipo, // siempre Errado
+                'local'     => $local,
+            ];
+        }
+        dd($penales);
+        return $penales;
+    }
 
     private function getGolesConTipo(\DOMXPath $xpath)
     {
@@ -8445,14 +8509,16 @@ private function normalizarMinuto(string $texto): int
                 $nodesAwayBench = $xpath->query("//div[contains(@class,'hs-lineup--bench') and contains(@class,'away')]//div[contains(@class,'event') and contains(@class,'bench')]");
 
                 $golesConTipo = $this->getGolesConTipo($xpath);
-                //dd($golesConTipo);
-// Parsear cada grupo
-                $localTitulares = $this->parsePlayers($nodesHomeStarter, $xpath, $golesConTipo);
-                //dd($localTitulares);
-                $visitanteTitulares = $this->parsePlayers($nodesAwayStarter, $xpath, $golesConTipo);
-                $localSuplentes = $this->parsePlayers($nodesHomeBench, $xpath, $golesConTipo);
 
-                $visitanteSuplentes = $this->parsePlayers($nodesAwayBench, $xpath, $golesConTipo);
+                //dd($golesConTipo);
+                $penalesFallados = $this->getPenalesErrados($xpath);
+// Parsear cada grupo
+                $localTitulares = $this->parsePlayers($nodesHomeStarter, $xpath, $golesConTipo,$penalesFallados);
+                //dd($localTitulares);
+                $visitanteTitulares = $this->parsePlayers($nodesAwayStarter, $xpath, $golesConTipo,$penalesFallados);
+                $localSuplentes = $this->parsePlayers($nodesHomeBench, $xpath, $golesConTipo,$penalesFallados);
+
+                $visitanteSuplentes = $this->parsePlayers($nodesAwayBench, $xpath, $golesConTipo,$penalesFallados);
                 //dd($visitanteSuplentes);
 
                 $localDT = $this->getDT($xpath, 'home');
@@ -8496,6 +8562,15 @@ private function normalizarMinuto(string $texto): int
                                     default:
                                         $incidencias[] = ['Gol', $minute]; // normal/jugada
                                 }
+                            }
+                        }
+
+                        // penales errados
+                        if (!empty($p['penals'])) {
+                            foreach ($p['penals'] as $penal) {
+                                $minute = isset($penal['minute']) ? intval($penal['minute']) : 0;
+
+                                $incidencias[] = ['Penal errado', $minute];
                             }
                         }
 
@@ -8963,6 +9038,53 @@ private function normalizarMinuto(string $texto): int
                                         //}
 
                                     }
+
+                                    $tipopenal = '';
+                                    switch (trim($incidencia[0])) {
+                                        case 'Penal errado':
+                                            $tipopenal = 'Errado';
+                                            break;
+                                        case 'Penal atajado':
+                                            $tipopenal = 'Atajado';
+                                            break;
+                                    }
+
+                                    if ($tipopenal) {
+                                        $penaldata = array(
+                                            'partido_id' => $partido->id,
+                                            'jugador_id' => $jugador_id,
+                                            'minuto' => intval(trim($incidencia[1])),
+                                            'tipo' => $tipopenal
+                                        );
+
+                                        $penal = Penal::where('partido_id', '=', $partido->id)
+                                            ->where('jugador_id', '=', $jugador_id)
+                                            ->where('minuto', '=', intval(trim($incidencia[1])))
+                                            ->first();
+
+                                        try {
+                                            if (!empty($penal)) {
+                                                $penal->update($penaldata);
+                                            } else {
+                                                $penal = Penal::create($penaldata);
+                                            }
+                                            $success .= 'Penal errado: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
+                                        } catch (QueryException $ex) {
+                                            if ($ex->errorInfo[1] == 1452) {
+
+                                                $error .= 'Jugador no cargado: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] .
+                                                    ' - ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])) .
+                                                    ' en el equipo ' . $eq['equipo'] . '<br>';
+
+                                            } else {
+                                                $error = $ex->getMessage();
+                                            }
+
+                                            $ok = 0;
+                                            continue;
+                                        }
+                                    }
+
                                     $tipotarjeta = '';
                                     switch (trim($incidencia[0])) {
                                         case 'Tarjeta amarilla':
