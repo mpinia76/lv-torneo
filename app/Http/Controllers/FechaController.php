@@ -5982,8 +5982,8 @@ private function normalizarMinuto(string $texto): int
                             }
 
                             foreach ($urls as $urlJugador) {
-                                //Log::info('Url procesada '. $urlJugador);
-                                $html2 = HttpHelper::getHtmlContent($urlJugador);
+                                Log::info('Url procesada '. $urlJugador);
+                                $html2 = HttpHelper::getHtmlContent($urlJugador, true);
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
