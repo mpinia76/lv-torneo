@@ -82,7 +82,9 @@
                     //Log::channel('mi_log')->warning('PÃ¡gina no encontrada (404) para la URL: ' . $urlOriginal);
                     return false;
                 }
-
+                var_dump($httpCode);
+                echo $response;
+                die();
                 return $response;
             }
         }
