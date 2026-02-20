@@ -10,7 +10,7 @@
         public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
         {
             $urlOriginal = trim($urlOriginal); // evita espacios invisibles
-            $usarScraperRemoto=true;
+
             if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
                 //Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
                 return false;
@@ -42,7 +42,7 @@
                 curl_close($ch);
 
                 if ($httpCode >= 400) {
-                    Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
+                    //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
                     return false;
                 }
 
