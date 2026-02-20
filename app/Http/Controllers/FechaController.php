@@ -5929,7 +5929,7 @@ private function normalizarMinuto(string $texto): int
                         $persona = $alineacion->jugador->persona;
 
 // Extraer nombres
-                        $nombreParts = explode(' ', trim($persona->nombre));
+                        /*$nombreParts = explode(' ', trim($persona->nombre));
                         $apellidoParts = explode(' ', trim($persona->apellido));
 
                         // Detectar si nombre o apellido son compuestos
@@ -5997,13 +5997,13 @@ private function normalizarMinuto(string $texto): int
 // Aquí $html2 ya tiene el HTML válido, $cachedUrl/$urlJugador siempre es una string
 
 
-// Aquí $urlJugador ya tiene la URL válida (con o sin nacionalidad)
+// Aquí $urlJugador ya tiene la URL válida (con o sin nacionalidad)*/
 
-
-                        if ($html2) {
+                        $id_jugador =$alineacion->jugador->url_nombre;
+                        if ($id_jugador) {
 
                                 // Crear un nuevo DOMDocument y cargar el HTML
-                                $dom = new \DOMDocument();
+                                /*$dom = new \DOMDocument();
                                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
                                 $dom->loadHTML($html2);
                                 libxml_clear_errors();
@@ -6060,7 +6060,7 @@ private function normalizarMinuto(string $texto): int
                                             }
                                         }
                                     }
-                                }
+                                }*/
                                 if ($id_jugador) {
                                     $strTorneoFecha = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre);
                                     $strTorneoFechaIda = $this->dameNombreTorneoURL(strtolower($fecha->grupo->torneo->url_nombre), $fecha->url_nombre, 'ida');
@@ -6709,7 +6709,7 @@ private function normalizarMinuto(string $texto): int
                             } else {
 
                                 //Log::channel('mi_log')->info('OJO!!! No se econtró la URL del jugador' , []);
-                                $success .= '<span style="color:red">No se econtró la URL del jugador ' . $alineacion->dorsal . ' ' .$alineacion->jugador->persona->name . '</span><br>';
+                                $success .= '<span style="color:red">Falta el id de ' . $alineacion->dorsal . ' ' .$alineacion->jugador->persona->name . '</span><br>';
                             }
                             // }
 
