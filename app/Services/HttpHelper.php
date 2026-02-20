@@ -42,16 +42,14 @@
                 curl_close($ch);
 
                 if ($httpCode >= 400) {
-                    //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
+                    Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
                     return false;
                 }
 
                 if (empty($response)) {
                     //Log::channel('mi_log')->warning("Scraper remoto devolvió HTML vacío para: $urlOriginal");
                 }
-                var_dump($httpCode);
-                echo $response;
-                die();
+
                 return $response;
             } else {
                 $ch = curl_init();
