@@ -5943,14 +5943,14 @@ private function normalizarMinuto(string $texto): int
 
                         $cacheKey = 'slug_jugador_' . $alineacion->jugador->id;
                         $cachedUrl = Cache::get($cacheKey);
-                        Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
+                        //Log::info('Cache get', ['key' => $cacheKey, 'url' => $cachedUrl]);
 
                         $html2 = null;
 
                         if ($cachedUrl) {
                             // Ya tenemos la URL válida en cache
                             $slugJugador = basename($cachedUrl);
-                            $html2 = HttpHelper::getHtmlContent($cachedUrl, true);
+                            $html2 = HttpHelper::getHtmlContent($cachedUrl);
                         }
 
                         if (!$html2) {
@@ -5977,13 +5977,13 @@ private function normalizarMinuto(string $texto): int
 
                             $urls = [];
                             foreach ($intentos as $slug) {
-                                $urls[] = "http://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}";
-                                $urls[] = "http://www.futbol360.com.ar/jugadores/{$slug}";
+                                $urls[] = "https://www.futbol360.com.ar/jugadores/{$nacionalidadSlug}/{$slug}";
+                                $urls[] = "https://www.futbol360.com.ar/jugadores/{$slug}";
                             }
 
                             foreach ($urls as $urlJugador) {
-                                Log::info('Url procesada '. $urlJugador);
-                                $html2 = HttpHelper::getHtmlContent($urlJugador, true);
+                                //Log::info('Url procesada '. $urlJugador);
+                                $html2 = HttpHelper::getHtmlContent($urlJugador);
                                 if ($html2) {
                                     // Guardamos la URL completa en cache
                                     Cache::put($cacheKey, $urlJugador, now()->addDays(30));
