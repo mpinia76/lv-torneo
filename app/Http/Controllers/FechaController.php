@@ -5950,7 +5950,7 @@ private function normalizarMinuto(string $texto): int
                         if ($cachedUrl) {
                             // Ya tenemos la URL válida en cache
                             $slugJugador = basename($cachedUrl);
-                            $html2 = HttpHelper::getHtmlContent($cachedUrl);
+                            $html2 = HttpHelper::getHtmlContent($cachedUrl, true);
                         }
 
                         if (!$html2) {
