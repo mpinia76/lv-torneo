@@ -8256,7 +8256,7 @@ private function normalizarMinuto(string $texto): int
                 'local'     => $local,
             ];
         }
-        dd($penales);
+        //dd($penales);
         return $penales;
     }
 
@@ -8971,8 +8971,8 @@ private function normalizarMinuto(string $texto): int
                             foreach ($jugador['incidencias'] as $incidencia) {
 
                                 if (!empty($incidencia)) {
-                                    //Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
-                                    //Log::channel('mi_log')->info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    Log::channel('mi_log')->info('Incidencia: ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
+                                    Log::channel('mi_log')->info('Incidencias Jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' - ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])), []);
                                     $tipogol = '';
                                     switch (trim($incidencia[0])) {
                                         case 'Gol':
