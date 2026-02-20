@@ -10,7 +10,7 @@
         public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
         {
             $urlOriginal = trim($urlOriginal); // evita espacios invisibles
-
+            $usarScraperRemoto=true;
             if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
                 //Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
                 return false;
@@ -49,7 +49,9 @@
                 if (empty($response)) {
                     //Log::channel('mi_log')->warning("Scraper remoto devolvió HTML vacío para: $urlOriginal");
                 }
-
+                var_dump($httpCode);
+                echo $response;
+                die();
                 return $response;
             } else {
                 $ch = curl_init();
@@ -82,9 +84,7 @@
                     //Log::channel('mi_log')->warning('PÃ¡gina no encontrada (404) para la URL: ' . $urlOriginal);
                     return false;
                 }
-                var_dump($httpCode);
-                echo $response;
-                die();
+
                 return $response;
             }
         }
