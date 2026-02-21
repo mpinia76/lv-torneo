@@ -1712,6 +1712,8 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
     GROUP BY torneos.nombre, torneos.year
 "), ['torneo_id' => $torneo_id]);
 
+        dd($estadisticas);
+
 
         // Reuso una función para obtener partidos con max o min goles totales
         $maxGoles = $this->partidosPorGolesTotales($torneo_id, 'MAX');
