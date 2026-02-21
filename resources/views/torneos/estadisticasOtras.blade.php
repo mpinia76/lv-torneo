@@ -103,7 +103,7 @@
                     'Max 1 partido' => 'max_goles',
                      'Goles Local' => 'goles_local',
                     'Goles Visitante' => 'goles_visitante',
-                    'Goles Neutrales' => 'goles_neutrales',
+                    'Goles Neutrales' => 'goles_neutral',
                     'Amarillas' => 'amarillas',
                     'Rojas' => 'rojas',
 
