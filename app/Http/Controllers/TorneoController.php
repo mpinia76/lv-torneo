@@ -2122,7 +2122,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
             // Goles
             $golesVisitante = DB::selectOne(DB::raw("
-        SELECT SUM(p.golesl) AS goles_local, SUM(p.golesl) AS goles_visitante
+        SELECT SUM(p.golesl) AS goles_local, SUM(p.golesv) AS goles_visitante
         FROM partidos p
         INNER JOIN fechas f ON p.fecha_id = f.id
         INNER JOIN grupos g ON f.grupo_id = g.id
