@@ -2097,7 +2097,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         FROM partidos p
         INNER JOIN fechas f ON p.fecha_id = f.id
         INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE WHERE g.torneo_id = :torneoId
+        WHERE g.torneo_id = :torneoId
                 AND p.golesl IS NOT NULL
                 AND p.golesv IS NOT NULL
     "), ['torneoId' => $torneoId]);
