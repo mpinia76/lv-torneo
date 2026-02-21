@@ -1690,7 +1690,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
         COUNT(CASE WHEN partidos.golesl IS NOT NULL AND partidos.golesv IS NOT NULL THEN 1 END) AS total_partidos,
         SUM(partidos.golesl + partidos.golesv) AS total_goles,
-        (SUM(partidos.golesl + partidos.golesv) * 1.0 / COUNT(*)) AS promedio_total,
+        (SUM(partidos.golesl + partidos.golesv) * 1.0 / NULLIF(COUNT(CASE WHEN partidos.golesl IS NOT NULL AND partidos.golesv IS NOT NULL THEN 1 END), 0)) AS promedio_total,
 
         SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesl ELSE 0 END) AS goles_local,
         SUM(CASE WHEN partidos.neutral = 0 THEN partidos.golesv ELSE 0 END) AS goles_visitante,
