@@ -100,9 +100,10 @@
                     'Partidos' => 'partidos',
                     'Goles' => 'goles',
                     'Promedio' => 'promedio_goles',
-                    'Max Goles' => 'max_goles',
+                    'Max 1 partido' => 'max_goles',
                      'Goles Local' => 'goles_local',
                     'Goles Visitante' => 'goles_visitante',
+                    'Goles Neutrales' => 'goles_neutrales',
                     'Amarillas' => 'amarillas',
                     'Rojas' => 'rojas',
 

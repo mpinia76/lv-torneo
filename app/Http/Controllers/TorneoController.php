@@ -2092,7 +2092,6 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             $totales = DB::selectOne(DB::raw("
         SELECT COUNT(*) AS partidos,
                SUM(p.golesl + p.golesv) AS goles,
-               SUM(p.golesl) AS goles_local,
                (SUM(p.golesl + p.golesv) * 1.0 / COUNT(*)) AS promedio_goles
         FROM partidos p
         INNER JOIN fechas f ON p.fecha_id = f.id
@@ -2121,13 +2120,21 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
           AND p.golesl = p.golesv
     "), ['torneoId' => $torneoId]);
 
-            // Goles visitante
+            // Goles
             $golesVisitante = DB::selectOne(DB::raw("
-        SELECT SUM(p.golesv) AS goles_visitante
+        SELECT SUM(p.golesl) AS goles_local, SUM(p.golesl) AS goles_visitante
         FROM partidos p
         INNER JOIN fechas f ON p.fecha_id = f.id
         INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId
+        WHERE g.torneo_id = :torneoId AND p.neutral = 0
+    "), ['torneoId' => $torneoId]);
+
+            $golesNeutral = DB::selectOne(DB::raw("
+        SELECT SUM(p.golesl + p.golesv) AS goles_neutral
+        FROM partidos p
+        INNER JOIN fechas f ON p.fecha_id = f.id
+        INNER JOIN grupos g ON f.grupo_id = g.id
+        WHERE g.torneo_id = :torneoId AND p.neutral = 1
     "), ['torneoId' => $torneoId]);
 
             // Tarjetas
@@ -2150,13 +2157,14 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 'escudoTorneo' => $torneo->escudoTorneo,
                 'partidos' => $totales->partidos ?? 0,
                 'goles' => $totales->goles ?? 0,
-                'goles_local' => $totales->goles_local ?? 0,
+                'goles_local' => $golesVisitante->goles_local ?? 0,
                 'promedio_goles' => $totales->promedio_goles ?? 0,
                 'max_goles' => $maxGoles->max_goles ?? 0,
                 'empates' => $empates->empates ?? 0,
                 'goles_visitante' => $golesVisitante->goles_visitante ?? 0,
                 'amarillas' => $tarjetas->amarillas ?? 0,
                 'rojas' => $tarjetas->rojas ?? 0,
+                'goles_neutral' => $golesNeutral->goles_neutral ?? 0,
             ];
         }
 
