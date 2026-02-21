@@ -43,11 +43,11 @@
                 'Total' => 'total_goles',
                 'Promedio' => 'promedio_total',
                 'Locales' => 'goles_local',
-                'Promedio' => 'promedio_local',
+                'Prom. Local' => 'promedio_local',
                 'Visitante' => 'goles_visitante',
-                'Promedio' => 'promedio_visitante',
+                'Prom. Visitante' => 'promedio_visitante',
                 'Neutrales' => 'goles_neutral',
-                'Promedio' => 'promedio_neutral',
+                'Prom. Neutral' => 'promedio_neutral',
             ]"/>
             </div>
 
