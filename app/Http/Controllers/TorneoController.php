@@ -1688,7 +1688,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         torneos.escudo AS escudoTorneo,
         torneos.year,
 
-        COUNT(*) AS total_partidos,
+        COUNT(CASE WHEN partidos.golesl IS NOT NULL AND partidos.golesv IS NOT NULL THEN 1 END) AS total_partidos,
         SUM(partidos.golesl + partidos.golesv) AS total_goles,
         (SUM(partidos.golesl + partidos.golesv) * 1.0 / COUNT(*)) AS promedio_total,
 
@@ -1765,7 +1765,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         e.nombre AS nombre,
          e.escudo AS escudo,
          e.pais AS pais,
-        COUNT(p.id) AS partidos,
+        COUNT(CASE WHEN p.golesl IS NOT NULL AND p.golesv IS NOT NULL THEN 1 END) AS partidos,
         SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl ELSE p.golesv END) AS goles_favor,
         SUM(CASE WHEN p.equipol_id = e.id THEN p.golesv ELSE p.golesl END) AS goles_contra,
         (SUM(CASE WHEN p.equipol_id = e.id THEN p.golesl ELSE p.golesv END) -
