@@ -66,7 +66,10 @@
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
-
+                        <a href="{{ route('plantillas.reasignarGrupo', $plantilla->id) }}"
+                           class="btn btn-warning m-1">
+                            Reasignar grupo
+                        </a>
                     </div>
 
                 </td>

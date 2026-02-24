@@ -54,6 +54,12 @@ Route::group(['prefix' => 'admin'], function()
     )->name('jugadores.confirmarNombresLargos');
 
 
+    Route::get('/plantillas/{id}/reasignar-grupo', [PlantillaController::class, 'reasignarGrupo'])
+        ->name('plantillas.reasignarGrupo');
+
+    Route::post('/plantillas/{id}/guardar-grupo', [PlantillaController::class, 'guardarGrupo'])
+        ->name('plantillas.guardarGrupo');
+
     Route::resource('jugadores', 'JugadorController');
     Route::resource('equipos', 'EquipoController');
     Route::resource('fechas', 'FechaController');

@@ -1406,5 +1406,25 @@ class PlantillaController extends Controller
         return view('plantillas.buscar', compact('plantillas', 'torneo', 'nombre'));
     }
 
+    public function reasignarGrupo($id)
+    {
+        $plantilla = Plantilla::with('grupo.torneo')->findOrFail($id);
 
+        $grupos = Grupo::where('torneo_id', $plantilla->grupo->torneo->id)
+            ->pluck('nombre', 'id'); // Obtiene los nombres con los IDs como clave
+
+        return view('plantillas.reasignar_grupo', compact('plantilla', 'grupos'));
+    }
+
+    public function guardarGrupo(Request $request, $id)
+    {
+        $plantilla = Plantilla::findOrFail($id);
+
+        $plantilla->grupo_id = $request->grupo_id;
+        $plantilla->save();
+
+        return redirect()->route('plantillas.index', [
+            'grupoId' => $request->grupo_id
+        ])->with('success', 'Grupo actualizado correctamente');
+    }
 }
