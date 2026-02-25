@@ -9,10 +9,10 @@
         <div class="mb-3">
             <label>Grupo</label>
             <select name="grupo_id" class="form-control">
-                @foreach($grupos as $grupo)
-                    <option value="{{ $grupo->id }}"
-                            @if($plantilla->grupo_id == $grupo->id) selected @endif>
-                        {{ $grupo->nombre }}
+                @foreach($grupos as $id => $nombre)
+                    <option value="{{ $id }}"
+                            @if($plantilla->grupo_id == $id) selected @endif>
+                        {{ $nombre }}
                     </option>
                 @endforeach
             </select>
