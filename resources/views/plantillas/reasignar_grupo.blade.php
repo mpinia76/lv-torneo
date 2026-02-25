@@ -1,3 +1,8 @@
+@extends('layouts.app')
+
+@section('pageTitle', 'Importar jugador')
+
+@section('content')
 <div class="container">
     <h3>Reasignar grupo</h3>
 
@@ -23,3 +28,4 @@
         <a href="{{ url()->previous() }}" class="btn btn-secondary">Cancelar</a>
     </form>
 </div>
+@endsection
