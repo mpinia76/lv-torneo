@@ -571,35 +571,35 @@ class ArbitroController extends Controller
                 // Buscar todos los pares dt/dd dentro del aside
                 $dtNodes = $xpath->query('.//dt', $sidebar);
                 foreach ($dtNodes as $dtNode) {
-
-                    // Normalizar label
                     $label = trim($dtNode->textContent);
-                    $labelClean = mb_strtolower($label);
-                    $labelClean = iconv('UTF-8', 'ASCII//TRANSLIT', $labelClean); // sin acentos
+                    $ddNode = $dtNode->nextSibling;
 
-                    // Obtener el <dd> directamente con XPath (más seguro que nextSibling)
-                    $ddNode = $xpath->query('following-sibling::dd[1]', $dtNode)->item(0);
-                    $value = $ddNode ? trim($ddNode->textContent) : null;
-
-                    if (!$value) {
-                        continue;
+                    // Buscar el siguiente dd (ignorando nodos vacíos o texto)
+                    while ($ddNode && $ddNode->nodeName !== 'dd') {
+                        $ddNode = $ddNode->nextSibling;
                     }
 
-                    // Map flexible (no dependés de texto exacto)
-                    if (str_contains($labelClean, 'nombre')) {
-                        $datos['nombre'] = $value;
+                    $value = $ddNode ? trim($ddNode->textContent) : '';
 
-                    } elseif (str_contains($labelClean, 'cumple')) {
-                        $datos['cumpleanos'] = $value;
+                    $labelClean = mb_strtolower(trim($label));
+                    $labelClean = iconv('UTF-8', 'ASCII//TRANSLIT', $labelClean);
 
-                    } elseif (str_contains($labelClean, 'nacido')) {
-                        $datos['nacido_en'] = $value;
-
-                    } elseif (str_contains($labelClean, 'nacionalidad')) {
-                        $datos['nacionalidad'] = $value;
-
-                    } elseif (str_contains($labelClean, 'peso')) {
-                        $datos['peso'] = $value;
+                    switch ($labelClean) {
+                        case 'nombre':
+                            $datos['nombre'] = $value;
+                            break;
+                        case 'cumpleanos':
+                            $datos['cumpleanos'] = $value;
+                            break;
+                        case 'nacido en':
+                            $datos['nacido_en'] = $value;
+                            break;
+                        case 'nacionalidad':
+                            $datos['nacionalidad'] = $value;
+                            break;
+                        case 'peso':
+                            $datos['peso'] = $value;
+                            break;
                     }
                 }
             }
