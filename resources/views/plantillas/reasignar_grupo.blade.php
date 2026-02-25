@@ -5,7 +5,7 @@
 @section('content')
 <div class="container">
     <div class="container">
-        <h1 class="display-6">Reasignar grupo a {{$plantilla->equipo->nombre}} en {{$plantilla->rupo->torneo->nombre}} {{$plantilla->grupo->torneo->year}}</h1>
+        <h1 class="display-6">Reasignar grupo a {{$plantilla->equipo->nombre}} en {{$plantilla->grupo->torneo->nombre}} {{$plantilla->grupo->torneo->year}}</h1>
         <br>
         @if($plantilla->equipo->escudo)
             <img id="original" src="{{ url('images/'.$plantilla->equipo->escudo) }}" height="50">
