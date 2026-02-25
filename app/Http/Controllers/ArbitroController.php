@@ -580,7 +580,7 @@ class ArbitroController extends Controller
                     }
 
                     $value = $ddNode ? trim($ddNode->textContent) : '';
-
+                    Log::info("LABEL RAW: [" . $label . "]");
                     $labelClean = mb_strtolower(trim($label));
                     $labelClean = iconv('UTF-8', 'ASCII//TRANSLIT', $labelClean);
 
