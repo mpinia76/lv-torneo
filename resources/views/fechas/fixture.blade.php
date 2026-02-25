@@ -33,7 +33,7 @@
 
                 {{-- Tabla de partidos --}}
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped align-middle text-center" style="margin: 0 auto;width: auto;">
+                    <table class="table table-hover table-striped align-middle text-center">
                         <tbody>
                         @php
                             $lastDate = null;
@@ -147,6 +147,7 @@
     </script>
 
     <style>
+
         .clickable-row {
             cursor: pointer;
             transition: background-color 0.15s ease-in-out;
@@ -154,5 +155,22 @@
         .clickable-row:hover {
             background-color: #e6ffe6 !important;
         }
+        .table tbody tr td:nth-child(1) { /* Hora */
+            width: 5%;
+        }
+        .table tbody tr td:nth-child(2){ /* Local */
+
+            width: 30%;
+        }
+
+        .table tbody tr td:nth-child(5) { /* Visitante */
+            width: 35%;
+        }
+        .table tbody tr td:nth-child(3), /* Goles local */
+        .table tbody tr td:nth-child(4) { /* Goles visitante */
+            width: 2%;
+            text-align: center;
+        }
+
     </style>
 @endsection
