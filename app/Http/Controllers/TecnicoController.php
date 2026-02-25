@@ -949,32 +949,35 @@ WHERE (tecnicos.id = ".$id.")";
                 // Buscar todos los pares dt/dd dentro del aside
                 $dtNodes = $xpath->query('.//dt', $sidebar);
                 foreach ($dtNodes as $dtNode) {
-                    $label = trim($dtNode->textContent);
-                    $ddNode = $dtNode->nextSibling;
 
-                    // Buscar el siguiente dd (ignorando nodos vacíos o texto)
-                    while ($ddNode && $ddNode->nodeName !== 'dd') {
-                        $ddNode = $ddNode->nextSibling;
+                    // Normalizar label
+                    $label = trim($dtNode->textContent);
+                    $labelClean = mb_strtolower($label);
+                    $labelClean = iconv('UTF-8', 'ASCII//TRANSLIT', $labelClean); // sin acentos
+
+                    // Obtener el <dd> directamente con XPath (más seguro que nextSibling)
+                    $ddNode = $xpath->query('following-sibling::dd[1]', $dtNode)->item(0);
+                    $value = $ddNode ? trim($ddNode->textContent) : null;
+
+                    if (!$value) {
+                        continue;
                     }
 
-                    $value = $ddNode ? trim($ddNode->textContent) : '';
+                    // Map flexible (no dependés de texto exacto)
+                    if (str_contains($labelClean, 'nombre')) {
+                        $datos['nombre'] = $value;
 
-                    switch (mb_strtolower($label)) {
-                        case 'nombre':
-                            $datos['nombre'] = $value;
-                            break;
-                        case 'cumpleaños':
-                            $datos['cumpleanos'] = $value;
-                            break;
-                        case 'nacido en':
-                            $datos['nacido_en'] = $value;
-                            break;
-                        case 'nacionalidad':
-                            $datos['nacionalidad'] = $value;
-                            break;
-                        case 'peso':
-                            $datos['peso'] = $value;
-                            break;
+                    } elseif (str_contains($labelClean, 'cumple')) {
+                        $datos['cumpleanos'] = $value;
+
+                    } elseif (str_contains($labelClean, 'nacido')) {
+                        $datos['nacido_en'] = $value;
+
+                    } elseif (str_contains($labelClean, 'nacionalidad')) {
+                        $datos['nacionalidad'] = $value;
+
+                    } elseif (str_contains($labelClean, 'peso')) {
+                        $datos['peso'] = $value;
                     }
                 }
             }
