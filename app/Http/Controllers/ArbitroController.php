@@ -580,15 +580,13 @@ class ArbitroController extends Controller
                     }
 
                     $value = $ddNode ? trim($ddNode->textContent) : '';
-                    Log::info("LABEL RAW: [" . $label . "]");
-                    $labelClean = mb_strtolower(trim($label));
-                    $labelClean = iconv('UTF-8', 'ASCII//TRANSLIT', $labelClean);
 
-                    switch ($labelClean) {
+
+                    switch (mb_strtolower($label)) {
                         case 'nombre':
                             $datos['nombre'] = $value;
                             break;
-                        case 'cumpleanos':
+                        case 'cumpleaños':
                             $datos['cumpleanos'] = $value;
                             break;
                         case 'nacido en':
@@ -661,7 +659,11 @@ class ArbitroController extends Controller
 
             if (!empty($datos['cumpleanos'])) {
                 try {
-                    $nacimiento = Carbon::createFromFormat('d.m.Y', $datos['cumpleanos'])->format('Y-m-d');
+                    // Limpiar la fecha (quedarse solo con la parte antes del "|")
+                    $fechaLimpia = trim(explode('|', $datos['cumpleanos'])[0]);
+
+                    $nacimiento = Carbon::createFromFormat('d.m.Y', $fechaLimpia)->format('Y-m-d');
+
                 } catch (\Exception $e) {
                     Log::warning("Fecha inválida: " . $datos['cumpleanos']);
                 }
