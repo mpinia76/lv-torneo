@@ -33,7 +33,7 @@
 
                 {{-- Tabla de partidos --}}
                 <div class="table-responsive">
-                    <table class="table table-hover table-striped align-middle text-center">
+                    <table class="table table-hover table-striped align-middle text-center" style="margin: 0 auto;width: auto;">
                         <tbody>
                         @php
                             $lastDate = null;
