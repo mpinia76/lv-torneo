@@ -23,7 +23,7 @@
 
                         <div class="form-check" style="margin-right: 20px;margin-left: 20px;">
                             <input type="checkbox" class="form-check-input" id="actuales" name="actuales" @if ($actuales == 1) checked @endif onchange="enviarForm()">
-                            <label class="form-check-label" for="actuales">Jugando</label>
+                            <label class="form-check-label" for="actuales">Dirigiendo</label>
                         </div>
                         <div class="form-check" >
                             <input type="checkbox" class="form-check-input" id="campeones" name="campeones" @if ($campeones == 1) checked @endif onchange="enviarForm()">
