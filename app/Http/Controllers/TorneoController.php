@@ -788,7 +788,7 @@ order by promedio desc, puntaje desc, equipo ASC';
     order by promedio desc, puntaje desc, equipo ASC';
 
 
-                echo $sql;
+                //echo $sql;
                 $promedios = DB::select(DB::raw($sql));
                 // Ordenar en PHP por promedio ascendente
                 usort($promedios, function($a, $b) {
@@ -910,7 +910,7 @@ from ( ';
 group by equipo, foto, equipo_id
 
 order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
-            //echo $sql;
+            echo $sql;
             $acumulado = DB::select(DB::raw($sql));
         }
 
