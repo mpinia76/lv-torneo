@@ -808,6 +808,7 @@ order by promedio desc, puntaje desc, equipo ASC';
         ]);
         $acumulado = array();
         if (count($acumuladoTorneos)>0){
+            $primero = true;
             $sql='SELECT foto, equipo,
        count(CASE WHEN fecha_id IS NOT NULL THEN 1 END) jugados,
        count(case when fecha_id IS NOT NULL AND golesl > golesv then 1 end) ganados,
@@ -861,6 +862,9 @@ from ( ';
                 $arrequipos = substr($arrequipos, 0, -1);//quito última coma
 
 
+                if (!$primero){
+                    $sql .= ' UNION ALL ';
+                }
 
 
 
@@ -901,8 +905,9 @@ from ( ';
     FROM incidencias
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     WHERE incidencias.torneo_id = '.$acumuladoTorneo->torneoAnterior_id.' AND equipos.id IN ('.$arrequipos.')
-    GROUP BY equipo, foto, equipos.id, incidencias.puntos';
-                $sql .=' union all ';
+    GROUP BY equipo, foto, equipos.id';
+                //$sql .=' union all ';
+                $primero = false;
             }
 
             $sql .=') a
