@@ -902,7 +902,7 @@ from ( ';
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     WHERE incidencias.torneo_id = '.$acumuladoTorneo->torneoAnterior_id.' AND equipos.id IN ('.$arrequipos.')
     GROUP BY equipo, foto, equipos.id, incidencias.puntos';
-                //$sql .=' union all ';
+                $sql .=' union all ';
             }
 
             $sql .=') a
@@ -910,7 +910,7 @@ from ( ';
 group by equipo, foto, equipo_id
 
 order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
-            echo $sql;
+            //echo $sql;
             $acumulado = DB::select(DB::raw($sql));
         }
 
