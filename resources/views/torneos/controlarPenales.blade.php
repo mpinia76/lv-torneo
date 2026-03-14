@@ -113,7 +113,7 @@
             </thead>
             <tbody>
             @php
-            $iterador=0
+            $iterador=1;
             @endphp
             @forelse($penalesExistentesMalCargados as $p)
                 <tr>
