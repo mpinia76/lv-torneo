@@ -8185,15 +8185,19 @@ private function normalizarMinuto(string $texto): int
             $penales = [];
 
             foreach ($penalesErrados as $penal) {
+
                 $penalMin = (int) filter_var($penal['minuto'], FILTER_SANITIZE_NUMBER_INT);
 
-                $nombreCoincide = mb_stripos($penal['jugador'], $name) !== false;
+                if (!empty($name)) {
 
-                if ($nombreCoincide) {
-                    $penales[] = [
-                        'type' => 'Errado', // o 'errado'
-                        'minute' => $penalMin,
-                    ];
+                    $nombreCoincide = mb_stripos($penal['jugador'], $name) !== false;
+
+                    if ($nombreCoincide) {
+                        $penales[] = [
+                            'type' => 'Errado',
+                            'minute' => $penalMin,
+                        ];
+                    }
                 }
             }
 
