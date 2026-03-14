@@ -116,11 +116,8 @@
             @forelse($penalesExistentesMalCargados as $p)
                 <tr>
                     <td>{{ $p->id }}</td>
-                    <td>{{ $p->partido_id }}</td>
-                    <td>{{ $p->minuto }}'</td>
-                    <td>{{ $p->jugador_id }}</td>
-                    <a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-warning m-1">Partido</a>
-                    <a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a>
+                    <td><a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-primary m-1">Partido</a></td>
+                    <td><a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a></td>
                 </tr>
             @empty
                 <tr><td colspan="4">No hay penales previamente cargados con arquero suplente.</td></tr>
