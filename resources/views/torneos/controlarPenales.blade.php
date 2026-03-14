@@ -105,9 +105,7 @@
             <thead>
             <tr>
                 <th>Penal ID</th>
-                <th>Partido ID</th>
-                <th>Minuto</th>
-                <th>Arquero ID</th>
+
                 <th>Partido</th>
                 <th>Penales</th>
             </tr>
