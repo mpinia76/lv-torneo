@@ -108,6 +108,8 @@
                 <th>Partido ID</th>
                 <th>Minuto</th>
                 <th>Arquero ID</th>
+                <th>Partido</th>
+                <th>Penales</th>
             </tr>
             </thead>
             <tbody>
@@ -117,6 +119,8 @@
                     <td>{{ $p->partido_id }}</td>
                     <td>{{ $p->minuto }}'</td>
                     <td>{{ $p->jugador_id }}</td>
+                    <a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-warning m-1">Partido</a>
+                    <a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a>
                 </tr>
             @empty
                 <tr><td colspan="4">No hay penales previamente cargados con arquero suplente.</td></tr>
