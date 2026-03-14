@@ -104,6 +104,7 @@
         <table class="table table-bordered" style="font-size: 14px;">
             <thead>
             <tr>
+                <th>#</th>
                 <th>Penal ID</th>
 
                 <th>Partido</th>
@@ -111,8 +112,12 @@
             </tr>
             </thead>
             <tbody>
+            @php
+            $iterador=0
+            @endphp
             @forelse($penalesExistentesMalCargados as $p)
                 <tr>
+                    <td>{{ $iterador++ }}</td>
                     <td>{{ $p->id }}</td>
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a></td>
