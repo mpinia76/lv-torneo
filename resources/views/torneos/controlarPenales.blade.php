@@ -126,10 +126,16 @@
                         <img class="imgCircle" src="{{ $penal['arquero_erroneo']->persona->foto ? url('images/'.$penal['arquero_erroneo']->persona->foto) : url('images/sin_foto.png') }}">
                         ❌ {{ $penal['arquero_erroneo']->persona->name }}
                     </td>
+                    @if(isset($penal['sin_arquero']) && $penal['sin_arquero'])
+                        <td class="text-warning">
+                            ⚠️ Sin arquero (jugador de campo)
+                        </td>
+                    @else
                     <td>
                         <img class="imgCircle" src="{{ $penal['arquero_correcto']->jugador->persona->foto ? url('images/'.$penal['arquero_correcto']->jugador->persona->foto) : url('images/sin_foto.png') }}">
                         ✅ {{ $penal['arquero_correcto']->dorsal }} - {{ $penal['arquero_correcto']->jugador->persona->name }}
                     </td>
+                    @endif
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $penal['partido']->id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $penal['partido']->id))}}" class="btn btn-warning m-1">Penales</a></td>
                 </tr>

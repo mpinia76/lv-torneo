@@ -5097,7 +5097,15 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                     $penal->minuto
                 );
 
-                if (!$arqueroCorrecto) return null;
+                if (!$arqueroCorrecto) {
+                    return [
+                        'partido' => $penal->partido,
+                        'minuto' => $penal->minuto,
+                        'arquero_erroneo' => $penal->jugador,
+                        'arquero_correcto' => null,
+                        'sin_arquero' => true
+                    ];
+                }
 
                 // ❗ solo los distintos
                 if ($penal->jugador_id == $arqueroCorrecto->jugador_id) {
