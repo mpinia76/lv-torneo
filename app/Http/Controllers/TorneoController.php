@@ -5101,31 +5101,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             return $penal->jugador_id != $arqueroCorrecto->jugador_id;
         });
 
-        // 🔥 CORREGIR AUTOMÁTICAMENTE
-        foreach ($penalesExistentesMalCargados as $penal) {
 
-            $alineacionActual = Alineacion::where('partido_id', $penal->partido_id)
-                ->where('jugador_id', $penal->jugador_id)
-                ->first();
-
-            if (!$alineacionActual) continue;
-
-            $equipoId = $alineacionActual->equipo_id;
-
-            $arqueroCorrecto = $this->obtenerArqueroEnCancha(
-                $penal->partido_id,
-                $equipoId,
-                $penal->minuto
-            );
-
-            if (!$arqueroCorrecto) continue;
-
-            if ($penal->jugador_id != $arqueroCorrecto->jugador_id) {
-                $penal->update([
-                    'jugador_id' => $arqueroCorrecto->jugador_id
-                ]);
-            }
-        }
 
         return view('torneos.controlarPenales', [
             'penalesCargados' => $penalesCargados,
