@@ -105,7 +105,7 @@
             <thead>
             <tr>
                 <th>#</th>
-                <th>Penal ID</th>
+                <th>Partido</th>
                 <th>Minuto</th>
                 <th>Arquero cargado</th>
                 <th>Arquero correcto</th>
@@ -117,19 +117,19 @@
             @php
             $iterador=1;
             @endphp
-            @forelse($penalesExistentesMalCargados as $p)
+            @foreach($penalesExistentesMalCargados as $penal)
                 <tr>
                     <td>{{ $iterador++ }}</td>
-                    <td>{{ $p->id }}</td>
-                    <td>{{ $p['minuto'] }}'</td>
+                    <td>{{ $penal['partido']->id }}</td>
+                    <td>{{ $penal['minuto'] }}'</td>
                     <td>
-                        ❌ {{ $p['arquero_erroneo']->name }}
+                        ❌ {{ $penal['arquero_erroneo']->nombre }}
                     </td>
                     <td>
-                        ✅ {{ $p['arquero_correcto']->name }}
+                        ✅ {{ $penal['arquero_correcto']->nombre }}
                     </td>
-                    <td><a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-primary m-1">Partido</a></td>
-                    <td><a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a></td>
+                    <td><a href="{{ route('fechas.detalle', ['partidoId' => $penal['partido']->id]) }}'" class="btn btn-primary m-1">Partido</a></td>
+                    <td><a href="{{route('penales.index', array('partidoId' => $penal['partido']->id))}}" class="btn btn-warning m-1">Penales</a></td>
                 </tr>
             @empty
                 <tr><td colspan="4">No hay penales previamente cargados con arquero suplente.</td></tr>
