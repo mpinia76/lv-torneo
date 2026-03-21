@@ -5081,13 +5081,13 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
         $penalesExistentesMalCargados = Penal::where('tipo', 'Convirtieron')
             ->get()
-            ->filter(function ($penal) {
+            ->map(function ($penal) {
 
                 $alineacion = Alineacion::where('partido_id', $penal->partido_id)
                     ->where('jugador_id', $penal->jugador_id)
                     ->first();
 
-                if (!$alineacion) return false;
+                if (!$alineacion) return null;
 
                 $equipoId = $alineacion->equipo_id;
 
@@ -5097,10 +5097,21 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                     $penal->minuto
                 );
 
-                if (!$arqueroCorrecto) return false;
+                if (!$arqueroCorrecto) return null;
 
-                return $penal->jugador_id != $arqueroCorrecto->jugador_id;
-            });
+                // ❗ solo los distintos
+                if ($penal->jugador_id == $arqueroCorrecto->jugador_id) {
+                    return null;
+                }
+
+                return [
+                    'partido' => $penal->partido,
+                    'minuto' => $penal->minuto,
+                    'arquero_erroneo' => $penal->jugador,
+                    'arquero_correcto' => $arqueroCorrecto->jugador,
+                ];
+            })
+            ->filter(); // elimina nulls
 
 
 

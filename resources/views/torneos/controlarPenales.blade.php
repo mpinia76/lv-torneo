@@ -106,7 +106,9 @@
             <tr>
                 <th>#</th>
                 <th>Penal ID</th>
-
+                <th>Minuto</th>
+                <th>Arquero cargado</th>
+                <th>Arquero correcto</th>
                 <th>Partido</th>
                 <th>Penales</th>
             </tr>
@@ -119,6 +121,13 @@
                 <tr>
                     <td>{{ $iterador++ }}</td>
                     <td>{{ $p->id }}</td>
+                    <td>{{ $penal['minuto'] }}'</td>
+                    <td>
+                        ❌ {{ $penal['arquero_erroneo']->name }}
+                    </td>
+                    <td>
+                        ✅ {{ $penal['arquero_correcto']->name }}
+                    </td>
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a></td>
                 </tr>
