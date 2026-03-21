@@ -5018,17 +5018,19 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
         $golesPenales = Gol::with(['partido', 'jugador'])->where('tipo', 'penal')->get();
 
         $penalesCargados = collect();
-        $penalesMalCargados = collect(); // Penales donde el arquero es suplente
+        $penalesMalCargados = collect();
 
         foreach ($golesPenales as $gol) {
+
             // Evitar duplicados
             $existe = Penal::where('partido_id', $gol->partido_id)
                 ->where('minuto', $gol->minuto)
                 ->where('tipo', 'Convirtieron')
                 ->first();
+
             if ($existe) continue;
 
-            // Buscar el equipo del jugador que hizo el gol
+            // Equipo del jugador que hizo el gol
             $alineacionGol = Alineacion::where('partido_id', $gol->partido_id)
                 ->where('jugador_id', $gol->jugador_id)
                 ->first();
@@ -5037,17 +5039,17 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
             $equipoGolId = $alineacionGol->equipo_id;
 
-            // Buscar el equipo rival
+            // Equipo rival
             $equipoRivalId = Alineacion::where('partido_id', $gol->partido_id)
                 ->where('equipo_id', '!=', $equipoGolId)
                 ->value('equipo_id');
 
             if (!$equipoRivalId) continue;
 
-            // Buscar arquero titular del equipo rival
+            // Arquero titular rival
             $arqueroTitular = Alineacion::where('partido_id', $gol->partido_id)
                 ->where('equipo_id', $equipoRivalId)
-                ->where('tipo', 'Titular') // solo titulares
+                ->where('tipo', 'Titular')
                 ->whereHas('jugador', function ($q) {
                     $q->where('tipoJugador', 'Arquero');
                 })
@@ -5058,7 +5060,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
             $arqueroFinal = $arqueroTitular;
 
-            // Buscar si entró otro arquero antes del penal
+            // Buscar cambio de arquero (del equipo rival)
             $cambioArquero = Cambio::where('partido_id', $gol->partido_id)
                 ->where('minuto', '<=', $gol->minuto)
                 ->where('tipo', 'Entra')
@@ -5079,8 +5081,25 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                 }
             }
 
-            // Detectar si el arqueroFinal es suplente
-            if ($arqueroFinal->tipo === 'Suplente') {
+            // ✅ VALIDAR SI EL ARQUERO ESTABA JUGANDO
+            $jugando = false;
+
+            if ($arqueroFinal->tipo === 'Titular') {
+                $jugando = true;
+            } else {
+                $entroAntes = Cambio::where('partido_id', $gol->partido_id)
+                    ->where('jugador_id', $arqueroFinal->jugador_id)
+                    ->where('tipo', 'Entra')
+                    ->where('minuto', '<=', $gol->minuto)
+                    ->exists();
+
+                if ($entroAntes) {
+                    $jugando = true;
+                }
+            }
+
+            // ❌ Mal cargado si no estaba jugando
+            if (!$jugando) {
                 $penalesMalCargados->push([
                     'partido_id' => $gol->partido_id,
                     'minuto' => $gol->minuto,
@@ -5089,7 +5108,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                 ]);
             }
 
-            // Crear registro en penals
+            // Crear penal
             $penal = Penal::create([
                 'partido_id' => $gol->partido_id,
                 'jugador_id' => $arqueroFinal->jugador_id,
@@ -5097,7 +5116,6 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                 'tipo' => 'Convirtieron',
             ]);
 
-            // Guardar info para la vista
             $penalesCargados->push([
                 'partido' => $gol->partido,
                 'arquero' => $arqueroFinal->jugador,
@@ -5106,12 +5124,29 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             ]);
         }
 
-        // Detectar penales existentes previamente cargados con suplente
+        // ✅ CORRECCIÓN DE PENALES YA EXISTENTES
         $penalesExistentesMalCargados = Penal::get()->filter(function ($penal) {
+
             $alineacion = Alineacion::where('partido_id', $penal->partido_id)
                 ->where('jugador_id', $penal->jugador_id)
                 ->first();
-            return $alineacion && $alineacion->tipo === 'Suplente';
+
+            if (!$alineacion) return false;
+
+            // Titular → OK
+            if ($alineacion->tipo === 'Titular') {
+                return false;
+            }
+
+            // Suplente → verificar si entró
+            $entroAntes = Cambio::where('partido_id', $penal->partido_id)
+                ->where('jugador_id', $penal->jugador_id)
+                ->where('tipo', 'Entra')
+                ->where('minuto', '<=', $penal->minuto)
+                ->exists();
+
+            // ❌ mal si no entró
+            return !$entroAntes;
         });
 
         return view('torneos.controlarPenales', [
