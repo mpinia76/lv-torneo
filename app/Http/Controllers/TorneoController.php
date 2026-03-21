@@ -5046,66 +5046,21 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
             if (!$equipoRivalId) continue;
 
-            // Arquero titular rival
-            $arqueroTitular = Alineacion::where('partido_id', $gol->partido_id)
-                ->where('equipo_id', $equipoRivalId)
-                ->where('tipo', 'Titular')
-                ->whereHas('jugador', function ($q) {
-                    $q->where('tipoJugador', 'Arquero');
-                })
-                ->orderBy('orden', 'asc')
-                ->first();
+            // 🔥 USAMOS LA FUNCIÓN
+            $arqueroFinal = $this->obtenerArqueroEnCancha(
+                $gol->partido_id,
+                $equipoRivalId,
+                $gol->minuto
+            );
 
-            if (!$arqueroTitular) continue;
-
-            $arqueroFinal = $arqueroTitular;
-
-            // Buscar cambio de arquero (del equipo rival)
-            $cambioArquero = Cambio::where('partido_id', $gol->partido_id)
-                ->where('minuto', '<=', $gol->minuto)
-                ->where('tipo', 'Entra')
-                ->whereHas('jugador', function ($q) {
-                    $q->where('tipoJugador', 'Arquero');
-                })
-                ->orderBy('minuto', 'desc')
-                ->first();
-
-            if ($cambioArquero) {
-                $alineacionCambio = Alineacion::where('partido_id', $gol->partido_id)
-                    ->where('jugador_id', $cambioArquero->jugador_id)
-                    ->where('equipo_id', $equipoRivalId)
-                    ->first();
-
-                if ($alineacionCambio) {
-                    $arqueroFinal = $alineacionCambio;
-                }
-            }
-
-            // ✅ VALIDAR SI EL ARQUERO ESTABA JUGANDO
-            $jugando = false;
-
-            if ($arqueroFinal->tipo === 'Titular') {
-                $jugando = true;
-            } else {
-                $entroAntes = Cambio::where('partido_id', $gol->partido_id)
-                    ->where('jugador_id', $arqueroFinal->jugador_id)
-                    ->where('tipo', 'Entra')
-                    ->where('minuto', '<=', $gol->minuto)
-                    ->exists();
-
-                if ($entroAntes) {
-                    $jugando = true;
-                }
-            }
-
-            // ❌ Mal cargado si no estaba jugando
-            if (!$jugando) {
+            if (!$arqueroFinal) {
                 $penalesMalCargados->push([
                     'partido_id' => $gol->partido_id,
                     'minuto' => $gol->minuto,
-                    'arquero_id' => $arqueroFinal->jugador_id,
+                    'arquero_id' => null,
                     'ejecutor_id' => $gol->jugador_id
                 ]);
+                continue;
             }
 
             // Crear penal
@@ -5124,7 +5079,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             ]);
         }
 
-        // ✅ CORRECCIÓN DE PENALES YA EXISTENTES
+        // 🔥 DETECTAR MAL CARGADOS (FORMA CORRECTA)
         $penalesExistentesMalCargados = Penal::get()->filter(function ($penal) {
 
             $alineacion = Alineacion::where('partido_id', $penal->partido_id)
@@ -5133,21 +5088,44 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
             if (!$alineacion) return false;
 
-            // Titular → OK
-            if ($alineacion->tipo === 'Titular') {
-                return false;
-            }
+            $equipoId = $alineacion->equipo_id;
 
-            // Suplente → verificar si entró
-            $entroAntes = Cambio::where('partido_id', $penal->partido_id)
-                ->where('jugador_id', $penal->jugador_id)
-                ->where('tipo', 'Entra')
-                ->where('minuto', '<=', $penal->minuto)
-                ->exists();
+            $arqueroCorrecto = $this->obtenerArqueroEnCancha(
+                $penal->partido_id,
+                $equipoId,
+                $penal->minuto
+            );
 
-            // ❌ mal si no entró
-            return !$entroAntes;
+            if (!$arqueroCorrecto) return false;
+
+            return $penal->jugador_id != $arqueroCorrecto->jugador_id;
         });
+
+        // 🔥 CORREGIR AUTOMÁTICAMENTE
+        foreach ($penalesExistentesMalCargados as $penal) {
+
+            $alineacionActual = Alineacion::where('partido_id', $penal->partido_id)
+                ->where('jugador_id', $penal->jugador_id)
+                ->first();
+
+            if (!$alineacionActual) continue;
+
+            $equipoId = $alineacionActual->equipo_id;
+
+            $arqueroCorrecto = $this->obtenerArqueroEnCancha(
+                $penal->partido_id,
+                $equipoId,
+                $penal->minuto
+            );
+
+            if (!$arqueroCorrecto) continue;
+
+            if ($penal->jugador_id != $arqueroCorrecto->jugador_id) {
+                $penal->update([
+                    'jugador_id' => $arqueroCorrecto->jugador_id
+                ]);
+            }
+        }
 
         return view('torneos.controlarPenales', [
             'penalesCargados' => $penalesCargados,
@@ -5156,6 +5134,55 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
         ]);
     }
 
+    private function obtenerArqueroEnCancha($partidoId, $equipoId, $minuto)
+    {
+        $arqueroTitular = Alineacion::where('partido_id', $partidoId)
+            ->where('equipo_id', $equipoId)
+            ->where('tipo', 'Titular')
+            ->whereHas('jugador', function ($q) {
+                $q->where('tipoJugador', 'Arquero');
+            })
+            ->orderBy('orden', 'asc')
+            ->first();
+
+        if (!$arqueroTitular) return null;
+
+        $arqueroActual = $arqueroTitular;
+
+        $cambios = Cambio::where('partido_id', $partidoId)
+            ->where('minuto', '<=', $minuto)
+            ->whereHas('jugador', function ($q) {
+                $q->where('tipoJugador', 'Arquero');
+            })
+            ->whereHas('jugador.alineaciones', function ($q) use ($equipoId, $partidoId) {
+                $q->where('equipo_id', $equipoId)
+                    ->where('partido_id', $partidoId);
+            })
+            ->orderBy('minuto', 'asc')
+            ->get();
+
+        foreach ($cambios as $cambio) {
+
+            if ($cambio->tipo === 'Entra') {
+                $alineacionCambio = Alineacion::where('partido_id', $partidoId)
+                    ->where('jugador_id', $cambio->jugador_id)
+                    ->where('equipo_id', $equipoId)
+                    ->first();
+
+                if ($alineacionCambio) {
+                    $arqueroActual = $alineacionCambio;
+                }
+            }
+
+            if ($cambio->tipo === 'Sale') {
+                if ($arqueroActual && $arqueroActual->jugador_id == $cambio->jugador_id) {
+                    $arqueroActual = null;
+                }
+            }
+        }
+
+        return $arqueroActual;
+    }
 
     public function importargoles_new(Request $request)
     {
