@@ -121,12 +121,12 @@
                 <tr>
                     <td>{{ $iterador++ }}</td>
                     <td>{{ $p->id }}</td>
-                    <td>{{ $penal['minuto'] }}'</td>
+                    <td>{{ $p['minuto'] }}'</td>
                     <td>
-                        ❌ {{ $penal['arquero_erroneo']->name }}
+                        ❌ {{ $p['arquero_erroneo']->name }}
                     </td>
                     <td>
-                        ✅ {{ $penal['arquero_correcto']->name }}
+                        ✅ {{ $p['arquero_correcto']->name }}
                     </td>
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $p->partido_id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $p->partido_id))}}" class="btn btn-warning m-1">Penales</a></td>
