@@ -117,7 +117,7 @@
             @php
             $iterador=1;
             @endphp
-            @foreach($penalesExistentesMalCargados as $penal)
+            @forelse($penalesExistentesMalCargados as $penal)
                 <tr>
                     <td>{{ $iterador++ }}</td>
                     <td>{{ $penal['partido']->id }}</td>
