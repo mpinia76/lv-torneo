@@ -5079,27 +5079,28 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             ]);
         }
 
-        // 🔥 DETECTAR MAL CARGADOS (FORMA CORRECTA)
-        $penalesExistentesMalCargados = Penal::get()->filter(function ($penal) {
+        $penalesExistentesMalCargados = Penal::where('tipo', 'Convirtieron')
+            ->get()
+            ->filter(function ($penal) {
 
-            $alineacion = Alineacion::where('partido_id', $penal->partido_id)
-                ->where('jugador_id', $penal->jugador_id)
-                ->first();
+                $alineacion = Alineacion::where('partido_id', $penal->partido_id)
+                    ->where('jugador_id', $penal->jugador_id)
+                    ->first();
 
-            if (!$alineacion) return false;
+                if (!$alineacion) return false;
 
-            $equipoId = $alineacion->equipo_id;
+                $equipoId = $alineacion->equipo_id;
 
-            $arqueroCorrecto = $this->obtenerArqueroEnCancha(
-                $penal->partido_id,
-                $equipoId,
-                $penal->minuto
-            );
+                $arqueroCorrecto = $this->obtenerArqueroEnCancha(
+                    $penal->partido_id,
+                    $equipoId,
+                    $penal->minuto
+                );
 
-            if (!$arqueroCorrecto) return false;
+                if (!$arqueroCorrecto) return false;
 
-            return $penal->jugador_id != $arqueroCorrecto->jugador_id;
-        });
+                return $penal->jugador_id != $arqueroCorrecto->jugador_id;
+            });
 
 
 
