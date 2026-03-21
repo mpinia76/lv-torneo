@@ -126,7 +126,7 @@
                         ❌ {{ $penal['arquero_erroneo']->persona->name }}
                     </td>
                     <td>
-                        ✅ {{ $penal['arquero_correcto']->persona->nombre }}
+                        ✅ {{ $penal['arquero_correcto']->dorsal }} - {{ $penal['arquero_correcto']->persona->name }}
                     </td>
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $penal['partido']->id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $penal['partido']->id))}}" class="btn btn-warning m-1">Penales</a></td>
