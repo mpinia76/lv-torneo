@@ -123,10 +123,10 @@
                     <td>{{ $penal['partido']->id }}</td>
                     <td>{{ $penal['minuto'] }}'</td>
                     <td>
-                        ❌ {{ $penal['arquero_erroneo']->nombre }}
+                        ❌ {{ $penal['arquero_erroneo']->persona->name }}
                     </td>
                     <td>
-                        ✅ {{ $penal['arquero_correcto']->nombre }}
+                        ✅ {{ $penal['arquero_correcto']->persona->nombre }}
                     </td>
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $penal['partido']->id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $penal['partido']->id))}}" class="btn btn-warning m-1">Penales</a></td>
