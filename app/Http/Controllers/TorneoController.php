@@ -6,6 +6,7 @@ use App\AcumuladoTorneo;
 use App\Fecha;
 use App\Partido;
 use App\Jugador;
+use App\Tarjeta;
 use App\Titulo;
 use App\Tecnico;
 use App\PartidoTecnico;
@@ -5179,7 +5180,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
         // 🔥 AHORA sí validar expulsión del arquero FINAL
         if ($arqueroActual) {
-            $expulsado = Evento::where('partido_id', $partidoId)
+            $expulsado = Tarjeta::where('partido_id', $partidoId)
                 ->where('jugador_id', $arqueroActual->jugador_id)
                 ->where('tipo', 'Roja')
                 ->where('minuto', '<=', $minuto)
