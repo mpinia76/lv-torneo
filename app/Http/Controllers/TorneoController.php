@@ -5108,7 +5108,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
                     'partido' => $penal->partido,
                     'minuto' => $penal->minuto,
                     'arquero_erroneo' => $penal->jugador,
-                    'arquero_correcto' => $arqueroCorrecto->jugador,
+                    'arquero_correcto' => $arqueroCorrecto,
                 ];
             })
             ->filter(); // elimina nulls

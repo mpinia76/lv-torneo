@@ -123,10 +123,12 @@
                     <td>{{ $penal['partido']->id }}</td>
                     <td>{{ $penal['minuto'] }}'</td>
                     <td>
+                        <img class="imgCircle" src="{{ $penal['arquero_erroneo']->persona->foto ? url('images/'.$penal['arquero_erroneo']->persona->foto) : url('images/sin_foto.png') }}">
                         ❌ {{ $penal['arquero_erroneo']->persona->name }}
                     </td>
                     <td>
-                        ✅ {{ $penal['arquero_correcto']->dorsal }} - {{ $penal['arquero_correcto']->persona->name }}
+                        <img class="imgCircle" src="{{ $penal['arquero_correcto']->jugador->persona->foto ? url('images/'.$penal['arquero_correcto']->jugador->persona->foto) : url('images/sin_foto.png') }}">
+                        ✅ {{ $penal['arquero_correcto']->dorsal }} - {{ $penal['arquero_correcto']->jugador->persona->name }}
                     </td>
                     <td><a href="{{ route('fechas.detalle', ['partidoId' => $penal['partido']->id]) }}'" class="btn btn-primary m-1">Partido</a></td>
                     <td><a href="{{route('penales.index', array('partidoId' => $penal['partido']->id))}}" class="btn btn-warning m-1">Penales</a></td>
