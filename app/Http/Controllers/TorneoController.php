@@ -5154,7 +5154,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
             ->whereHas('jugador', function ($q) {
                 $q->where('tipoJugador', 'Arquero');
             })
-            ->whereHas('jugador.alineaciones', function ($q) use ($equipoId, $partidoId) {
+            ->whereHas('jugador.alineacions', function ($q) use ($equipoId, $partidoId) {
                 $q->where('equipo_id', $equipoId)
                     ->where('partido_id', $partidoId);
             })
