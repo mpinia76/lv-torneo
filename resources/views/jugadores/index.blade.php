@@ -96,6 +96,10 @@
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
                         <a href="{{route('jugadores.reasignar', $jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
+                        <a href="{{ route('jugador-estadisticas.indexPorJugador', $jugador->id) }}"
+                           class="btn btn-warning m-1">
+                            Estadísticas
+                        </a>
                     </div>
 
                 </td>

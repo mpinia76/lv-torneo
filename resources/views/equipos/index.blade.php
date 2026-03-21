@@ -65,6 +65,10 @@
                             <input type="hidden" name="_token" value="{{ csrf_token() }}">
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
+                        <a href="{{ route('equipo-estadisticas.indexPorEquipo', $equipo->id) }}"
+                           class="btn btn-warning m-1">
+                            Estadísticas
+                        </a>
                     </div>
 
                 </td>

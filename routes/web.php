@@ -145,7 +145,32 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('importargoles', 'TorneoController@importargoles')->name('torneos.importargoles');
 
     Route::resource('titulos', 'TituloController');
+    Route::resource('jugador-estadisticas', 'JugadorEstadisticaManualController');
 
+    Route::get(
+        'jugadores/{jugador}/jugador-estadisticas',
+        'JugadorEstadisticaManualController@indexPorJugador'
+    )->name('jugador-estadisticas.indexPorJugador');
+    Route::get('jugador-estadisticas/createPorJugador/{jugadorId}', 'JugadorEstadisticaManualController@createPorJugador')
+        ->name('jugador-estadisticas.createPorJugador');
+
+    Route::resource('tecnico-estadisticas', 'TecnicoEstadisticaManualController');
+
+    Route::get(
+        'tecnicos/{tecnico}/tecnico-estadisticas',
+        'TecnicoEstadisticaManualController@indexPorTecnico'
+    )->name('tecnico-estadisticas.indexPorTecnico');
+    Route::get('tecnico-estadisticas/createPorTecnico/{tecnicoId}', 'TecnicoEstadisticaManualController@createPorTecnico')
+        ->name('tecnico-estadisticas.createPorTecnico');
+
+    Route::resource('equipo-estadisticas', 'EquipoEstadisticaManualController');
+
+    Route::get(
+        'equipos/{equipo}/equipo-estadisticas',
+        'EquipoEstadisticaManualController@indexPorEquipo'
+    )->name('equipo-estadisticas.indexPorEquipo');
+    Route::get('equipo-estadisticas/createPorEquipo/{equipoId}', 'EquipoEstadisticaManualController@createPorEquipo')
+        ->name('equipo-estadisticas.createPorEquipo');
 
 });
 

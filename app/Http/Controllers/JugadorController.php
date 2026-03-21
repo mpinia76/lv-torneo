@@ -18,6 +18,7 @@ use App\PosicionTorneo;
 use App\Tecnico;
 use App\Titulo;
 use App\Torneo;
+use App\JugadorEstadisticaManual;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -774,6 +775,82 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.
 
         }
 
+        $estadisticasManuales = JugadorEstadisticaManual::where('jugador_id', $id)->get();
+
+        foreach ($estadisticasManuales as $manual) {
+
+            $torneoManual = new \stdClass();
+
+            $torneoManual->idTorneo = 'manual_'.$manual->id;
+            $torneoManual->nombreTorneo = $manual->torneo_nombre;
+            $torneoManual->escudo = $manual->torneo_logo ?? '';
+
+
+            $torneoManual->jugados = $manual->partidos ?? 0;
+
+            $torneoManual->goles =
+                ($manual->goles_cabeza ?? 0) +
+                ($manual->goles_penal ?? 0) +
+                ($manual->goles_tiro_libre ?? 0) +
+                ($manual->goles_jugada ?? 0);
+
+            $torneoManual->amarillas = $manual->amarillas ?? 0;
+            $torneoManual->rojas = $manual->rojas ?? 0;
+
+            $torneoManual->errados = $manual->penales_errados ?? 0;
+            $torneoManual->atajados = $manual->penales_atajo ?? 0;
+
+            $torneoManual->recibidos = $manual->goles_recibidos ?? 0;
+            $torneoManual->invictas = $manual->vallas_invictas ?? 0;
+
+            $torneoManual->tipo = $manual->tipo ?? 'Liga';
+            $torneoManual->ambito = $manual->ambito ?? 'Nacional';
+            $torneoManual->escudoTorneo = $manual->torneo_logo ?? '';
+            // POSICION
+            $posicion = $manual->posicion;
+
+            $equipo = Equipo::find($manual->equipo_id);
+
+            $strPosicion = '';
+
+            if($posicion == 1){
+                $strPosicion = '<img src="'.asset('images/campeon.png').'" height="20"> Campeón';
+            }
+            elseif($posicion == 2){
+                $strPosicion = '<img src="'.asset('images/subcampeon.png').'" height="20"> Subcampeón';
+            }
+            else{
+                $strPosicion = $manual->posicion;
+            }
+
+            $torneoManual->escudo =
+                $equipo->escudo.'_'.
+                $equipo->id.'_'.
+                $strPosicion.'_'.
+                $equipo->nombre.',';
+            // CONTAR TITULOS
+            if ($posicion == 1) {
+
+                if ($torneoManual->ambito == 'Nacional') {
+
+                    if ($torneoManual->tipo == 'Copa') {
+                        $titulosJugadorCopa++;
+                    } else {
+                        $titulosJugadorLiga++;
+                    }
+
+                } else {
+
+                    $titulosJugadorInternacional++;
+
+                }
+
+            }
+
+            $torneosJugador[] = $torneoManual;
+
+        }
+//dd($torneosJugador);
         $tecnico = Tecnico::where('persona_id', '=', $jugador->persona_id)->first();
         $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, tecnicos.id as idTecnico, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id

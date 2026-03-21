@@ -41,4 +41,9 @@ class Jugador extends Model
         return $this->hasMany('App\Penal', 'jugador_id');
     }
 
+    public function statsManual()
+    {
+        return $this->hasMany('App\JugadorEstadisticaManual', 'jugador_id');
+    }
+
 }

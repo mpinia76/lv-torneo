@@ -70,6 +70,10 @@
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
                         <a href="{{route('tecnicos.reasignar', $tecnico->id)}}" class="btn btn-info m-1">Reasignar</a>
+                        <a href="{{ route('tecnico-estadisticas.indexPorTecnico', $tecnico->id) }}"
+                           class="btn btn-warning m-1">
+                            Estadísticas
+                        </a>
                     </div>
 
                 </td>

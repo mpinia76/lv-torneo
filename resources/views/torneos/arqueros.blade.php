@@ -46,7 +46,8 @@
                     $columns = [
                         'jugados' => 'Jugados',
                         'recibidos' => 'Goles',
-                        'invictas' => 'Vallas invictas'
+                        'invictas' => 'Vallas invictas',
+                        'atajos' => 'P. Atajados'
                     ];
                 @endphp
                 @foreach($columns as $key => $label)
@@ -93,6 +94,7 @@
                     <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id]) }}">{{ $jugador->jugados }}</a></td>
                     <td>{{ $jugador->recibidos }} ({{ $jugador->jugados ? round($jugador->recibidos / $jugador->jugados,2) : 0 }})</td>
                     <td>{{ $jugador->invictas }} ({{ $jugador->jugados ? round($jugador->invictas / $jugador->jugados,2) : 0 }})</td>
+                    <td><a href="{{ route('jugadores.penals', ['jugadorId'=>$jugador->id,'tipo'=>'Atajó']) }}">{{ $jugador->atajos }}</a></td>
                     <td>
                         @if($jugador->escudo)
                             @foreach(explode(',', $jugador->escudo) as $escudo)
