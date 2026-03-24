@@ -173,7 +173,7 @@ class ScraperController extends Controller
     {
         set_time_limit(0);
         $url = "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=" . urlencode($nombre);
-
+        //dd($url);
         $html = HttpHelper::getHtmlContent($url, false);
 
         if (!$html) {
@@ -363,10 +363,10 @@ class ScraperController extends Controller
         $tecnico = \App\Tecnico::findOrFail($request->tecnico_id);
 
         $variantes = [
-            $tecnico->nombre . ' ' . $tecnico->apellido,
-            $tecnico->apellido,
-            $tecnico->nombre,
-            $tecnico->name,
+            $tecnico->persona->nombre . ' ' . $tecnico->persona->apellido,
+            $tecnico->persona->apellido,
+            $tecnico->persona->nombre,
+            $tecnico->persona->name,
         ];
 
         foreach ($variantes as $nombre) {
