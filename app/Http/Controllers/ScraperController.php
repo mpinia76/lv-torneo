@@ -371,10 +371,12 @@ class ScraperController extends Controller
 
         foreach ($variantes as $nombre) {
             $data = $this->scrapearTecnico($nombre);
+
+            if (!empty($data)) {
+                return response()->json($data);
+            }
         }
 
-
-
-        return response()->json($data);
+        return response()->json([]);
     }
 }
