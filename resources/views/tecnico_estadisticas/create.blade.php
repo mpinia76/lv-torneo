@@ -177,9 +177,11 @@
         let equipo_id = document.querySelector('[name="equipo_id"]').value;
 
         let url = "{{ url('admin/scraper/tecnico') }}";
+
         // 🔥 mostrar loading
         document.getElementById('loadingScraper').style.display = 'block';
         document.getElementById('resultadoScraper').innerHTML = '';
+
         fetch(`${url}?tecnico_id=${tecnico_id}&equipo_id=${equipo_id}`)
             .then(res => res.json())
             .then(data => {
@@ -187,14 +189,29 @@
                 let html = '';
                 let items = data.original ?? [];
 
+                // 🔥 totales
+                let totPartidos = 0;
+                let totGanados = 0;
+                let totEmpatados = 0;
+                let totPerdidos = 0;
+                let totGF = 0;
+                let totGE = 0;
+
                 items.forEach(competition => {
 
-                    html += `<h5>${clean(competition.competition)}</h5>`;
+                    totPartidos += parseInt(competition.partidos || 0);
+                    totGanados += parseInt(competition.ganados || 0);
+                    totEmpatados += parseInt(competition.empatados || 0);
+                    totPerdidos += parseInt(competition.perdidos || 0);
+                    totGF += parseInt(competition.gf || 0);
+                    totGE += parseInt(competition.ge || 0);
+
+                    html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
                     html += '<table class="table table-sm">';
                     html += '<tr><th>Equipo</th><th>Partidos</th><th>Ganados</th><th>Empatados</th><th>Perdidos</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
 
                     html += `<tr>
-                    <td>${competition.equipo}</td>
+                    <td style="color: #0a6ebd">${competition.equipo}</td>
                     <td>${competition.partidos}</td>
                     <td>${competition.ganados}</td>
                     <td>${competition.empatados}</td>
@@ -211,6 +228,33 @@
                     html += '</table>';
                 });
 
+                // 🔥 tabla totales
+                if (items.length) {
+                    html += `
+                <table class="table table-sm table-bordered mt-3">
+                    <tr class="table-dark">
+                        <th>Totales</th>
+                        <th>Partidos</th>
+                        <th>Ganados</th>
+                        <th>Empatados</th>
+                        <th>Perdidos</th>
+                        <th>GF</th>
+                        <th>GE</th>
+                        <th></th>
+                    </tr>
+                    <tr class="table-warning">
+                        <td><strong>Total</strong></td>
+                        <td>${totPartidos}</td>
+                        <td>${totGanados}</td>
+                        <td>${totEmpatados}</td>
+                        <td>${totPerdidos}</td>
+                        <td>${totGF}</td>
+                        <td>${totGE}</td>
+                        <td></td>
+                    </tr>
+                </table>`;
+                }
+
                 document.getElementById('resultadoScraper').innerHTML = html;
             })
             .catch(err => {
@@ -219,7 +263,6 @@
                     '<div class="alert alert-danger">Error cargando datos</div>';
             })
             .finally(() => {
-                // 🔥 ocultar loading SIEMPRE
                 document.getElementById('loadingScraper').style.display = 'none';
             });
     }
