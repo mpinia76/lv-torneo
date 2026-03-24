@@ -42,6 +42,15 @@
                 </ul>
             </div>
         @endif
+        <button type="button" class="btn btn-info" onclick="verHistorial()">
+            🔍 Ver historial
+        </button>
+        <div id="loadingScraper" style="display:none;" class="alert alert-info">
+            ⏳ Cargando historial, puede tardar unos segundos...
+        </div>
+        <div id="resultadoScraper" class="mt-3"></div>
+
+        <hr>
 
         <form action="{{ route('tecnico-estadisticas.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
@@ -162,3 +171,109 @@
         </form>
     </div>
 @endsection
+<script>
+    function verHistorial() {
+        let tecnico_id = document.querySelector('[name="tecnico_id"]').value;
+        let equipo_id = document.querySelector('[name="equipo_id"]').value;
+
+        let url = "{{ url('admin/scraper/tecnico') }}";
+        // 🔥 mostrar loading
+        document.getElementById('loadingScraper').style.display = 'block';
+        document.getElementById('resultadoScraper').innerHTML = '';
+        fetch(`${url}?tecnico_id=${tecnico_id}&equipo_id=${equipo_id}`)
+            .then(res => res.json())
+            .then(data => {
+
+                let html = '';
+                let items = data.original ?? [];
+
+                items.forEach(competition => {
+
+                    html += `<h5>${clean(competition.competition)}</h5>`;
+                    html += '<table class="table table-sm">';
+                    html += '<tr><th>Equipo</th><th>Partidos</th><th>Ganados</th><th>Empatados</th><th>Perdidos</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
+
+                    html += `<tr>
+                    <td>${competition.equipo}</td>
+                    <td>${competition.partidos}</td>
+                    <td>${competition.ganados}</td>
+                    <td>${competition.empatados}</td>
+                    <td>${competition.perdidos}</td>
+                    <td>${competition.gf}</td>
+                    <td>${competition.ge}</td>
+                    <td>
+                        <button onclick='usarDato(${JSON.stringify(competition)})' class="btn btn-success btn-sm">
+                            Usar
+                        </button>
+                    </td>
+                </tr>`;
+
+                    html += '</table>';
+                });
+
+                document.getElementById('resultadoScraper').innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('resultadoScraper').innerHTML =
+                    '<div class="alert alert-danger">Error cargando datos</div>';
+            })
+            .finally(() => {
+                // 🔥 ocultar loading SIEMPRE
+                document.getElementById('loadingScraper').style.display = 'none';
+            });
+    }
+
+    function normalizar(texto) {
+        return texto
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\./g, "")
+            .replace(/club|fc|de|la|el/g, "")
+            .trim();
+    }
+
+    function clean(texto) {
+        return texto ? texto.trim().replace(/\s+/g, ' ') : '';
+    }
+
+    function usarDato(item) {
+
+        // ⚽ partidos
+        document.querySelector('[name="partidos"]').value = item.partidos;
+        document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
+        document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
+        document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
+        document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
+        document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
+
+        document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
+
+        // 🧠 match equipo
+        let select = document.querySelector('[name="equipo_id"]');
+        let equipoScraper = normalizar(item.equipo);
+
+        let mejorMatch = null;
+        let maxScore = 0;
+
+        for (let option of select.options) {
+            let equipoDB = normalizar(option.text);
+            let score = 0;
+
+            if (equipoDB.includes(equipoScraper)) score += 2;
+            if (equipoScraper.includes(equipoDB)) score += 2;
+
+            if (score > maxScore) {
+                maxScore = score;
+                mejorMatch = option;
+            }
+        }
+
+        if (mejorMatch) {
+            select.value = mejorMatch.value;
+            $(select).trigger('change'); // Select2
+        }
+    }
+
+</script>

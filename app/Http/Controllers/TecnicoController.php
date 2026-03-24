@@ -11,6 +11,7 @@ use App\Partido;
 use App\PartidoTecnico;
 use App\Persona;
 use App\PosicionTorneo;
+use App\TecnicoEstadisticaManual;
 use App\Services\HttpHelper;
 use App\Tecnico;
 use App\Torneo;
@@ -737,7 +738,71 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
 
         }
 
+        // --- Estadísticas manuales del técnico ---
+        $estadisticasManuales = TecnicoEstadisticaManual::where('tecnico_id', $id)->get();
 
+        foreach ($estadisticasManuales as $manual) {
+            // Buscar si el torneo ya está en el listado de torneosTecnico
+            $torneoExistente = collect($torneosTecnico)->firstWhere('idTorneo', $manual->torneo_nombre);
+
+            // Construimos la "posición" como se hace en las no manuales
+            $strPosicion = '';
+            if ($manual->posicion == 1) {
+                $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón';
+            } elseif ($manual->posicion == 2) {
+                $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón';
+            } elseif ($manual->posicion > 2) {
+                $strPosicion = $manual->posicion;
+            }
+
+            // Creamos la cadena de "escudos" igual que en las no manuales
+            $escudoManual = $manual->equipo->escudo.'_'.$manual->equipo_id.'_'.$strPosicion.'_'.$manual->equipo->nombre.',';
+
+            //dd($escudoManual);
+            if ($torneoExistente) {
+                // Si existe, sumamos las estadísticas manuales
+                $torneoExistente->jugados += $manual->partidos;
+                $torneoExistente->ganados += $manual->ganados;
+                $torneoExistente->empatados += $manual->empatados;
+                $torneoExistente->perdidos += $manual->perdidos;
+                $torneoExistente->favor += $manual->goles_favor;
+                $torneoExistente->contra += $manual->goles_en_contra;
+                // Concatenamos el escudo manual
+                $torneoExistente->escudo .= $escudoManual;
+            } else {
+                // Si no existe, lo agregamos como un "nuevo torneo"
+                $torneosTecnico[] = (object)[
+                    'idTorneo' => $manual->torneo_nombre,
+                    'nombreTorneo' => $manual->torneo_nombre,
+                    'escudo' => $escudoManual,
+                    'escudoTorneo' => $manual->torneo_logo,
+                    'jugados' => $manual->partidos,
+                    'ganados' => $manual->ganados,
+                    'empatados' => $manual->empatados,
+                    'perdidos' => $manual->perdidos,
+                    'favor' => $manual->goles_favor,
+                    'contra' => $manual->goles_en_contra,
+                    'puntaje' => $manual->ganados*3+$manual->empatados, // opcional si no lo calculas aquí
+                    'porcentaje' => round(($manual->ganados*3+$manual->empatados)*(100/($manual->partidos*3)),2).'%',
+                    'tipo' => $manual->tipo,
+                    'ambito' => $manual->ambito
+                ];
+            }
+            // --- Conteo de títulos manuales según posición ---
+            if ($manual->posicion == 1) {
+
+                if ($manual->ambito == 'Nacional') {
+                    if ($manual->tipo == 'Copa') {
+                        $titulosTecnicoCopa++;
+                    } else {
+                        $titulosTecnicoLiga++;
+                    }
+                } else {
+                    $titulosTecnicoInternacional++;
+                }
+            }
+            //dd($torneosTecnico);
+        }
 
         return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
     }

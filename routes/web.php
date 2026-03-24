@@ -172,6 +172,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('equipo-estadisticas/createPorEquipo/{equipoId}', 'EquipoEstadisticaManualController@createPorEquipo')
         ->name('equipo-estadisticas.createPorEquipo');
 
+    Route::get('/test-scraper', 'ScraperController@test');
+    Route::get('/scraper/tecnico', 'ScraperController@autocompletar');
 });
 
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\TecnicoEstadisticaManual;
 use App\Tecnico;
 use App\Equipo;
+use App\PartidoTecnico;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
@@ -68,6 +69,15 @@ class TecnicoEstadisticaManualController extends Controller
         DB::beginTransaction();
         $ok=1;
         try {
+            $torneoNombre = $request->torneo_nombre;
+            //dd($torneoNombre);
+            $existeAuto = PartidoTecnico::where('tecnico_id', $request->tecnico_id)
+                ->where('equipo_id', $request->equipo_id)
+                ->whereHas('partido.fecha.grupo.torneo', function ($q) use ($torneoNombre) {
+                    $q->whereRaw("CONCAT(nombre, ' ', year) = ?", [$torneoNombre]);
+                })
+                ->exists();
+
             TecnicoEstadisticaManual::create($request->all());
         }catch(QueryException $ex){
             //if email or phone exist before in db redirect with error messages
@@ -84,8 +94,14 @@ class TecnicoEstadisticaManualController extends Controller
         }
         if ($ok){
             DB::commit();
-            $respuestaID='success';
-            $respuestaMSJ='Registro creado satisfactoriamente';
+            $respuestaID = 'success';
+
+            if ($existeAuto) {
+                $respuestaMSJ = 'Registro creado, pero ⚠ ya existen estadísticas automáticas para ese técnico en un torneo con el mismo nombre.';
+
+            } else {
+                $respuestaMSJ = 'Registro creado satisfactoriamente';
+            }
         }
         else{
             DB::rollback();
@@ -149,6 +165,14 @@ class TecnicoEstadisticaManualController extends Controller
         DB::beginTransaction();
         $ok=1;
         try {
+            $torneoNombre = $request->torneo_nombre;
+            //dd($torneoNombre);
+            $existeAuto = PartidoTecnico::where('tecnico_id', $request->tecnico_id)
+                ->where('equipo_id', $request->equipo_id)
+                ->whereHas('partido.fecha.grupo.torneo', function ($q) use ($torneoNombre) {
+                    $q->whereRaw("CONCAT(nombre, ' ', year) = ?", [$torneoNombre]);
+                })
+                ->exists();
             $stat->update($request->all());
         }catch(QueryException $ex){
             //if email or phone exist before in db redirect with error messages
@@ -165,8 +189,14 @@ class TecnicoEstadisticaManualController extends Controller
         }
         if ($ok){
             DB::commit();
-            $respuestaID='success';
-            $respuestaMSJ='Registro modificado satisfactoriamente';
+            $respuestaID = 'success';
+
+            if ($existeAuto) {
+                $respuestaMSJ = 'Registro modificado, pero ⚠ ya existen estadísticas automáticas para ese técnico en un torneo con el mismo nombre.';
+
+            } else {
+                $respuestaMSJ = 'Registro modificado satisfactoriamente';
+            }
         }
         else{
             DB::rollback();
