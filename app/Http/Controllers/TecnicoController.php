@@ -803,7 +803,14 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
             }
             //dd($torneosTecnico);
         }
-
+        $torneosTecnico = collect($torneosTecnico)
+            ->sortByDesc(function ($t) {
+                // intentamos sacar el año del nombre (ej: "Torneo 2020")
+                preg_match('/(\d{4})/', $t->nombreTorneo, $matches);
+                return $matches[1] ?? 0;
+            })
+            ->values()
+            ->all();
         return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
     }
 
