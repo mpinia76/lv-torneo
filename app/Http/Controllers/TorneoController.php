@@ -3141,15 +3141,67 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                 }
                 // Reconstruir string de escudos incluyendo puntaje y títulos manuales
                 //$tecnico->escudo = '';
+                // convertir escudos actuales a array
+                $escudosArray = [];
+
+                if (!empty($tecnico->escudo)) {
+                    $items = explode(',', rtrim($tecnico->escudo, ','));
+                    foreach ($items as $item) {
+                        $parts = explode('_', $item);
+                        if (count($parts) >= 4) {
+                            $escudosArray[$parts[1]] = $parts; // indexado por equipo_id
+                        }
+                    }
+                }
+
                 foreach ($manuales[$tecnico->tecnico_id] as $manual) {
+
                     $ptsManual = ($manual->ganados * 3) + $manual->empatados;
                     $porcentajeManual = round($ptsManual*(100/($manual->partidos*3)),2).'%';
 
-                    $ligasManuales=($ligas)?$ligas.' Ligas':'';
-                    $copasManuales=($copas)?$copas.' Copas':'';
-                    $internacionalesManuales=($internacionales)?$internacionales.' Internacionales':'';
-                    $titulosManual=$copas+$ligas+$internacionales. ' ('.$ligasManuales.' '.$copasManuales.' '.$internacionalesManuales.')';
-                    $tecnico->escudo .= $manual->escudo . '_' . $manual->equipo_id . '_' . $ptsManual. '_' . $porcentajeManual . '_' . $titulosManual . ',';
+                    if ($copas+$ligas+$internacionales>0){
+                        $ligasManuales=($ligas)?$ligas.' Ligas':'';
+                        $copasManuales=($copas)?$copas.' Copas':'';
+                        $internacionalesManuales=($internacionales)?$internacionales.' Internacionales':'';
+                        $titulosManual=$copas+$ligas+$internacionales. ' ('.$ligasManuales.' '.$copasManuales.' '.$internacionalesManuales.')';
+                    } else {
+                        $titulosManual = null;
+                    }
+
+                    // si el equipo ya existe → sumar
+                    if (isset($escudosArray[$manual->equipo_id])) {
+
+                        $ptsExistente = (int)$escudosArray[$manual->equipo_id][2];
+                        $ptsTotal = $ptsExistente + $ptsManual;
+
+                        $escudosArray[$manual->equipo_id][2] = $ptsTotal;
+                        $escudosArray[$manual->equipo_id][3] = round($ptsTotal*(100/(($manual->partidos)*3)),2).'%';
+
+                        if ($titulosManual) {
+                            $escudosArray[$manual->equipo_id][4] = $titulosManual;
+                        }
+
+                    } else {
+                        // si no existe → agregar nuevo
+                        $nuevo = [
+                            $manual->escudo,
+                            $manual->equipo_id,
+                            $ptsManual,
+                            $porcentajeManual
+                        ];
+
+                        if ($titulosManual) {
+                            $nuevo[] = $titulosManual;
+                        }
+
+                        $escudosArray[$manual->equipo_id] = $nuevo;
+                    }
+                }
+
+// reconstruir string
+                $tecnico->escudo = '';
+                foreach ($escudosArray as $esc) {
+                    $tecnico->escudo .= implode('_', $esc) . ',';
                 }
 
                 // Sumar títulos manuales al total y reconstruir string completo
