@@ -362,7 +362,18 @@ class ScraperController extends Controller
     {
         $tecnico = \App\Tecnico::findOrFail($request->tecnico_id);
 
-        $data = $this->scrapearTecnico($tecnico->persona->name);
+        $variantes = [
+            $tecnico->nombre . ' ' . $tecnico->apellido,
+            $tecnico->apellido,
+            $tecnico->nombre,
+            $tecnico->name,
+        ];
+
+        foreach ($variantes as $nombre) {
+            $data = $this->scrapearTecnico($nombre);
+        }
+
+
 
         return response()->json($data);
     }
