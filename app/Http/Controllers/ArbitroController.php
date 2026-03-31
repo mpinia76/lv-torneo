@@ -772,7 +772,7 @@ class ArbitroController extends Controller
         // Validar los datos de entrada
         $request->validate([
             'arbitroId' => 'required|integer|exists:arbitros,id',
-            'reasignarId' => 'required|integer|exists:arbitros,id|different:arbitroId',
+            'arbitro_id' => 'required|integer|exists:arbitros,id|different:arbitroId',
         ]);
 
         $arbitroActual = $request->input('arbitroId');
