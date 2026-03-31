@@ -935,7 +935,7 @@ class FechaController extends Controller
                                         $fechaHoraObj = DateTime::createFromFormat('Y-m-d H:i', $fechaFormateada . ' ' . $hora);
 
                                         if (strpos($url2, 'https://arg.worldfootball.net/') === false && $fechaHoraObj) {
-                                            $fechaHoraObj->modify('-4 hours');
+                                            $fechaHoraObj->modify('-5 hours');
                                         }
 
                                         $partidos[count($partidos) - 1]['fecha'] = $fechaHoraObj ? $fechaHoraObj->format('Y-m-d') : $fechaFormateada;
