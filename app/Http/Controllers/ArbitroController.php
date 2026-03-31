@@ -760,8 +760,11 @@ class ArbitroController extends Controller
     public function reasignar($id)
     {
         $arbitro=Arbitro::findOrFail($id);
+        $arbitros = Arbitro::SELECT('arbitros.*','personas.nombre','personas.apellido','personas.nacimiento','personas.fallecimiento','personas.foto')->JOIN('personas','personas.id','=','arbitros.persona_id')->orderBy('apellido', 'asc')->orderBy('nombre', 'asc')->get();
+        //dd($arbitros);
+        $arbitros = $arbitros->pluck('persona.full_name', 'id')->prepend('','');
 
-        return view('arbitros.reasignar', compact('arbitro'));
+        return view('arbitros.reasignar', compact('arbitro','arbitros'));
     }
 
     public function guardarReasignar(Request $request)
@@ -773,7 +776,7 @@ class ArbitroController extends Controller
         ]);
 
         $arbitroActual = $request->input('arbitroId');
-        $arbitroNuevo = $request->input('reasignarId');
+        $arbitroNuevo = $request->input('arbitro_id');
 
         try {
             // Inicia una transacción para garantizar que todas las actualizaciones se completen
