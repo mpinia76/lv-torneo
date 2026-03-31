@@ -756,4 +756,53 @@ class ArbitroController extends Controller
 
         return redirect()->route('arbitros.index')->with($respuestaID, $respuestaMSJ);
     }
+
+    public function reasignar($id)
+    {
+        $arbitro=Arbitro::findOrFail($id);
+
+        return view('arbitros.reasignar', compact('arbitro'));
+    }
+
+    public function guardarReasignar(Request $request)
+    {
+        // Validar los datos de entrada
+        $request->validate([
+            'arbitroId' => 'required|integer|exists:arbitros,id',
+            'reasignarId' => 'required|integer|exists:arbitros,id|different:arbitroId',
+        ]);
+
+        $arbitroActual = $request->input('arbitroId');
+        $arbitroNuevo = $request->input('reasignarId');
+
+        try {
+            // Inicia una transacción para garantizar que todas las actualizaciones se completen
+            DB::beginTransaction();
+
+            // Actualizar en las tablas necesarias
+
+            DB::update('UPDATE partido_arbitros SET arbitro_id = ? WHERE arbitro_id = ?', [$arbitroNuevo, $arbitroActual]);
+
+            $arbitro = Arbitro::find($arbitroActual);
+            $persona = Persona::find($arbitro->persona_id);
+            $arbitro->delete();
+// Verificar si la persona tiene una foto y eliminarla del servidor
+            if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
+                //unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
+            }
+            $persona->delete();
+            // Confirmar la transacción
+            DB::commit();
+
+            // Redirigir con un mensaje de éxito
+            return redirect()->route('jugadores.verificarPersonas')->with('success', 'Arbitro reasignado exitosamente.');
+        } catch (\Exception $e) {
+            Log::info('Error: ' . $e->getMessage(), []);
+            // Revertir los cambios si hay algún error
+            DB::rollBack();
+
+            // Regresar con un mensaje de error
+            return redirect()->back()->withErrors(['error' => 'Hubo un problema al reasignar el arbitro.']);
+        }
+    }
 }

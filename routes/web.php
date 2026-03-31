@@ -112,6 +112,9 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/reassign/{id}', 'TecnicoController@reasignar')->name('tecnicos.reasignar');
     Route::put('saveReassign', 'TecnicoController@guardarReasignar');
 
+    Route::get('/reasignarArbitro/{id}', 'ArbitroController@reasignar')->name('arbitros.reasignar');
+    Route::put('saveReasignarArbitro', 'ArbitroController@guardarReasignar');
+
     Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');
 
