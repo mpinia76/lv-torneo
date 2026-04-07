@@ -201,7 +201,7 @@ class ScraperController extends Controller
         $perfilUrl = "https://www.transfermarkt.com" . $link;
 
         $htmlPerfil = HttpHelper::getHtmlContent($perfilUrl, false);
-        dd($htmlPerfil);
+        //dd($htmlPerfil);
         if (!$htmlPerfil) {
             return [];
         }
