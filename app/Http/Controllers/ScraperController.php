@@ -179,7 +179,7 @@ class ScraperController extends Controller
         if (!$html) {
             $html = HttpHelper::getHtmlContent($url, true);
         }
-        dd($html);
+        //dd($html);
         if (!$html) {
             return [];
         }
