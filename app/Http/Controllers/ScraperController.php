@@ -173,7 +173,7 @@ class ScraperController extends Controller
     {
         set_time_limit(0);
         $url = "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=" . urlencode($nombre);
-        //dd($url);
+        dd($url);
         $html = HttpHelper::getHtmlContent($url, false);
 
         if (!$html) {
