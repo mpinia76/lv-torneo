@@ -97,6 +97,11 @@
         </table>
 
         {{ $stats->links() }}
+        <a href="{{ route('tecnicos.index') }}"
+           class="btn btn-success">
+            Volver
+        </a>
+
     </div>
 
     <script>
