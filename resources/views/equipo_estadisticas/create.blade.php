@@ -55,6 +55,7 @@
             <div class="alert alert-warning">
                 ⚠️ Este equipo no tiene configurado el <strong>LiveFutbol ID</strong>.
                 No se podrá consultar historial automático hasta cargarlo manualmente.
+                <a href="{{route('equipos.edit', $equipo->id)}}" class="btn btn-primary m-1">Editar</a>
             </div>
         @else
         <button type="button" class="btn btn-info mb-3" onclick="verHistorialEquipo()">
