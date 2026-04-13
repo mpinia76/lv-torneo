@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Services\HttpHelper;
 use Illuminate\Support\Facades\Log;
-
+use App\Equipo;
+use App\EquipoEstadisticaManual;
+use Illuminate\Support\Str;
 class ScraperController extends Controller
 {
     public function test()
@@ -379,4 +381,163 @@ class ScraperController extends Controller
 
         return response()->json([]);
     }
+
+    public function equipo(Request $request)
+    {
+        $equipo = Equipo::find($request->equipo_id);
+
+        if (!$equipo) {
+            return response()->json([]);
+        }
+
+        $teamCode = 1513;
+
+        $baseUrl = "https://www.livefutbol.com/teams/te{$teamCode}/racing-club/all-matches/";
+
+        $html = HttpHelper::getHtmlContent($baseUrl, false);
+
+        if (!$html) {
+            return response()->json([]);
+        }
+
+        libxml_use_internal_errors(true);
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html);
+
+        $xp = new \DOMXPath($dom);
+
+        /*
+        |---------------------------------------
+        | 1. TEMPORADAS
+        |---------------------------------------
+        */
+        $seasonNodes = $xp->query("//select[contains(@class,'season-navigation')]/option");
+
+        $seasons = [];
+
+        foreach ($seasonNodes as $node) {
+
+            $url = trim($node->getAttribute('value'));
+            //dd($url);
+            if ($url) {
+                $seasons[] = "https://www.livefutbol.com" . $url;
+            }
+        }
+
+        $torneos = [];
+
+        /*
+        |---------------------------------------
+        | 2. POR TEMPORADA
+        |---------------------------------------
+        */
+        foreach ($seasons as $seasonUrl) {
+
+            $htmlSeason = HttpHelper::getHtmlContent($seasonUrl, false);
+
+            if (!$htmlSeason) continue;
+
+            $dom2 = new \DOMDocument();
+            @$dom2->loadHTML($htmlSeason);
+
+            $xp2 = new \DOMXPath($dom2);
+
+            /*
+            |---------------------------------------
+            | COMPETITIONS DE ESA TEMPORADA
+            |---------------------------------------
+            */
+            $compNodes = $xp2->query("//select[contains(@class,'hs-filter-competition_id')]/option");
+
+            foreach ($compNodes as $compNode) {
+
+                $compId = trim($compNode->getAttribute('value'));
+                $compName = trim($compNode->nodeValue);
+
+                if (!$compId || $compId == "0") continue;
+
+                /*
+                |---------------------------------------
+                | URL FILTRADA REAL
+                |---------------------------------------
+                */
+                $url = $seasonUrl . "?competition_id={$compId}";
+
+                $pageHtml = HttpHelper::getHtmlContent($url, false);
+
+                if (!$pageHtml) continue;
+
+                $dom3 = new \DOMDocument();
+                @$dom3->loadHTML($pageHtml);
+
+                $xp3 = new \DOMXPath($dom3);
+                dd($xp3);
+                $rows = $xp3->query("//table[contains(@class,'standard_tabelle')]//tr");
+
+                $played = $won = $draw = $lost = $gf = $ga = 0;
+
+                foreach ($rows as $row) {
+
+                    $cells = $row->getElementsByTagName('td');
+
+                    if ($cells->length < 3) continue;
+
+                    $result = trim($cells->item(1)->nodeValue ?? '');
+
+                    if (preg_match('/(\d+)\s*:\s*(\d+)/', $result, $m)) {
+
+                        $home = (int)$m[1];
+                        $away = (int)$m[2];
+
+                        $gf += $home;
+                        $ga += $away;
+
+                        if ($home > $away) $won++;
+                        elseif ($home < $away) $lost++;
+                        else $draw++;
+
+                        $played++;
+                    }
+                }
+
+                if ($played === 0) continue;
+
+                $key = $compName . ' ' . basename($seasonUrl);
+
+                $torneos[$key] = [
+                    'liga' => $compName,
+                    'year' => basename($seasonUrl),
+                    'competition' => $key,
+                    'partidos' => $played,
+                    'ganados' => $won,
+                    'empatados' => $draw,
+                    'perdidos' => $lost,
+                    'gf' => $gf,
+                    'ge' => $ga
+                ];
+            }
+        }
+
+        /*
+        |---------------------------------------
+        | YA CARGADOS MANUALES
+        |---------------------------------------
+        */
+        $existentes = EquipoEstadisticaManual::where('equipo_id', $equipo->id)
+            ->pluck('torneo_nombre')
+            ->toArray();
+
+        $result = [];
+
+        foreach ($torneos as $torneo) {
+            if (!in_array($torneo['competition'], $existentes)) {
+                $result[] = $torneo;
+            }
+        }
+
+        return response()->json(array_values($result));
+    }
+
+
 }

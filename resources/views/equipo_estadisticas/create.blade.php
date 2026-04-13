@@ -51,7 +51,17 @@
                 </ul>
             </div>
         @endif
+        <button type="button" class="btn btn-info mb-3" onclick="verHistorialEquipo()">
+            ⚽ Ver historial desde API-Football
+        </button>
 
+        <div id="loadingScraper" style="display:none;" class="alert alert-info">
+            ⏳ Cargando historial del equipo...
+        </div>
+
+        <div id="resultadoScraper" class="mt-3"></div>
+
+        <hr>
         <form action="{{ route('equipo-estadisticas.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
 
@@ -160,3 +170,71 @@
         </form>
     </div>
 @endsection
+<script>
+    function verHistorialEquipo() {
+
+        let equipo_id = document.querySelector('[name="equipo_id"]').value;
+
+        let url = "{{ url('admin/scraper/equipo') }}";
+
+        document.getElementById('loadingScraper').style.display = 'block';
+        document.getElementById('resultadoScraper').innerHTML = '';
+
+        fetch(`${url}?equipo_id=${equipo_id}`)
+            .then(res => res.json())
+            .then(data => {
+
+                let html = '';
+                let items = data.original ?? data;
+
+                items.forEach(competition => {
+
+                    html += `<h5 style="color: darkgreen">${competition.liga} - ${competition.year}</h5>`;
+                    html += '<table class="table table-sm table-bordered">';
+                    html += '<tr><th>Pos</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th></th></tr>';
+
+                    html += `<tr>
+                    <td>${competition.posicion ?? ''}</td>
+                    <td>${competition.partidos ?? ''}</td>
+                    <td>${competition.ganados ?? ''}</td>
+                    <td>${competition.empatados ?? ''}</td>
+                    <td>${competition.perdidos ?? ''}</td>
+                    <td>${competition.gf ?? ''}</td>
+                    <td>${competition.ge ?? ''}</td>
+                    <td>
+                        <button onclick='usarDatoEquipo(${JSON.stringify(competition)})'
+                            class="btn btn-success btn-sm">
+                            Usar
+                        </button>
+                    </td>
+                </tr>`;
+
+                    html += '</table>';
+                });
+
+                document.getElementById('resultadoScraper').innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('resultadoScraper').innerHTML =
+                    '<div class="alert alert-danger">Error cargando datos</div>';
+            })
+            .finally(() => {
+                document.getElementById('loadingScraper').style.display = 'none';
+            });
+    }
+
+    function usarDatoEquipo(item) {
+
+        document.querySelector('[name="torneo_nombre"]').value = item.competition;
+        document.querySelector('[name="posicion"]').value = item.posicion ?? '';
+        document.querySelector('[name="partidos"]').value = item.partidos ?? '';
+
+        document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
+        document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
+        document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
+
+        document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
+        document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
+    }
+</script>
