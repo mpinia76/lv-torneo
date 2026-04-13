@@ -51,8 +51,14 @@
                 </ul>
             </div>
         @endif
+        @if(!$equipo->url_id)
+            <div class="alert alert-warning">
+                ⚠️ Este equipo no tiene configurado el <strong>LiveFutbol ID</strong>.
+                No se podrá consultar historial automático hasta cargarlo manualmente.
+            </div>
+        @else
         <button type="button" class="btn btn-info mb-3" onclick="verHistorialEquipo()">
-            ⚽ Ver historial desde API-Football
+            ⚽ Ver historial
         </button>
 
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
@@ -60,7 +66,7 @@
         </div>
 
         <div id="resultadoScraper" class="mt-3"></div>
-
+        @endif
         <hr>
         <form action="{{ route('equipo-estadisticas.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
