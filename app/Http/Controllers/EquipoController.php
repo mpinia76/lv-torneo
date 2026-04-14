@@ -372,7 +372,7 @@ class EquipoController extends Controller
             // Posición manual no aplica lógica de tabla
             $obj->posicion = ($manual->posicion == 1) ?
                 '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                (($manual->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion);
+                (($manual->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $manual->posicion);
 
 
 
