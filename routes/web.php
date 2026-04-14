@@ -179,6 +179,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/scraper/tecnico', 'ScraperController@autocompletar');
 
     Route::get('/scraper/equipo', 'ScraperController@equipo');
+
+    Route::post('/scraper/csv-tecnico', 'ScraperController@csvTecnico');
 });
 
 
