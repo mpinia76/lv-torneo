@@ -233,7 +233,7 @@
 
     function usarDatoEquipo(item) {
 
-        document.querySelector('[name="torneo_nombre"]').value = item.competition;
+        document.querySelector('[name="torneo_nombre"]').value = item.liga+' '+item.year;
         document.querySelector('[name="posicion"]').value = item.posicion ?? '';
         document.querySelector('[name="partidos"]').value = item.partidos ?? '';
 
