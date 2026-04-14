@@ -9,6 +9,7 @@ use App\Titulo;
 use App\Partido;
 use App\PosicionTorneo;
 use App\Torneo;
+use App\EquipoEstadisticaManual;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
@@ -242,6 +243,10 @@ class EquipoController extends Controller
         $titulosInternacional=0;
 
         $torneosEquipo = DB::select(DB::raw($sql));
+        // Estadísticas manuales
+        $estadisticasManuales = EquipoEstadisticaManual::where('equipo_id', $id)->get();
+
+
         $torneosTitulos=array();
         foreach ($torneosEquipo as $torneo){
             // GRUPOS
@@ -331,6 +336,63 @@ class EquipoController extends Controller
                     $torneosTitulos[]=$torneo;
                 }
             }
+        }
+        foreach ($estadisticasManuales as $manual) {
+
+            $obj = new \stdClass();
+
+            // Identificador tipo torneo
+            $obj->idTorneo = 'manual_'.$manual->id;
+            $obj->nombreTorneo = $manual->torneo_nombre;
+            $obj->escudoTorneo = $manual->torneo_logo;
+            // 🔥 EXTRAER AÑO DEL NOMBRE
+            preg_match('/(19|20)\d{2}/', $manual->torneo_nombre, $matches);
+            $obj->year = $matches[0] ?? 0;
+
+
+            // Stats ya guardadas (NO SQL)
+            $obj->jugados = $manual->partidos;
+            $obj->ganados = $manual->ganados;
+            $obj->empatados = $manual->empatados;
+            $obj->perdidos = $manual->perdidos;
+            $obj->favor = $manual->goles_favor;
+            $obj->contra = $manual->goles_en_contra;
+
+            $obj->puntaje = ($manual->ganados * 3) + $manual->empatados;
+
+            $total = $manual->partidos * 3;
+
+            $obj->porcentaje = $total > 0
+                ? round(($obj->puntaje * 100) / $total, 2) . '%'
+                : '0%';
+
+            $obj->tipo = $manual->tipo;
+            $obj->ambito = $manual->ambito;
+
+            // Posición manual no aplica lógica de tabla
+            $obj->posicion = ($manual->posicion == 1) ?
+                '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
+                (($manual->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion);
+
+
+
+            // 🔥 SI ES TÍTULO
+            if ($manual->posicion == 1) {
+
+                $torneosTitulos[] = $obj;
+
+                if ($manual->ambito == 'Nacional') {
+                    if ($manual->tipo == 'Copa') {
+                        $titulosCopa++;
+                    } else {
+                        $titulosLiga++;
+                    }
+                } else {
+                    $titulosInternacional++;
+                }
+            }
+
+            $torneosEquipo[] = $obj;
         }
         // Títulos extras cargados manualmente desde la tabla titulos
         $titulosExtras = Titulo::where('equipo_id', $id)->get();
@@ -665,6 +727,11 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
             ]
         );
 
+
+        $torneosEquipo = collect($torneosEquipo)
+            ->sortByDesc('year')
+            ->values()
+            ->all();
 
         return view('equipos.ver', compact('equipo', 'torneosEquipo','titulosCopa','titulosLiga','torneosTitulos','jugadores','order','tipoOrder','iterator','titulosInternacional','partidos'));
     }

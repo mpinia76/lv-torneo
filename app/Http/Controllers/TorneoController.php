@@ -11,6 +11,7 @@ use App\Titulo;
 use App\Tecnico;
 use App\PartidoTecnico;
 use App\EquipoClasificado;
+use App\EquipoEstadisticaManual;
 use App\Plantilla;
 use App\PlantillaJugador;
 use App\PosicionTorneo;
@@ -2022,6 +2023,10 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
        // Log::channel('mi_log')->info('Sql pos: '.$sql,[]);
                 $posiciones = DB::select(DB::raw($sql));
 
+        $manuales = EquipoEstadisticaManual::all()->groupBy('equipo_id');
+
+
+
         $page = $request->query('page', 1);
 
         $paginate = 15;
@@ -2064,6 +2069,46 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                     }
                 }
             }
+            $manual = $manuales[$posicion->equipo_id] ?? collect();
+
+            $manualJugados = 0;
+            $manualGanados = 0;
+            $manualEmpatados = 0;
+            $manualPerdidos = 0;
+            $manualPuntos = 0;
+
+            foreach ($manual as $m) {
+                $manualJugados += $m->partidos;
+                $manualGanados += $m->ganados;
+                $manualEmpatados += $m->empatados;
+                $manualPerdidos += $m->perdidos;
+
+                $manualPuntos += ($m->ganados * 3) + $m->empatados;
+                if ($m->posicion == 1){
+                    //if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+                    if ($m->ambito == 'Nacional') {
+                        if (!$ambito || $ambito=='nacional') {
+                            if ($m->tipo == 'Copa') {
+                                if (!$tipo || $tipo == 'copa') {
+                                    $titulosCopa++;
+                                }
+
+                            } else {
+                                if (!$tipo || $tipo == 'liga') {
+                                    $titulosLiga++;
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        if (!$ambito || $ambito=='internacional') {
+                            $titulosInternacional++;
+                        }
+                    }
+                }
+            }
+
+
             // ---- TÍTULOS EXTRAS ----
             $titulosExtras = Titulo::where('equipo_id', $posicion->equipo_id)->get();
 
@@ -2105,6 +2150,22 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                 $internacionales=($titulosInternacional)?$titulosInternacional.' Internacionales':'';
                 $posicion->titulos=$titulosCopa+$titulosLiga+$titulosInternacional. ' ('.$ligas.' '.$copas.' '.$internacionales.')';
             }
+
+
+
+            // 🔥 sumar al ranking base
+            $posicion->jugados += $manualJugados;
+            $posicion->ganados += $manualGanados;
+            $posicion->empatados += $manualEmpatados;
+            $posicion->perdidos += $manualPerdidos;
+            $posicion->puntaje += $manualPuntos;
+
+            $totalManual = $manualJugados * 3;
+
+            $posicion->promedio =
+                $posicion->jugados > 0
+                    ? $posicion->puntaje / $posicion->jugados
+                    : 0;
 
         }
 
