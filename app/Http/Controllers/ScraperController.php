@@ -671,6 +671,8 @@ class ScraperController extends Controller
                 continue;
             }
 
+
+
             $row = array_combine($header, $row);
 
             $equipo   = trim($row['equipo'] ?? '');
@@ -690,21 +692,7 @@ class ScraperController extends Controller
                 continue;
             }
 
-            // Download logo if URL provided
-            $logoNombre = null;
-            if ($logoUrl) {
-                try {
-                    $contenido = file_get_contents($logoUrl);
-                    if ($contenido !== false) {
-                        $ext = pathinfo(parse_url($logoUrl, PHP_URL_PATH), PATHINFO_EXTENSION);
-                        $ext = $ext ?: 'png';
-                        $logoNombre = time() . '_' . uniqid() . '.' . $ext;
-                        file_put_contents(public_path('/images/' . $logoNombre), $contenido);
-                    }
-                } catch (\Exception $e) {
-                    $logoNombre = null;
-                }
-            }
+            $logoNombre = $logoUrl ?: null;
 
             $data[] = [
                 'competition' => trim($torneo . ' ' . $year),

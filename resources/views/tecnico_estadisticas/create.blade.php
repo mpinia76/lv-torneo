@@ -49,9 +49,9 @@
                 📄 Procesar CSV
             </button>
         </div>
-        <button type="button" class="btn btn-info" onclick="verHistorial()">
+        <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
             🔍 Ver historial
-        </button>
+        </button>-->
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando historial, puede tardar unos segundos...
         </div>
@@ -79,6 +79,7 @@
                     <label>Logo torneo</label>
 
                     <input type="file" class="form-control" name="escudoTmp">
+                    <input type="hidden" name="torneo_logo_guardado" value="">
                 </div>
                 <div class="form-group col-xs-12 col-sm-6 col-md-2">
                     {{Form::label('tipo', 'Tipo')}}
@@ -177,6 +178,7 @@
 
         </form>
     </div>
+
 @endsection
 <script>
     function verHistorial() {
@@ -290,7 +292,8 @@
 
     function usarDato(item) {
 
-        // ⚽ partidos
+        document.querySelector('[name="tipo"]').value = item.tipo;
+        document.querySelector('[name="ambito"]').value = item.ambito;
         document.querySelector('[name="partidos"]').value = item.partidos;
         document.querySelector('[name="posicion"]').value = item.posicion;
         document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
@@ -298,6 +301,9 @@
         document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
         document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
         document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
+
+
+        document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
 
         document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
 
@@ -396,7 +402,7 @@
 
             // Logo preview
             let logoHtml = competition.torneo_logo
-                ? `<img src="{{ url('images/') }}/${competition.torneo_logo}" height="40" style="object-fit:contain;">`
+                ? `<img src="${competition.torneo_logo}" height="40" style="object-fit:contain;">`
                 : '<span class="text-muted">—</span>';
 
             html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
