@@ -625,7 +625,7 @@ class ScraperController extends Controller
     {
         set_time_limit(0);
 
-        $file = $request->file('file'); // ← FIX
+        $file = $request->file('file');
 
         if (!$file) {
             return response()->json([]);
@@ -644,15 +644,8 @@ class ScraperController extends Controller
         $header = [];
         $i = 0;
 
-        /*
-        |---------------------------------------
-        | EXISTENTES
-        |---------------------------------------
-        */
         $existentes = collect()
-            ->merge(
-                \App\TecnicoEstadisticaManual::pluck('torneo_nombre') // ← FIX
-            )
+            ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
             ->merge(
                 \App\Torneo::all()->map(function ($t) {
                     return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
@@ -680,11 +673,11 @@ class ScraperController extends Controller
 
             $row = array_combine($header, $row);
 
+            $equipo   = trim($row['equipo'] ?? '');
+            $torneo   = trim($row['torneo'] ?? '');
+            $year     = trim($row['año'] ?? '');
+            $logoUrl  = trim($row['logo_url'] ?? '');
 
-            $equipo = trim($row['equipo'] ?? '');
-            $torneo = trim($row['torneo'] ?? '');
-            $year   = trim($row['año'] ?? '');
-            //Log::info($equipo);
             if (!$equipo || !$torneo) continue;
 
             $key = (string) \Str::of($torneo . ' ' . $year)
@@ -697,19 +690,38 @@ class ScraperController extends Controller
                 continue;
             }
 
+            // Download logo if URL provided
+            $logoNombre = null;
+            if ($logoUrl) {
+                try {
+                    $contenido = file_get_contents($logoUrl);
+                    if ($contenido !== false) {
+                        $ext = pathinfo(parse_url($logoUrl, PHP_URL_PATH), PATHINFO_EXTENSION);
+                        $ext = $ext ?: 'png';
+                        $logoNombre = time() . '_' . uniqid() . '.' . $ext;
+                        file_put_contents(public_path('/images/' . $logoNombre), $contenido);
+                    }
+                } catch (\Exception $e) {
+                    $logoNombre = null;
+                }
+            }
+
             $data[] = [
-                'competition' => trim($torneo.' '.$year),
-                'equipo' => $equipo,
-                'posicion' => (int) ($row['posicion'] ?? 0),
-                'partidos' =>
+                'competition' => trim($torneo . ' ' . $year),
+                'equipo'      => $equipo,
+                'posicion'    => (int) ($row['posicion'] ?? 0),
+                'partidos'    =>
                     ((int) ($row['ganados'] ?? 0)) +
                     ((int) ($row['empatados'] ?? 0)) +
                     ((int) ($row['perdidos'] ?? 0)),
-                'ganados' => (int) ($row['ganados'] ?? 0),
-                'empatados' => (int) ($row['empatados'] ?? 0),
-                'perdidos' => (int) ($row['perdidos'] ?? 0),
-                'gf' => (int) ($row['gf'] ?? 0),
-                'ge' => (int) ($row['gc'] ?? 0),
+                'ganados'     => (int) ($row['ganados'] ?? 0),
+                'empatados'   => (int) ($row['empatados'] ?? 0),
+                'perdidos'    => (int) ($row['perdidos'] ?? 0),
+                'gf'          => (int) ($row['gf'] ?? 0),
+                'ge'          => (int) ($row['gc'] ?? 0),
+                'torneo_logo' => $logoNombre,
+                'tipo'        => trim($row['tipo'] ?? ''),
+                'ambito'      => trim($row['ambito'] ?? ''),
             ];
         }
 

@@ -154,13 +154,13 @@ class TecnicoEstadisticaManualController extends Controller
 
         if ($files = $request->file('escudoTmp')) {
             $image = $request->file('escudoTmp');
-            $name = time().'.'.$image->getClientOriginalExtension();
+            $name = time() . '.' . $image->getClientOriginalExtension();
             $destinationPath = public_path('/images');
             $image->move($destinationPath, $name);
-
-
-
             $request->merge(['torneo_logo' => $name]);
+        } elseif ($request->filled('torneo_logo_guardado')) {
+            // Logo already downloaded by CSV processor
+            $request->merge(['torneo_logo' => $request->torneo_logo_guardado]);
         }
         DB::beginTransaction();
         $ok=1;

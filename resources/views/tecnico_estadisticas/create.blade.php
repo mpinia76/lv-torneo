@@ -361,12 +361,9 @@
     function renderResultados(items) {
 
         let html = '';
-
-        // consolidar torneo + equipo
         let torneos = {};
 
         items.forEach(row => {
-
             let key = clean(row.competition) + '|' + clean(row.equipo);
 
             if (!torneos[key]) {
@@ -379,27 +376,38 @@
                     empatados: 0,
                     perdidos: 0,
                     gf: 0,
-                    ge: 0
+                    ge: 0,
+                    torneo_logo: row.torneo_logo ?? null,
+                    tipo: row.tipo ?? '',
+                    ambito: row.ambito ?? '',
                 };
             }
 
-            torneos[key].partidos += parseInt(row.partidos || 0);
-            torneos[key].posicion += parseInt(row.posicion || 0);
-            torneos[key].ganados += parseInt(row.ganados || 0);
-            torneos[key].empatados += parseInt(row.empatados || 0);
-            torneos[key].perdidos += parseInt(row.perdidos || 0);
-            torneos[key].gf += parseInt(row.gf || 0);
-            torneos[key].ge += parseInt(row.ge || 0);
+            torneos[key].partidos   += parseInt(row.partidos ?? 0);
+            torneos[key].posicion   += parseInt(row.posicion ?? 0);
+            torneos[key].ganados    += parseInt(row.ganados ?? 0);
+            torneos[key].empatados  += parseInt(row.empatados ?? 0);
+            torneos[key].perdidos   += parseInt(row.perdidos ?? 0);
+            torneos[key].gf         += parseInt(row.gf ?? 0);
+            torneos[key].ge         += parseInt(row.ge ?? 0);
         });
 
         Object.values(torneos).forEach(competition => {
 
+            // Logo preview
+            let logoHtml = competition.torneo_logo
+                ? `<img src="{{ url('images/') }}/${competition.torneo_logo}" height="40" style="object-fit:contain;">`
+                : '<span class="text-muted">—</span>';
+
             html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
             html += '<table class="table table-sm">';
-            html += '<tr><th>Equipo</th><th>Posición</th><th>Partidos</th><th>Ganados</th><th>Empatados</th><th>Perdidos</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
+            html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
 
             html += `<tr>
+            <td>${logoHtml}</td>
             <td style="color:#0a6ebd">${competition.equipo}</td>
+            <td>${competition.tipo}</td>
+            <td>${competition.ambito}</td>
             <td>${competition.posicion}</td>
             <td>${competition.partidos}</td>
             <td>${competition.ganados}</td>
