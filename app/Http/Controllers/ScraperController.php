@@ -513,108 +513,155 @@ class ScraperController extends Controller
             | COMPETITIONS
             |---------------------------------------
             */
+
             $compNodes = $xp2->query("//select[contains(@class,'hs-filter-competition_id')]/option");
+            $hasSelect = $compNodes->length > 0;
 
-            foreach ($compNodes as $compNode) {
+            /*
+            |---------------------------------------
+            | CASO 1: HAY SELECT DE COMPETENCIAS
+            |---------------------------------------
+            */
+            if ($hasSelect) {
 
-                $compId = trim($compNode->getAttribute('value'));
-                $compName = trim($compNode->nodeValue);
+                foreach ($compNodes as $compNode) {
 
-                if (!$compId || $compId == "0") continue;
+                    $compId = trim($compNode->getAttribute('value'));
+                    $compName = trim($compNode->nodeValue);
 
-                //$key = $compName . ' ' . $seasonYear;
-                $key = $this->normalizeKey($compName, $seasonYear);
-                //log::info($key);
+                    if (!$compId || $compId == "0") continue;
 
-                /*
-                |---------------------------------------
-                | FILTRO LOCAL (NO REQUEST)
-                |---------------------------------------
-                */
-                if (isset($existentes[$key])) {
-                    continue;
-                }
+                    $key = $this->normalizeKey($compName, $seasonYear);
 
-                /*
-                |---------------------------------------
-                | USAR HTML YA DESCARGADO DE LA TEMPORADA
-                |---------------------------------------
-                */
-                $dom3 = new \DOMDocument();
-                @$dom3->loadHTML($htmlSeason);
+                    if (isset($existentes[$key])) {
+                        continue;
+                    }
 
-                $xp3 = new \DOMXPath($dom3);
+                    $dom3 = new \DOMDocument();
+                    @$dom3->loadHTML($htmlSeason);
 
-                /*
-                |---------------------------------------
-                | BLOQUE REAL: FILTRAR POR COMPETENCIA
-                |---------------------------------------
-                */
-                $rows = $xp3->query("//tr[contains(@class,'match') and @data-competition_id='{$compId}']");
+                    $xp3 = new \DOMXPath($dom3);
 
-                $played = $won = $draw = $lost = $gf = $ga = 0;
+                    $rows = $xp3->query("//tr[contains(@class,'match') and @data-competition_id='{$compId}']");
 
-                foreach ($rows as $row) {
+                    $played = $won = $draw = $lost = $gf = $ga = 0;
 
-                    $resultText = '';
+                    foreach ($rows as $row) {
 
-                    /*
-                    |---------------------------------------
-                    | BUSCAR SPAN REAL DEL RESULTADO
-                    |---------------------------------------
-                    */
-                    $spans = $row->getElementsByTagName('span');
+                        $spans = $row->getElementsByTagName('span');
 
-                    foreach ($spans as $span) {
+                        foreach ($spans as $span) {
 
-                        $class = $span->getAttribute('class');
+                            $class = $span->getAttribute('class');
 
-                        if (str_contains($class, 'match-result')) {
+                            if (str_contains($class, 'match-result')) {
 
-                            $text = trim($span->nodeValue);
+                                $text = trim($span->nodeValue);
 
-                            if (preg_match('/\d+\s*:\s*\d+/', $text, $m)) {
-                                $resultText = $m[0];
+                                if (preg_match('/\d+\s*:\s*\d+/', $text, $m)) {
+                                    $resultText = $m[0];
+
+                                    if (preg_match('/(\d+)\s*:\s*(\d+)/', $resultText, $m2)) {
+
+                                        $teamGoals = (int) $m2[1];
+                                        $opponentGoals = (int) $m2[2];
+
+                                        $gf += $teamGoals;
+                                        $ga += $opponentGoals;
+
+                                        if ($teamGoals > $opponentGoals) $won++;
+                                        elseif ($teamGoals < $opponentGoals) $lost++;
+                                        else $draw++;
+
+                                        $played++;
+                                    }
+                                }
+
                                 break;
                             }
                         }
                     }
 
-                    if (!$resultText) continue;
+                    if ($played === 0) continue;
 
-                    if (preg_match('/(\d+)\s*:\s*(\d+)/', $resultText, $m)) {
-
-                        $teamGoals = (int) $m[1];
-                        $opponentGoals = (int) $m[2];
-
-                        $gf += $teamGoals;
-                        $ga += $opponentGoals;
-
-                        if ($teamGoals > $opponentGoals) {
-                            $won++;
-                        } elseif ($teamGoals < $opponentGoals) {
-                            $lost++;
-                        } else {
-                            $draw++;
-                        }
-
-                        $played++;
-                    }
+                    $torneos[$key] = [
+                        'liga' => $compName,
+                        'year' => $seasonYear,
+                        'competition' => $key,
+                        'partidos' => $played,
+                        'ganados' => $won,
+                        'empatados' => $draw,
+                        'perdidos' => $lost,
+                        'gf' => $gf,
+                        'ge' => $ga
+                    ];
                 }
 
-                if ($played === 0) continue;
+                /*
+                |---------------------------------------
+                | CASO 2: NO HAY SELECT (FALLBACK)
+                |---------------------------------------
+                */
+            } else {
 
-                $torneos[$key] = [
-                    'liga' => $compName,
-                    'year' => $seasonYear,
-                    'competition' => $key,
-                    'partidos' => $played,
-                    'ganados' => $won,
-                    'empatados' => $draw,
-                    'perdidos' => $lost,
-                    'gf' => $gf,
-                    'ge' => $ga
-                ];
+                $compName = 'Todos los partidos';
+                /*
+     |---------------------------------------
+     | INTENTAR OBTENER NOMBRE REAL
+     |---------------------------------------
+     */
+                $header = $xp2->query("//tr[contains(@class,'competition-head')]")->item(0);
+
+                if ($header) {
+                    $link = $header->getElementsByTagName('a')->item(1);
+                    $compName = $link ? trim($link->nodeValue) : 'Sin nombre';
+                } else {
+                    $compName = 'Sin competencia';
+                }
+
+                $key = $this->normalizeKey($compName, $seasonYear);
+                //log::info($key);
+                if (!isset($existentes[$key])) {
+
+                    $rows = $xp2->query("//tr[contains(@class,'match')]");
+
+                    $played = $won = $draw = $lost = $gf = $ga = 0;
+
+                    foreach ($rows as $row) {
+
+                        $rowText = trim($row->textContent);
+
+                        if (preg_match('/(\d+)\s*:\s*(\d+)/', $rowText, $m)) {
+
+                            $home = (int) $m[1];
+                            $away = (int) $m[2];
+
+                            $gf += $home;
+                            $ga += $away;
+
+                            if ($home > $away) $won++;
+                            elseif ($home < $away) $lost++;
+                            else $draw++;
+
+                            $played++;
+                        }
+                    }
+
+                    if ($played > 0) {
+
+                        $torneos[$key] = [
+                            'liga' => $compName,
+                            'year' => $seasonYear,
+                            'competition' => $key,
+                            'partidos' => $played,
+                            'ganados' => $won,
+                            'empatados' => $draw,
+                            'perdidos' => $lost,
+                            'gf' => $gf,
+                            'ge' => $ga
+                        ];
+                    }
+                }
             }
         }
         //dd($torneos);
