@@ -19,8 +19,10 @@
             if ($usarScraperRemoto) {
                 $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
 
-                $scraperEndpoint = 'https://scraper-railway.onrender.com/scrape?' . http_build_query([
-                        'url' => $urlOriginal
+                $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
+                        'api_key' => 'a36c0383b6153a740f783cc5ba9bd54c',
+                        'url'     => $urlOriginal,
+                        'render'  => 'true',
                     ]);
 
                 Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
@@ -29,7 +31,7 @@
                 curl_setopt($ch, CURLOPT_URL, $scraperEndpoint);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 60);
 
                 $response = curl_exec($ch);
 
