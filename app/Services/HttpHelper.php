@@ -23,18 +23,18 @@
                         'url' => $urlOriginal
                     ]);
 
-                //Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
+                Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
 
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $scraperEndpoint);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 120);
 
                 $response = curl_exec($ch);
 
                 if (curl_errno($ch)) {
-                    //Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
+                    Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
                     return false;
                 }
 
