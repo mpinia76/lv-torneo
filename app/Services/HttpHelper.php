@@ -19,7 +19,7 @@
             if ($usarScraperRemoto) {
                 $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
 
-                $scraperEndpoint = 'https://scrape-prod.up.railway.app/scrape?' . http_build_query([
+                $scraperEndpoint = 'https://scraper-railway.onrender.com/scrape?' . http_build_query([
                         'url' => $urlOriginal
                     ]);
 
