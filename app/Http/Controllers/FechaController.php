@@ -8430,15 +8430,15 @@ private function normalizarMinuto(string $texto): int
             // Intenta cargar el HTML recuperado
             if ($dom->loadHTML($html2)) {
                 $xpath = new \DOMXPath($dom);
-                //dd($xpath);
-                $jueces = $this->getJueces($xpath);
-                //dd($jueces);
+
                 $jueces = $this->getJueces($xpath);
 
+                // ---- VALIDAR JUECES ----
+                $juecesEncontrados = 0;
                 foreach ($jueces as $tipo => $nombreCompleto) {
 
                     if (empty($nombreCompleto)) continue; // Si está vacío, saltar
-
+                    $juecesEncontrados++;
                     $partesNombre = explode(' ', $nombreCompleto);
 
                     // Buscar el árbitro por nombre y apellido
@@ -8524,6 +8524,27 @@ private function normalizarMinuto(string $texto): int
 
                 $visitanteSuplentes = $this->parsePlayers($nodesAwayBench, $xpath, $golesConTipo,$penalesFallados);
                 //dd($visitanteSuplentes);
+
+                $titularesLocal = count($localTitulares ?? []);
+                $titularesVisitante = count($visitanteTitulares ?? []);
+
+                if ($juecesEncontrados === 0 && $titularesLocal === 0 && $titularesVisitante === 0) {
+                    $error .= 'No se encontraron jueces ni jugadores. Verificá la URL.<br>';
+                    $ok = 0;
+                } else {
+                    if ($juecesEncontrados < 3) {
+                        $success .= '⚠️ WARNING: Solo se encontraron ' . $juecesEncontrados . ' juez/jueces (se esperan 3).<br>';
+                    }
+                    if ($titularesLocal < 11) {
+                        $success .= '⚠️ WARNING: ' . $strLocal . ' tiene solo ' . $titularesLocal . ' titular/es (se esperan 11).<br>';
+                    }
+                    if ($titularesVisitante < 11) {
+                        $success .= '⚠️ WARNING: ' . $strVisitante . ' tiene solo ' . $titularesVisitante . ' titular/es (se esperan 11).<br>';
+                    }
+                }
+
+
+
 
                 $localDT = $this->getDT($xpath, 'home');
                 $awayDT = $this->getDT($xpath, 'away');
@@ -8729,6 +8750,14 @@ private function normalizarMinuto(string $texto): int
 // ---- LLAMADAS ----
                 $strEntrenadorLocal = is_array($dtLocal) ? trim(implode(' ', $dtLocal)) : trim($dtLocal);
                 $strEntrenadorVisitante = is_array($dtVisitante) ? trim(implode(' ', $dtVisitante)) : trim($dtVisitante);
+
+                // ---- VALIDAR TÉCNICOS ----
+                if (empty(trim($strEntrenadorLocal))) {
+                    $success .= '⚠️ WARNING: No se encontró técnico para ' . $strLocal . '.<br>';
+                }
+                if (empty(trim($strEntrenadorVisitante))) {
+                    $success .= '⚠️ WARNING: No se encontró técnico para ' . $strVisitante . '.<br>';
+                }
 
                 procesarTecnicos($strEntrenadorLocal, $partido->equipol, $partido, $success, $error, $ok);
                 procesarTecnicos($strEntrenadorVisitante, $partido->equipov, $partido, $success, $error, $ok);
