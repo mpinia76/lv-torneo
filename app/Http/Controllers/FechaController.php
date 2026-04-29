@@ -8404,7 +8404,7 @@ private function normalizarMinuto(string $texto): int
         try {
             if ($url2) {
 
-                $html2 = HttpHelper::getHtmlContent($url2);
+                $html2 = HttpHelper::getHtmlContent($url2, true);
 
             }
 
