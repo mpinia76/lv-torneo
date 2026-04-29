@@ -621,5 +621,102 @@ class ScraperController extends Controller
         return response()->json(array_values($torneos));
     }
 
+    public function csvTecnico(Request $request)
+    {
+        set_time_limit(0);
+
+        $file = $request->file('file');
+
+        if (!$file) {
+            return response()->json([]);
+        }
+
+        $extension = $file->getClientOriginalExtension();
+
+        if (strtolower($extension) != 'csv') {
+            return response()->json([]);
+        }
+
+        $filepath = $file->getRealPath();
+        $handle = fopen($filepath, "r");
+
+        $data = [];
+        $header = [];
+        $i = 0;
+
+        $existentes = collect()
+            ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
+            ->merge(
+                \App\Torneo::all()->map(function ($t) {
+                    return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+                })
+            )
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)
+                    ->lower()
+                    ->ascii()
+                    ->replaceMatches('/\s+/', ' ')
+                    ->trim();
+            })
+            ->unique()
+            ->flip()
+            ->toArray();
+
+        while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
+
+            if ($i == 0) {
+                $header = array_map('strtolower', $row);
+                $i++;
+                continue;
+            }
+
+
+
+            $row = array_combine($header, $row);
+
+            $equipo   = trim($row['equipo'] ?? '');
+            $torneo   = trim($row['torneo'] ?? '');
+            $year     = trim($row['año'] ?? '');
+            $logoUrl  = trim($row['logo_url'] ?? '');
+
+            if (!$equipo || !$torneo) continue;
+
+            $key = (string) \Str::of($torneo . ' ' . $year)
+                ->lower()
+                ->ascii()
+                ->replaceMatches('/\s+/', ' ')
+                ->trim();
+
+            if (isset($existentes[$key])) {
+                continue;
+            }
+
+            $logoNombre = $logoUrl ?: null;
+
+            $data[] = [
+                'competition' => trim($torneo . ' ' . $year),
+                'equipo'      => $equipo,
+                'posicion'    => (int) ($row['posicion'] ?? 0),
+                'partidos'    =>
+                    ((int) ($row['ganados'] ?? 0)) +
+                    ((int) ($row['empatados'] ?? 0)) +
+                    ((int) ($row['perdidos'] ?? 0)),
+                'ganados'     => (int) ($row['ganados'] ?? 0),
+                'empatados'   => (int) ($row['empatados'] ?? 0),
+                'perdidos'    => (int) ($row['perdidos'] ?? 0),
+                'gf'          => (int) ($row['gf'] ?? 0),
+                'ge'          => (int) ($row['gc'] ?? 0),
+                'torneo_logo' => $logoNombre,
+                'tipo'        => trim($row['tipo'] ?? ''),
+                'ambito'      => trim($row['ambito'] ?? ''),
+            ];
+        }
+
+        fclose($handle);
+
+        return response()->json($data);
+    }
+
 
 }

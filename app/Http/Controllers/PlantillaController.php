@@ -1143,14 +1143,18 @@ class PlantillaController extends Controller
                     } catch (QueryException $ex) {
                         if ($ex->errorInfo[1] === 1062) {
                             if (strpos($ex->errorInfo[2], 'plantilla_id_dorsal') !== false) {
-                                $consultarPlantilla = PlantillaJugador::where('plantilla_id', "$id")->where('dorsal', $dorsal)->first();
-                                $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
-                                $success .= "El dorsal " . $dorsal . " ya lo usa " . $jugadorRepetido->persona->apellido . ", " . $jugadorRepetido->persona->nombre . '<br>';
-                            } elseif (strpos($ex->errorInfo[2], 'plantilla_id_jugador_id') !== false) {
-                                $jugadorRepetido = Jugador::where('id', '=', $persona->jugador->id)->first();
-                                $success .= "Jugador repetido: " . $jugadorRepetido->persona->apellido . ", " . $jugadorRepetido->persona->nombre . '<br>';
-                            } else {
-                                $error = $ex->getMessage();
+                                $consultarPlantilla = PlantillaJugador::where('plantilla_id', "$id")
+                                    ->where('dorsal', $dorsal)
+                                    ->first();
+
+                                if ($consultarPlantilla) {
+                                    $jugadorRepetido = Jugador::where('id', '=', $consultarPlantilla->jugador_id)->first();
+                                    $success .= "El dorsal " . $dorsal . " ya lo usa "
+                                        . $jugadorRepetido->persona->apellido . ", "
+                                        . $jugadorRepetido->persona->nombre . '<br>';
+                                } else {
+                                    $success .= "El dorsal " . $dorsal . " generó un conflicto pero no se encontró el jugador que lo ocupa.<br>";
+                                }
                             }
                         } else {
                             $error = $ex->getMessage();

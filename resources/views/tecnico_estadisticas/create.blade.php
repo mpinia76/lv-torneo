@@ -42,9 +42,16 @@
                 </ul>
             </div>
         @endif
-        <button type="button" class="btn btn-info" onclick="verHistorial()">
+        <div class="mb-3">
+            <label>Importar desde CSV</label>
+            <input type="file" id="csvFile" class="form-control" accept=".csv">
+            <button type="button" class="btn btn-secondary mt-2" onclick="procesarCSV()">
+                📄 Procesar CSV
+            </button>
+        </div>
+        <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
             🔍 Ver historial
-        </button>
+        </button>-->
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando historial, puede tardar unos segundos...
         </div>
@@ -72,6 +79,7 @@
                     <label>Logo torneo</label>
 
                     <input type="file" class="form-control" name="escudoTmp">
+                    <input type="hidden" name="torneo_logo_guardado" value="">
                 </div>
                 <div class="form-group col-xs-12 col-sm-6 col-md-2">
                     {{Form::label('tipo', 'Tipo')}}
@@ -170,6 +178,7 @@
 
         </form>
     </div>
+
 @endsection
 <script>
     function verHistorial() {
@@ -283,13 +292,18 @@
 
     function usarDato(item) {
 
-        // ⚽ partidos
+        document.querySelector('[name="tipo"]').value = item.tipo;
+        document.querySelector('[name="ambito"]').value = item.ambito;
         document.querySelector('[name="partidos"]').value = item.partidos;
+        document.querySelector('[name="posicion"]').value = item.posicion;
         document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
         document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
         document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
         document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
         document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
+
+
+        document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
 
         document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
 
@@ -317,6 +331,106 @@
             select.value = mejorMatch.value;
             $(select).trigger('change'); // Select2
         }
+    }
+
+    function procesarCSV() {
+
+        let file = document.getElementById('csvFile').files[0];
+
+        if (!file) {
+            alert('Seleccione un CSV');
+            return;
+        }
+
+        let formData = new FormData();
+        formData.append('file', file);
+
+        document.getElementById('loadingScraper').style.display = 'block';
+        document.getElementById('resultadoScraper').innerHTML = '';
+
+        fetch("{{ url('/admin/scraper/csv-tecnico') }}", {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: formData
+        })
+            .then(res => res.json())
+            .then(data => {
+                renderResultados(data); // si usás función común
+            })
+            .finally(() => {
+                document.getElementById('loadingScraper').style.display = 'none';
+            });
+    }
+
+    function renderResultados(items) {
+
+        let html = '';
+        let torneos = {};
+
+        items.forEach(row => {
+            let key = clean(row.competition) + '|' + clean(row.equipo);
+
+            if (!torneos[key]) {
+                torneos[key] = {
+                    competition: clean(row.competition),
+                    equipo: row.equipo,
+                    partidos: 0,
+                    posicion: 0,
+                    ganados: 0,
+                    empatados: 0,
+                    perdidos: 0,
+                    gf: 0,
+                    ge: 0,
+                    torneo_logo: row.torneo_logo ?? null,
+                    tipo: row.tipo ?? '',
+                    ambito: row.ambito ?? '',
+                };
+            }
+
+            torneos[key].partidos   += parseInt(row.partidos ?? 0);
+            torneos[key].posicion   += parseInt(row.posicion ?? 0);
+            torneos[key].ganados    += parseInt(row.ganados ?? 0);
+            torneos[key].empatados  += parseInt(row.empatados ?? 0);
+            torneos[key].perdidos   += parseInt(row.perdidos ?? 0);
+            torneos[key].gf         += parseInt(row.gf ?? 0);
+            torneos[key].ge         += parseInt(row.ge ?? 0);
+        });
+
+        Object.values(torneos).forEach(competition => {
+
+            // Logo preview
+            let logoHtml = competition.torneo_logo
+                ? `<img src="${competition.torneo_logo}" height="40" style="object-fit:contain;">`
+                : '<span class="text-muted">—</span>';
+
+            html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
+            html += '<table class="table table-sm">';
+            html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
+
+            html += `<tr>
+            <td>${logoHtml}</td>
+            <td style="color:#0a6ebd">${competition.equipo}</td>
+            <td>${competition.tipo}</td>
+            <td>${competition.ambito}</td>
+            <td>${competition.posicion}</td>
+            <td>${competition.partidos}</td>
+            <td>${competition.ganados}</td>
+            <td>${competition.empatados}</td>
+            <td>${competition.perdidos}</td>
+            <td>${competition.gf}</td>
+            <td>${competition.ge}</td>
+            <td>
+                <button onclick='usarDato(${JSON.stringify(competition)})'
+                    class="btn btn-success btn-sm">Usar</button>
+            </td>
+        </tr>`;
+
+            html += '</table>';
+        });
+
+        document.getElementById('resultadoScraper').innerHTML = html;
     }
 
 </script>

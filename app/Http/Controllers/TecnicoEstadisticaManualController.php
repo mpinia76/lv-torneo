@@ -57,14 +57,45 @@ class TecnicoEstadisticaManualController extends Controller
     public function store(Request $request)
     {
         if ($files = $request->file('escudoTmp')) {
+            // Subida manual de archivo
             $image = $request->file('escudoTmp');
-            $name = time().'.'.$image->getClientOriginalExtension();
-            $destinationPath = public_path('/images');
-            $image->move($destinationPath, $name);
-
-
-
+            $name = time() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('/images'), $name);
             $request->merge(['torneo_logo' => $name]);
+
+        } elseif ($request->filled('torneo_logo_guardado')) {
+            $logoUrl = $request->torneo_logo_guardado;
+            $proxyUrl = 'https://images.weserv.nl/?url=' . urlencode($logoUrl);
+
+            try {
+                $client = new \GuzzleHttp\Client();
+                $response = $client->get($proxyUrl, [  // 👈 $proxyUrl, no $logoUrl
+                    'headers' => [
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept'     => 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    ]
+                ]);
+
+                if ($response->getStatusCode() === 200) {
+                    $contenido = $response->getBody()->getContents();
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $mimeType = $finfo->buffer($contenido);
+                    $mimeToExt = [
+                        'image/png'     => 'png',
+                        'image/jpeg'    => 'jpg',
+                        'image/webp'    => 'webp',
+                        'image/svg+xml' => 'svg',
+                        'image/gif'     => 'gif',
+                    ];
+                    if (isset($mimeToExt[$mimeType])) {
+                        $nombre = time() . '_' . uniqid() . '.' . $mimeToExt[$mimeType];
+                        file_put_contents(public_path('/images/' . $nombre), $contenido);
+                        $request->merge(['torneo_logo' => $nombre]);
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::error('Logo download en store: ' . $e->getMessage());
+            }
         }
         DB::beginTransaction();
         $ok=1;
@@ -153,14 +184,45 @@ class TecnicoEstadisticaManualController extends Controller
 
 
         if ($files = $request->file('escudoTmp')) {
+            // Subida manual de archivo
             $image = $request->file('escudoTmp');
-            $name = time().'.'.$image->getClientOriginalExtension();
-            $destinationPath = public_path('/images');
-            $image->move($destinationPath, $name);
-
-
-
+            $name = time() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('/images'), $name);
             $request->merge(['torneo_logo' => $name]);
+
+        } elseif ($request->filled('torneo_logo_guardado')) {
+            $logoUrl = $request->torneo_logo_guardado;
+
+            try {
+                $client = new \GuzzleHttp\Client();
+                $response = $client->get($logoUrl, [
+                    'headers' => [
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept'     => 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                        'Referer'    => 'https://www.sofascore.com/',
+                    ]
+                ]);
+
+                if ($response->getStatusCode() === 200) {
+                    $contenido = $response->getBody()->getContents();
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $mimeType = $finfo->buffer($contenido);
+                    $mimeToExt = [
+                        'image/png'     => 'png',
+                        'image/jpeg'    => 'jpg',
+                        'image/webp'    => 'webp',
+                        'image/svg+xml' => 'svg',
+                        'image/gif'     => 'gif',
+                    ];
+                    if (isset($mimeToExt[$mimeType])) {
+                        $nombre = time() . '_' . uniqid() . '.' . $mimeToExt[$mimeType];
+                        file_put_contents(public_path('/images/' . $nombre), $contenido);
+                        $request->merge(['torneo_logo' => $nombre]);
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::error('Logo download en store: ' . $e->getMessage());
+            }
         }
         DB::beginTransaction();
         $ok=1;
