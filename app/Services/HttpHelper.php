@@ -41,6 +41,10 @@
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
 
+                Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
+                Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
+
+
                 if ($httpCode >= 400) {
                     //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
                     return false;
@@ -58,19 +62,21 @@
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
-                // Evita el 403 añadiendo User-Agent tipo navegador
-                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36');
-
+                $headers = [
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language: es-AR,es;q=0.9,en;q=0.8',
+                    'Accept-Encoding: gzip, deflate, br',
+                    'Referer: https://www.livefutbol.com/',
+                    'Connection: keep-alive',
+                    'Upgrade-Insecure-Requests: 1',
+                ];
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_ENCODING, ''); // maneja gzip/deflate automáticamente
 
                 $response = curl_exec($ch);
 
                 if (curl_errno($ch)) {
-                    //Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
-                    return false;
-                }
-
-                if ($response === false) {
-                    //Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $urlOriginal);
                     curl_close($ch);
                     return false;
                 }
@@ -78,9 +84,18 @@
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
 
+                Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
+                Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
+
+
                 if ($httpCode == 404) {
-                    //Log::channel('mi_log')->warning('PÃ¡gina no encontrada (404) para la URL: ' . $urlOriginal);
                     return false;
+                }
+
+                // Si sigue dando 403, intentar con el scraper remoto como fallback
+                if ($httpCode == 403 || empty($response)) {
+                    //Log::channel('mi_log')->warning("403 en modo directo, reintentando con scraper remoto: $urlOriginal");
+                    return self::getHtmlContent($urlOriginal, true);
                 }
 
                 return $response;
