@@ -8373,6 +8373,20 @@ private function normalizarMinuto(string $texto): int
         return $jueces;
     }
 
+    public function importarPartidoProcess(Request $request)
+    {
+        $url2 = rtrim(trim($request->get('url2')), '/');
+        $url3 = rtrim(trim($request->get('url3')), '/');
+
+        // If livefutbol URL provided, use old method
+        if (!empty($url3) && strpos($url3, 'livefutbol') !== false) {
+            $request->merge(['url2' => $url3]);
+            return $this->importarPartidoProcess_LF($request);
+        }
+
+        // Otherwise use resultados-futbol
+        return $this->importarPartidoProcess_RF($request);
+    }
 
     public function importarPartidoProcess_RF(Request $request)
     {
@@ -9154,7 +9168,7 @@ private function normalizarMinuto(string $texto): int
     }
 
 
-    public function importarPartidoProcess(Request $request)
+    public function importarPartidoProcess_LF(Request $request)
     {
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
