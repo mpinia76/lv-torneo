@@ -8592,18 +8592,33 @@ private function normalizarMinuto(string $texto): int
         //    Match events to players by name similarity
         // -----------------------------------------------------------------------
         $nombreCoincide = function(string $nombreScraper, string $nombreJugador) {
-            // Remove dots and split
-            $partes = explode(' ', strtolower(trim($nombreScraper)));
-            $target = strtolower($nombreJugador);
+            $scraperLower = strtolower(trim($nombreScraper));
+            $jugadorLower = strtolower(trim($nombreJugador));
 
+            // Exact match
+            if ($scraperLower === $jugadorLower) return true;
+
+            $partes = explode(' ', $scraperLower);
+
+            // ALL parts must match (AND)
             foreach ($partes as $parte) {
                 $parte = trim($parte, '.');
-                if (strlen($parte) <= 1) continue; // Skip single letter initials
-                if (strpos($target, $parte) !== false) {
-                    return true;
+                if (strlen($parte) === 0) continue;
+
+                if (strlen($parte) === 1) {
+                    // Initial: any word in target must start with this letter
+                    $palabras = explode(' ', $jugadorLower);
+                    $found = false;
+                    foreach ($palabras as $palabra) {
+                        if (strpos($palabra, $parte) === 0) { $found = true; break; }
+                    }
+                    if (!$found) return false;
+                } else {
+                    // Full word: must appear in target
+                    if (strpos($jugadorLower, $parte) === false) return false;
                 }
             }
-            return false;
+            return true;
         };
 
         $buildIncidencias = function(string $nombreJugador, array $eventos, array $todosJugadores) use ($nombreCoincide) {
