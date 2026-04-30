@@ -23,6 +23,7 @@
                         'api_key' => 'a36c0383b6153a740f783cc5ba9bd54c',
                         'url'     => $urlOriginal,
                         'render'  => 'true',
+                        'premium' => 'true',
                     ]);
 
                 Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
