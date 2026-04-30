@@ -8697,25 +8697,27 @@ private function normalizarMinuto(string $texto): int
         foreach ($jueces as $juez) {
             $nombreCompleto = $juez['nombre'];
             $tipoJuez       = $juez['tipo'];
-            $partesNombre   = array_map(function($p) { return trim($p, '.'); }, explode(' ', $nombreCompleto));
-            $partesMayores  = array_filter($partesNombre, function($p) { return strlen($p) > 2; });
+            $partesNombre  = array_map(function($p) { return trim($p, '.'); }, explode(' ', $nombreCompleto));
+            $partesMayores = array_values(array_filter($partesNombre, function($p) { return strlen($p) > 2; }));
 
             $arbitrosEncontrados = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
                 ->where(function ($query) use ($partesMayores) {
-                    $query->where(function ($q) use ($partesMayores) {
+                    if (count($partesMayores) > 1) {
+                        // Full name available: use AND — all parts must match
                         foreach ($partesMayores as $parte) {
-                            $q->where(function ($q2) use ($parte) {
-                                $q2->where('personas.nombre', 'LIKE', "%$parte%")
+                            $query->where(function ($q) use ($parte) {
+                                $q->where('personas.nombre', 'LIKE', "%$parte%")
                                     ->orWhere('personas.apellido', 'LIKE', "%$parte%")
                                     ->orWhere('personas.name', 'LIKE', "%$parte%");
                             });
                         }
-                    })->orWhere(function ($q) use ($partesMayores) {
+                    } else {
+                        // Only one significant part (initial + surname): use OR on apellido/name only
                         foreach ($partesMayores as $parte) {
-                            $q->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                            $query->orWhere('personas.apellido', 'LIKE', "%$parte%")
                                 ->orWhere('personas.name', 'LIKE', "%$parte%");
                         }
-                    });
+                    }
                 })
                 ->select('arbitros.id as arbitro_id', 'personas.*')
                 ->get();
