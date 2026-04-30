@@ -8977,6 +8977,8 @@ private function normalizarMinuto(string $texto): int
                         }
                     }
 
+
+
                     // CARD
                     $tipotarjeta = '';
                     switch ($tipoInc) {
@@ -9035,6 +9037,38 @@ private function normalizarMinuto(string $texto): int
                             }
                         } catch (QueryException $ex) {
                             $error .= 'Error cambio: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
+                            $ok = 0;
+                            continue;
+                        }
+                    }
+
+                    // PENAL
+                    $tipopenal = '';
+                    switch ($tipoInc) {
+                        case 'Penal errado':  $tipopenal = 'Errado'; break;
+                        case 'Penal atajado': $tipopenal = 'Atajado'; break;
+                    }
+
+                    if ($tipopenal) {
+                        $penaldata = [
+                            'partido_id' => $partido->id,
+                            'jugador_id' => $jugador_id,
+                            'minuto'     => $minutoInc,
+                            'tipo'       => $tipopenal,
+                        ];
+                        $penal = Penal::where('partido_id', '=', $partido->id)
+                            ->where('jugador_id', '=', $jugador_id)
+                            ->where('minuto', '=', $minutoInc)
+                            ->first();
+                        try {
+                            if ($penal) {
+                                $penal->update($penaldata);
+                            } else {
+                                Penal::create($penaldata);
+                            }
+                            $success .= 'Penal ' . strtolower($tipopenal) . ': ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
+                        } catch (QueryException $ex) {
+                            $error .= 'Error penal: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
                             $ok = 0;
                             continue;
                         }
@@ -9761,33 +9795,47 @@ private function normalizarMinuto(string $texto): int
 
                                     }
 
-                                    // PENAL
                                     $tipopenal = '';
-                                    switch ($tipoInc) {
-                                        case 'Penal errado':  $tipopenal = 'Errado'; break;
-                                        case 'Penal atajado': $tipopenal = 'Atajado'; break;
+                                    switch (trim($incidencia[0])) {
+                                        case 'Penal errado':
+                                            $tipopenal = 'Errado';
+                                            break;
+                                        case 'Penal atajado':
+                                            $tipopenal = 'Atajado';
+                                            break;
                                     }
 
                                     if ($tipopenal) {
-                                        $penaldata = [
+                                        $penaldata = array(
                                             'partido_id' => $partido->id,
                                             'jugador_id' => $jugador_id,
-                                            'minuto'     => $minutoInc,
-                                            'tipo'       => $tipopenal,
-                                        ];
+                                            'minuto' => intval(trim($incidencia[1])),
+                                            'tipo' => $tipopenal
+                                        );
+
                                         $penal = Penal::where('partido_id', '=', $partido->id)
                                             ->where('jugador_id', '=', $jugador_id)
-                                            ->where('minuto', '=', $minutoInc)
+                                            ->where('minuto', '=', intval(trim($incidencia[1])))
                                             ->first();
+
                                         try {
-                                            if ($penal) {
+                                            if (!empty($penal)) {
                                                 $penal->update($penaldata);
                                             } else {
-                                                Penal::create($penaldata);
+                                                $penal = Penal::create($penaldata);
                                             }
-                                            $success .= 'Penal ' . strtolower($tipopenal) . ': ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
+                                            $success .= 'Penal errado: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
                                         } catch (QueryException $ex) {
-                                            $error .= 'Error penal: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
+                                            if ($ex->errorInfo[1] == 1452) {
+
+                                                $error .= 'Jugador no cargado: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] .
+                                                    ' - ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])) .
+                                                    ' en el equipo ' . $eq['equipo'] . '<br>';
+
+                                            } else {
+                                                $error = $ex->getMessage();
+                                            }
+
                                             $ok = 0;
                                             continue;
                                         }
