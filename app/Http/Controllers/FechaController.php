@@ -8374,7 +8374,7 @@ private function normalizarMinuto(string $texto): int
     }
 
 
-    public function importarPartidoProcess(Request $request)
+    public function importarPartidoProcess_RF(Request $request)
     {
         set_time_limit(0);
 
@@ -9154,7 +9154,7 @@ private function normalizarMinuto(string $texto): int
     }
 
 
-    public function importarPartidoProcess_livefutbol(Request $request)
+    public function importarPartidoProcess(Request $request)
     {
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
