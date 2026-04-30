@@ -8486,34 +8486,26 @@ private function normalizarMinuto(string $texto): int
             return $players;
         };
 
-        // Starters: ul that contain small.align-dorsal
-        $allUlsTitulares = $xpathAlineacion->query(
-            "//ul[.//small[contains(@class,'align-dorsal')]]"
-        );
+        $allUls = $xpathAlineacion->query("//ul[.//h5[contains(@class,'align-player')]]");
 
-        // Bench: ul with align-player links but WITHOUT small.align-dorsal
-        $allUlsSuplentes = $xpathAlineacion->query(
-            "//ul[.//h5[contains(@class,'align-player')] and not(.//small[contains(@class,'align-dorsal')])]"
-        );
-
-        $localTitulares     = $allUlsTitulares->length >= 1
-            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsTitulares->item(0)), $xpathAlineacion)
+        $localTitulares     = $allUls->length >= 1
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUls->item(0)), $xpathAlineacion)
             : [];
-        $visitanteTitulares = $allUlsTitulares->length >= 2
-            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsTitulares->item(1)), $xpathAlineacion)
+        $localSuplentes     = $allUls->length >= 2
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUls->item(1)), $xpathAlineacion)
             : [];
-        $localSuplentes     = $allUlsSuplentes->length >= 1
-            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsSuplentes->item(0)), $xpathAlineacion)
+        $visitanteTitulares = $allUls->length >= 3
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUls->item(2)), $xpathAlineacion)
             : [];
-        $visitanteSuplentes = $allUlsSuplentes->length >= 2
-            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsSuplentes->item(1)), $xpathAlineacion)
+        $visitanteSuplentes = $allUls->length >= 4
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUls->item(3)), $xpathAlineacion)
             : [];
 
 
-        Log::channel('mi_log')->debug('Local titulares: ' . implode(', ', array_column($localTitulares, 'nombre')));
+        /*Log::channel('mi_log')->debug('Local titulares: ' . implode(', ', array_column($localTitulares, 'nombre')));
         Log::channel('mi_log')->debug('Visitante titulares: ' . implode(', ', array_column($visitanteTitulares, 'nombre')));
         Log::channel('mi_log')->debug('Local suplentes: ' . implode(', ', array_column($localSuplentes, 'nombre')));
-        Log::channel('mi_log')->debug('Visitante suplentes: ' . implode(', ', array_column($visitanteSuplentes, 'nombre')));
+        Log::channel('mi_log')->debug('Visitante suplentes: ' . implode(', ', array_column($visitanteSuplentes, 'nombre')));*/
 
         // -----------------------------------------------------------------------
         // 5. PARSE EVENTS (from resumen page)

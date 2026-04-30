@@ -37,15 +37,15 @@
                 $response = curl_exec($ch);
 
                 if (curl_errno($ch)) {
-                    Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
+                    //Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
                     return false;
                 }
 
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
 
-                Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
-                Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
+                //Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
+                //Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
 
 
                 if ($httpCode >= 400) {
@@ -87,8 +87,8 @@
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
 
-                Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
-                Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
+                //Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
+                //Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
 
 
                 if ($httpCode == 404) {
