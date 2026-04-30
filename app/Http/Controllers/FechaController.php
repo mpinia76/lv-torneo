@@ -8401,6 +8401,11 @@ private function normalizarMinuto(string $texto): int
         $htmlAlineacion = HttpHelper::getHtmlContent($url3 . '/alineacion');
         $htmlResumen    = HttpHelper::getHtmlContent($url3 . '/resumen');
 
+        Log::channel('mi_log')->debug('[RF] htmlPrevia: ' . ($htmlPrevia ? 'OK ('.strlen($htmlPrevia).' chars)' : 'FALLÓ'));
+        Log::channel('mi_log')->debug('[RF] htmlAlineacion: ' . ($htmlAlineacion ? 'OK ('.strlen($htmlAlineacion).' chars)' : 'FALLÓ'));
+        Log::channel('mi_log')->debug('[RF] htmlResumen: ' . ($htmlResumen ? 'OK ('.strlen($htmlResumen).' chars)' : 'FALLÓ'));
+
+
         if (!$htmlPrevia || !$htmlAlineacion || !$htmlResumen) {
             DB::rollback();
             return redirect()->route('fechas.show', $partido->fecha->id)
