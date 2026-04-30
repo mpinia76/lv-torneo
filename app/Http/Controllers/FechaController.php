@@ -8683,6 +8683,20 @@ private function normalizarMinuto(string $texto): int
             $matchesLocal     = array_filter($todosLocal,     function($j) use ($ev, $nombreCoincide) { return $nombreCoincide($ev['nombre'], $j['nombre']); });
             $matchesVisitante = array_filter($todosVisitante, function($j) use ($ev, $nombreCoincide) { return $nombreCoincide($ev['nombre'], $j['nombre']); });
 
+            // Try exact match to disambiguate
+            if (count($matchesLocal) > 1) {
+                $exact = array_filter($matchesLocal, function($j) use ($ev) {
+                    return strtolower(trim($j['nombre'])) === strtolower(trim($ev['nombre']));
+                });
+                if (count($exact) === 1) $matchesLocal = $exact;
+            }
+            if (count($matchesVisitante) > 1) {
+                $exact = array_filter($matchesVisitante, function($j) use ($ev) {
+                    return strtolower(trim($j['nombre'])) === strtolower(trim($ev['nombre']));
+                });
+                if (count($exact) === 1) $matchesVisitante = $exact;
+            }
+
             if (count($matchesLocal) > 1 || count($matchesVisitante) > 1) {
                 $nombresL = implode(', ', array_column(array_values($matchesLocal), 'nombre'));
                 $nombresV = implode(', ', array_column(array_values($matchesVisitante), 'nombre'));
