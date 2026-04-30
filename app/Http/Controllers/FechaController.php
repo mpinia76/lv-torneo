@@ -8604,70 +8604,78 @@ private function normalizarMinuto(string $texto): int
             return false;
         };
 
-        $buildIncidencias = function(string $nombreJugador, array $eventos) use ($nombreCoincide) {
+        $buildIncidencias = function(string $nombreJugador, array $eventos, array $todosJugadores) use ($nombreCoincide) {
             $incidencias = [];
             foreach ($eventos as $ev) {
                 if (!$nombreCoincide($ev['nombre'], $nombreJugador)) continue;
 
+                // Check ambiguity: how many players in the team match this event name
+                $matches = array_filter($todosJugadores, function($j) use ($ev, $nombreCoincide) {
+                    return $nombreCoincide($ev['nombre'], $j['nombre']);
+                });
+
+                if (count($matches) > 1) {
+                    // Ambiguous — skip, will be reported as warning
+                    continue;
+                }
+
                 switch ($ev['tipo']) {
-                    case 'Gol':
-                        $incidencias[] = ['Gol', $ev['minuto']];
-                        break;
-                    case 'Gol propia puerta':
-                        $incidencias[] = ['Gol en propia meta', $ev['minuto']];
-                        break;
-                    case 'T. Amarilla':
-                        $incidencias[] = ['Tarjeta amarilla', $ev['minuto']];
-                        break;
-                    case 'T. Roja':
-                        $incidencias[] = ['Tarjeta roja', $ev['minuto']];
-                        break;
-                    case 'Entra en el partido':
-                        $incidencias[] = ['Entra', $ev['minuto']];
-                        break;
-                    case 'Sale del partido':
-                        $incidencias[] = ['Sale', $ev['minuto']];
-                        break;
-                    case 'Penalti parado':
-                        $incidencias[] = ['Penal atajado', $ev['minuto']];
-                        break;
-                    case 'Penalti fallado':
-                        $incidencias[] = ['Penal errado', $ev['minuto']];
-                        break;
+                    case 'Gol':                $incidencias[] = ['Gol', $ev['minuto']]; break;
+                    case 'Gol propia puerta':  $incidencias[] = ['Gol en propia meta', $ev['minuto']]; break;
+                    case 'T. Amarilla':        $incidencias[] = ['Tarjeta amarilla', $ev['minuto']]; break;
+                    case 'T. Roja':            $incidencias[] = ['Tarjeta roja', $ev['minuto']]; break;
+                    case 'Entra en el partido': $incidencias[] = ['Entra', $ev['minuto']]; break;
+                    case 'Sale del partido':   $incidencias[] = ['Sale', $ev['minuto']]; break;
+                    case 'Penalti parado':     $incidencias[] = ['Penal atajado', $ev['minuto']]; break;
+                    case 'Penalti fallado':    $incidencias[] = ['Penal errado', $ev['minuto']]; break;
                 }
             }
             return $incidencias;
         };
-
-        $buildJugadoresList = function(array $players, string $tipo, array $eventos) use ($buildIncidencias) {
+        $buildJugadoresList = function(array $players, string $tipo, array $eventos, array $todosJugadores) use ($buildIncidencias) {
             $out = [];
             foreach ($players as $p) {
                 $out[] = [
                     'dorsal'      => $p['dorsal'],
                     'nombre'      => $p['nombre'],
                     'tipo'        => $tipo,
-                    'incidencias' => $buildIncidencias($p['nombre'], $eventos),
+                    'incidencias' => $buildIncidencias($p['nombre'], $eventos, $todosJugadores),
                 ];
             }
             return $out;
         };
 
+        $todosLocal     = array_merge($localTitulares, $localSuplentes);
+        $todosVisitante = array_merge($visitanteTitulares, $visitanteSuplentes);
+
         $equipos = [
             [
                 'equipo'    => $strLocal,
                 'jugadores' => array_merge(
-                    $buildJugadoresList($localTitulares, 'Titular', $eventos),
-                    $buildJugadoresList($localSuplentes, 'Suplente', $eventos)
+                    $buildJugadoresList($localTitulares, 'Titular', $eventos, $todosLocal),
+                    $buildJugadoresList($localSuplentes, 'Suplente', $eventos, $todosLocal)
                 ),
             ],
             [
                 'equipo'    => $strVisitante,
                 'jugadores' => array_merge(
-                    $buildJugadoresList($visitanteTitulares, 'Titular', $eventos),
-                    $buildJugadoresList($visitanteSuplentes, 'Suplente', $eventos)
+                    $buildJugadoresList($visitanteTitulares, 'Titular', $eventos, $todosVisitante),
+                    $buildJugadoresList($visitanteSuplentes, 'Suplente', $eventos, $todosVisitante)
                 ),
             ],
         ];
+
+        // Warn about ambiguous events
+        foreach ($eventos as $ev) {
+            $matchesLocal     = array_filter($todosLocal,     function($j) use ($ev, $nombreCoincide) { return $nombreCoincide($ev['nombre'], $j['nombre']); });
+            $matchesVisitante = array_filter($todosVisitante, function($j) use ($ev, $nombreCoincide) { return $nombreCoincide($ev['nombre'], $j['nombre']); });
+
+            if (count($matchesLocal) > 1 || count($matchesVisitante) > 1) {
+                $nombresL = implode(', ', array_column(array_values($matchesLocal), 'nombre'));
+                $nombresV = implode(', ', array_column(array_values($matchesVisitante), 'nombre'));
+                $success .= '⚠️ WARNING: Evento ambiguo "' . $ev['tipo'] . ' ' . $ev['nombre'] . '" min ' . $ev['minuto'] . ' — coincide con: ' . implode(', ', array_filter([$nombresL, $nombresV])) . '<br>';
+            }
+        }
 
         // -----------------------------------------------------------------------
         // 7. VALIDATE
