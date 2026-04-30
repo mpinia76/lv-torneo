@@ -8547,6 +8547,8 @@ private function normalizarMinuto(string $texto): int
                 $nombre = trim(str_replace('Gol propia puerta', '', $title));
             } elseif (strpos($title, 'Gol concedido VAR') !== false) {
                 continue; // Skip VAR annulments
+            } elseif (strpos($title, 'Gol anulado') !== false) {
+                continue; // Skip cancelled goals
             } elseif (strpos($title, 'Gol') !== false) {
                 $tipo   = 'Gol';
                 $nombre = trim(str_replace('Gol', '', $title));
