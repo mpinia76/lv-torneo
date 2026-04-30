@@ -8401,9 +8401,6 @@ private function normalizarMinuto(string $texto): int
         $htmlAlineacion = HttpHelper::getHtmlContent($url3 . '/alineacion');
         $htmlResumen    = HttpHelper::getHtmlContent($url3 . '/resumen');
 
-        Log::channel('mi_log')->debug('[RF] htmlPrevia: ' . ($htmlPrevia ? 'OK ('.strlen($htmlPrevia).' chars)' : 'FALLÓ'));
-        Log::channel('mi_log')->debug('[RF] htmlAlineacion: ' . ($htmlAlineacion ? 'OK ('.strlen($htmlAlineacion).' chars)' : 'FALLÓ'));
-        Log::channel('mi_log')->debug('[RF] htmlResumen: ' . ($htmlResumen ? 'OK ('.strlen($htmlResumen).' chars)' : 'FALLÓ'));
 
 
         if (!$htmlPrevia || !$htmlAlineacion || !$htmlResumen) {
@@ -8511,6 +8508,12 @@ private function normalizarMinuto(string $texto): int
         $visitanteSuplentes = $allUlsSuplentes->length >= 2
             ? $parsePlayerList($xpathAlineacion->query("li", $allUlsSuplentes->item(1)), $xpathAlineacion)
             : [];
+
+
+        Log::channel('mi_log')->debug('Local titulares: ' . implode(', ', array_column($localTitulares, 'nombre')));
+        Log::channel('mi_log')->debug('Visitante titulares: ' . implode(', ', array_column($visitanteTitulares, 'nombre')));
+        Log::channel('mi_log')->debug('Local suplentes: ' . implode(', ', array_column($localSuplentes, 'nombre')));
+        Log::channel('mi_log')->debug('Visitante suplentes: ' . implode(', ', array_column($visitanteSuplentes, 'nombre')));
 
         // -----------------------------------------------------------------------
         // 5. PARSE EVENTS (from resumen page)
