@@ -20,10 +20,10 @@
                 $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
 
                 $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
-                        'api_key' => 'a36c0383b6153a740f783cc5ba9bd54c',
-                        'url'     => $urlOriginal,
-                        'render'  => 'true',
-                        'premium' => 'true',
+                        'api_key'       => 'a36c0383b6153a740f783cc5ba9bd54c',
+                        'url'           => $urlOriginal,
+                        'render'        => 'true',
+                        'ultra_premium' => 'true',
                     ]);
 
                 Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
