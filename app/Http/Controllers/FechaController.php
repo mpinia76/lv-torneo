@@ -8590,10 +8590,14 @@ private function normalizarMinuto(string $texto): int
         //    Match events to players by name similarity
         // -----------------------------------------------------------------------
         $nombreCoincide = function(string $nombreScraper, string $nombreJugador) {
+            // Remove dots and split
             $partes = explode(' ', strtolower(trim($nombreScraper)));
             $target = strtolower($nombreJugador);
+
             foreach ($partes as $parte) {
-                if (strlen($parte) > 1 && strpos($target, $parte) !== false) {
+                $parte = trim($parte, '.');
+                if (strlen($parte) <= 1) continue; // Skip single letter initials
+                if (strpos($target, $parte) !== false) {
                     return true;
                 }
             }
@@ -8693,10 +8697,10 @@ private function normalizarMinuto(string $texto): int
         foreach ($jueces as $juez) {
             $nombreCompleto = $juez['nombre'];
             $tipoJuez       = $juez['tipo'];
-            $partesNombre = array_map(function($p) { return trim($p, '.'); }, explode(' ', $nombreCompleto));
-            $partesMayores = array_filter($partesNombre, function($p) { return strlen($p) > 2; });
+            $partesNombre   = array_map(function($p) { return trim($p, '.'); }, explode(' ', $nombreCompleto));
+            $partesMayores  = array_filter($partesNombre, function($p) { return strlen($p) > 2; });
 
-            $arbitro = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
+            $arbitrosEncontrados = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
                 ->where(function ($query) use ($partesMayores) {
                     $query->where(function ($q) use ($partesMayores) {
                         foreach ($partesMayores as $parte) {
@@ -8714,12 +8718,24 @@ private function normalizarMinuto(string $texto): int
                     });
                 })
                 ->select('arbitros.id as arbitro_id', 'personas.*')
-                ->first();
+                ->get();
 
-            if (!$arbitro) {
+            if ($arbitrosEncontrados->count() === 0) {
                 $success .= $tipoJuez . ' NO encontrado: ' . $nombreCompleto . '<br>';
                 continue;
             }
+
+            if ($arbitrosEncontrados->count() > 1) {
+                $nombres = $arbitrosEncontrados->map(function($a) {
+                    return $a->apellido . ', ' . $a->nombre;
+                })->implode(' | ');
+                $success .= '⚠️ WARNING: ' . $tipoJuez . ' ambiguo "' . $nombreCompleto . '", múltiples coincidencias: ' . $nombres . '<br>';
+                continue;
+            }
+
+            $arbitro = $arbitrosEncontrados->first();
+
+// ... resto del bloque de guardado igual
 
             $data = [
                 'partido_id' => $partido->id,
@@ -9745,47 +9761,33 @@ private function normalizarMinuto(string $texto): int
 
                                     }
 
+                                    // PENAL
                                     $tipopenal = '';
-                                    switch (trim($incidencia[0])) {
-                                        case 'Penal errado':
-                                            $tipopenal = 'Errado';
-                                            break;
-                                        case 'Penal atajado':
-                                            $tipopenal = 'Atajado';
-                                            break;
+                                    switch ($tipoInc) {
+                                        case 'Penal errado':  $tipopenal = 'Errado'; break;
+                                        case 'Penal atajado': $tipopenal = 'Atajado'; break;
                                     }
 
                                     if ($tipopenal) {
-                                        $penaldata = array(
+                                        $penaldata = [
                                             'partido_id' => $partido->id,
                                             'jugador_id' => $jugador_id,
-                                            'minuto' => intval(trim($incidencia[1])),
-                                            'tipo' => $tipopenal
-                                        );
-
+                                            'minuto'     => $minutoInc,
+                                            'tipo'       => $tipopenal,
+                                        ];
                                         $penal = Penal::where('partido_id', '=', $partido->id)
                                             ->where('jugador_id', '=', $jugador_id)
-                                            ->where('minuto', '=', intval(trim($incidencia[1])))
+                                            ->where('minuto', '=', $minutoInc)
                                             ->first();
-
                                         try {
-                                            if (!empty($penal)) {
+                                            if ($penal) {
                                                 $penal->update($penaldata);
                                             } else {
-                                                $penal = Penal::create($penaldata);
+                                                Penal::create($penaldata);
                                             }
-                                            $success .= 'Penal errado: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
+                                            $success .= 'Penal ' . strtolower($tipopenal) . ': ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
                                         } catch (QueryException $ex) {
-                                            if ($ex->errorInfo[1] == 1452) {
-
-                                                $error .= 'Jugador no cargado: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] .
-                                                    ' - ' . trim($incidencia[0]) . ' MIN: ' . intval(trim($incidencia[1])) .
-                                                    ' en el equipo ' . $eq['equipo'] . '<br>';
-
-                                            } else {
-                                                $error = $ex->getMessage();
-                                            }
-
+                                            $error .= 'Error penal: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
                                             $ok = 0;
                                             continue;
                                         }
