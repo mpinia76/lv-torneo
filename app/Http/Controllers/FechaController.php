@@ -8464,11 +8464,20 @@ private function normalizarMinuto(string $texto): int
         // Parse a DOMNodeList of <li> elements into ['dorsal','nombre'] arrays
         $parsePlayerList = function(\DOMNodeList $listItems, \DOMXPath $xpath) {
             $players = [];
+            //$loggedBench = false;
             foreach ($listItems as $li) {
-                $dorsalNode = $xpath->query(".//small[contains(@class,'align-dorsal')]", $li)->item(0);
+                $dorsalNodes = $xpath->query(".//small[contains(@class,'align-dorsal')]", $li);
+                $dorsalNode  = $dorsalNodes->length > 0 ? $dorsalNodes->item($dorsalNodes->length - 1) : null;
                 $nameNode   = $xpath->query(".//h5[contains(@class,'align-player')]//a", $li)->item(0);
 
                 if (!$nameNode) continue;
+
+                /*if ($dorsalNode && trim($dorsalNode->textContent) === '' && !$loggedBench) {
+                    $doc = new \DOMDocument();
+                    $doc->appendChild($doc->importNode($li, true));
+                    Log::channel('mi_log')->debug('LI suplente HTML: ' . $doc->saveHTML());
+                    $loggedBench = true;
+                }*/
 
                 if ($dorsalNode) {
                     $dorsal = trim($dorsalNode->textContent);
@@ -8477,6 +8486,8 @@ private function normalizarMinuto(string $texto): int
                     preg_match('/^\s*(\d+)/', $li->textContent, $m);
                     $dorsal = isset($m[1]) ? $m[1] : '';
                 }
+
+                //Log::channel('mi_log')->debug("Player: " . trim($nameNode->textContent) . " | dorsal: [$dorsal] | dorsalNode: " . ($dorsalNode ? 'SI' : 'NO'));
 
                 $players[] = [
                     'dorsal' => $dorsal,
@@ -8502,10 +8513,10 @@ private function normalizarMinuto(string $texto): int
             : [];
 
 
-        /*Log::channel('mi_log')->debug('Local titulares: ' . implode(', ', array_column($localTitulares, 'nombre')));
-        Log::channel('mi_log')->debug('Visitante titulares: ' . implode(', ', array_column($visitanteTitulares, 'nombre')));
-        Log::channel('mi_log')->debug('Local suplentes: ' . implode(', ', array_column($localSuplentes, 'nombre')));
-        Log::channel('mi_log')->debug('Visitante suplentes: ' . implode(', ', array_column($visitanteSuplentes, 'nombre')));*/
+        //Log::channel('mi_log')->debug('Local titulares: ' . implode(', ', array_column($localTitulares, 'nombre')));
+        //Log::channel('mi_log')->debug('Visitante titulares: ' . implode(', ', array_column($visitanteTitulares, 'nombre')));
+        //Log::channel('mi_log')->debug('Local suplentes: ' . implode(', ', array_column($localSuplentes, 'nombre')));
+        //Log::channel('mi_log')->debug('Visitante suplentes: ' . implode(', ', array_column($visitanteSuplentes, 'nombre')));
 
         // -----------------------------------------------------------------------
         // 5. PARSE EVENTS (from resumen page)
@@ -8682,17 +8693,25 @@ private function normalizarMinuto(string $texto): int
         foreach ($jueces as $juez) {
             $nombreCompleto = $juez['nombre'];
             $tipoJuez       = $juez['tipo'];
-            $partesNombre   = explode(' ', $nombreCompleto);
+            $partesNombre = array_map(function($p) { return trim($p, '.'); }, explode(' ', $nombreCompleto));
+            $partesMayores = array_filter($partesNombre, function($p) { return strlen($p) > 2; });
 
             $arbitro = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
-                ->where(function ($query) use ($partesNombre) {
-                    foreach ($partesNombre as $parte) {
-                        $query->where(function ($query) use ($parte) {
-                            $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                ->where(function ($query) use ($partesMayores) {
+                    $query->where(function ($q) use ($partesMayores) {
+                        foreach ($partesMayores as $parte) {
+                            $q->where(function ($q2) use ($parte) {
+                                $q2->where('personas.nombre', 'LIKE', "%$parte%")
+                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                    ->orWhere('personas.name', 'LIKE', "%$parte%");
+                            });
+                        }
+                    })->orWhere(function ($q) use ($partesMayores) {
+                        foreach ($partesMayores as $parte) {
+                            $q->orWhere('personas.apellido', 'LIKE', "%$parte%")
                                 ->orWhere('personas.name', 'LIKE', "%$parte%");
-                        });
-                    }
+                        }
+                    });
                 })
                 ->select('arbitros.id as arbitro_id', 'personas.*')
                 ->first();
@@ -8798,18 +8817,29 @@ private function normalizarMinuto(string $texto): int
 
                 if (!empty($plantillaJugador)) {
                     $jugador_id   = $plantillaJugador->jugador->id;
-                    $partesNombre = explode(' ', $jugador['nombre']);
+                    $partesNombre = array_map(function($p) { return trim($p, '.'); }, explode(' ', $jugador['nombre']));
+                    $partesMayores = array_filter($partesNombre, function($p) { return strlen($p) > 2; });
 
                     $consultarJugador = Jugador::join('personas', 'personas.id', '=', 'jugadors.persona_id')
-                        ->where('jugadors.id', '=', $jugador_id)
-                        ->where(function ($query) use ($partesNombre) {
-                            foreach ($partesNombre as $parte) {
-                                $query->where(function ($query) use ($parte) {
-                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
-                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                        ->join('plantilla_jugadors', 'jugadors.id', '=', 'plantilla_jugadors.jugador_id')
+                        ->wherein('plantilla_jugadors.plantilla_id', explode(',', $arrplantillas))
+                        ->where(function ($query) use ($partesMayores) {
+                            $query->where(function ($q) use ($partesMayores) {
+                                // Try to match all significant parts (AND)
+                                foreach ($partesMayores as $parte) {
+                                    $q->where(function ($q2) use ($parte) {
+                                        $q2->where('personas.nombre', 'LIKE', "%$parte%")
+                                            ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                            ->orWhere('personas.name', 'LIKE', "%$parte%");
+                                    });
+                                }
+                            })->orWhere(function ($q) use ($partesMayores) {
+                                // Fallback: match any significant part (OR)
+                                foreach ($partesMayores as $parte) {
+                                    $q->orWhere('personas.apellido', 'LIKE', "%$parte%")
                                         ->orWhere('personas.name', 'LIKE', "%$parte%");
-                                });
-                            }
+                                }
+                            });
                         })
                         ->first();
 
