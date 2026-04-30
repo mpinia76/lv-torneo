@@ -8615,8 +8615,21 @@ private function normalizarMinuto(string $texto): int
                 });
 
                 if (count($matches) > 1) {
-                    // Ambiguous — skip, will be reported as warning
-                    continue;
+                    // Try exact match to disambiguate
+                    $exactMatches = array_filter($matches, function($j) use ($ev) {
+                        return strtolower(trim($j['nombre'])) === strtolower(trim($ev['nombre']));
+                    });
+
+                    if (count($exactMatches) === 1) {
+                        // Exact match found — only assign if this is the exact player
+                        $exactPlayer = reset($exactMatches);
+                        if (strtolower(trim($exactPlayer['nombre'])) !== strtolower(trim($nombreJugador))) {
+                            continue; // Not this player
+                        }
+                        // Fall through to switch
+                    } else {
+                        continue; // Still ambiguous, skip
+                    }
                 }
 
                 switch ($ev['tipo']) {
