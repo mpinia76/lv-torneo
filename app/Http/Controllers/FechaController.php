@@ -8374,10 +8374,653 @@ private function normalizarMinuto(string $texto): int
     }
 
 
-
-
-
     public function importarPartidoProcess(Request $request)
+    {
+        set_time_limit(0);
+
+        $partido_id = $request->get('partido_id');
+        $url3       = rtrim(trim($request->get('url2')), '/');
+
+        $partido  = Partido::findOrFail($partido_id);
+        $fecha    = Fecha::findOrFail($partido->fecha->id);
+        $grupo    = Grupo::findOrFail($fecha->grupo->id);
+
+        $ok       = 1;
+        $error    = '';
+        $success  = '';
+
+        $strLocal     = $partido->equipol->nombre;
+        $strVisitante = $partido->equipov->nombre;
+
+        DB::beginTransaction();
+
+        // -----------------------------------------------------------------------
+        // 1. FETCH THE THREE PAGES
+        // -----------------------------------------------------------------------
+        $htmlPrevia     = HttpHelper::getHtmlContent($url3);
+        $htmlAlineacion = HttpHelper::getHtmlContent($url3 . '/alineacion');
+        $htmlResumen    = HttpHelper::getHtmlContent($url3 . '/resumen');
+
+        if (!$htmlPrevia || !$htmlAlineacion || !$htmlResumen) {
+            DB::rollback();
+            return redirect()->route('fechas.show', $partido->fecha->id)
+                ->with('error', 'No se pudo obtener el HTML de resultados-futbol.com. Verificá la URL.');
+        }
+
+        // -----------------------------------------------------------------------
+        // 2. HELPER: build DOMXPath from raw HTML
+        // -----------------------------------------------------------------------
+        $buildXpath = function(string $html) {
+            $dom = new \DOMDocument();
+            libxml_use_internal_errors(true);
+            $dom->loadHTML($html);
+            libxml_clear_errors();
+            return new \DOMXPath($dom);
+        };
+
+        $xpathPrevia     = $buildXpath($htmlPrevia);
+        $xpathAlineacion = $buildXpath($htmlAlineacion);
+        $xpathResumen    = $buildXpath($htmlResumen);
+
+        // -----------------------------------------------------------------------
+        // 3. PARSE REFEREES (from previa page)
+        //    We want: Árbitro principal → Principal
+        //             First Asistente   → Línea 1
+        //             Second Asistente  → Línea 2
+        // -----------------------------------------------------------------------
+        $jueces          = [];
+        $asistentesVisto = 0;
+
+        $filas = $xpathPrevia->query("//table//tr[td]");
+        foreach ($filas as $fila) {
+            $celdas = $xpathPrevia->query("td", $fila);
+            if ($celdas->length < 2) continue;
+
+            $label  = trim($celdas->item(0)->textContent);
+            $nombre = trim($celdas->item(1)->textContent);
+
+            if (empty($nombre)) continue;
+
+            if (stripos($label, 'Árbitro principal') !== false || stripos($label, 'Arbitro principal') !== false) {
+                $jueces[] = ['tipo' => 'Principal', 'nombre' => $nombre];
+            } elseif (stripos($label, 'Asistente') !== false) {
+                $asistentesVisto++;
+                if ($asistentesVisto === 1) {
+                    $jueces[] = ['tipo' => 'Línea 1', 'nombre' => $nombre];
+                } elseif ($asistentesVisto === 2) {
+                    $jueces[] = ['tipo' => 'Línea 2', 'nombre' => $nombre];
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // 4. PARSE LINEUPS (from alineacion page)
+        //    - Starters: ul containing small.align-dorsal  → [0]=local, [1]=visitante
+        //    - Bench:    ul with h5.align-player but NO small.align-dorsal → [0]=local, [1]=visitante
+        // -----------------------------------------------------------------------
+
+        // Parse a DOMNodeList of <li> elements into ['dorsal','nombre'] arrays
+        $parsePlayerList = function(\DOMNodeList $listItems, \DOMXPath $xpath) {
+            $players = [];
+            foreach ($listItems as $li) {
+                $dorsalNode = $xpath->query(".//small[contains(@class,'align-dorsal')]", $li)->item(0);
+                $nameNode   = $xpath->query(".//h5[contains(@class,'align-player')]//a", $li)->item(0);
+
+                if (!$nameNode) continue;
+
+                if ($dorsalNode) {
+                    $dorsal = trim($dorsalNode->textContent);
+                } else {
+                    // Bench players: dorsal is the first number in the li text
+                    preg_match('/^\s*(\d+)/', $li->textContent, $m);
+                    $dorsal = isset($m[1]) ? $m[1] : '';
+                }
+
+                $players[] = [
+                    'dorsal' => $dorsal,
+                    'nombre' => trim($nameNode->textContent),
+                ];
+            }
+            return $players;
+        };
+
+        // Starters: ul that contain small.align-dorsal
+        $allUlsTitulares = $xpathAlineacion->query(
+            "//ul[.//small[contains(@class,'align-dorsal')]]"
+        );
+
+        // Bench: ul with align-player links but WITHOUT small.align-dorsal
+        $allUlsSuplentes = $xpathAlineacion->query(
+            "//ul[.//h5[contains(@class,'align-player')] and not(.//small[contains(@class,'align-dorsal')])]"
+        );
+
+        $localTitulares     = $allUlsTitulares->length >= 1
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsTitulares->item(0)), $xpathAlineacion)
+            : [];
+        $visitanteTitulares = $allUlsTitulares->length >= 2
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsTitulares->item(1)), $xpathAlineacion)
+            : [];
+        $localSuplentes     = $allUlsSuplentes->length >= 1
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsSuplentes->item(0)), $xpathAlineacion)
+            : [];
+        $visitanteSuplentes = $allUlsSuplentes->length >= 2
+            ? $parsePlayerList($xpathAlineacion->query("li", $allUlsSuplentes->item(1)), $xpathAlineacion)
+            : [];
+
+        // -----------------------------------------------------------------------
+        // 5. PARSE EVENTS (from resumen page)
+        //    Event anchors have title="Gol PlayerName", "T. Amarilla PlayerName", etc.
+        //    Minute is found in the parent node text as "MINUTO N'"
+        // -----------------------------------------------------------------------
+        $extractMinute = function(string $text) {
+            if (preg_match('/(\d+)/', $text, $m)) {
+                return intval($m[1]);
+            }
+            return 0;
+        };
+
+        $eventos = [];
+
+        $eventNodes = $xpathResumen->query(
+            "//a[contains(@title,'Gol') or contains(@title,'T. Amarilla') or contains(@title,'T. Roja') or contains(@title,'Entra') or contains(@title,'Sale') or contains(@title,'Penalti')]"
+        );
+
+        foreach ($eventNodes as $node) {
+            $title = trim($node->getAttribute('title'));
+
+            $tipo   = '';
+            $nombre = '';
+
+            if (strpos($title, 'Gol propia puerta') !== false) {
+                $tipo   = 'Gol propia puerta';
+                $nombre = trim(str_replace('Gol propia puerta', '', $title));
+            } elseif (strpos($title, 'Gol concedido VAR') !== false) {
+                continue; // Skip VAR annulments
+            } elseif (strpos($title, 'Gol') !== false) {
+                $tipo   = 'Gol';
+                $nombre = trim(str_replace('Gol', '', $title));
+            } elseif (strpos($title, 'T. Amarilla') !== false) {
+                $tipo   = 'T. Amarilla';
+                $nombre = trim(str_replace('T. Amarilla', '', $title));
+            } elseif (strpos($title, 'T. Roja') !== false) {
+                $tipo   = 'T. Roja';
+                $nombre = trim(str_replace('T. Roja', '', $title));
+            } elseif (strpos($title, 'Entra en el partido') !== false) {
+                $tipo   = 'Entra en el partido';
+                $nombre = trim(str_replace('Entra en el partido', '', $title));
+            } elseif (strpos($title, 'Sale del partido') !== false) {
+                $tipo   = 'Sale del partido';
+                $nombre = trim(str_replace('Sale del partido', '', $title));
+            } elseif (strpos($title, 'Penalti parado') !== false) {
+                $tipo   = 'Penalti parado';
+                $nombre = trim(str_replace('Penalti parado', '', $title));
+            } elseif (strpos($title, 'Penalti fallado') !== false) {
+                $tipo   = 'Penalti fallado';
+                $nombre = trim(str_replace('Penalti fallado', '', $title));
+            } else {
+                continue;
+            }
+
+            if (empty($nombre)) continue;
+
+            $parent     = $node->parentNode;
+            $parentText = $parent ? $parent->textContent : '';
+            $minuto     = $extractMinute($parentText);
+
+            $eventos[] = [
+                'tipo'   => $tipo,
+                'nombre' => $nombre,
+                'minuto' => $minuto,
+            ];
+        }
+
+        // -----------------------------------------------------------------------
+        // 6. BUILD $equipos STRUCTURE
+        //    Match events to players by name similarity
+        // -----------------------------------------------------------------------
+        $nombreCoincide = function(string $nombreScraper, string $nombreJugador) {
+            $partes = explode(' ', strtolower(trim($nombreScraper)));
+            $target = strtolower($nombreJugador);
+            foreach ($partes as $parte) {
+                if (strlen($parte) > 1 && strpos($target, $parte) !== false) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        $buildIncidencias = function(string $nombreJugador, array $eventos) use ($nombreCoincide) {
+            $incidencias = [];
+            foreach ($eventos as $ev) {
+                if (!$nombreCoincide($ev['nombre'], $nombreJugador)) continue;
+
+                switch ($ev['tipo']) {
+                    case 'Gol':
+                        $incidencias[] = ['Gol', $ev['minuto']];
+                        break;
+                    case 'Gol propia puerta':
+                        $incidencias[] = ['Gol en propia meta', $ev['minuto']];
+                        break;
+                    case 'T. Amarilla':
+                        $incidencias[] = ['Tarjeta amarilla', $ev['minuto']];
+                        break;
+                    case 'T. Roja':
+                        $incidencias[] = ['Tarjeta roja', $ev['minuto']];
+                        break;
+                    case 'Entra en el partido':
+                        $incidencias[] = ['Entra', $ev['minuto']];
+                        break;
+                    case 'Sale del partido':
+                        $incidencias[] = ['Sale', $ev['minuto']];
+                        break;
+                    case 'Penalti parado':
+                        $incidencias[] = ['Penal atajado', $ev['minuto']];
+                        break;
+                    case 'Penalti fallado':
+                        $incidencias[] = ['Penal errado', $ev['minuto']];
+                        break;
+                }
+            }
+            return $incidencias;
+        };
+
+        $buildJugadoresList = function(array $players, string $tipo, array $eventos) use ($buildIncidencias) {
+            $out = [];
+            foreach ($players as $p) {
+                $out[] = [
+                    'dorsal'      => $p['dorsal'],
+                    'nombre'      => $p['nombre'],
+                    'tipo'        => $tipo,
+                    'incidencias' => $buildIncidencias($p['nombre'], $eventos),
+                ];
+            }
+            return $out;
+        };
+
+        $equipos = [
+            [
+                'equipo'    => $strLocal,
+                'jugadores' => array_merge(
+                    $buildJugadoresList($localTitulares, 'Titular', $eventos),
+                    $buildJugadoresList($localSuplentes, 'Suplente', $eventos)
+                ),
+            ],
+            [
+                'equipo'    => $strVisitante,
+                'jugadores' => array_merge(
+                    $buildJugadoresList($visitanteTitulares, 'Titular', $eventos),
+                    $buildJugadoresList($visitanteSuplentes, 'Suplente', $eventos)
+                ),
+            ],
+        ];
+
+        // -----------------------------------------------------------------------
+        // 7. VALIDATE
+        // -----------------------------------------------------------------------
+        $titularesLocal     = count($localTitulares);
+        $titularesVisitante = count($visitanteTitulares);
+
+        if (count($jueces) === 0 && $titularesLocal === 0 && $titularesVisitante === 0) {
+            DB::rollback();
+            return redirect()->route('fechas.show', $partido->fecha->id)
+                ->with('error', 'No se encontraron jueces ni jugadores. Verificá la URL.');
+        }
+
+        if (count($jueces) < 3) {
+            $success .= '⚠️ WARNING: Solo se encontraron ' . count($jueces) . ' juez/jueces (se esperan 3).<br>';
+        }
+        if ($titularesLocal < 11) {
+            $success .= '⚠️ WARNING: ' . $strLocal . ' tiene solo ' . $titularesLocal . ' titular/es (se esperan 11).<br>';
+        }
+        if ($titularesVisitante < 11) {
+            $success .= '⚠️ WARNING: ' . $strVisitante . ' tiene solo ' . $titularesVisitante . ' titular/es (se esperan 11).<br>';
+        }
+
+        // -----------------------------------------------------------------------
+        // 8. SAVE REFEREES
+        // -----------------------------------------------------------------------
+        foreach ($jueces as $juez) {
+            $nombreCompleto = $juez['nombre'];
+            $tipoJuez       = $juez['tipo'];
+            $partesNombre   = explode(' ', $nombreCompleto);
+
+            $arbitro = Arbitro::join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                ->where(function ($query) use ($partesNombre) {
+                    foreach ($partesNombre as $parte) {
+                        $query->where(function ($query) use ($parte) {
+                            $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                ->orWhere('personas.name', 'LIKE', "%$parte%");
+                        });
+                    }
+                })
+                ->select('arbitros.id as arbitro_id', 'personas.*')
+                ->first();
+
+            if (!$arbitro) {
+                $success .= $tipoJuez . ' NO encontrado: ' . $nombreCompleto . '<br>';
+                continue;
+            }
+
+            $data = [
+                'partido_id' => $partido->id,
+                'arbitro_id' => $arbitro->arbitro_id,
+                'tipo'       => $tipoJuez,
+            ];
+
+            $partido_arbitro = PartidoArbitro::where('partido_id', $partido->id)
+                ->where('arbitro_id', $arbitro->arbitro_id)
+                ->first();
+
+            try {
+                if ($partido_arbitro) {
+                    $partido_arbitro->update($data);
+                } else {
+                    PartidoArbitro::create($data);
+                }
+            } catch (QueryException $ex) {
+                $error .= 'Error guardando juez: ' . $ex->getMessage() . '<br>';
+                $ok = 0;
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // 9. SAVE PLAYERS + EVENTS
+        // -----------------------------------------------------------------------
+        $golesLocalesCargados    = 0;
+        $golesVisitantesCargados = 0;
+
+        foreach ($equipos as $eq) {
+            $strEquipo = trim($eq['equipo']);
+            $equipo    = Equipo::where('nombre', 'like', "%$strEquipo%")->first();
+
+            if (empty($equipo)) {
+                $error .= 'NO se encontró al equipo: ' . $strEquipo . '<br>';
+                $ok = 0;
+                continue;
+            }
+
+            // Check for duplicate dorsals
+            $dorsales          = [];
+            $dorsalesRepetidos = [];
+            foreach ($eq['jugadores'] as $jugador) {
+                $dorsal = isset($jugador['dorsal']) ? trim($jugador['dorsal']) : '';
+                if ($dorsal === '') continue;
+                if (isset($dorsales[$dorsal])) {
+                    if (!isset($dorsalesRepetidos[$dorsal])) {
+                        $dorsalesRepetidos[$dorsal] = [$dorsales[$dorsal]];
+                    }
+                    $dorsalesRepetidos[$dorsal][] = $jugador['nombre'];
+                } else {
+                    $dorsales[$dorsal] = $jugador['nombre'];
+                }
+            }
+            foreach ($dorsalesRepetidos as $dorsal => $jugadores) {
+                $success .= 'DORSAL REPETIDO en equipo ' . $strEquipo . ': dorsal ' . $dorsal . ' usado por ' . implode(', ', $jugadores) . '<br>';
+            }
+
+            foreach ($eq['jugadores'] as $jugador) {
+                $jugador_id = 0;
+
+                $grupos    = Grupo::where('torneo_id', '=', $grupo->torneo->id)->get();
+                $arrgrupos = '';
+                foreach ($grupos as $g) {
+                    $arrgrupos .= $g->id . ',';
+                }
+
+                $plantillas = Plantilla::wherein('grupo_id', explode(',', $arrgrupos))
+                    ->where('equipo_id', '=', $equipo->id)
+                    ->get();
+
+                $arrplantillas = '';
+                foreach ($plantillas as $plantilla) {
+                    $arrplantillas .= $plantilla->id . ',';
+                }
+
+                if (empty($plantillas)) {
+                    $error .= 'No hay plantilla del equipo ' . $strEquipo . '<br>';
+                    $ok = 0;
+                    continue;
+                }
+
+                $plantillaJugador = null;
+                $sinDorsal        = ' OJO!!! ';
+                $consultarJugador = null;
+
+                if (!empty($jugador['dorsal'])) {
+                    $plantillaJugador = PlantillaJugador::wherein('plantilla_id', explode(',', $arrplantillas))
+                        ->distinct()
+                        ->where('dorsal', '=', $jugador['dorsal'])
+                        ->first();
+                } else {
+                    $sinDorsal = ' es ' . $jugador['nombre'];
+                }
+
+                if (!empty($plantillaJugador)) {
+                    $jugador_id   = $plantillaJugador->jugador->id;
+                    $partesNombre = explode(' ', $jugador['nombre']);
+
+                    $consultarJugador = Jugador::join('personas', 'personas.id', '=', 'jugadors.persona_id')
+                        ->where('jugadors.id', '=', $jugador_id)
+                        ->where(function ($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function ($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
+                                });
+                            }
+                        })
+                        ->first();
+
+                    if (!$consultarJugador) {
+                        $success .= 'Problema con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
+                    }
+                } else {
+                    // Try to find by name in plantilla
+                    $partesNombre = explode(' ', $jugador['nombre']);
+
+                    $consultarJugador = Jugador::join('personas', 'personas.id', '=', 'jugadors.persona_id')
+                        ->join('plantilla_jugadors', 'jugadors.id', '=', 'plantilla_jugadors.jugador_id')
+                        ->wherein('plantilla_jugadors.plantilla_id', explode(',', $arrplantillas))
+                        ->where(function ($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function ($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.name', 'LIKE', "%$parte%");
+                                });
+                            }
+                        })
+                        ->first();
+
+                    if (!empty($consultarJugador)) {
+                        $jugador_id = $consultarJugador['jugador_id'];
+                        $success   .= $consultarJugador['dorsal'] . ' - ' . $consultarJugador['apellido'] . ', ' . $consultarJugador['nombre'] . $sinDorsal . ' - equipo ' . $strEquipo . '<br>';
+                    } else {
+                        $error .= 'NO se encontró al jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
+                        $ok = 0;
+                        continue;
+                    }
+                }
+
+                // Determine orden by player position
+                $tipoJugadorPos = '';
+                if (!empty($plantillaJugador) && !empty($plantillaJugador->jugador)) {
+                    $tipoJugadorPos = $plantillaJugador->jugador->tipoJugador ?? '';
+                } elseif (!empty($consultarJugador)) {
+                    $tipoJugadorPos = $consultarJugador['tipoJugador'] ?? '';
+                }
+
+                switch ($tipoJugadorPos) {
+                    case 'Arquero':   $orden = 0; break;
+                    case 'Defensor':  $orden = 1; break;
+                    case 'Medio':     $orden = 2; break;
+                    case 'Delantero': $orden = 3; break;
+                    default:          $orden = 3;
+                }
+
+                $alineaciondata = [
+                    'partido_id' => $partido->id,
+                    'jugador_id' => $jugador_id,
+                    'equipo_id'  => $equipo->id,
+                    'dorsal'     => !empty($jugador['dorsal']) ? $jugador['dorsal'] : null,
+                    'tipo'       => $jugador['tipo'],
+                    'orden'      => $orden,
+                ];
+
+                $alineacion = Alineacion::where('partido_id', '=', $partido->id)
+                    ->where('jugador_id', '=', $jugador_id)
+                    ->first();
+
+                try {
+                    if (!empty($alineacion)) {
+                        $alineacion->update($alineaciondata);
+                    } else {
+                        Alineacion::create($alineaciondata);
+                    }
+                } catch (QueryException $ex) {
+                    $error .= $ex->getMessage() . '<br>';
+                    $ok = 0;
+                    continue;
+                }
+
+                // Save events (incidencias)
+                foreach ($jugador['incidencias'] as $incidencia) {
+                    if (empty($incidencia)) continue;
+
+                    $tipoInc   = trim($incidencia[0]);
+                    $minutoInc = intval($incidencia[1]);
+
+                    // GOAL
+                    $tipogol = '';
+                    switch ($tipoInc) {
+                        case 'Gol':               $tipogol = 'Jugada'; break;
+                        case 'Penal':             $tipogol = 'Penal'; break;
+                        case 'Tiro libre':        $tipogol = 'Tiro libre'; break;
+                        case 'Cabeza':            $tipogol = 'Cabeza'; break;
+                        case 'Gol en propia meta': $tipogol = 'En Contra'; break;
+                    }
+
+                    if ($tipogol) {
+                        $goldata = [
+                            'partido_id' => $partido->id,
+                            'jugador_id' => $jugador_id,
+                            'minuto'     => $minutoInc,
+                            'tipo'       => $tipogol,
+                        ];
+                        $gol = Gol::where('partido_id', '=', $partido->id)
+                            ->where('jugador_id', '=', $jugador_id)
+                            ->where('minuto', '=', $minutoInc)
+                            ->first();
+                        try {
+                            if ($gol) {
+                                $gol->update($goldata);
+                            } else {
+                                Gol::create($goldata);
+                            }
+                            if ($eq['equipo'] === $strLocal) {
+                                $golesLocalesCargados++;
+                            } elseif ($eq['equipo'] === $strVisitante) {
+                                $golesVisitantesCargados++;
+                            }
+                        } catch (QueryException $ex) {
+                            $error .= 'Error gol: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
+                            $ok = 0;
+                            continue;
+                        }
+                    }
+
+                    // CARD
+                    $tipotarjeta = '';
+                    switch ($tipoInc) {
+                        case 'Tarjeta amarilla':             $tipotarjeta = 'Amarilla'; break;
+                        case 'Expulsado por doble amarilla': $tipotarjeta = 'Doble Amarilla'; break;
+                        case 'Tarjeta roja':                 $tipotarjeta = 'Roja'; break;
+                    }
+
+                    if ($tipotarjeta) {
+                        $tarjeadata = [
+                            'partido_id' => $partido->id,
+                            'jugador_id' => $jugador_id,
+                            'minuto'     => $minutoInc,
+                            'tipo'       => $tipotarjeta,
+                        ];
+                        $tarjeta = Tarjeta::where('partido_id', '=', $partido->id)
+                            ->where('jugador_id', '=', $jugador_id)
+                            ->where('minuto', '=', $minutoInc)
+                            ->first();
+                        try {
+                            if ($tarjeta) {
+                                $tarjeta->update($tarjeadata);
+                            } else {
+                                Tarjeta::create($tarjeadata);
+                            }
+                        } catch (QueryException $ex) {
+                            $error .= 'Error tarjeta: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
+                            $ok = 0;
+                            continue;
+                        }
+                    }
+
+                    // SUBSTITUTION
+                    $tipocambio = '';
+                    switch ($tipoInc) {
+                        case 'Sale':  $tipocambio = 'Sale'; break;
+                        case 'Entra': $tipocambio = 'Entra'; break;
+                    }
+
+                    if ($tipocambio) {
+                        $cambiodata = [
+                            'partido_id' => $partido->id,
+                            'jugador_id' => $jugador_id,
+                            'minuto'     => $minutoInc,
+                            'tipo'       => $tipocambio,
+                        ];
+                        $cambio = Cambio::where('partido_id', '=', $partido->id)
+                            ->where('jugador_id', '=', $jugador_id)
+                            ->where('minuto', '=', $minutoInc)
+                            ->first();
+                        try {
+                            if ($cambio) {
+                                $cambio->update($cambiodata);
+                            } else {
+                                Cambio::create($cambiodata);
+                            }
+                        } catch (QueryException $ex) {
+                            $error .= 'Error cambio: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
+                            $ok = 0;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------------
+        // 10. VERIFY GOAL COUNT
+        // -----------------------------------------------------------------------
+        if ($golesLocalesCargados != $partido->golesl || $golesVisitantesCargados != $partido->golesv) {
+            $success .= '⚠️ No coincide la cantidad de goles: ' .
+                $partido->equipol->nombre . ' (' . $golesLocalesCargados . ') vs ' .
+                $partido->equipov->nombre . ' (' . $golesVisitantesCargados . ')' .
+                ' — Resultado oficial: ' . $partido->golesl . '-' . $partido->golesv . '<br>';
+        }
+
+        // -----------------------------------------------------------------------
+        // 11. COMMIT OR ROLLBACK
+        // -----------------------------------------------------------------------
+        if ($ok) {
+            DB::commit();
+            return redirect()->route('fechas.show', $partido->fecha->id)->with('success', $success);
+        } else {
+            DB::rollback();
+            return redirect()->route('fechas.show', $partido->fecha->id)->with('error', $error . '<br>' . $success);
+        }
+    }
+
+
+    public function importarPartidoProcess_livefutbol(Request $request)
     {
         set_time_limit(0);
         //Log::channel('mi_log')->info('Entraaaaaa', []);
