@@ -441,38 +441,39 @@
 
             document.getElementById('resultadoScraper').innerHTML = html;
 
-            function scrapearFootballDB() {
-                let url = document.getElementById('footballdbUrl').value.trim();
 
-                if (!url) {
-                    alert('Ingresá la URL');
-                    return;
-                }
 
-                document.getElementById('loadingScraper').style.display = 'block';
-                document.getElementById('resultadoScraper').innerHTML = '';
 
-                fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url))
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.error) {
-                            document.getElementById('resultadoScraper').innerHTML =
-                                '<div class="alert alert-danger">' + data.error + '</div>';
-                            return;
-                        }
-                        renderResultados(data);
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        document.getElementById('resultadoScraper').innerHTML =
-                            '<div class="alert alert-danger">Error scrapeando</div>';
-                    })
-                    .finally(() => {
-                        document.getElementById('loadingScraper').style.display = 'none';
-                    });
+        }
+        function scrapearFootballDB() {
+            let url = document.getElementById('footballdbUrl').value.trim();
+
+            if (!url) {
+                alert('Ingresá la URL');
+                return;
             }
 
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
 
+            fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url))
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('resultadoScraper').innerHTML =
+                            '<div class="alert alert-danger">' + data.error + '</div>';
+                        return;
+                    }
+                    renderResultados(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoScraper').innerHTML =
+                        '<div class="alert alert-danger">Error scrapeando</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
         }
 
     </script>
