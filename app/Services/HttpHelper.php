@@ -90,14 +90,34 @@
                 //Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
                 //Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
 
-
                 if ($httpCode == 404) {
                     return false;
                 }
 
-                // Si sigue dando 403, intentar con el scraper remoto como fallback
+// Retry up to 3 times if 403 or empty
                 if ($httpCode == 403 || empty($response)) {
-                    //Log::channel('mi_log')->warning("403 en modo directo, reintentando con scraper remoto: $urlOriginal");
+                    for ($i = 1; $i <= 3; $i++) {
+                        sleep(2);
+                        Log::channel('mi_log')->debug("[DIRECTO] Retry $i para: $urlOriginal");
+
+                        $ch = curl_init();
+                        curl_setopt($ch, CURLOPT_URL, $urlOriginal);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                        curl_setopt($ch, CURLOPT_ENCODING, '');
+                        $response = curl_exec($ch);
+                        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        curl_close($ch);
+
+                        //Log::channel('mi_log')->debug("[DIRECTO] Retry $i HTTP Code: $httpCode");
+
+                        if ($httpCode == 200 && !empty($response)) {
+                            return $response;
+                        }
+                    }
+                    // All retries failed, try remote scraper as last resort
                     return self::getHtmlContent($urlOriginal, true);
                 }
 
