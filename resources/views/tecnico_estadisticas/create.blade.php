@@ -49,6 +49,18 @@
                 📄 Procesar CSV
             </button>
         </div>
+        <div class="mb-6 mt-2">
+            <label>Importar desde FootballDatabase</label>
+            <div class="input-group">
+                <input type="text" id="footballdbUrl" class="form-control"
+                       placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-warning" onclick="scrapearFootballDB()">
+                        🌐 Scrapear
+                    </button>
+                </div>
+            </div>
+        </div>
         <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
             🔍 Ver historial
         </button>-->
@@ -190,48 +202,46 @@
 
         </form>
     </div>
+    <script>
+        function verHistorial() {
+            let tecnico_id = document.querySelector('[name="tecnico_id"]').value;
+            let equipo_id = document.querySelector('[name="equipo_id"]').value;
 
-@endsection
-<script>
-    function verHistorial() {
-        let tecnico_id = document.querySelector('[name="tecnico_id"]').value;
-        let equipo_id = document.querySelector('[name="equipo_id"]').value;
+            let url = "{{ url('admin/scraper/tecnico') }}";
 
-        let url = "{{ url('admin/scraper/tecnico') }}";
+            // 🔥 mostrar loading
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
 
-        // 🔥 mostrar loading
-        document.getElementById('loadingScraper').style.display = 'block';
-        document.getElementById('resultadoScraper').innerHTML = '';
+            fetch(`${url}?tecnico_id=${tecnico_id}&equipo_id=${equipo_id}`)
+                .then(res => res.json())
+                .then(data => {
 
-        fetch(`${url}?tecnico_id=${tecnico_id}&equipo_id=${equipo_id}`)
-            .then(res => res.json())
-            .then(data => {
+                    let html = '';
+                    let items = data.original ?? [];
 
-                let html = '';
-                let items = data.original ?? [];
+                    // 🔥 totales
+                    let totPartidos = 0;
+                    let totGanados = 0;
+                    let totEmpatados = 0;
+                    let totPerdidos = 0;
+                    let totGF = 0;
+                    let totGE = 0;
 
-                // 🔥 totales
-                let totPartidos = 0;
-                let totGanados = 0;
-                let totEmpatados = 0;
-                let totPerdidos = 0;
-                let totGF = 0;
-                let totGE = 0;
+                    items.forEach(competition => {
 
-                items.forEach(competition => {
+                        totPartidos += parseInt(competition.partidos || 0);
+                        totGanados += parseInt(competition.ganados || 0);
+                        totEmpatados += parseInt(competition.empatados || 0);
+                        totPerdidos += parseInt(competition.perdidos || 0);
+                        totGF += parseInt(competition.gf || 0);
+                        totGE += parseInt(competition.ge || 0);
 
-                    totPartidos += parseInt(competition.partidos || 0);
-                    totGanados += parseInt(competition.ganados || 0);
-                    totEmpatados += parseInt(competition.empatados || 0);
-                    totPerdidos += parseInt(competition.perdidos || 0);
-                    totGF += parseInt(competition.gf || 0);
-                    totGE += parseInt(competition.ge || 0);
+                        html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
+                        html += '<table class="table table-sm">';
+                        html += '<tr><th>Equipo</th><th>Partidos</th><th>Ganados</th><th>Empatados</th><th>Perdidos</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
 
-                    html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
-                    html += '<table class="table table-sm">';
-                    html += '<tr><th>Equipo</th><th>Partidos</th><th>Ganados</th><th>Empatados</th><th>Perdidos</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
-
-                    html += `<tr>
+                        html += `<tr>
                     <td style="color: #0a6ebd">${competition.equipo}</td>
                     <td>${competition.partidos}</td>
                     <td>${competition.ganados}</td>
@@ -246,12 +256,12 @@
                     </td>
                 </tr>`;
 
-                    html += '</table>';
-                });
+                        html += '</table>';
+                    });
 
-                // 🔥 tabla totales
-                if (items.length) {
-                    html += `
+                    // 🔥 tabla totales
+                    if (items.length) {
+                        html += `
                 <table class="table table-sm table-bordered mt-3">
                     <tr class="table-dark">
                         <th>Totales</th>
@@ -274,154 +284,154 @@
                         <td></td>
                     </tr>
                 </table>`;
+                    }
+
+                    document.getElementById('resultadoScraper').innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoScraper').innerHTML =
+                        '<div class="alert alert-danger">Error cargando datos</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
+        }
+
+        function normalizar(texto) {
+            return texto
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\./g, "")
+                .replace(/club|fc|de|la|el/g, "")
+                .trim();
+        }
+
+        function clean(texto) {
+            return texto ? texto.trim().replace(/\s+/g, ' ') : '';
+        }
+
+        function usarDato(item) {
+
+            document.querySelector('[name="tipo"]').value = item.tipo;
+            document.querySelector('[name="ambito"]').value = item.ambito;
+            document.querySelector('[name="partidos"]').value = item.partidos;
+            document.querySelector('[name="posicion"]').value = item.posicion;
+            document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
+            document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
+            document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
+            document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
+            document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
+
+
+            document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
+
+            document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
+
+            // 🧠 match equipo
+            let select = document.querySelector('[name="equipo_id"]');
+            let equipoScraper = normalizar(item.equipo);
+
+            let mejorMatch = null;
+            let maxScore = 0;
+
+            for (let option of select.options) {
+                let equipoDB = normalizar(option.text);
+                let score = 0;
+
+                if (equipoDB.includes(equipoScraper)) score += 2;
+                if (equipoScraper.includes(equipoDB)) score += 2;
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    mejorMatch = option;
+                }
+            }
+
+            if (mejorMatch) {
+                select.value = mejorMatch.value;
+                $(select).trigger('change'); // Select2
+            }
+        }
+
+        function procesarCSV() {
+
+            let file = document.getElementById('csvFile').files[0];
+
+            if (!file) {
+                alert('Seleccione un CSV');
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
+
+            fetch("{{ url('/admin/scraper/csv-tecnico') }}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: formData
+            })
+                .then(res => res.json())
+                .then(data => {
+                    renderResultados(data); // si usás función común
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
+        }
+
+        function renderResultados(items) {
+
+            let html = '';
+            let torneos = {};
+
+            items.forEach(row => {
+                let key = clean(row.competition) + '|' + clean(row.equipo);
+
+                if (!torneos[key]) {
+                    torneos[key] = {
+                        competition: clean(row.competition),
+                        equipo: row.equipo,
+                        partidos: 0,
+                        posicion: 0,
+                        ganados: 0,
+                        empatados: 0,
+                        perdidos: 0,
+                        gf: 0,
+                        ge: 0,
+                        torneo_logo: row.torneo_logo ?? null,
+                        tipo: row.tipo ?? '',
+                        ambito: row.ambito ?? '',
+                    };
                 }
 
-                document.getElementById('resultadoScraper').innerHTML = html;
-            })
-            .catch(err => {
-                console.error(err);
-                document.getElementById('resultadoScraper').innerHTML =
-                    '<div class="alert alert-danger">Error cargando datos</div>';
-            })
-            .finally(() => {
-                document.getElementById('loadingScraper').style.display = 'none';
+                torneos[key].partidos   += parseInt(row.partidos ?? 0);
+                torneos[key].posicion   += parseInt(row.posicion ?? 0);
+                torneos[key].ganados    += parseInt(row.ganados ?? 0);
+                torneos[key].empatados  += parseInt(row.empatados ?? 0);
+                torneos[key].perdidos   += parseInt(row.perdidos ?? 0);
+                torneos[key].gf         += parseInt(row.gf ?? 0);
+                torneos[key].ge         += parseInt(row.ge ?? 0);
             });
-    }
 
-    function normalizar(texto) {
-        return texto
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\./g, "")
-            .replace(/club|fc|de|la|el/g, "")
-            .trim();
-    }
+            Object.values(torneos).forEach(competition => {
 
-    function clean(texto) {
-        return texto ? texto.trim().replace(/\s+/g, ' ') : '';
-    }
+                // Logo preview
+                let logoHtml = competition.torneo_logo
+                    ? `<img src="${competition.torneo_logo}" height="40" style="object-fit:contain;">`
+                    : '<span class="text-muted">—</span>';
 
-    function usarDato(item) {
+                html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
+                html += '<table class="table table-sm">';
+                html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
 
-        document.querySelector('[name="tipo"]').value = item.tipo;
-        document.querySelector('[name="ambito"]').value = item.ambito;
-        document.querySelector('[name="partidos"]').value = item.partidos;
-        document.querySelector('[name="posicion"]').value = item.posicion;
-        document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
-        document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
-        document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
-        document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
-        document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
-
-
-        document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
-
-        document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
-
-        // 🧠 match equipo
-        let select = document.querySelector('[name="equipo_id"]');
-        let equipoScraper = normalizar(item.equipo);
-
-        let mejorMatch = null;
-        let maxScore = 0;
-
-        for (let option of select.options) {
-            let equipoDB = normalizar(option.text);
-            let score = 0;
-
-            if (equipoDB.includes(equipoScraper)) score += 2;
-            if (equipoScraper.includes(equipoDB)) score += 2;
-
-            if (score > maxScore) {
-                maxScore = score;
-                mejorMatch = option;
-            }
-        }
-
-        if (mejorMatch) {
-            select.value = mejorMatch.value;
-            $(select).trigger('change'); // Select2
-        }
-    }
-
-    function procesarCSV() {
-
-        let file = document.getElementById('csvFile').files[0];
-
-        if (!file) {
-            alert('Seleccione un CSV');
-            return;
-        }
-
-        let formData = new FormData();
-        formData.append('file', file);
-
-        document.getElementById('loadingScraper').style.display = 'block';
-        document.getElementById('resultadoScraper').innerHTML = '';
-
-        fetch("{{ url('/admin/scraper/csv-tecnico') }}", {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: formData
-        })
-            .then(res => res.json())
-            .then(data => {
-                renderResultados(data); // si usás función común
-            })
-            .finally(() => {
-                document.getElementById('loadingScraper').style.display = 'none';
-            });
-    }
-
-    function renderResultados(items) {
-
-        let html = '';
-        let torneos = {};
-
-        items.forEach(row => {
-            let key = clean(row.competition) + '|' + clean(row.equipo);
-
-            if (!torneos[key]) {
-                torneos[key] = {
-                    competition: clean(row.competition),
-                    equipo: row.equipo,
-                    partidos: 0,
-                    posicion: 0,
-                    ganados: 0,
-                    empatados: 0,
-                    perdidos: 0,
-                    gf: 0,
-                    ge: 0,
-                    torneo_logo: row.torneo_logo ?? null,
-                    tipo: row.tipo ?? '',
-                    ambito: row.ambito ?? '',
-                };
-            }
-
-            torneos[key].partidos   += parseInt(row.partidos ?? 0);
-            torneos[key].posicion   += parseInt(row.posicion ?? 0);
-            torneos[key].ganados    += parseInt(row.ganados ?? 0);
-            torneos[key].empatados  += parseInt(row.empatados ?? 0);
-            torneos[key].perdidos   += parseInt(row.perdidos ?? 0);
-            torneos[key].gf         += parseInt(row.gf ?? 0);
-            torneos[key].ge         += parseInt(row.ge ?? 0);
-        });
-
-        Object.values(torneos).forEach(competition => {
-
-            // Logo preview
-            let logoHtml = competition.torneo_logo
-                ? `<img src="${competition.torneo_logo}" height="40" style="object-fit:contain;">`
-                : '<span class="text-muted">—</span>';
-
-            html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
-            html += '<table class="table table-sm">';
-            html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
-
-            html += `<tr>
+                html += `<tr>
             <td>${logoHtml}</td>
             <td style="color:#0a6ebd">${competition.equipo}</td>
             <td>${competition.tipo}</td>
@@ -439,13 +449,45 @@
             </td>
         </tr>`;
 
-            html += '</table>';
-        });
+                html += '</table>';
+            });
 
-        document.getElementById('resultadoScraper').innerHTML = html;
+            document.getElementById('resultadoScraper').innerHTML = html;
+
+            function scrapearFootballDB() {
+                let url = document.getElementById('footballdbUrl').value.trim();
+
+                if (!url) {
+                    alert('Ingresá la URL');
+                    return;
+                }
+
+                document.getElementById('loadingScraper').style.display = 'block';
+                document.getElementById('resultadoScraper').innerHTML = '';
+
+                fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url))
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.error) {
+                            document.getElementById('resultadoScraper').innerHTML =
+                                '<div class="alert alert-danger">' + data.error + '</div>';
+                            return;
+                        }
+                        renderResultados(data);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        document.getElementById('resultadoScraper').innerHTML =
+                            '<div class="alert alert-danger">Error scrapeando</div>';
+                    })
+                    .finally(() => {
+                        document.getElementById('loadingScraper').style.display = 'none';
+                    });
+            }
 
 
+        }
 
-    }
+    </script>
+@endsection
 
-</script>
