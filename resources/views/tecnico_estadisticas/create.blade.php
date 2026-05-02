@@ -49,13 +49,15 @@
                 📄 Procesar CSV
             </button>
         </div>
-        <div class="mb-6 mt-2">
+        <div class="mb-3 mt-3">
             <label>Importar desde FootballDatabase</label>
-            <div class="input-group">
-                <input type="text" id="footballdbUrl" class="form-control"
-                       placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
-                <div class="input-group-append">
-                    <button type="button" class="btn btn-warning" onclick="scrapearFootballDB()">
+            <div class="row">
+                <div class="col-10">
+                    <input type="text" id="footballdbUrl" class="form-control"
+                           placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
+                </div>
+                <div class="col-2">
+                    <button type="button" class="btn btn-warning btn-block" onclick="scrapearFootballDB()">
                         🌐 Scrapear
                     </button>
                 </div>
@@ -64,18 +66,7 @@
         <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
             🔍 Ver historial
         </button>-->
-        <div class="mb-3 mt-2">
-            <label>Importar desde FootballDatabase</label>
-            <div class="input-group">
-                <input type="text" id="footballdbUrl" class="form-control"
-                       placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
-                <div class="input-group-append">
-                    <button type="button" class="btn btn-warning" onclick="scrapearFootballDB()">
-                        🌐 Scrapear
-                    </button>
-                </div>
-            </div>
-        </div>
+
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando historial, puede tardar unos segundos...
         </div>
