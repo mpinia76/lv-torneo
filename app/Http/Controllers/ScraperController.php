@@ -788,9 +788,9 @@ class ScraperController extends Controller
         // Filter from year 2000 onwards, skip Argentine clubs
         $existentes = collect()
             ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
-            ->merge(\App\Torneo::all()->map(fn($t) => ($t->nombre ?? '') . ' ' . ($t->year ?? '')))
+            ->merge(\App\Torneo::all()->map(function ($t) { return ($t->nombre ?? '') . ' ' . ($t->year ?? ''); }))
             ->filter()
-            ->map(fn($v) => (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim())
+            ->map(function ($v) { return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim(); })
             ->unique()->flip()->toArray();
 
         $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
