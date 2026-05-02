@@ -51,16 +51,12 @@
         </div>
         <div class="mb-3 mt-3">
             <label>Importar desde FootballDatabase</label>
-            <div class="row">
-                <div class="col-10">
-                    <input type="text" id="footballdbUrl" class="form-control"
-                           placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
-                </div>
-                <div class="col-2">
-                    <button type="button" class="btn btn-warning btn-block" onclick="scrapearFootballDB()">
-                        🌐 Scrapear
-                    </button>
-                </div>
+            <div class="d-flex">
+                <input type="text" id="footballdbUrl" class="form-control mr-2"
+                       placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
+                <button type="button" class="btn btn-warning" onclick="scrapearFootballDB()" style="white-space:nowrap;">
+                    🌐 Scrapear
+                </button>
             </div>
         </div>
         <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
