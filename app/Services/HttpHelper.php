@@ -87,8 +87,8 @@
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
 
-                //Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
-                //Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
+                Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
+                Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
 
                 if ($httpCode == 404) {
                     return false;
@@ -111,7 +111,7 @@
                         $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                         curl_close($ch);
 
-                        //Log::channel('mi_log')->debug("[DIRECTO] Retry $i HTTP Code: $httpCode");
+                        Log::channel('mi_log')->debug("[DIRECTO] Retry $i HTTP Code: $httpCode");
 
                         if ($httpCode == 200 && !empty($response)) {
                             return $response;
