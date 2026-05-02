@@ -182,7 +182,7 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::post('/scraper/csv-tecnico', 'ScraperController@csvTecnico');
 
-    Route::get('/admin/scraper/tecnico-footballdb', [ScraperController::class, 'tecnicoFootballDatabase']);
+    Route::get('/scraper/tecnico-footballdb', 'ScraperController@tecnicoFootballDatabase');
 });
 
 

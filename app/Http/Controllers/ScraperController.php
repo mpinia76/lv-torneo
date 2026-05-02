@@ -765,28 +765,18 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+
+
     public function tecnicoFootballDatabase(Request $request)
     {
         set_time_limit(0);
 
         $url = trim($request->url);
+        if (!$url) return response()->json([]);
 
-        if (!$url) {
-            return response()->json([]);
-        }
-
-        // Fetch the classifications tab
-        $clasificacionesUrl = rtrim($url, '/') . '/clasificaciones';
-
-        $html = HttpHelper::getHtmlContent($clasificacionesUrl, false);
-
-        if (!$html) {
-            $html = HttpHelper::getHtmlContent($clasificacionesUrl, true);
-        }
-
-        if (!$html) {
-            return response()->json(['error' => 'No se pudo obtener la página']);
-        }
+        $html = HttpHelper::getHtmlContent($url, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
 
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
@@ -795,75 +785,106 @@ class ScraperController extends Controller
 
         $xpath = new \DOMXPath($dom);
 
-        // Extract year from URL
-        preg_match('/\/(\d{4})$/', $url, $m);
-        $year = $m[1] ?? '';
+        // Filter from year 2000 onwards, skip Argentine clubs
+        $existentes = collect()
+            ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
+            ->merge(\App\Torneo::all()->map(fn($t) => ($t->nombre ?? '') . ' ' . ($t->year ?? '')))
+            ->filter()
+            ->map(fn($v) => (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim())
+            ->unique()->flip()->toArray();
 
+        $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
         $data = [];
 
-        // Tables with standings - each competition has its own table
-        $tables = $xpath->query('//table');
+        foreach ($rows as $row) {
+            $cols = $row->getElementsByTagName('td');
+            if ($cols->length < 4) continue;
 
-        foreach ($tables as $table) {
+            // Season
+            $season = trim($cols->item(0)->textContent);
 
-            // Get competition name from heading above the table
-            $compName = '';
-            $prev = $table->previousSibling;
-            while ($prev) {
-                if ($prev->nodeType === XML_ELEMENT_NODE) {
-                    $tag = strtolower($prev->nodeName);
-                    if (in_array($tag, ['h2', 'h3', 'h4', 'div'])) {
-                        $compName = trim($prev->textContent);
-                        break;
-                    }
+            // Extract year
+            preg_match('/(\d{4})/', $season, $mYear);
+            $year = $mYear[1] ?? null;
+            if (!$year || (int)$year < 2000) continue;
+
+            // Club + country flag
+            $clubCell = $cols->item(1);
+            $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
+            $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
+
+            // Skip Argentine clubs
+            if (strtolower($country) === 'argentina') continue;
+
+            $clubLink = $xpath->query('.//a', $clubCell)->item(0);
+            $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
+
+            // Liga stats
+            $pj = 0; $v = 0; $e = 0; $d = 0; $gf = 0; $gc = 0;
+
+            foreach ($cols as $col) {
+                $class = $col->getAttribute('class');
+
+                if (str_contains($class, 'matchsplayed') && str_contains($class, 'champ')) {
+                    $pj = (int) trim($col->textContent);
                 }
-                $prev = $prev->previousSibling;
+                if (str_contains($class, 'pc_v1') && str_contains($class, 'champ')) {
+                    $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                    $v = $slip ? (int) trim($slip->textContent) : 0;
+                }
+                if (str_contains($class, 'pc_d1') && str_contains($class, 'champ')) {
+                    $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                    $e = $slip ? (int) trim($slip->textContent) : 0;
+                }
+                if (str_contains($class, 'pc_l1') && str_contains($class, 'champ')) {
+                    $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                    $d = $slip ? (int) trim($slip->textContent) : 0;
+                }
+                if (str_contains($class, 'pc_goalsfor1') && str_contains($class, 'champ')) {
+                    $a = $xpath->query('.//a', $col)->item(0);
+                    $gf = $a ? (int) trim($a->textContent) : 0;
+                }
+                if (str_contains($class, 'pc_goalsagainst1') && str_contains($class, 'champ')) {
+                    $a = $xpath->query('.//a', $col)->item(0);
+                    $gc = $a ? (int) trim($a->textContent) : 0;
+                }
             }
 
-            $rows = $table->getElementsByTagName('tr');
+            if ($pj === 0) continue;
 
-            foreach ($rows as $row) {
-                $cols = $row->getElementsByTagName('td');
-
-                if ($cols->length < 8) continue;
-
-                $teamName = trim($cols->item(1)->textContent);
-
-                // Check if this row corresponds to our team
-                // We look for rows that have the team highlighted or we return all
-                $pj = (int) trim($cols->item(2)->textContent);
-                $g  = (int) trim($cols->item(3)->textContent);
-                $e  = (int) trim($cols->item(4)->textContent);
-                $p  = (int) trim($cols->item(5)->textContent);
-                $gf = (int) trim($cols->item(6)->textContent);
-                $gc = (int) trim($cols->item(7)->textContent);
-
-                if ($pj === 0) continue;
-
-                // Get position (first column)
-                $pos = trim($cols->item(0)->textContent);
-                $pos = preg_replace('/\D/', '', $pos);
-
-                $key = $compName . '|' . $teamName;
-
-                $data[$key] = [
-                    'competition' => trim($compName . ' ' . $year),
-                    'equipo'      => $teamName,
-                    'posicion'    => (int) $pos,
-                    'partidos'    => $pj,
-                    'ganados'     => $g,
-                    'empatados'   => $e,
-                    'perdidos'    => $p,
-                    'gf'          => $gf,
-                    'ge'          => $gc,
-                    'torneo_logo' => null,
-                    'tipo'        => '',
-                    'ambito'      => '',
-                ];
+            $competitionName = 'Liga';
+            $compLink = $xpath->query('.//td[@class="champ"]/a', $row)->item(0);
+            if ($compLink) {
+                // Extract competition name from href
+                $href = $compLink->getAttribute('href');
+                preg_match('/\/([^\/]+)\/\d/', $href, $mComp);
+                $competitionName = isset($mComp[1])
+                    ? ucwords(str_replace(['-', '_'], ' ', $mComp[1]))
+                    : 'Liga';
             }
+
+            $key = \Str::of($competitionName . ' ' . $year)->lower()->ascii()
+                ->replaceMatches('/\s+/', ' ')->trim()->__toString();
+
+            if (isset($existentes[$key])) continue;
+
+            $data[] = [
+                'competition' => $competitionName . ' ' . $year,
+                'equipo'      => $club,
+                'posicion'    => 0,
+                'partidos'    => $pj,
+                'ganados'     => $v,
+                'empatados'   => $e,
+                'perdidos'    => $d,
+                'gf'          => $gf,
+                'ge'          => $gc,
+                'torneo_logo' => null,
+                'tipo'        => 'Liga',
+                'ambito'      => 'Nacional',
+            ];
         }
 
-        return response()->json(array_values($data));
+        return response()->json($data);
     }
 
 }
