@@ -52,6 +52,18 @@
         <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
             🔍 Ver historial
         </button>-->
+        <div class="mb-3 mt-2">
+            <label>Importar desde FootballDatabase</label>
+            <div class="input-group">
+                <input type="text" id="footballdbUrl" class="form-control"
+                       placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-warning" onclick="scrapearFootballDB()">
+                        🌐 Scrapear
+                    </button>
+                </div>
+            </div>
+        </div>
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando historial, puede tardar unos segundos...
         </div>
@@ -431,6 +443,38 @@
         });
 
         document.getElementById('resultadoScraper').innerHTML = html;
+
+        function scrapearFootballDB() {
+            let url = document.getElementById('footballdbUrl').value.trim();
+
+            if (!url) {
+                alert('Ingresá la URL');
+                return;
+            }
+
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
+
+            fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url))
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('resultadoScraper').innerHTML =
+                            '<div class="alert alert-danger">' + data.error + '</div>';
+                        return;
+                    }
+                    renderResultados(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoScraper').innerHTML =
+                        '<div class="alert alert-danger">Error scrapeando</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
+        }
+
     }
 
 </script>

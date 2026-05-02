@@ -765,5 +765,105 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+    public function tecnicoFootballDatabase(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+
+        if (!$url) {
+            return response()->json([]);
+        }
+
+        // Fetch the classifications tab
+        $clasificacionesUrl = rtrim($url, '/') . '/clasificaciones';
+
+        $html = HttpHelper::getHtmlContent($clasificacionesUrl, false);
+
+        if (!$html) {
+            $html = HttpHelper::getHtmlContent($clasificacionesUrl, true);
+        }
+
+        if (!$html) {
+            return response()->json(['error' => 'No se pudo obtener la página']);
+        }
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        // Extract year from URL
+        preg_match('/\/(\d{4})$/', $url, $m);
+        $year = $m[1] ?? '';
+
+        $data = [];
+
+        // Tables with standings - each competition has its own table
+        $tables = $xpath->query('//table');
+
+        foreach ($tables as $table) {
+
+            // Get competition name from heading above the table
+            $compName = '';
+            $prev = $table->previousSibling;
+            while ($prev) {
+                if ($prev->nodeType === XML_ELEMENT_NODE) {
+                    $tag = strtolower($prev->nodeName);
+                    if (in_array($tag, ['h2', 'h3', 'h4', 'div'])) {
+                        $compName = trim($prev->textContent);
+                        break;
+                    }
+                }
+                $prev = $prev->previousSibling;
+            }
+
+            $rows = $table->getElementsByTagName('tr');
+
+            foreach ($rows as $row) {
+                $cols = $row->getElementsByTagName('td');
+
+                if ($cols->length < 8) continue;
+
+                $teamName = trim($cols->item(1)->textContent);
+
+                // Check if this row corresponds to our team
+                // We look for rows that have the team highlighted or we return all
+                $pj = (int) trim($cols->item(2)->textContent);
+                $g  = (int) trim($cols->item(3)->textContent);
+                $e  = (int) trim($cols->item(4)->textContent);
+                $p  = (int) trim($cols->item(5)->textContent);
+                $gf = (int) trim($cols->item(6)->textContent);
+                $gc = (int) trim($cols->item(7)->textContent);
+
+                if ($pj === 0) continue;
+
+                // Get position (first column)
+                $pos = trim($cols->item(0)->textContent);
+                $pos = preg_replace('/\D/', '', $pos);
+
+                $key = $compName . '|' . $teamName;
+
+                $data[$key] = [
+                    'competition' => trim($compName . ' ' . $year),
+                    'equipo'      => $teamName,
+                    'posicion'    => (int) $pos,
+                    'partidos'    => $pj,
+                    'ganados'     => $g,
+                    'empatados'   => $e,
+                    'perdidos'    => $p,
+                    'gf'          => $gf,
+                    'ge'          => $gc,
+                    'torneo_logo' => null,
+                    'tipo'        => '',
+                    'ambito'      => '',
+                ];
+            }
+        }
+
+        return response()->json(array_values($data));
+    }
 
 }
