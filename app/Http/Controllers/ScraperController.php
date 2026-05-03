@@ -297,7 +297,7 @@ class ScraperController extends Controller
 
                 //dd($competitionName,$temporada,$equipo);
                 //Log::info($equipo.' -> '.$homeTeam.' -> '.$awayTeam.' -> '.$resultStr);
-                if (!str_contains($resultStr, ':')) continue; // ignorar si no hay resultado
+                if (strpos($resultStr, ':') === false) continue; // ignorar si no hay resultado
                 list($homeGoals, $awayGoals) = array_map('intval', explode(':', $resultStr));
 
 
@@ -317,7 +317,7 @@ class ScraperController extends Controller
                     $ge = $homeGoals;
                     $resultado = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
                 } else {
-                    Log::info($teamNameNorm.' -> '.$homeTeamNorm.' -> '.$awayTeamNorm.' -> '.$homeGoals.' -> '.$awayGoals);
+                    //$teamNameNorm.' -> '.$homeTeamNorm.' -> '.$awayTeamNorm.' -> '.$homeGoals.' -> '.$awayGoals);
                     continue; // partido no corresponde al equipo dirigido
                 }
 
@@ -828,7 +828,7 @@ class ScraperController extends Controller
 
                 $pj = 0; $v = 0; $e = 0; $d = 0; $gf = 0; $gc = 0;
                 $compName = null;
-
+                $posicion = 0;
                 foreach ($cols as $col) {
                     $class = $col->getAttribute('class');
 
@@ -862,6 +862,10 @@ class ScraperController extends Controller
                             $compName = trim($spans->item(0)->textContent);
                         }
                     }
+                    if (str_contains($class, 'pc_club_ranking1') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $posicion = $a ? (int) trim($a->textContent) : 0;
+                    }
                 }
 
                 if ($pj === 0) continue;
@@ -890,7 +894,7 @@ class ScraperController extends Controller
                 $data[] = [
                     'competition' => $competition,
                     'equipo'      => $club,
-                    'posicion'    => 0,
+                    'posicion'    => $posicion,
                     'partidos'    => $pj,
                     'ganados'     => $v,
                     'empatados'   => $e,
@@ -945,7 +949,7 @@ class ScraperController extends Controller
             if ($cols->length < 4) continue;
 
             $season = trim($cols->item(0)->textContent);
-            \Log::info('Season row: ' . $season . ' cols: ' . $cols->length);
+            //\Log::info('Season row: ' . $season . ' cols: ' . $cols->length);
 
             preg_match('/(\d{4})/', $season, $mYear);
             $year = $mYear[1] ?? null;
@@ -954,7 +958,7 @@ class ScraperController extends Controller
             $clubCell = $cols->item(1);
             $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
-            \Log::info('Country: ' . $country);
+            //\Log::info('Country: ' . $country);
             if (strtolower($country) === 'argentina') continue;
 
             // Find morecareer row
@@ -963,7 +967,7 @@ class ScraperController extends Controller
             while ($next) {
                 if ($next->nodeType === XML_ELEMENT_NODE) {
                     $id = $next->getAttribute('id');
-                    \Log::info('Next sibling id: ' . $id);
+                    //\Log::info('Next sibling id: ' . $id);
                     if (strpos($id, 'morecareer_2_') === 0) {
                         $detailRow = $next;
                     }
@@ -971,17 +975,17 @@ class ScraperController extends Controller
                 }
                 $next = $next->nextSibling;
             }
-            \Log::info('DetailRow found: ' . ($detailRow ? 'yes' : 'no'));
+            //\Log::info('DetailRow found: ' . ($detailRow ? 'yes' : 'no'));
 
             if (!$detailRow) continue;
 
             // Parse detail table rows - each is one competition
             $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
-            \Log::info('Detail data rows count: ' . $detailDataRows->length);
+            //\Log::info('Detail data rows count: ' . $detailDataRows->length);
 
             foreach ($detailDataRows as $dRow) {
                 $dCols = $dRow->getElementsByTagName('td');
-                \Log::info('dRow cols: ' . $dCols->length . ' | ' . trim($dCols->item(0)->textContent ?? '') . ' | ' . trim($dCols->item(1)->textContent ?? ''));
+                //\Log::info('dRow cols: ' . $dCols->length . ' | ' . trim($dCols->item(0)->textContent ?? '') . ' | ' . trim($dCols->item(1)->textContent ?? ''));
                 if ($dCols->length < 3) continue;
 
                 $clubName  = trim($dCols->item(0)->textContent);
@@ -1046,9 +1050,9 @@ class ScraperController extends Controller
                         break;
                     }
                 }
-                $tipo = str_contains($compLower, 'liga') || str_contains($compLower, 'mls')
-                || str_contains($compLower, 'premier') || str_contains($compLower, 'bundesliga')
-                || str_contains($compLower, 'ligue') || str_contains($compLower, 'serie')
+                $tipo = (strpos($compLower, 'liga') !== false || strpos($compLower, 'mls') !== false
+                    || strpos($compLower, 'premier') !== false || strpos($compLower, 'bundesliga') !== false
+                    || strpos($compLower, 'ligue') !== false || strpos($compLower, 'serie') !== false)
                     ? 'Liga' : 'Copa';
 
                 $data[] = [
