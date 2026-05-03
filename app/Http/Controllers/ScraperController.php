@@ -856,10 +856,26 @@ class ScraperController extends Controller
                         $gc = $a ? (int) trim($a->textContent) : 0;
                     }
                     // Competition name from lastrounds
+                    // En tecnicoFootballDatabase(), dentro del foreach de $competencias:
+
                     if (str_contains($class, 'pc_lastrounds1') && str_contains($class, $suffix) && !$compName) {
+                        // Try span first
                         $spans = $xpath->query('.//span[@class="competition"]', $col);
                         if ($spans->length > 0) {
                             $compName = trim($spans->item(0)->textContent);
+                        }
+
+                        // Fallback: extract from raw text "- Copa Libertadores2e t2e tour"
+                        if (!$compName) {
+                            $raw = trim($col->textContent);
+                            // Each competition starts with "- "
+                            $parts = preg_split('/\s*-\s+/', $raw, -1, PREG_SPLIT_NO_EMPTY);
+                            if (!empty($parts)) {
+                                // Take first competition name — strip trailing round info like "2e t", "1er", "1/4"
+                                $first = trim($parts[0]);
+                                $first = preg_replace('/\s*(FinaFinale|1\/2.*|1\/4.*|1\/8.*|1\/16.*|\d+e\s*t.*|Grou.*|Tour.*)$/i', '', $first);
+                                $compName = trim($first);
+                            }
                         }
                     }
                     if (str_contains($class, 'pc_club_ranking1') && str_contains($class, $suffix)) {
