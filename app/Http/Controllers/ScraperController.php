@@ -907,4 +907,150 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+    public function jugadorFootballDatabase(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json([]);
+
+        $html = HttpHelper::getHtmlContent($url, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        $existentes = collect()
+            ->merge(\App\JugadorEstadisticaManual::pluck('torneo_nombre'))
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->unique()->flip()->toArray();
+
+        $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
+        $data = [];
+
+        $competencias = [
+            'champ' => ['tipo' => 'Liga', 'ambito' => 'Nacional'],
+            'cont'  => ['tipo' => 'Copa', 'ambito' => 'Internacional'],
+            'cup'   => ['tipo' => 'Copa', 'ambito' => 'Nacional'],
+            'int'   => ['tipo' => 'Copa', 'ambito' => 'Internacional'],
+        ];
+
+        foreach ($rows as $row) {
+            $cols = $row->getElementsByTagName('td');
+            if ($cols->length < 4) continue;
+
+            $season = trim($cols->item(0)->textContent);
+            preg_match('/(\d{4})/', $season, $mYear);
+            $year = $mYear[1] ?? null;
+            if (!$year || (int)$year < 2000) continue;
+
+            $clubCell = $cols->item(1);
+            $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
+            $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
+            if (strtolower($country) === 'argentina') continue;
+
+            $clubLink = $xpath->query('.//a', $clubCell)->item(0);
+            $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
+
+            foreach ($competencias as $suffix => $meta) {
+
+                $pj = 0; $goles = 0; $amarillas = 0; $rojas = 0;
+                $golesRecibidos = 0; $vallasInvictas = 0; $propios = 0;
+                $compName = null;
+
+                foreach ($cols as $col) {
+                    $class = $col->getAttribute('class');
+
+                    if (str_contains($class, 'matchsplayed') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $pj = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_goals2') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $goles = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_yc2') && str_contains($class, $suffix)) {
+                        $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        if ($slip) $amarillas = (int) trim($slip->textContent);
+                        elseif ($a) $amarillas = (int) trim($a->textContent);
+                    }
+                    if (str_contains($class, 'pc_rc2') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $rojas = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_goals_conceded2') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $golesRecibidos = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_cleansheets2') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $vallasInvictas = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_own_goals2') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $propios = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_lastrounds') && str_contains($class, $suffix) && !$compName) {
+                        $spans = $xpath->query('.//span[@class="competition"]', $col);
+                        if ($spans->length > 0) {
+                            $compName = trim($spans->item(0)->textContent);
+                        }
+                    }
+                }
+
+                if ($pj === 0) continue;
+
+                // Fallback name for liga
+                if (!$compName && $suffix === 'champ') {
+                    $compLink = $xpath->query('.//td[@class="champ"]/a', $row)->item(0);
+                    if ($compLink) {
+                        $href = $compLink->getAttribute('href');
+                        preg_match('/\/\d+-([^\/]+)\//', $href, $mComp);
+                        if (isset($mComp[1])) {
+                            $compName = ucwords(str_replace('_', ' ', $mComp[1]));
+                        }
+                    }
+                }
+
+                if (!$compName) $compName = $meta['tipo'];
+
+                $competition = $compName . ' ' . $year;
+                $key = (string) \Str::of($competition)->lower()->ascii()
+                    ->replaceMatches('/\s+/', ' ')->trim();
+
+                if (isset($existentes[$key])) continue;
+
+                $data[] = [
+                    'competition'     => $competition,
+                    'equipo'          => $club,
+                    'posicion'        => 0,
+                    'partidos'        => $pj,
+                    'goles_jugada'    => $goles,
+                    'goles_en_contra' => $propios,
+                    'goles_recibidos' => $golesRecibidos,
+                    'vallas_invictas' => $vallasInvictas,
+                    'amarillas'       => $amarillas,
+                    'rojas'           => $rojas,
+                    'torneo_logo'     => null,
+                    'tipo'            => $meta['tipo'],
+                    'ambito'          => $meta['ambito'],
+                ];
+            }
+        }
+
+        return response()->json($data);
+    }
+
 }

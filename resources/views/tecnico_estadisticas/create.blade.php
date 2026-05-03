@@ -42,18 +42,18 @@
                 </ul>
             </div>
         @endif
-        <div class="mb-3">
+        <!--<div class="mb-3">
             <label>Importar desde CSV</label>
             <input type="file" id="csvFile" class="form-control" accept=".csv">
             <button type="button" class="btn btn-secondary mt-2" onclick="procesarCSV()">
                 📄 Procesar CSV
             </button>
-        </div>
+        </div>-->
         <div class="mb-3 mt-3">
             <label>Importar desde FootballDatabase</label>
             <div class="d-flex">
                 <input type="text" id="footballdbUrl" class="form-control mr-2"
-                       placeholder="https://www.footballdatabase.eu/es/club/equipo/407-millonarios_bogota/2017">
+                       placeholder="https://www.footballdatabase.eu/es/jugador/detalles/31288-julio_cesar-falcioni">
                 <button type="button" class="btn btn-warning" onclick="scrapearFootballDB()" style="white-space:nowrap;">
                     🌐 Scrapear
                 </button>
