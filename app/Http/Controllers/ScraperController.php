@@ -976,7 +976,7 @@ class ScraperController extends Controller
             if (!$detailRow) continue;
 
             // Parse detail table rows - each is one competition
-            $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]/tbody/tr[not(th)]', $detailRow);
+            $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
             \Log::info('Detail data rows count: ' . $detailDataRows->length);
 
             foreach ($detailDataRows as $dRow) {
