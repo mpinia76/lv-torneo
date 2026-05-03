@@ -936,95 +936,94 @@ class ScraperController extends Controller
             })
             ->unique()->flip()->toArray();
 
-        $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
+        // Each season row has a corresponding morecareer detail row
+        $seasonRows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
         $data = [];
 
-        $competencias = [
-            'champ' => ['tipo' => 'Liga', 'ambito' => 'Nacional'],
-            'cont'  => ['tipo' => 'Copa', 'ambito' => 'Internacional'],
-            'cup'   => ['tipo' => 'Copa', 'ambito' => 'Nacional'],
-            'int'   => ['tipo' => 'Copa', 'ambito' => 'Internacional'],
-        ];
-
-        foreach ($rows as $row) {
-            $cols = $row->getElementsByTagName('td');
+        foreach ($seasonRows as $seasonRow) {
+            $cols = $seasonRow->getElementsByTagName('td');
             if ($cols->length < 4) continue;
 
+            // Get year
             $season = trim($cols->item(0)->textContent);
             preg_match('/(\d{4})/', $season, $mYear);
             $year = $mYear[1] ?? null;
             if (!$year || (int)$year < 2000) continue;
 
+            // Skip Argentine clubs
             $clubCell = $cols->item(1);
             $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
             if (strtolower($country) === 'argentina') continue;
 
-            $clubLink = $xpath->query('.//a', $clubCell)->item(0);
-            $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
+            // Find the morecareer row that follows this season row
+            // It has id="morecareer_2_N" — find via nextSibling
+            $detailRow = null;
+            $next = $seasonRow->nextSibling;
+            while ($next) {
+                if ($next->nodeType === XML_ELEMENT_NODE) {
+                    $id = $next->getAttribute('id');
+                    if (str_starts_with($id, 'morecareer_2_')) {
+                        $detailRow = $next;
+                    }
+                    break;
+                }
+                $next = $next->nextSibling;
+            }
 
-            foreach ($competencias as $suffix => $meta) {
+            if (!$detailRow) continue;
 
-                $pj = 0; $goles = 0; $amarillas = 0; $rojas = 0;
-                $golesRecibidos = 0; $vallasInvictas = 0; $propios = 0;
-                $compName = null;
+            // Parse detail table rows - each is one competition
+            $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]/tbody/tr[not(th)]', $detailRow);
 
-                foreach ($cols as $col) {
-                    $class = $col->getAttribute('class');
+            foreach ($detailDataRows as $dRow) {
+                $dCols = $dRow->getElementsByTagName('td');
+                if ($dCols->length < 3) continue;
 
-                    if (str_contains($class, 'matchsplayed') && str_contains($class, $suffix)) {
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        $pj = $a ? (int) trim($a->textContent) : 0;
-                    }
-                    if (str_contains($class, 'pc_goals2') && str_contains($class, $suffix)) {
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        $goles = $a ? (int) trim($a->textContent) : 0;
-                    }
-                    if (str_contains($class, 'pc_yc2') && str_contains($class, $suffix)) {
-                        $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        if ($slip) $amarillas = (int) trim($slip->textContent);
-                        elseif ($a) $amarillas = (int) trim($a->textContent);
-                    }
-                    if (str_contains($class, 'pc_rc2') && str_contains($class, $suffix)) {
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        $rojas = $a ? (int) trim($a->textContent) : 0;
-                    }
-                    if (str_contains($class, 'pc_goals_conceded2') && str_contains($class, $suffix)) {
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        $golesRecibidos = $a ? (int) trim($a->textContent) : 0;
-                    }
-                    if (str_contains($class, 'pc_cleansheets2') && str_contains($class, $suffix)) {
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        $vallasInvictas = $a ? (int) trim($a->textContent) : 0;
-                    }
-                    if (str_contains($class, 'pc_own_goals2') && str_contains($class, $suffix)) {
-                        $a = $xpath->query('.//a', $col)->item(0);
-                        $propios = $a ? (int) trim($a->textContent) : 0;
-                    }
-                    if (str_contains($class, 'pc_lastrounds') && str_contains($class, $suffix) && !$compName) {
-                        $spans = $xpath->query('.//span[@class="competition"]', $col);
-                        if ($spans->length > 0) {
-                            $compName = trim($spans->item(0)->textContent);
-                        }
-                    }
+                $clubName  = trim($dCols->item(0)->textContent);
+                $compName  = trim($dCols->item(1)->textContent);
+                $pj        = (int) trim($dCols->item(2)->textContent);
+
+                if ($pj === 0 || !$compName) continue;
+
+                // Skip Argentina national team
+                // Skip national teams - club name matches a country name
+// Get country from the season row flag
+                $flagSpans = $xpath->query('.//span[@class="real_flag"]', $detailRow);
+// Simple approach: if club name has no spaces typical of team names
+// or matches known country patterns, skip
+// Better: check if clubName matches the country of any flag in the detail
+                $isNationalTeam = false;
+                $detailFlags = $xpath->query('.//span[@class="real_flag"]', $dRow);
+// In detail rows there are no flags - use parent season row country
+// Skip if clubName == country of season row
+                if (strtolower(trim($clubName)) === strtolower(trim($country))) {
+                    $isNationalTeam = true;
+                }
+                if ($isNationalTeam) continue;
+
+                // Goles: first pc_offense2 td after PJ
+                $goles = 0;
+                $amarillas = 0;
+                $rojas = 0;
+                $golesRecibidos = 0;
+                $vallasInvictas = 0;
+                $propios = 0;
+
+                $offenseCols = $xpath->query('.//td[contains(@class,"pc_offense2")]', $dRow);
+                if ($offenseCols->length > 0) {
+                    $goles = (int) trim($offenseCols->item(0)->textContent);
                 }
 
-                if ($pj === 0) continue;
+                $defenseCols = $xpath->query('.//td[contains(@class,"pc_defense2")]', $dRow);
+                // order: own_goals, goals_conceded, cleansheets
+                if ($defenseCols->length > 0) $propios        = (int) trim($defenseCols->item(0)->textContent);
+                if ($defenseCols->length > 1) $golesRecibidos = (int) trim($defenseCols->item(1)->textContent);
+                if ($defenseCols->length > 2) $vallasInvictas = (int) trim($defenseCols->item(2)->textContent);
 
-                // Fallback name for liga
-                if (!$compName && $suffix === 'champ') {
-                    $compLink = $xpath->query('.//td[@class="champ"]/a', $row)->item(0);
-                    if ($compLink) {
-                        $href = $compLink->getAttribute('href');
-                        preg_match('/\/\d+-([^\/]+)\//', $href, $mComp);
-                        if (isset($mComp[1])) {
-                            $compName = ucwords(str_replace('_', ' ', $mComp[1]));
-                        }
-                    }
-                }
-
-                if (!$compName) $compName = $meta['tipo'];
+                $disciplineCols = $xpath->query('.//td[contains(@class,"pc_discipline2")]', $dRow);
+                if ($disciplineCols->length > 0) $amarillas = (int) trim($disciplineCols->item(0)->textContent);
+                if ($disciplineCols->length > 1) $rojas     = (int) trim($disciplineCols->item(1)->textContent);
 
                 $competition = $compName . ' ' . $year;
                 $key = (string) \Str::of($competition)->lower()->ascii()
@@ -1032,9 +1031,25 @@ class ScraperController extends Controller
 
                 if (isset($existentes[$key])) continue;
 
+                // Determine tipo/ambito from competition name
+                $compLower = strtolower($competition);
+                $internacional = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
+                    'mundial', 'nations', 'copa america', 'eurocopa', 'amistosos'];
+                $ambito = 'Nacional';
+                foreach ($internacional as $kw) {
+                    if (str_contains($compLower, $kw)) {
+                        $ambito = 'Internacional';
+                        break;
+                    }
+                }
+                $tipo = str_contains($compLower, 'liga') || str_contains($compLower, 'mls')
+                || str_contains($compLower, 'premier') || str_contains($compLower, 'bundesliga')
+                || str_contains($compLower, 'ligue') || str_contains($compLower, 'serie')
+                    ? 'Liga' : 'Copa';
+
                 $data[] = [
                     'competition'     => $competition,
-                    'equipo'          => $club,
+                    'equipo'          => $clubName,
                     'posicion'        => 0,
                     'partidos'        => $pj,
                     'goles_jugada'    => $goles,
@@ -1044,8 +1059,8 @@ class ScraperController extends Controller
                     'amarillas'       => $amarillas,
                     'rojas'           => $rojas,
                     'torneo_logo'     => null,
-                    'tipo'            => $meta['tipo'],
-                    'ambito'          => $meta['ambito'],
+                    'tipo'            => $tipo,
+                    'ambito'          => $ambito,
                 ];
             }
         }
