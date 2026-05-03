@@ -937,33 +937,32 @@ class ScraperController extends Controller
             ->unique()->flip()->toArray();
 
         // Each season row has a corresponding morecareer detail row
-        $seasonRows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
+        $seasonRows = $xpath->query('//table[contains(@class,"firstblock")]//tr[contains(@class,"line") and not(contains(@class,"total"))]');
         $data = [];
 
         foreach ($seasonRows as $seasonRow) {
             $cols = $seasonRow->getElementsByTagName('td');
             if ($cols->length < 4) continue;
 
+            // Get year
             $season = trim($cols->item(0)->textContent);
-            \Log::info('Season row: ' . $season . ' cols: ' . $cols->length);
-
             preg_match('/(\d{4})/', $season, $mYear);
             $year = $mYear[1] ?? null;
             if (!$year || (int)$year < 2000) continue;
 
+            // Skip Argentine clubs
             $clubCell = $cols->item(1);
             $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
-            \Log::info('Country: ' . $country);
             if (strtolower($country) === 'argentina') continue;
 
-            // Find morecareer row
-            $next = $seasonRow->nextSibling;
+            // Find the morecareer row that follows this season row
+            // It has id="morecareer_2_N" — find via nextSibling
             $detailRow = null;
+            $next = $seasonRow->nextSibling;
             while ($next) {
                 if ($next->nodeType === XML_ELEMENT_NODE) {
                     $id = $next->getAttribute('id');
-                    \Log::info('Next sibling id: ' . $id);
                     if (strpos($id, 'morecareer_2_') === 0) {
                         $detailRow = $next;
                     }
@@ -971,7 +970,6 @@ class ScraperController extends Controller
                 }
                 $next = $next->nextSibling;
             }
-            \Log::info('DetailRow found: ' . ($detailRow ? 'yes' : 'no'));
 
             if (!$detailRow) continue;
 
