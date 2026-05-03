@@ -808,27 +808,27 @@ class ScraperController extends Controller
             $year = $mYear[1] ?? null;
             if (!$year || (int)$year < 2000) continue;
 
-            // Club + country
             $clubCell = $cols->item(1);
             $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
-            $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
+            $country  = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
             if (strtolower($country) === 'argentina') continue;
 
             $clubLink = $xpath->query('.//a', $clubCell)->item(0);
             $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
 
-            // Tipos de competencia: champ=Liga, cont=Internacional, cup=Copa
             $competencias = [
-                'champ' => ['tipo' => 'Liga',  'ambito' => 'Nacional'],
-                'cont'  => ['tipo' => 'Copa',  'ambito' => 'Internacional'],
-                'cup'   => ['tipo' => 'Copa',  'ambito' => 'Nacional'],
+                'champ' => ['tipo' => 'Liga', 'ambito' => 'Nacional'],
+                'cont'  => ['tipo' => 'Copa', 'ambito' => 'Internacional'],
+                'cup'   => ['tipo' => 'Copa', 'ambito' => 'Nacional'],
             ];
 
             foreach ($competencias as $suffix => $meta) {
 
                 $pj = 0; $v = 0; $e = 0; $d = 0; $gf = 0; $gc = 0;
                 $compName = null;
-                $posicion = 0;
+                $posicion = null;
+                $lastRoundsRaw = '';
+
                 foreach ($cols as $col) {
                     $class = $col->getAttribute('class');
 
@@ -855,40 +855,28 @@ class ScraperController extends Controller
                         $a = $xpath->query('.//a', $col)->item(0);
                         $gc = $a ? (int) trim($a->textContent) : 0;
                     }
-                    // Competition name from lastrounds
-                    // En tecnicoFootballDatabase(), dentro del foreach de $competencias:
-
-                    if (str_contains($class, 'pc_lastrounds1') && str_contains($class, $suffix) && !$compName) {
-                        // Try span first
+                    if (str_contains($class, 'pc_lastrounds1') && str_contains($class, $suffix)) {
+                        // Try span.competition first
                         $spans = $xpath->query('.//span[@class="competition"]', $col);
                         if ($spans->length > 0) {
                             $compName = trim($spans->item(0)->textContent);
                         }
-
-                        // Fallback: extract from raw text "- Copa Libertadores2e t2e tour"
-                        if (!$compName) {
-                            $raw = trim($col->textContent);
-                            // Each competition starts with "- "
-                            $parts = preg_split('/\s*-\s+/', $raw, -1, PREG_SPLIT_NO_EMPTY);
-                            if (!empty($parts)) {
-                                // Take first competition name — strip trailing round info like "2e t", "1er", "1/4"
-                                $first = trim($parts[0]);
-                                $first = preg_replace('/\s*(FinaFinale|1\/2.*|1\/4.*|1\/8.*|1\/16.*|\d+e\s*t.*|Grou.*|Tour.*)$/i', '', $first);
-                                $compName = trim($first);
-                            }
-                        }
+                        // Always grab raw text for multi-competition parsing
+                        $lastRoundsRaw = trim($col->textContent);
                     }
                     if (str_contains($class, 'pc_club_ranking1') && str_contains($class, $suffix)) {
                         $a = $xpath->query('.//a', $col)->item(0);
-                        $posicion = $a ? (int) trim($a->textContent) : 0;
+                        $text = $a ? trim($a->textContent) : trim($col->textContent);
+                        $num = (int) preg_replace('/\D/', '', $text);
+                        $posicion = ($num > 0 && $num <= 50) ? $num : null;
                     }
                 }
 
                 if ($pj === 0) continue;
 
-                // Fallback: get name from champ link for liga
+                // Fallback name for champ from href
                 if (!$compName && $suffix === 'champ') {
-                    $compLink = $xpath->query('.//td[@class="champ"]/a', $row)->item(0);
+                    $compLink = $xpath->query('.//td[contains(@class,"champ")]//a', $row)->item(0);
                     if ($compLink) {
                         $href = $compLink->getAttribute('href');
                         preg_match('/\/\d+-([^\/]+)\//', $href, $mComp);
@@ -898,10 +886,80 @@ class ScraperController extends Controller
                     }
                 }
 
+                // For cont/cup: parse multiple competitions from lastRoundsRaw
+                // Format: "- Copa Libertadores2e t2e tour - Copa Sudamericana1er 1er tour"
+                if (($suffix === 'cont' || $suffix === 'cup') && $lastRoundsRaw) {
+                    // Split on " - " keeping each competition block
+                    $parts = preg_split('/\s+-\s+/', $lastRoundsRaw, -1, PREG_SPLIT_NO_EMPTY);
+
+                    $competitionsFound = [];
+                    foreach ($parts as $part) {
+                        $part = trim($part);
+                        if (!$part) continue;
+
+                        // Strip round suffixes — everything after the comp name
+                        // Patterns: "1/2 finales", "1/4 de finale", "FinaFinale", "Grou Groupe X",
+                        //           "2e t2e tour", "1er 1er tour", "Tour préliminaire", etc.
+                        $name = preg_replace(
+                            '/\s*(Fina\s*Finale?|Final|1\/2.*|1\/4.*|1\/8.*|1\/16.*|1\/32.*|\d+[a-z]*\s*[a-z]*\s*tour.*|Grou.*|Tour.*|Group.*|Phase.*|Round.*|\d+\s*de\s*finale.*|Journee.*)/i',
+                            '',
+                            $part
+                        );
+                        $name = trim($name);
+
+                        if (strlen($name) > 2) {
+                            $competitionsFound[] = $name;
+                        }
+                    }
+
+                    if (empty($competitionsFound) && $compName) {
+                        $competitionsFound[] = $compName;
+                    }
+
+                    if (empty($competitionsFound)) {
+                        $competitionsFound[] = $meta['tipo'];
+                    }
+
+                    // Determine ambito per competition name
+                    $internacionalKw = ['champions', 'libertadores', 'sudamericana', 'europa league',
+                        'concacaf', 'mundial', 'intercontinental', 'club world', 'recopa'];
+
+                    foreach ($competitionsFound as $cName) {
+                        $competition = $cName . ' ' . $year;
+                        $key = (string) \Str::of($competition)->lower()->ascii()
+                            ->replaceMatches('/\s+/', ' ')->trim();
+
+                        if (isset($existentes[$key])) continue;
+
+                        $ambitoComp = 'Nacional';
+                        foreach ($internacionalKw as $kw) {
+                            if (stripos($cName, $kw) !== false) { $ambitoComp = 'Internacional'; break; }
+                        }
+
+                        $data[] = [
+                            'competition' => $competition,
+                            'equipo'      => $club,
+                            'posicion'    => null,
+                            'partidos'    => $pj,
+                            'ganados'     => $v,
+                            'empatados'   => $e,
+                            'perdidos'    => $d,
+                            'gf'          => $gf,
+                            'ge'          => $gc,
+                            'torneo_logo' => null,
+                            'tipo'        => 'Copa',
+                            'ambito'      => $ambitoComp,
+                        ];
+                    }
+
+                    // Skip the generic single-entry below for cont/cup
+                    continue;
+                }
+
+                // For champ: single entry
                 if (!$compName) $compName = $meta['tipo'];
 
                 $competition = $compName . ' ' . $year;
-
                 $key = (string) \Str::of($competition)->lower()->ascii()
                     ->replaceMatches('/\s+/', ' ')->trim();
 
