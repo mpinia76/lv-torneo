@@ -785,12 +785,15 @@ class ScraperController extends Controller
 
         $xpath = new \DOMXPath($dom);
 
-        // Filter from year 2000 onwards, skip Argentine clubs
         $existentes = collect()
             ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
-            ->merge(\App\Torneo::all()->map(function ($t) { return ($t->nombre ?? '') . ' ' . ($t->year ?? ''); }))
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
             ->filter()
-            ->map(function ($v) { return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim(); })
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
             ->unique()->flip()->toArray();
 
         $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
@@ -800,88 +803,105 @@ class ScraperController extends Controller
             $cols = $row->getElementsByTagName('td');
             if ($cols->length < 4) continue;
 
-            // Season
             $season = trim($cols->item(0)->textContent);
-
-            // Extract year
             preg_match('/(\d{4})/', $season, $mYear);
             $year = $mYear[1] ?? null;
             if (!$year || (int)$year < 2000) continue;
 
-            // Club + country flag
+            // Club + country
             $clubCell = $cols->item(1);
             $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
-
-            // Skip Argentine clubs
             if (strtolower($country) === 'argentina') continue;
 
             $clubLink = $xpath->query('.//a', $clubCell)->item(0);
             $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
 
-            // Liga stats
-            $pj = 0; $v = 0; $e = 0; $d = 0; $gf = 0; $gc = 0;
-
-            foreach ($cols as $col) {
-                $class = $col->getAttribute('class');
-
-                if (str_contains($class, 'matchsplayed') && str_contains($class, 'champ')) {
-                    $pj = (int) trim($col->textContent);
-                }
-                if (str_contains($class, 'pc_v1') && str_contains($class, 'champ')) {
-                    $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
-                    $v = $slip ? (int) trim($slip->textContent) : 0;
-                }
-                if (str_contains($class, 'pc_d1') && str_contains($class, 'champ')) {
-                    $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
-                    $e = $slip ? (int) trim($slip->textContent) : 0;
-                }
-                if (str_contains($class, 'pc_l1') && str_contains($class, 'champ')) {
-                    $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
-                    $d = $slip ? (int) trim($slip->textContent) : 0;
-                }
-                if (str_contains($class, 'pc_goalsfor1') && str_contains($class, 'champ')) {
-                    $a = $xpath->query('.//a', $col)->item(0);
-                    $gf = $a ? (int) trim($a->textContent) : 0;
-                }
-                if (str_contains($class, 'pc_goalsagainst1') && str_contains($class, 'champ')) {
-                    $a = $xpath->query('.//a', $col)->item(0);
-                    $gc = $a ? (int) trim($a->textContent) : 0;
-                }
-            }
-
-            if ($pj === 0) continue;
-
-            $competitionName = 'Liga';
-            $compLink = $xpath->query('.//td[@class="champ"]/a', $row)->item(0);
-            if ($compLink) {
-                // Extract competition name from href
-                $href = $compLink->getAttribute('href');
-                preg_match('/\/([^\/]+)\/\d/', $href, $mComp);
-                $competitionName = isset($mComp[1])
-                    ? ucwords(str_replace(['-', '_'], ' ', $mComp[1]))
-                    : 'Liga';
-            }
-
-            $key = \Str::of($competitionName . ' ' . $year)->lower()->ascii()
-                ->replaceMatches('/\s+/', ' ')->trim()->__toString();
-
-            if (isset($existentes[$key])) continue;
-
-            $data[] = [
-                'competition' => $competitionName . ' ' . $year,
-                'equipo'      => $club,
-                'posicion'    => 0,
-                'partidos'    => $pj,
-                'ganados'     => $v,
-                'empatados'   => $e,
-                'perdidos'    => $d,
-                'gf'          => $gf,
-                'ge'          => $gc,
-                'torneo_logo' => null,
-                'tipo'        => 'Liga',
-                'ambito'      => 'Nacional',
+            // Tipos de competencia: champ=Liga, cont=Internacional, cup=Copa
+            $competencias = [
+                'champ' => ['tipo' => 'Liga',  'ambito' => 'Nacional'],
+                'cont'  => ['tipo' => 'Copa',  'ambito' => 'Internacional'],
+                'cup'   => ['tipo' => 'Copa',  'ambito' => 'Nacional'],
             ];
+
+            foreach ($competencias as $suffix => $meta) {
+
+                $pj = 0; $v = 0; $e = 0; $d = 0; $gf = 0; $gc = 0;
+                $compName = null;
+
+                foreach ($cols as $col) {
+                    $class = $col->getAttribute('class');
+
+                    if (str_contains($class, 'matchsplayed') && str_contains($class, $suffix)) {
+                        $pj = (int) trim($col->textContent);
+                    }
+                    if (str_contains($class, 'pc_v1') && str_contains($class, $suffix)) {
+                        $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                        $v = $slip ? (int) trim($slip->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_d1') && str_contains($class, $suffix)) {
+                        $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                        $e = $slip ? (int) trim($slip->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_l1') && str_contains($class, $suffix)) {
+                        $slip = $xpath->query('.//span[@class="slip"]', $col)->item(0);
+                        $d = $slip ? (int) trim($slip->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_goalsfor1') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $gf = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    if (str_contains($class, 'pc_goalsagainst1') && str_contains($class, $suffix)) {
+                        $a = $xpath->query('.//a', $col)->item(0);
+                        $gc = $a ? (int) trim($a->textContent) : 0;
+                    }
+                    // Competition name from lastrounds
+                    if (str_contains($class, 'pc_lastrounds1') && str_contains($class, $suffix) && !$compName) {
+                        $spans = $xpath->query('.//span[@class="competition"]', $col);
+                        if ($spans->length > 0) {
+                            $compName = trim($spans->item(0)->textContent);
+                        }
+                    }
+                }
+
+                if ($pj === 0) continue;
+
+                // Fallback: get name from champ link for liga
+                if (!$compName && $suffix === 'champ') {
+                    $compLink = $xpath->query('.//td[@class="champ"]/a', $row)->item(0);
+                    if ($compLink) {
+                        $href = $compLink->getAttribute('href');
+                        preg_match('/\/\d+-([^\/]+)\//', $href, $mComp);
+                        if (isset($mComp[1])) {
+                            $compName = ucwords(str_replace('_', ' ', $mComp[1]));
+                        }
+                    }
+                }
+
+                if (!$compName) $compName = $meta['tipo'];
+
+                $competition = $compName . ' ' . $year;
+
+                $key = (string) \Str::of($competition)->lower()->ascii()
+                    ->replaceMatches('/\s+/', ' ')->trim();
+
+                if (isset($existentes[$key])) continue;
+
+                $data[] = [
+                    'competition' => $competition,
+                    'equipo'      => $club,
+                    'posicion'    => 0,
+                    'partidos'    => $pj,
+                    'ganados'     => $v,
+                    'empatados'   => $e,
+                    'perdidos'    => $d,
+                    'gf'          => $gf,
+                    'ge'          => $gc,
+                    'torneo_logo' => null,
+                    'tipo'        => $meta['tipo'],
+                    'ambito'      => $meta['ambito'],
+                ];
+            }
         }
 
         return response()->json($data);
