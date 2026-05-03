@@ -963,7 +963,7 @@ class ScraperController extends Controller
             while ($next) {
                 if ($next->nodeType === XML_ELEMENT_NODE) {
                     $id = $next->getAttribute('id');
-                    if (str_starts_with($id, 'morecareer_2_')) {
+                    if (strpos($id, 'morecareer_2_') === 0) {
                         $detailRow = $next;
                     }
                     break;
@@ -1037,7 +1037,7 @@ class ScraperController extends Controller
                     'mundial', 'nations', 'copa america', 'eurocopa', 'amistosos'];
                 $ambito = 'Nacional';
                 foreach ($internacional as $kw) {
-                    if (str_contains($compLower, $kw)) {
+                    if (strpos($compLower, $kw) !== false) {
                         $ambito = 'Internacional';
                         break;
                     }
