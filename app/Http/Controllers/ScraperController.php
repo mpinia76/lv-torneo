@@ -944,25 +944,26 @@ class ScraperController extends Controller
             $cols = $seasonRow->getElementsByTagName('td');
             if ($cols->length < 4) continue;
 
-            // Get year
             $season = trim($cols->item(0)->textContent);
+            \Log::info('Season row: ' . $season . ' cols: ' . $cols->length);
+
             preg_match('/(\d{4})/', $season, $mYear);
             $year = $mYear[1] ?? null;
             if (!$year || (int)$year < 2000) continue;
 
-            // Skip Argentine clubs
             $clubCell = $cols->item(1);
             $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
+            \Log::info('Country: ' . $country);
             if (strtolower($country) === 'argentina') continue;
 
-            // Find the morecareer row that follows this season row
-            // It has id="morecareer_2_N" — find via nextSibling
-            $detailRow = null;
+            // Find morecareer row
             $next = $seasonRow->nextSibling;
+            $detailRow = null;
             while ($next) {
                 if ($next->nodeType === XML_ELEMENT_NODE) {
                     $id = $next->getAttribute('id');
+                    \Log::info('Next sibling id: ' . $id);
                     if (strpos($id, 'morecareer_2_') === 0) {
                         $detailRow = $next;
                     }
@@ -970,14 +971,17 @@ class ScraperController extends Controller
                 }
                 $next = $next->nextSibling;
             }
+            \Log::info('DetailRow found: ' . ($detailRow ? 'yes' : 'no'));
 
             if (!$detailRow) continue;
 
             // Parse detail table rows - each is one competition
             $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]/tbody/tr[not(th)]', $detailRow);
+            \Log::info('Detail data rows count: ' . $detailDataRows->length);
 
             foreach ($detailDataRows as $dRow) {
                 $dCols = $dRow->getElementsByTagName('td');
+                \Log::info('dRow cols: ' . $dCols->length . ' | ' . trim($dCols->item(0)->textContent ?? '') . ' | ' . trim($dCols->item(1)->textContent ?? ''));
                 if ($dCols->length < 3) continue;
 
                 $clubName  = trim($dCols->item(0)->textContent);
