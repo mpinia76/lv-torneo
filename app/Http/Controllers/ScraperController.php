@@ -1041,8 +1041,10 @@ class ScraperController extends Controller
 
                 // Determine tipo/ambito from competition name
                 $compLower = strtolower($competition);
+                // Fix 1 y 2: chequear ámbito ANTES que tipo
                 $internacional = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
-                    'mundial', 'nations', 'copa america', 'eurocopa', 'amistosos'];
+                    'mundial', 'nations', 'copa america', 'eurocopa', 'amistosos',
+                    'campeones', 'intercontinental', 'sudamericano', 'olimpico', 'olimpicos'];
                 $ambito = 'Nacional';
                 foreach ($internacional as $kw) {
                     if (strpos($compLower, $kw) !== false) {
@@ -1050,10 +1052,32 @@ class ScraperController extends Controller
                         break;
                     }
                 }
-                $tipo = (strpos($compLower, 'liga') !== false || strpos($compLower, 'mls') !== false
-                    || strpos($compLower, 'premier') !== false || strpos($compLower, 'bundesliga') !== false
-                    || strpos($compLower, 'ligue') !== false || strpos($compLower, 'serie') !== false)
-                    ? 'Liga' : 'Copa';
+
+// Tipo depende del ámbito también
+                $esLiga = (strpos($compLower, 'liga') !== false && $ambito === 'Nacional')
+                    || strpos($compLower, 'mls') !== false
+                    || strpos($compLower, 'premier') !== false
+                    || strpos($compLower, 'bundesliga') !== false
+                    || strpos($compLower, 'ligue') !== false
+                    || strpos($compLower, 'serie') !== false
+                    || strpos($compLower, 'primera') !== false
+                    || strpos($compLower, 'division') !== false
+                    || strpos($compLower, 'segunda') !== false;
+                $tipo = $esLiga ? 'Liga' : 'Copa';
+
+// Fix 3: filtrar selecciones por palabras clave en clubName
+                $selecciones = ['argentina', 'brasil', 'españa', 'france', 'italia', 'alemania',
+                    'germany', 'england', 'portugal', 'colombia', 'uruguay', 'chile',
+                    'mexico', 'peru', 'venezuela', 'ecuador', 'paraguay', 'bolivia',
+                    'estados unidos', 'usa', 'netherlands', 'holanda', 'belgica',
+                    'croacia', 'suiza', 'suecia', 'dinamarca', 'noruega', 'japon',
+                    'corea', 'marruecos', 'senegal', 'ghana', 'nigeria', 'camerun'];
+                $clubLower = strtolower(trim($clubName));
+                $esSeleccion = false;
+                foreach ($selecciones as $pais) {
+                    if (strpos($clubLower, $pais) !== false) { $esSeleccion = true; break; }
+                }
+                if ($esSeleccion) continue;
 
                 $data[] = [
                     'competition'     => $competition,
@@ -1062,8 +1086,8 @@ class ScraperController extends Controller
                     'partidos'        => $pj,
                     'goles_jugada'    => $goles,
                     'goles_en_contra' => $propios,
-                    'goles_recibidos' => $golesRecibidos,
-                    'vallas_invictas' => $vallasInvictas,
+                    'goles_recibidos' => 0,
+                    'vallas_invictas' => 0,
                     'amarillas'       => $amarillas,
                     'rojas'           => $rojas,
                     'torneo_logo'     => null,
