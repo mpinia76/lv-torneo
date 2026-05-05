@@ -2685,8 +2685,10 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
     public function tecnicos(Request $request)
     {
-        $order = in_array($request->query('order'), ['puntaje', 'jugados', 'ganados', 'perdidos', 'empatados', 'tecnico', 'prom', 'golesl', 'golesv', 'diferencia', 'porcentaje'])
-            ? $request->query('order')
+
+        $orderRaw = strtolower($request->query('order', ''));
+        $order = in_array($orderRaw, ['puntaje','jugados','ganados','perdidos','empatados','tecnico','prom','golesl','golesv','diferencia','porcentaje'])
+            ? $orderRaw
             : 'puntaje';
 
         $tipoOrder = strtoupper($request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
