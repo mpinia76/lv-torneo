@@ -1212,8 +1212,14 @@ class ScraperController extends Controller
             $name = trim($link->textContent);
             if (strlen($name) < 3) continue;
 
+            // Normalize: strip trailing 2-3 letter codes glued to the name
+            // (e.g. "Copa LibertadoresCL" -> "Copa Libertadores")
+            $nameClean = preg_replace('/[A-Z]{2,4}$/', '', $name);
+            $nameClean = trim($nameClean);
+            if (strlen($nameClean) < 3) $nameClean = $name;
+
             $isInternational = false;
-            $nameLower = strtolower($name);
+            $nameLower = strtolower($nameClean);
             foreach ($internacionalKw as $kw) {
                 if (strpos($nameLower, $kw) !== false) {
                     $isInternational = true;
@@ -1222,21 +1228,23 @@ class ScraperController extends Controller
             }
 
             if ($suffix === 'cont' && $isInternational) {
-                $candidates[$name] = true;
+                // Use lowercase version as key for dedup, store original casing as value
+                $candidates[strtolower($nameClean)] = $nameClean;
             } elseif ($suffix === 'cup' && !$isInternational
                 && stripos($nameLower, 'liga') === false
                 && stripos($nameLower, 'primera') === false
-                && stripos($nameLower, 'division') === false) {
-                // Domestic cup, not the league
-                $candidates[$name] = true;
+                && stripos($nameLower, 'division') === false
+                && stripos($nameLower, 'serie') === false
+                && stripos($nameLower, 'premier') === false
+                && stripos($nameLower, 'bundesliga') === false) {
+                $candidates[strtolower($nameClean)] = $nameClean;
             }
         }
 
-        \Log::info("[RESOLVE] Suffix={$suffix} candidates=" . json_encode(array_keys($candidates)));
+        \Log::info("[RESOLVE] Suffix={$suffix} candidates=" . json_encode(array_values($candidates)));
 
-        // If exactly one candidate, return it. If multiple, return null (ambiguous).
         if (count($candidates) === 1) {
-            return array_keys($candidates)[0];
+            return array_values($candidates)[0];
         }
 
         return null;
