@@ -2848,24 +2848,13 @@ ORDER BY $order $tipoOrder, jugados DESC, tecnico ASC
         /**
          * Ejecutar
          */
+        /**
+         * Ejecutar
+         */
         $goleadores = DB::select($sql, $params);
 
-        /**
-         * Paginación (igual que la tuya)
-         */
-        $page = $request->query('page', 1);
-        $paginate = 15;
-        $offSet = ($page * $paginate) - $paginate;
-
-        $itemsForCurrentPage = array_slice($goleadores, $offSet, $paginate, true);
-
-        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator(
-            $itemsForCurrentPage,
-            count($goleadores),
-            $paginate,
-            $page
-        );
-
+// Convertir a colección para poder iterar/ordenar/paginar después
+        $goleadores = collect($goleadores);
 
         foreach ($goleadores as $goleador){
             $titulosTecnicoCopa=0;
@@ -3092,11 +3081,8 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
 
         }
 
-        $goleadores->setPath(route('torneos.tecnicos',array('order'=>$order,'tipoOrder'=>$tipoOrder,'actuales'=>$actuales,'campeones'=>$campeones,'torneoId'=>$torneoId)));
-
-
         // Obtener IDs de técnicos ya cargados
-        $tecnicoIds = $goleadores->getCollection()->pluck('tecnico_id')->filter()->toArray();
+        $tecnicoIds = $goleadores->pluck('tecnico_id')->filter()->toArray();
 
 // Traer manuales solo si no hay filtro de torneo y hay técnicos
         $manuales = collect();
@@ -3127,9 +3113,8 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         }
 
 // Transformar colección agregando manuales a los técnicos existentes
-        $collection = $goleadores->getCollection();
-
-        $collection->transform(function ($tecnico) use ($manuales, $year) {
+        // Transformar colección agregando manuales a los técnicos existentes
+        $goleadores->transform(function ($tecnico) use ($manuales, $year) {
             if (isset($manuales[$tecnico->tecnico_id])) {
                 $equipos = [];
 
@@ -3294,7 +3279,35 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             return $tecnico;
         });
 
-        $goleadores->setCollection($collection);
+        // Reordenar DESPUÉS de sumar manuales, en PHP
+        $goleadores = $goleadores->sortBy([
+            [$order, strtolower($tipoOrder) === 'asc' ? 'asc' : 'desc'],
+            ['jugados', 'desc'],
+            ['tecnico', 'asc'],
+        ])->values();
+
+// Paginar manualmente después del orden
+        $page = $request->query('page', 1);
+        $paginate = 15;
+        $offSet = ($page * $paginate) - $paginate;
+
+        $total = $goleadores->count();
+        $itemsForCurrentPage = $goleadores->slice($offSet, $paginate)->values();
+
+        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsForCurrentPage,
+            $total,
+            $paginate,
+            $page
+        );
+
+        $goleadores->setPath(route('torneos.tecnicos', [
+            'order' => $order,
+            'tipoOrder' => $tipoOrder,
+            'actuales' => $actuales,
+            'campeones' => $campeones,
+            'torneoId' => $torneoId
+        ]));
 
 
 
