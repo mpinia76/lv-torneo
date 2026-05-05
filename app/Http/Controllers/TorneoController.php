@@ -3065,32 +3065,29 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                 $goleador->tecnico_id
             ]);
 
+            // Auxiliar: jugados por equipo (para usar luego al sumar manuales)
+            $jugadosPorEquipo = [];
+
             foreach ($escudos as $escudo){
-                $tl=0;
-                $tc=0;
-                $ti=0;
-                if (isset($titulosTecnicoLigaEquipo[$escudo->equipo_id])){
-                    $tl=$titulosTecnicoLigaEquipo[$escudo->equipo_id];
-                }
-                if (isset($titulosTecnicoCopaEquipo[$escudo->equipo_id])){
-                    $tc=$titulosTecnicoCopaEquipo[$escudo->equipo_id];
-                }
-                if (isset($titulosTecnicoInternacionalEquipo[$escudo->equipo_id])){
-                    $ti=$titulosTecnicoInternacionalEquipo[$escudo->equipo_id];
-                }
-                if ($tc+$tl+$ti>0){
-                    $ligas=($tl)?$tl.' Ligas':'';
-                    $copas=($tc)?$tc.' Copas':'';
-                    $internacionales=($ti)?$ti.' Internacionales':'';
-                     $titulos=$tc+$tl+$ti. ' ('.$ligas.' '.$copas.' '.$internacionales.')';
+                $jugadosPorEquipo[$escudo->equipo_id] = $escudo->jugados;
+
+                $tl = $titulosTecnicoLigaEquipo[$escudo->equipo_id] ?? 0;
+                $tc = $titulosTecnicoCopaEquipo[$escudo->equipo_id] ?? 0;
+                $ti = $titulosTecnicoInternacionalEquipo[$escudo->equipo_id] ?? 0;
+
+                if ($tc+$tl+$ti > 0){
+                    $ligas = $tl ? $tl.' Ligas' : '';
+                    $copas = $tc ? $tc.' Copas' : '';
+                    $internacionales = $ti ? $ti.' Internacionales' : '';
+                    $titulos = ($tc+$tl+$ti).' ('.$ligas.' '.$copas.' '.$internacionales.')';
                     $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.'_'.$titulos.',';
-                }
-                else{
+                } else {
                     $goleador->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$escudo->puntaje.'_'.$escudo->porcentaje.',';
                 }
-
-
             }
+
+// Guardarlo en el técnico para usarlo en el transform de manuales
+            $goleador->jugadosPorEquipo = $jugadosPorEquipo;
 
 
         }
@@ -3235,21 +3232,34 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                         $ptsExistente = (int)$escudosArray[$manual->equipo_id][2];
                         $ptsTotal = $ptsExistente + $ptsManual;
 
+                        // Total de partidos = los que ya tenía (del SQL) + los del manual
+                        $jugadosExistente = $tecnico->jugadosPorEquipo[$manual->equipo_id] ?? 0;
+                        $jugadosTotal = $jugadosExistente + $manual->partidos;
+
                         $escudosArray[$manual->equipo_id][2] = $ptsTotal;
-                        $escudosArray[$manual->equipo_id][3] = round($ptsTotal*(100/(($manual->partidos)*3)),2).'%';
+                        $escudosArray[$manual->equipo_id][3] = $jugadosTotal > 0
+                            ? round($ptsTotal * 100 / ($jugadosTotal * 3), 2).'%'
+                            : '0%';
+
+                        // Actualizar el contador de jugados acumulado para futuras iteraciones
+                        // (por si hay más de un registro manual para el mismo equipo)
+                        $tecnico->jugadosPorEquipo[$manual->equipo_id] = $jugadosTotal;
 
                         if ($titulosManual) {
                             $escudosArray[$manual->equipo_id][4] = $titulosManual;
                         }
 
                     } else {
-                        // si no existe → agregar nuevo
+                        // No existía en SQL → es 100% manual
                         $nuevo = [
                             $manual->escudo,
                             $manual->equipo_id,
                             $ptsManual,
                             $porcentajeManual
                         ];
+
+                        // Inicializar jugados acumulados por si vienen más manuales del mismo equipo
+                        $tecnico->jugadosPorEquipo[$manual->equipo_id] = $manual->partidos;
 
                         if ($titulosManual) {
                             $nuevo[] = $titulosManual;

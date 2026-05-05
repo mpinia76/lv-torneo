@@ -30,6 +30,6 @@ class TecnicoEstadisticaManual extends Model
 
     public function tecnico()
     {
-        return $this->belongsTo(tecnico::class);
+        return $this->belongsTo(Tecnico::class);
     }
 }
