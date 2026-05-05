@@ -886,6 +886,16 @@ class ScraperController extends Controller
                     }
                 }
 
+                // 🆕 Fallback for cont/cup when lastRoundsRaw is empty
+                if (!$compName && ($suffix === 'cont' || $suffix === 'cup') && empty($lastRoundsRaw)) {
+                    $clubLink = $xpath->query('.//a', $clubCell)->item(0);
+                    if ($clubLink) {
+                        $clubHref = $clubLink->getAttribute('href');
+                        $clubUrl = "https://www.footballdatabase.eu" . $clubHref;
+                        $compName = $this->resolveCompetitionFromClubPage($clubUrl, $suffix);
+                    }
+                }
+
                 // For cont/cup: parse multiple competitions from lastRoundsRaw
                 // Format: "- Copa Libertadores2e t2e tour - Copa Sudamericana1er 1er tour"
                 if (($suffix === 'cont' || $suffix === 'cup') && $lastRoundsRaw) {
