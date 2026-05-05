@@ -48,10 +48,10 @@
             @php
                 $columns = [
                     'puntaje' => 'Punt.',
-                    'Jugados' => 'J',
-                    'Ganados' => 'G',
-                    'Empatados' => 'E',
-                    'Perdidos' => 'P',
+                    'jugados' => 'J',
+                    'ganados' => 'G',
+                    'empatados' => 'E',
+                    'perdidos' => 'P',
                     'golesl' => 'GF',
                     'golesv' => 'GC',
                     'diferencia' => 'Dif.',
