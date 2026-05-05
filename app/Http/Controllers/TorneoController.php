@@ -2910,7 +2910,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
         // Manuales detallados para los técnicos de la página (para escudos y "jugando")
         $manualesDetalle = collect();
-        if (!$request->query('torneoId') && count($tecnicoIdsPagina)) {
+        if (count($tecnicoIdsPagina)) {
             $manualesDetalle = DB::table('tecnico_estadistica_manuals as m')
                 ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
                 ->select(
