@@ -1184,4 +1184,57 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+    private function resolveCompetitionFromClubPage($clubUrl, $suffix)
+    {
+        $html = HttpHelper::getHtmlContent($clubUrl, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($clubUrl, true);
+        if (!$html) return null;
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        // Keywords for international competitions (suffix=cont)
+        $internacionalKw = ['champions', 'libertadores', 'sudamericana', 'europa league',
+            'concacaf', 'mundial', 'intercontinental', 'club world', 'recopa',
+            'copa america', 'supercopa sudamericana'];
+
+        // Look for competition links in the season's competition list
+        $compLinks = $xpath->query('//a[contains(@href,"/competicion/general/")]');
+
+        $candidates = [];
+        foreach ($compLinks as $link) {
+            $name = trim($link->textContent);
+            if (strlen($name) < 3) continue;
+
+            $isInternational = false;
+            $nameLower = strtolower($name);
+            foreach ($internacionalKw as $kw) {
+                if (strpos($nameLower, $kw) !== false) {
+                    $isInternational = true;
+                    break;
+                }
+            }
+
+            if ($suffix === 'cont' && $isInternational) {
+                $candidates[$name] = true;
+            } elseif ($suffix === 'cup' && !$isInternational
+                && stripos($nameLower, 'liga') === false
+                && stripos($nameLower, 'primera') === false
+                && stripos($nameLower, 'division') === false) {
+                // Domestic cup, not the league
+                $candidates[$name] = true;
+            }
+        }
+
+        // If exactly one candidate, return it. If multiple, return null (ambiguous).
+        if (count($candidates) === 1) {
+            return array_keys($candidates)[0];
+        }
+
+        return null;
+    }
+
 }
