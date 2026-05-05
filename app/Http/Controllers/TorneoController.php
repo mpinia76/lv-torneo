@@ -2685,6 +2685,561 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
     public function tecnicos(Request $request)
     {
+        $order = in_array($request->query('order'), ['puntaje', 'jugados', 'ganados', 'perdidos', 'empatados', 'tecnico', 'prom', 'golesl', 'golesv', 'diferencia', 'porcentaje'])
+            ? $request->query('order')
+            : 'puntaje';
+
+        $tipoOrder = strtoupper($request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
+
+        $actuales = $request->boolean('actuales');
+        $campeones = $request->boolean('campeones');
+
+        $torneoId = $request->query('torneoId') ?? Torneo::orderByDesc('year')->orderByDesc('id')->value('id');
+
+        $nombre = $request->get('buscarpor', session('nombre_filtro_jugador'));
+
+        if ($request->has('buscarpor')) {
+            session(['nombre_filtro_jugador' => $nombre]);
+        }
+
+        $params = [];
+        $nombreFiltro = '';
+        $nombreFiltro2 = '';
+        $nombreFiltro3 = '';
+
+        if ($nombre) {
+            $nombreFiltro = " AND (personas.apellido LIKE ? OR personas.nombre LIKE ?) ";
+            $nombreFiltro2 = " AND (P2.apellido LIKE ? OR P2.nombre LIKE ?) ";
+            $nombreFiltro3 = " AND (P3.apellido LIKE ? OR P3.nombre LIKE ?) ";
+
+            $like = "%$nombre%";
+            array_push($params, $like, $like);
+        }
+
+        $year = date('Y');
+
+        /**
+         * Filtros dinámicos
+         */
+        $filtroActuales = '';
+        if ($actuales) {
+            $filtroActuales = " AND EXISTS (
+            SELECT PT1.id
+            FROM partido_tecnicos PT1
+            INNER JOIN tecnicos TEC ON PT1.tecnico_id = TEC.id
+            INNER JOIN personas P2 ON TEC.persona_id = P2.id
+            INNER JOIN partidos ON PT1.partido_id = partidos.id
+            INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
+            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+            WHERE T1.year LIKE ?
+            AND TEC.id = tecnicos.id
+            $nombreFiltro2
+        )";
+
+            $params[] = "%$year%";
+            if ($nombre) {
+                array_push($params, $like, $like);
+            }
+        }
+
+        $filtroCampeones = '';
+        if ($campeones) {
+            $filtroCampeones = " AND EXISTS (
+            SELECT PT2.id
+            FROM partido_tecnicos PT2
+            INNER JOIN tecnicos T2 ON PT2.tecnico_id = T2.id
+            INNER JOIN personas P3 ON T2.persona_id = P3.id
+            INNER JOIN partidos par ON PT2.partido_id = par.id
+            INNER JOIN fechas F2 ON par.fecha_id = F2.id
+            INNER JOIN grupos G2 ON G2.id = F2.grupo_id
+            INNER JOIN posicion_torneos
+                ON posicion_torneos.torneo_id = G2.torneo_id
+                AND posicion_torneos.equipo_id = PT2.equipo_id
+                AND posicion_torneos.posicion = 1
+            WHERE T2.id = tecnicos.id
+            $nombreFiltro3
+        )";
+
+            if ($nombre) {
+                array_push($params, $like, $like);
+            }
+        }
+
+        /**
+         * Base query (reutilizable) — SOLO datos de partidos
+         */
+        $baseQuery = "
+        SELECT DISTINCT
+            personas.name as tecnico,
+            CONCAT(personas.apellido, ', ', personas.nombre) completo,
+            personas.foto fotoTecnico,
+            personas.nacionalidad nacionalidadTecnico,
+            tecnicos.id tecnico_id,
+            %s golesl,
+            %s golesv,
+            equipos.escudo,
+            fechas.id fecha_id
+        FROM partidos
+        INNER JOIN equipos ON %s
+        INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+        INNER JOIN fechas ON partidos.fecha_id = fechas.id
+        INNER JOIN grupos ON fechas.grupo_id = grupos.id
+        INNER JOIN partido_tecnicos
+            ON partidos.id = partido_tecnicos.partido_id
+            AND equipos.id = partido_tecnicos.equipo_id
+        INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+        INNER JOIN personas ON personas.id = tecnicos.persona_id
+        WHERE golesl IS NOT NULL AND golesv IS NOT NULL
+        $nombreFiltro
+        $filtroActuales
+        $filtroCampeones
+    ";
+
+        $sqlUnion = sprintf($baseQuery, 'golesl', 'golesv', 'partidos.equipol_id = equipos.id')
+            . " UNION ALL " .
+            sprintf($baseQuery, 'golesv', 'golesl', 'partidos.equipov_id = equipos.id');
+
+        /**
+         * Query final con manuales sumados vía LEFT JOIN agregado.
+         * El ORDER BY y la paginación se aplican YA con los totales correctos.
+         */
+        $sql = "
+        SELECT
+            base.tecnico,
+            base.fotoTecnico,
+            base.nacionalidadTecnico,
+            base.tecnico_id,
+
+            (base.jugados_sql + COALESCE(man.jugados_man, 0))     AS jugados,
+            (base.ganados_sql + COALESCE(man.ganados_man, 0))     AS ganados,
+            (base.perdidos_sql + COALESCE(man.perdidos_man, 0))   AS perdidos,
+            (base.empatados_sql + COALESCE(man.empatados_man, 0)) AS empatados,
+            (base.golesl_sql + COALESCE(man.golesl_man, 0))       AS golesl,
+            (base.golesv_sql + COALESCE(man.golesv_man, 0))       AS golesv,
+            (base.golesl_sql + COALESCE(man.golesl_man, 0))
+              - (base.golesv_sql + COALESCE(man.golesv_man, 0))   AS diferencia,
+            (base.puntaje_sql + COALESCE(man.puntaje_man, 0))     AS puntaje,
+
+            CASE
+                WHEN (base.jugados_sql + COALESCE(man.jugados_man, 0)) > 0
+                THEN CONCAT(
+                    ROUND(
+                        ((base.puntaje_sql + COALESCE(man.puntaje_man, 0)) * 100)
+                        / ((base.jugados_sql + COALESCE(man.jugados_man, 0)) * 3),
+                        2
+                    ),
+                    '%'
+                )
+                ELSE '0%'
+            END AS porcentaje,
+
+            CASE
+                WHEN (base.jugados_sql + COALESCE(man.jugados_man, 0)) > 0
+                THEN ROUND(
+                    (base.puntaje_sql + COALESCE(man.puntaje_man, 0))
+                    / (base.jugados_sql + COALESCE(man.jugados_man, 0)),
+                    2
+                )
+                ELSE 0
+            END AS prom,
+
+            '' AS escudo,
+            '' AS jugando,
+            '' AS titulos
+        FROM (
+            SELECT
+                tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id,
+                COUNT(*) AS jugados_sql,
+                COUNT(CASE WHEN golesl > golesv THEN 1 END) AS ganados_sql,
+                COUNT(CASE WHEN golesv > golesl THEN 1 END) AS perdidos_sql,
+                COUNT(CASE WHEN golesl = golesv THEN 1 END) AS empatados_sql,
+                SUM(golesl) AS golesl_sql,
+                SUM(golesv) AS golesv_sql,
+                SUM(
+                    CASE WHEN golesl > golesv THEN 3 ELSE 0 END +
+                    CASE WHEN golesl = golesv THEN 1 ELSE 0 END
+                ) AS puntaje_sql
+            FROM ( $sqlUnion ) a
+            GROUP BY tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
+        ) base
+        LEFT JOIN (
+            SELECT
+                tecnico_id,
+                SUM(partidos)        AS jugados_man,
+                SUM(ganados)         AS ganados_man,
+                SUM(empatados)       AS empatados_man,
+                SUM(perdidos)        AS perdidos_man,
+                SUM(goles_favor)     AS golesl_man,
+                SUM(goles_en_contra) AS golesv_man,
+                SUM(ganados * 3 + empatados) AS puntaje_man
+            FROM tecnico_estadistica_manuals
+            GROUP BY tecnico_id
+        ) man ON man.tecnico_id = base.tecnico_id
+        ORDER BY $order $tipoOrder, jugados DESC, tecnico ASC
+    ";
+
+        $tecnicosFull = DB::select($sql, $params);
+
+        /**
+         * Paginación en PHP (ya está ordenado por SQL)
+         */
+        $page = $request->query('page', 1);
+        $paginate = 15;
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($tecnicosFull, $offSet, $paginate, true);
+
+        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsForCurrentPage,
+            count($tecnicosFull),
+            $paginate,
+            $page
+        );
+
+        /**
+         * Solo procesamos títulos y escudos para los técnicos de la página actual.
+         * Eager-load de Titulo con torneos una sola vez fuera del loop.
+         */
+        $titulosExtras = Titulo::with('torneos')->get();
+
+        // IDs de la página actual
+        $tecnicoIdsPagina = collect($itemsForCurrentPage)->pluck('tecnico_id')->filter()->toArray();
+
+        // Manuales detallados para los técnicos de la página (para escudos y "jugando")
+        $manualesDetalle = collect();
+        if (!$request->query('torneoId') && count($tecnicoIdsPagina)) {
+            $manualesDetalle = DB::table('tecnico_estadistica_manuals as m')
+                ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
+                ->select(
+                    'm.tecnico_id',
+                    'm.partidos',
+                    'm.posicion',
+                    'm.ganados',
+                    'm.empatados',
+                    'm.perdidos',
+                    'm.goles_favor',
+                    'm.goles_en_contra',
+                    'm.tipo',
+                    'm.ambito',
+                    'equipos.escudo',
+                    'equipos.id as equipo_id',
+                    'equipos.nombre',
+                    'm.torneo_nombre'
+                )
+                ->whereIn('m.tecnico_id', $tecnicoIdsPagina)
+                ->get()
+                ->groupBy('tecnico_id');
+        }
+
+        foreach ($goleadores as $goleador) {
+            $titulosTecnicoCopa = 0;
+            $titulosTecnicoLiga = 0;
+            $titulosTecnicoInternacional = 0;
+            $titulosTecnicoCopaEquipo = [];
+            $titulosTecnicoLigaEquipo = [];
+            $titulosTecnicoInternacionalEquipo = [];
+
+            // Torneos jugados por este técnico
+            $sqlTorneos = '
+            SELECT DISTINCT grupos.torneo_id, partido_tecnicos.equipo_id
+            FROM partido_tecnicos
+            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+            INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            WHERE tecnicos.id = ?
+        ';
+
+            $torneosJugados = DB::select($sqlTorneos, [$goleador->tecnico_id]);
+
+            foreach ($torneosJugados as $tj) {
+                $grupoIds = Grupo::where('torneo_id', $tj->torneo_id)->pluck('id');
+                $fechaIds = Fecha::whereIn('grupo_id', $grupoIds)->pluck('id');
+
+                $posicionTorneo = PosicionTorneo::where('torneo_id', $tj->torneo_id)
+                    ->where('equipo_id', $tj->equipo_id)
+                    ->where('posicion', 1)
+                    ->first();
+
+                if (!empty($posicionTorneo)) {
+                    $ultimoPartido = Partido::whereIn('fecha_id', $fechaIds)
+                        ->where(function ($query) use ($posicionTorneo) {
+                            $query->where('equipol_id', $posicionTorneo->equipo_id)
+                                ->orWhere('equipov_id', $posicionTorneo->equipo_id);
+                        })
+                        ->orderBy('dia', 'DESC')
+                        ->first();
+
+                    if ($ultimoPartido) {
+                        $partidoTecnico = PartidoTecnico::where('partido_id', $ultimoPartido->id)
+                            ->where('equipo_id', $posicionTorneo->equipo_id)
+                            ->where('tecnico_id', $goleador->tecnico_id)
+                            ->first();
+
+                        if (!empty($partidoTecnico)) {
+                            $torneo = Torneo::findOrFail($tj->torneo_id);
+                            if ($torneo->ambito == 'Nacional') {
+                                if ($torneo->tipo == 'Copa') {
+                                    $titulosTecnicoCopa++;
+                                    $titulosTecnicoCopaEquipo[$posicionTorneo->equipo_id] = ($titulosTecnicoCopaEquipo[$posicionTorneo->equipo_id] ?? 0) + 1;
+                                } else {
+                                    $titulosTecnicoLiga++;
+                                    $titulosTecnicoLigaEquipo[$posicionTorneo->equipo_id] = ($titulosTecnicoLigaEquipo[$posicionTorneo->equipo_id] ?? 0) + 1;
+                                }
+                            } else {
+                                $titulosTecnicoInternacional++;
+                                $titulosTecnicoInternacionalEquipo[$posicionTorneo->equipo_id] = ($titulosTecnicoInternacionalEquipo[$posicionTorneo->equipo_id] ?? 0) + 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Títulos extras
+            foreach ($titulosExtras as $tituloExtra) {
+                $equipoId = $tituloExtra->equipo_id;
+                $torneosIds = $tituloExtra->torneos->pluck('id')->toArray();
+                if (empty($torneosIds)) continue;
+
+                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function ($q) use ($torneosIds) {
+                    $q->whereIn('torneo_id', $torneosIds);
+                })
+                    ->where(function ($q) use ($equipoId) {
+                        $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
+                    })
+                    ->orderBy('dia', 'DESC')
+                    ->first();
+
+                if (!$ultimoPartidoEquipo) continue;
+
+                $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
+                    ->where('equipo_id', $equipoId)
+                    ->where('tecnico_id', $goleador->tecnico_id)
+                    ->exists();
+
+                if ($dirigio) {
+                    if ($tituloExtra->ambito == 'Nacional') {
+                        if ($tituloExtra->tipo == 'Copa') {
+                            $titulosTecnicoCopa++;
+                            $titulosTecnicoCopaEquipo[$equipoId] = ($titulosTecnicoCopaEquipo[$equipoId] ?? 0) + 1;
+                        } else {
+                            $titulosTecnicoLiga++;
+                            $titulosTecnicoLigaEquipo[$equipoId] = ($titulosTecnicoLigaEquipo[$equipoId] ?? 0) + 1;
+                        }
+                    } else {
+                        $titulosTecnicoInternacional++;
+                        $titulosTecnicoInternacionalEquipo[$equipoId] = ($titulosTecnicoInternacionalEquipo[$equipoId] ?? 0) + 1;
+                    }
+                }
+            }
+
+            // Títulos provenientes de manuales (si aplica)
+            $ligasManualEquipo = [];
+            $copasManualEquipo = [];
+            $internacionalesManualEquipo = [];
+
+            if (isset($manualesDetalle[$goleador->tecnico_id])) {
+                foreach ($manualesDetalle[$goleador->tecnico_id] as $manual) {
+                    if ($manual->posicion == 1) {
+                        if ($manual->ambito == 'Nacional') {
+                            if ($manual->tipo == 'Copa') {
+                                $titulosTecnicoCopa++;
+                                $titulosTecnicoCopaEquipo[$manual->equipo_id] = ($titulosTecnicoCopaEquipo[$manual->equipo_id] ?? 0) + 1;
+                                $copasManualEquipo[$manual->equipo_id] = ($copasManualEquipo[$manual->equipo_id] ?? 0) + 1;
+                            } else {
+                                $titulosTecnicoLiga++;
+                                $titulosTecnicoLigaEquipo[$manual->equipo_id] = ($titulosTecnicoLigaEquipo[$manual->equipo_id] ?? 0) + 1;
+                                $ligasManualEquipo[$manual->equipo_id] = ($ligasManualEquipo[$manual->equipo_id] ?? 0) + 1;
+                            }
+                        } else {
+                            $titulosTecnicoInternacional++;
+                            $titulosTecnicoInternacionalEquipo[$manual->equipo_id] = ($titulosTecnicoInternacionalEquipo[$manual->equipo_id] ?? 0) + 1;
+                            $internacionalesManualEquipo[$manual->equipo_id] = ($internacionalesManualEquipo[$manual->equipo_id] ?? 0) + 1;
+                        }
+                    }
+                }
+            }
+
+            // String de títulos consolidado
+            $totalTitulos = $titulosTecnicoCopa + $titulosTecnicoLiga + $titulosTecnicoInternacional;
+            if ($totalTitulos == 0) {
+                $goleador->titulos = '';
+            } else {
+                $ligas = $titulosTecnicoLiga ? $titulosTecnicoLiga . ' Ligas' : '';
+                $copas = $titulosTecnicoCopa ? $titulosTecnicoCopa . ' Copas' : '';
+                $internacionales = $titulosTecnicoInternacional ? $titulosTecnicoInternacional . ' Internacionales' : '';
+                $goleador->titulos = $totalTitulos . ' (' . trim($ligas . ' ' . $copas . ' ' . $internacionales) . ')';
+            }
+
+            // Equipos en los que está dirigiendo este año (SQL)
+            $sqlJugando = "
+            SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
+            FROM partido_tecnicos
+            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+            INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
+            INNER JOIN torneos ON torneos.id = grupos.torneo_id
+            WHERE torneos.year LIKE ? AND tecnicos.id = ?
+        ";
+
+            $jugando = '';
+            $juega = DB::select($sqlJugando, ["%$year%", $goleador->tecnico_id]);
+            foreach ($juega as $e) {
+                $jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+            }
+
+            // Sumar al "jugando" los equipos del año actual desde manuales
+            if (isset($manualesDetalle[$goleador->tecnico_id])) {
+                foreach ($manualesDetalle[$goleador->tecnico_id] as $manual) {
+                    if (str_contains($manual->torneo_nombre, $year)) {
+                        $jugando .= $manual->escudo . '_' . $manual->equipo_id . '_' . $manual->nombre . ',';
+                    }
+                }
+            }
+
+            $goleador->jugando = $jugando;
+
+            // Estadísticas por equipo (SQL)
+            $sql2 = '
+            SELECT equipo, escudo, equipo_id,
+                   count(*) jugados,
+                   count(case when golesl > golesv then 1 end) ganados,
+                   count(case when golesv > golesl then 1 end) perdidos,
+                   count(case when golesl = golesv then 1 end) empatados,
+                   sum(golesl) golesl,
+                   sum(golesv) golesv,
+                   sum(golesl) - sum(golesv) diferencia,
+                   sum(
+                         case when golesl > golesv then 3 else 0 end
+                       + case when golesl = golesv then 1 else 0 end
+                   ) puntaje,
+                   CONCAT(
+                        ROUND(
+                            (
+                                sum(
+                                    case when golesl > golesv then 3 else 0 end
+                                  + case when golesl = golesv then 1 else 0 end
+                                ) * 100/(COUNT(*)*3)
+                            ),
+                            2
+                        ),
+                        \'%\'
+                   ) porcentaje
+            FROM (
+                   SELECT equipos.nombre equipo, equipos.id equipo_id, golesl, golesv, equipos.escudo
+                   FROM partidos
+                   INNER JOIN equipos ON partidos.equipol_id = equipos.id
+                   INNER JOIN partido_tecnicos
+                        ON partidos.id = partido_tecnicos.partido_id
+                        AND equipos.id = partido_tecnicos.equipo_id
+                   INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+                   WHERE golesl IS NOT NULL
+                     AND golesv IS NOT NULL
+                     AND tecnicos.id = ?
+
+                   UNION ALL
+
+                   SELECT equipos.nombre equipo, equipos.id equipo_id, golesv, golesl, equipos.escudo
+                   FROM partidos
+                   INNER JOIN equipos ON partidos.equipov_id = equipos.id
+                   INNER JOIN partido_tecnicos
+                        ON partidos.id = partido_tecnicos.partido_id
+                        AND equipos.id = partido_tecnicos.equipo_id
+                   INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
+                   WHERE golesl IS NOT NULL
+                     AND golesv IS NOT NULL
+                     AND tecnicos.id = ?
+            ) a
+            GROUP BY equipo, escudo, equipo_id
+            ORDER BY puntaje DESC, diferencia DESC, golesl DESC
+        ';
+
+            $escudos = DB::select($sql2, [$goleador->tecnico_id, $goleador->tecnico_id]);
+
+            // Construir array indexado por equipo_id con todos los datos necesarios
+            // para luego fusionar con los manuales sin perder partidos jugados
+            $escudosArray = [];
+            foreach ($escudos as $escudo) {
+                $escudosArray[$escudo->equipo_id] = [
+                    'escudo' => $escudo->escudo,
+                    'equipo_id' => $escudo->equipo_id,
+                    'puntaje' => (int)$escudo->puntaje,
+                    'jugados' => (int)$escudo->jugados,
+                    'porcentaje' => $escudo->porcentaje,
+                ];
+            }
+
+            // Fusionar con manuales: sumar puntaje y jugados, recalcular porcentaje
+            if (isset($manualesDetalle[$goleador->tecnico_id])) {
+                foreach ($manualesDetalle[$goleador->tecnico_id] as $manual) {
+                    $ptsManual = ($manual->ganados * 3) + $manual->empatados;
+
+                    if (isset($escudosArray[$manual->equipo_id])) {
+                        $escudosArray[$manual->equipo_id]['puntaje'] += $ptsManual;
+                        $escudosArray[$manual->equipo_id]['jugados'] += $manual->partidos;
+                    } else {
+                        $escudosArray[$manual->equipo_id] = [
+                            'escudo' => $manual->escudo,
+                            'equipo_id' => $manual->equipo_id,
+                            'puntaje' => $ptsManual,
+                            'jugados' => $manual->partidos,
+                            'porcentaje' => '0%',
+                        ];
+                    }
+
+                    // Recalcular porcentaje con totales acumulados
+                    $j = $escudosArray[$manual->equipo_id]['jugados'];
+                    $p = $escudosArray[$manual->equipo_id]['puntaje'];
+                    $escudosArray[$manual->equipo_id]['porcentaje'] = $j > 0
+                        ? round($p * 100 / ($j * 3), 2) . '%'
+                        : '0%';
+                }
+            }
+
+            // Reordenar por puntaje descendente (como hacía el SQL original)
+            uasort($escudosArray, function ($a, $b) {
+                return $b['puntaje'] <=> $a['puntaje'];
+            });
+
+            // Reconstruir string final con títulos por equipo
+            $goleador->escudo = '';
+            foreach ($escudosArray as $equipoId => $data) {
+                $tl = $titulosTecnicoLigaEquipo[$equipoId] ?? 0;
+                $tc = $titulosTecnicoCopaEquipo[$equipoId] ?? 0;
+                $ti = $titulosTecnicoInternacionalEquipo[$equipoId] ?? 0;
+
+                $linea = $data['escudo'] . '_' . $data['equipo_id'] . '_' . $data['puntaje'] . '_' . $data['porcentaje'];
+
+                if ($tc + $tl + $ti > 0) {
+                    $ligasStr = $tl ? $tl . ' Ligas' : '';
+                    $copasStr = $tc ? $tc . ' Copas' : '';
+                    $internacionalesStr = $ti ? $ti . ' Internacionales' : '';
+                    $titulos = ($tc + $tl + $ti) . ' (' . trim($ligasStr . ' ' . $copasStr . ' ' . $internacionalesStr) . ')';
+                    $linea .= '_' . $titulos;
+                }
+
+                $goleador->escudo .= $linea . ',';
+            }
+        }
+
+        $goleadores->setPath(route('torneos.tecnicos', [
+            'order' => $order,
+            'tipoOrder' => $tipoOrder,
+            'actuales' => $actuales,
+            'campeones' => $campeones,
+            'torneoId' => $torneoId,
+        ]));
+
+        $i = $offSet + 1;
+
+        return view('torneos.tecnicos', compact('goleadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId', 'campeones'));
+    }
+
+    public function tecnicos_old(Request $request)
+    {
 
         $order = in_array($request->query('order'), ['puntaje','jugados','ganados','perdidos','empatados','tecnico'])
             ? $request->query('order')
@@ -2848,13 +3403,24 @@ ORDER BY $order $tipoOrder, jugados DESC, tecnico ASC
         /**
          * Ejecutar
          */
-        /**
-         * Ejecutar
-         */
         $goleadores = DB::select($sql, $params);
 
-// Convertir a colección para poder iterar/ordenar/paginar después
-        $goleadores = collect($goleadores);
+        /**
+         * Paginación (igual que la tuya)
+         */
+        $page = $request->query('page', 1);
+        $paginate = 15;
+        $offSet = ($page * $paginate) - $paginate;
+
+        $itemsForCurrentPage = array_slice($goleadores, $offSet, $paginate, true);
+
+        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsForCurrentPage,
+            count($goleadores),
+            $paginate,
+            $page
+        );
+
 
         foreach ($goleadores as $goleador){
             $titulosTecnicoCopa=0;
@@ -3081,8 +3647,11 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
 
         }
 
+        $goleadores->setPath(route('torneos.tecnicos',array('order'=>$order,'tipoOrder'=>$tipoOrder,'actuales'=>$actuales,'campeones'=>$campeones,'torneoId'=>$torneoId)));
+
+
         // Obtener IDs de técnicos ya cargados
-        $tecnicoIds = $goleadores->pluck('tecnico_id')->filter()->toArray();
+        $tecnicoIds = $goleadores->getCollection()->pluck('tecnico_id')->filter()->toArray();
 
 // Traer manuales solo si no hay filtro de torneo y hay técnicos
         $manuales = collect();
@@ -3113,8 +3682,9 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         }
 
 // Transformar colección agregando manuales a los técnicos existentes
-        // Transformar colección agregando manuales a los técnicos existentes
-        $goleadores->transform(function ($tecnico) use ($manuales, $year) {
+        $collection = $goleadores->getCollection();
+
+        $collection->transform(function ($tecnico) use ($manuales, $year) {
             if (isset($manuales[$tecnico->tecnico_id])) {
                 $equipos = [];
 
@@ -3217,34 +3787,21 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                         $ptsExistente = (int)$escudosArray[$manual->equipo_id][2];
                         $ptsTotal = $ptsExistente + $ptsManual;
 
-                        // Total de partidos = los que ya tenía (del SQL) + los del manual
-                        $jugadosExistente = $tecnico->jugadosPorEquipo[$manual->equipo_id] ?? 0;
-                        $jugadosTotal = $jugadosExistente + $manual->partidos;
-
                         $escudosArray[$manual->equipo_id][2] = $ptsTotal;
-                        $escudosArray[$manual->equipo_id][3] = $jugadosTotal > 0
-                            ? round($ptsTotal * 100 / ($jugadosTotal * 3), 2).'%'
-                            : '0%';
-
-                        // Actualizar el contador de jugados acumulado para futuras iteraciones
-                        // (por si hay más de un registro manual para el mismo equipo)
-                        $tecnico->jugadosPorEquipo[$manual->equipo_id] = $jugadosTotal;
+                        $escudosArray[$manual->equipo_id][3] = round($ptsTotal*(100/(($manual->partidos)*3)),2).'%';
 
                         if ($titulosManual) {
                             $escudosArray[$manual->equipo_id][4] = $titulosManual;
                         }
 
                     } else {
-                        // No existía en SQL → es 100% manual
+                        // si no existe → agregar nuevo
                         $nuevo = [
                             $manual->escudo,
                             $manual->equipo_id,
                             $ptsManual,
                             $porcentajeManual
                         ];
-
-                        // Inicializar jugados acumulados por si vienen más manuales del mismo equipo
-                        $tecnico->jugadosPorEquipo[$manual->equipo_id] = $manual->partidos;
 
                         if ($titulosManual) {
                             $nuevo[] = $titulosManual;
@@ -3279,35 +3836,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             return $tecnico;
         });
 
-        // Reordenar DESPUÉS de sumar manuales, en PHP
-        $goleadores = $goleadores->sortBy([
-            [$order, strtolower($tipoOrder) === 'asc' ? 'asc' : 'desc'],
-            ['jugados', 'desc'],
-            ['tecnico', 'asc'],
-        ])->values();
-
-// Paginar manualmente después del orden
-        $page = $request->query('page', 1);
-        $paginate = 15;
-        $offSet = ($page * $paginate) - $paginate;
-
-        $total = $goleadores->count();
-        $itemsForCurrentPage = $goleadores->slice($offSet, $paginate)->values();
-
-        $goleadores = new \Illuminate\Pagination\LengthAwarePaginator(
-            $itemsForCurrentPage,
-            $total,
-            $paginate,
-            $page
-        );
-
-        $goleadores->setPath(route('torneos.tecnicos', [
-            'order' => $order,
-            'tipoOrder' => $tipoOrder,
-            'actuales' => $actuales,
-            'campeones' => $campeones,
-            'torneoId' => $torneoId
-        ]));
+        $goleadores->setCollection($collection);
 
 
 
