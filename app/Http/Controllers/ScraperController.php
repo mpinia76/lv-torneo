@@ -887,12 +887,15 @@ class ScraperController extends Controller
                 }
 
                 // 🆕 Fallback for cont/cup when lastRoundsRaw is empty
+                // 🆕 Fallback for cont/cup when lastRoundsRaw is empty
                 if (!$compName && ($suffix === 'cont' || $suffix === 'cup') && empty($lastRoundsRaw)) {
                     $clubLink = $xpath->query('.//a', $clubCell)->item(0);
                     if ($clubLink) {
                         $clubHref = $clubLink->getAttribute('href');
                         $clubUrl = "https://www.footballdatabase.eu" . $clubHref;
+                        \Log::info("[FALLBACK] Resolving for {$club} {$year} suffix={$suffix} url={$clubUrl}");
                         $compName = $this->resolveCompetitionFromClubPage($clubUrl, $suffix);
+                        \Log::info("[FALLBACK] Result: " . ($compName ?? 'NULL'));
                     }
                 }
 
@@ -1228,6 +1231,8 @@ class ScraperController extends Controller
                 $candidates[$name] = true;
             }
         }
+
+        \Log::info("[RESOLVE] Suffix={$suffix} candidates=" . json_encode(array_keys($candidates)));
 
         // If exactly one candidate, return it. If multiple, return null (ambiguous).
         if (count($candidates) === 1) {
