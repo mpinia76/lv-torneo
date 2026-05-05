@@ -156,26 +156,29 @@ class HttpHelper
     public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
-
+        //Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
         if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
-            //Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
+            Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
             return false;
         }
 
         if ($usarScraperRemoto) {
             $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
 
-            $scraperEndpoint = 'https://scrape-prod.up.railway.app/scrape?' . http_build_query([
-                    'url' => $urlOriginal
+            $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
+                    'api_key' => 'a36c0383b6153a740f783cc5ba9bd54c',
+                    'url'     => $urlOriginal,
+                    'render'  => 'true',
+                    'premium' => 'true',
                 ]);
 
-            //Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
+            Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
 
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $scraperEndpoint);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
 
             $response = curl_exec($ch);
 
@@ -186,6 +189,10 @@ class HttpHelper
 
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
+
+            //Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
+            //Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
+
 
             if ($httpCode >= 400) {
                 //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
@@ -204,18 +211,28 @@ class HttpHelper
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
-            // Evita el 403 añadiendo User-Agent tipo navegador
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.90 Safari/537.36');
+            $headers = [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language: es-AR,es;q=0.9,en;q=0.8',
+                'Accept-Encoding: gzip, deflate',
+                'Referer: https://www.livefutbol.com/',
+                'Connection: keep-alive',
+                'Upgrade-Insecure-Requests: 1',
+            ];
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_ENCODING, ''); // maneja gzip/deflate automáticamente
+
+            //Log::channel('mi_log')->debug("[DIRECTO] Antes de curl_exec | URL: $urlOriginal");
 
             $response = curl_exec($ch);
 
-            if (curl_errno($ch)) {
-                //Log::channel('mi_log')->error('Error en cURL: ' . curl_error($ch));
-                return false;
-            }
+            //Log::channel('mi_log')->debug("[DIRECTO] Después de curl_exec | bytes: " . strlen($response ?: ''));
 
-            if ($response === false) {
-                //Log::channel('mi_log')->error('Fallo en la solicitud cURL para la URL: ' . $urlOriginal);
+            if (curl_errno($ch)) {
+                $errNo  = curl_errno($ch);
+                $errMsg = curl_error($ch);
+                //Log::channel('mi_log')->error("[DIRECTO] cURL error #$errNo: $errMsg | URL: $urlOriginal");
                 curl_close($ch);
                 return false;
             }
@@ -223,9 +240,38 @@ class HttpHelper
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
+            //Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
+            //Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
+
             if ($httpCode == 404) {
-                //Log::channel('mi_log')->warning('Página no encontrada (404) para la URL: ' . $urlOriginal);
                 return false;
+            }
+
+// Retry up to 3 times if 403 or empty
+            if ($httpCode == 403 || empty($response)) {
+                for ($i = 1; $i <= 3; $i++) {
+                    sleep(2);
+                    //Log::channel('mi_log')->debug("[DIRECTO] Retry $i para: $urlOriginal");
+
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $urlOriginal);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                    curl_setopt($ch, CURLOPT_ENCODING, '');
+                    $response = curl_exec($ch);
+                    $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+
+                    //Log::channel('mi_log')->debug("[DIRECTO] Retry $i HTTP Code: $httpCode");
+
+                    if ($httpCode == 200 && !empty($response)) {
+                        return $response;
+                    }
+                }
+                // All retries failed, try remote scraper as last resort
+                return self::getHtmlContent($urlOriginal, true);
             }
 
             return $response;
