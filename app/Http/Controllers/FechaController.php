@@ -9114,7 +9114,7 @@ private function normalizarMinuto(string $texto): int
                     $tipopenal = '';
                     switch ($tipoInc) {
                         case 'Penal errado':  $tipopenal = 'Errado'; break;
-                        case 'Penal atajado': $tipopenal = 'Atajado'; break;
+                        case 'Penal atajado': $tipopenal = 'Atajó'; break;
                     }
 
                     if ($tipopenal) {
