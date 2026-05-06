@@ -278,7 +278,7 @@ class HttpHelper
         }
     }
 
-    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false): string|false
+    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
 
