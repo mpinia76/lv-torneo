@@ -153,7 +153,7 @@ class HttpHelper
     }
 
 
-    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent_other(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
         //Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
@@ -278,4 +278,39 @@ class HttpHelper
         }
     }
 
+    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false): string|false
+    {
+        $urlOriginal = trim($urlOriginal);
+
+        if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $targetUrl = $usarScraperRemoto
+            ? 'https://scrape-prod.up.railway.app/scrape?' . http_build_query(['url' => $urlOriginal])
+            : $urlOriginal;
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $targetUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT        => 30,
+        ]);
+
+        $response = curl_exec($ch);
+        $curlError = curl_errno($ch);
+        $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($curlError || $response === false) {
+            return false;
+        }
+
+        if ($httpCode >= 400) {
+            return false;
+        }
+
+        return $response;
+    }
 }
