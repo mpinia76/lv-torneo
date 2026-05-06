@@ -783,7 +783,9 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
                     'favor' => $manual->goles_favor,
                     'contra' => $manual->goles_en_contra,
                     'puntaje' => $manual->ganados*3+$manual->empatados, // opcional si no lo calculas aquí
-                    'porcentaje' => round(($manual->ganados*3+$manual->empatados)*(100/($manual->partidos*3)),2).'%',
+                    'porcentaje' => $manual->partidos > 0
+                        ? round(($manual->ganados * 3 + $manual->empatados) * (100 / ($manual->partidos * 3)), 2) . '%'
+                        : '0%',
                     'tipo' => $manual->tipo,
                     'ambito' => $manual->ambito
                 ];
