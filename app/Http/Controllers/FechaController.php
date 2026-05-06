@@ -8757,6 +8757,8 @@ private function normalizarMinuto(string $texto): int
             $success .= '⚠️ WARNING: ' . $strVisitante . ' tiene solo ' . $titularesVisitante . ' titular/es (se esperan 11).<br>';
         }
 
+        // AGREGAR:
+        $success .= '<span style="color:orange">⚠️ WARNING: Técnicos no importados. Verificar manualmente.</span><br>';
         // -----------------------------------------------------------------------
         // 8. SAVE REFEREES
         // -----------------------------------------------------------------------
