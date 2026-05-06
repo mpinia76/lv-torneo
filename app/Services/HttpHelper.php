@@ -153,7 +153,7 @@ class HttpHelper
     }
 
 
-    public static function getHtmlContent_other(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
         //Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
@@ -278,7 +278,7 @@ class HttpHelper
         }
     }
 
-    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent_old(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
 
