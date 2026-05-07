@@ -9,7 +9,7 @@ use App\Equipo;
 use App\Torneo;
 use App\EquipoEstadisticaManual;
 use Illuminate\Support\Str;
-
+use App\CompetenciaExcluida;
 class ScraperController extends Controller
 {
     public function test()
@@ -384,6 +384,11 @@ class ScraperController extends Controller
         return response()->json([]);
     }
 
+    private function debeExcluirCompetencia($nombre)
+    {
+        return CompetenciaExcluida::debeExcluir($nombre);
+    }
+
     private function normalizeKey($name, $year)
     {
         $name = \Str::of($name)
@@ -537,6 +542,10 @@ class ScraperController extends Controller
                         continue;
                     }
 
+                    if ($this->debeExcluirCompetencia($compName)) {
+                        continue;
+                    }
+
                     $dom3 = new \DOMDocument();
                     @$dom3->loadHTML($htmlSeason);
 
@@ -621,7 +630,7 @@ class ScraperController extends Controller
 
                 $key = $this->normalizeKey($compName, $seasonYear);
                 //log::info($key);
-                if (!isset($existentes[$key])) {
+                if (!isset($existentes[$key]) && !$this->debeExcluirCompetencia($compName)) {
 
                     $rows = $xp2->query("//tr[contains(@class,'match')]");
 
@@ -736,6 +745,10 @@ class ScraperController extends Controller
                 ->trim();
 
             if (isset($existentes[$key])) {
+                continue;
+            }
+
+            if ($this->debeExcluirCompetencia($torneo)) {
                 continue;
             }
 
@@ -938,6 +951,11 @@ class ScraperController extends Controller
                         'concacaf', 'mundial', 'intercontinental', 'club world', 'recopa'];
 
                     foreach ($competitionsFound as $cName) {
+
+                        if ($this->debeExcluirCompetencia($cName)) {
+                            continue;
+                        }
+
                         $competition = $cName . ' ' . $year;
                         $key = (string) \Str::of($competition)->lower()->ascii()
                             ->replaceMatches('/\s+/', ' ')->trim();
@@ -972,11 +990,19 @@ class ScraperController extends Controller
                 // For champ: single entry
                 if (!$compName) $compName = $meta['tipo'];
 
+                if ($this->debeExcluirCompetencia($compName)) {
+                    continue;
+                }
+
                 $competition = $compName . ' ' . $year;
                 $key = (string) \Str::of($competition)->lower()->ascii()
                     ->replaceMatches('/\s+/', ' ')->trim();
 
                 if (isset($existentes[$key])) continue;
+
+                if ($this->debeExcluirCompetencia($compName)) {
+                    continue;
+                }
 
                 $data[] = [
                     'competition' => $competition,

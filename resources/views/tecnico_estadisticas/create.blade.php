@@ -416,7 +416,7 @@
 
                 html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
                 html += '<table class="table table-sm">';
-                html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
+                html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th><th>Excluir</th></tr>';
 
                 html += `<tr>
             <td>${logoHtml}</td>
@@ -433,6 +433,12 @@
             <td>
                 <button onclick='usarDato(${JSON.stringify(competition)})'
                     class="btn btn-success btn-sm">Usar</button>
+            </td>
+            <td>
+                <button onclick='excluirCompetencia(${JSON.stringify(competition.competition)}, this)'
+                    class="btn btn-danger btn-sm" title="No mostrar más esta competencia">
+                    🚫
+                </button>
             </td>
         </tr>`;
 
@@ -473,6 +479,55 @@
                 })
                 .finally(() => {
                     document.getElementById('loadingScraper').style.display = 'none';
+                });
+        }
+
+        function excluirCompetencia(nombre, btn) {
+            if (!confirm('¿Excluir "' + nombre + '" de futuros scrapeos?\n\n' +
+                'Se guardará el patrón sin el año (ej: "Segunda B 2024" → "segunda b").')) return;
+
+            let token = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="_token"]')?.value;
+
+            fetch("{{ url('/admin/competencias-excluidas/excluir-rapido') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-TOKEN': token,
+                    'Accept': 'application/json'
+                },
+                body: 'nombre=' + encodeURIComponent(nombre)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        // Ocultar el bloque (h5 + table) o la fila según el scraper
+                        let table  = btn.closest('table');
+                        let row    = btn.closest('tr');
+                        let isOneRowTable = table && table.querySelectorAll('tbody tr, tr').length <= 2;
+
+                        if (isOneRowTable) {
+                            let header = table.previousElementSibling;
+                            if (header && header.tagName === 'H5') header.remove();
+                            table.remove();
+                        } else if (row) {
+                            row.remove();
+                        }
+
+                        let msg = document.createElement('div');
+                        msg.className = 'alert alert-warning';
+                        msg.innerText = data.creado
+                            ? '✅ "' + data.patron + '" agregado a la lista de exclusiones.'
+                            : 'ℹ️ "' + data.patron + '" ya estaba excluido.';
+                        document.getElementById('resultadoScraper').prepend(msg);
+                        setTimeout(() => msg.remove(), 3500);
+                    } else {
+                        alert(data.msg || 'No se pudo excluir');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error al excluir');
                 });
         }
 

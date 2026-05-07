@@ -184,6 +184,19 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('/scraper/tecnico-footballdb', 'ScraperController@tecnicoFootballDatabase');
     Route::get('/scraper/jugador-footballdb', [App\Http\Controllers\ScraperController::class, 'jugadorFootballDatabase']);
+
+    Route::group(['prefix' => 'competencias-excluidas'], function () {
+        Route::get('/',             'CompetenciaExcluidaController@index')->name('competencias_excluidas.index');
+        Route::get('/listar',       'CompetenciaExcluidaController@listar')->name('competencias_excluidas.listar');
+        Route::post('/',            'CompetenciaExcluidaController@store')->name('competencias_excluidas.store');
+        Route::put('/{id}',         'CompetenciaExcluidaController@update')->name('competencias_excluidas.update');
+        Route::post('/{id}/toggle', 'CompetenciaExcluidaController@toggle')->name('competencias_excluidas.toggle');
+        Route::delete('/{id}',      'CompetenciaExcluidaController@destroy')->name('competencias_excluidas.destroy');
+        Route::post('/probar',      'CompetenciaExcluidaController@probar')->name('competencias_excluidas.probar');
+        Route::post('/competencias-excluidas/excluir-rapido',
+            'CompetenciaExcluidaController@excluirRapido'
+        )->name('competencias_excluidas.excluirRapido');
+    });
 });
 
 
