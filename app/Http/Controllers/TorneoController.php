@@ -1334,6 +1334,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$goleador->id. " GROUP B
                     'equipos.nombre',
                     'm.torneo_nombre'
                 )
+                ->whereIn('m.jugador_id', $jugadorIds)  // ← solo los de la página actual
                 ->get()
                 ->groupBy('jugador_id');
 
