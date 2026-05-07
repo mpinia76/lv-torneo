@@ -8563,6 +8563,10 @@ private function normalizarMinuto(string $texto): int
                 continue; // Skip VAR annulments
             } elseif (strpos($title, 'Gol anulado') !== false) {
                 continue; // Skip cancelled goals
+            } elseif (stripos($title, 'Gol de penalti') !== false || stripos($title, 'Gol penalti') !== false || stripos($title, 'Gol de penalty') !== false) {
+                $tipo   = 'Gol de penal';
+                // Remove all variations
+                $nombre = trim(preg_replace('/Gol de penalti|Gol penalti|Gol de penalty/i', '', $title));
             } elseif (strpos($title, 'Gol') !== false) {
                 $tipo   = 'Gol';
                 $nombre = trim(str_replace('Gol', '', $title));
@@ -8665,6 +8669,7 @@ private function normalizarMinuto(string $texto): int
 
                 switch ($ev['tipo']) {
                     case 'Gol':                $incidencias[] = ['Gol', $ev['minuto']]; break;
+                    case 'Gol de penal':       $incidencias[] = ['Penal', $ev['minuto']]; break;
                     case 'Gol propia puerta':  $incidencias[] = ['Gol en propia meta', $ev['minuto']]; break;
                     case 'T. Amarilla':        $incidencias[] = ['Tarjeta amarilla', $ev['minuto']]; break;
                     case 'T. Roja':            $incidencias[] = ['Tarjeta roja', $ev['minuto']]; break;
