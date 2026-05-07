@@ -1150,7 +1150,7 @@ class ScraperController extends Controller
                 $key = (string) \Str::of($competition)->lower()->ascii()
                     ->replaceMatches('/\s+/', ' ')->trim();
 
-                //if (isset($existentes[$key])) continue;
+                if (isset($existentes[$key])) continue;
 
                 // Determine tipo/ambito from competition name
                 $compLower = strtolower($competition);
