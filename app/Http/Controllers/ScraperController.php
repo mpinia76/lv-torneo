@@ -1140,10 +1140,13 @@ class ScraperController extends Controller
 // pc_offense2: [0]=goles, [1]=asistencias, [2]=goles en contra propia
                 $offenseCols = $xpath->query('.//td[contains(@class,"pc_offense2")]', $dRow);
                 if ($offenseCols->length > 0) $goles   = (int) trim($offenseCols->item(0)->textContent);
-                if ($offenseCols->length > 2) $propios = (int) trim($offenseCols->item(2)->textContent);
+                //if ($offenseCols->length > 2) $propios = (int) trim($offenseCols->item(2)->textContent);
 
 // pc_defense2: [0]=(arquero, vacío para campo), [1]=goles recibidos, [2]=vallas invictas
                 $defenseCols = $xpath->query('.//td[contains(@class,"pc_defense2")]', $dRow);
+                if ($defenseCols->length > 0) {
+                    $propios = (int) trim($defenseCols->item(0)->textContent);
+                }
                 if ($defenseCols->length > 1) {
                     $golesRecibidos = (int) trim($defenseCols->item(1)->textContent);
                 }
@@ -1292,6 +1295,59 @@ class ScraperController extends Controller
     {
         set_time_limit(0);
 
+        $competicionBuscada = trim($request->competicion ?? '');
+        $clubBuscado        = trim($request->club ?? '');
+        $temporadaBuscada   = trim($request->temporada ?? '');
+
+        $normalizar = function ($txt) {
+
+            $txt = mb_strtolower($txt);
+
+            $txt = iconv('UTF-8', 'ASCII//TRANSLIT', $txt);
+
+            $txt = preg_replace('/\b(fc|cf|club|de|la|el)\b/', ' ', $txt);
+
+            $txt = preg_replace('/[^a-z0-9 ]/', ' ', $txt);
+
+            $txt = preg_replace('/\s+/', ' ', $txt);
+
+            return trim($txt);
+        };
+
+        $normalizarCompeticion = function ($txt) {
+
+            $txt = mb_strtolower($txt);
+
+            // sacar años
+            $txt = preg_replace('/\b(19|20)\d{2}\b/', '', $txt);
+
+            $txt = trim($txt);
+
+            $map = [
+
+                'mls' => 'major league soccer',
+
+                'liga bbva' => 'laliga',
+                'primera division' => 'laliga',
+
+                'champions league' => 'liga de campeones',
+
+                'europa league' => 'uefa europa league',
+
+                'mundial de clubes' => 'fifa club world cup',
+            ];
+
+            foreach ($map as $from => $to) {
+
+                if (str_contains($txt, $from)) {
+
+                    return $to;
+                }
+            }
+
+            return $txt;
+        };
+
         $url = trim($request->url);
         if (!$url) return response()->json([]);
 
@@ -1304,6 +1360,8 @@ class ScraperController extends Controller
 
         $alleToreUrl = "https://www.transfermarkt.com.ar/{$slug}/alletore/spieler/{$id}";
 
+        //\Log::info($alleToreUrl);
+
         $html = HttpHelper::getHtmlContent($alleToreUrl, false);
         if (!$html) $html = HttpHelper::getHtmlContent($alleToreUrl, true);
         if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
@@ -1314,7 +1372,7 @@ class ScraperController extends Controller
         libxml_clear_errors();
 
         $xpath = new \DOMXPath($dom);
-
+        //\Log::info($dom->saveHTML());
         // Map Transfermarkt "Tipo de gol" text -> bucket field
         $tipoMap = [
             'Remate de cabeza'                   => 'cabeza',
@@ -1335,11 +1393,11 @@ class ScraperController extends Controller
 
         // The goals table is the one that has rows with "Temporada XX/YY" header rows.
         // Pick all rows from that table by matching the header-row pattern.
-        $allRows = $xpath->query('//table[contains(@class,"items")]//tr');
+        $allRows = $xpath->query('//div[contains(@class,"responsive-table")]//table//tbody//tr');
 
         $temporadaActual = null;
         $stats = [];
-
+        //\Log::info('Rows: '.$allRows->length);
         foreach ($allRows as $row) {
             // Check if this is a "Temporada XX/YY" header row
             $tdHeader = $xpath->query('./td[@colspan and contains(@class,"hauptlink")]', $row);
@@ -1395,6 +1453,61 @@ class ScraperController extends Controller
             // inside the td after "Localia" (H/A). Use the first <a title> with /spielplan/verein/.
             $clubLink = $xpath->query('.//a[contains(@href,"/spielplan/verein/")]', $row)->item(0);
             $club = $clubLink ? trim($clubLink->getAttribute('title')) : '';
+
+            // ======================
+// FILTROS OPCIONALES
+// ======================
+
+
+
+            $compNorm =
+                $normalizarCompeticion($normalizar($competicion));
+
+            $compBuscadaNorm =
+                $normalizarCompeticion($normalizar($competicionBuscada));
+
+                $clubNorm = $normalizar($club);
+                $clubBuscadoNorm = $normalizar($clubBuscado);
+
+
+            if ($competicionBuscada) {
+
+                $okComp =
+                    str_contains($compNorm, $compBuscadaNorm)
+                    || str_contains($compBuscadaNorm, $compNorm);
+
+                if (!$okComp) {
+
+                    \Log::info("[TM] Skip comp '{$competicion}' vs '{$competicionBuscada}'");
+
+                    continue;
+                }
+            }
+
+            if ($clubBuscado) {
+
+                $okClub =
+                    str_contains($clubNorm, $clubBuscadoNorm)
+                    || str_contains($clubBuscadoNorm, $clubNorm);
+
+                if (!$okClub) {
+
+                    similar_text($clubNorm, $clubBuscadoNorm, $scoreClub);
+
+                    if ($scoreClub < 45) {
+
+                        \Log::info("[TM] Skip club '{$club}' vs '{$clubBuscado}'");
+
+                        continue;
+                    }
+                }
+            }
+
+            if ($temporadaBuscada && $temporadaActual !== $temporadaBuscada) {
+
+                continue;
+            }
+
 
             $key = $temporadaActual . '|' . $competicion . '|' . $club;
 

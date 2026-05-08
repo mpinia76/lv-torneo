@@ -47,6 +47,13 @@
             </div>
         @endif
 
+        <div class="mb-3">
+            <label>URL Transfermarkt</label>
+            <input type="text"
+                   id="transfermarktUrl"
+                   class="form-control"
+                   placeholder="https://www.transfermarkt.com.ar/lionel-messi/profil/spieler/28003">
+        </div>
         {{-- Importar desde FootballDatabase --}}
         <div class="mb-3">
             <label>Importar desde FootballDatabase</label>
@@ -64,7 +71,7 @@
         </div>
         <div id="resultadoScraper" class="mt-3"></div>
         {{-- Importar tipos de goles desde Transfermarkt --}}
-        <div class="mb-3">
+        <!--<div class="mb-3">
             <label>Importar tipos de goles desde Transfermarkt</label>
             <div class="d-flex">
                 <input type="text" id="transfermarktUrl" class="form-control mr-2"
@@ -76,7 +83,7 @@
             <small class="text-muted">
                 Pegá cualquier URL del jugador en Transfermarkt. Muestra los goles agrupados por temporada y competición para que los cargues a mano. Excluye Argentina, competiciones CONMEBOL y temporadas previas al 2000.
             </small>
-        </div>
+        </div>-->
 
         <div id="loadingTM" style="display:none;" class="alert alert-info">
             ⏳ Trayendo goles desde Transfermarkt, puede tardar unos segundos...
@@ -243,40 +250,269 @@
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
         }
 
-        function usarDato(item) {
-            document.querySelector('[name="torneo_nombre"]').value   = clean(item.competition);
-            document.querySelector('[name="tipo"]').value            = item.tipo ?? '';
-            document.querySelector('[name="ambito"]').value          = item.ambito ?? '';
-            document.querySelector('[name="partidos"]').value        = item.partidos ?? 0;
-            document.querySelector('[name="posicion"]').value        = item.posicion ?? 0;
-            document.querySelector('[name="goles_jugada"]').value    = item.goles_jugada ?? 0;
-            document.querySelector('[name="goles_en_contra"]').value = item.goles_en_contra ?? 0;
-            document.querySelector('[name="amarillas"]').value       = item.amarillas ?? 0;
-            document.querySelector('[name="rojas"]').value           = item.rojas ?? 0;
-            document.querySelector('[name="goles_recibidos"]').value = item.goles_recibidos ?? 0;
-            document.querySelector('[name="vallas_invictas"]').value = item.vallas_invictas ?? 0;
+        async function usarDato(item) {
 
-            if (item.torneo_logo) {
-                document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
+            // =========================
+            // DATOS BASE
+            // =========================
+
+            document.querySelector('[name="torneo_nombre"]').value =
+                clean(item.competition);
+
+            document.querySelector('[name="tipo"]').value =
+                item.tipo ?? '';
+
+            document.querySelector('[name="ambito"]').value =
+                item.ambito ?? '';
+
+            document.querySelector('[name="partidos"]').value =
+                item.partidos ?? 0;
+
+            document.querySelector('[name="posicion"]').value =
+                item.posicion ?? 0;
+
+            document.querySelector('[name="goles_en_contra"]').value =
+                item.goles_en_contra ?? 0;
+
+            document.querySelector('[name="amarillas"]').value =
+                item.amarillas ?? 0;
+
+            document.querySelector('[name="rojas"]').value =
+                item.rojas ?? 0;
+
+            // =========================
+            // ARQUERO
+            // =========================
+
+            let esArquero =
+                "{{ mb_strtolower($jugador->tipoJugador ?? '') }}".includes('arquero');
+
+            let golesRecibidosInput =
+                document.querySelector('[name="goles_recibidos"]');
+
+            let vallasInvictasInput =
+                document.querySelector('[name="vallas_invictas"]');
+
+            if (golesRecibidosInput) {
+
+                golesRecibidosInput.value = esArquero
+                    ? (item.goles_recibidos ?? 0)
+                    : 0;
             }
 
-            // Match equipo por nombre fuzzy
+            if (vallasInvictasInput) {
+
+                vallasInvictasInput.value = esArquero
+                    ? (item.vallas_invictas ?? 0)
+                    : 0;
+            }
+
+            // =========================
+            // RESET GOLES TM
+            // =========================
+
+            document.querySelector('[name="goles_cabeza"]').value = 0;
+            document.querySelector('[name="goles_jugada"]').value = 0;
+            document.querySelector('[name="goles_penal"]').value = 0;
+            document.querySelector('[name="goles_tiro_libre"]').value = 0;
+
+            // =========================
+            // LOGO
+            // =========================
+
+            if (item.torneo_logo) {
+
+                document.querySelector('[name="torneo_logo_guardado"]').value =
+                    item.torneo_logo;
+            }
+
+            // =========================
+            // MATCH EQUIPO
+            // =========================
+
             let select = document.querySelector('[name="equipo_id"]');
+
             let equipoScraper = normalizar(item.equipo);
+
             let mejorMatch = null;
+
             let maxScore = 0;
 
             for (let option of select.options) {
+
                 let equipoDB = normalizar(option.text);
+
                 let score = 0;
+
                 if (equipoDB.includes(equipoScraper)) score += 2;
                 if (equipoScraper.includes(equipoDB)) score += 2;
-                if (score > maxScore) { maxScore = score; mejorMatch = option; }
+
+                if (score > maxScore) {
+
+                    maxScore = score;
+                    mejorMatch = option;
+                }
             }
 
             if (mejorMatch) {
+
                 select.value = mejorMatch.value;
+
                 $(select).trigger('change');
+            }
+
+            // =========================
+            // TRANSFERMARKT
+            // =========================
+
+            let tmUrl = document.getElementById('transfermarktUrl').value.trim();
+
+            if (!tmUrl) {
+
+                let warn = `
+            <div class="alert alert-warning">
+                ⚠️ No cargaste URL de Transfermarkt.<br>
+                Los tipos de goles no se pueden consultar.
+            </div>
+        `;
+
+                document.getElementById('resultadoTM').innerHTML = warn;
+
+                return;
+            }
+
+            try {
+
+                document.getElementById('loadingTM')
+                    ?.style.setProperty('display', 'block');
+
+                document.getElementById('resultadoTM').innerHTML = '';
+
+                let response = await fetch(
+                    "{{ url('/admin/scraper/jugador-transfermarkt-goles') }}"
+                    + "?url=" + encodeURIComponent(tmUrl)
+                    + "&competicion=" + encodeURIComponent(item.competition)
+                    + "&club=" + encodeURIComponent(item.equipo)
+                );
+
+                let data = await response.json();
+
+                console.log('TM DATA', data);
+
+                if (data.error) {
+
+                    document.getElementById('resultadoTM').innerHTML =
+                        `<div class="alert alert-danger">${data.error}</div>`;
+
+                    return;
+                }
+
+                if (!data.length) {
+
+                    document.getElementById('resultadoTM').innerHTML =
+                        `
+                <div class="alert alert-warning">
+                    ⚠️ No se encontraron coincidencias en Transfermarkt.<br>
+                    <strong>${item.competition}</strong> / ${item.equipo}
+                </div>
+                `;
+
+                    return;
+                }
+
+                // =========================
+                // TABLA TM
+                // =========================
+
+                let html = `
+            <h5 style="color:#0a6ebd">
+                Tipos de goles encontrados en Transfermarkt
+            </h5>
+
+            <table class="table table-sm table-bordered">
+                <thead>
+                    <tr>
+                        <th>Temp.</th>
+                        <th>Competición</th>
+                        <th>Club</th>
+                        <th>Total</th>
+                        <th>Cabeza</th>
+                        <th>Jugada</th>
+                        <th>Penal</th>
+                        <th>T. Libre</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+                data.forEach(g => {
+
+                    let totalTM =
+                        parseInt(g.total ?? 0);
+
+                    let totalFDB =
+                        parseInt(item.goles_jugada ?? 0);
+
+                    let diferencia =
+                        totalFDB !== totalTM;
+
+                    html += `
+                <tr ${diferencia ? 'style="background:#fff3cd;"' : ''}>
+                    <td>${g.temporada}</td>
+                    <td>${g.competicion}</td>
+                    <td>${g.club}</td>
+
+                    <td>
+                        <strong>${g.total}</strong>
+
+                        ${
+                        diferencia
+                            ? `<br><small style="color:#856404">
+                                FDB: ${totalFDB}
+                              </small>`
+                            : ''
+                    }
+                    </td>
+
+                    <td>${g.cabeza}</td>
+                    <td>${g.jugada}</td>
+                    <td>${g.penal}</td>
+                    <td>${g.tiro_libre}</td>
+
+                    <td>
+                        <button
+                            class="btn btn-success btn-sm"
+                            onclick='usarGolesTM(${JSON.stringify(g)})'>
+                            Usar
+                        </button>
+                    </td>
+                </tr>
+            `;
+                });
+
+                html += `
+                </tbody>
+            </table>
+        `;
+
+                document.getElementById('resultadoTM').innerHTML = html;
+
+            } catch (e) {
+
+                console.error('Error TM', e);
+
+                document.getElementById('resultadoTM').innerHTML =
+                    `
+            <div class="alert alert-danger">
+                Error consultando Transfermarkt
+            </div>
+            `;
+
+            } finally {
+
+                document.getElementById('loadingTM')
+                    ?.style.setProperty('display', 'none');
             }
         }
 
