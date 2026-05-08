@@ -1092,6 +1092,23 @@ class ScraperController extends Controller
 
             if (!$detailRow) continue;
 
+            if ($detailRow) {
+                $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
+                foreach ($detailDataRows as $dRow) {
+                    $dCols = $dRow->getElementsByTagName('td');
+                    \Log::info("=== Detail row: " . trim($dCols->item(0)->textContent ?? '')
+                        . " | " . trim($dCols->item(1)->textContent ?? '') . " ===");
+                    foreach ($dCols as $i => $col) {
+                        \Log::info(sprintf(
+                            "  Col %02d: class='%s' | text='%s'",
+                            $i,
+                            $col->getAttribute('class'),
+                            trim($col->textContent)
+                        ));
+                    }
+                }
+            }
+
             // Parse detail table rows - each is one competition
             $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
             //\Log::info('Detail data rows count: ' . $detailDataRows->length);
