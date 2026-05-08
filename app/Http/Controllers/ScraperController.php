@@ -1346,7 +1346,8 @@ class ScraperController extends Controller
             if ($tdHeader->length > 0) {
                 $headerText = trim($tdHeader->item(0)->textContent);
                 if (preg_match('/Temporada\s+(\d{2}\/\d{2})/i', $headerText, $mT)) {
-                    $temporadaActual = $mT[1]; // e.g. "04/05"
+                    $temporadaActual = $mT[1];
+                    \Log::info("[TM Goles] Header temporada: {$temporadaActual}");
                 }
                 continue;
             }
@@ -1354,32 +1355,35 @@ class ScraperController extends Controller
             if (!$temporadaActual) continue;
 
             $cols = $row->getElementsByTagName('td');
-            // Skip rows that are not goal rows (e.g. headers, empty)
-            if ($cols->length < 11) continue;
+            if ($cols->length < 11) {
+                \Log::info("[TM Goles] Skip: cols={$cols->length} temp={$temporadaActual}");
+                continue;
+            }
 
-            // Year filter: only XXI century. Temporada "98/99" -> year start 1998 -> skip.
-            $yearStart = (int) ('20' . substr($temporadaActual, 0, 2));
-            // Edge case: temporadas anteriores a 2000 vienen como 98/99, 99/00, etc.
-            // "99/00" -> 1999, "00/01" -> 2000, "98/99" -> 1998
             $yy = (int) substr($temporadaActual, 0, 2);
             $yearStart = ($yy >= 50) ? 1900 + $yy : 2000 + $yy;
-            if ($yearStart < 2000) continue;
+            if ($yearStart < 2000) {
+                \Log::info("[TM Goles] Skip < 2000: temp={$temporadaActual} year={$yearStart}");
+                continue;
+            }
 
-            // Extract competition name from first td (img title attribute)
             $compImg = $xpath->query('.//td[1]//img', $row)->item(0);
             $competicion = $compImg ? trim($compImg->getAttribute('title')) : '';
-
-            // Strip trailing "(-20/21)" or similar parenthetical
             $competicion = preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $competicion);
             $competicion = trim($competicion);
 
+            \Log::info("[TM Goles] Fila temp={$temporadaActual} comp='{$competicion}'");
+
             if (!$competicion) continue;
 
-            // Apply exclusion keywords
             $compLower = mb_strtolower($competicion);
             $skip = false;
             foreach ($excluir as $kw) {
-                if (mb_strpos($compLower, $kw) !== false) { $skip = true; break; }
+                if (mb_strpos($compLower, $kw) !== false) {
+                    \Log::info("[TM Goles] EXCLUIDO por '{$kw}': {$competicion}");
+                    $skip = true;
+                    break;
+                }
             }
             if ($skip) continue;
 
@@ -1417,7 +1421,7 @@ class ScraperController extends Controller
             $cmp = strcmp($b['temporada'], $a['temporada']);
             return $cmp !== 0 ? $cmp : strcmp($a['competicion'], $b['competicion']);
         });
-
+        \Log::info('[TM Goles] Stats finales: ' . json_encode($stats));
         return response()->json($result);
     }
 
