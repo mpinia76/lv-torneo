@@ -1109,6 +1109,9 @@ class ScraperController extends Controller
 
                 if ($pj === 0 || !$compName) continue;
 
+                // Skip excluded competitions (segunda b, sub 20, juvenil, etc.)
+                if ($this->debeExcluirCompetencia($compName)) continue;
+
                 // Skip Argentina national team
                 // Skip national teams - club name matches a country name
 // Get country from the season row flag
