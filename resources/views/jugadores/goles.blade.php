@@ -83,6 +83,14 @@
                     </div>
                 </div>
 
+                {{-- Nota de goles manuales --}}
+                @if($golesManuales > 0)
+                    <div class="alert alert-info small mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Se incluyen <strong>{{ $golesManuales }}</strong> {{ $golesManuales == 1 ? 'gol cargado manualmente' : 'goles cargados manualmente' }} en los totales. Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.
+                    </div>
+                @endif
+
                 {{-- Tabla de partidos --}}
                 <div class="card shadow-sm mb-4">
                     <div class="card-body">

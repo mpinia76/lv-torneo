@@ -1257,20 +1257,20 @@ group by tecnico_id
 
         // Estadísticas totales del jugador
         $sqlStats = "
-        SELECT
-            COUNT(gols.id) AS totalTodos,
-            COUNT(CASE WHEN tipo = 'Jugada' THEN 1 END) AS totalJugada,
-            COUNT(CASE WHEN tipo = 'Cabeza' THEN 1 END) AS totalCabeza,
-            COUNT(CASE WHEN tipo = 'Penal' THEN 1 END) AS totalPenal,
-            COUNT(CASE WHEN tipo = 'Tiro Libre' THEN 1 END) AS totalTiroLibre
-        FROM gols
-        INNER JOIN jugadors ON gols.jugador_id = jugadors.id
-        INNER JOIN partidos ON gols.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON fechas.grupo_id = grupos.id
-        WHERE gols.tipo <> 'En contra'
-          AND jugadors.id = :jugadorId
-          " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
+    SELECT
+        COUNT(gols.id) AS totalTodos,
+        COUNT(CASE WHEN tipo = 'Jugada' THEN 1 END) AS totalJugada,
+        COUNT(CASE WHEN tipo = 'Cabeza' THEN 1 END) AS totalCabeza,
+        COUNT(CASE WHEN tipo = 'Penal' THEN 1 END) AS totalPenal,
+        COUNT(CASE WHEN tipo = 'Tiro Libre' THEN 1 END) AS totalTiroLibre
+    FROM gols
+    INNER JOIN jugadors ON gols.jugador_id = jugadors.id
+    INNER JOIN partidos ON gols.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    WHERE gols.tipo <> 'En contra'
+      AND jugadors.id = :jugadorId
+      " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
     ";
 
         $bindings = ['jugadorId' => $id];
@@ -1278,44 +1278,69 @@ group by tecnico_id
 
         $golStats = DB::selectOne(DB::raw($sqlStats), $bindings);
 
-        $totalTodos = $golStats->totalTodos ?? 0;
-        $totalJugada = $golStats->totalJugada ?? 0;
-        $totalCabeza = $golStats->totalCabeza ?? 0;
-        $totalPenal = $golStats->totalPenal ?? 0;
+        $totalTodos     = $golStats->totalTodos     ?? 0;
+        $totalJugada    = $golStats->totalJugada    ?? 0;
+        $totalCabeza    = $golStats->totalCabeza    ?? 0;
+        $totalPenal     = $golStats->totalPenal     ?? 0;
         $totalTiroLibre = $golStats->totalTiroLibre ?? 0;
+
+        // Goles provenientes de estadísticas manuales (sin partidos cargados)
+        $golesManuales = 0;
+
+        if (!$idTorneo) {
+            $manuales = DB::table('jugador_estadistica_manuals')
+                ->where('jugador_id', $id)
+                ->get();
+
+            foreach ($manuales as $m) {
+                $jugada    = $m->goles_jugada     ?? 0;
+                $cabeza    = $m->goles_cabeza     ?? 0;
+                $penal     = $m->goles_penal      ?? 0;
+                $tiroLibre = $m->goles_tiro_libre ?? 0;
+
+                $totalJugada    += $jugada;
+                $totalCabeza    += $cabeza;
+                $totalPenal     += $penal;
+                $totalTiroLibre += $tiroLibre;
+
+                $sumaFila = $jugada + $cabeza + $penal + $tiroLibre;
+                $totalTodos    += $sumaFila;
+                $golesManuales += $sumaFila;
+            }
+        }
 
         // Lista de partidos donde hizo goles
         $sqlPartidos = "
-        SELECT DISTINCT
-            torneos.nombre AS nombreTorneo,
-            torneos.escudo AS escudoTorneo,
-            torneos.year,
-            fechas.numero,
-            partidos.dia,
-            e1.id AS equipol_id,
-            e1.escudo AS fotoLocal,
-            e1.nombre AS local,
-            e2.id AS equipov_id,
-            e2.escudo AS fotoVisitante,
-            e2.nombre AS visitante,
-            partidos.golesl,
-            partidos.golesv,
-            partidos.penalesl,
-            partidos.penalesv,
-            partidos.id AS partido_id,
-            gols.tipo AS tipoGol
-        FROM partidos
-        INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-        INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON fechas.grupo_id = grupos.id
-        INNER JOIN torneos ON grupos.torneo_id = torneos.id
-        INNER JOIN alineacions ON alineacions.partido_id = partidos.id
-        INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
-        WHERE alineacions.jugador_id = :jugadorId
-          " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
-          " . ($tipo ? " AND gols.tipo = :tipoGol" : "") . "
-        ORDER BY partidos.dia DESC
+    SELECT DISTINCT
+        torneos.nombre AS nombreTorneo,
+        torneos.escudo AS escudoTorneo,
+        torneos.year,
+        fechas.numero,
+        partidos.dia,
+        e1.id AS equipol_id,
+        e1.escudo AS fotoLocal,
+        e1.nombre AS local,
+        e2.id AS equipov_id,
+        e2.escudo AS fotoVisitante,
+        e2.nombre AS visitante,
+        partidos.golesl,
+        partidos.golesv,
+        partidos.penalesl,
+        partidos.penalesv,
+        partidos.id AS partido_id,
+        gols.tipo AS tipoGol
+    FROM partidos
+    INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
+    INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON fechas.grupo_id = grupos.id
+    INNER JOIN torneos ON grupos.torneo_id = torneos.id
+    INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+    INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
+    WHERE alineacions.jugador_id = :jugadorId
+      " . ($idTorneo ? " AND grupos.torneo_id = :torneoId" : "") . "
+      " . ($tipo ? " AND gols.tipo = :tipoGol" : "") . "
+    ORDER BY partidos.dia DESC
     ";
 
         $bindingsPartidos = ['jugadorId' => $id];
@@ -1353,7 +1378,8 @@ group by tecnico_id
             'totalPenal',
             'totalTiroLibre',
             'partidos',
-            'tipo'
+            'tipo',
+            'golesManuales'
         ));
     }
 
