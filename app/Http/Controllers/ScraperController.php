@@ -1092,22 +1092,7 @@ class ScraperController extends Controller
 
             if (!$detailRow) continue;
 
-            if ($detailRow) {
-                $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
-                foreach ($detailDataRows as $dRow) {
-                    $dCols = $dRow->getElementsByTagName('td');
-                    \Log::info("=== Detail row: " . trim($dCols->item(0)->textContent ?? '')
-                        . " | " . trim($dCols->item(1)->textContent ?? '') . " ===");
-                    foreach ($dCols as $i => $col) {
-                        \Log::info(sprintf(
-                            "  Col %02d: class='%s' | text='%s'",
-                            $i,
-                            $col->getAttribute('class'),
-                            trim($col->textContent)
-                        ));
-                    }
-                }
-            }
+
 
             // Parse detail table rows - each is one competition
             $detailDataRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
@@ -1141,6 +1126,7 @@ class ScraperController extends Controller
                 if ($isNationalTeam) continue;
 
                 // Goles: first pc_offense2 td after PJ
+                // Inicializar
                 $goles = 0;
                 $amarillas = 0;
                 $rojas = 0;
@@ -1148,17 +1134,23 @@ class ScraperController extends Controller
                 $vallasInvictas = 0;
                 $propios = 0;
 
+// pc_offense2: [0]=goles, [1]=asistencias, [2]=goles en contra propia
                 $offenseCols = $xpath->query('.//td[contains(@class,"pc_offense2")]', $dRow);
-                if ($offenseCols->length > 0) {
-                    $goles = (int) trim($offenseCols->item(0)->textContent);
+                if ($offenseCols->length > 0) $goles   = (int) trim($offenseCols->item(0)->textContent);
+                if ($offenseCols->length > 2) $propios = (int) trim($offenseCols->item(2)->textContent);
+
+// pc_defense2: [0]=(arquero, vacío para campo), [1]=goles recibidos, [2]=vallas invictas
+                $defenseCols = $xpath->query('.//td[contains(@class,"pc_defense2")]', $dRow);
+                if ($defenseCols->length > 1) {
+                    $golesRecibidos = (int) trim($defenseCols->item(1)->textContent);
+                }
+                if ($defenseCols->length > 2) {
+                    $vallasText = trim($defenseCols->item(2)->textContent);
+                    preg_match('/(\d+)/', $vallasText, $mVI);
+                    $vallasInvictas = isset($mVI[1]) ? (int) $mVI[1] : 0;
                 }
 
-                $defenseCols = $xpath->query('.//td[contains(@class,"pc_defense2")]', $dRow);
-                // order: own_goals, goals_conceded, cleansheets
-                if ($defenseCols->length > 0) $propios        = (int) trim($defenseCols->item(0)->textContent);
-                if ($defenseCols->length > 1) $golesRecibidos = (int) trim($defenseCols->item(1)->textContent);
-                if ($defenseCols->length > 2) $vallasInvictas = (int) trim($defenseCols->item(2)->textContent);
-
+// pc_discipline2: [0]=amarillas, [1]=rojas
                 $disciplineCols = $xpath->query('.//td[contains(@class,"pc_discipline2")]', $dRow);
                 if ($disciplineCols->length > 0) $amarillas = (int) trim($disciplineCols->item(0)->textContent);
                 if ($disciplineCols->length > 1) $rojas     = (int) trim($disciplineCols->item(1)->textContent);
@@ -1216,8 +1208,8 @@ class ScraperController extends Controller
                     'partidos'        => $pj,
                     'goles_jugada'    => $goles,
                     'goles_en_contra' => $propios,
-                    'goles_recibidos' => 0,
-                    'vallas_invictas' => 0,
+                    'goles_recibidos' => $golesRecibidos,   // ← antes era 0
+                    'vallas_invictas' => $vallasInvictas,   // ← antes era 0
                     'amarillas'       => $amarillas,
                     'rojas'           => $rojas,
                     'torneo_logo'     => null,
