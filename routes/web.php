@@ -196,7 +196,7 @@ Route::group(['prefix' => 'admin'], function()
         Route::post('/excluir-rapido', 'CompetenciaExcluidaController@excluirRapido')->name('competencias_excluidas.excluirRapido');
     });
     Route::get('/scraper/jugador-transfermarkt-goles',
-        [ScraperController::class, 'jugadorTransfermarktGoles'])
+        [App\Http\Controllers\ScraperController::class, 'jugadorTransfermarktGoles'])
         ->name('scraper.jugador-transfermarkt-goles');
 });
 
