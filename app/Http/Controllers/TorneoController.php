@@ -1311,7 +1311,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$goleador->id. " GROUP B
 
             $goleadores->setPath(route('torneos.goleadores',array('order'=>$order,'tipoOrder'=>$tipoOrder,'actuales'=>$actuales,'torneoId'=>$torneoId)));
 
-        $jugadorIds = collect($goleadores)->pluck('id')->toArray();
+        $jugadorIds = collect($goleadores->items())->pluck('id')->toArray();
 
         $manuales = collect();
 
@@ -1337,7 +1337,7 @@ WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = ".$goleador->id. " GROUP B
                 ->whereIn('m.jugador_id', $jugadorIds)  // ← solo los de la página actual
                 ->get()
                 ->groupBy('jugador_id');
-            dd($jugadorIds, $manuales->toArray());
+
 
         }
 
