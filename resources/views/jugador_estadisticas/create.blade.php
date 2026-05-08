@@ -428,6 +428,67 @@
                     alert('Error al excluir');
                 });
         }
+
+        function scrapearTransfermarkt() {
+            let url = document.getElementById('transfermarktUrl').value.trim();
+            if (!url) {
+                alert('Ingresá la URL del jugador en Transfermarkt');
+                return;
+            }
+
+            document.getElementById('loadingTM').style.display = 'block';
+            document.getElementById('resultadoTM').innerHTML = '';
+
+            fetch("{{ url('/admin/scraper/jugador-transfermarkt-goles') }}?url=" + encodeURIComponent(url))
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('resultadoTM').innerHTML =
+                            '<div class="alert alert-danger">' + data.error + '</div>';
+                        return;
+                    }
+                    if (!data.length) {
+                        document.getElementById('resultadoTM').innerHTML =
+                            '<div class="alert alert-warning">Sin resultados después de filtrar (Argentina + CONMEBOL + < 2000).</div>';
+                        return;
+                    }
+
+                    let html = '<h5 style="color:#0a6ebd">Goles por temporada y competición (Transfermarkt)</h5>';
+                    html += '<table class="table table-sm table-bordered">';
+                    html += '<thead><tr>'
+                        + '<th>Temporada</th><th>Competición</th><th>Club</th>'
+                        + '<th class="text-center">Total</th>'
+                        + '<th class="text-center">Cabeza</th>'
+                        + '<th class="text-center">Jugada</th>'
+                        + '<th class="text-center">Penal</th>'
+                        + '<th class="text-center">T. Libre</th>'
+                        + '</tr></thead><tbody>';
+
+                    data.forEach(r => {
+                        html += `<tr>
+                    <td>${r.temporada}</td>
+                    <td>${r.competicion}</td>
+                    <td>${r.club}</td>
+                    <td class="text-center"><strong>${r.total}</strong></td>
+                    <td class="text-center">${r.cabeza || ''}</td>
+                    <td class="text-center">${r.jugada || ''}</td>
+                    <td class="text-center">${r.penal  || ''}</td>
+                    <td class="text-center">${r.tiro_libre || ''}</td>
+                </tr>`;
+                    });
+
+                    html += '</tbody></table>';
+                    document.getElementById('resultadoTM').innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoTM').innerHTML =
+                        '<div class="alert alert-danger">Error scrapeando Transfermarkt</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingTM').style.display = 'none';
+                });
+        }
     </script>
 
 @endsection
