@@ -94,7 +94,6 @@
                                 $opciones = [
                                     '' => ['label' => 'Todos', 'valorDB' => ''],
                                     'Convirtieron' => ['label' => 'Convirtieron', 'valorDB' => 'Convirtieron'],
-
                                     'Atajó' => ['label' => 'Atajó', 'valorDB' => 'Atajó'],
                                 ];
                             @endphp
@@ -112,7 +111,6 @@
                                                 @switch($tipoClave)
                                                     @case('') {{ $totalTodosArquero }} @break
                                                     @case('Convirtieron') {{ $totalConvirtieron }} @break
-
                                                     @case('Atajó') {{ $totalAtajos }} @break
                                                 @endswitch
                                             </strong>
@@ -121,138 +119,3 @@
                                 </div>
                             @endforeach
                         </div>
-                        {{-- Gráfico de penales al arquero --}}
-                        <div class="row mt-4">
-                            <div class="col-md-8 offset-md-2">
-                                <div class="card">
-                                    <div class="card-body">
-
-
-
-
-                                        <div id="pie_arqueros" style="height: 300px;"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                {{-- Tabla de partidos --}}
-                <div class="row mt-4">
-                    <div class="col-md-12">
-                        <table class="table table-hover align-middle">
-                            <thead class="table-dark">
-                            <tr>
-                                <th>Torneo</th>
-                                <th>Fecha</th>
-                                <th>Día</th>
-                                <th>Local</th>
-                                <th>GL</th>
-                                <th>GV</th>
-                                <th>Visitante</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($partidos as $partido)
-                                <tr onclick="window.location='{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}'" style="cursor:pointer;">
-                                    <td>
-                                        @if($partido->escudoTorneo)
-                                            <img src="{{ url('images/'.$partido->escudoTorneo) }}" alt="Escudo {{ $partido->nombreTorneo }}" height="20" class="me-1">
-                                        @endif
-                                        {{ $partido->nombreTorneo }} {{ $partido->year }}
-                                    </td>
-                                    <td>{{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}</td>
-                                    <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                                    <td>
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol_id]) }}" onclick="event.stopPropagation()">
-                                            @if($partido->fotoLocal)
-                                                <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
-                                            @endif
-                                            {{ $partido->local }}
-                                        </a>
-                                    </td>
-                                    <td>{{ $partido->golesl }} @if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
-                                    <td>{{ $partido->golesv }} @if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
-                                    <td>
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov_id]) }}" onclick="event.stopPropagation()">
-                                            @if($partido->fotoVisitante)
-                                                <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
-                                            @endif
-                                            {{ $partido->visitante }}
-                                        </a>
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-
-                        <div class="row">
-                            <div class="col-md-9">{{ $partidos->links() }}</div>
-                            <div class="col-md-3 text-end"><strong>Total: {{ $partidos->total() }}</strong></div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Botón volver --}}
-                <div class="d-flex mt-3">
-                    <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Scripts de gráficos --}}
-    <script type="text/javascript">
-        // Gráfico general
-        var pie_basic_element = document.getElementById('pie_basic');
-        if (pie_basic_element) {
-            var pie_basic = echarts.init(pie_basic_element);
-            pie_basic.setOption({
-                color: ['#4caf50', '#f44336', '#2196f3'],
-                legend: { orient: 'horizontal', bottom: 0, left: 'center', data: ['Convertidos', 'Errados', 'Atajados'] },
-                tooltip: { trigger: 'item', formatter: "{b}: {c} ({d}%)" },
-                series: [{
-                    name: 'Penales',
-                    type: 'pie',
-                    radius: '70%',
-                    center: ['50%', '50%'],
-                    data: [
-                        {value: {{ $totalConvertidos }}, name: 'Convertidos'},
-                        {value: {{ $totalErrados }}, name: 'Errados'},
-                        {value: {{ $totalAtajados }}, name: 'Atajados'}
-                    ]
-                }]
-            });
-        }
-
-        // Gráfico del arquero
-        var pie_arqueros_element = document.getElementById('pie_arqueros');
-        if (pie_arqueros_element) {
-            var pie_arqueros = echarts.init(pie_arqueros_element);
-            pie_arqueros.setOption({
-                color: ['#4caf50', '#f44336'],
-                legend: { orient: 'horizontal', bottom: 0, left: 'center', data: ['Atajó', 'Convertido'] },
-                tooltip: { trigger: 'item', formatter: "{b}: {c} ({d}%)" },
-                series: [{
-                    name: 'Penales al arquero',
-                    type: 'pie',
-                    radius: '70%',
-                    center: ['50%', '50%'],
-                    data: [
-                        {value: {{ $totalAtajos ?? 0 }}, name: 'Atajó'},
-                        {value: {{ $totalConvirtieron ?? 0 }}, name: 'Convertido'}
-                    ]
-                }]
-            });
-        }
-    </script>
-
-    <style>
-        tr[onclick]:hover {
-            background-color: #d1f7d1 !important;
-            transition: background-color 0.2s ease-in-out;
-        }
-    </style>
-@endsection

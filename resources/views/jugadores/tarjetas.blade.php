@@ -91,6 +91,17 @@
                     </div>
                 </div>
 
+                {{-- Nota de tarjetas manuales --}}
+                @if($tarjetasManuales > 0)
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <div class="alert alert-info small mb-0">
+                                ℹ️ Se incluyen <strong>{{ $tarjetasManuales }}</strong> {{ $tarjetasManuales == 1 ? 'tarjeta cargada manualmente' : 'tarjetas cargadas manualmente' }} en los totales. Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Tabla de partidos --}}
                 <div class="row mt-4">
                     <div class="col-md-12">
