@@ -1288,4 +1288,137 @@ class ScraperController extends Controller
         return null;
     }
 
+    public function jugadorTransfermarktGoles(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json([]);
+
+        // Extraer slug e ID desde cualquier URL del jugador en Transfermarkt
+        if (!preg_match('#transfermarkt\.[^/]+/([^/]+)/[^/]+/spieler/(\d+)#', $url, $m)) {
+            return response()->json(['error' => 'URL inválida de Transfermarkt']);
+        }
+        $slug = $m[1];
+        $id   = $m[2];
+
+        $alleToreUrl = "https://www.transfermarkt.com.ar/{$slug}/alletore/spieler/{$id}";
+
+        $html = HttpHelper::getHtmlContent($alleToreUrl, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($alleToreUrl, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        // Map Transfermarkt "Tipo de gol" text -> bucket field
+        $tipoMap = [
+            'Remate de cabeza'                   => 'cabeza',
+            'Pecho'                              => 'cabeza',
+            'Penalti'                            => 'penal',
+            'Rebote de penalti'                  => 'jugada',
+            'Libre directo'                      => 'tiro_libre',
+            'Gol directo de un saque de esquina' => 'tiro_libre',
+            // El resto cae en 'jugada' por default
+        ];
+
+        // Argentina + CONMEBOL exclusion keywords (case-insensitive)
+        $excluir = [
+            'argentin', 'torneo apertura', 'torneo clausura', 'primera división argentina',
+            'copa argentina', 'libertadores', 'sudamericana', 'recopa', 'conmebol',
+            'suruga', 'copa américa', 'copa america', 'eliminatorias',
+        ];
+
+        // The goals table is the one that has rows with "Temporada XX/YY" header rows.
+        // Pick all rows from that table by matching the header-row pattern.
+        $allRows = $xpath->query('//table[contains(@class,"items")]//tr');
+
+        $temporadaActual = null;
+        $stats = [];
+
+        foreach ($allRows as $row) {
+            // Check if this is a "Temporada XX/YY" header row
+            $tdHeader = $xpath->query('./td[@colspan and contains(@class,"hauptlink")]', $row);
+            if ($tdHeader->length > 0) {
+                $headerText = trim($tdHeader->item(0)->textContent);
+                if (preg_match('/Temporada\s+(\d{2}\/\d{2})/i', $headerText, $mT)) {
+                    $temporadaActual = $mT[1]; // e.g. "04/05"
+                }
+                continue;
+            }
+
+            if (!$temporadaActual) continue;
+
+            $cols = $row->getElementsByTagName('td');
+            // Skip rows that are not goal rows (e.g. headers, empty)
+            if ($cols->length < 11) continue;
+
+            // Year filter: only XXI century. Temporada "98/99" -> year start 1998 -> skip.
+            $yearStart = (int) ('20' . substr($temporadaActual, 0, 2));
+            // Edge case: temporadas anteriores a 2000 vienen como 98/99, 99/00, etc.
+            // "99/00" -> 1999, "00/01" -> 2000, "98/99" -> 1998
+            $yy = (int) substr($temporadaActual, 0, 2);
+            $yearStart = ($yy >= 50) ? 1900 + $yy : 2000 + $yy;
+            if ($yearStart < 2000) continue;
+
+            // Extract competition name from first td (img title attribute)
+            $compImg = $xpath->query('.//td[1]//img', $row)->item(0);
+            $competicion = $compImg ? trim($compImg->getAttribute('title')) : '';
+
+            // Strip trailing "(-20/21)" or similar parenthetical
+            $competicion = preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $competicion);
+            $competicion = trim($competicion);
+
+            if (!$competicion) continue;
+
+            // Apply exclusion keywords
+            $compLower = mb_strtolower($competicion);
+            $skip = false;
+            foreach ($excluir as $kw) {
+                if (mb_strpos($compLower, $kw) !== false) { $skip = true; break; }
+            }
+            if ($skip) continue;
+
+            // "Tipo de gol" is the LAST <td> in the row
+            $tipoText = trim($cols->item($cols->length - 1)->textContent);
+            $bucket   = $tipoMap[$tipoText] ?? 'jugada';
+
+            // Club "Para" is the team this goal was scored for. It's the <a title="...">
+            // inside the td after "Localia" (H/A). Use the first <a title> with /spielplan/verein/.
+            $clubLink = $xpath->query('.//a[contains(@href,"/spielplan/verein/")]', $row)->item(0);
+            $club = $clubLink ? trim($clubLink->getAttribute('title')) : '';
+
+            $key = $temporadaActual . '|' . $competicion . '|' . $club;
+
+            if (!isset($stats[$key])) {
+                $stats[$key] = [
+                    'temporada'   => $temporadaActual,
+                    'competicion' => $competicion,
+                    'club'        => $club,
+                    'total'       => 0,
+                    'cabeza'      => 0,
+                    'jugada'      => 0,
+                    'penal'       => 0,
+                    'tiro_libre'  => 0,
+                ];
+            }
+
+            $stats[$key]['total']++;
+            $stats[$key][$bucket]++;
+        }
+
+        // Sort by temporada desc, then competition
+        $result = array_values($stats);
+        usort($result, function ($a, $b) {
+            $cmp = strcmp($b['temporada'], $a['temporada']);
+            return $cmp !== 0 ? $cmp : strcmp($a['competicion'], $b['competicion']);
+        });
+
+        return response()->json($result);
+    }
+
 }

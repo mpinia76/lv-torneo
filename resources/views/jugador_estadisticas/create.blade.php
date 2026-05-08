@@ -63,7 +63,25 @@
             ⏳ Cargando datos, puede tardar unos segundos...
         </div>
         <div id="resultadoScraper" class="mt-3"></div>
+        {{-- Importar tipos de goles desde Transfermarkt --}}
+        <div class="mb-3">
+            <label>Importar tipos de goles desde Transfermarkt</label>
+            <div class="d-flex">
+                <input type="text" id="transfermarktUrl" class="form-control mr-2"
+                       placeholder="https://www.transfermarkt.com.ar/lionel-messi/profil/spieler/28003">
+                <button type="button" class="btn btn-info" onclick="scrapearTransfermarkt()" style="white-space:nowrap;">
+                    ⚽ Tipos de goles
+                </button>
+            </div>
+            <small class="text-muted">
+                Pegá cualquier URL del jugador en Transfermarkt. Muestra los goles agrupados por temporada y competición para que los cargues a mano. Excluye Argentina, competiciones CONMEBOL y temporadas previas al 2000.
+            </small>
+        </div>
 
+        <div id="loadingTM" style="display:none;" class="alert alert-info">
+            ⏳ Trayendo goles desde Transfermarkt, puede tardar unos segundos...
+        </div>
+        <div id="resultadoTM" class="mt-3"></div>
         <hr>
 
         <form action="{{ route('jugador-estadisticas.store') }}" method="POST" enctype="multipart/form-data">
