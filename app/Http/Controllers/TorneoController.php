@@ -2687,7 +2687,6 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
     public function tecnicos(Request $request)
     {
-
         $orderRaw = strtolower($request->query('order', ''));
         $order = in_array($orderRaw, ['puntaje','jugados','ganados','perdidos','empatados','tecnico','prom','golesl','golesv','diferencia','porcentaje'])
             ? $orderRaw
@@ -2706,24 +2705,22 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             session(['nombre_filtro_jugador' => $nombre]);
         }
 
-        $params = [];
         $nombreFiltro = '';
         $nombreFiltro2 = '';
         $nombreFiltro3 = '';
+        $like = null;
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE ? OR personas.nombre LIKE ?) ";
+            $nombreFiltro  = " AND (personas.apellido LIKE ? OR personas.nombre LIKE ?) ";
             $nombreFiltro2 = " AND (P2.apellido LIKE ? OR P2.nombre LIKE ?) ";
             $nombreFiltro3 = " AND (P3.apellido LIKE ? OR P3.nombre LIKE ?) ";
-
             $like = "%$nombre%";
-            array_push($params, $like, $like);
         }
 
         $year = date('Y');
 
         /**
-         * Filtros dinámicos
+         * Dynamic filters
          */
         $filtroActuales = '';
         if ($actuales) {
@@ -2740,11 +2737,6 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             AND TEC.id = tecnicos.id
             $nombreFiltro2
         )";
-
-            $params[] = "%$year%";
-            if ($nombre) {
-                array_push($params, $like, $like);
-            }
         }
 
         $filtroCampeones = '';
@@ -2764,14 +2756,37 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             WHERE T2.id = tecnicos.id
             $nombreFiltro3
         )";
-
-            if ($nombre) {
-                array_push($params, $like, $like);
-            }
         }
 
         /**
-         * Base query (reutilizable) — SOLO datos de partidos
+         * Build bindings for ONE half of the UNION ALL.
+         * The base query is reused twice (one per UNION half), so bindings
+         * must be duplicated to match the placeholder count.
+         */
+        $buildParams = function () use ($nombre, $like, $actuales, $campeones, $year) {
+            $p = [];
+            if ($nombre) {
+                array_push($p, $like, $like); // nombreFiltro
+            }
+            if ($actuales) {
+                $p[] = "%$year%"; // T1.year LIKE ?
+                if ($nombre) {
+                    array_push($p, $like, $like); // nombreFiltro2
+                }
+            }
+            if ($campeones) {
+                if ($nombre) {
+                    array_push($p, $like, $like); // nombreFiltro3
+                }
+            }
+            return $p;
+        };
+
+        // Duplicate bindings: one set per UNION half
+        $params = array_merge($buildParams(), $buildParams());
+
+        /**
+         * Reusable base query — match data only
          */
         $baseQuery = "
         SELECT DISTINCT
@@ -2805,8 +2820,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             sprintf($baseQuery, 'golesv', 'golesl', 'partidos.equipov_id = equipos.id');
 
         /**
-         * Query final con manuales sumados vía LEFT JOIN agregado.
-         * El ORDER BY y la paginación se aplican YA con los totales correctos.
+         * Final query with manual stats added via aggregated LEFT JOIN.
+         * ORDER BY and pagination are applied with correct totals.
          */
         $sql = "
         SELECT
@@ -2886,7 +2901,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         $tecnicosFull = DB::select($sql, $params);
 
         /**
-         * Paginación en PHP (ya está ordenado por SQL)
+         * Pagination in PHP (already ordered by SQL)
          */
         $page = $request->query('page', 1);
         $paginate = 15;
@@ -2902,15 +2917,15 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
         );
 
         /**
-         * Solo procesamos títulos y escudos para los técnicos de la página actual.
-         * Eager-load de Titulo con torneos una sola vez fuera del loop.
+         * Only process titles and shields for current page coaches.
+         * Eager-load Titulo with torneos once outside the loop.
          */
         $titulosExtras = Titulo::with('torneos')->get();
 
-        // IDs de la página actual
+        // IDs from current page
         $tecnicoIdsPagina = collect($itemsForCurrentPage)->pluck('tecnico_id')->filter()->toArray();
 
-        // Manuales detallados para los técnicos de la página (para escudos y "jugando")
+        // Detailed manual stats for current page coaches (for shields and "jugando")
         $manualesDetalle = collect();
         if (count($tecnicoIdsPagina)) {
             $manualesDetalle = DB::table('tecnico_estadistica_manuals as m')
@@ -2944,7 +2959,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             $titulosTecnicoLigaEquipo = [];
             $titulosTecnicoInternacionalEquipo = [];
 
-            // Torneos jugados por este técnico
+            // Tournaments played by this coach
             $sqlTorneos = '
             SELECT DISTINCT grupos.torneo_id, partido_tecnicos.equipo_id
             FROM partido_tecnicos
@@ -3000,7 +3015,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 }
             }
 
-            // Títulos extras
+            // Extra titles
             foreach ($titulosExtras as $tituloExtra) {
                 $equipoId = $tituloExtra->equipo_id;
                 $torneosIds = $tituloExtra->torneos->pluck('id')->toArray();
@@ -3038,7 +3053,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 }
             }
 
-            // Títulos provenientes de manuales (si aplica)
+            // Titles from manual stats (if applicable)
             $ligasManualEquipo = [];
             $copasManualEquipo = [];
             $internacionalesManualEquipo = [];
@@ -3065,7 +3080,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 }
             }
 
-            // String de títulos consolidado
+            // Consolidated titles string
             $totalTitulos = $titulosTecnicoCopa + $titulosTecnicoLiga + $titulosTecnicoInternacional;
             if ($totalTitulos == 0) {
                 $goleador->titulos = '';
@@ -3076,7 +3091,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 $goleador->titulos = $totalTitulos . ' (' . trim($ligas . ' ' . $copas . ' ' . $internacionales) . ')';
             }
 
-            // Equipos en los que está dirigiendo este año (SQL)
+            // Teams currently coached this year (SQL)
             $sqlJugando = "
             SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
             FROM partido_tecnicos
@@ -3095,7 +3110,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 $jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
             }
 
-            // Sumar al "jugando" los equipos del año actual desde manuales
+            // Add current-year teams from manual stats to "jugando"
             if (isset($manualesDetalle[$goleador->tecnico_id])) {
                 foreach ($manualesDetalle[$goleador->tecnico_id] as $manual) {
                     if (str_contains($manual->torneo_nombre, $year)) {
@@ -3106,7 +3121,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
             $goleador->jugando = $jugando;
 
-            // Estadísticas por equipo (SQL)
+            // Stats per team (SQL)
             $sql2 = '
             SELECT equipo, escudo, equipo_id,
                    count(*) jugados,
@@ -3163,8 +3178,8 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
             $escudos = DB::select($sql2, [$goleador->tecnico_id, $goleador->tecnico_id]);
 
-            // Construir array indexado por equipo_id con todos los datos necesarios
-            // para luego fusionar con los manuales sin perder partidos jugados
+            // Build array indexed by equipo_id with all needed data
+            // to later merge with manual stats without losing matches played
             $escudosArray = [];
             foreach ($escudos as $escudo) {
                 $escudosArray[$escudo->equipo_id] = [
@@ -3176,7 +3191,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 ];
             }
 
-            // Fusionar con manuales: sumar puntaje y jugados, recalcular porcentaje
+            // Merge with manual stats: sum points and matches, recalc percentage
             if (isset($manualesDetalle[$goleador->tecnico_id])) {
                 foreach ($manualesDetalle[$goleador->tecnico_id] as $manual) {
                     $ptsManual = ($manual->ganados * 3) + $manual->empatados;
@@ -3194,7 +3209,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                         ];
                     }
 
-                    // Recalcular porcentaje con totales acumulados
+                    // Recalc percentage with accumulated totals
                     $j = $escudosArray[$manual->equipo_id]['jugados'];
                     $p = $escudosArray[$manual->equipo_id]['puntaje'];
                     $escudosArray[$manual->equipo_id]['porcentaje'] = $j > 0
@@ -3203,12 +3218,12 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 }
             }
 
-            // Reordenar por puntaje descendente (como hacía el SQL original)
+            // Reorder by descending points (as the original SQL did)
             uasort($escudosArray, function ($a, $b) {
                 return $b['puntaje'] <=> $a['puntaje'];
             });
 
-            // Reconstruir string final con títulos por equipo
+            // Rebuild final string with titles per team
             $goleador->escudo = '';
             foreach ($escudosArray as $equipoId => $data) {
                 $tl = $titulosTecnicoLigaEquipo[$equipoId] ?? 0;
