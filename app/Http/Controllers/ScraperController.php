@@ -1330,7 +1330,7 @@ class ScraperController extends Controller
                 'liga bbva' => 'laliga',
                 'primera division' => 'laliga',
 
-                'champions league' => 'liga de campeones',
+                'UEFA champions league' => 'liga de campeones',
 
                 'europa league' => 'uefa europa league',
 
