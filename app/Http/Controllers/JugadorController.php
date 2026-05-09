@@ -1125,6 +1125,19 @@ group by tecnico_id
             }
         }
 
+        usort($torneosJugador, function ($a, $b) {
+            preg_match('/\b(19|20)\d{2}\b/', $a->nombreTorneo, $ma);
+            preg_match('/\b(19|20)\d{2}\b/', $b->nombreTorneo, $mb);
+            $yearA = (int)($ma[0] ?? 0);
+            $yearB = (int)($mb[0] ?? 0);
+
+            if ($yearA !== $yearB) {
+                return $yearB <=> $yearA;
+            }
+            // Desempate: los manuales (idTorneo string "manual_X") al final del año
+            return strcmp((string)$a->idTorneo, (string)$b->idTorneo);
+        });
+
         return view('jugadores.ver', compact('jugador','torneosJugador','torneosTecnico','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional','tecnico'));
     }
 
