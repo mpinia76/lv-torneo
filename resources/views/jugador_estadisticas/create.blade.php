@@ -725,6 +725,20 @@
                     document.getElementById('loadingTM').style.display = 'none';
                 });
         }
+        function usarGolesTM(goles) {
+
+            document.querySelector('[name="goles_cabeza"]').value =
+                goles.cabeza ?? 0;
+
+            document.querySelector('[name="goles_jugada"]').value =
+                goles.jugada ?? 0;
+
+            document.querySelector('[name="goles_penal"]').value =
+                goles.penal ?? 0;
+
+            document.querySelector('[name="goles_tiro_libre"]').value =
+                goles.tiro_libre ?? 0;
+        }
     </script>
 
 @endsection
