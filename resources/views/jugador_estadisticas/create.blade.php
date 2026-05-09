@@ -250,6 +250,18 @@
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
         }
 
+        function avisoFallbackGoles(item, motivo) {
+            let total = parseInt(item.goles_jugada ?? 0);
+            return `
+        <div class="alert alert-warning">
+            ⚠️ <strong>Goles cargados como "Jugada" (sin desglose de Transfermarkt)</strong><br>
+            ${motivo}<br>
+            Se asignaron <strong>${total}</strong> goles al campo "Jugada" desde FootballDatabase.
+            Si querés desglosarlos por tipo, editalos a mano antes de guardar.
+        </div>
+    `;
+        }
+
         async function usarDato(item) {
 
             // =========================
@@ -311,8 +323,9 @@
             // RESET GOLES TM
             // =========================
 
+            // Fallback: si TM no trae datos, todos los goles van a "jugada"
             document.querySelector('[name="goles_cabeza"]').value = 0;
-            document.querySelector('[name="goles_jugada"]').value = 0;
+            document.querySelector('[name="goles_jugada"]').value = item.goles_jugada ?? 0;
             document.querySelector('[name="goles_penal"]').value = 0;
             document.querySelector('[name="goles_tiro_libre"]').value = 0;
 
@@ -369,14 +382,8 @@
 
             if (!tmUrl) {
 
-                let warn = `
-            <div class="alert alert-warning">
-                ⚠️ No cargaste URL de Transfermarkt.<br>
-                Los tipos de goles no se pueden consultar.
-            </div>
-        `;
-
-                document.getElementById('resultadoTM').innerHTML = warn;
+                document.getElementById('resultadoTM').innerHTML =
+                    avisoFallbackGoles(item, 'No cargaste URL de Transfermarkt.');
 
                 return;
             }
@@ -410,12 +417,10 @@
                 if (!data.length) {
 
                     document.getElementById('resultadoTM').innerHTML =
-                        `
-                <div class="alert alert-warning">
-                    ⚠️ No se encontraron coincidencias en Transfermarkt.<br>
-                    <strong>${item.competition}</strong> / ${item.equipo}
-                </div>
-                `;
+                        avisoFallbackGoles(
+                            item,
+                            `No se encontraron coincidencias en Transfermarkt para <strong>${item.competition}</strong> / ${item.equipo}.`
+                        );
 
                     return;
                 }
@@ -503,11 +508,7 @@
                 console.error('Error TM', e);
 
                 document.getElementById('resultadoTM').innerHTML =
-                    `
-            <div class="alert alert-danger">
-                Error consultando Transfermarkt
-            </div>
-            `;
+                    avisoFallbackGoles(item, 'Error consultando Transfermarkt (timeout o red).');
 
             } finally {
 
@@ -679,8 +680,10 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.error) {
+
                         document.getElementById('resultadoTM').innerHTML =
-                            '<div class="alert alert-danger">' + data.error + '</div>';
+                            avisoFallbackGoles(item, `Error de Transfermarkt: ${data.error}`);
+
                         return;
                     }
                     if (!data.length) {
