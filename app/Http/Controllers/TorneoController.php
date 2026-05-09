@@ -1161,16 +1161,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         $year = date('Y');
-        // DEBUG TEMPORAL - QUITAR DESPUÉS
-        $debugMessi = DB::table('jugador_estadistica_manuals')
-            ->where('jugador_id', 16104)
-            ->get();
-        dd([
-            'messi_manuales_count' => $debugMessi->count(),
-            'messi_manuales' => $debugMessi,
-            'torneoId_query' => $request->query('torneoId'),
-            'entra_a_traer_manuales' => !$request->query('torneoId'),
-        ]);
+
         // Build name filters (escaped)
         $nombreFiltro  = '';
         $nombreFiltro2 = '';
@@ -1226,7 +1217,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         // 2) Fetch ALL manuals (only when not filtering by torneo)
         $manuales = collect();
-        if (!$request->query('torneoId')) {
+        //if (!$request->query('torneoId')) {
             $manuales = DB::table('jugador_estadistica_manuals as m')
                 ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
                 ->select(
@@ -1244,7 +1235,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 )
                 ->get()
                 ->groupBy('jugador_id');
-        }
+        //}
 
         // 3) Merge manuals with real goleadores
         $goleadoresPorId = $goleadores->keyBy('id');
