@@ -986,6 +986,11 @@ class ScraperController extends Controller
                 // For champ: single entry
                 if (!$compName) $compName = $meta['tipo'];
 
+                // 🆕 LOG TEMPORAL
+                if ($suffix === 'champ' && stripos($club, 'independiente') !== false) {
+                    \Log::info("[FBDB INDEP] year={$year} club='{$club}' compName='{$compName}' pj={$pj}");
+                }
+
                 if ($this->debeExcluirCompetencia($compName)) {
                     continue;
                 }

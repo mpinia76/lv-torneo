@@ -439,7 +439,7 @@
                     class="btn btn-danger btn-sm" title="No mostrar más esta competencia">
                     🚫
                 </button>
-            <button onclick='excluirEquipo(${JSON.stringify(competition.equipo)}, this)'
+                <button onclick='excluirEquipo(${JSON.stringify(competition.equipo)}, this)'
                     class="btn btn-danger btn-sm" title="No mostrar más este equipo">
                     🚫
                 </button>
