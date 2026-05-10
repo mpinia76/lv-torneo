@@ -177,7 +177,7 @@ class HttpHelper
     public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
-        //Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
+        Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
         if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
             Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
             return false;
@@ -193,7 +193,7 @@ class HttpHelper
                     'premium' => 'true',
                 ]);
 
-            //Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
+            Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
 
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $scraperEndpoint);
@@ -204,24 +204,24 @@ class HttpHelper
             $response = curl_exec($ch);
 
             if (curl_errno($ch)) {
-                //Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
+                Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
                 return false;
             }
 
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
-            //Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
-            //Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
+            Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
+            Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
 
 
             if ($httpCode >= 400) {
-                //Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
+                Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
                 return false;
             }
 
             if (empty($response)) {
-                //Log::channel('mi_log')->warning("Scraper remoto devolvió HTML vacío para: $urlOriginal");
+                Log::channel('mi_log')->warning("Scraper remoto devolvió HTML vacío para: $urlOriginal");
             }
 
             return $response;
