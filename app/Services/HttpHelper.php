@@ -272,7 +272,7 @@ class HttpHelper
             if ($httpCode == 403 || empty($response)) {
                 for ($i = 1; $i <= 3; $i++) {
                     sleep(2);
-                    //Log::channel('mi_log')->debug("[DIRECTO] Retry $i para: $urlOriginal");
+                    Log::channel('mi_log')->debug("[DIRECTO] Retry $i para: $urlOriginal");
 
                     $ch = curl_init();
                     curl_setopt($ch, CURLOPT_URL, $urlOriginal);
