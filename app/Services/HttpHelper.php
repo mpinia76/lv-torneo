@@ -45,6 +45,7 @@ class HttpHelper
             || str_contains($html, 'challenge-platform');
     }
 
+
     // ---------------------------------------------------
     // Direct cURL — mimics a real browser as closely as possible
     // ---------------------------------------------------
@@ -101,7 +102,7 @@ class HttpHelper
     private static function fetchRemoto(string $url)
     {
         $params = [
-            'api_key'      => 'a36c0383b6153a740f783cc5ba9bd54c',
+            'api_key'      => '44182b1d4649eb00f3c41258721c4884',
             'url'          => $url,
             'render'       => 'true',
             'premium'      => 'true',
