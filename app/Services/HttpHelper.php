@@ -16,22 +16,17 @@ class HttpHelper
 
         $host = parse_url($urlOriginal, PHP_URL_HOST);
 
-        // Dominios que sabemos que están detrás de Cloudflare → directo al scraper
-        $dominiosConCloudflare = [
-            'www.livefutbol.com',
-            'livefutbol.com',
-        ];
+        // Dominios con Cloudflare → directo al scraper, sin perder tiempo con cURL
+        $dominiosCloudflare = ['www.livefutbol.com', 'livefutbol.com', 'www.footballdatabase.eu', 'footballdatabase.eu'];
 
-        if ($usarScraperRemoto || in_array($host, $dominiosConCloudflare, true)) {
+        if ($usarScraperRemoto || in_array($host, $dominiosCloudflare, true)) {
             return self::fetchRemoto($urlOriginal);
         }
 
-        // Intento directo
+        // Para otros dominios, intento directo SIN fallback interno
         $response = self::fetchDirecto($urlOriginal);
 
-        // Si el directo falló o detectamos Cloudflare en el HTML, caemos al scraper
         if ($response === false || self::esCloudflareChallenge($response)) {
-            Log::channel('mi_log')->debug("[FALLBACK] Usando scraper remoto para: $urlOriginal");
             return self::fetchRemoto($urlOriginal);
         }
 
