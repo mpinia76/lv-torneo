@@ -790,8 +790,14 @@ class ScraperController extends Controller
 
         $xpath = new \DOMXPath($dom);
 
+        $tecnicoId = $request->tecnico_id;
+
         $existentes = collect()
-            ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
+            ->merge(
+                $tecnicoId
+                    ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
+                    : collect()
+            )
             ->merge(\App\Torneo::all()->map(function ($t) {
                 return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
             }))
@@ -800,6 +806,9 @@ class ScraperController extends Controller
                 return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
             })
             ->unique()->flip()->toArray();
+
+        \Log::info("[FBDB EXISTENTES] tecnicoId={$tecnicoId} | total=" . count($existentes));   // 🆕
+
 
         $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
         $data = [];
