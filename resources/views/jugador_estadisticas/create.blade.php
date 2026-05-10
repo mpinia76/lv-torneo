@@ -579,6 +579,11 @@
                             class="btn btn-danger btn-sm" title="No mostrar más esta competencia">
                             🚫
                         </button>
+
+                        <button onclick='excluirEquipo(${JSON.stringify(competition.equipo)}, this)'
+                            class="btn btn-danger btn-sm" title="No mostrar más este equipo">
+                            🚫
+                        </button>
                     </td>
                 </tr>`;
                 html += '</table>';
@@ -741,6 +746,73 @@
 
             document.querySelector('[name="goles_tiro_libre"]').value =
                 goles.tiro_libre ?? 0;
+        }
+
+        function excluirEquipo(nombre, btn) {
+            if (!confirm('¿Excluir "' + nombre + '" de futuros scrapeos?\n\n' +
+                'Se ignorarán todas las filas de este equipo.')) return;
+
+            let token = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="_token"]')?.value;
+
+            fetch("{{ url('/admin/equipos-excluidos/excluir-rapido') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-TOKEN': token,
+                    'Accept': 'application/json'
+                },
+                body: 'nombre=' + encodeURIComponent(nombre)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        // Ocultar TODAS las tablas/filas de ese equipo en pantalla
+                        let nombreNorm = normalizar(nombre);
+
+                        document.querySelectorAll('#resultadoScraper table').forEach(table => {
+                            let rows = table.querySelectorAll('tr');
+                            let dataRows = Array.from(rows).slice(1); // saltea header
+
+                            let allMatch = dataRows.length > 0 && dataRows.every(r => {
+                                let equipoCell = r.cells[1]?.innerText ?? '';
+                                return normalizar(equipoCell) === nombreNorm
+                                    || normalizar(equipoCell).includes(nombreNorm)
+                                    || nombreNorm.includes(normalizar(equipoCell));
+                            });
+
+                            if (allMatch) {
+                                let header = table.previousElementSibling;
+                                if (header && header.tagName === 'H5') header.remove();
+                                table.remove();
+                            } else {
+                                dataRows.forEach(r => {
+                                    let equipoCell = r.cells[1]?.innerText ?? '';
+                                    let eqNorm = normalizar(equipoCell);
+                                    if (eqNorm === nombreNorm
+                                        || eqNorm.includes(nombreNorm)
+                                        || nombreNorm.includes(eqNorm)) {
+                                        r.remove();
+                                    }
+                                });
+                            }
+                        });
+
+                        let msg = document.createElement('div');
+                        msg.className = 'alert alert-warning';
+                        msg.innerText = data.creado
+                            ? '✅ Equipo "' + data.nombre + '" agregado a la lista de exclusiones.'
+                            : 'ℹ️ Equipo "' + data.nombre + '" ya estaba excluido.';
+                        document.getElementById('resultadoScraper').prepend(msg);
+                        setTimeout(() => msg.remove(), 3500);
+                    } else {
+                        alert(data.msg || 'No se pudo excluir');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Error al excluir equipo');
+                });
         }
     </script>
 

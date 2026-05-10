@@ -198,6 +198,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/scraper/jugador-transfermarkt-goles',
         [App\Http\Controllers\ScraperController::class, 'jugadorTransfermarktGoles'])
         ->name('scraper.jugador-transfermarkt-goles');
+
+    Route::post('/equipos-excluidos/excluir-rapido', 'EquipoExcluidoController@excluirRapido');
 });
 
 
