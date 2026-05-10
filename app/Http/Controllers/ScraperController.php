@@ -22,10 +22,6 @@ class ScraperController extends Controller
         $html = HttpHelper::getHtmlContent($url, false);
 
         if (!$html) {
-            $html = HttpHelper::getHtmlContent($url, true);
-        }
-
-        if (!$html) {
             return "Error obteniendo búsqueda";
         }
 
@@ -50,9 +46,7 @@ class ScraperController extends Controller
         // 🔥 PERFIL
         $htmlPerfil = HttpHelper::getHtmlContent($perfilUrl, false);
 
-        if (!$htmlPerfil) {
-            $htmlPerfil = HttpHelper::getHtmlContent($perfilUrl, true);
-        }
+
 
         if (!$htmlPerfil) {
             return "Error perfil";
@@ -78,9 +72,6 @@ class ScraperController extends Controller
         // 🔥 HISTORIAL
         $htmlHistorial = HttpHelper::getHtmlContent($historialUrl, false);
 
-        if (!$htmlHistorial) {
-            $htmlHistorial = HttpHelper::getHtmlContent($historialUrl, true);
-        }
 
         if (!$htmlHistorial) {
             return "Error historial";
@@ -180,9 +171,7 @@ class ScraperController extends Controller
         //dd($url);
         $html = HttpHelper::getHtmlContent($url, false);
 
-        if (!$html) {
-            $html = HttpHelper::getHtmlContent($url, true);
-        }
+
         //dd($html);
         if (!$html) {
             return [];
