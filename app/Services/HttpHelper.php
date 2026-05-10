@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Log;
 
 class HttpHelper
 {
-    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent_new(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
 
@@ -174,7 +174,7 @@ class HttpHelper
     }
 
 
-    public static function getHtmlContent_real(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
         //Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
@@ -187,7 +187,7 @@ class HttpHelper
             $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
 
             $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
-                    'api_key' => 'a36c0383b6153a740f783cc5ba9bd54c',
+                    'api_key' => '44182b1d4649eb00f3c41258721c4884',
                     'url'     => $urlOriginal,
                     'render'  => 'true',
                     'premium' => 'true',
