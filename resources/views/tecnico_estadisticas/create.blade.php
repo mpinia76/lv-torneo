@@ -466,8 +466,8 @@
 
             document.getElementById('loadingScraper').style.display = 'block';
             document.getElementById('resultadoScraper').innerHTML = '';
-
-            fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url))
+            let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
+            fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url) + "&tecnico_id=" + tecnicoId)
                 .then(res => res.json())
                 .then(data => {
                     if (data.error) {

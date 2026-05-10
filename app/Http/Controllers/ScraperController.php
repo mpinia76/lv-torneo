@@ -694,24 +694,22 @@ class ScraperController extends Controller
         $header = [];
         $i = 0;
 
+        $tecnicoId = $request->tecnico_id;
+
         $existentes = collect()
-            ->merge(\App\TecnicoEstadisticaManual::pluck('torneo_nombre'))
             ->merge(
-                \App\Torneo::all()->map(function ($t) {
-                    return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
-                })
+                $tecnicoId
+                    ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
+                    : collect()
             )
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
             ->filter()
             ->map(function ($v) {
-                return (string) \Str::of($v)
-                    ->lower()
-                    ->ascii()
-                    ->replaceMatches('/\s+/', ' ')
-                    ->trim();
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
             })
-            ->unique()
-            ->flip()
-            ->toArray();
+            ->unique()->flip()->toArray();
 
         while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
 
