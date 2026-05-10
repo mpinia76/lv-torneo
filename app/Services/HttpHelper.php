@@ -5,19 +5,44 @@ use Illuminate\Support\Facades\Log;
 
 class HttpHelper
 {
-    public static function getHtmlContent_new(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
 
         if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
+            Log::channel('mi_log')->error("URL inválida: [$urlOriginal]");
             return false;
         }
 
-        if ($usarScraperRemoto) {
+        $host = parse_url($urlOriginal, PHP_URL_HOST);
+
+        // Dominios que sabemos que están detrás de Cloudflare → directo al scraper
+        $dominiosConCloudflare = [
+            'www.livefutbol.com',
+            'livefutbol.com',
+        ];
+
+        if ($usarScraperRemoto || in_array($host, $dominiosConCloudflare, true)) {
             return self::fetchRemoto($urlOriginal);
         }
 
-        return self::fetchDirecto($urlOriginal);
+        // Intento directo
+        $response = self::fetchDirecto($urlOriginal);
+
+        // Si el directo falló o detectamos Cloudflare en el HTML, caemos al scraper
+        if ($response === false || self::esCloudflareChallenge($response)) {
+            Log::channel('mi_log')->debug("[FALLBACK] Usando scraper remoto para: $urlOriginal");
+            return self::fetchRemoto($urlOriginal);
+        }
+
+        return $response;
+    }
+
+    private static function esCloudflareChallenge(string $html): bool
+    {
+        return str_contains($html, 'Just a moment')
+            || str_contains($html, 'cf-browser-verification')
+            || str_contains($html, 'challenge-platform');
     }
 
     // ---------------------------------------------------
@@ -153,7 +178,7 @@ class HttpHelper
     }
 
 
-    public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
+    public static function getHtmlContent_real(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
         //Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
