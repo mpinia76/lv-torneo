@@ -811,9 +811,9 @@ class ScraperController extends Controller
             if (!$year || (int)$year < 2000) continue;
 
             $clubCell = $cols->item(1);
-            $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
+            /*$flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country  = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
-            if (strtolower($country) === 'argentina') continue;
+            if (strtolower($country) === 'argentina') continue;*/
 
             $clubLink = $xpath->query('.//a', $clubCell)->item(0);
             $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
@@ -1058,10 +1058,10 @@ class ScraperController extends Controller
             if (!$year || (int)$year < 2000) continue;
 
             $clubCell = $cols->item(1);
-            $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
+            /*$flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
             $country = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
             //\Log::info('Country: ' . $country);
-            if (strtolower($country) === 'argentina') continue;
+            if (strtolower($country) === 'argentina') continue;*/
 
             // Find morecareer row
             $next = $seasonRow->nextSibling;
