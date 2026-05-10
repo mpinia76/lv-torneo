@@ -984,10 +984,34 @@ class ScraperController extends Controller
                 // For champ: single entry
                 if (!$compName) $compName = $meta['tipo'];
 
-                // 🆕 LOG TEMPORAL
-                if ($suffix === 'champ' && stripos($club, 'independiente') !== false) {
+                $esIndep = ($suffix === 'champ' && stripos($club, 'independiente') !== false);
+
+                if ($esIndep) {
                     \Log::info("[FBDB INDEP] year={$year} club='{$club}' compName='{$compName}' pj={$pj}");
                 }
+
+                if ($this->debeExcluirCompetencia($compName)) {
+                    if ($esIndep) \Log::info("[FBDB INDEP] SKIP: excluida por compName");
+                    continue;
+                }
+
+                $competition = $compName . ' ' . $year;
+                $key = (string) \Str::of($competition)->lower()->ascii()
+                    ->replaceMatches('/\s+/', ' ')->trim();
+
+                if ($esIndep) \Log::info("[FBDB INDEP] competition='{$competition}' key='{$key}'");
+
+                if (isset($existentes[$key])) {
+                    if ($esIndep) \Log::info("[FBDB INDEP] SKIP: ya existe en existentes");
+                    continue;
+                }
+
+                if ($this->debeExcluirCompetencia($compName)) {
+                    if ($esIndep) \Log::info("[FBDB INDEP] SKIP: excluida por compName (2da vez)");
+                    continue;
+                }
+
+                if ($esIndep) \Log::info("[FBDB INDEP] OK - se agrega al data");
 
                 if ($this->debeExcluirCompetencia($compName)) {
                     continue;
