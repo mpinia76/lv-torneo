@@ -807,7 +807,7 @@ class ScraperController extends Controller
             })
             ->unique()->flip()->toArray();
 
-        \Log::info("[FBDB EXISTENTES] tecnicoId={$tecnicoId} | total=" . count($existentes));   // 🆕
+        //\Log::info("[FBDB EXISTENTES] tecnicoId={$tecnicoId} | total=" . count($existentes));   // 🆕
 
 
         $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
@@ -909,9 +909,9 @@ class ScraperController extends Controller
                     if ($clubLink) {
                         $clubHref = $clubLink->getAttribute('href');
                         $clubUrl = "https://www.footballdatabase.eu" . $clubHref;
-                        \Log::info("[FALLBACK] Resolving for {$club} {$year} suffix={$suffix} url={$clubUrl}");
+                        //\Log::info("[FALLBACK] Resolving for {$club} {$year} suffix={$suffix} url={$clubUrl}");
                         $compName = $this->resolveCompetitionFromClubPage($clubUrl, $suffix);
-                        \Log::info("[FALLBACK] Result: " . ($compName ?? 'NULL'));
+                        //\Log::info("[FALLBACK] Result: " . ($compName ?? 'NULL'));
                     }
                 }
 
@@ -993,34 +993,7 @@ class ScraperController extends Controller
                 // For champ: single entry
                 if (!$compName) $compName = $meta['tipo'];
 
-                $esIndep = ($suffix === 'champ' && stripos($club, 'independiente') !== false);
 
-                if ($esIndep) {
-                    \Log::info("[FBDB INDEP] year={$year} club='{$club}' compName='{$compName}' pj={$pj}");
-                }
-
-                if ($this->debeExcluirCompetencia($compName)) {
-                    if ($esIndep) \Log::info("[FBDB INDEP] SKIP: excluida por compName");
-                    continue;
-                }
-
-                $competition = $compName . ' ' . $year;
-                $key = (string) \Str::of($competition)->lower()->ascii()
-                    ->replaceMatches('/\s+/', ' ')->trim();
-
-                if ($esIndep) \Log::info("[FBDB INDEP] competition='{$competition}' key='{$key}'");
-
-                if (isset($existentes[$key])) {
-                    if ($esIndep) \Log::info("[FBDB INDEP] SKIP: ya existe en existentes");
-                    continue;
-                }
-
-                if ($this->debeExcluirCompetencia($compName)) {
-                    if ($esIndep) \Log::info("[FBDB INDEP] SKIP: excluida por compName (2da vez)");
-                    continue;
-                }
-
-                if ($esIndep) \Log::info("[FBDB INDEP] OK - se agrega al data");
 
                 if ($this->debeExcluirCompetencia($compName)) {
                     continue;
@@ -1074,8 +1047,14 @@ class ScraperController extends Controller
 
         $xpath = new \DOMXPath($dom);
 
+        $jugadorId = $request->jugador_id;
+
         $existentes = collect()
-            ->merge(\App\JugadorEstadisticaManual::pluck('torneo_nombre'))
+            ->merge(
+                $jugadorId
+                    ? \App\JugadorEstadisticaManual::where('jugador_id', $jugadorId)->pluck('torneo_nombre')
+                    : collect()
+            )
             ->merge(\App\Torneo::all()->map(function ($t) {
                 return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
             }))
@@ -1317,7 +1296,7 @@ class ScraperController extends Controller
             }
         }
 
-        \Log::info("[RESOLVE] Suffix={$suffix} candidates=" . json_encode(array_values($candidates)));
+        //\Log::info("[RESOLVE] Suffix={$suffix} candidates=" . json_encode(array_values($candidates)));
 
         if (count($candidates) === 1) {
             return array_values($candidates)[0];
@@ -1440,7 +1419,7 @@ class ScraperController extends Controller
                 $headerText = trim($tdHeader->item(0)->textContent);
                 if (preg_match('/Temporada\s+(\d{2}\/\d{2})/i', $headerText, $mT)) {
                     $temporadaActual = $mT[1];
-                    \Log::info("[TM Goles] Header temporada: {$temporadaActual}");
+                    //\Log::info("[TM Goles] Header temporada: {$temporadaActual}");
                 }
                 continue;
             }
@@ -1449,14 +1428,14 @@ class ScraperController extends Controller
 
             $cols = $row->getElementsByTagName('td');
             if ($cols->length < 11) {
-                \Log::info("[TM Goles] Skip: cols={$cols->length} temp={$temporadaActual}");
+                //\Log::info("[TM Goles] Skip: cols={$cols->length} temp={$temporadaActual}");
                 continue;
             }
 
             $yy = (int) substr($temporadaActual, 0, 2);
             $yearStart = ($yy >= 50) ? 1900 + $yy : 2000 + $yy;
             if ($yearStart < 2000) {
-                \Log::info("[TM Goles] Skip < 2000: temp={$temporadaActual} year={$yearStart}");
+                //\Log::info("[TM Goles] Skip < 2000: temp={$temporadaActual} year={$yearStart}");
                 continue;
             }
 
@@ -1465,7 +1444,7 @@ class ScraperController extends Controller
             $competicion = preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $competicion);
             $competicion = trim($competicion);
 
-            \Log::info("[TM Goles] Fila temp={$temporadaActual} comp='{$competicion}'");
+            //\Log::info("[TM Goles] Fila temp={$temporadaActual} comp='{$competicion}'");
 
             if (!$competicion) continue;
 
@@ -1473,7 +1452,7 @@ class ScraperController extends Controller
             $skip = false;
             foreach ($excluir as $kw) {
                 if (mb_strpos($compLower, $kw) !== false) {
-                    \Log::info("[TM Goles] EXCLUIDO por '{$kw}': {$competicion}");
+                    //\Log::info("[TM Goles] EXCLUIDO por '{$kw}': {$competicion}");
                     $skip = true;
                     break;
                 }
@@ -1513,7 +1492,7 @@ class ScraperController extends Controller
 
                 if (!$okComp) {
 
-                    \Log::info("[TM] Skip comp '{$competicion}' vs '{$competicionBuscada}'");
+                    //\Log::info("[TM] Skip comp '{$competicion}' vs '{$competicionBuscada}'");
 
                     continue;
                 }
@@ -1531,7 +1510,7 @@ class ScraperController extends Controller
 
                     if ($scoreClub < 45) {
 
-                        \Log::info("[TM] Skip club '{$club}' vs '{$clubBuscado}'");
+                        //\Log::info("[TM] Skip club '{$club}' vs '{$clubBuscado}'");
 
                         continue;
                     }
@@ -1569,7 +1548,7 @@ class ScraperController extends Controller
             $cmp = strcmp($b['temporada'], $a['temporada']);
             return $cmp !== 0 ? $cmp : strcmp($a['competicion'], $b['competicion']);
         });
-        \Log::info('[TM Goles] Stats finales: ' . json_encode($stats));
+        //\Log::info('[TM Goles] Stats finales: ' . json_encode($stats));
         return response()->json($result);
     }
 

@@ -602,7 +602,9 @@
             document.getElementById('loadingScraper').style.display = 'block';
             document.getElementById('resultadoScraper').innerHTML = '';
 
-            fetch("{{ url('/admin/scraper/jugador-footballdb') }}?url=" + encodeURIComponent(url))
+            let jugadorId = document.querySelector('[name="jugador_id"]').value;
+            fetch("{{ url('/admin/scraper/jugador-footballdb') }}?url=" + encodeURIComponent(url)
+                + "&jugador_id=" + jugadorId)
                 .then(res => res.json())
                 .then(data => {
                     if (data.error) {
