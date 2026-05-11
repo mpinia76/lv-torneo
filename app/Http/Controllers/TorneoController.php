@@ -3979,12 +3979,12 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         // 4) Sort the merged collection
         // ---------------------------------------------------------------
         $todos = $arquerosPorId->values();
-        \Log::info('Sample arquero', ['first' => $todos->first(), 'types' => array_map('gettype', (array) $todos->first())]);
+        //\Log::info('Sample arquero', ['first' => $todos->first(), 'types' => array_map('gettype', (array) $todos->first())]);
 
         $validFields = ['jugados', 'recibidos', 'invictas', 'atajos', 'jugador'];
         $orderField  = in_array($order, $validFields) ? $order : 'jugados';
 
-        if (strtoupper($tipoOrder) === 'DESC') {
+        /*if (strtoupper($tipoOrder) === 'DESC') {
             $todos = $todos->sortBy([
                 [$orderField, 'desc'],
                 ['jugados', 'desc'],
@@ -3996,7 +3996,19 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                 ['jugados', 'desc'],
                 ['recibidos', 'asc'],
             ])->values();
-        }
+        }*/
+
+        $direction = strtoupper($tipoOrder) === 'DESC' ? -1 : 1;
+
+        $todos = $todos->sort(function ($a, $b) use ($orderField, $direction) {
+            $cmp = ($a->{$orderField} <=> $b->{$orderField}) * $direction;
+            if ($cmp !== 0) return $cmp;
+
+            $cmp = $b->jugados <=> $a->jugados;
+            if ($cmp !== 0) return $cmp;
+
+            return $a->recibidos <=> $b->recibidos;
+        })->values();
 
         // ---------------------------------------------------------------
         // 5) Paginate manually
