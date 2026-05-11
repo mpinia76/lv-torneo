@@ -3979,6 +3979,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         // 4) Sort the merged collection
         // ---------------------------------------------------------------
         $todos = $arquerosPorId->values();
+        \Log::info('Sample arquero', ['first' => $todos->first(), 'types' => array_map('gettype', (array) $todos->first())]);
 
         $validFields = ['jugados', 'recibidos', 'invictas', 'atajos', 'jugador'];
         $orderField  = in_array($order, $validFields) ? $order : 'jugados';
