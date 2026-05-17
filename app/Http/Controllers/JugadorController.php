@@ -797,7 +797,9 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.
             $torneoManual->amarillas = $manual->amarillas ?? 0;
             $torneoManual->rojas = $manual->rojas ?? 0;
 
-            $torneoManual->errados = $manual->penales_errados ?? 0;
+            $errados = $manual->penales_errados ?? 0;
+            $atajados = $manual->penales_atajados ?? 0;
+            $torneoManual->errados = $errados + $atajados;
             $torneoManual->atajados = $manual->penales_atajo ?? 0;
 
             $torneoManual->recibidos = $manual->goles_recibidos ?? 0;
