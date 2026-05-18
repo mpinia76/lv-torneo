@@ -6,7 +6,7 @@
     <div class="container">
         <div class="row mb-4 align-items-center">
             <div class="col-md-3 text-center">
-                <img src="{{ $tecnico->persona->foto ? url('images/'.$tecnico->persona->foto) : url('images/sin_foto.png') }}"
+                <img src="{{ $tecnico->persona->foto ? url('images/'.$tecnico->persona->foto) : url('images/sin_foto_tecnico.png') }}"
                      alt="Foto tecnico" class="img-fluid mb-2" style="max-height: 200px;">
                 <div class="mb-2">
                     <img src="{{ $tecnico->persona->bandera_url }}" alt="{{ $tecnico->persona->nacionalidad }}" height="25">
