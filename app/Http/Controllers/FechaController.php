@@ -8912,33 +8912,29 @@ private function normalizarMinuto(string $texto): int
 
                 if (!empty($plantillaJugador)) {
                     $jugador_id   = $plantillaJugador->jugador->id;
-                    $partesNombre = array_map(function($p) { return trim($p, '.'); }, explode(' ', $jugador['nombre']));
-                    $partesMayores = array_filter($partesNombre, function($p) { return strlen($p) > 2; });
+                    $partesNombre = explode(' ', $jugador['nombre']);
+                    $mismoDorsal  = 0;
 
+                    // Verify the dorsal-matched player actually matches the scraper name.
+                    // Always search within the plantilla, filtered by the dorsal's jugador_id.
                     $consultarJugador = Jugador::join('personas', 'personas.id', '=', 'jugadors.persona_id')
-                        ->join('plantilla_jugadors', 'jugadors.id', '=', 'plantilla_jugadors.jugador_id')
-                        ->wherein('plantilla_jugadors.plantilla_id', explode(',', $arrplantillas))
-                        ->where(function ($query) use ($partesMayores) {
-                            $query->where(function ($q) use ($partesMayores) {
-                                // Try to match all significant parts (AND)
-                                foreach ($partesMayores as $parte) {
-                                    $q->where(function ($q2) use ($parte) {
-                                        $q2->where('personas.nombre', 'LIKE', "%$parte%")
-                                            ->orWhere('personas.apellido', 'LIKE', "%$parte%")
-                                            ->orWhere('personas.name', 'LIKE', "%$parte%");
-                                    });
-                                }
-                            })->orWhere(function ($q) use ($partesMayores) {
-                                // Fallback: match any significant part (OR)
-                                foreach ($partesMayores as $parte) {
-                                    $q->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                        ->where('jugadors.id', '=', $jugador_id)
+                        ->where(function ($query) use ($partesNombre) {
+                            foreach ($partesNombre as $parte) {
+                                $query->where(function ($query) use ($parte) {
+                                    $query->where('personas.nombre', 'LIKE', "%$parte%")
+                                        ->orWhere('personas.apellido', 'LIKE', "%$parte%")
                                         ->orWhere('personas.name', 'LIKE', "%$parte%");
-                                }
-                            });
+                                });
+                            }
                         })
                         ->first();
 
-                    if (!$consultarJugador) {
+                    if (!empty($consultarJugador)) {
+                        $mismoDorsal = 1;
+                    }
+
+                    if (!$mismoDorsal) {
                         $success .= 'Problema con jugador: ' . $jugador['dorsal'] . ' ' . $jugador['nombre'] . ' del equipo ' . $strEquipo . '<br>';
                     }
                 } else {
