@@ -178,8 +178,18 @@ class CruceController extends Controller
     {
         $cruce = Cruce::find($id);
 
+        // Guard against a missing record
+        if (!$cruce) {
+            return redirect()->route('cruces.index')->with('error', 'Cruce no encontrado');
+        }
+
+        $torneo_id = $cruce->torneo_id; // Keep tournament context for the redirect
+
         $cruce->delete();
-        return redirect()->route('cruces.index')->with('success','Registro eliminado satisfactoriamente');
+
+        return redirect()
+            ->route('cruces.index', ['torneo_id' => $torneo_id])
+            ->with('success', 'Registro eliminado satisfactoriamente');
     }
 
 }
