@@ -168,5 +168,19 @@ class CruceController extends Controller
 
     }
 
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id)
+    {
+        $cruce = Cruce::find($id);
+
+        $cruce->delete();
+        return redirect()->route('cruces.index')->with('success','Registro eliminado satisfactoriamente');
+    }
+
 }
 
