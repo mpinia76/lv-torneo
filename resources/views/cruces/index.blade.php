@@ -25,9 +25,8 @@
         @if($torneo)<a class="btn btn-success m-1" href="{{route('cruces.create', ['torneo_id' => $torneo->id])}}">Nuevo</a>@endif
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
-
-                <input  value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_cruce') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
-                <input type="hidden" name="torneo_id" value="{{ $torneo->id }}">
+                <input value="{{ (isset($_GET['buscarpor']))?$_GET['buscarpor']:session('nombre_filtro_cruce') }}" name="buscarpor" class="form-control mr-sm-2" type="search" placeholder="Buscar" aria-label="Search">
+                @if($torneo)<input type="hidden" name="torneo_id" value="{{ $torneo->id }}">@endif
                 <button class="btn btn-success m-1" type="submit">Buscar</button>
             </form>
         </nav>
