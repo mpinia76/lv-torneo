@@ -42,13 +42,7 @@
                 </ul>
             </div>
         @endif
-        <!--<div class="mb-3">
-            <label>Importar desde CSV</label>
-            <input type="file" id="csvFile" class="form-control" accept=".csv">
-            <button type="button" class="btn btn-secondary mt-2" onclick="procesarCSV()">
-                📄 Procesar CSV
-            </button>
-        </div>-->
+
         <div class="mb-3 mt-3">
             <label>Importar desde FootballDatabase</label>
             <div class="d-flex">
@@ -59,9 +53,6 @@
                 </button>
             </div>
         </div>
-        <!--<button type="button" class="btn btn-info" onclick="verHistorial()">
-            🔍 Ver historial
-        </button>-->
 
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando historial, puede tardar unos segundos...
@@ -88,7 +79,6 @@
                 {{-- logo --}}
                 <div class="form-group col-md-3">
                     <label>Logo torneo</label>
-
                     <input type="file" class="form-control" name="escudoTmp">
                     <input type="hidden" name="torneo_logo_guardado" value="">
                 </div>
@@ -104,7 +94,6 @@
             </div>
 
             <hr>
-
 
             {{-- stats base --}}
             <div class="row">
@@ -133,20 +122,15 @@
             <hr>
 
             <h5>Partidos</h5>
-            {{-- stats base --}}
             <div class="row">
-
-
                 <div class="form-group col-md-2">
                     <label>Ganados</label>
                     <input type="number" name="ganados" class="form-control" value="{{ old('ganados') }}">
                 </div>
-
                 <div class="form-group col-md-2">
                     <label>Empatados</label>
                     <input type="number" name="empatados" class="form-control" value="{{ old('empatados') }}">
                 </div>
-
                 <div class="form-group col-md-2">
                     <label>Perdidos</label>
                     <input type="number" name="perdidos" class="form-control" value="{{ old('perdidos') }}">
@@ -155,30 +139,20 @@
 
             <hr>
 
-            {{-- ⚽ TIPOS DE GOLES --}}
+            {{-- ⚽ GOLES --}}
             <h5>Goles</h5>
-
             <div class="row">
                 <div class="form-group col-md-2">
                     <label>Favor</label>
                     <input type="number" name="goles_favor" class="form-control" value="{{ old('goles_favor') }}">
                 </div>
-
-
-
                 <div class="form-group col-md-2">
                     <label>En contra</label>
                     <input type="number" name="goles_en_contra" class="form-control" value="{{ old('goles_en_contra') }}">
                 </div>
             </div>
 
-
-
             <hr>
-
-
-
-
 
             <button class="btn btn-primary">Guardar</button>
 
@@ -189,100 +163,26 @@
 
         </form>
     </div>
+
     <script>
-        function verHistorial() {
-            let tecnico_id = document.querySelector('[name="tecnico_id"]').value;
-            let equipo_id = document.querySelector('[name="equipo_id"]').value;
+        // Build the <option> list for the team selects, reusing the page's main equipo select.
+        function opcionesEquipos(selectedId) {
+            let base = document.querySelector('[name="equipo_id"]');
+            let html = '';
+            for (let option of base.options) {
+                let sel = (String(option.value) === String(selectedId)) ? 'selected' : '';
+                html += `<option value="${option.value}" ${sel}>${option.text}</option>`;
+            }
+            return html;
+        }
 
-            let url = "{{ url('admin/scraper/tecnico') }}";
-
-            // 🔥 mostrar loading
-            document.getElementById('loadingScraper').style.display = 'block';
-            document.getElementById('resultadoScraper').innerHTML = '';
-
-            fetch(`${url}?tecnico_id=${tecnico_id}&equipo_id=${equipo_id}`)
-                .then(res => res.json())
-                .then(data => {
-
-                    let html = '';
-                    let items = data.original ?? [];
-
-                    // 🔥 totales
-                    let totPartidos = 0;
-                    let totGanados = 0;
-                    let totEmpatados = 0;
-                    let totPerdidos = 0;
-                    let totGF = 0;
-                    let totGE = 0;
-
-                    items.forEach(competition => {
-
-                        totPartidos += parseInt(competition.partidos || 0);
-                        totGanados += parseInt(competition.ganados || 0);
-                        totEmpatados += parseInt(competition.empatados || 0);
-                        totPerdidos += parseInt(competition.perdidos || 0);
-                        totGF += parseInt(competition.gf || 0);
-                        totGE += parseInt(competition.ge || 0);
-
-                        html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
-                        html += '<table class="table table-sm">';
-                        html += '<tr><th>Equipo</th><th>Partidos</th><th>Ganados</th><th>Empatados</th><th>Perdidos</th><th>GF</th><th>GE</th><th>Usar</th></tr>';
-
-                        html += `<tr>
-                    <td style="color: #0a6ebd">${competition.equipo}</td>
-                    <td>${competition.partidos}</td>
-                    <td>${competition.ganados}</td>
-                    <td>${competition.empatados}</td>
-                    <td>${competition.perdidos}</td>
-                    <td>${competition.gf}</td>
-                    <td>${competition.ge}</td>
-                    <td>
-                        <button onclick='usarDato(${JSON.stringify(competition)})' class="btn btn-success btn-sm">
-                            Usar
-                        </button>
-                    </td>
-                </tr>`;
-
-                        html += '</table>';
-                    });
-
-                    // 🔥 tabla totales
-                    if (items.length) {
-                        html += `
-                <table class="table table-sm table-bordered mt-3">
-                    <tr class="table-dark">
-                        <th>Totales</th>
-                        <th>Partidos</th>
-                        <th>Ganados</th>
-                        <th>Empatados</th>
-                        <th>Perdidos</th>
-                        <th>GF</th>
-                        <th>GE</th>
-                        <th></th>
-                    </tr>
-                    <tr class="table-warning">
-                        <td><strong>Total</strong></td>
-                        <td>${totPartidos}</td>
-                        <td>${totGanados}</td>
-                        <td>${totEmpatados}</td>
-                        <td>${totPerdidos}</td>
-                        <td>${totGF}</td>
-                        <td>${totGE}</td>
-                        <td></td>
-                    </tr>
-                </table>`;
-                    }
-
-                    document.getElementById('resultadoScraper').innerHTML = html;
-                })
-                .catch(err => {
-                    console.error(err);
-                    document.getElementById('resultadoScraper').innerHTML =
-                        '<div class="alert alert-danger">Error cargando datos</div>';
-                })
-                .finally(() => {
-                    document.getElementById('loadingScraper').style.display = 'none';
-                });
+        function opcionesSelect(valores, seleccionado) {
+            let html = '';
+            valores.forEach(v => {
+                let sel = (v === (seleccionado ?? '')) ? 'selected' : '';
+                html += `<option value="${v}" ${sel}>${v === '' ? 'Seleccionar...' : v}</option>`;
+            });
+            return html;
         }
 
         function normalizar(texto) {
@@ -299,166 +199,166 @@
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
         }
 
-        function usarDato(item) {
-
-            document.querySelector('[name="tipo"]').value = item.tipo;
-            document.querySelector('[name="ambito"]').value = item.ambito;
-            document.querySelector('[name="partidos"]').value = item.partidos;
-            document.querySelector('[name="posicion"]').value = item.posicion;
-            document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
-            document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
-            document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
-            document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
-            document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
-
-
-            document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
-
-            document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
-
-            // 🧠 match equipo
+        // Resolve a DB equipo_id from a scraped team name (same fuzzy match as usarDato()).
+        function matchEquipoId(nombreEquipo) {
             let select = document.querySelector('[name="equipo_id"]');
-            let equipoScraper = normalizar(item.equipo);
-
+            let equipoScraper = normalizar(nombreEquipo);
             let mejorMatch = null;
             let maxScore = 0;
 
             for (let option of select.options) {
+                if (!option.value) continue;
                 let equipoDB = normalizar(option.text);
                 let score = 0;
-
                 if (equipoDB.includes(equipoScraper)) score += 2;
                 if (equipoScraper.includes(equipoDB)) score += 2;
-
                 if (score > maxScore) {
                     maxScore = score;
                     mejorMatch = option;
                 }
             }
-
-            if (mejorMatch) {
-                select.value = mejorMatch.value;
-                $(select).trigger('change'); // Select2
-            }
+            return mejorMatch ? mejorMatch.value : null;
         }
 
-        function procesarCSV() {
+        function usarDato(item) {
+            document.querySelector('[name="tipo"]').value = item.tipo ?? '';
+            document.querySelector('[name="ambito"]').value = item.ambito ?? '';
+            document.querySelector('[name="partidos"]').value = item.partidos ?? 0;
+            document.querySelector('[name="posicion"]').value = item.posicion ?? 0;
+            document.querySelector('[name="ganados"]').value = item.ganados ?? 0;
+            document.querySelector('[name="empatados"]').value = item.empatados ?? 0;
+            document.querySelector('[name="perdidos"]').value = item.perdidos ?? 0;
+            document.querySelector('[name="goles_favor"]').value = item.gf ?? 0;
+            document.querySelector('[name="goles_en_contra"]').value = item.ge ?? 0;
+            document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
 
-            let file = document.getElementById('csvFile').files[0];
-
-            if (!file) {
-                alert('Seleccione un CSV');
-                return;
+            if (item.torneo_logo) {
+                document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
             }
 
-            let formData = new FormData();
-            formData.append('file', file);
-
-            document.getElementById('loadingScraper').style.display = 'block';
-            document.getElementById('resultadoScraper').innerHTML = '';
-
-            fetch("{{ url('/admin/scraper/csv-tecnico') }}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: formData
-            })
-                .then(res => res.json())
-                .then(data => {
-                    renderResultados(data); // si usás función común
-                })
-                .finally(() => {
-                    document.getElementById('loadingScraper').style.display = 'none';
-                });
+            let select = document.querySelector('[name="equipo_id"]');
+            let equipoMatch = matchEquipoId(item.equipo);
+            if (equipoMatch) {
+                select.value = equipoMatch;
+                $(select).trigger('change');
+            }
         }
 
         function renderResultados(items) {
-
-            let html = '';
             let torneos = {};
 
             items.forEach(row => {
                 let key = clean(row.competition) + '|' + clean(row.equipo);
-
                 if (!torneos[key]) {
                     torneos[key] = {
                         competition: clean(row.competition),
-                        equipo: row.equipo,
-                        partidos: 0,
-                        posicion: 0,
-                        ganados: 0,
-                        empatados: 0,
-                        perdidos: 0,
-                        gf: 0,
-                        ge: 0,
-                        torneo_logo: row.torneo_logo ?? null,
-                        tipo: row.tipo ?? '',
-                        ambito: row.ambito ?? '',
+                        equipo:      row.equipo,
+                        partidos:    0,
+                        posicion:    0,
+                        ganados:     0,
+                        empatados:   0,
+                        perdidos:    0,
+                        gf:          0,
+                        ge:          0,
+                        tipo:        row.tipo ?? '',
+                        ambito:      row.ambito ?? '',
                     };
                 }
-
-                torneos[key].partidos   += parseInt(row.partidos ?? 0);
-                torneos[key].posicion   += parseInt(row.posicion ?? 0);
-                torneos[key].ganados    += parseInt(row.ganados ?? 0);
-                torneos[key].empatados  += parseInt(row.empatados ?? 0);
-                torneos[key].perdidos   += parseInt(row.perdidos ?? 0);
-                torneos[key].gf         += parseInt(row.gf ?? 0);
-                torneos[key].ge         += parseInt(row.ge ?? 0);
+                torneos[key].partidos  += parseInt(row.partidos ?? 0);
+                torneos[key].posicion  += parseInt(row.posicion ?? 0);
+                torneos[key].ganados   += parseInt(row.ganados ?? 0);
+                torneos[key].empatados += parseInt(row.empatados ?? 0);
+                torneos[key].perdidos  += parseInt(row.perdidos ?? 0);
+                torneos[key].gf        += parseInt(row.gf ?? 0);
+                torneos[key].ge        += parseInt(row.ge ?? 0);
             });
 
-            Object.values(torneos).forEach(competition => {
+            let lista = Object.values(torneos);
 
-                // Logo preview
-                let logoHtml = competition.torneo_logo
-                    ? `<img src="${competition.torneo_logo}" height="40" style="object-fit:contain;">`
-                    : '<span class="text-muted">—</span>';
+            if (!lista.length) {
+                document.getElementById('resultadoScraper').innerHTML =
+                    '<div class="alert alert-warning">Sin resultados.</div>';
+                return;
+            }
 
-                html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
-                html += '<table class="table table-sm">';
-                html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>Posición</th><th>Partidos</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GE</th><th>Usar</th><th>Excluir</th></tr>';
+            let html = `
+                <div class="d-flex align-items-center mb-3">
+                    <button type="button" class="btn btn-primary mr-2" onclick="guardarSeleccionados()">
+                        💾 Guardar seleccionados
+                    </button>
+                    <label class="mb-0">
+                        <input type="checkbox" id="checkTodos" onclick="toggleTodos(this)"> Seleccionar todos
+                    </label>
+                    <span id="resumenMasivo" class="ml-3"></span>
+                </div>`;
 
-                html += `<tr>
-            <td>${logoHtml}</td>
-            <td style="color:#0a6ebd">${competition.equipo}</td>
-            <td>${competition.tipo}</td>
-            <td>${competition.ambito}</td>
-            <td>${competition.posicion}</td>
-            <td>${competition.partidos}</td>
-            <td>${competition.ganados}</td>
-            <td>${competition.empatados}</td>
-            <td>${competition.perdidos}</td>
-            <td>${competition.gf}</td>
-            <td>${competition.ge}</td>
-            <td>
-                <button onclick='usarDato(${JSON.stringify(competition)})'
-                    class="btn btn-success btn-sm">Usar</button>
-            </td>
-            <td>
-                <button onclick='excluirCompetencia(${JSON.stringify(competition.competition)}, this)'
-                    class="btn btn-danger btn-sm" title="No mostrar más esta competencia">
-                    🚫
-                </button>
-                <button onclick='excluirEquipo(${JSON.stringify(competition.equipo)}, this)'
-                    class="btn btn-danger btn-sm" title="No mostrar más este equipo">
-                    🚫
-                </button>
-            </td>
+            lista.forEach((c, idx) => {
+                let equipoMatch = matchEquipoId(c.equipo);
 
-        </tr>`;
+                html += `
+                <div class="card mb-3 fila-torneo" data-idx="${idx}">
+                    <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
+                        <input type="checkbox" class="check-torneo mr-2" value="${idx}">
+                        <strong style="color: darkgreen;">${clean(c.competition)}</strong>
+                        <span class="ml-auto">
+                            <button type="button" onclick='excluirCompetencia(${JSON.stringify(c.competition)}, this)'
+                                class="btn btn-danger btn-sm" title="No mostrar más esta competencia">🚫 Comp.</button>
+                            <button type="button" onclick='excluirEquipo(${JSON.stringify(c.equipo)}, this)'
+                                class="btn btn-danger btn-sm" title="No mostrar más este equipo">🚫 Equipo</button>
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="form-group col-md-3">
+                                <label class="small mb-0">Torneo</label>
+                                <input type="text" class="form-control form-control-sm f-torneo_nombre" value="${clean(c.competition)}">
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label class="small mb-0">Equipo</label>
+                                <select class="form-control form-control-sm f-equipo_id">${opcionesEquipos(equipoMatch)}</select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label class="small mb-0">Tipo</label>
+                                <select class="form-control form-control-sm f-tipo">${opcionesSelect(['', 'Liga', 'Copa'], c.tipo)}</select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label class="small mb-0">Ámbito</label>
+                                <select class="form-control form-control-sm f-ambito">${opcionesSelect(['', 'Nacional', 'Internacional'], c.ambito)}</select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label class="small mb-0">Logo</label>
+                                <input type="file" class="form-control-file form-control-sm f-logo_file">
+                            </div>
+                        </div>
 
-                html += '</table>';
+                        <div class="row">
+                            <div class="form-group col-md-2"><label class="small mb-0">Posición</label>
+                                <input type="number" class="form-control form-control-sm f-posicion" value="${c.posicion}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">Partidos</label>
+                                <input type="number" class="form-control form-control-sm f-partidos" value="${c.partidos}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">Ganados</label>
+                                <input type="number" class="form-control form-control-sm f-ganados" value="${c.ganados}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">Empatados</label>
+                                <input type="number" class="form-control form-control-sm f-empatados" value="${c.empatados}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">Perdidos</label>
+                                <input type="number" class="form-control form-control-sm f-perdidos" value="${c.perdidos}"></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group col-md-2"><label class="small mb-0">Goles Favor</label>
+                                <input type="number" class="form-control form-control-sm f-goles_favor" value="${c.gf}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">Goles Contra</label>
+                                <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${c.ge}"></div>
+                        </div>
+                    </div>
+                </div>`;
             });
 
             document.getElementById('resultadoScraper').innerHTML = html;
-
-
-
-
         }
+
         function scrapearFootballDB() {
             let url = document.getElementById('footballdbUrl').value.trim();
-
             if (!url) {
                 alert('Ingresá la URL');
                 return;
@@ -506,18 +406,8 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.ok) {
-                        // Ocultar el bloque (h5 + table) o la fila según el scraper
-                        let table  = btn.closest('table');
-                        let row    = btn.closest('tr');
-                        let isOneRowTable = table && table.querySelectorAll('tbody tr, tr').length <= 2;
-
-                        if (isOneRowTable) {
-                            let header = table.previousElementSibling;
-                            if (header && header.tagName === 'H5') header.remove();
-                            table.remove();
-                        } else if (row) {
-                            row.remove();
-                        }
+                        let card = btn.closest('.fila-torneo');
+                        if (card) card.remove();
 
                         let msg = document.createElement('div');
                         msg.className = 'alert alert-warning';
@@ -555,34 +445,14 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.ok) {
-                        // Ocultar TODAS las tablas/filas de ese equipo en pantalla
                         let nombreNorm = normalizar(nombre);
 
-                        document.querySelectorAll('#resultadoScraper table').forEach(table => {
-                            let rows = table.querySelectorAll('tr');
-                            let dataRows = Array.from(rows).slice(1); // saltea header
-
-                            let allMatch = dataRows.length > 0 && dataRows.every(r => {
-                                let equipoCell = r.cells[1]?.innerText ?? '';
-                                return normalizar(equipoCell) === nombreNorm
-                                    || normalizar(equipoCell).includes(nombreNorm)
-                                    || nombreNorm.includes(normalizar(equipoCell));
-                            });
-
-                            if (allMatch) {
-                                let header = table.previousElementSibling;
-                                if (header && header.tagName === 'H5') header.remove();
-                                table.remove();
-                            } else {
-                                dataRows.forEach(r => {
-                                    let equipoCell = r.cells[1]?.innerText ?? '';
-                                    let eqNorm = normalizar(equipoCell);
-                                    if (eqNorm === nombreNorm
-                                        || eqNorm.includes(nombreNorm)
-                                        || nombreNorm.includes(eqNorm)) {
-                                        r.remove();
-                                    }
-                                });
+                        document.querySelectorAll('#resultadoScraper .fila-torneo').forEach(card => {
+                            let sel = card.querySelector('.f-equipo_id');
+                            let texto = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : '';
+                            let eqNorm = normalizar(texto);
+                            if (eqNorm === nombreNorm || eqNorm.includes(nombreNorm) || nombreNorm.includes(eqNorm)) {
+                                card.remove();
                             }
                         });
 
@@ -603,6 +473,109 @@
                 });
         }
 
+        function toggleTodos(master) {
+            document.querySelectorAll('.check-torneo').forEach(c => c.checked = master.checked);
+        }
+
+        async function guardarSeleccionados() {
+            let seleccionados = Array.from(document.querySelectorAll('.check-torneo:checked'));
+
+            if (!seleccionados.length) {
+                alert('No seleccionaste ningún torneo.');
+                return;
+            }
+
+            let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
+
+            let token = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="_token"]')?.value;
+
+            // Numeric/select fields read straight from each row's editable inputs.
+            let campos = [
+                'torneo_nombre', 'equipo_id', 'tipo', 'ambito',
+                'posicion', 'partidos',
+                'ganados', 'empatados', 'perdidos',
+                'goles_favor', 'goles_en_contra',
+            ];
+
+            // Build multipart FormData so each row can carry its uploaded logo file.
+            let formData = new FormData();
+            formData.append('tecnico_id', tecnicoId);
+
+            // Map each payload index to its card, so we can remove only the saved ones later.
+            let cardsPorIndice = {};
+
+            seleccionados.forEach((chk, i) => {
+                let card = chk.closest('.fila-torneo');
+                cardsPorIndice[i] = card;
+
+                campos.forEach(campo => {
+                    let el = card.querySelector('.f-' + campo);
+                    formData.append(`torneos[${i}][${campo}]`, el ? el.value : '');
+                });
+
+                // Per-row logo file (optional).
+                let fileInput = card.querySelector('.f-logo_file');
+                if (fileInput && fileInput.files.length) {
+                    formData.append(`torneos[${i}][logo_file]`, fileInput.files[0]);
+                }
+            });
+
+            let resumen = document.getElementById('resumenMasivo');
+            resumen.innerHTML = '⏳ Guardando...';
+
+            try {
+                // Note: no Content-Type header — the browser sets the multipart boundary itself.
+                let res = await fetch("{{ route('tecnico-estadisticas.storeMasivo') }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': token,
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                let data = await res.json();
+
+                // Remove only the cards that were actually saved; keep skipped/duplicated ones visible.
+                if (data.resultados && data.resultados.length) {
+                    data.resultados.forEach(r => {
+                        let card = cardsPorIndice[r.i];
+                        if (!card) return;
+
+                        if (r.ok) {
+                            card.remove();
+                        } else if (r.motivo === 'duplicado') {
+                            card.style.opacity = '0.6';
+                            let chk = card.querySelector('.check-torneo');
+                            if (chk) chk.checked = false;
+                            let header = card.querySelector('.card-header strong');
+                            if (header && !header.querySelector('.dup-tag')) {
+                                header.insertAdjacentHTML('beforeend',
+                                    ' <span class="dup-tag badge badge-warning">ya existe</span>');
+                            }
+                        } else {
+                            let chk = card.querySelector('.check-torneo');
+                            if (chk) chk.checked = false;
+                        }
+                    });
+                }
+
+                let msg = `✅ Guardados: ${data.guardados} · ⏭️ Salteados: ${data.salteados}`;
+                if (data.con_auto) {
+                    msg += ` · ⚠ ${data.con_auto} con stats automáticas existentes`;
+                }
+                if (data.errores && data.errores.length) {
+                    msg += `<br><small style="color:#856404">${data.errores.join('<br>')}</small>`;
+                }
+                resumen.innerHTML = msg;
+
+                let master = document.getElementById('checkTodos');
+                if (master) master.checked = false;
+            } catch (e) {
+                console.error('Error guardado masivo', e);
+                resumen.innerHTML = '<span style="color:#a94442">Error guardando.</span>';
+            }
+        }
     </script>
 @endsection
-

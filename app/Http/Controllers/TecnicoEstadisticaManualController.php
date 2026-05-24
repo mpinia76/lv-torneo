@@ -280,4 +280,109 @@ class TecnicoEstadisticaManualController extends Controller
         TecnicoEstadisticaManual::destroy($id);
         return back();
     }
+
+    // ============================================================================
+//  Add this method to TecnicoEstadisticaManualController.
+//  Reads multipart FormData (torneos[i][campo] + torneos[i][logo_file]),
+//  scopes everything to tecnico_id, skips duplicates (1062) without aborting
+//  the batch, flags rows that already have automatic stats (PartidoTecnico),
+//  and reports the per-row outcome so the UI removes only the saved rows.
+// ============================================================================
+
+    /**
+     * Store several scraped tournaments at once (from a single scrape).
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeMasivo(Request $request)
+    {
+        $tecnicoId = $request->input('tecnico_id');
+        $torneos   = $request->input('torneos', []);
+
+        // Whitelist of stat fields we accept from the client payload.
+        // Aligned with the model $fillable. torneo_logo is handled separately (file upload).
+        $campos = [
+            'equipo_id', 'torneo_nombre', 'tipo', 'ambito',
+            'posicion', 'partidos',
+            'ganados', 'empatados', 'perdidos',
+            'goles_favor', 'goles_en_contra',
+        ];
+
+        $guardados = 0;
+        $salteados = 0;
+        $conAuto   = 0;
+        $errores   = [];
+        // Per-row outcome keyed by the client index, so the UI removes only saved cards.
+        $resultados = [];
+
+        foreach ($torneos as $index => $torneo) {
+            // Always scope to the current coach. Never trust a tecnico_id coming inside the row.
+            $data = ['tecnico_id' => $tecnicoId];
+
+            foreach ($campos as $campo) {
+                $data[$campo] = $torneo[$campo] ?? null;
+            }
+
+            // Skip empty/garbage rows (no team and no tournament name).
+            if (empty($data['equipo_id']) && empty($data['torneo_nombre'])) {
+                $salteados++;
+                $resultados[] = ['i' => $index, 'ok' => false, 'motivo' => 'vacio'];
+                continue;
+            }
+
+            // Handle the per-row uploaded logo (same approach as the manual store()).
+            // The file arrives as torneos[i][logo_file] in the multipart payload.
+            $data['torneo_logo'] = null;
+            $logoFile = $request->file("torneos.$index.logo_file");
+
+            if ($logoFile) {
+                // time()_uniqid() avoids collisions when several logos are saved in the same second.
+                $name = time() . '_' . uniqid() . '.' . $logoFile->getClientOriginalExtension();
+                $logoFile->move(public_path('/images'), $name);
+                $data['torneo_logo'] = $name;
+            }
+
+            try {
+                TecnicoEstadisticaManual::create($data);
+                $guardados++;
+
+                // Warn (do not block) if automatic stats already exist for this coach/team/tournament.
+                $torneoNombre = $data['torneo_nombre'];
+                $existeAuto = PartidoTecnico::where('tecnico_id', $tecnicoId)
+                    ->where('equipo_id', $data['equipo_id'])
+                    ->whereHas('partido.fecha.grupo.torneo', function ($q) use ($torneoNombre) {
+                        $q->whereRaw("CONCAT(nombre, ' ', year) = ?", [$torneoNombre]);
+                    })
+                    ->exists();
+
+                if ($existeAuto) {
+                    $conAuto++;
+                }
+
+                $resultados[] = ['i' => $index, 'ok' => true, 'auto' => $existeAuto];
+            } catch (QueryException $ex) {
+                $errorCode = $ex->errorInfo[1] ?? null;
+
+                if ($errorCode == 1062) {
+                    // Duplicate for this coach/team/tournament: skip, keep going.
+                    $salteados++;
+                    $resultados[] = ['i' => $index, 'ok' => false, 'motivo' => 'duplicado'];
+                } else {
+                    $salteados++;
+                    $errores[] = ($data['torneo_nombre'] ?? '?') . ': ' . $ex->getMessage();
+                    $resultados[] = ['i' => $index, 'ok' => false, 'motivo' => 'error'];
+                }
+            }
+        }
+
+        return response()->json([
+            'ok'         => true,
+            'guardados'  => $guardados,
+            'salteados'  => $salteados,
+            'con_auto'   => $conAuto,
+            'errores'    => $errores,
+            'resultados' => $resultados,
+        ]);
+    }
 }

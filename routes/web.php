@@ -169,6 +169,9 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('tecnico-estadisticas/createPorTecnico/{tecnicoId}', 'TecnicoEstadisticaManualController@createPorTecnico')
         ->name('tecnico-estadisticas.createPorTecnico');
 
+    Route::post('tecnico-estadisticas/masivo', 'TecnicoEstadisticaManualController@storeMasivo')
+        ->name('tecnico-estadisticas.storeMasivo');
+
     Route::resource('equipo-estadisticas', 'EquipoEstadisticaManualController');
 
     Route::get(
