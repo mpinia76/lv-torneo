@@ -188,4 +188,82 @@ class JugadorEstadisticaManualController extends Controller
         JugadorEstadisticaManual::destroy($id);
         return back();
     }
+
+    /**
+     * Store several scraped tournaments at once (from a single scrape).
+     * Reads multipart FormData (torneos[i][campo] + torneos[i][logo_file]).
+     * Skips rows that collide with the unique index instead of failing the whole batch.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeMasivo(Request $request)
+    {
+        $jugadorId = $request->input('jugador_id');
+        $torneos   = $request->input('torneos', []);
+
+        // Whitelist of stat fields we accept from the client payload.
+        // Aligned with the model $fillable. torneo_logo is handled separately (file upload).
+        $campos = [
+            'equipo_id', 'torneo_nombre', 'tipo', 'ambito',
+            'posicion', 'partidos',
+            'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_en_contra',
+            'amarillas', 'rojas',
+            'penales_errados', 'penales_atajados',
+            'goles_recibidos', 'vallas_invictas', 'penales_atajo',
+        ];
+
+        $guardados = 0;
+        $salteados = 0;
+        $errores   = [];
+
+        foreach ($torneos as $index => $torneo) {
+            // Always scope to the current player. Never trust a jugador_id coming inside the row.
+            $data = ['jugador_id' => $jugadorId];
+
+            foreach ($campos as $campo) {
+                $data[$campo] = $torneo[$campo] ?? null;
+            }
+
+            // Skip empty/garbage rows (no team and no tournament name).
+            if (empty($data['equipo_id']) && empty($data['torneo_nombre'])) {
+                $salteados++;
+                continue;
+            }
+
+            // Handle the per-row uploaded logo (same approach as the manual store()).
+            // The file arrives as torneos[i][logo_file] in the multipart payload.
+            $data['torneo_logo'] = null;
+            $logoFile = $request->file("torneos.$index.logo_file");
+
+            if ($logoFile) {
+                // time()_uniqid() avoids collisions when several logos are saved in the same second.
+                $name = time() . '_' . uniqid() . '.' . $logoFile->getClientOriginalExtension();
+                $logoFile->move(public_path('/images'), $name);
+                $data['torneo_logo'] = $name;
+            }
+
+            try {
+                JugadorEstadisticaManual::create($data);
+                $guardados++;
+            } catch (QueryException $ex) {
+                $errorCode = $ex->errorInfo[1] ?? null;
+
+                if ($errorCode == 1062) {
+                    // Duplicate for this player/team/tournament: skip, keep going.
+                    $salteados++;
+                } else {
+                    $salteados++;
+                    $errores[] = ($data['torneo_nombre'] ?? '?') . ': ' . $ex->getMessage();
+                }
+            }
+        }
+
+        return response()->json([
+            'ok'        => true,
+            'guardados' => $guardados,
+            'salteados' => $salteados,
+            'errores'   => $errores,
+        ]);
+    }
 }

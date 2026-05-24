@@ -156,6 +156,9 @@ Route::group(['prefix' => 'admin'], function()
     )->name('jugador-estadisticas.indexPorJugador');
     Route::get('jugador-estadisticas/createPorJugador/{jugadorId}', 'JugadorEstadisticaManualController@createPorJugador')
         ->name('jugador-estadisticas.createPorJugador');
+    // Mass insert: save several scraped tournaments from a single scrape
+    Route::post('jugador-estadisticas/masivo', 'JugadorEstadisticaManualController@storeMasivo')
+        ->name('jugador-estadisticas.storeMasivo');
 
     Route::resource('tecnico-estadisticas', 'TecnicoEstadisticaManualController');
 

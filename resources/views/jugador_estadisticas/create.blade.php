@@ -70,20 +70,6 @@
             ⏳ Cargando datos, puede tardar unos segundos...
         </div>
         <div id="resultadoScraper" class="mt-3"></div>
-        {{-- Importar tipos de goles desde Transfermarkt --}}
-        <!--<div class="mb-3">
-            <label>Importar tipos de goles desde Transfermarkt</label>
-            <div class="d-flex">
-                <input type="text" id="transfermarktUrl" class="form-control mr-2"
-                       placeholder="https://www.transfermarkt.com.ar/lionel-messi/profil/spieler/28003">
-                <button type="button" class="btn btn-info" onclick="scrapearTransfermarkt()" style="white-space:nowrap;">
-                    ⚽ Tipos de goles
-                </button>
-            </div>
-            <small class="text-muted">
-                Pegá cualquier URL del jugador en Transfermarkt. Muestra los goles agrupados por temporada y competición para que los cargues a mano. Excluye Argentina, competiciones CONMEBOL y temporadas previas al 2000.
-            </small>
-        </div>-->
 
         <div id="loadingTM" style="display:none;" class="alert alert-info">
             ⏳ Trayendo goles desde Transfermarkt, puede tardar unos segundos...
@@ -236,6 +222,26 @@
     </div>
 
     <script>
+        // Build the <option> list for the team selects, reusing the page's main equipo select.
+        function opcionesEquipos(selectedId) {
+            let base = document.querySelector('[name="equipo_id"]');
+            let html = '';
+            for (let option of base.options) {
+                let sel = (String(option.value) === String(selectedId)) ? 'selected' : '';
+                html += `<option value="${option.value}" ${sel}>${option.text}</option>`;
+            }
+            return html;
+        }
+
+        function opcionesSelect(valores, seleccionado) {
+            let html = '';
+            valores.forEach(v => {
+                let sel = (v === (seleccionado ?? '')) ? 'selected' : '';
+                html += `<option value="${v}" ${sel}>${v === '' ? 'Seleccionar...' : v}</option>`;
+            });
+            return html;
+        }
+
         function normalizar(texto) {
             return texto
                 .toLowerCase()
@@ -248,6 +254,27 @@
 
         function clean(texto) {
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
+        }
+
+        // Resolve a DB equipo_id from a scraped team name using the same fuzzy match as usarDato().
+        function matchEquipoId(nombreEquipo) {
+            let select = document.querySelector('[name="equipo_id"]');
+            let equipoScraper = normalizar(nombreEquipo);
+            let mejorMatch = null;
+            let maxScore = 0;
+
+            for (let option of select.options) {
+                if (!option.value) continue;
+                let equipoDB = normalizar(option.text);
+                let score = 0;
+                if (equipoDB.includes(equipoScraper)) score += 2;
+                if (equipoScraper.includes(equipoDB)) score += 2;
+                if (score > maxScore) {
+                    maxScore = score;
+                    mejorMatch = option;
+                }
+            }
+            return mejorMatch ? mejorMatch.value : null;
         }
 
         function avisoFallbackGoles(item, motivo) {
@@ -263,136 +290,46 @@
         }
 
         async function usarDato(item) {
+            document.querySelector('[name="torneo_nombre"]').value = clean(item.competition);
+            document.querySelector('[name="tipo"]').value = item.tipo ?? '';
+            document.querySelector('[name="ambito"]').value = item.ambito ?? '';
+            document.querySelector('[name="partidos"]').value = item.partidos ?? 0;
+            document.querySelector('[name="posicion"]').value = item.posicion ?? 0;
+            document.querySelector('[name="goles_en_contra"]').value = item.goles_en_contra ?? 0;
+            document.querySelector('[name="amarillas"]').value = item.amarillas ?? 0;
+            document.querySelector('[name="rojas"]').value = item.rojas ?? 0;
 
-            // =========================
-            // DATOS BASE
-            // =========================
+            let esArquero = "{{ mb_strtolower($jugador->tipoJugador ?? '') }}".includes('arquero');
+            let golesRecibidosInput = document.querySelector('[name="goles_recibidos"]');
+            let vallasInvictasInput = document.querySelector('[name="vallas_invictas"]');
+            if (golesRecibidosInput) golesRecibidosInput.value = esArquero ? (item.goles_recibidos ?? 0) : 0;
+            if (vallasInvictasInput) vallasInvictasInput.value = esArquero ? (item.vallas_invictas ?? 0) : 0;
 
-            document.querySelector('[name="torneo_nombre"]').value =
-                clean(item.competition);
-
-            document.querySelector('[name="tipo"]').value =
-                item.tipo ?? '';
-
-            document.querySelector('[name="ambito"]').value =
-                item.ambito ?? '';
-
-            document.querySelector('[name="partidos"]').value =
-                item.partidos ?? 0;
-
-            document.querySelector('[name="posicion"]').value =
-                item.posicion ?? 0;
-
-            document.querySelector('[name="goles_en_contra"]').value =
-                item.goles_en_contra ?? 0;
-
-            document.querySelector('[name="amarillas"]').value =
-                item.amarillas ?? 0;
-
-            document.querySelector('[name="rojas"]').value =
-                item.rojas ?? 0;
-
-            // =========================
-            // ARQUERO
-            // =========================
-
-            let esArquero =
-                "{{ mb_strtolower($jugador->tipoJugador ?? '') }}".includes('arquero');
-
-            let golesRecibidosInput =
-                document.querySelector('[name="goles_recibidos"]');
-
-            let vallasInvictasInput =
-                document.querySelector('[name="vallas_invictas"]');
-
-            if (golesRecibidosInput) {
-
-                golesRecibidosInput.value = esArquero
-                    ? (item.goles_recibidos ?? 0)
-                    : 0;
-            }
-
-            if (vallasInvictasInput) {
-
-                vallasInvictasInput.value = esArquero
-                    ? (item.vallas_invictas ?? 0)
-                    : 0;
-            }
-
-            // =========================
-            // RESET GOLES TM
-            // =========================
-
-            // Fallback: si TM no trae datos, todos los goles van a "jugada"
             document.querySelector('[name="goles_cabeza"]').value = 0;
             document.querySelector('[name="goles_jugada"]').value = item.goles_jugada ?? 0;
             document.querySelector('[name="goles_penal"]').value = 0;
             document.querySelector('[name="goles_tiro_libre"]').value = 0;
 
-            // =========================
-            // LOGO
-            // =========================
-
             if (item.torneo_logo) {
-
-                document.querySelector('[name="torneo_logo_guardado"]').value =
-                    item.torneo_logo;
+                document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
             }
-
-            // =========================
-            // MATCH EQUIPO
-            // =========================
 
             let select = document.querySelector('[name="equipo_id"]');
-
-            let equipoScraper = normalizar(item.equipo);
-
-            let mejorMatch = null;
-
-            let maxScore = 0;
-
-            for (let option of select.options) {
-
-                let equipoDB = normalizar(option.text);
-
-                let score = 0;
-
-                if (equipoDB.includes(equipoScraper)) score += 2;
-                if (equipoScraper.includes(equipoDB)) score += 2;
-
-                if (score > maxScore) {
-
-                    maxScore = score;
-                    mejorMatch = option;
-                }
-            }
-
-            if (mejorMatch) {
-
-                select.value = mejorMatch.value;
-
+            let equipoMatch = matchEquipoId(item.equipo);
+            if (equipoMatch) {
+                select.value = equipoMatch;
                 $(select).trigger('change');
             }
 
-            // =========================
-            // TRANSFERMARKT
-            // =========================
-
             let tmUrl = document.getElementById('transfermarktUrl').value.trim();
-
             if (!tmUrl) {
-
                 document.getElementById('resultadoTM').innerHTML =
                     avisoFallbackGoles(item, 'No cargaste URL de Transfermarkt.');
-
                 return;
             }
 
             try {
-
-                document.getElementById('loadingTM')
-                    ?.style.setProperty('display', 'block');
-
+                document.getElementById('loadingTM')?.style.setProperty('display', 'block');
                 document.getElementById('resultadoTM').innerHTML = '';
 
                 let response = await fetch(
@@ -404,121 +341,61 @@
 
                 let data = await response.json();
 
-                console.log('TM DATA', data);
-
                 if (data.error) {
-
                     document.getElementById('resultadoTM').innerHTML =
                         `<div class="alert alert-danger">${data.error}</div>`;
-
                     return;
                 }
 
                 if (!data.length) {
-
                     document.getElementById('resultadoTM').innerHTML =
-                        avisoFallbackGoles(
-                            item,
-                            `No se encontraron coincidencias en Transfermarkt para <strong>${item.competition}</strong> / ${item.equipo}.`
-                        );
-
+                        avisoFallbackGoles(item,
+                            `No se encontraron coincidencias en Transfermarkt para <strong>${item.competition}</strong> / ${item.equipo}.`);
                     return;
                 }
 
-                // =========================
-                // TABLA TM
-                // =========================
-
                 let html = `
-            <h5 style="color:#0a6ebd">
-                Tipos de goles encontrados en Transfermarkt
-            </h5>
-
+            <h5 style="color:#0a6ebd">Tipos de goles encontrados en Transfermarkt</h5>
             <table class="table table-sm table-bordered">
-                <thead>
-                    <tr>
-                        <th>Temp.</th>
-                        <th>Competición</th>
-                        <th>Club</th>
-                        <th>Total</th>
-                        <th>Cabeza</th>
-                        <th>Jugada</th>
-                        <th>Penal</th>
-                        <th>T. Libre</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
+                <thead><tr>
+                    <th>Temp.</th><th>Competición</th><th>Club</th><th>Total</th>
+                    <th>Cabeza</th><th>Jugada</th><th>Penal</th><th>T. Libre</th><th></th>
+                </tr></thead><tbody>`;
 
                 data.forEach(g => {
-
-                    let totalTM =
-                        parseInt(g.total ?? 0);
-
-                    let totalFDB =
-                        parseInt(item.goles_jugada ?? 0);
-
-                    let diferencia =
-                        totalFDB !== totalTM;
+                    let totalTM = parseInt(g.total ?? 0);
+                    let totalFDB = parseInt(item.goles_jugada ?? 0);
+                    let diferencia = totalFDB !== totalTM;
 
                     html += `
                 <tr ${diferencia ? 'style="background:#fff3cd;"' : ''}>
                     <td>${g.temporada}</td>
                     <td>${g.competicion}</td>
                     <td>${g.club}</td>
-
-                    <td>
-                        <strong>${g.total}</strong>
-
-                        ${
-                        diferencia
-                            ? `<br><small style="color:#856404">
-                                FDB: ${totalFDB}
-                              </small>`
-                            : ''
-                    }
+                    <td><strong>${g.total}</strong>
+                        ${diferencia ? `<br><small style="color:#856404">FDB: ${totalFDB}</small>` : ''}
                     </td>
-
                     <td>${g.cabeza}</td>
                     <td>${g.jugada}</td>
                     <td>${g.penal}</td>
                     <td>${g.tiro_libre}</td>
-
-                    <td>
-                        <button
-                            class="btn btn-success btn-sm"
-                            onclick='usarGolesTM(${JSON.stringify(g)})'>
-                            Usar
-                        </button>
-                    </td>
-                </tr>
-            `;
+                    <td><button class="btn btn-success btn-sm" onclick='usarGolesTM(${JSON.stringify(g)})'>Usar</button></td>
+                </tr>`;
                 });
 
-                html += `
-                </tbody>
-            </table>
-        `;
-
+                html += `</tbody></table>`;
                 document.getElementById('resultadoTM').innerHTML = html;
 
             } catch (e) {
-
                 console.error('Error TM', e);
-
                 document.getElementById('resultadoTM').innerHTML =
                     avisoFallbackGoles(item, 'Error consultando Transfermarkt (timeout o red).');
-
             } finally {
-
-                document.getElementById('loadingTM')
-                    ?.style.setProperty('display', 'none');
+                document.getElementById('loadingTM')?.style.setProperty('display', 'none');
             }
         }
 
         function renderResultados(items) {
-            let html = '';
             let torneos = {};
 
             items.forEach(row => {
@@ -535,7 +412,6 @@
                         rojas:            0,
                         goles_recibidos:  0,
                         vallas_invictas:  0,
-                        torneo_logo:      row.torneo_logo ?? null,
                         tipo:             row.tipo ?? '',
                         ambito:           row.ambito ?? '',
                     };
@@ -550,43 +426,101 @@
                 torneos[key].vallas_invictas += parseInt(row.vallas_invictas ?? 0);
             });
 
-            Object.values(torneos).forEach(competition => {
-                let logoHtml = competition.torneo_logo
-                    ? `<img src="${competition.torneo_logo}" height="40" style="object-fit:contain;">`
-                    : '<span class="text-muted">—</span>';
+            let lista = Object.values(torneos);
 
-                html += `<h5 style="color: darkgreen">${clean(competition.competition)}</h5>`;
-                html += '<table class="table table-sm">';
-                html += '<tr><th>Logo</th><th>Equipo</th><th>Tipo</th><th>Ámbito</th><th>PJ</th><th>Goles</th><th>Propios</th><th>Amarillas</th><th>Rojas</th><th>G.Rec</th><th>V.Inv</th><th>Usar</th><th>Excluir</th></tr>';
-                html += `<tr>
-                    <td>${logoHtml}</td>
-                    <td style="color:#0a6ebd">${competition.equipo}</td>
-                    <td>${competition.tipo}</td>
-                    <td>${competition.ambito}</td>
-                    <td>${competition.partidos}</td>
-                    <td>${competition.goles_jugada}</td>
-                    <td>${competition.goles_en_contra}</td>
-                    <td>${competition.amarillas}</td>
-                    <td>${competition.rojas}</td>
-                    <td>${competition.goles_recibidos}</td>
-                    <td>${competition.vallas_invictas}</td>
-                    <td>
-                        <button onclick='usarDato(${JSON.stringify(competition)})'
-                            class="btn btn-success btn-sm">Usar</button>
-                    </td>
-                    <td>
-                        <button onclick='excluirCompetencia(${JSON.stringify(competition.competition)}, this)'
-                            class="btn btn-danger btn-sm" title="No mostrar más esta competencia">
-                            🚫
-                        </button>
+            if (!lista.length) {
+                document.getElementById('resultadoScraper').innerHTML =
+                    '<div class="alert alert-warning">Sin resultados.</div>';
+                return;
+            }
 
-                        <button onclick='excluirEquipo(${JSON.stringify(competition.equipo)}, this)'
-                            class="btn btn-danger btn-sm" title="No mostrar más este equipo">
-                            🚫
-                        </button>
-                    </td>
-                </tr>`;
-                html += '</table>';
+            let esArquero = "{{ mb_strtolower($jugador->tipoJugador ?? '') }}".includes('arquero');
+
+            let html = `
+                <div class="d-flex align-items-center mb-3">
+                    <button type="button" class="btn btn-primary mr-2" onclick="guardarSeleccionados()">
+                        💾 Guardar seleccionados
+                    </button>
+                    <label class="mb-0">
+                        <input type="checkbox" id="checkTodos" onclick="toggleTodos(this)"> Seleccionar todos
+                    </label>
+                    <span id="resumenMasivo" class="ml-3"></span>
+                </div>`;
+
+            lista.forEach((c, idx) => {
+                let equipoMatch = matchEquipoId(c.equipo);
+
+                html += `
+                <div class="card mb-3 fila-torneo" data-idx="${idx}">
+                    <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
+                        <input type="checkbox" class="check-torneo mr-2" value="${idx}">
+                        <strong style="color: darkgreen;">${clean(c.competition)}</strong>
+                        <span class="ml-auto">
+                            <button type="button" onclick='excluirCompetencia(${JSON.stringify(c.competition)}, this)'
+                                class="btn btn-danger btn-sm" title="No mostrar más esta competencia">🚫 Comp.</button>
+                            <button type="button" onclick='excluirEquipo(${JSON.stringify(c.equipo)}, this)'
+                                class="btn btn-danger btn-sm" title="No mostrar más este equipo">🚫 Equipo</button>
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="form-group col-md-3">
+                                <label class="small mb-0">Torneo</label>
+                                <input type="text" class="form-control form-control-sm f-torneo_nombre" value="${clean(c.competition)}">
+                            </div>
+                            <div class="form-group col-md-3">
+                                <label class="small mb-0">Equipo</label>
+                                <select class="form-control form-control-sm f-equipo_id">${opcionesEquipos(equipoMatch)}</select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label class="small mb-0">Tipo</label>
+                                <select class="form-control form-control-sm f-tipo">${opcionesSelect(['', 'Liga', 'Copa'], c.tipo)}</select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label class="small mb-0">Ámbito</label>
+                                <select class="form-control form-control-sm f-ambito">${opcionesSelect(['', 'Nacional', 'Internacional'], c.ambito)}</select>
+                            </div>
+                            <div class="form-group col-md-2">
+                                <label class="small mb-0">Logo</label>
+                                <input type="file" class="form-control-file form-control-sm f-logo_file">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group col-md-1"><label class="small mb-0">PJ</label>
+                                <input type="number" class="form-control form-control-sm f-partidos" value="${c.partidos}"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Pos.</label>
+                                <input type="number" class="form-control form-control-sm f-posicion" value="${c.posicion}"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Cabeza</label>
+                                <input type="number" class="form-control form-control-sm f-goles_cabeza" value="0"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Jugada</label>
+                                <input type="number" class="form-control form-control-sm f-goles_jugada" value="${c.goles_jugada}"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Penal</label>
+                                <input type="number" class="form-control form-control-sm f-goles_penal" value="0"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">T.Libre</label>
+                                <input type="number" class="form-control form-control-sm f-goles_tiro_libre" value="0"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Contra</label>
+                                <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${c.goles_en_contra}"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Amar.</label>
+                                <input type="number" class="form-control form-control-sm f-amarillas" value="${c.amarillas}"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Rojas</label>
+                                <input type="number" class="form-control form-control-sm f-rojas" value="${c.rojas}"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">P.Err</label>
+                                <input type="number" class="form-control form-control-sm f-penales_errados" value="0"></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">P.Ataj</label>
+                                <input type="number" class="form-control form-control-sm f-penales_atajados" value="0"></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group col-md-2"><label class="small mb-0">G. Recibidos</label>
+                                <input type="number" class="form-control form-control-sm f-goles_recibidos" value="${esArquero ? c.goles_recibidos : 0}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">V. Invictas</label>
+                                <input type="number" class="form-control form-control-sm f-vallas_invictas" value="${esArquero ? c.vallas_invictas : 0}"></div>
+                            <div class="form-group col-md-2"><label class="small mb-0">P. Atajó (arq)</label>
+                                <input type="number" class="form-control form-control-sm f-penales_atajo" value="0"></div>
+                        </div>
+                    </div>
+                </div>`;
             });
 
             document.getElementById('resultadoScraper').innerHTML = html;
@@ -643,18 +577,8 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.ok) {
-                        // Ocultar el bloque (h5 + table) o la fila según el scraper
-                        let table  = btn.closest('table');
-                        let row    = btn.closest('tr');
-                        let isOneRowTable = table && table.querySelectorAll('tbody tr, tr').length <= 2;
-
-                        if (isOneRowTable) {
-                            let header = table.previousElementSibling;
-                            if (header && header.tagName === 'H5') header.remove();
-                            table.remove();
-                        } else if (row) {
-                            row.remove();
-                        }
+                        let card = btn.closest('.fila-torneo');
+                        if (card) card.remove();
 
                         let msg = document.createElement('div');
                         msg.className = 'alert alert-warning';
@@ -687,10 +611,8 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.error) {
-
                         document.getElementById('resultadoTM').innerHTML =
-                            avisoFallbackGoles(item, `Error de Transfermarkt: ${data.error}`);
-
+                            `<div class="alert alert-danger">Error de Transfermarkt: ${data.error}</div>`;
                         return;
                     }
                     if (!data.length) {
@@ -735,19 +657,12 @@
                     document.getElementById('loadingTM').style.display = 'none';
                 });
         }
+
         function usarGolesTM(goles) {
-
-            document.querySelector('[name="goles_cabeza"]').value =
-                goles.cabeza ?? 0;
-
-            document.querySelector('[name="goles_jugada"]').value =
-                goles.jugada ?? 0;
-
-            document.querySelector('[name="goles_penal"]').value =
-                goles.penal ?? 0;
-
-            document.querySelector('[name="goles_tiro_libre"]').value =
-                goles.tiro_libre ?? 0;
+            document.querySelector('[name="goles_cabeza"]').value = goles.cabeza ?? 0;
+            document.querySelector('[name="goles_jugada"]').value = goles.jugada ?? 0;
+            document.querySelector('[name="goles_penal"]').value = goles.penal ?? 0;
+            document.querySelector('[name="goles_tiro_libre"]').value = goles.tiro_libre ?? 0;
         }
 
         function excluirEquipo(nombre, btn) {
@@ -769,34 +684,14 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.ok) {
-                        // Ocultar TODAS las tablas/filas de ese equipo en pantalla
                         let nombreNorm = normalizar(nombre);
 
-                        document.querySelectorAll('#resultadoScraper table').forEach(table => {
-                            let rows = table.querySelectorAll('tr');
-                            let dataRows = Array.from(rows).slice(1); // saltea header
-
-                            let allMatch = dataRows.length > 0 && dataRows.every(r => {
-                                let equipoCell = r.cells[1]?.innerText ?? '';
-                                return normalizar(equipoCell) === nombreNorm
-                                    || normalizar(equipoCell).includes(nombreNorm)
-                                    || nombreNorm.includes(normalizar(equipoCell));
-                            });
-
-                            if (allMatch) {
-                                let header = table.previousElementSibling;
-                                if (header && header.tagName === 'H5') header.remove();
-                                table.remove();
-                            } else {
-                                dataRows.forEach(r => {
-                                    let equipoCell = r.cells[1]?.innerText ?? '';
-                                    let eqNorm = normalizar(equipoCell);
-                                    if (eqNorm === nombreNorm
-                                        || eqNorm.includes(nombreNorm)
-                                        || nombreNorm.includes(eqNorm)) {
-                                        r.remove();
-                                    }
-                                });
+                        document.querySelectorAll('#resultadoScraper .fila-torneo').forEach(card => {
+                            let sel = card.querySelector('.f-equipo_id');
+                            let texto = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text : '';
+                            let eqNorm = normalizar(texto);
+                            if (eqNorm === nombreNorm || eqNorm.includes(nombreNorm) || nombreNorm.includes(eqNorm)) {
+                                card.remove();
                             }
                         });
 
@@ -815,6 +710,84 @@
                     console.error(err);
                     alert('Error al excluir equipo');
                 });
+        }
+
+        function toggleTodos(master) {
+            document.querySelectorAll('.check-torneo').forEach(c => c.checked = master.checked);
+        }
+
+        async function guardarSeleccionados() {
+            let seleccionados = Array.from(document.querySelectorAll('.check-torneo:checked'));
+
+            if (!seleccionados.length) {
+                alert('No seleccionaste ningún torneo.');
+                return;
+            }
+
+            let jugadorId = document.querySelector('[name="jugador_id"]').value;
+
+            let token = document.querySelector('meta[name="csrf-token"]')?.content
+                || document.querySelector('input[name="_token"]')?.value;
+
+            // Numeric/select fields read straight from each row's editable inputs.
+            let campos = [
+                'torneo_nombre', 'equipo_id', 'tipo', 'ambito',
+                'partidos', 'posicion',
+                'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_en_contra',
+                'amarillas', 'rojas',
+                'penales_errados', 'penales_atajados',
+                'goles_recibidos', 'vallas_invictas', 'penales_atajo',
+            ];
+
+            // Build multipart FormData so each row can carry its uploaded logo file.
+            let formData = new FormData();
+            formData.append('jugador_id', jugadorId);
+
+            seleccionados.forEach((chk, i) => {
+                let card = chk.closest('.fila-torneo');
+
+                campos.forEach(campo => {
+                    let el = card.querySelector('.f-' + campo);
+                    formData.append(`torneos[${i}][${campo}]`, el ? el.value : '');
+                });
+
+                // Per-row logo file (optional).
+                let fileInput = card.querySelector('.f-logo_file');
+                if (fileInput && fileInput.files.length) {
+                    formData.append(`torneos[${i}][logo_file]`, fileInput.files[0]);
+                }
+            });
+
+            let resumen = document.getElementById('resumenMasivo');
+            resumen.innerHTML = '⏳ Guardando...';
+
+            try {
+                // Note: no Content-Type header — the browser sets the multipart boundary itself.
+                let res = await fetch("{{ route('jugador-estadisticas.storeMasivo') }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': token,
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                let data = await res.json();
+
+                let msg = `✅ Guardados: ${data.guardados} · ⏭️ Salteados: ${data.salteados}`;
+                if (data.errores && data.errores.length) {
+                    msg += `<br><small style="color:#856404">${data.errores.join('<br>')}</small>`;
+                }
+                resumen.innerHTML = msg;
+
+                // Uncheck saved rows so a second click doesn't resend them.
+                seleccionados.forEach(c => c.checked = false);
+                let master = document.getElementById('checkTodos');
+                if (master) master.checked = false;
+            } catch (e) {
+                console.error('Error guardado masivo', e);
+                resumen.innerHTML = '<span style="color:#a94442">Error guardando.</span>';
+            }
         }
     </script>
 
