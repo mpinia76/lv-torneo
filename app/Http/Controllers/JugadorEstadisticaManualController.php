@@ -189,10 +189,16 @@ class JugadorEstadisticaManualController extends Controller
         return back();
     }
 
+    // ============================================================================
+//  Add this method to JugadorEstadisticaManualController.
+//  Reads multipart FormData (torneos[i][campo] + torneos[i][logo_file]),
+//  scopes everything to jugador_id, skips duplicates (1062) without aborting
+//  the batch, and reports the per-row outcome so the UI can remove only the
+//  rows that were actually saved.
+// ============================================================================
+
     /**
      * Store several scraped tournaments at once (from a single scrape).
-     * Reads multipart FormData (torneos[i][campo] + torneos[i][logo_file]).
-     * Skips rows that collide with the unique index instead of failing the whole batch.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
@@ -216,6 +222,8 @@ class JugadorEstadisticaManualController extends Controller
         $guardados = 0;
         $salteados = 0;
         $errores   = [];
+        // Per-row outcome keyed by the client index, so the UI removes only saved cards.
+        $resultados = [];
 
         foreach ($torneos as $index => $torneo) {
             // Always scope to the current player. Never trust a jugador_id coming inside the row.
@@ -228,6 +236,7 @@ class JugadorEstadisticaManualController extends Controller
             // Skip empty/garbage rows (no team and no tournament name).
             if (empty($data['equipo_id']) && empty($data['torneo_nombre'])) {
                 $salteados++;
+                $resultados[] = ['i' => $index, 'ok' => false, 'motivo' => 'vacio'];
                 continue;
             }
 
@@ -246,24 +255,28 @@ class JugadorEstadisticaManualController extends Controller
             try {
                 JugadorEstadisticaManual::create($data);
                 $guardados++;
+                $resultados[] = ['i' => $index, 'ok' => true];
             } catch (QueryException $ex) {
                 $errorCode = $ex->errorInfo[1] ?? null;
 
                 if ($errorCode == 1062) {
                     // Duplicate for this player/team/tournament: skip, keep going.
                     $salteados++;
+                    $resultados[] = ['i' => $index, 'ok' => false, 'motivo' => 'duplicado'];
                 } else {
                     $salteados++;
                     $errores[] = ($data['torneo_nombre'] ?? '?') . ': ' . $ex->getMessage();
+                    $resultados[] = ['i' => $index, 'ok' => false, 'motivo' => 'error'];
                 }
             }
         }
 
         return response()->json([
-            'ok'        => true,
-            'guardados' => $guardados,
-            'salteados' => $salteados,
-            'errores'   => $errores,
+            'ok'         => true,
+            'guardados'  => $guardados,
+            'salteados'  => $salteados,
+            'errores'    => $errores,
+            'resultados' => $resultados,
         ]);
     }
 }

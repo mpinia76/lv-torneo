@@ -743,8 +743,12 @@
             let formData = new FormData();
             formData.append('jugador_id', jugadorId);
 
+            // Map each payload index to its card, so we can remove only the saved ones later.
+            let cardsPorIndice = {};
+
             seleccionados.forEach((chk, i) => {
                 let card = chk.closest('.fila-torneo');
+                cardsPorIndice[i] = card;
 
                 campos.forEach(campo => {
                     let el = card.querySelector('.f-' + campo);
@@ -774,14 +778,37 @@
 
                 let data = await res.json();
 
+                // Remove only the cards that were actually saved; keep skipped/duplicated ones visible.
+                if (data.resultados && data.resultados.length) {
+                    data.resultados.forEach(r => {
+                        let card = cardsPorIndice[r.i];
+                        if (!card) return;
+
+                        if (r.ok) {
+                            card.remove();
+                        } else if (r.motivo === 'duplicado') {
+                            // Flag duplicates so the user notices why they stayed.
+                            card.style.opacity = '0.6';
+                            let chk = card.querySelector('.check-torneo');
+                            if (chk) chk.checked = false;
+                            let header = card.querySelector('.card-header strong');
+                            if (header && !header.querySelector('.dup-tag')) {
+                                header.insertAdjacentHTML('beforeend',
+                                    ' <span class="dup-tag badge badge-warning">ya existe</span>');
+                            }
+                        } else {
+                            let chk = card.querySelector('.check-torneo');
+                            if (chk) chk.checked = false;
+                        }
+                    });
+                }
+
                 let msg = `✅ Guardados: ${data.guardados} · ⏭️ Salteados: ${data.salteados}`;
                 if (data.errores && data.errores.length) {
                     msg += `<br><small style="color:#856404">${data.errores.join('<br>')}</small>`;
                 }
                 resumen.innerHTML = msg;
 
-                // Uncheck saved rows so a second click doesn't resend them.
-                seleccionados.forEach(c => c.checked = false);
                 let master = document.getElementById('checkTodos');
                 if (master) master.checked = false;
             } catch (e) {
