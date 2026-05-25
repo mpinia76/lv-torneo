@@ -208,7 +208,7 @@ class HttpHelper
 
         if ($usarScraperRemoto) {
             $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
-                    'api_key' => config('services.scraperapi.key'),
+                    'api_key' => '44182b1d4649eb00f3c41258721c4884',
                     'url'     => $urlOriginal,
                     'render'  => 'true',
                     'premium' => 'true',
