@@ -174,37 +174,59 @@ class HttpHelper
     }
 
 
+    // ============================================================================
+//  Replacement for HttpHelper::getHtmlContent().
+//  Adds the Cloudflare-domain shortcut: known Cloudflare-protected hosts
+//  (footballdatabase.eu, livefutbol.com) skip the direct cURL — which only
+//  gets back a generic/blocked page that doesn't trip the challenge detector —
+//  and go straight to ScraperAPI with render=true.
+// ============================================================================
+
     public static function getHtmlContent(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal); // evita espacios invisibles
         Log::channel('mi_log')->debug("[INICIO] usarScraperRemoto=" . ($usarScraperRemoto ? 'true' : 'false') . " | URL: $urlOriginal");
+
         if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
             Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
             return false;
         }
 
-        if ($usarScraperRemoto) {
-            $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
+        // Cloudflare-protected hosts: direct cURL returns a generic page that does NOT
+        // contain 'Just a moment' / 'cf-browser-verification', so it slips past the
+        // challenge detector and breaks the parser. Force the remote scraper for them.
+        $host = strtolower(parse_url($urlOriginal, PHP_URL_HOST) ?? '');
+        $dominiosCloudflare = [
+            'www.livefutbol.com', 'livefutbol.com',
+            'www.footballdatabase.eu', 'footballdatabase.eu',
+        ];
 
+        if (!$usarScraperRemoto && in_array($host, $dominiosCloudflare, true)) {
+            Log::channel('mi_log')->debug("[CLOUDFLARE] $host va directo a ScraperAPI: $urlOriginal");
+            $usarScraperRemoto = true;
+        }
+
+        if ($usarScraperRemoto) {
             $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
-                    'api_key' => '44182b1d4649eb00f3c41258721c4884',
+                    'api_key' => config('services.scraperapi.key'),
                     'url'     => $urlOriginal,
                     'render'  => 'true',
                     'premium' => 'true',
                 ]);
 
-            Log::channel('mi_log')->debug("Usando scraper remoto para: $scraperEndpoint");
+            Log::channel('mi_log')->debug("Usando scraper remoto para: $urlOriginal");
 
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $scraperEndpoint);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 120); // render=true needs more time
 
             $response = curl_exec($ch);
 
             if (curl_errno($ch)) {
                 Log::channel('mi_log')->error('Error en cURL (remoto): ' . curl_error($ch));
+                curl_close($ch);
                 return false;
             }
 
@@ -212,8 +234,6 @@ class HttpHelper
             curl_close($ch);
 
             Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
-            //Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
-
 
             if ($httpCode >= 400) {
                 Log::channel('mi_log')->warning("Error HTTP $httpCode al usar scraper remoto para: $urlOriginal");
@@ -268,7 +288,7 @@ class HttpHelper
                 return false;
             }
 
-// Retry up to 3 times if 403 or empty
+            // Retry up to 3 times if 403 or empty
             if ($httpCode == 403 || empty($response)) {
                 for ($i = 1; $i <= 3; $i++) {
                     sleep(2);
