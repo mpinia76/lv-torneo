@@ -315,7 +315,7 @@
                             </div>
                             <div class="form-group col-md-3">
                                 <label class="small mb-0">Equipo</label>
-                                <select class="form-control form-control-sm f-equipo_id">${opcionesEquipos(equipoMatch)}</select>
+                                <select class="form-control form-control-sm f-equipo_id select2-equipo" style="width:100%">${opcionesEquipos(equipoMatch)}</select>
                             </div>
                             <div class="form-group col-md-2">
                                 <label class="small mb-0">Tipo</label>
@@ -355,6 +355,13 @@
             });
 
             document.getElementById('resultadoScraper').innerHTML = html;
+
+            // Init Select2 on the team selects of the freshly rendered cards.
+            // jQuery is required (same as the page's main select). The cards are
+            // built dynamically, so this must run after they are in the DOM.
+            if (window.jQuery && $.fn.select2) {
+                $('#resultadoScraper .select2-equipo').select2({ width: '100%' });
+            }
         }
 
         function scrapearFootballDB() {
