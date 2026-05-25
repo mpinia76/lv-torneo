@@ -212,7 +212,7 @@ class HttpHelper
             curl_close($ch);
 
             Log::channel('mi_log')->debug("[REMOTO] HTTP Code: $httpCode | URL: $urlOriginal");
-            Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
+            //Log::channel('mi_log')->debug("[REMOTO] Response (500 chars): " . substr($response, 0, 500));
 
 
             if ($httpCode >= 400) {
@@ -262,7 +262,7 @@ class HttpHelper
             curl_close($ch);
 
             Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
-            Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
+            //Log::channel('mi_log')->debug("[DIRECTO] Response (500 chars): " . substr($response, 0, 500));
 
             if ($httpCode == 404) {
                 return false;
