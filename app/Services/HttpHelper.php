@@ -262,7 +262,7 @@ class HttpHelper
             curl_close($ch);
 
             Log::channel('mi_log')->debug("[DIRECTO] HTTP Code: $httpCode | URL: $urlOriginal");
-            Log::channel('mi_log')->debug("[DIRECTO] Response (1500 chars): " . substr($response, 0, 500));
+            Log::channel('mi_log')->debug("[DIRECTO] Response (1500 chars): " . substr($response, 0, 1500));
 
             if ($httpCode == 404) {
                 return false;
