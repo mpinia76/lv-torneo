@@ -276,6 +276,7 @@
                         <td></td>
 
                         <td><strong>Totales</strong></td>
+                        <td><strong>{{ $totalPuntaje}}</strong></td>
                         <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id))}}" >{{ $totalJugados}}</a></strong></td>
                         <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'tipo'=>'Ganados'))}}" >{{ $totalGanados}}</a></strong></td>
                         <td><strong><a href="{{route('equipos.jugados', array('equipoId' => $equipo->id,'tipo'=>'Empatados'))}}" >{{ $totalEmpatados}}</a></strong></td>
@@ -283,7 +284,7 @@
                         <td><strong>{{ $totalFavor}}</strong></td>
                         <td><strong>{{ $totalContra}}</strong></td>
                         <td><strong>{{ $totalFavor-$totalContra}}</strong></td>
-                        <td><strong>{{ $totalPuntaje}}</strong></td>
+
                         <td><strong>{{ ROUND(
                 (
                 $totalPuntaje
