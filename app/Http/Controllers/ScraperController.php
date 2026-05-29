@@ -1591,23 +1591,27 @@ class ScraperController extends Controller
             $val  = (int) preg_replace('/\D/', '', $optSel->getAttribute('value'));
             $text = trim($optSel->textContent);
 
-            if ($val >= 1900) {
-                // A slash in the visible text means the season spans two calendar years.
-                $year = str_contains($text, '/')
-                    ? $val . '/' . substr((string) ($val + 1), -2)  // 2025 -> "2025/26"
-                    : (string) $val;                                 // 2000 -> "2000"
+            if (str_contains($text, '/')) {
+                // Cross-year season (European leagues): text like "25/26".
+                // value is the start year (saison_id) -> "2025/26".
+                if ($val >= 1900) $year = $val . '/' . substr((string) ($val + 1), -2);
+            } else {
+                // Calendar-year season (South American leagues): the VISIBLE text is the
+                // real year ("2024"), while value/saison_id is one less ("2023"). Trust text.
+                if (preg_match('/(\d{4})/', $text, $m) && (int) $m[1] >= 1900) {
+                    $year = $m[1];
+                }
             }
         }
 
-// Fallback: saison_id in URL (start year only, no cross-year info).
+// Fallback: saison_id in URL (start year only).
         if (!$year && preg_match('#saison_id[=/](\d{4})#', $url, $mY)) {
             $year = $mY[1];
         }
 
-// Last resort: current TM season (assume cross-year).
+// Last resort: current TM season start year.
         if (!$year) {
-            $start = (int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1;
-            $year  = $start . '/' . substr((string) ($start + 1), -2);
+            $year = (string) ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
         }
 
         // ----------------------------------------------------------------
@@ -1774,21 +1778,23 @@ class ScraperController extends Controller
 // Guess tipo/ambito from the competition name (same spirit as the dts scraper).
     private function clasificarCompetencia($nombre)
     {
-        $n = mb_strtolower($nombre);
+        // ascii-fold so "Série A" matches the accent-free keywords below
+        $n = (string) \Str::of($nombre)->lower()->ascii(); // "campeonato brasileiro serie a"
 
         $intl = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
             'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa'];
         foreach ($intl as $kw) {
-            if (mb_strpos($n, $kw) !== false) return ['Copa', 'Internacional'];
+            if (str_contains($n, $kw)) return ['Copa', 'Internacional'];
         }
 
         $ligaKw = ['laliga', 'la liga', 'liga', 'primera', 'serie a', 'serie b',
-            'premier', 'bundesliga', 'ligue', 'eredivisie', 'mls', 'primeira'];
+            'premier', 'bundesliga', 'ligue', 'eredivisie', 'mls', 'primeira',
+            'brasileiro', 'brasileir']; // 👈 Brasileirão directo, por si "serie a" falla
         foreach ($ligaKw as $kw) {
-            if (mb_strpos($n, $kw) !== false) return ['Liga', 'Nacional'];
+            if (str_contains($n, $kw)) return ['Liga', 'Nacional'];
         }
 
-        return ['Copa', 'Nacional']; // Copa del Rey, Supercopa de España, etc.
+        return ['Copa', 'Nacional'];
     }
 
 }
