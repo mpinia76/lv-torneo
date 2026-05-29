@@ -1552,4 +1552,216 @@ class ScraperController extends Controller
         return response()->json($result);
     }
 
+    public function equipoTransfermarkt(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) {
+            return response()->json(['error' => 'Falta la URL de Transfermarkt']);
+        }
+
+        // Extract verein id + season from the spielplan URL.
+        // e.g. .../fc-barcelona/spielplan/verein/131/plus/0?saison_id=2025
+        if (!preg_match('#/verein/(\d+)#', $url, $mId)) {
+            return response()->json(['error' => 'URL inválida (falta /verein/{id})']);
+        }
+        $vereinId = $mId[1];
+
+        // Season comes from the URL; defaults to current TM season if absent.
+        $year = preg_match('/saison_id=(\d{4})/', $url, $mY)
+            ? (int) $mY[1]
+            : ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
+
+        $html = HttpHelper::getHtmlContent($url, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        // ----------------------------------------------------------------
+        // 1) Locate the "Estadísticas" summary table by its "Balance total" row.
+        // ----------------------------------------------------------------
+        $statsTable = null;
+        foreach ($xpath->query('//table') as $t) {
+            if (mb_stripos($t->textContent, 'Balance total') !== false) {
+                $statsTable = $t;
+                break;
+            }
+        }
+
+        // Debug: ?debug=1 dumps the stats-box HTML so selectors can be verified.
+        if ($request->debug) {
+            return response($statsTable ? $dom->saveHTML($statsTable) : 'NO STATS TABLE');
+        }
+
+        if (!$statsTable) {
+            return response()->json(['error' => 'No se encontró la tabla de estadísticas']);
+        }
+
+        // ----------------------------------------------------------------
+        // 2) League position from the "Clasificación" box.
+        //    Match the row whose club links to /verein/{vereinId}/ and whose
+        //    first cell is a plain ranking number.
+        // ----------------------------------------------------------------
+        $posicionLiga = null;
+        foreach ($xpath->query("//a[contains(@href,'/verein/{$vereinId}/')]") as $a) {
+            $tr = $a;
+            while ($tr && $tr->nodeName !== 'tr') $tr = $tr->parentNode;
+            if (!$tr) continue;
+
+            $firstCell = $xpath->query('./td[1]', $tr)->item(0);
+            if ($firstCell) {
+                $n = (int) preg_replace('/\D/', '', $firstCell->textContent);
+                if ($n > 0 && $n <= 30) { $posicionLiga = $n; break; }
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // 3) Existing tournaments for dedup (manual + automatic Torneo rows).
+        // ----------------------------------------------------------------
+        $equipoId = $request->equipo_id;
+        $existentes = collect()
+            ->merge(
+                $equipoId
+                    ? EquipoEstadisticaManual::where('equipo_id', $equipoId)->pluck('torneo_nombre')
+                    : collect()
+            )
+            ->merge(Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->unique()->flip()->toArray();
+
+        // ----------------------------------------------------------------
+        // 4) Parse rows. Competition headers set $currentComp; data rows
+        //    (anchored on the "NN:NN" goals cell) accumulate into it.
+        //    LaLiga has two rows (casa/fuera) -> summed under the same comp.
+        // ----------------------------------------------------------------
+        $torneos = [];
+        $currentComp = null;
+
+        $num = function ($td) {
+            $t = trim($td->textContent);
+            if ($t === '' || $t === '-') return 0;
+            return (int) preg_replace('/\D/', '', $t);
+        };
+
+        foreach ($xpath->query('.//tr', $statsTable) as $row) {
+
+            $rowText = trim($row->textContent);
+            if ($rowText === '') continue;
+
+            // Total section is last -> stop here.
+            if (mb_stripos($rowText, 'Balance total') !== false) break;
+
+            $cells = [];
+            foreach ($row->getElementsByTagName('td') as $td) $cells[] = $td;
+
+            // Competition link (covers /wettbewerb/ and /pokalwettbewerb/).
+            $compLink = $xpath->query(".//a[contains(@href,'wettbewerb')]", $row)->item(0);
+
+            // Find goals cell "NN:NN".
+            $idxGoals = -1;
+            foreach ($cells as $i => $td) {
+                if (preg_match('/^\s*\d+\s*:\s*\d+\s*$/', trim($td->textContent))) {
+                    $idxGoals = $i;
+                    break;
+                }
+            }
+
+            // No stats in this row -> it's a competition header.
+            if ($idxGoals === -1) {
+                if ($compLink) $currentComp = trim($compLink->textContent);
+                continue;
+            }
+
+            // Data row but no comp set yet -> try same-row comp name.
+            if (!$currentComp) {
+                if ($compLink) $currentComp = trim($compLink->textContent);
+                if (!$currentComp) continue;
+            }
+
+            $partidos  = isset($cells[$idxGoals - 5]) ? $num($cells[$idxGoals - 5]) : 0;
+            $ganados   = isset($cells[$idxGoals - 4]) ? $num($cells[$idxGoals - 4]) : 0;
+            $empatados = isset($cells[$idxGoals - 3]) ? $num($cells[$idxGoals - 3]) : 0;
+            $perdidos  = isset($cells[$idxGoals - 2]) ? $num($cells[$idxGoals - 2]) : 0;
+
+            list($gf, $ge) = array_map('intval', explode(':', trim($cells[$idxGoals]->textContent)));
+
+            if (!isset($torneos[$currentComp])) {
+                $torneos[$currentComp] = [
+                    'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
+                    'perdidos' => 0, 'gf' => 0, 'ge' => 0,
+                ];
+            }
+            $torneos[$currentComp]['partidos']  += $partidos;
+            $torneos[$currentComp]['ganados']   += $ganados;
+            $torneos[$currentComp]['empatados'] += $empatados;
+            $torneos[$currentComp]['perdidos']  += $perdidos;
+            $torneos[$currentComp]['gf']        += $gf;
+            $torneos[$currentComp]['ge']        += $ge;
+        }
+
+        // ----------------------------------------------------------------
+        // 5) Build payload (same shape the front-end cards expect).
+        // ----------------------------------------------------------------
+        $data = [];
+        foreach ($torneos as $compName => $s) {
+
+            if ($this->debeExcluirCompetencia($compName)) continue;
+
+            list($tipo, $ambito) = $this->clasificarCompetencia($compName);
+
+            $competition = trim($compName) . ' ' . $year;
+            $key = (string) \Str::of($competition)->lower()->ascii()
+                ->replaceMatches('/\s+/', ' ')->trim();
+
+            if (isset($existentes[$key])) continue;
+
+            $data[] = [
+                'competition' => $competition,
+                'posicion'    => $tipo === 'Liga' ? $posicionLiga : null,
+                'partidos'    => $s['partidos'],
+                'ganados'     => $s['ganados'],
+                'empatados'   => $s['empatados'],
+                'perdidos'    => $s['perdidos'],
+                'gf'          => $s['gf'],
+                'ge'          => $s['ge'],
+                'torneo_logo' => null,
+                'tipo'        => $tipo,
+                'ambito'      => $ambito,
+            ];
+        }
+
+        return response()->json($data);
+    }
+
+// Guess tipo/ambito from the competition name (same spirit as the dts scraper).
+    private function clasificarCompetencia($nombre)
+    {
+        $n = mb_strtolower($nombre);
+
+        $intl = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
+            'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa'];
+        foreach ($intl as $kw) {
+            if (mb_strpos($n, $kw) !== false) return ['Copa', 'Internacional'];
+        }
+
+        $ligaKw = ['laliga', 'la liga', 'liga', 'primera', 'serie a', 'serie b',
+            'premier', 'bundesliga', 'ligue', 'eredivisie', 'mls', 'primeira'];
+        foreach ($ligaKw as $kw) {
+            if (mb_strpos($n, $kw) !== false) return ['Liga', 'Nacional'];
+        }
+
+        return ['Copa', 'Nacional']; // Copa del Rey, Supercopa de España, etc.
+    }
+
 }

@@ -186,4 +186,97 @@ class EquipoEstadisticaManualController extends Controller
         EquipoEstadisticaManual::destroy($id);
         return back();
     }
+
+    public function storeMasivo(Request $request)
+    {
+        $equipoId = $request->equipo_id;
+        $torneos  = $request->input('torneos', []);
+
+        $guardados = 0; $salteados = 0; $conAuto = 0;
+        $errores = []; $resultados = [];
+
+        // Manual tournaments already loaded for this team (duplicate guard).
+        $existentes = EquipoEstadisticaManual::where('equipo_id', $equipoId)
+            ->pluck('torneo_nombre')
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->flip()->toArray();
+
+        // Automatic tournaments -> only warn, never block.
+        $automaticos = \App\Torneo::all()
+            ->map(function ($t) {
+                return (string) \Str::of(($t->nombre ?? '') . ' ' . ($t->year ?? ''))
+                    ->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->filter()->flip()->toArray();
+
+        foreach ($torneos as $i => $t) {
+
+            $torneoNombre = trim($t['torneo_nombre'] ?? '');
+            if ($torneoNombre === '') {
+                $resultados[] = ['i' => $i, 'ok' => false, 'motivo' => 'sin_nombre'];
+                $salteados++;
+                continue;
+            }
+
+            $key = (string) \Str::of($torneoNombre)->lower()->ascii()
+                ->replaceMatches('/\s+/', ' ')->trim();
+
+            if (isset($existentes[$key])) {
+                $resultados[] = ['i' => $i, 'ok' => false, 'motivo' => 'duplicado'];
+                $salteados++;
+                continue;
+            }
+
+            // Per-row logo upload (optional).
+            $logoName = null;
+            $fileKey = "torneos.{$i}.logo_file";
+            if ($request->hasFile($fileKey)) {
+                $image = $request->file($fileKey);
+                $logoName = time() . '_' . $i . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('/images'), $logoName);
+            }
+
+            try {
+                EquipoEstadisticaManual::create([
+                    'equipo_id'       => $equipoId,
+                    'torneo_nombre'   => $torneoNombre,
+                    'torneo_logo'     => $logoName,
+                    'tipo'            => $t['tipo'] ?? null,
+                    'ambito'          => $t['ambito'] ?? null,
+                    'posicion'        => $t['posicion'] ?? null,
+                    'partidos'        => $t['partidos'] ?? 0,
+                    'ganados'         => $t['ganados'] ?? 0,
+                    'empatados'       => $t['empatados'] ?? 0,
+                    'perdidos'        => $t['perdidos'] ?? 0,
+                    'goles_favor'     => $t['goles_favor'] ?? 0,
+                    'goles_en_contra' => $t['goles_en_contra'] ?? 0,
+                ]);
+
+                $existentes[$key] = true; // avoid in-batch duplicates
+                if (isset($automaticos[$key])) $conAuto++;
+
+                $resultados[] = ['i' => $i, 'ok' => true];
+                $guardados++;
+
+            } catch (\Illuminate\Database\QueryException $ex) {
+                if (($ex->errorInfo[1] ?? null) == 1062) {
+                    $resultados[] = ['i' => $i, 'ok' => false, 'motivo' => 'duplicado'];
+                    $salteados++;
+                } else {
+                    $resultados[] = ['i' => $i, 'ok' => false, 'motivo' => 'error'];
+                    $errores[] = "Fila {$i}: " . $ex->getMessage();
+                }
+            }
+        }
+
+        return response()->json([
+            'guardados'  => $guardados,
+            'salteados'  => $salteados,
+            'con_auto'   => $conAuto,
+            'errores'    => $errores,
+            'resultados' => $resultados,
+        ]);
+    }
 }

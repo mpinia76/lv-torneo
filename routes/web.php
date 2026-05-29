@@ -206,6 +206,10 @@ Route::group(['prefix' => 'admin'], function()
         ->name('scraper.jugador-transfermarkt-goles');
 
     Route::post('/equipos-excluidos/excluir-rapido', 'EquipoExcluidoController@excluirRapido');
+
+    Route::get('/scraper/equipo-transfermarkt', 'ScraperController@equipoTransfermarkt');
+    Route::post('equipo-estadisticas/store-masivo', 'EquipoEstadisticaManualController@storeMasivo')
+        ->name('equipo-estadisticas.storeMasivo');
 });
 
 
