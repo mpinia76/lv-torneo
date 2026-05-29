@@ -1852,35 +1852,31 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
     public function posiciones(Request $request)
     {
-        if ($request->has('buscarpor')){
+        if ($request->has('buscarpor')) {
             $nombre = $request->get('buscarpor');
-
             $request->session()->put('nombre_filtro_equipo', $request->get('buscarpor'));
-
-        }
-        else{
+        } else {
             $nombre = $request->session()->get('nombre_filtro_equipo');
-
         }
-        $nombreFiltro='';
 
+        $nombreFiltro = '';
         if ($nombre) {
             $nombreFiltro = " AND (equipos.nombre LIKE '%$nombre%') ";
-
         }
-        $tipo='';
-        if($request->query('tipo')) {
+
+        $tipo = '';
+        if ($request->query('tipo')) {
             $tipo = $request->query('tipo');
-
         }
-        $ambito='';
-        if($request->query('ambito')) {
+
+        $ambito = '';
+        if ($request->query('ambito')) {
             $ambito = $request->query('ambito');
-
         }
 
-        $argentinos= ($request->query('argentinos'))?1:0;
-                $sql='SELECT
+        $argentinos = ($request->query('argentinos')) ? 1 : 0;
+
+        $sql = 'SELECT
     foto,
     equipo,
     pais,
@@ -1918,9 +1914,9 @@ from (
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
         INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .=($tipo)?' AND torneos.tipo = \''.$tipo.'\'':'';
-        $sql .=($ambito)?' AND torneos.ambito = \''.$ambito.'\'':'';
-        $sql .=' union all
+        $sql .= ($tipo) ? ' AND torneos.tipo = \''.$tipo.'\'' : '';
+        $sql .= ($ambito) ? ' AND torneos.ambito = \''.$ambito.'\'' : '';
+        $sql .= ' union all
        select DISTINCT equipos.nombre equipo, equipos.pais pais, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id, 0 as puntos
 		 from partidos
 		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
@@ -1929,8 +1925,8 @@ from (
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		 INNER JOIN torneos ON grupos.torneo_id = torneos.id
 		 WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .=($tipo)?' AND torneos.tipo = \''.$tipo.'\'':'';
-        $sql .=($ambito)?' AND torneos.ambito = \''.$ambito.'\'':'';
+        $sql .= ($tipo) ? ' AND torneos.tipo = \''.$tipo.'\'' : '';
+        $sql .= ($ambito) ? ' AND torneos.ambito = \''.$ambito.'\'' : '';
         $sql .= ' UNION ALL
     SELECT
         equipos.nombre AS equipo,
@@ -1944,177 +1940,199 @@ from (
     FROM incidencias
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     INNER JOIN torneos ON incidencias.torneo_id = torneos.id
-    WHERE 1=1'.$nombreFiltro;;
-        $sql .=($tipo)?' AND torneos.tipo = \''.$tipo.'\'':'';
-        $sql .=($ambito)?' AND torneos.ambito = \''.$ambito.'\'':'';
-        $sql .=' GROUP BY equipos.nombre, equipos.pais, equipos.escudo, equipos.id, incidencias.puntos';
+    WHERE 1=1'.$nombreFiltro;
+        $sql .= ($tipo) ? ' AND torneos.tipo = \''.$tipo.'\'' : '';
+        $sql .= ($ambito) ? ' AND torneos.ambito = \''.$ambito.'\'' : '';
+        $sql .= ' GROUP BY equipos.nombre, equipos.pais, equipos.escudo, equipos.id, incidencias.puntos';
         $sql .= ') a WHERE 1=1 ';
 
-// 🔹 Aplico el filtro de argentinos aquí
+        // Filter argentinos here
         if ($argentinos) {
             $sql .= " AND pais = 'Argentina' ";
         }
 
         $sql .= ' group by equipo, pais, foto, equipo_id
 order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
-       // Log::channel('mi_log')->info('Sql pos: '.$sql,[]);
-                $posiciones = DB::select(DB::raw($sql));
+
+        $posiciones = DB::select(DB::raw($sql));
 
         $manuales = EquipoEstadisticaManual::all()->groupBy('equipo_id');
 
+        // -----------------------------------------------------------------
+        // STEP 1: merge manual stats into the FULL result set, BEFORE sorting
+        // and paginating. This is the actual fix: previously the manual points
+        // were added after the SQL ORDER BY and after array_slice(), so the
+        // ranking and the page contents were computed from the base puntaje
+        // while the displayed puntaje was base + manual.
+        // -----------------------------------------------------------------
+        foreach ($posiciones as $posicion) {
+            $manual = $manuales[$posicion->equipo_id] ?? collect();
 
+            $manualJugados   = 0;
+            $manualGanados   = 0;
+            $manualEmpatados = 0;
+            $manualPerdidos  = 0;
+            $manualPuntos    = 0;
 
+            foreach ($manual as $m) {
+                // Respect the SAME ambito / tipo filters applied to real matches
+                // in the SQL. Without this, e.g. selecting "Internacional" still
+                // added a team's "Nacional" manual points. Manual records store
+                // ambito/tipo capitalized ('Nacional', 'Copa', ...) while the query
+                // params come lowercase, so compare case-insensitively.
+                if ($ambito && strtolower($m->ambito) != strtolower($ambito)) {
+                    continue;
+                }
+                if ($tipo && strtolower($m->tipo) != strtolower($tipo)) {
+                    continue;
+                }
+
+                $manualJugados   += $m->partidos;
+                $manualGanados   += $m->ganados;
+                $manualEmpatados += $m->empatados;
+                $manualPerdidos  += $m->perdidos;
+                $manualPuntos    += ($m->ganados * 3) + $m->empatados;
+            }
+
+            $posicion->jugados   += $manualJugados;
+            $posicion->ganados   += $manualGanados;
+            $posicion->empatados += $manualEmpatados;
+            $posicion->perdidos  += $manualPerdidos;
+            $posicion->puntaje   += $manualPuntos;
+
+            $posicion->promedio = $posicion->jugados > 0
+                ? $posicion->puntaje / $posicion->jugados
+                : 0;
+        }
+
+        // -----------------------------------------------------------------
+        // STEP 2: re-sort the full set in PHP using the SAME criteria as the
+        // SQL ORDER BY (puntaje desc, promedio desc, diferencia desc,
+        // golesl desc, equipo asc). Numeric fields are cast to float because
+        // DB::select returns them as strings.
+        // -----------------------------------------------------------------
+        usort($posiciones, function ($a, $b) {
+            return [(float) $b->puntaje, (float) $b->promedio, (float) $b->diferencia, (float) $b->golesl, $a->equipo]
+                <=> [(float) $a->puntaje, (float) $a->promedio, (float) $a->diferencia, (float) $a->golesl, $b->equipo];
+        });
+
+        // -----------------------------------------------------------------
+        // STEP 3: paginate the already-merged, already-sorted set.
+        // -----------------------------------------------------------------
         $page = $request->query('page', 1);
-
         $paginate = 15;
-
         $offSet = ($page * $paginate) - $paginate;
 
         $itemsForCurrentPage = array_slice($posiciones, $offSet, $paginate, true);
 
+        $posiciones = new \Illuminate\Pagination\LengthAwarePaginator(
+            $itemsForCurrentPage,
+            count($posiciones),
+            $paginate,
+            $page
+        );
 
+        // -----------------------------------------------------------------
+        // STEP 4: titles loop. This only builds the "titulos" display string
+        // and does NOT affect the ranking, so it can run after pagination
+        // (only over the 15 visible rows). Manual stats are NOT re-added here
+        // to avoid double counting; only manual posicion==1 is counted for
+        // title purposes.
+        // -----------------------------------------------------------------
+        foreach ($posiciones as $posicion) {
+            $titulosCopa = 0;
+            $titulosLiga = 0;
+            $titulosInternacional = 0;
 
-        $posiciones = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($posiciones), $paginate, $page);
-
-        foreach ($posiciones as $posicion){
-            $titulosCopa=0;
-            $titulosLiga=0;
-            $titulosInternacional=0;
-            $posicionTorneo = PosicionTorneo::where('equipo_id', '=',$posicion->equipo_id)->get();
-            foreach ($posicionTorneo as $pt){
-                $torneo=Torneo::findOrFail($pt->torneo_id);
-                if ($pt->posicion == 1){
-                    //if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+            $posicionTorneo = PosicionTorneo::where('equipo_id', '=', $posicion->equipo_id)->get();
+            foreach ($posicionTorneo as $pt) {
+                $torneo = Torneo::findOrFail($pt->torneo_id);
+                if ($pt->posicion == 1) {
                     if ($torneo->ambito == 'Nacional') {
-                        if (!$ambito || $ambito=='nacional') {
+                        if (!$ambito || $ambito == 'nacional') {
                             if ($torneo->tipo == 'Copa') {
                                 if (!$tipo || $tipo == 'copa') {
                                     $titulosCopa++;
                                 }
-
                             } else {
                                 if (!$tipo || $tipo == 'liga') {
                                     $titulosLiga++;
                                 }
                             }
                         }
-                    }
-                    else{
-                        if (!$ambito || $ambito=='internacional') {
+                    } else {
+                        if (!$ambito || $ambito == 'internacional') {
                             $titulosInternacional++;
                         }
                     }
                 }
             }
+
+            // Manual titles (posicion == 1). Stats already merged in STEP 1.
             $manual = $manuales[$posicion->equipo_id] ?? collect();
-
-            $manualJugados = 0;
-            $manualGanados = 0;
-            $manualEmpatados = 0;
-            $manualPerdidos = 0;
-            $manualPuntos = 0;
-
             foreach ($manual as $m) {
-                $manualJugados += $m->partidos;
-                $manualGanados += $m->ganados;
-                $manualEmpatados += $m->empatados;
-                $manualPerdidos += $m->perdidos;
-
-                $manualPuntos += ($m->ganados * 3) + $m->empatados;
-                if ($m->posicion == 1){
-                    //if ((stripos($torneo->nombre, 'Copa') !== false)||(stripos($torneo->nombre, 'Trofeo') !== false)) {
+                if ($m->posicion == 1) {
                     if ($m->ambito == 'Nacional') {
-                        if (!$ambito || $ambito=='nacional') {
+                        if (!$ambito || $ambito == 'nacional') {
                             if ($m->tipo == 'Copa') {
                                 if (!$tipo || $tipo == 'copa') {
                                     $titulosCopa++;
                                 }
-
                             } else {
                                 if (!$tipo || $tipo == 'liga') {
                                     $titulosLiga++;
                                 }
                             }
                         }
-                    }
-                    else{
-                        if (!$ambito || $ambito=='internacional') {
+                    } else {
+                        if (!$ambito || $ambito == 'internacional') {
                             $titulosInternacional++;
                         }
                     }
                 }
             }
 
-
-            // ---- TÍTULOS EXTRAS ----
+            // ---- EXTRA TITLES ----
             $titulosExtras = Titulo::where('equipo_id', $posicion->equipo_id)->get();
-
             foreach ($titulosExtras as $te) {
-
-                // 🔹 aplicar filtro de TIPO, si corresponde
+                // Apply TIPO filter if set
                 if ($tipo) {
                     if (strtolower($tipo) == 'liga' && strtolower($te->tipo) != 'liga') continue;
                     if (strtolower($tipo) == 'copa' && strtolower($te->tipo) != 'copa') continue;
                 }
-
-                // 🔹 aplicar filtro de ÁMBITO, si corresponde
+                // Apply AMBITO filter if set
                 if ($ambito) {
                     if (strtolower($ambito) != strtolower($te->ambito)) continue;
                 }
 
-                // 🔹 sumar según tipo
                 switch ($te->tipo) {
                     case 'Liga':
                         $titulosLiga++;
                         break;
-
                     case 'Copa':
                         $titulosCopa++;
                         break;
-
                     case 'Internacional':
                         $titulosInternacional++;
                         break;
                 }
             }
 
-            if (($titulosCopa+$titulosLiga+$titulosInternacional)==0){
-                $posicion->titulos='';
+            if (($titulosCopa + $titulosLiga + $titulosInternacional) == 0) {
+                $posicion->titulos = '';
+            } else {
+                $ligas = ($titulosLiga) ? $titulosLiga.' Ligas' : '';
+                $copas = ($titulosCopa) ? $titulosCopa.' Copas' : '';
+                $internacionales = ($titulosInternacional) ? $titulosInternacional.' Internacionales' : '';
+                $posicion->titulos = $titulosCopa + $titulosLiga + $titulosInternacional.' ('.$ligas.' '.$copas.' '.$internacionales.')';
             }
-            else{
-                $ligas=($titulosLiga)?$titulosLiga.' Ligas':'';
-                $copas=($titulosCopa)?$titulosCopa.' Copas':'';
-                $internacionales=($titulosInternacional)?$titulosInternacional.' Internacionales':'';
-                $posicion->titulos=$titulosCopa+$titulosLiga+$titulosInternacional. ' ('.$ligas.' '.$copas.' '.$internacionales.')';
-            }
-
-
-
-            // 🔥 sumar al ranking base
-            $posicion->jugados += $manualJugados;
-            $posicion->ganados += $manualGanados;
-            $posicion->empatados += $manualEmpatados;
-            $posicion->perdidos += $manualPerdidos;
-            $posicion->puntaje += $manualPuntos;
-
-            $totalManual = $manualJugados * 3;
-
-            $posicion->promedio =
-                $posicion->jugados > 0
-                    ? $posicion->puntaje / $posicion->jugados
-                    : 0;
-
         }
 
+        $posiciones->setPath(route('torneos.posiciones', array('argentinos' => $argentinos, 'tipo' => $tipo, 'ambito' => $ambito, 'buscarpor' => $nombre)));
 
+        $i = $offSet + 1;
 
-        $posiciones->setPath(route('torneos.posiciones',array('argentinos'=>$argentinos,'tipo'=>$tipo,'ambito'=>$ambito,'buscarpor'=>$nombre)));
-
-
-        $i=$offSet+1;
-
-
-        return view('torneos.posiciones', compact('posiciones','i','argentinos'));
+        return view('torneos.posiciones', compact('posiciones', 'i', 'argentinos'));
     }
 
     public function estadisticasTorneo(Request $request)
