@@ -1568,10 +1568,7 @@ class ScraperController extends Controller
         }
         $vereinId = $mId[1];
 
-        // Season comes from the URL; defaults to current TM season if absent.
-        $year = preg_match('/saison_id=(\d{4})/', $url, $mY)
-            ? (int) $mY[1]
-            : ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
+
 
         $html = HttpHelper::getHtmlContent($url, false);
         if (!$html) $html = HttpHelper::getHtmlContent($url, true);
@@ -1582,6 +1579,36 @@ class ScraperController extends Controller
         $dom->loadHTML($html);
         libxml_clear_errors();
         $xpath = new \DOMXPath($dom);
+
+        // Season label from the "Elegir temporada" select (source of truth).
+// TM shows two formats depending on the competition calendar:
+//   - Cross-year (Europe):     value="2025", text="25/26"  -> "2025/26"
+//   - Calendar-year (S. Amer): value="2000", text="2000"   -> "2000"
+        $year = null;
+
+        $optSel = $xpath->query("//select[contains(@name,'saison_id')]/option[@selected]")->item(0);
+        if ($optSel) {
+            $val  = (int) preg_replace('/\D/', '', $optSel->getAttribute('value'));
+            $text = trim($optSel->textContent);
+
+            if ($val >= 1900) {
+                // A slash in the visible text means the season spans two calendar years.
+                $year = str_contains($text, '/')
+                    ? $val . '/' . substr((string) ($val + 1), -2)  // 2025 -> "2025/26"
+                    : (string) $val;                                 // 2000 -> "2000"
+            }
+        }
+
+// Fallback: saison_id in URL (start year only, no cross-year info).
+        if (!$year && preg_match('#saison_id[=/](\d{4})#', $url, $mY)) {
+            $year = $mY[1];
+        }
+
+// Last resort: current TM season (assume cross-year).
+        if (!$year) {
+            $start = (int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1;
+            $year  = $start . '/' . substr((string) ($start + 1), -2);
+        }
 
         // ----------------------------------------------------------------
         // 1) Locate the "Estadísticas" summary table by its "Balance total" row.
