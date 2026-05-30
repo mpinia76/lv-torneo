@@ -1968,11 +1968,13 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         foreach ($posiciones as $posicion) {
             $manual = $manuales[$posicion->equipo_id] ?? collect();
 
-            $manualJugados   = 0;
-            $manualGanados   = 0;
-            $manualEmpatados = 0;
-            $manualPerdidos  = 0;
-            $manualPuntos    = 0;
+            $manualJugados     = 0;
+            $manualGanados     = 0;
+            $manualEmpatados   = 0;
+            $manualPerdidos    = 0;
+            $manualPuntos      = 0;
+            $manualGolesFavor  = 0;
+            $manualGolesContra = 0;
 
             foreach ($manual as $m) {
                 // Respect the SAME ambito / tipo filters applied to real matches
@@ -1992,6 +1994,10 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                 $manualEmpatados += $m->empatados;
                 $manualPerdidos  += $m->perdidos;
                 $manualPuntos    += ($m->ganados * 3) + $m->empatados;
+
+                // Manual goal columns from EquipoEstadisticaManual.
+                $manualGolesFavor  += $m->goles_favor;
+                $manualGolesContra += $m->goles_en_contra;
             }
 
             $posicion->jugados   += $manualJugados;
@@ -1999,6 +2005,12 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             $posicion->empatados += $manualEmpatados;
             $posicion->perdidos  += $manualPerdidos;
             $posicion->puntaje   += $manualPuntos;
+
+            // Add manual goals and recompute the goal difference so that GF, GC,
+            // Dif. and the sort all reflect the merged totals.
+            $posicion->golesl    += $manualGolesFavor;
+            $posicion->golesv    += $manualGolesContra;
+            $posicion->diferencia = $posicion->golesl - $posicion->golesv;
 
             $posicion->promedio = $posicion->jugados > 0
                 ? $posicion->puntaje / $posicion->jugados
