@@ -209,6 +209,8 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('/scraper/jugador-transfermarkt', [App\Http\Controllers\ScraperController::class, 'jugadorTransfermarkt']);
 
+    Route::get('/scraper/test-jugador', [App\Http\Controllers\ScraperController::class, 'testJugadorDirecto']);
+
     Route::post('/equipos-excluidos/excluir-rapido', 'EquipoExcluidoController@excluirRapido');
 
     Route::get('/scraper/equipo-transfermarkt', 'ScraperController@equipoTransfermarkt');

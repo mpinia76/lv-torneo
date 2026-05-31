@@ -951,7 +951,7 @@ class ScraperController extends Controller
 
                     // Determine ambito per competition name
                     $internacionalKw = ['champions', 'libertadores', 'sudamericana', 'europa league',
-                        'concacaf', 'mundial', 'intercontinental', 'club world', 'recopa'];
+                        'concacaf', 'mundial', 'intercontinental', 'club world', 'recopa', 'leagues cup'];
 
                     foreach ($competitionsFound as $cName) {
 
@@ -2006,6 +2006,9 @@ class ScraperController extends Controller
             return response()->json(['error' => 'URL inválida (falta /spieler/{id})']);
         }
 
+        $url = preg_replace('#/(detaillierteleistungsdaten|leistungsdaten)/spieler/#', '/leistungsdatendetails/spieler/', $url);
+
+
         $html = HttpHelper::getHtmlContent($url, false);
         if (!$html) $html = HttpHelper::getHtmlContent($url, true);
         if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
@@ -2028,7 +2031,10 @@ class ScraperController extends Controller
                 if (preg_match('/(\d{4})/', $text, $m2) && (int) $m2[1] >= 1900) $year = $m2[1];
             }
         }
-        if (!$year && preg_match('#saison[_=/]+(\d{4})#', $url, $mY)) $year = $mY[1];
+// Fallback: season in URL — both /saison/2021 and ?saison_id=2021 (and saison_id/2021).
+        if (!$year && preg_match('#saison(?:_id)?[=/](\d{4})#', $url, $mY)) {
+            $year = $mY[1];
+        }
         if (!$year) $year = (string) ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
 
         // ---- Stats table (the "items" one with most data rows) ----
@@ -2036,29 +2042,68 @@ class ScraperController extends Controller
 
         // Debug: dump the season + the first 2 data rows (escaped) to inspect columns.
         if ($request->debug) {
-            $out = "AÑO: {$year}\n\n=== TABLAS ENCONTRADAS ===\n";
-            $i = 0;
-            foreach ($xpath->query('//table') as $t) {
-                $cls = $t->getAttribute('class');
-                $txt = preg_replace('/\s+/', ' ', trim($t->textContent));
-                $txt = mb_substr($txt, 0, 200);
-                $out .= "[{$i}] class='{$cls}'\n     {$txt}\n\n";
-                $i++;
+            $out = '';
+            $offset = 0;
+            $n = 0;
+            while (($pos = strpos($html, 'Copa Argentina', $offset)) !== false) {
+                $ctx = mb_substr($html, max(0, $pos - 80), 160);
+                $ctx = preg_replace('/\s+/', ' ', $ctx);
+                $out .= "[{$n}] pos={$pos}: ..." . $ctx . "...\n\n";
+                $offset = $pos + 14;
+                if (++$n >= 12) break;
             }
-            $out .= "\n=== SELECTS ===\n";
-            foreach ($xpath->query('//select') as $sel) {
-                $out .= "name='" . $sel->getAttribute('name') . "' id='" . $sel->getAttribute('id') . "'\n";
-                $c = 0;
-                foreach ($xpath->query('.//option', $sel) as $o) {
-                    $sel2 = $o->getAttribute('selected') !== '' ? ' [SELECTED]' : '';
-                    $out .= "   value='" . $o->getAttribute('value') . "' text='" . trim($o->textContent) . "'{$sel2}\n";
-                    if (++$c >= 4) { $out .= "   ...\n"; break; }
-                }
+            // Also: does it contain the match-table markers?
+            $out .= "\n--- markers ---\n";
+            foreach (['responsive-table','grid-view','class="items"','spielplandatensatz','show-for-small','tm-table'] as $m) {
+                $out .= "{$m}: " . (strpos($html, $m) !== false ? 'SÍ' : 'NO') . "\n";
             }
             return response('<pre>' . htmlspecialchars($out) . '</pre>');
         }
 
         return response()->json(['todo' => 'parser pendiente del debug']);
+    }
+
+    public function testJugadorDirecto(Request $request)
+    {
+        $url = trim($request->url);
+        $parsed  = parse_url($url);
+        $origin  = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+
+        $headers = [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language: es-AR,es;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding: gzip, deflate, br',
+            'sec-ch-ua: "Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            'sec-ch-ua-mobile: ?0',
+            'sec-ch-ua-platform: "Windows"',
+            'Sec-Fetch-Dest: document',
+            'Sec-Fetch-Mode: navigate',
+            'Sec-Fetch-Site: none',
+            'Sec-Fetch-User: ?1',
+            'Upgrade-Insecure-Requests: 1',
+            "Referer: {$origin}/",
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_ENCODING, '');
+        $html = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return response('<pre>'
+            . "HTTP: {$code}\n"
+            . "len: " . strlen($html ?: '') . "\n"
+            . "class=items: " . (strpos($html ?: '', 'class="items"') !== false ? 'SÍ' : 'NO') . "\n"
+            . "responsive-table: " . (strpos($html ?: '', 'responsive-table') !== false ? 'SÍ' : 'NO') . "\n"
+            . "grid-view: " . (strpos($html ?: '', 'grid-view') !== false ? 'SÍ' : 'NO') . "\n"
+            . "'/saison/' refs: " . substr_count($html ?: '', '/saison/') . "\n"
+            . '</pre>');
     }
 
 }
