@@ -1778,23 +1778,31 @@ class ScraperController extends Controller
 // Guess tipo/ambito from the competition name (same spirit as the dts scraper).
     private function clasificarCompetencia($nombre)
     {
-        // ascii-fold so "Série A" matches the accent-free keywords below
-        $n = (string) \Str::of($nombre)->lower()->ascii(); // "campeonato brasileiro serie a"
+        $n = (string) \Str::of($nombre)->lower()->ascii();
 
+        // International cups first.
         $intl = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
-            'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa'];
+            'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa',
+            'afc', 'caf', 'asian'];
         foreach ($intl as $kw) {
             if (str_contains($n, $kw)) return ['Copa', 'Internacional'];
         }
 
-        $ligaKw = ['laliga', 'la liga', 'liga', 'primera', 'serie a', 'serie b',
+        // Cups (explicit) -> Copa, before the generic league check.
+        $copaKw = ['copa', 'cup', 'pokal', 'coupe', 'supercopa', 'super cup', 'trophy', 'shield', 'playoff'];
+        foreach ($copaKw as $kw) {
+            if (str_contains($n, $kw)) return ['Copa', 'Nacional'];
+        }
+
+        // Leagues: explicit names + generic "league"/"liga"/"division".
+        $ligaKw = ['laliga', 'la liga', 'liga', 'league', 'primera', 'segunda', 'serie a', 'serie b',
             'premier', 'bundesliga', 'ligue', 'eredivisie', 'mls', 'primeira',
-            'brasileiro', 'brasileir']; // 👈 Brasileirão directo, por si "serie a" falla
+            'brasileiro', 'brasileir', 'division', 'división', 'championship', 'ekstraklasa'];
         foreach ($ligaKw as $kw) {
             if (str_contains($n, $kw)) return ['Liga', 'Nacional'];
         }
 
-        return ['Copa', 'Nacional'];
+        return ['Copa', 'Nacional']; // default
     }
 
     public function tecnicoTransfermarkt(Request $request)
