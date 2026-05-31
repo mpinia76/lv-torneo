@@ -1854,10 +1854,11 @@ class ScraperController extends Controller
         // ---- Pass 1: collect raw matches + count team frequency to find the DT's club ----
         $partidosRaw = [];
         $freq = [];
+        $nombres = []; // norm-key -> display name
 
         foreach ($xpath->query('.//tbody/tr', $statsTable) as $row) {
 
-            // Result cell "NN:NN".
+            // Result cell "NN:NN" (inside the ergebnis-link span).
             $resStr = null;
             foreach ($row->getElementsByTagName('td') as $td) {
                 $tt = trim($td->textContent);
@@ -1865,33 +1866,45 @@ class ScraperController extends Controller
             }
             if (!$resStr) continue;
 
-            // Competition name from the first <img title> in the row.
-            $compImg = $xpath->query('.//img[@title]', $row)->item(0);
-            $comp = $compImg ? trim($compImg->getAttribute('title')) : '';
-            $comp = preg_replace('/\s*\(\d{2}\/\d{2}\)\s*$/', '', $comp); // strip "(17/18)" if present
-
-            // Home / away club links (skip the competition link if any).
-            $clubLinks = $xpath->query(".//a[contains(@href,'/verein/')]", $row);
-            if ($clubLinks->length < 2) {
-                // fallback: any two <a> with a team-looking text
-                $clubLinks = $xpath->query('.//a[normalize-space(text())]', $row);
+            // Competition: anchor with /wettbewerb/ -> its inner <img title="...">.
+            $comp = '';
+            $compA = $xpath->query(".//a[contains(@href,'/wettbewerb/')]", $row)->item(0);
+            if ($compA) {
+                $img = $xpath->query('.//img[@title]', $compA)->item(0);
+                $comp = $img ? trim($img->getAttribute('title')) : trim($compA->getAttribute('alt'));
             }
-            if ($clubLinks->length < 2) continue;
+            $comp = preg_replace('/\s*\(\d{2}\/\d{2}\)\s*$/', '', $comp);
 
-            $home = trim($clubLinks->item(0)->textContent);
-            $away = trim($clubLinks->item(1)->textContent);
+            // Teams: the two <a> that link to /verein/ AND have text (not the escudo-only ones).
+            $home = $away = '';
+            foreach ($xpath->query(".//a[contains(@href,'/verein/')]", $row) as $a) {
+                $txt = trim($a->textContent);
+                if ($txt === '') continue; // skip the crest-image anchors
+                if ($home === '') { $home = $txt; }
+                elseif ($away === '') { $away = $txt; break; }
+            }
             if (!$home || !$away) continue;
 
             list($hg, $ag) = array_map('intval', explode(':', $resStr));
-
             $partidosRaw[] = compact('comp', 'home', 'away', 'hg', 'ag');
 
-            $freq[$this->normalizeTeam($home)] = ($freq[$this->normalizeTeam($home)] ?? 0) + 1;
-            $freq[$this->normalizeTeam($away)] = ($freq[$this->normalizeTeam($away)] ?? 0) + 1;
-            // keep a display name for the most frequent norm-key
-            $freq['_name_' . $this->normalizeTeam($home)] = $home;
-            $freq['_name_' . $this->normalizeTeam($away)] = $away;
+            $hk = $this->normalizeTeam($home);
+            $ak = $this->normalizeTeam($away);
+            $freq[$hk] = ($freq[$hk] ?? 0) + 1;
+            $freq[$ak] = ($freq[$ak] ?? 0) + 1;
+            $nombres[$hk] = $home;
+            $nombres[$ak] = $away;
         }
+
+        if (empty($partidosRaw)) return response()->json([]);
+
+        // The directed club = most frequent team across all matches this season.
+        $bestKey = null; $bestCount = 0;
+        foreach ($freq as $k => $v) {
+            if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; }
+        }
+        $equipoDir = $nombres[$bestKey] ?? '';
+        $dirNorm = $bestKey;
 
         if (empty($partidosRaw)) return response()->json([]);
 
