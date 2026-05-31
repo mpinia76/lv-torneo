@@ -57,11 +57,10 @@
             <label>Importar desde Transfermarkt</label>
             <div class="d-flex">
                 <input type="text" id="tmUrlTecnico" class="form-control mr-2"
-                       placeholder="https://www.transfermarkt.com.ar/<slug>/profil/trainer/<id>">
-                <button type="button" class="btn btn-warning mr-2" onclick="scrapearTransfermarktTecnico()" style="white-space:nowrap;">🌐 Scrapear TM</button>
-                <button type="button" class="btn btn-outline-danger" id="btnDetenerTMTecnico" onclick="detenerTMTecnico()" style="display:none;white-space:nowrap;">⏹ Detener</button>
+                       placeholder="https://www.transfermarkt.com.ar/<slug>/leistungsdatenDetail/trainer/17428?saison_id=2024">
+                <button type="button" class="btn btn-warning" onclick="scrapearTransfermarktTecnico()" style="white-space:nowrap;">🌐 Scrapear TM</button>
             </div>
-            <small class="text-muted">Recorre club por club (cada uno = 1 consulta). Podés frenar cuando quieras.</small>
+            <small class="text-muted">Pegá la URL de "Datos de rendimiento" con <code>saison_id</code>. Para otra temporada cambialo y volvé a scrapear.</small>
             <div id="tmProgresoTecnico" class="mt-2"></div>
         </div>
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
@@ -426,67 +425,35 @@
         // Transfermarkt: phase A lists the directed clubs, then one fetch per
         // club appends its tournaments. Can be stopped mid-way.
         // ------------------------------------------------------------------
-        let detenerTMTecnicoFlag = false;
-        function detenerTMTecnico() { detenerTMTecnicoFlag = true; }
 
-        async function scrapearTransfermarktTecnico() {
+
+        function scrapearTransfermarktTecnico() {
             let url = document.getElementById('tmUrlTecnico').value.trim();
-            if (!url) { alert('Pegá la URL del perfil del DT en Transfermarkt'); return; }
+            if (!url) { alert('Pegá la URL del DT en Transfermarkt'); return; }
 
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
+            document.getElementById('tmProgresoTecnico').innerHTML = '';
             let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
-            let progreso  = document.getElementById('tmProgresoTecnico');
-            let endpoint  = "{{ url('/admin/scraper/tecnico-transfermarkt') }}";
 
-            detenerTMTecnicoFlag = false;
-            iniciarResultados();
-            progreso.innerHTML = '⏳ Buscando clubes dirigidos...';
-
-            // Phase A: get the list of spells (clubs) with their matches URL.
-            let spells = [];
-            try {
-                let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`);
-                let data = await res.json();
-                if (data.error) { progreso.innerHTML = '<span style="color:#a94442">' + data.error + '</span>'; return; }
-                spells = data.spells || [];
-            } catch (e) {
-                console.error(e);
-                progreso.innerHTML = '<span style="color:#a94442">Error obteniendo clubes</span>';
-                return;
-            }
-
-            if (!spells.length) {
-                progreso.innerHTML = '<span style="color:#856404">No se encontraron clubes dirigidos.</span>';
-                return;
-            }
-
-            document.getElementById('btnDetenerTMTecnico').style.display = 'inline-block';
-
-            // Phase B: one fetch per club, appending cards as they arrive.
-            let total = 0;
-            for (let i = 0; i < spells.length; i++) {
-                if (detenerTMTecnicoFlag) {
-                    progreso.innerHTML = `⏹ Detenido. ${total} torneos de ${i}/${spells.length} clubes.`;
-                    break;
-                }
-                let sp = spells[i];
-                progreso.innerHTML = `⏳ ${i + 1}/${spells.length} — <strong>${sp.equipo}</strong> (${total} torneos hasta ahora)`;
-                try {
-                    let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`
-                        + `&matchUrl=${encodeURIComponent(sp.matchUrl)}&equipo=${encodeURIComponent(sp.equipo)}`);
-                    let data = await res.json();
-                    if (Array.isArray(data) && data.length) {
-                        agregarCards(data);
-                        total += data.length;
+            fetch("{{ url('/admin/scraper/tecnico-transfermarkt') }}?url=" + encodeURIComponent(url) + "&tecnico_id=" + tecnicoId)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('resultadoScraper').innerHTML =
+                            '<div class="alert alert-danger">' + data.error + '</div>';
+                        return;
                     }
-                } catch (e) {
-                    console.error('Club ' + sp.equipo, e);
-                }
-            }
-
-            document.getElementById('btnDetenerTMTecnico').style.display = 'none';
-            if (!detenerTMTecnicoFlag) {
-                progreso.innerHTML = `✅ Listo. ${total} torneos de ${spells.length} clubes.`;
-            }
+                    renderResultados(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoScraper').innerHTML =
+                        '<div class="alert alert-danger">Error scrapeando</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
         }
 
         function excluirCompetencia(nombre, btn) {
