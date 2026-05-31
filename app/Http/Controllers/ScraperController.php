@@ -1996,4 +1996,60 @@ class ScraperController extends Controller
         return $raw;
     }
 
+    public function jugadorTransfermarkt(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json(['error' => 'Falta la URL de Transfermarkt']);
+        if (!preg_match('#/spieler/(\d+)#', $url, $mId)) {
+            return response()->json(['error' => 'URL inválida (falta /spieler/{id})']);
+        }
+
+        $html = HttpHelper::getHtmlContent($url, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        // ---- Season from the "Elegir temporada" select (same logic as dts/equipos) ----
+        $year = null;
+        $optSel = $xpath->query("//select[contains(@name,'saison')]/option[@selected]")->item(0);
+        if ($optSel) {
+            $val  = (int) preg_replace('/\D/', '', $optSel->getAttribute('value'));
+            $text = trim($optSel->textContent);
+            if (str_contains($text, '/')) {
+                if ($val >= 1900) $year = $val . '/' . substr((string) ($val + 1), -2);
+            } else {
+                if (preg_match('/(\d{4})/', $text, $m2) && (int) $m2[1] >= 1900) $year = $m2[1];
+            }
+        }
+        if (!$year && preg_match('#saison[_=/]+(\d{4})#', $url, $mY)) $year = $mY[1];
+        if (!$year) $year = (string) ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
+
+        // ---- Stats table (the "items" one with most data rows) ----
+        $statsTable = $xpath->query('//table[contains(@class,"items")]')->item(0);
+
+        // Debug: dump the season + the first 2 data rows (escaped) to inspect columns.
+        if ($request->debug) {
+            $selVal  = $optSel ? $optSel->getAttribute('value') : '(sin selected)';
+            $selText = $optSel ? trim($optSel->textContent) : '';
+            $out = "AÑO: {$year}\nOPTION value='{$selVal}' text='{$selText}'\n\n";
+            if ($statsTable) {
+                $rows = $xpath->query('.//tbody/tr', $statsTable);
+                $c = 0;
+                foreach ($rows as $r) { $out .= $dom->saveHTML($r) . "\n\n----\n\n"; if (++$c >= 3) break; }
+            } else {
+                $out .= 'NO STATS TABLE';
+            }
+            return response('<pre>' . htmlspecialchars($out) . '</pre>');
+        }
+
+        return response()->json(['todo' => 'parser pendiente del debug']);
+    }
+
 }
