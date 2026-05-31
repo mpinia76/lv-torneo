@@ -1852,12 +1852,22 @@ class ScraperController extends Controller
         }
 
         if ($request->debug) {
-            $selVal  = $optSel ? $optSel->getAttribute('value') : '(sin selected)';
-            $selText = $optSel ? trim($optSel->textContent) : '';
-            return response(
-                "AÑO: {$year}\nOPTION value='{$selVal}' text='{$selText}'\nGOAL CELLS: {$bestGoals}\n\n" .
-                ($statsTable ? $dom->saveHTML($statsTable) : 'NO STATS TABLE')
-            );
+            $out = "=== SELECT COMPETICION ===\n";
+            foreach ($xpath->query("//select") as $sel) {
+                $name = $sel->getAttribute('name');
+                if (stripos($name, 'wettbewerb') !== false || stripos($name, 'liga') !== false) {
+                    $out .= "name='{$name}'\n" . $dom->saveHTML($sel) . "\n\n";
+                }
+            }
+            $out .= "=== BOX ESTADISTICAS ===\n";
+            // The stats box usually lives near a header containing "Estadísticas"/"Statistik".
+            foreach ($xpath->query("//table") as $t) {
+                $txt = $t->textContent;
+                if (mb_stripos($txt, 'Encuentros') !== false || mb_stripos($txt, 'PPP') !== false) {
+                    $out .= $dom->saveHTML($t) . "\n\n";
+                }
+            }
+            return response($out);
         }
 
         if (!$statsTable) return response()->json(['error' => 'No se encontró la tabla de estadísticas']);
