@@ -2036,15 +2036,24 @@ class ScraperController extends Controller
 
         // Debug: dump the season + the first 2 data rows (escaped) to inspect columns.
         if ($request->debug) {
-            $selVal  = $optSel ? $optSel->getAttribute('value') : '(sin selected)';
-            $selText = $optSel ? trim($optSel->textContent) : '';
-            $out = "AÑO: {$year}\nOPTION value='{$selVal}' text='{$selText}'\n\n";
-            if ($statsTable) {
-                $rows = $xpath->query('.//tbody/tr', $statsTable);
+            $out = "AÑO: {$year}\n\n=== TABLAS ENCONTRADAS ===\n";
+            $i = 0;
+            foreach ($xpath->query('//table') as $t) {
+                $cls = $t->getAttribute('class');
+                $txt = preg_replace('/\s+/', ' ', trim($t->textContent));
+                $txt = mb_substr($txt, 0, 200);
+                $out .= "[{$i}] class='{$cls}'\n     {$txt}\n\n";
+                $i++;
+            }
+            $out .= "\n=== SELECTS ===\n";
+            foreach ($xpath->query('//select') as $sel) {
+                $out .= "name='" . $sel->getAttribute('name') . "' id='" . $sel->getAttribute('id') . "'\n";
                 $c = 0;
-                foreach ($rows as $r) { $out .= $dom->saveHTML($r) . "\n\n----\n\n"; if (++$c >= 3) break; }
-            } else {
-                $out .= 'NO STATS TABLE';
+                foreach ($xpath->query('.//option', $sel) as $o) {
+                    $sel2 = $o->getAttribute('selected') !== '' ? ' [SELECTED]' : '';
+                    $out .= "   value='" . $o->getAttribute('value') . "' text='" . trim($o->textContent) . "'{$sel2}\n";
+                    if (++$c >= 4) { $out .= "   ...\n"; break; }
+                }
             }
             return response('<pre>' . htmlspecialchars($out) . '</pre>');
         }
