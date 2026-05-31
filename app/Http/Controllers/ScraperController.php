@@ -1797,4 +1797,203 @@ class ScraperController extends Controller
         return ['Copa', 'Nacional'];
     }
 
+    public function tecnicoTransfermarkt(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json(['error' => 'Falta la URL del perfil de Transfermarkt']);
+
+        // Expected: https://www.transfermarkt.com.ar/<slug>/profil/trainer/<id>
+        if (!preg_match('#/([^/]+)/profil/trainer/(\d+)#', $url, $m)) {
+            return response()->json(['error' => 'URL inválida (debe ser /profil/trainer/{id})']);
+        }
+        $slug = $m[1];
+        $trainerId = $m[2];
+
+        // PHASE A: no matchUrl -> return the club spells (cheap, 1 fetch).
+        if (!$request->matchUrl) {
+            return $this->tmTecnicoEstaciones($slug, $trainerId);
+        }
+
+        // PHASE B: a matchUrl was given -> scrape that single spell's matches.
+        return $this->tmTecnicoPartidos($request);
+    }
+
+// PHASE A — list of "Manager" spells with their matches URL.
+    private function tmTecnicoEstaciones($slug, $trainerId)
+    {
+        // Build the stationen URL directly (saves the profile fetch).
+        $stationenUrl = "https://www.transfermarkt.com.ar/{$slug}/stationen/trainer/{$trainerId}/plus/1";
+
+        $html = HttpHelper::getHtmlContent($stationenUrl, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($stationenUrl, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener las estaciones del DT']);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        $rows = $xpath->query('//table[contains(@class,"items")]/tbody/tr');
+        $spells = [];
+
+        foreach ($rows as $row) {
+            $cols = $row->getElementsByTagName('td');
+            if ($cols->length < 7) continue;
+
+            // Same Manager filter as scrapearTecnico().
+            $equipoRaw = trim($cols->item(1)->textContent);
+            preg_match('/^(.*?)(Manager|Assistant Manager|Caretaker Manager|Sporting Director)?$/', $equipoRaw, $mm);
+            $equipo = trim($mm[1]);
+            $rol = $mm[2] ?? '';
+            if (!preg_match('/Manager/i', $rol)) continue;
+            if (!$equipo) continue;
+            if ($this->debeExcluirEquipo($equipo)) continue;
+
+            // Matches link lives in col 6 (same index your code uses).
+            $a = $cols->item(6)->getElementsByTagName('a')->item(0);
+            if (!$a) continue;
+            $href = $a->getAttribute('href') . '/plus/1';
+            $matchUrl = str_starts_with($href, 'http') ? $href : 'https://www.transfermarkt.com.ar' . $href;
+
+            $spells[] = ['equipo' => $equipo, 'matchUrl' => $matchUrl];
+        }
+
+        return response()->json(['spells' => $spells]);
+    }
+
+// PHASE B — aggregate one spell's matches by competition + season.
+    private function tmTecnicoPartidos(Request $request)
+    {
+        $matchUrl  = trim($request->matchUrl);
+        $equipoDir = trim($request->equipo); // the club for this spell (from phase A)
+        $tecnicoId = $request->tecnico_id;
+
+        $html = HttpHelper::getHtmlContent($matchUrl, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($matchUrl, true);
+        if (!$html) return response()->json([]);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        if ($request->debug) {
+            $t = $xpath->query('//table[contains(@class,"items")]')->item(0);
+            return response($t ? $dom->saveHTML($t) : 'NO MATCHES TABLE');
+        }
+
+        // Dedup set (manual + automatic), same recipe as the footballdb method.
+        $existentes = collect()
+            ->merge(
+                $tecnicoId
+                    ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
+                    : collect()
+            )
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->unique()->flip()->toArray();
+
+        $rows = $xpath->query('//table[contains(@class,"items")]/tbody/tr');
+        $stats = [];
+
+        foreach ($rows as $row) {
+            $cols = $row->getElementsByTagName('td');
+            if ($cols->length < 9) continue;
+
+            // Same column indices as scrapearTecnico() (matches page /plus/1).
+            $competitionName = trim($cols->item(1)->textContent);
+            $temporadaRaw    = trim($cols->item(2)->textContent);
+            $homeTeam        = trim($cols->item(4)->textContent);
+            $resultStr       = trim($cols->item(6)->textContent);
+            $awayTeam        = trim($cols->item(8)->textContent);
+
+            if (!$competitionName) continue;
+            if (strpos($resultStr, ':') === false) continue;
+
+            $year = $this->normalizarTemporadaTM($temporadaRaw);
+
+            list($homeGoals, $awayGoals) = array_map('intval', explode(':', $resultStr));
+
+            $dir  = $this->normalizeTeam($equipoDir);
+            $home = $this->normalizeTeam($homeTeam);
+            $away = $this->normalizeTeam($awayTeam);
+
+            if ($dir === $home)      { $gf = $homeGoals; $ge = $awayGoals; }
+            elseif ($dir === $away)  { $gf = $awayGoals; $ge = $homeGoals; }
+            else continue; // match not played by the directed club
+
+            $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
+
+            // Key now includes the season -> no cross-season collapse.
+            $key = $competitionName . '|' . $equipoDir . '|' . $year;
+
+            if (!isset($stats[$key])) {
+                $stats[$key] = [
+                    'competition' => trim($competitionName) . ' ' . $year,
+                    'equipo'      => $equipoDir,
+                    'partidos'    => 0, 'ganados' => 0, 'empatados' => 0,
+                    'perdidos'    => 0, 'gf' => 0, 'ge' => 0,
+                ];
+            }
+            $stats[$key]['partidos']++;
+            $stats[$key]['ganados']   += $res === 'W' ? 1 : 0;
+            $stats[$key]['empatados'] += $res === 'D' ? 1 : 0;
+            $stats[$key]['perdidos']  += $res === 'L' ? 1 : 0;
+            $stats[$key]['gf'] += $gf;
+            $stats[$key]['ge'] += $ge;
+        }
+
+        // Build footballdb-shaped rows + classify + dedup.
+        $data = [];
+        foreach ($stats as $s) {
+
+            $compSinAnio = preg_replace('/\s+\d{4}(\/\d{2})?$/', '', $s['competition']);
+            if ($this->debeExcluirCompetencia($compSinAnio)) continue;
+
+            $key = (string) \Str::of($s['competition'])->lower()->ascii()
+                ->replaceMatches('/\s+/', ' ')->trim();
+            if (isset($existentes[$key])) continue;
+
+            list($tipo, $ambito) = $this->clasificarCompetencia($compSinAnio);
+
+            $data[] = [
+                'competition' => $s['competition'],
+                'equipo'      => $s['equipo'],
+                'posicion'    => null, // not derivable per-coach from match list
+                'partidos'    => $s['partidos'],
+                'ganados'     => $s['ganados'],
+                'empatados'   => $s['empatados'],
+                'perdidos'    => $s['perdidos'],
+                'gf'          => $s['gf'],
+                'ge'          => $s['ge'],
+                'torneo_logo' => null,
+                'tipo'        => $tipo,
+                'ambito'      => $ambito,
+            ];
+        }
+
+        return response()->json($data);
+    }
+
+// "23/24" -> "2023/24" (cross-year) ; "2024" -> "2024" (calendar-year)
+    private function normalizarTemporadaTM($raw)
+    {
+        $raw = trim($raw);
+        if (preg_match('#(\d{2})/(\d{2})#', $raw, $m)) {
+            $start = ((int) $m[1] >= 50 ? 1900 : 2000) + (int) $m[1];
+            return $start . '/' . $m[2];
+        }
+        if (preg_match('/(\d{4})/', $raw, $m)) return $m[1];
+        return $raw;
+    }
+
 }

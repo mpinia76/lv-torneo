@@ -53,7 +53,17 @@
                 </button>
             </div>
         </div>
-
+        <div class="mb-3 mt-3">
+            <label>Importar desde Transfermarkt</label>
+            <div class="d-flex">
+                <input type="text" id="tmUrlTecnico" class="form-control mr-2"
+                       placeholder="https://www.transfermarkt.com.ar/<slug>/profil/trainer/<id>">
+                <button type="button" class="btn btn-warning mr-2" onclick="scrapearTransfermarktTecnico()" style="white-space:nowrap;">🌐 Scrapear TM</button>
+                <button type="button" class="btn btn-outline-danger" id="btnDetenerTMTecnico" onclick="detenerTMTecnico()" style="display:none;white-space:nowrap;">⏹ Detener</button>
+            </div>
+            <small class="text-muted">Recorre club por club (cada uno = 1 consulta). Podés frenar cuando quieras.</small>
+            <div id="tmProgresoTecnico" class="mt-2"></div>
+        </div>
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando historial, puede tardar unos segundos...
         </div>
@@ -244,9 +254,98 @@
             }
         }
 
-        function renderResultados(items) {
-            let torneos = {};
+        // ------------------------------------------------------------------
+        // Card rendering, split so footballdb (one shot) and Transfermarkt
+        // (club by club) can both reuse it.
+        // ------------------------------------------------------------------
+        let _idxTorneo = 0;
 
+        // Render the toolbar + empty list container once, before adding cards.
+        function iniciarResultados() {
+            _idxTorneo = 0;
+            document.getElementById('resultadoScraper').innerHTML = `
+            <div class="d-flex align-items-center mb-3">
+                <button type="button" class="btn btn-primary mr-2" onclick="guardarSeleccionados()">
+                    💾 Guardar seleccionados
+                </button>
+                <label class="mb-0">
+                    <input type="checkbox" id="checkTodos" onclick="toggleTodos(this)"> Seleccionar todos
+                </label>
+                <span id="resumenMasivo" class="ml-3"></span>
+            </div>
+            <div id="listaTorneos"></div>`;
+        }
+
+        // Build the markup for a single tournament card.
+        function cardTorneo(c, idx) {
+            let equipoMatch = matchEquipoId(c.equipo);
+            return `
+        <div class="card mb-3 fila-torneo" data-idx="${idx}">
+            <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
+                <input type="checkbox" class="check-torneo mr-2" value="${idx}">
+                <strong style="color: darkgreen;">${clean(c.competition)}</strong>
+                <span class="ml-auto">
+                    <button type="button" onclick='excluirCompetencia(${JSON.stringify(c.competition)}, this)'
+                        class="btn btn-danger btn-sm" title="No mostrar más esta competencia">🚫 Comp.</button>
+                    <button type="button" onclick='excluirEquipo(${JSON.stringify(c.equipo)}, this)'
+                        class="btn btn-danger btn-sm" title="No mostrar más este equipo">🚫 Equipo</button>
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="form-group col-md-3">
+                        <label class="small mb-0">Torneo</label>
+                        <input type="text" class="form-control form-control-sm f-torneo_nombre" value="${clean(c.competition)}">
+                    </div>
+                    <div class="form-group col-md-3">
+                        <label class="small mb-0">Equipo</label>
+                        <select class="form-control form-control-sm f-equipo_id select2-equipo" style="width:100%">${opcionesEquipos(equipoMatch)}</select>
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label class="small mb-0">Tipo</label>
+                        <select class="form-control form-control-sm f-tipo">${opcionesSelect(['', 'Liga', 'Copa'], c.tipo)}</select>
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label class="small mb-0">Ámbito</label>
+                        <select class="form-control form-control-sm f-ambito">${opcionesSelect(['', 'Nacional', 'Internacional'], c.ambito)}</select>
+                    </div>
+                    <div class="form-group col-md-2">
+                        <label class="small mb-0">Logo</label>
+                        <input type="file" class="form-control-file form-control-sm f-logo_file">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group col-md-2"><label class="small mb-0">Posición</label>
+                        <input type="number" class="form-control form-control-sm f-posicion" value="${c.posicion ?? ''}"></div>
+                    <div class="form-group col-md-2"><label class="small mb-0">Partidos</label>
+                        <input type="number" class="form-control form-control-sm f-partidos" value="${c.partidos}"></div>
+                    <div class="form-group col-md-2"><label class="small mb-0">Ganados</label>
+                        <input type="number" class="form-control form-control-sm f-ganados" value="${c.ganados}"></div>
+                    <div class="form-group col-md-2"><label class="small mb-0">Empatados</label>
+                        <input type="number" class="form-control form-control-sm f-empatados" value="${c.empatados}"></div>
+                    <div class="form-group col-md-2"><label class="small mb-0">Perdidos</label>
+                        <input type="number" class="form-control form-control-sm f-perdidos" value="${c.perdidos}"></div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group col-md-2"><label class="small mb-0">Goles Favor</label>
+                        <input type="number" class="form-control form-control-sm f-goles_favor" value="${c.gf}"></div>
+                    <div class="form-group col-md-2"><label class="small mb-0">Goles Contra</label>
+                        <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${c.ge}"></div>
+                </div>
+            </div>
+        </div>`;
+        }
+
+        // Aggregate incoming rows by competition|equipo (same logic the old
+        // renderResultados used), then append them as cards. Safe to call many
+        // times: footballdb calls it once, Transfermarkt once per club.
+        function agregarCards(items) {
+            let lista = document.getElementById('listaTorneos');
+            if (!lista) { iniciarResultados(); lista = document.getElementById('listaTorneos'); }
+
+            let torneos = {};
             items.forEach(row => {
                 let key = clean(row.competition) + '|' + clean(row.equipo);
                 if (!torneos[key]) {
@@ -254,7 +353,7 @@
                         competition: clean(row.competition),
                         equipo:      row.equipo,
                         partidos:    0,
-                        posicion:    0,
+                        posicion:    parseInt(row.posicion ?? 0) || 0,
                         ganados:     0,
                         empatados:   0,
                         perdidos:    0,
@@ -265,7 +364,6 @@
                     };
                 }
                 torneos[key].partidos  += parseInt(row.partidos ?? 0);
-                torneos[key].posicion  += parseInt(row.posicion ?? 0);
                 torneos[key].ganados   += parseInt(row.ganados ?? 0);
                 torneos[key].empatados += parseInt(row.empatados ?? 0);
                 torneos[key].perdidos  += parseInt(row.perdidos ?? 0);
@@ -273,95 +371,25 @@
                 torneos[key].ge        += parseInt(row.ge ?? 0);
             });
 
-            let lista = Object.values(torneos);
+            Object.values(torneos).forEach(c => {
+                lista.insertAdjacentHTML('beforeend', cardTorneo(c, _idxTorneo++));
+            });
 
-            if (!lista.length) {
+            // Init Select2 only on the newly added selects (avoid re-init).
+            if (window.jQuery && $.fn.select2) {
+                $('#resultadoScraper .select2-equipo:not(.select2-hidden-accessible)').select2({ width: '100%' });
+            }
+        }
+
+        // footballdb: render everything in one shot (replaces previous results).
+        function renderResultados(items) {
+            if (!items.length) {
                 document.getElementById('resultadoScraper').innerHTML =
                     '<div class="alert alert-warning">Sin resultados.</div>';
                 return;
             }
-
-            let html = `
-                <div class="d-flex align-items-center mb-3">
-                    <button type="button" class="btn btn-primary mr-2" onclick="guardarSeleccionados()">
-                        💾 Guardar seleccionados
-                    </button>
-                    <label class="mb-0">
-                        <input type="checkbox" id="checkTodos" onclick="toggleTodos(this)"> Seleccionar todos
-                    </label>
-                    <span id="resumenMasivo" class="ml-3"></span>
-                </div>`;
-
-            lista.forEach((c, idx) => {
-                let equipoMatch = matchEquipoId(c.equipo);
-
-                html += `
-                <div class="card mb-3 fila-torneo" data-idx="${idx}">
-                    <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
-                        <input type="checkbox" class="check-torneo mr-2" value="${idx}">
-                        <strong style="color: darkgreen;">${clean(c.competition)}</strong>
-                        <span class="ml-auto">
-                            <button type="button" onclick='excluirCompetencia(${JSON.stringify(c.competition)}, this)'
-                                class="btn btn-danger btn-sm" title="No mostrar más esta competencia">🚫 Comp.</button>
-                            <button type="button" onclick='excluirEquipo(${JSON.stringify(c.equipo)}, this)'
-                                class="btn btn-danger btn-sm" title="No mostrar más este equipo">🚫 Equipo</button>
-                        </span>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="form-group col-md-3">
-                                <label class="small mb-0">Torneo</label>
-                                <input type="text" class="form-control form-control-sm f-torneo_nombre" value="${clean(c.competition)}">
-                            </div>
-                            <div class="form-group col-md-3">
-                                <label class="small mb-0">Equipo</label>
-                                <select class="form-control form-control-sm f-equipo_id select2-equipo" style="width:100%">${opcionesEquipos(equipoMatch)}</select>
-                            </div>
-                            <div class="form-group col-md-2">
-                                <label class="small mb-0">Tipo</label>
-                                <select class="form-control form-control-sm f-tipo">${opcionesSelect(['', 'Liga', 'Copa'], c.tipo)}</select>
-                            </div>
-                            <div class="form-group col-md-2">
-                                <label class="small mb-0">Ámbito</label>
-                                <select class="form-control form-control-sm f-ambito">${opcionesSelect(['', 'Nacional', 'Internacional'], c.ambito)}</select>
-                            </div>
-                            <div class="form-group col-md-2">
-                                <label class="small mb-0">Logo</label>
-                                <input type="file" class="form-control-file form-control-sm f-logo_file">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="form-group col-md-2"><label class="small mb-0">Posición</label>
-                                <input type="number" class="form-control form-control-sm f-posicion" value="${c.posicion}"></div>
-                            <div class="form-group col-md-2"><label class="small mb-0">Partidos</label>
-                                <input type="number" class="form-control form-control-sm f-partidos" value="${c.partidos}"></div>
-                            <div class="form-group col-md-2"><label class="small mb-0">Ganados</label>
-                                <input type="number" class="form-control form-control-sm f-ganados" value="${c.ganados}"></div>
-                            <div class="form-group col-md-2"><label class="small mb-0">Empatados</label>
-                                <input type="number" class="form-control form-control-sm f-empatados" value="${c.empatados}"></div>
-                            <div class="form-group col-md-2"><label class="small mb-0">Perdidos</label>
-                                <input type="number" class="form-control form-control-sm f-perdidos" value="${c.perdidos}"></div>
-                        </div>
-
-                        <div class="row">
-                            <div class="form-group col-md-2"><label class="small mb-0">Goles Favor</label>
-                                <input type="number" class="form-control form-control-sm f-goles_favor" value="${c.gf}"></div>
-                            <div class="form-group col-md-2"><label class="small mb-0">Goles Contra</label>
-                                <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${c.ge}"></div>
-                        </div>
-                    </div>
-                </div>`;
-            });
-
-            document.getElementById('resultadoScraper').innerHTML = html;
-
-            // Init Select2 on the team selects of the freshly rendered cards.
-            // jQuery is required (same as the page's main select). The cards are
-            // built dynamically, so this must run after they are in the DOM.
-            if (window.jQuery && $.fn.select2) {
-                $('#resultadoScraper .select2-equipo').select2({ width: '100%' });
-            }
+            iniciarResultados();
+            agregarCards(items);
         }
 
         function scrapearFootballDB() {
@@ -392,6 +420,73 @@
                 .finally(() => {
                     document.getElementById('loadingScraper').style.display = 'none';
                 });
+        }
+
+        // ------------------------------------------------------------------
+        // Transfermarkt: phase A lists the directed clubs, then one fetch per
+        // club appends its tournaments. Can be stopped mid-way.
+        // ------------------------------------------------------------------
+        let detenerTMTecnicoFlag = false;
+        function detenerTMTecnico() { detenerTMTecnicoFlag = true; }
+
+        async function scrapearTransfermarktTecnico() {
+            let url = document.getElementById('tmUrlTecnico').value.trim();
+            if (!url) { alert('Pegá la URL del perfil del DT en Transfermarkt'); return; }
+
+            let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
+            let progreso  = document.getElementById('tmProgresoTecnico');
+            let endpoint  = "{{ url('/admin/scraper/tecnico-transfermarkt') }}";
+
+            detenerTMTecnicoFlag = false;
+            iniciarResultados();
+            progreso.innerHTML = '⏳ Buscando clubes dirigidos...';
+
+            // Phase A: get the list of spells (clubs) with their matches URL.
+            let spells = [];
+            try {
+                let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`);
+                let data = await res.json();
+                if (data.error) { progreso.innerHTML = '<span style="color:#a94442">' + data.error + '</span>'; return; }
+                spells = data.spells || [];
+            } catch (e) {
+                console.error(e);
+                progreso.innerHTML = '<span style="color:#a94442">Error obteniendo clubes</span>';
+                return;
+            }
+
+            if (!spells.length) {
+                progreso.innerHTML = '<span style="color:#856404">No se encontraron clubes dirigidos.</span>';
+                return;
+            }
+
+            document.getElementById('btnDetenerTMTecnico').style.display = 'inline-block';
+
+            // Phase B: one fetch per club, appending cards as they arrive.
+            let total = 0;
+            for (let i = 0; i < spells.length; i++) {
+                if (detenerTMTecnicoFlag) {
+                    progreso.innerHTML = `⏹ Detenido. ${total} torneos de ${i}/${spells.length} clubes.`;
+                    break;
+                }
+                let sp = spells[i];
+                progreso.innerHTML = `⏳ ${i + 1}/${spells.length} — <strong>${sp.equipo}</strong> (${total} torneos hasta ahora)`;
+                try {
+                    let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`
+                        + `&matchUrl=${encodeURIComponent(sp.matchUrl)}&equipo=${encodeURIComponent(sp.equipo)}`);
+                    let data = await res.json();
+                    if (Array.isArray(data) && data.length) {
+                        agregarCards(data);
+                        total += data.length;
+                    }
+                } catch (e) {
+                    console.error('Club ' + sp.equipo, e);
+                }
+            }
+
+            document.getElementById('btnDetenerTMTecnico').style.display = 'none';
+            if (!detenerTMTecnicoFlag) {
+                progreso.innerHTML = `✅ Listo. ${total} torneos de ${spells.length} clubes.`;
+            }
         }
 
         function excluirCompetencia(nombre, btn) {
