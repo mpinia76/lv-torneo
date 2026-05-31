@@ -1852,20 +1852,17 @@ class ScraperController extends Controller
         }
 
         if ($request->debug) {
-            $out = "=== SELECT COMPETICION ===\n";
-            foreach ($xpath->query("//select") as $sel) {
-                $name = $sel->getAttribute('name');
-                if (stripos($name, 'wettbewerb') !== false || stripos($name, 'liga') !== false) {
-                    $out .= "name='{$name}'\n" . $dom->saveHTML($sel) . "\n\n";
-                }
-            }
-            $out .= "=== BOX ESTADISTICAS ===\n";
-            // The stats box usually lives near a header containing "Estadísticas"/"Statistik".
-            foreach ($xpath->query("//table") as $t) {
-                $txt = $t->textContent;
-                if (mb_stripos($txt, 'Encuentros') !== false || mb_stripos($txt, 'PPP') !== false) {
-                    $out .= $dom->saveHTML($t) . "\n\n";
-                }
+            // Dump the matches table (the one with date + result rows).
+            $t = $xpath->query('//table[contains(@class,"items")]')->item(0);
+            if (!$t) return response('NO TABLE');
+
+            // First 3 data rows, raw, to inspect the Competición cell + result cell.
+            $out = '';
+            $rows = $xpath->query('.//tbody/tr', $t);
+            $c = 0;
+            foreach ($rows as $r) {
+                $out .= $dom->saveHTML($r) . "\n\n----\n\n";
+                if (++$c >= 3) break;
             }
             return response($out);
         }
