@@ -1866,11 +1866,22 @@ class ScraperController extends Controller
 
         foreach ($xpath->query('.//tbody/tr', $statsTable) as $row) {
 
-            // Result lives inside the .ergebnis-link anchor. Take its first NN:NN.
+            // Result from the .ergebnis-link.
+            //   "2:1"        -> normal result.
+            //   "4:5 pen."   -> TM shows ONLY the shootout here; the real (drawn)
+            //                   regulation score lives in the match report.
             $resStr = null;
             $resLink = $xpath->query(".//a[contains(@class,'ergebnis-link')]", $row)->item(0);
-            if ($resLink && preg_match('/(\d+)\s*:\s*(\d+)/', trim($resLink->textContent), $mRes)) {
-                $resStr = $mRes[1] . ':' . $mRes[2];
+            if ($resLink) {
+                $resTxt = trim($resLink->textContent);
+
+                if (stripos($resTxt, 'pen') !== false) {
+                    // Penalties -> fetch the regulation score from the match report.
+                    $href = $resLink->getAttribute('href');
+                    $resStr = $this->resultadoReglamentarioTM($href); // returns a draw "N:N"
+                } elseif (preg_match('/(\d+)\s*:\s*(\d+)/', $resTxt, $mRes)) {
+                    $resStr = $mRes[1] . ':' . $mRes[2];
+                }
             }
             if ($resStr === null) continue;
 
@@ -1994,6 +2005,40 @@ class ScraperController extends Controller
         }
         if (preg_match('/(\d{4})/', $raw, $m)) return $m[1];
         return $raw;
+    }
+
+    // Fetch the regulation/ET score from a TM match report ("spielbericht").
+    // Only used when the schedule shows just the shootout score (e.g. "4:5 pen.").
+    // The final regulation score = the LAST goal's running score in #sb-tore.
+    // No goals listed -> 0:0.
+    private function resultadoReglamentarioTM($href)
+    {
+        if (strpos($href, 'http') !== 0) {
+            $href = 'https://www.transfermarkt.com.ar' . $href;
+        }
+
+        $html = HttpHelper::getHtmlContent($href, false);
+        if (!$html) return '0:0';
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        // Running scores of each goal, in order. The last one is the final score.
+        $nodes = $xpath->query("//div[@id='sb-tore']//div[contains(@class,'sb-aktion-spielstand')]");
+
+        $ultimo = null;
+        foreach ($nodes as $n) {
+            $t = trim($n->textContent);
+            if (preg_match('/(\d+)\s*:\s*(\d+)/', $t, $m)) {
+                $ultimo = $m[1] . ':' . $m[2];
+            }
+        }
+
+        // No goals in the report -> goalless draw (still went to penalties).
+        return $ultimo ?? '0:0';
     }
 
 }
