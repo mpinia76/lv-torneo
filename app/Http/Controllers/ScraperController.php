@@ -1866,20 +1866,23 @@ class ScraperController extends Controller
             }
             if (!$resStr) continue;
 
-            // Competition: anchor with /wettbewerb/ -> its inner <img title="...">.
+            // Competition: prefer the icon with class "wappen-position-grid-view"
+            // (the competition crest); team crests use "tiny_wappen". This is
+            // robust for continental cups whose <a> doesn't carry /wettbewerb/.
             $comp = '';
-            $compA = $xpath->query(".//a[contains(@href,'/wettbewerb/')]", $row)->item(0);
-            if ($compA) {
-                $img = $xpath->query('.//img[@title]', $compA)->item(0);
-                $comp = $img ? trim($img->getAttribute('title')) : trim($compA->getAttribute('alt'));
+            $compImg = $xpath->query('.//img[contains(@class,"wappen-position-grid-view")]', $row)->item(0);
+            if (!$compImg) {
+                $compImg = $xpath->query('.//img[@title]', $row)->item(0); // fallback: first titled img
             }
-            $comp = preg_replace('/\s*\(\d{2}\/\d{2}\)\s*$/', '', $comp);
+            if ($compImg) $comp = trim($compImg->getAttribute('title'));
+            $comp = preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $comp);
+            $comp = trim($comp);
 
-            // Teams: the two <a> that link to /verein/ AND have text (not the escudo-only ones).
+            // Teams: the two <a> that link to /verein/ AND have text (not the crest-only anchors).
             $home = $away = '';
             foreach ($xpath->query(".//a[contains(@href,'/verein/')]", $row) as $a) {
                 $txt = trim($a->textContent);
-                if ($txt === '') continue; // skip the crest-image anchors
+                if ($txt === '') continue;
                 if ($home === '') { $home = $txt; }
                 elseif ($away === '') { $away = $txt; break; }
             }
@@ -1904,17 +1907,6 @@ class ScraperController extends Controller
             if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; }
         }
         $equipoDir = $nombres[$bestKey] ?? '';
-        $dirNorm = $bestKey;
-
-        if (empty($partidosRaw)) return response()->json([]);
-
-        // The directed club = most frequent team across all matches this season.
-        $bestKey = null; $bestCount = 0;
-        foreach ($freq as $k => $v) {
-            if (strpos($k, '_name_') === 0) continue;
-            if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; }
-        }
-        $equipoDir = $freq['_name_' . $bestKey] ?? '';
         $dirNorm = $bestKey;
 
         // ---- Pass 2: aggregate by competition from the DT's perspective ----

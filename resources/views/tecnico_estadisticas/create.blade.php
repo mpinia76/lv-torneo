@@ -208,25 +208,40 @@
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
         }
 
-        // Resolve a DB equipo_id from a scraped team name (same fuzzy match as usarDato()).
+        // Resolve a DB equipo_id from a scraped team name.
+        // Returns null when there's no confident match, so the card's select
+        // stays empty (same behaviour footballdb already has for foreign clubs).
         function matchEquipoId(nombreEquipo) {
             let select = document.querySelector('[name="equipo_id"]');
             let equipoScraper = normalizar(nombreEquipo);
+            if (!equipoScraper) return null; // empty scraped name -> no match
+
             let mejorMatch = null;
             let maxScore = 0;
 
             for (let option of select.options) {
                 if (!option.value) continue;
                 let equipoDB = normalizar(option.text);
+                if (!equipoDB) continue;
+
                 let score = 0;
                 if (equipoDB.includes(equipoScraper)) score += 2;
                 if (equipoScraper.includes(equipoDB)) score += 2;
+
+                // Ignore matches based on a too-short overlap (e.g. "al" matching
+                // "Al-Wasl" against half your list). Require the shorter of the
+                // two normalized names to be at least 4 chars.
+                if (score > 0 && Math.min(equipoDB.length, equipoScraper.length) < 4) {
+                    score = 0;
+                }
+
                 if (score > maxScore) {
                     maxScore = score;
                     mejorMatch = option;
                 }
             }
-            return mejorMatch ? mejorMatch.value : null;
+
+            return maxScore > 0 ? (mejorMatch ? mejorMatch.value : null) : null;
         }
 
         function usarDato(item) {
