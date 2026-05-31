@@ -1866,13 +1866,13 @@ class ScraperController extends Controller
 
         foreach ($xpath->query('.//tbody/tr', $statsTable) as $row) {
 
-            // Result cell "NN:NN" (inside the ergebnis-link span).
+            // Result lives inside the .ergebnis-link anchor. Take its first NN:NN.
             $resStr = null;
-            foreach ($row->getElementsByTagName('td') as $td) {
-                $tt = trim($td->textContent);
-                if (preg_match('/^\s*\d+\s*:\s*\d+\s*$/', $tt)) { $resStr = $tt; break; }
+            $resLink = $xpath->query(".//a[contains(@class,'ergebnis-link')]", $row)->item(0);
+            if ($resLink && preg_match('/(\d+)\s*:\s*(\d+)/', trim($resLink->textContent), $mRes)) {
+                $resStr = $mRes[1] . ':' . $mRes[2];
             }
-            if (!$resStr) continue;
+            if ($resStr === null) continue;
 
             // Competition: prefer the icon with class "wappen-position-grid-view"
             // (the competition crest); team crests use "tiny_wappen". This is
