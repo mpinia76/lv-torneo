@@ -1909,31 +1909,47 @@ class ScraperController extends Controller
 
         if (empty($partidosRaw)) return response()->json([]);
 
-        // The directed club = most frequent team across all matches this season.
-        $bestKey = null; $bestCount = 0;
-        foreach ($freq as $k => $v) {
-            if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; }
-        }
-        $equipoDir = $nombres[$bestKey] ?? '';
-        $dirNorm = $bestKey;
+        if (empty($partidosRaw)) return response()->json([]);
 
-        // ---- Pass 2: aggregate by competition from the DT's perspective ----
+        // ---- Detect ALL directed clubs of the season (a coach may manage 2+). ----
+        // A team counts as "directed" if it shows up in a meaningful share of matches,
+        // so both clubs of a mid-season move are kept (e.g. Olimpia + Fortaleza).
+        $totalPartidos = count($partidosRaw);
+        $umbral = max(3, (int) floor($totalPartidos * 0.15));
+
+        $clubesDir = [];
+        foreach ($freq as $k => $v) {
+            if ($v >= $umbral) $clubesDir[$k] = true;
+        }
+        // Safety net: nothing passed the threshold -> keep the single most frequent.
+        if (empty($clubesDir)) {
+            $bestKey = null; $bestCount = 0;
+            foreach ($freq as $k => $v) { if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; } }
+            if ($bestKey) $clubesDir[$bestKey] = true;
+        }
+
+        // ---- Pass 2: aggregate by competition + the directed club in each match ----
         $stats = [];
         foreach ($partidosRaw as $p) {
             $homeNorm = $this->normalizeTeam($p['home']);
             $awayNorm = $this->normalizeTeam($p['away']);
 
-            if ($homeNorm === $dirNorm)      { $gf = $p['hg']; $ge = $p['ag']; }
-            elseif ($awayNorm === $dirNorm)  { $gf = $p['ag']; $ge = $p['hg']; }
-            else continue; // match where the directed club didn't play (shouldn't happen)
+            // Which side is the directed club in THIS match?
+            $dirNorm = null; $equipoDir = null;
+            if (isset($clubesDir[$homeNorm]))      { $dirNorm = $homeNorm; $equipoDir = $p['home']; }
+            elseif (isset($clubesDir[$awayNorm]))  { $dirNorm = $awayNorm; $equipoDir = $p['away']; }
+            else continue; // neither side is a directed club -> skip
+
+            if ($dirNorm === $homeNorm) { $gf = $p['hg']; $ge = $p['ag']; }
+            else                        { $gf = $p['ag']; $ge = $p['hg']; }
 
             $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
-            $comp = $p['comp'] ?: 'Sin competencia';
-            $key = $comp;
 
+            // Key by competition + directed club (Olimpia/Fortaleza stay separate).
+            $key = $p['comp'] . '|' . $equipoDir;
             if (!isset($stats[$key])) {
                 $stats[$key] = [
-                    'competition' => $comp, 'equipo' => $equipoDir,
+                    'competition' => $p['comp'], 'equipo' => $equipoDir,
                     'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
                     'perdidos' => 0, 'gf' => 0, 'ge' => 0,
                 ];
@@ -1946,7 +1962,8 @@ class ScraperController extends Controller
             $stats[$key]['ge'] += $ge;
         }
 
-        // ---- Dedup + classify + payload (footballdb shape) ----
+        // ---- Dedup only (NO exclusions: TM brings everything raw; filtering is
+        //      done manually with the 🚫 buttons on the cards). ----
         $tecnicoId = $request->tecnico_id;
         $existentes = collect()
             ->merge($tecnicoId ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre') : collect())
@@ -1957,13 +1974,14 @@ class ScraperController extends Controller
 
         $data = [];
         foreach ($stats as $s) {
-            if ($this->debeExcluirCompetencia($s['competition'])) continue;
+
+            // No debeExcluirCompetencia / debeExcluirEquipo here on purpose.
 
             list($tipo, $ambito) = $this->clasificarCompetencia($s['competition']);
 
             $competition = trim($s['competition']) . ' ' . $year;
             $key = (string) \Str::of($competition)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
-            if (isset($existentes[$key])) continue;
+            if (isset($existentes[$key])) continue; // skip already-loaded tournaments
 
             $data[] = [
                 'competition' => $competition,
