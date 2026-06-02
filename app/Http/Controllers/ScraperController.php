@@ -2022,10 +2022,11 @@ class ScraperController extends Controller
     // The year is stripped before matching, so "Campeonato Brasileiro Série A 2010/11" -> brasileirao.
     private function logoTorneo($competitionConAnio)
     {
-        // Strip trailing year(s): "... 2010", "... 2010/11"
         $nombre = preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competitionConAnio);
-
         $key = (string) \Str::of($nombre)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+
+        // 1) Curated map (logos in public/images/torneos/). Keys MUST be normalized
+        //    (lowercase, no accents, no year) to match $key.
 
         $mapa = [
             'campeonato brasileiro serie a' => 'torneos/brasileirao.png',
@@ -2045,7 +2046,36 @@ class ScraperController extends Controller
             // agregá los que tengas, key normalizada (minúsculas, sin acentos, sin año)
         ];
 
-        return $mapa[$key] ?? null;
+        if (isset($mapa[$key])) return $mapa[$key];
+
+        // 2) Reuse a logo uploaded before for the same tournament name (any year).
+        return $this->logoReusado($key);
+    }
+
+    // Find a previously saved logo whose tournament name (year stripped, normalized)
+    // matches $key. Looks across both manual stats tables, newest first.
+    private function logoReusado($key)
+    {
+        $buscar = function ($coleccion) use ($key) {
+            foreach ($coleccion as $row) {
+                if (empty($row->torneo_logo)) continue;
+                $n = preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $row->torneo_nombre);
+                $k = (string) \Str::of($n)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+                if ($k === $key) return $row->torneo_logo;
+            }
+            return null;
+        };
+
+        $tec = \App\TecnicoEstadisticaManual::whereNotNull('torneo_logo')
+            ->where('torneo_logo', '!=', '')
+            ->orderByDesc('id')->get(['torneo_nombre', 'torneo_logo']);
+        $hit = $buscar($tec);
+        if ($hit) return $hit;
+
+        $eq = \App\EquipoEstadisticaManual::whereNotNull('torneo_logo')
+            ->where('torneo_logo', '!=', '')
+            ->orderByDesc('id')->get(['torneo_nombre', 'torneo_logo']);
+        return $buscar($eq);
     }
 
 }
