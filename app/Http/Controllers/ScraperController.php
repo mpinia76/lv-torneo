@@ -2033,10 +2033,10 @@ class ScraperController extends Controller
             'laliga'                => 'torneos/LaLiga.png',
             'copa del rey'                => 'torneos/Copa-del-Rey.png',
             'supercopa de españa'                => 'torneos/Supercopa-espana.png',
-            'UEFA Champions League'                => 'torneos/1778184904.png',
-            'Supercopa de Europa'                => 'torneos/supercopa-uefa.jpg',
-            'UEFA Europa League'                => 'torneos/el.png',
-            'UEFA Conference League'                => 'torneos/ucol.png',
+            'uefa champions league'                => 'torneos/1778184904.png',
+            'supercopa de europa'                => 'torneos/supercopa-uefa.jpg',
+            'uefa europa league'                => 'torneos/el.png',
+            'uefa conference league'                => 'torneos/ucol.png',
             // agregá los que tengas, key normalizada (minúsculas, sin acentos, sin año)
         ];
 
