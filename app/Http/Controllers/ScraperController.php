@@ -2041,6 +2041,7 @@ class ScraperController extends Controller
             'supercopa de europa'                => 'torneos/supercopa-uefa.jpg',
             'uefa europa league'                => 'torneos/el.png',
             'uefa conference league'                => 'torneos/ucol.png',
+            'serie a'                => 'torneos/Serie_A.svg.png',
             // agregá los que tengas, key normalizada (minúsculas, sin acentos, sin año)
         ];
 
