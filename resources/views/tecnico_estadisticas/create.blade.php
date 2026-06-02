@@ -293,7 +293,7 @@
         // Build the markup for a single tournament card.
         function cardTorneo(c, idx) {
             let equipoMatch = matchEquipoId(c.equipo);
-            // Build logo preview separately to avoid nested template-literal issues.
+
             let baseImg = "{{ url('images') }}";
             let logoPreview = c.torneo_logo
                 ? '<img src="' + baseImg + '/' + c.torneo_logo + '" alt="logo" height="28" class="d-block mb-1">'
@@ -385,6 +385,7 @@
                         ge:          0,
                         tipo:        row.tipo ?? '',
                         ambito:      row.ambito ?? '',
+                        torneo_logo: row.torneo_logo ?? '',
                     };
                 }
                 torneos[key].partidos  += parseInt(row.partidos ?? 0);
