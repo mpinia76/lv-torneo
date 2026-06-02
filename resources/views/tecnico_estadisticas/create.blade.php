@@ -324,9 +324,11 @@
                         <label class="small mb-0">Ámbito</label>
                         <select class="form-control form-control-sm f-ambito">${opcionesSelect(['', 'Nacional', 'Internacional'], c.ambito)}</select>
                     </div>
-                    <div class="form-group col-md-2">
+                     <div class="form-group col-md-2">
                         <label class="small mb-0">Logo</label>
+                        ${c.torneo_logo ? `<img src="{{ url('images') }}/${c.torneo_logo}" alt="logo" height="28" class="d-block mb-1">` : ''}
                         <input type="file" class="form-control-file form-control-sm f-logo_file">
+                        <input type="hidden" class="f-torneo_logo" value="${c.torneo_logo ?? ''}">
                     </div>
                 </div>
 
