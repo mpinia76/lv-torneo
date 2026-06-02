@@ -1852,8 +1852,13 @@ class ScraperController extends Controller
 
         if ($request->debug) {
             $rows = $xpath->query('.//tbody/tr', $statsTable);
-            $out = ''; $c = 0;
-            foreach ($rows as $r) { $out .= $dom->saveHTML($r) . "\n\n----\n\n"; if (++$c >= 2) break; }
+            $out = "Filas: {$rows->length}\n\n";
+            $c = 0;
+            foreach ($rows as $r) {
+                $t = preg_replace('/\s+/', ' ', trim($r->textContent));
+                $out .= mb_substr($t, 0, 120) . "\n";
+                if (++$c >= 10) break;
+            }
             return response('<pre>' . htmlspecialchars($out) . '</pre>');
         }
 
@@ -1886,18 +1891,21 @@ class ScraperController extends Controller
             $comp = preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $comp);
             $comp = trim($comp);
 
-            // Teams: the two <a> that link to /verein/ AND have text (not the crest-only anchors).
+            // Teams + their verein id (from the /verein/{id}/ link).
             $home = $away = '';
+            $homeId = $awayId = null;
             foreach ($xpath->query(".//a[contains(@href,'/verein/')]", $row) as $a) {
                 $txt = trim($a->textContent);
                 if ($txt === '') continue;
-                if ($home === '') { $home = $txt; }
-                elseif ($away === '') { $away = $txt; break; }
+                $vid = null;
+                if (preg_match('#/verein/(\d+)#', $a->getAttribute('href'), $mvid)) $vid = $mvid[1];
+                if ($home === '') { $home = $txt; $homeId = $vid; }
+                elseif ($away === '') { $away = $txt; $awayId = $vid; break; }
             }
             if (!$home || !$away) continue;
 
             list($hg, $ag) = array_map('intval', explode(':', $resStr));
-            $partidosRaw[] = compact('comp', 'home', 'away', 'hg', 'ag');
+            $partidosRaw[] = compact('comp', 'home', 'away', 'hg', 'ag', 'homeId', 'awayId');
 
             $hk = $this->normalizeTeam($home);
             $ak = $this->normalizeTeam($away);
@@ -1909,57 +1917,69 @@ class ScraperController extends Controller
 
         if (empty($partidosRaw)) return response()->json([]);
 
-        if (empty($partidosRaw)) return response()->json([]);
-
-        // ---- Detect ALL directed clubs of the season (a coach may manage 2+). ----
-        // A team counts as "directed" if it shows up in a meaningful share of matches,
-        // so both clubs of a mid-season move are kept (e.g. Olimpia + Fortaleza).
-        $totalPartidos = count($partidosRaw);
-        $umbral = max(3, (int) floor($totalPartidos * 0.15));
+        // ---- Directed club(s): if the URL carries verein_id, count ONLY that club.
+        //      Otherwise, keep every team that played enough matches (a coach may
+        //      have managed several clubs that season). ----
+        $vereinId = null;
+        if (preg_match('#verein_id=(\d+)#', $url, $mV)) {
+            $vereinId = $mV[1];
+        }
 
         $clubesDir = [];
-        foreach ($freq as $k => $v) {
-            if ($v >= $umbral) $clubesDir[$k] = true;
-        }
-        // Safety net: nothing passed the threshold -> keep the single most frequent.
-        if (empty($clubesDir)) {
-            $bestKey = null; $bestCount = 0;
-            foreach ($freq as $k => $v) { if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; } }
-            if ($bestKey) $clubesDir[$bestKey] = true;
+        if ($vereinId) {
+            // Only the filtered club. Match it by the /verein/{id}/ link seen in rows.
+            // We stored the display name in $nombres; map the id to its normalized key
+            // via the raw matches (the link id lives in $partidosRaw entries).
+            foreach ($partidosRaw as $p) {
+                if (($p['homeId'] ?? null) === $vereinId) $clubesDir[$this->normalizeTeam($p['home'])] = true;
+                if (($p['awayId'] ?? null) === $vereinId) $clubesDir[$this->normalizeTeam($p['away'])] = true;
+            }
+        } else {
+            $totalPartidos = count($partidosRaw);
+            $umbral = max(3, (int) floor($totalPartidos * 0.15));
+            foreach ($freq as $k => $v) {
+                if ($v >= $umbral) $clubesDir[$k] = true;
+            }
+            if (empty($clubesDir)) {
+                $bestKey = null; $bestCount = 0;
+                foreach ($freq as $k => $v) { if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; } }
+                if ($bestKey) $clubesDir[$bestKey] = true;
+            }
         }
 
-        // ---- Pass 2: aggregate by competition + the directed club in each match ----
+        // ---- Pass 2: count each match for every directed club that played in it ----
         $stats = [];
         foreach ($partidosRaw as $p) {
             $homeNorm = $this->normalizeTeam($p['home']);
             $awayNorm = $this->normalizeTeam($p['away']);
 
-            // Which side is the directed club in THIS match?
-            $dirNorm = null; $equipoDir = null;
-            if (isset($clubesDir[$homeNorm]))      { $dirNorm = $homeNorm; $equipoDir = $p['home']; }
-            elseif (isset($clubesDir[$awayNorm]))  { $dirNorm = $awayNorm; $equipoDir = $p['away']; }
-            else continue; // neither side is a directed club -> skip
-
-            if ($dirNorm === $homeNorm) { $gf = $p['hg']; $ge = $p['ag']; }
-            else                        { $gf = $p['ag']; $ge = $p['hg']; }
-
-            $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
-
-            // Key by competition + directed club (Olimpia/Fortaleza stay separate).
-            $key = $p['comp'] . '|' . $equipoDir;
-            if (!isset($stats[$key])) {
-                $stats[$key] = [
-                    'competition' => $p['comp'], 'equipo' => $equipoDir,
-                    'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
-                    'perdidos' => 0, 'gf' => 0, 'ge' => 0,
-                ];
+            $lados = [];
+            if (isset($clubesDir[$homeNorm])) {
+                $lados[] = ['nombre' => $p['home'], 'gf' => $p['hg'], 'ge' => $p['ag']];
             }
-            $stats[$key]['partidos']++;
-            $stats[$key]['ganados']   += $res === 'W' ? 1 : 0;
-            $stats[$key]['empatados'] += $res === 'D' ? 1 : 0;
-            $stats[$key]['perdidos']  += $res === 'L' ? 1 : 0;
-            $stats[$key]['gf'] += $gf;
-            $stats[$key]['ge'] += $ge;
+            if (isset($clubesDir[$awayNorm])) {
+                $lados[] = ['nombre' => $p['away'], 'gf' => $p['ag'], 'ge' => $p['hg']];
+            }
+
+            foreach ($lados as $lado) {
+                $gf = $lado['gf']; $ge = $lado['ge'];
+                $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
+
+                $key = $p['comp'] . '|' . $lado['nombre'];
+                if (!isset($stats[$key])) {
+                    $stats[$key] = [
+                        'competition' => $p['comp'], 'equipo' => $lado['nombre'],
+                        'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
+                        'perdidos' => 0, 'gf' => 0, 'ge' => 0,
+                    ];
+                }
+                $stats[$key]['partidos']++;
+                $stats[$key]['ganados']   += $res === 'W' ? 1 : 0;
+                $stats[$key]['empatados'] += $res === 'D' ? 1 : 0;
+                $stats[$key]['perdidos']  += $res === 'L' ? 1 : 0;
+                $stats[$key]['gf'] += $gf;
+                $stats[$key]['ge'] += $ge;
+            }
         }
 
         // ---- Dedup only (NO exclusions: TM brings everything raw; filtering is
