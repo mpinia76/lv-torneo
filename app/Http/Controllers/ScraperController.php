@@ -1962,6 +1962,12 @@ class ScraperController extends Controller
             list($tipo, $ambito) = $this->clasificarCompetencia($s['competition']);
             $competition = trim($s['competition']) . ' ' . $year;
             $key = (string) \Str::of($competition)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+
+            // LOG ANTES del dedup para ver TODAS, incluso las ya cargadas
+            \Log::info('[LOGO] comp="' . $competition . '" key="'
+                . (string) \Str::of(preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competition))->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim()
+                . '" logo=' . ($this->logoTorneo($competition) ?? 'NULL')
+                . ' dedup=' . (isset($existentes[$key]) ? 'YA_EXISTE' : 'no'));
             if (isset($existentes[$key])) continue;
 
             $data[] = [
@@ -1979,9 +1985,7 @@ class ScraperController extends Controller
                 'ambito'      => $ambito,
             ];
         }
-        \Log::info('[LOGO] comp="' . $competition . '" -> key="'
-            . (string) \Str::of(preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competition))->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim()
-            . '" -> logo=' . ($logo ?? 'NULL'));
+
         return response()->json(['fase' => 'B', 'data' => $data]);
     }
 
