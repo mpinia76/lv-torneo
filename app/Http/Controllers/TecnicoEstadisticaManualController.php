@@ -331,8 +331,8 @@ class TecnicoEstadisticaManualController extends Controller
                 continue;
             }
 
-            // Handle the per-row uploaded logo (same approach as the manual store()).
-            // The file arrives as torneos[i][logo_file] in the multipart payload.
+            // Per-row logo. Priority: an uploaded file wins; otherwise fall back to
+            // the preloaded logo name that came from the scraper map (torneo_logo).
             $data['torneo_logo'] = null;
             $logoFile = $request->file("torneos.$index.logo_file");
 
@@ -341,6 +341,9 @@ class TecnicoEstadisticaManualController extends Controller
                 $name = time() . '_' . uniqid() . '.' . $logoFile->getClientOriginalExtension();
                 $logoFile->move(public_path('/images'), $name);
                 $data['torneo_logo'] = $name;
+            } elseif (!empty($torneo['torneo_logo'])) {
+                // Preloaded logo (already a file living in public/images) — no upload needed.
+                $data['torneo_logo'] = $torneo['torneo_logo'];
             }
 
             try {

@@ -1766,7 +1766,7 @@ class ScraperController extends Controller
                 'perdidos'    => $s['perdidos'],
                 'gf'          => $s['gf'],
                 'ge'          => $s['ge'],
-                'torneo_logo' => null,
+                'torneo_logo' => $this->logoTorneo($competition),
                 'tipo'        => $tipo,
                 'ambito'      => $ambito,
             ];
@@ -1974,7 +1974,7 @@ class ScraperController extends Controller
                 'perdidos'    => $s['perdidos'],
                 'gf'          => $s['gf'],
                 'ge'          => $s['ge'],
-                'torneo_logo' => null,
+                'torneo_logo' => $this->logoTorneo($competition),
                 'tipo'        => $tipo,
                 'ambito'      => $ambito,
             ];
@@ -2025,9 +2025,16 @@ class ScraperController extends Controller
             'campeonato brasileiro serie a' => 'torneos/brasileirao.png',
             'copa libertadores'             => 'torneos/libertadores.png',
             'copa sudamericana'             => 'torneos/sudamericana.png',
-            'copa do brasil'                => 'torneos/copa_brasil.png',
-            'supercopa de chile'            => 'torneos/supercopa_chile.png',
+            'copa do brasil'                => 'torneos/copa-brasil.png',
+            'supercopa de chile'            => 'torneos/csuc.png',
             'uae pro league'                => 'torneos/uae_pro_league.png',
+            'laliga'                => 'torneos/LaLiga.png',
+            'copa del rey'                => 'torneos/Copa-del-Rey.png',
+            'supercopa de españa'                => 'torneos/Supercopa-espana.png',
+            'UEFA Champions League'                => 'torneos/1778184904.png',
+            'Supercopa de Europa'                => 'torneos/supercopa-uefa.jpg',
+            'UEFA Europa League'                => 'torneos/el.png',
+            'UEFA Conference League'                => 'torneos/ucol.png',
             // agregá los que tengas, key normalizada (minúsculas, sin acentos, sin año)
         ];
 

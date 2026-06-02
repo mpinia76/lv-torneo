@@ -229,14 +229,19 @@ class EquipoEstadisticaManualController extends Controller
                 continue;
             }
 
-            // Per-row logo upload (optional).
+            // Per-row logo. Priority: uploaded file wins; otherwise use the preloaded
+            // logo name that came from the scraper map (torneo_logo).
             $logoName = null;
             $fileKey = "torneos.{$i}.logo_file";
             if ($request->hasFile($fileKey)) {
                 $image = $request->file($fileKey);
                 $logoName = time() . '_' . $i . '.' . $image->getClientOriginalExtension();
                 $image->move(public_path('/images'), $logoName);
+            } elseif (!empty($t['torneo_logo'])) {
+                // Preloaded logo (already a file in public/images) — no upload needed.
+                $logoName = $t['torneo_logo'];
             }
+
 
             try {
                 EquipoEstadisticaManual::create([
