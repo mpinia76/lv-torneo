@@ -293,6 +293,12 @@
         // Build the markup for a single tournament card.
         function cardTorneo(c, idx) {
             let equipoMatch = matchEquipoId(c.equipo);
+            // Build logo preview separately to avoid nested template-literal issues.
+            let baseImg = "{{ url('images') }}";
+            let logoPreview = c.torneo_logo
+                ? '<img src="' + baseImg + '/' + c.torneo_logo + '" alt="logo" height="28" class="d-block mb-1">'
+                : '';
+
             return `
         <div class="card mb-3 fila-torneo" data-idx="${idx}">
             <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
@@ -326,7 +332,7 @@
                     </div>
                      <div class="form-group col-md-2">
                         <label class="small mb-0">Logo</label>
-                        ${c.torneo_logo ? `<img src="{{ url('images') }}/${c.torneo_logo}" alt="logo" height="28" class="d-block mb-1">` : ''}
+                        ${logoPreview}
                         <input type="file" class="form-control-file form-control-sm f-logo_file">
                         <input type="hidden" class="f-torneo_logo" value="${c.torneo_logo ?? ''}">
                     </div>
@@ -594,7 +600,7 @@
                 'torneo_nombre', 'equipo_id', 'tipo', 'ambito',
                 'posicion', 'partidos',
                 'ganados', 'empatados', 'perdidos',
-                'goles_favor', 'goles_en_contra',
+                'goles_favor', 'goles_en_contra','torneo_logo',
             ];
 
             // Build multipart FormData so each row can carry its uploaded logo file.
