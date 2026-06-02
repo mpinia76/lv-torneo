@@ -1979,7 +1979,9 @@ class ScraperController extends Controller
                 'ambito'      => $ambito,
             ];
         }
-
+        \Log::info('[LOGO] comp="' . $competition . '" -> key="'
+            . (string) \Str::of(preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competition))->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim()
+            . '" -> logo=' . ($logo ?? 'NULL'));
         return response()->json(['fase' => 'B', 'data' => $data]);
     }
 
