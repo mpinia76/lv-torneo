@@ -368,7 +368,8 @@
                         competition: clean(row.competition),
                         equipo:      row.equipo,
                         partidos:    0,
-                        posicion:    parseInt(row.posicion ?? 0) || 0,
+                        posicion:    (row.posicion === null || row.posicion === undefined || row.posicion === '')
+                            ? '' : parseInt(row.posicion),
                         ganados:     0,
                         empatados:   0,
                         perdidos:    0,
