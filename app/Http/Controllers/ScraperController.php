@@ -2012,4 +2012,26 @@ class ScraperController extends Controller
         return $raw;
     }
 
+    // Map a TM competition name -> logo filename you already have in public/images/torneos/.
+    // The year is stripped before matching, so "Campeonato Brasileiro Série A 2010/11" -> brasileirao.
+    private function logoTorneo($competitionConAnio)
+    {
+        // Strip trailing year(s): "... 2010", "... 2010/11"
+        $nombre = preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competitionConAnio);
+
+        $key = (string) \Str::of($nombre)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+
+        $mapa = [
+            'campeonato brasileiro serie a' => 'torneos/brasileirao.png',
+            'copa libertadores'             => 'torneos/libertadores.png',
+            'copa sudamericana'             => 'torneos/sudamericana.png',
+            'copa do brasil'                => 'torneos/copa_brasil.png',
+            'supercopa de chile'            => 'torneos/supercopa_chile.png',
+            'uae pro league'                => 'torneos/uae_pro_league.png',
+            // agregá los que tengas, key normalizada (minúsculas, sin acentos, sin año)
+        ];
+
+        return $mapa[$key] ?? null;
+    }
+
 }
