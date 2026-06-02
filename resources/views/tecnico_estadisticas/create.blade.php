@@ -443,33 +443,44 @@
         // ------------------------------------------------------------------
 
 
-        function scrapearTransfermarktTecnico() {
+        async function scrapearTransfermarktTecnico() {
             let url = document.getElementById('tmUrlTecnico').value.trim();
             if (!url) { alert('Pegá la URL del DT en Transfermarkt'); return; }
 
-            document.getElementById('loadingScraper').style.display = 'block';
-            document.getElementById('resultadoScraper').innerHTML = '';
-            document.getElementById('tmProgresoTecnico').innerHTML = '';
             let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
+            let endpoint  = "{{ url('/admin/scraper/tecnico-transfermarkt') }}";
+            let progreso  = document.getElementById('tmProgresoTecnico');
 
-            fetch("{{ url('/admin/scraper/tecnico-transfermarkt') }}?url=" + encodeURIComponent(url) + "&tecnico_id=" + tecnicoId)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
-                        document.getElementById('resultadoScraper').innerHTML =
-                            '<div class="alert alert-danger">' + data.error + '</div>';
-                        return;
-                    }
-                    renderResultados(data);
-                })
-                .catch(err => {
-                    console.error(err);
-                    document.getElementById('resultadoScraper').innerHTML =
-                        '<div class="alert alert-danger">Error scrapeando</div>';
-                })
-                .finally(() => {
-                    document.getElementById('loadingScraper').style.display = 'none';
-                });
+            iniciarResultados();
+            progreso.innerHTML = '⏳ Leyendo clubes de la temporada...';
+
+            // Phase A: get clubs.
+            let faseA;
+            try {
+                let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`);
+                faseA = await res.json();
+                if (faseA.error) { progreso.innerHTML = `<span style="color:#a94442">${faseA.error}</span>`; return; }
+            } catch (e) {
+                console.error(e); progreso.innerHTML = '<span style="color:#a94442">Error leyendo clubes</span>'; return;
+            }
+
+            let clubes = faseA.clubes || [];
+            if (!clubes.length) { progreso.innerHTML = '<span style="color:#856404">No se encontraron clubes.</span>'; return; }
+
+            // Phase B: one fetch per club (filtered), append cards.
+            let total = 0;
+            for (let i = 0; i < clubes.length; i++) {
+                let c = clubes[i];
+                progreso.innerHTML = `⏳ ${i + 1}/${clubes.length} — <strong>${c.nombre}</strong> (${total} torneos)`;
+                try {
+                    let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`
+                        + `&verein_id=${encodeURIComponent(c.id)}&equipo_nombre=${encodeURIComponent(c.nombre)}`);
+                    let r = await res.json();
+                    if (r.data && r.data.length) { agregarCards(r.data); total += r.data.length; }
+                } catch (e) { console.error('Club ' + c.nombre, e); }
+            }
+
+            progreso.innerHTML = `✅ Listo. ${total} torneos de ${clubes.length} clubes.`;
         }
 
         function excluirCompetencia(nombre, btn) {

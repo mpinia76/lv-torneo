@@ -1815,9 +1815,62 @@ class ScraperController extends Controller
             return response()->json(['error' => 'URL inválida (falta /trainer/{id})']);
         }
 
-        $html = HttpHelper::getHtmlContent($url, false);
-        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
-        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+        // Strip any pre-existing filter params from the pasted URL; we set them ourselves.
+        $base = preg_replace('#[?&](verein_id|wettbewerb_id|gegner_id|liga|trainer_id)=[^&]*#', '', $url);
+
+        // Ensure there's a saison_id (year) so we can build filtered URLs.
+        // (kept as-is from the pasted URL or its select; see below)
+
+        // ---- PHASE A: no verein_id -> return the season's clubs + competitions ----
+        if (!$request->filled('verein_id')) {
+            $html = HttpHelper::getHtmlContent($url, false);
+            if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+
+            $dom = new \DOMDocument();
+            libxml_use_internal_errors(true);
+            $dom->loadHTML($html);
+            libxml_clear_errors();
+            $xpath = new \DOMXPath($dom);
+
+            $year = $this->anioDesdeSelect($xpath, $url);
+
+            $clubes = [];
+            foreach ($xpath->query("//select[@name='verein_id']/option") as $o) {
+                $v = trim($o->getAttribute('value'));
+                $t = trim($o->textContent);
+                if ($v !== '' && $t !== '') $clubes[] = ['id' => $v, 'nombre' => $t];
+            }
+
+            $competiciones = [];
+            foreach ($xpath->query("//select[@name='wettbewerb_id']/option") as $o) {
+                $v = trim($o->getAttribute('value'));
+                $t = trim($o->textContent);
+                if ($v !== '' && $t !== '' && stripos($t, 'Competicion') === false) {
+                    $competiciones[] = ['id' => $v, 'nombre' => $t];
+                }
+            }
+
+            return response()->json([
+                'fase'          => 'A',
+                'base'          => $base,
+                'year'          => $year,
+                'clubes'        => $clubes,
+                'competiciones' => $competiciones,
+            ]);
+        }
+
+        // ---- PHASE B: verein_id (+ optional wettbewerb_id) -> scrape that combo ----
+        $vereinId  = $request->verein_id;
+        $wettId    = $request->wettbewerb_id;
+        $equipoTM  = trim($request->equipo_nombre ?? ''); // display name passed from phase A
+
+        // Build the filtered TM URL.
+        $sep = strpos($base, '?') !== false ? '&' : '?';
+        $filtUrl = $base . $sep . 'verein_id=' . urlencode($vereinId);
+        if ($wettId) $filtUrl .= '&wettbewerb_id=' . urlencode($wettId);
+
+        $html = HttpHelper::getHtmlContent($filtUrl, false);
+        if (!$html) return response()->json([]);
 
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
@@ -1825,22 +1878,8 @@ class ScraperController extends Controller
         libxml_clear_errors();
         $xpath = new \DOMXPath($dom);
 
-        // ---- Season from the "Elegir temporada" select (same as equipos) ----
-        $year = null;
-        $optSel = $xpath->query("//select[contains(@name,'saison_id')]/option[@selected]")->item(0);
-        if ($optSel) {
-            $val  = (int) preg_replace('/\D/', '', $optSel->getAttribute('value'));
-            $text = trim($optSel->textContent);
-            if (str_contains($text, '/')) {
-                if ($val >= 1900) $year = $val . '/' . substr((string) ($val + 1), -2);
-            } else {
-                if (preg_match('/(\d{4})/', $text, $m2) && (int) $m2[1] >= 1900) $year = $m2[1];
-            }
-        }
-        if (!$year && preg_match('#saison_id[=/](\d{4})#', $url, $mY)) $year = $mY[1];
-        if (!$year) $year = (string) ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
+        $year = $this->anioDesdeSelect($xpath, $url);
 
-        // ---- Matches table (date + NN:NN result rows) ----
         $statsTable = null; $bestGoals = 0;
         foreach ($xpath->query('//table[contains(@class,"items")]') as $t) {
             $g = 0;
@@ -1849,29 +1888,14 @@ class ScraperController extends Controller
             }
             if ($g > $bestGoals) { $bestGoals = $g; $statsTable = $t; }
         }
+        if (!$statsTable) return response()->json([]);
 
-        if ($request->debug) {
-            $rows = $xpath->query('.//tbody/tr', $statsTable);
-            $out = "Filas: {$rows->length}\n\n";
-            $c = 0;
-            foreach ($rows as $r) {
-                $t = preg_replace('/\s+/', ' ', trim($r->textContent));
-                $out .= mb_substr($t, 0, 120) . "\n";
-                if (++$c >= 10) break;
-            }
-            return response('<pre>' . htmlspecialchars($out) . '</pre>');
-        }
-
-        if (!$statsTable) return response()->json(['error' => 'No se encontró la tabla de partidos']);
-
-        // ---- Pass 1: collect raw matches + count team frequency to find the DT's club ----
-        $partidosRaw = [];
-        $freq = [];
-        $nombres = []; // norm-key -> display name
-
+        // Aggregate. Now the club is FIXED (filtered by verein_id), so for every row
+        // we just need to know which side is our club to read gf/ge correctly.
+        $stats = [];
         foreach ($xpath->query('.//tbody/tr', $statsTable) as $row) {
 
-            // Result lives inside the .ergebnis-link anchor. Take its first NN:NN.
+            // Result (first NN:NN; penalties counted as the shown score — can't disambiguate here).
             $resStr = null;
             $resLink = $xpath->query(".//a[contains(@class,'ergebnis-link')]", $row)->item(0);
             if ($resLink && preg_match('/(\d+)\s*:\s*(\d+)/', trim($resLink->textContent), $mRes)) {
@@ -1879,21 +1903,16 @@ class ScraperController extends Controller
             }
             if ($resStr === null) continue;
 
-            // Competition: prefer the icon with class "wappen-position-grid-view"
-            // (the competition crest); team crests use "tiny_wappen". This is
-            // robust for continental cups whose <a> doesn't carry /wettbewerb/.
+            // Competition name (icon title).
             $comp = '';
             $compImg = $xpath->query('.//img[contains(@class,"wappen-position-grid-view")]', $row)->item(0);
-            if (!$compImg) {
-                $compImg = $xpath->query('.//img[@title]', $row)->item(0); // fallback: first titled img
-            }
+            if (!$compImg) $compImg = $xpath->query('.//img[@title]', $row)->item(0);
             if ($compImg) $comp = trim($compImg->getAttribute('title'));
-            $comp = preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $comp);
-            $comp = trim($comp);
+            $comp = trim(preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $comp));
+            if ($comp === '') $comp = 'Sin competencia';
 
-            // Teams + their verein id (from the /verein/{id}/ link).
-            $home = $away = '';
-            $homeId = $awayId = null;
+            // Find which side is OUR club (by verein id in the link).
+            $home = $away = ''; $homeId = $awayId = null;
             foreach ($xpath->query(".//a[contains(@href,'/verein/')]", $row) as $a) {
                 $txt = trim($a->textContent);
                 if ($txt === '') continue;
@@ -1905,85 +1924,31 @@ class ScraperController extends Controller
             if (!$home || !$away) continue;
 
             list($hg, $ag) = array_map('intval', explode(':', $resStr));
-            $partidosRaw[] = compact('comp', 'home', 'away', 'hg', 'ag', 'homeId', 'awayId');
 
-            $hk = $this->normalizeTeam($home);
-            $ak = $this->normalizeTeam($away);
-            $freq[$hk] = ($freq[$hk] ?? 0) + 1;
-            $freq[$ak] = ($freq[$ak] ?? 0) + 1;
-            $nombres[$hk] = $home;
-            $nombres[$ak] = $away;
+            // Our club's perspective.
+            if ((string) $homeId === (string) $vereinId)      { $gf = $hg; $ge = $ag; $eq = $home; }
+            elseif ((string) $awayId === (string) $vereinId)  { $gf = $ag; $ge = $hg; $eq = $away; }
+            else { $gf = $hg; $ge = $ag; $eq = $equipoTM ?: $home; } // fallback
+
+            $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
+
+            $key = $comp;
+            if (!isset($stats[$key])) {
+                $stats[$key] = [
+                    'competition' => $comp, 'equipo' => $equipoTM ?: $eq,
+                    'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
+                    'perdidos' => 0, 'gf' => 0, 'ge' => 0,
+                ];
+            }
+            $stats[$key]['partidos']++;
+            $stats[$key]['ganados']   += $res === 'W' ? 1 : 0;
+            $stats[$key]['empatados'] += $res === 'D' ? 1 : 0;
+            $stats[$key]['perdidos']  += $res === 'L' ? 1 : 0;
+            $stats[$key]['gf'] += $gf;
+            $stats[$key]['ge'] += $ge;
         }
 
-        if (empty($partidosRaw)) return response()->json([]);
-
-        // ---- Directed club(s): if the URL carries verein_id, count ONLY that club.
-        //      Otherwise, keep every team that played enough matches (a coach may
-        //      have managed several clubs that season). ----
-        $vereinId = null;
-        if (preg_match('#verein_id=(\d+)#', $url, $mV)) {
-            $vereinId = $mV[1];
-        }
-
-        $clubesDir = [];
-        if ($vereinId) {
-            // Only the filtered club. Match it by the /verein/{id}/ link seen in rows.
-            // We stored the display name in $nombres; map the id to its normalized key
-            // via the raw matches (the link id lives in $partidosRaw entries).
-            foreach ($partidosRaw as $p) {
-                if (($p['homeId'] ?? null) === $vereinId) $clubesDir[$this->normalizeTeam($p['home'])] = true;
-                if (($p['awayId'] ?? null) === $vereinId) $clubesDir[$this->normalizeTeam($p['away'])] = true;
-            }
-        } else {
-            $totalPartidos = count($partidosRaw);
-            $umbral = max(3, (int) floor($totalPartidos * 0.15));
-            foreach ($freq as $k => $v) {
-                if ($v >= $umbral) $clubesDir[$k] = true;
-            }
-            if (empty($clubesDir)) {
-                $bestKey = null; $bestCount = 0;
-                foreach ($freq as $k => $v) { if ($v > $bestCount) { $bestCount = $v; $bestKey = $k; } }
-                if ($bestKey) $clubesDir[$bestKey] = true;
-            }
-        }
-
-        // ---- Pass 2: count each match for every directed club that played in it ----
-        $stats = [];
-        foreach ($partidosRaw as $p) {
-            $homeNorm = $this->normalizeTeam($p['home']);
-            $awayNorm = $this->normalizeTeam($p['away']);
-
-            $lados = [];
-            if (isset($clubesDir[$homeNorm])) {
-                $lados[] = ['nombre' => $p['home'], 'gf' => $p['hg'], 'ge' => $p['ag']];
-            }
-            if (isset($clubesDir[$awayNorm])) {
-                $lados[] = ['nombre' => $p['away'], 'gf' => $p['ag'], 'ge' => $p['hg']];
-            }
-
-            foreach ($lados as $lado) {
-                $gf = $lado['gf']; $ge = $lado['ge'];
-                $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
-
-                $key = $p['comp'] . '|' . $lado['nombre'];
-                if (!isset($stats[$key])) {
-                    $stats[$key] = [
-                        'competition' => $p['comp'], 'equipo' => $lado['nombre'],
-                        'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
-                        'perdidos' => 0, 'gf' => 0, 'ge' => 0,
-                    ];
-                }
-                $stats[$key]['partidos']++;
-                $stats[$key]['ganados']   += $res === 'W' ? 1 : 0;
-                $stats[$key]['empatados'] += $res === 'D' ? 1 : 0;
-                $stats[$key]['perdidos']  += $res === 'L' ? 1 : 0;
-                $stats[$key]['gf'] += $gf;
-                $stats[$key]['ge'] += $ge;
-            }
-        }
-
-        // ---- Dedup only (NO exclusions: TM brings everything raw; filtering is
-        //      done manually with the 🚫 buttons on the cards). ----
+        // Dedup + payload.
         $tecnicoId = $request->tecnico_id;
         $existentes = collect()
             ->merge($tecnicoId ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre') : collect())
@@ -1994,14 +1959,10 @@ class ScraperController extends Controller
 
         $data = [];
         foreach ($stats as $s) {
-
-            // No debeExcluirCompetencia / debeExcluirEquipo here on purpose.
-
             list($tipo, $ambito) = $this->clasificarCompetencia($s['competition']);
-
             $competition = trim($s['competition']) . ' ' . $year;
             $key = (string) \Str::of($competition)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
-            if (isset($existentes[$key])) continue; // skip already-loaded tournaments
+            if (isset($existentes[$key])) continue;
 
             $data[] = [
                 'competition' => $competition,
@@ -2019,7 +1980,24 @@ class ScraperController extends Controller
             ];
         }
 
-        return response()->json($data);
+        return response()->json(['fase' => 'B', 'data' => $data]);
+    }
+
+// Year from the saison_id select (or URL fallback). Reused by both phases.
+    private function anioDesdeSelect($xpath, $url)
+    {
+        $optSel = $xpath->query("//select[contains(@name,'saison')]/option[@selected]")->item(0);
+        if ($optSel) {
+            $val  = (int) preg_replace('/\D/', '', $optSel->getAttribute('value'));
+            $text = trim($optSel->textContent);
+            if (str_contains($text, '/')) {
+                if ($val >= 1900) return $val . '/' . substr((string) ($val + 1), -2);
+            } else {
+                if (preg_match('/(\d{4})/', $text, $m) && (int) $m[1] >= 1900) return $m[1];
+            }
+        }
+        if (preg_match('#saison(?:_id)?[=/](\d{4})#', $url, $mY)) return $mY[1];
+        return (string) ((int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1);
     }
 
 // "23/24" -> "2023/24" (cross-year) ; "2024" -> "2024" (calendar-year)
