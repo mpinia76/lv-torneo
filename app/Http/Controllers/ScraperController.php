@@ -830,6 +830,12 @@ class ScraperController extends Controller
             $clubLink = $xpath->query('.//a', $clubCell)->item(0);
             $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
 
+            // 🔎 debug temporal
+            if (stripos($club, 'bolivar') !== false || stripos($club, 'bolívar') !== false) {
+                \Log::info("[FBDB BOLIVAR] year={$year} club='{$club}'");
+                \Log::info("[FBDB BOLIVAR] rowHTML=" . $dom->saveHTML($row));
+            }
+
             if ($this->debeExcluirEquipo($club)) continue;
 
             $competencias = [
