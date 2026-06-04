@@ -192,6 +192,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/scraper/tecnico-footballdb', 'ScraperController@tecnicoFootballDatabase');
     Route::get('/scraper/jugador-footballdb', [App\Http\Controllers\ScraperController::class, 'jugadorFootballDatabase']);
     Route::get('/scraper/tecnico-transfermarkt', [App\Http\Controllers\ScraperController::class, 'tecnicoTransfermarkt']);
+    Route::get('/scraper/tecnico-wikipedia', 'ScraperController@tecnicoWikipedia');
 
     Route::group(['prefix' => 'competencias-excluidas'], function () {
         Route::get('/',             'CompetenciaExcluidaController@index')->name('competencias_excluidas.index');
