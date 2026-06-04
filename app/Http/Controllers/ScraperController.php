@@ -2226,6 +2226,16 @@ class ScraperController extends Controller
             $n = preg_replace('/[^\d]/', '', $s);
             return $n === '' ? null : (int) $n;
         };
+        // Parse a league position from a "Pos." cell. Only accepts plain ordinals
+        // like "5.º" / "1.º" (1..50). Cup round labels ("FG", "1/8", "Inc.") -> null.
+        $posicionDeCelda = function ($cell) use ($txt) {
+            $t = $txt($cell);
+            if ($t === '' || $t === '-') return null;
+            if (!preg_match('/^\s*(\d{1,2})\s*\.?\s*º/u', $t, $m)) return null;
+            $n = (int) $m[1];
+            return ($n >= 1 && $n <= 50) ? $n : null;
+        };
+
         // Pull a clean competition name from a cell's <a title="...">, stripping a trailing year.
         $nombreDeLink = function ($cell) use ($xpath) {
             if (!$cell) return null;
@@ -2268,10 +2278,10 @@ class ScraperController extends Controller
             $tempTxt = $txt($cTemp);
             preg_match('/(\d{4})/', $tempTxt, $my);
             $year = $my[1] ?? null;
-            if (!$year) continue;
+            if (!$year || (int) $year < 2000) continue;
 
             // Helper to build one entry for a competition block.
-            $pushBloque = function ($baseCol, $tipo, $ambito, $nombreFallback, $posCol = null)
+            $pushBloque = function ($baseCol, $tipo, $ambito, $nombreFallback, $posCol = null, $posicion = null)
             use (&$data, $fila, $col, $txt, $num, $nombreDeLink, $club, $year, $cTemp, &$existentes) {
 
                 $pdCell = $fila[$baseCol] ?? null;
@@ -2300,7 +2310,7 @@ class ScraperController extends Controller
                 $data[] = [
                     'competition' => $competition,
                     'equipo'      => $club,
-                    'posicion'    => null,
+                    'posicion'    => $posicion,
                     'partidos'    => $pd,
                     'ganados'     => $g,
                     'empatados'   => $e,
@@ -2315,13 +2325,17 @@ class ScraperController extends Controller
 
             // Liga: prefer the Div. cell link (gives the country-specific league
             // name, e.g. "Primera División de Bolivia"); fall back to the season link.
+            // Position comes from the Liga "Pos." cell (liga+4).
             $nombreLiga = $nombreDeLink($fila[$col['div']] ?? null);
+            $posLiga    = $posicionDeCelda($fila[$col['liga'] + 4] ?? null);
             $pushBloque($col['liga'],  'Liga', 'Nacional',
                 $nombreLiga ?: 'Liga',
-                $nombreLiga ? null : $col['temporada']);
+                $nombreLiga ? null : $col['temporada'],
+                $posLiga);
             // Copa nacional: no name link in this block -> generic "Copa".
             $pushBloque($col['copa'],  'Copa', 'Nacional',      'Copa');
             // Internacional: name from the Pos cell link (Libertadores/Sudamericana).
+            // No table position here (cup rounds), so leave posicion null.
             $pushBloque($col['intl'],  'Copa', 'Internacional', 'Internacional', $col['intl'] + 4);
             // Otros: Recopa etc. -> treat as international cup.
             $pushBloque($col['otros'], 'Copa', 'Internacional', 'Otros');
