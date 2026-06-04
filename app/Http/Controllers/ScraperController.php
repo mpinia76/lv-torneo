@@ -2115,14 +2115,24 @@ class ScraperController extends Controller
         // 1) Find the coaching stats table. It's the wikitable whose header
         //    contains "Div." and "Temporada" (distinguishes it from palmarés).
         // ----------------------------------------------------------------
+        // Two templates exist:
+        //  - "bloques": header has Liga + Internacional + Rendimiento (e.g. Insúa).
+        //    One row carries several competition blocks (Liga/Copa/Intl/Otros).
+        //  - "simple":  header has Div. + Torneo + a single "Estadísticas" block
+        //    (PJ G E P GF GC ...). One competition per row, WITH goals (e.g. Astrada).
         $tabla = null;
+        $tipoTabla = null;
         foreach ($xpath->query('//table[contains(@class,"wikitable")]') as $t) {
             $txtTabla = $t->textContent;
-            if (mb_stripos($txtTabla, 'Temporada') !== false
-                && mb_stripos($txtTabla, 'Div.') !== false
+            $tieneDiv = mb_stripos($txtTabla, 'Div.') !== false;
+
+            if ($tieneDiv && mb_stripos($txtTabla, 'Internacional') !== false
                 && mb_stripos($txtTabla, 'Rendimiento') !== false) {
-                $tabla = $t;
-                break;
+                $tabla = $t; $tipoTabla = 'bloques'; break;
+            }
+            if ($tieneDiv && (mb_stripos($txtTabla, 'Torneo') !== false || mb_stripos($txtTabla, 'Temporada') !== false)
+                && mb_stripos($txtTabla, 'Efectividad') !== false) {
+                $tabla = $t; $tipoTabla = 'simple'; break;
             }
         }
         if (!$tabla) return response()->json(['error' => 'No se encontró la tabla de trayectoria como entrenador']);
@@ -2248,6 +2258,94 @@ class ScraperController extends Controller
             return trim($titulo) !== '' ? trim($titulo) : null;
         };
 
+        // Classify tipo/ámbito from a competition name (used by the "simple" template,
+        // which has no Liga/Copa/Intl columns — everything is one row).
+        $clasificar = function ($nombre) {
+            $n = (string) \Str::of($nombre)->lower()->ascii();
+            $intl = ['libertadores', 'sudamericana', 'recopa', 'champions', 'europa',
+                'concacaf', 'mundial', 'intercontinental', 'merconorte', 'mercosur',
+                'club world', 'conmebol'];
+            foreach ($intl as $kw) {
+                if (strpos($n, $kw) !== false) return ['Copa', 'Internacional'];
+            }
+            // National cups (explicit) before the generic league fallback.
+            $copa = ['copa argentina', 'copa chile', 'copa colombia', 'copa del rey',
+                'copa do brasil', 'copa ecuador', 'copa mx', 'supercopa', 'ca '];
+            foreach ($copa as $kw) {
+                if (strpos($n, $kw) !== false) return ['Copa', 'Nacional'];
+            }
+            if (preg_match('/^ca\s/', $n)) return ['Copa', 'Nacional']; // "CA 2014/15"
+            return ['Liga', 'Nacional'];
+        };
+
+        // ----------------------------------------------------------------
+        // SIMPLE TEMPLATE (one competition per row, with goals).
+        // Columns: 0 Equipo | 1 Div | 2 Torneo | 3 PJ | 4 G | 5 E | 6 P | 7 GF | 8 GC | ...
+        // ----------------------------------------------------------------
+        if ($tipoTabla === 'simple') {
+            $data = [];
+            $ultimoClub = null;
+
+            foreach ($grid as $r => $fila) {
+                if (count($fila) < 9) continue;
+
+                $cEquipo  = $fila[0] ?? null;
+                $cTorneo  = $fila[2] ?? null;
+                if (!$cEquipo || !$cTorneo) continue;
+                if ($cEquipo->nodeName === 'th') continue;  // header
+                if ($cTorneo->nodeName === 'th') continue;  // "Total..." row
+
+                // Club (rowspan already carried down in the grid).
+                $clubB = $xpath->query('.//b', $cEquipo)->item(0);
+                $nombreClub = $clubB ? trim(preg_replace('/\s+/u', ' ', $clubB->textContent)) : $txt($cEquipo);
+                $nombreClub = trim(preg_replace('/\s+(Argentina|Ecuador|Bolivia|Per[úu]|Colombia|Chile|Brasil|Paraguay|Uruguay)$/u', '', $nombreClub));
+                if ($nombreClub !== '') $ultimoClub = $nombreClub;
+                $club = $ultimoClub;
+                if (!$club) continue;
+
+                // Competition name = visible TEXT of the Torneo link (per user choice).
+                $aTor = $xpath->query('.//a', $cTorneo)->item(0);
+                $competition = $aTor ? trim(preg_replace('/\s+/u', ' ', $aTor->textContent)) : $txt($cTorneo);
+                if ($competition === '') continue;
+
+                // Year for the <2000 filter: first 4-digit run in the competition text.
+                preg_match('/(\d{4})/', $competition, $my);
+                $year = $my[1] ?? null;
+                if (!$year || (int) $year < 2000) continue;
+
+                $pj = $num($txt($fila[3] ?? null));
+                if ($pj === null) continue; // no matches
+                $g  = $num($txt($fila[4] ?? null)) ?? 0;
+                $e  = $num($txt($fila[5] ?? null)) ?? 0;
+                $p  = $num($txt($fila[6] ?? null)) ?? 0;
+                $gf = $num($txt($fila[7] ?? null)) ?? 0;
+                $gc = $num($txt($fila[8] ?? null)) ?? 0;
+
+                $key = (string) \Str::of($competition)->lower()->ascii()
+                    ->replaceMatches('/\s+/', ' ')->trim();
+                if (isset($existentes[$key])) continue;
+
+                list($tipo, $ambito) = $clasificar($competition);
+
+                $data[] = [
+                    'competition' => $competition,
+                    'equipo'      => $club,
+                    'posicion'    => null,
+                    'partidos'    => $pj,
+                    'ganados'     => $g,
+                    'empatados'   => $e,
+                    'perdidos'    => $p,
+                    'gf'          => $gf,
+                    'ge'          => $gc,
+                    'torneo_logo' => null,
+                    'tipo'        => $tipo,
+                    'ambito'      => $ambito,
+                ];
+            }
+
+            return response()->json($data);
+        }
+
         $data = [];
         $ultimoClub = null;
 
@@ -2274,15 +2372,16 @@ class ScraperController extends Controller
             $club = $ultimoClub;
             if (!$club) continue;
 
-            // Temporada / year
-            $tempTxt = $txt($cTemp);
-            preg_match('/(\d{4})/', $tempTxt, $my);
+            // Temporada: keep the full label for the name ("2015-16", "2002-03",
+            // "2025-A"). Extract the first 4-digit year ONLY to apply the <2000 filter.
+            $temporada = $txt($cTemp);
+            preg_match('/(\d{4})/', $temporada, $my);
             $year = $my[1] ?? null;
             if (!$year || (int) $year < 2000) continue;
 
             // Helper to build one entry for a competition block.
             $pushBloque = function ($baseCol, $tipo, $ambito, $nombreFallback, $posCol = null, $posicion = null)
-            use (&$data, $fila, $col, $txt, $num, $nombreDeLink, $club, $year, $cTemp, &$existentes) {
+            use (&$data, $fila, $col, $txt, $num, $nombreDeLink, $club, $temporada, $cTemp, &$existentes) {
 
                 $pdCell = $fila[$baseCol] ?? null;
                 $pd = $num($txt($pdCell));
@@ -2302,7 +2401,7 @@ class ScraperController extends Controller
                 if (!$nombre) $nombre = $nombreDeLink($cTemp);
                 if (!$nombre) $nombre = $nombreFallback;
 
-                $competition = $nombre . ' ' . $year;
+                $competition = $nombre . ' ' . $temporada;
                 $key = (string) \Str::of($competition)->lower()->ascii()
                     ->replaceMatches('/\s+/', ' ')->trim();
                 if (isset($existentes[$key])) return;
