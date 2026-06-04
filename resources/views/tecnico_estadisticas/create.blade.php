@@ -42,7 +42,15 @@
                 </ul>
             </div>
         @endif
-
+        <div class="mb-3 mt-3">
+            <label>Importar desde Wikipedia</label>
+            <div class="d-flex">
+                <input type="text" id="wikiUrlTecnico" class="form-control mr-2"
+                       placeholder="https://es.wikipedia.org/wiki/Rubén_Darío_Insúa">
+                <button type="button" class="btn btn-warning" onclick="scrapearWikipedia()" style="white-space:nowrap;">🌐 Scrapear Wiki</button>
+            </div>
+            <small class="text-muted">Trae partidos por equipo/temporada (sin goles, los completás a mano).</small>
+        </div>
         <div class="mb-3 mt-3">
             <label>Importar desde FootballDatabase</label>
             <div class="d-flex">
@@ -682,6 +690,33 @@
                 console.error('Error guardado masivo', e);
                 resumen.innerHTML = '<span style="color:#a94442">Error guardando.</span>';
             }
+        }
+        function scrapearWikipedia() {
+            let url = document.getElementById('wikiUrlTecnico').value.trim();
+            if (!url) { alert('Pegá la URL de Wikipedia'); return; }
+
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
+            let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
+
+            fetch("{{ url('/admin/scraper/tecnico-wikipedia') }}?url=" + encodeURIComponent(url) + "&tecnico_id=" + tecnicoId)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('resultadoScraper').innerHTML =
+                            '<div class="alert alert-danger">' + data.error + '</div>';
+                        return;
+                    }
+                    renderResultados(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoScraper').innerHTML =
+                        '<div class="alert alert-danger">Error scrapeando Wikipedia</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
         }
     </script>
 @endsection

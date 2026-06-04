@@ -2094,4 +2094,240 @@ class ScraperController extends Controller
         return $buscar($eq);
     }
 
+    public function tecnicoWikipedia(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json(['error' => 'Falta la URL de Wikipedia']);
+
+        $html = HttpHelper::getHtmlContent($url, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        // ----------------------------------------------------------------
+        // 1) Find the coaching stats table. It's the wikitable whose header
+        //    contains "Div." and "Temporada" (distinguishes it from palmarés).
+        // ----------------------------------------------------------------
+        $tabla = null;
+        foreach ($xpath->query('//table[contains(@class,"wikitable")]') as $t) {
+            $txtTabla = $t->textContent;
+            if (mb_stripos($txtTabla, 'Temporada') !== false
+                && mb_stripos($txtTabla, 'Div.') !== false
+                && mb_stripos($txtTabla, 'Rendimiento') !== false) {
+                $tabla = $t;
+                break;
+            }
+        }
+        if (!$tabla) return response()->json(['error' => 'No se encontró la tabla de trayectoria como entrenador']);
+
+        // ----------------------------------------------------------------
+        // 2) Expand the table into a grid, resolving rowspan/colspan exactly
+        //    like a browser would. Each logical cell carries its source <td>
+        //    node so we can read links/titles, not just text.
+        // ----------------------------------------------------------------
+        $filasTr = [];
+        foreach ($xpath->query('./tbody/tr | ./tr', $tabla) as $tr) {
+            $filasTr[] = $tr;
+        }
+
+        $grid = [];          // [rowIdx][colIdx] => DOMElement (td/th)
+        $ocupado = [];       // pending rowspans: [colIdx] => ['node'=>..., 'left'=>int]
+
+        foreach ($filasTr as $r => $tr) {
+            if (!isset($grid[$r])) $grid[$r] = [];
+            $col = 0;
+
+            // First, place any cells carried down from previous rows (rowspan).
+            $celdas = [];
+            foreach ($tr->childNodes as $c) {
+                if ($c->nodeType === XML_ELEMENT_NODE && ($c->nodeName === 'td' || $c->nodeName === 'th')) {
+                    $celdas[] = $c;
+                }
+            }
+
+            $ci = 0; // index into this row's actual cells
+            $maxCols = 60;
+            while ($col < $maxCols) {
+                // Slot filled by a rowspan from above?
+                if (isset($ocupado[$col]) && $ocupado[$col]['left'] > 0) {
+                    $grid[$r][$col] = $ocupado[$col]['node'];
+                    $ocupado[$col]['left']--;
+                    $col++;
+                    continue;
+                }
+
+                // No more real cells in this row -> done.
+                if ($ci >= count($celdas)) break;
+
+                $cell = $celdas[$ci++];
+                $rowspan = max(1, (int) ($cell->getAttribute('rowspan') ?: 1));
+                $colspan = max(1, (int) ($cell->getAttribute('colspan') ?: 1));
+
+                for ($k = 0; $k < $colspan; $k++) {
+                    $grid[$r][$col] = $cell;
+                    if ($rowspan > 1) {
+                        $ocupado[$col] = ['node' => $cell, 'left' => $rowspan - 1];
+                    }
+                    $col++;
+                }
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // 3) Column layout (after grid expansion), fixed by the header:
+        //    0 Equipo | 1 Div | 2 Temporada
+        //    3-7  Liga:  PD G E P Pos
+        //    8    sep
+        //    9-12 Copa:  PD G E P
+        //    13   sep
+        //    14-18 Internacional: PD G E P Pos
+        //    19   sep
+        //    20-23 Otros: PD G E P
+        //    24   sep
+        //    25+  Totales (ignored)
+        // ----------------------------------------------------------------
+        $col = [
+            'equipo' => 0, 'div' => 1, 'temporada' => 2,
+            'liga'  => 3,   // PD G E P Pos
+            'copa'  => 9,   // PD G E P
+            'intl'  => 14,  // PD G E P Pos
+            'otros' => 20,  // PD G E P
+        ];
+
+        $tecnicoId = $request->tecnico_id;
+        $existentes = collect()
+            ->merge(
+                $tecnicoId
+                    ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
+                    : collect()
+            )
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->unique()->flip()->toArray();
+
+        $txt = function ($node) {
+            return $node ? trim(preg_replace('/\s+/u', ' ', $node->textContent)) : '';
+        };
+        $num = function ($s) {
+            $s = trim($s);
+            if ($s === '' || $s === '-' || stripos($s, 'inc') !== false) return null;
+            $n = preg_replace('/[^\d]/', '', $s);
+            return $n === '' ? null : (int) $n;
+        };
+        // Pull a clean competition name from a cell's <a title="...">, stripping a trailing year.
+        $nombreDeLink = function ($cell) use ($xpath) {
+            if (!$cell) return null;
+            $a = $xpath->query('.//a[@title]', $cell)->item(0);
+            if (!$a) return null;
+            $titulo = trim($a->getAttribute('title'));
+            // "Campeonato Ecuatoriano de Fútbol 1997" -> drop trailing year(s)
+            $titulo = preg_replace('/\s+\d{4}(-\d{2,4})?(\s*\(.*\))?$/u', '', $titulo);
+            $titulo = preg_replace('/\s*\(.*\)$/u', '', $titulo); // drop "(Argentina)" etc.
+            return trim($titulo) !== '' ? trim($titulo) : null;
+        };
+
+        $data = [];
+        $ultimoClub = null;
+
+        foreach ($grid as $r => $fila) {
+            if (count($fila) < 8) continue;
+
+            // Skip header rows and "Total" rows: those have <th> in the data area.
+            $c0 = $fila[0] ?? null;
+            $cTemp = $fila[$col['temporada']] ?? null;
+            if (!$c0 || !$cTemp) continue;
+            if ($c0->nodeName === 'th') continue;             // header
+            if ($cTemp->nodeName === 'th') continue;          // "Total" row (colspan th)
+
+            // Equipo: grid already carried the rowspan down, so col 0 is always
+            // the right club node for this row.
+            $clubCell = $fila[$col['equipo']] ?? null;
+            if ($clubCell) {
+                $clubB = $xpath->query('.//b', $clubCell)->item(0);
+                $nombreClub = $clubB ? trim(preg_replace('/\s+/u', ' ', $clubB->textContent)) : $txt($clubCell);
+                // strip trailing country text that leaks from the <small> flag block
+                $nombreClub = trim(preg_replace('/\s+(Argentina|Ecuador|Bolivia|Per[úu]|Colombia|Chile|Brasil)$/u', '', $nombreClub));
+                if ($nombreClub !== '') $ultimoClub = $nombreClub;
+            }
+            $club = $ultimoClub;
+            if (!$club) continue;
+
+            // Temporada / year
+            $tempTxt = $txt($cTemp);
+            preg_match('/(\d{4})/', $tempTxt, $my);
+            $year = $my[1] ?? null;
+            if (!$year) continue;
+
+            // Helper to build one entry for a competition block.
+            $pushBloque = function ($baseCol, $tipo, $ambito, $nombreFallback, $posCol = null)
+            use (&$data, $fila, $col, $txt, $num, $nombreDeLink, $club, $year, $cTemp, &$existentes) {
+
+                $pdCell = $fila[$baseCol] ?? null;
+                $pd = $num($txt($pdCell));
+                if ($pd === null || $pd === 0) return; // no matches in this block
+
+                $g = $num($txt($fila[$baseCol + 1] ?? null)) ?? 0;
+                $e = $num($txt($fila[$baseCol + 2] ?? null)) ?? 0;
+                $p = $num($txt($fila[$baseCol + 3] ?? null)) ?? 0;
+
+                // Competition name: prefer the <a title> in the block's Pos cell
+                // (Internacional/Liga link to the real competition there), else the
+                // Temporada link, else the generic fallback.
+                $nombre = null;
+                if ($posCol !== null && isset($fila[$posCol])) {
+                    $nombre = $nombreDeLink($fila[$posCol]);
+                }
+                if (!$nombre) $nombre = $nombreDeLink($cTemp);
+                if (!$nombre) $nombre = $nombreFallback;
+
+                $competition = $nombre . ' ' . $year;
+                $key = (string) \Str::of($competition)->lower()->ascii()
+                    ->replaceMatches('/\s+/', ' ')->trim();
+                if (isset($existentes[$key])) return;
+
+                $data[] = [
+                    'competition' => $competition,
+                    'equipo'      => $club,
+                    'posicion'    => null,
+                    'partidos'    => $pd,
+                    'ganados'     => $g,
+                    'empatados'   => $e,
+                    'perdidos'    => $p,
+                    'gf'          => 0,   // Wikipedia table has no per-competition goals
+                    'ge'          => 0,
+                    'torneo_logo' => null,
+                    'tipo'        => $tipo,
+                    'ambito'      => $ambito,
+                ];
+            };
+
+            // Liga: prefer the Div. cell link (gives the country-specific league
+            // name, e.g. "Primera División de Bolivia"); fall back to the season link.
+            $nombreLiga = $nombreDeLink($fila[$col['div']] ?? null);
+            $pushBloque($col['liga'],  'Liga', 'Nacional',
+                $nombreLiga ?: 'Liga',
+                $nombreLiga ? null : $col['temporada']);
+            // Copa nacional: no name link in this block -> generic "Copa".
+            $pushBloque($col['copa'],  'Copa', 'Nacional',      'Copa');
+            // Internacional: name from the Pos cell link (Libertadores/Sudamericana).
+            $pushBloque($col['intl'],  'Copa', 'Internacional', 'Internacional', $col['intl'] + 4);
+            // Otros: Recopa etc. -> treat as international cup.
+            $pushBloque($col['otros'], 'Copa', 'Internacional', 'Otros');
+        }
+
+        return response()->json($data);
+    }
+
 }
