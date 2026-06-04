@@ -990,6 +990,7 @@ class ScraperController extends Controller
                             'tipo'        => 'Copa',
                             'ambito'      => $ambitoComp,
                         ];
+                        \Log::info("[BOLIVAR champ] AGREGADO comp='{$competition}' key='{$key}' equipo='{$club}'");
                     }
 
                     // Skip the generic single-entry below for cont/cup
