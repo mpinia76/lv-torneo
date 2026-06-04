@@ -878,13 +878,20 @@ class ScraperController extends Controller
                         $gc = $a ? (int) trim($a->textContent) : 0;
                     }
                     if (str_contains($class, 'pc_lastrounds1') && str_contains($class, $suffix)) {
-                        // Try span.competition first
                         $spans = $xpath->query('.//span[@class="competition"]', $col);
                         if ($spans->length > 0) {
-                            $compName = trim($spans->item(0)->textContent);
+                            // Quedate SOLO con los nombres de los spans, ignorá texto suelto y dígitos pegados
+                            $nombres = [];
+                            foreach ($spans as $sp) {
+                                $n = trim($sp->textContent);
+                                if ($n !== '') $nombres[] = $n;
+                            }
+                            $compName = $nombres[0] ?? null;
+                            // reconstruí el "raw" limpio para la rama múltiple cont/cup
+                            $lastRoundsRaw = implode(' - ', $nombres);
+                        } else {
+                            $lastRoundsRaw = ''; // sin spans -> sin nombre confiable, dejá que el fallback resuelva
                         }
-                        // Always grab raw text for multi-competition parsing
-                        $lastRoundsRaw = trim($col->textContent);
                     }
                     if (str_contains($class, 'pc_club_ranking1') && str_contains($class, $suffix)) {
                         $a = $xpath->query('.//a', $col)->item(0);
@@ -898,12 +905,13 @@ class ScraperController extends Controller
 
                 // Fallback name for champ from href
                 if (!$compName && $suffix === 'champ') {
-                    $compLink = $xpath->query('.//td[contains(@class,"champ")]//a', $row)->item(0);
+                    // ✅ solo el <a> que linkea a una competición
+                    $compLink = $xpath->query('.//a[contains(@href,"/competicion/general/")]', $row)->item(0);
                     if ($compLink) {
                         $href = $compLink->getAttribute('href');
                         preg_match('/\/\d+-([^\/]+)\//', $href, $mComp);
                         if (isset($mComp[1])) {
-                            $compName = ucwords(str_replace('_', ' ', $mComp[1]));
+                            $compName = ucwords(str_replace('_', ' ', $mComp[1])); // "Primera Division"
                         }
                     }
                 }
@@ -990,7 +998,7 @@ class ScraperController extends Controller
                             'tipo'        => 'Copa',
                             'ambito'      => $ambitoComp,
                         ];
-                        \Log::info("[BOLIVAR champ] AGREGADO comp='{$competition}' key='{$key}' equipo='{$club}'");
+
                     }
 
                     // Skip the generic single-entry below for cont/cup
@@ -1030,6 +1038,7 @@ class ScraperController extends Controller
                     'tipo'        => $meta['tipo'],
                     'ambito'      => $meta['ambito'],
                 ];
+                \Log::info("[BOLIVAR champ] AGREGADO comp='{$competition}' key='{$key}' equipo='{$club}'");
             }
         }
 
