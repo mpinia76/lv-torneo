@@ -1799,7 +1799,7 @@ class ScraperController extends Controller
         // International cups first.
         $intl = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
             'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa',
-            'afc', 'caf', 'asian'];
+            'afc', 'caf', 'asian','leagues lup'];
         foreach ($intl as $kw) {
             if (str_contains($n, $kw)) return ['Copa', 'Internacional'];
         }
