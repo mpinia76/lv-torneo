@@ -1799,7 +1799,7 @@ class ScraperController extends Controller
         // International cups first.
         $intl = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
             'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa',
-            'afc', 'caf', 'asian','leagues lup'];
+            'afc', 'caf', 'asian','leagues cup'];
         foreach ($intl as $kw) {
             if (str_contains($n, $kw)) return ['Copa', 'Internacional'];
         }
@@ -1980,10 +1980,10 @@ class ScraperController extends Controller
             $key = (string) \Str::of($competition)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
 
             // LOG ANTES del dedup para ver TODAS, incluso las ya cargadas
-            \Log::info('[LOGO] comp="' . $competition . '" key="'
+            /*\Log::info('[LOGO] comp="' . $competition . '" key="'
                 . (string) \Str::of(preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competition))->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim()
                 . '" logo=' . ($this->logoTorneo($competition) ?? 'NULL')
-                . ' dedup=' . (isset($existentes[$key]) ? 'YA_EXISTE' : 'no'));
+                . ' dedup=' . (isset($existentes[$key]) ? 'YA_EXISTE' : 'no'));*/
             if (isset($existentes[$key])) continue;
 
             $data[] = [
