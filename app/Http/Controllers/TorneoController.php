@@ -3150,6 +3150,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 $escudosArray[$escudo->equipo_id] = [
                     'escudo' => $escudo->escudo,
                     'equipo_id' => $escudo->equipo_id,
+                    'nombre' => $escudo->equipo->nombre,
                     'puntaje' => (int)$escudo->puntaje,
                     'jugados' => (int)$escudo->jugados,
                     'porcentaje' => $escudo->porcentaje,
@@ -3168,6 +3169,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                         $escudosArray[$manual->equipo_id] = [
                             'escudo' => $manual->escudo,
                             'equipo_id' => $manual->equipo_id,
+                            'nombre' => $manual->equipo->nombre,
                             'puntaje' => $ptsManual,
                             'jugados' => $manual->partidos,
                             'porcentaje' => '0%',
@@ -3195,7 +3197,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 $tc = $titulosTecnicoCopaEquipo[$equipoId] ?? 0;
                 $ti = $titulosTecnicoInternacionalEquipo[$equipoId] ?? 0;
 
-                $linea = $data['escudo'] . '_' . $data['equipo_id'] . '_' . $data['puntaje'] . '_' . $data['porcentaje'];
+                $linea = $data['escudo'] . '_' . $data['equipo_id'] . '_' . $data['puntaje'] . '_' . $data['porcentaje']. '_' . $data['nombre'];
 
                 if ($tc + $tl + $ti > 0) {
                     $ligasStr = $tl ? $tl . ' Ligas' : '';
