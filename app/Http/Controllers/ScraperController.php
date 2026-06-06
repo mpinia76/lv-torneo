@@ -1799,7 +1799,7 @@ class ScraperController extends Controller
         // International cups first.
         $intl = ['champions', 'libertadores', 'sudamericana', 'europa', 'concacaf',
             'mundial', 'intercontinental', 'recopa', 'club world', 'supercopa de europa',
-            'afc', 'caf', 'asian','leagues cup'];
+            'afc', 'caf', 'asian','leagues cup', 'campeones cup'];
         foreach ($intl as $kw) {
             if (str_contains($n, $kw)) return ['Copa', 'Internacional'];
         }
@@ -2046,11 +2046,8 @@ class ScraperController extends Controller
 
         $mapa = [
             'campeonato brasileiro serie a' => 'torneos/brasileirao.png',
-            'copa libertadores'             => 'torneos/libertadores.png',
-            'copa sudamericana'             => 'torneos/sudamericana.png',
             'copa do brasil'                => 'torneos/copa-brasil.png',
             'supercopa de chile'            => 'torneos/csuc.png',
-            'uae pro league'                => 'torneos/uae_pro_league.png',
             'laliga'                => 'torneos/LaLiga.png',
             'copa del rey'                => 'torneos/Copa-del-Rey.png',
             'supercopa de españa'                => 'torneos/Supercopa-espana.png',
