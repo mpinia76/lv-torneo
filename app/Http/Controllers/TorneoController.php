@@ -3150,7 +3150,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 $escudosArray[$escudo->equipo_id] = [
                     'escudo' => $escudo->escudo,
                     'equipo_id' => $escudo->equipo_id,
-                    'nombre' => $escudo->equipo->nombre,
+                    'nombre' => $escudo->equipo,
                     'puntaje' => (int)$escudo->puntaje,
                     'jugados' => (int)$escudo->jugados,
                     'porcentaje' => $escudo->porcentaje,
