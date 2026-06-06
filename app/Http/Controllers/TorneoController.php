@@ -3169,7 +3169,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                         $escudosArray[$manual->equipo_id] = [
                             'escudo' => $manual->escudo,
                             'equipo_id' => $manual->equipo_id,
-                            'nombre' => $manual->equipo->nombre,
+                            'nombre' => $manual->nombre,
                             'puntaje' => $ptsManual,
                             'jugados' => $manual->partidos,
                             'porcentaje' => '0%',
