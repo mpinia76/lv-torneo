@@ -2117,17 +2117,22 @@ class ScraperController extends Controller
         //    One row carries several competition blocks (Liga/Copa/Intl/Otros).
         //  - "simple":  header has Div. + Torneo + a single "Estadísticas" block
         //    (PJ G E P GF GC ...). One competition per row, WITH goals (e.g. Astrada).
+        // Two templates exist:
+        //  - "bloques": header has Liga + Internacional + Rendimiento (e.g. Insúa).
+        //  - "simple":  a single "Estadísticas" block (PJ G E P GF GC ...), one
+        //    competition per row, WITH goals. May or may not have a "Div." column
+        //    (e.g. Astrada/Pumpido have it, Borghi does not), so we don't require it.
         $tabla = null;
         $tipoTabla = null;
         foreach ($xpath->query('//table[contains(@class,"wikitable")]') as $t) {
             $txtTabla = $t->textContent;
-            $tieneDiv = mb_stripos($txtTabla, 'Div.') !== false;
 
-            if ($tieneDiv && mb_stripos($txtTabla, 'Internacional') !== false
-                && mb_stripos($txtTabla, 'Rendimiento') !== false) {
+            if (mb_stripos($txtTabla, 'Internacional') !== false
+                && mb_stripos($txtTabla, 'Rendimiento') !== false
+                && mb_stripos($txtTabla, 'Div.') !== false) {
                 $tabla = $t; $tipoTabla = 'bloques'; break;
             }
-            if ($tieneDiv && (mb_stripos($txtTabla, 'Torneo') !== false || mb_stripos($txtTabla, 'Temporada') !== false)
+            if (mb_stripos($txtTabla, 'Torneo') !== false
                 && mb_stripos($txtTabla, 'Efectividad') !== false) {
                 $tabla = $t; $tipoTabla = 'simple'; break;
             }
@@ -2283,11 +2288,29 @@ class ScraperController extends Controller
             $data = [];
             $ultimoClub = null;
 
+            // The "Torneo" column index varies: with a Div. column it sits at 2,
+            // without it at 1. Find it from the header row instead of hardcoding,
+            // so PJ/G/E/P/GF/GC are read relative to it (Torneo+1 ... Torneo+6).
+            $idxTorneo = null;
             foreach ($grid as $r => $fila) {
-                if (count($fila) < 9) continue;
+                foreach ($fila as $cIdx => $cell) {
+                    if ($cell && $cell->nodeName === 'th'
+                        && mb_stripos(trim($cell->textContent), 'Torneo') !== false) {
+                        $idxTorneo = $cIdx;
+                        break 2;
+                    }
+                }
+            }
+            if ($idxTorneo === null) $idxTorneo = 2; // safe default (with Div.)
 
-                $cEquipo  = $fila[0] ?? null;
-                $cTorneo  = $fila[2] ?? null;
+            $idxEquipo = 0;                 // Equipo is always first
+            $idxPJ     = $idxTorneo + 1;    // stats start right after Torneo
+
+            foreach ($grid as $r => $fila) {
+                if (count($fila) < $idxPJ + 6) continue;
+
+                $cEquipo  = $fila[$idxEquipo] ?? null;
+                $cTorneo  = $fila[$idxTorneo] ?? null;
                 if (!$cEquipo || !$cTorneo) continue;
                 if ($cEquipo->nodeName === 'th') continue;  // header
                 if ($cTorneo->nodeName === 'th') continue;  // "Total..." row
@@ -2295,7 +2318,7 @@ class ScraperController extends Controller
                 // Club (rowspan already carried down in the grid).
                 $clubB = $xpath->query('.//b', $cEquipo)->item(0);
                 $nombreClub = $clubB ? trim(preg_replace('/\s+/u', ' ', $clubB->textContent)) : $txt($cEquipo);
-                $nombreClub = trim(preg_replace('/\s+(Argentina|Ecuador|Bolivia|Per[úu]|Colombia|Chile|Brasil|Paraguay|Uruguay)$/u', '', $nombreClub));
+                $nombreClub = trim(preg_replace('/\s+(Argentina|Ecuador|Bolivia|Per[úu]|Colombia|Chile|Brasil|Paraguay|Uruguay|M[ée]xico|Arabia Saudita)$/u', '', $nombreClub));
                 if ($nombreClub !== '') $ultimoClub = $nombreClub;
                 $club = $ultimoClub;
                 if (!$club) continue;
@@ -2310,17 +2333,17 @@ class ScraperController extends Controller
                 $year = $my[1] ?? null;
                 if (!$year || (int) $year < 2000) continue;
 
-                $pj = $num($txt($fila[3] ?? null));
+                $pj = $num($txt($fila[$idxPJ]     ?? null));
                 if ($pj === null) continue; // no matches
-                $g  = $num($txt($fila[4] ?? null)) ?? 0;
-                $e  = $num($txt($fila[5] ?? null)) ?? 0;
-                $p  = $num($txt($fila[6] ?? null)) ?? 0;
-                $gf = $num($txt($fila[7] ?? null)) ?? 0;
-                $gc = $num($txt($fila[8] ?? null)) ?? 0;
+                $g  = $num($txt($fila[$idxPJ + 1] ?? null)) ?? 0;
+                $e  = $num($txt($fila[$idxPJ + 2] ?? null)) ?? 0;
+                $p  = $num($txt($fila[$idxPJ + 3] ?? null)) ?? 0;
+                $gf = $num($txt($fila[$idxPJ + 4] ?? null)) ?? 0;
+                $gc = $num($txt($fila[$idxPJ + 5] ?? null)) ?? 0;
 
                 $key = (string) \Str::of($competition)->lower()->ascii()
                     ->replaceMatches('/\s+/', ' ')->trim();
-                //if (isset($existentes[$key])) continue;
+                if (isset($existentes[$key])) continue;
 
                 list($tipo, $ambito) = $clasificar($competition);
 
