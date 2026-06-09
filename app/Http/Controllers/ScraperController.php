@@ -2320,7 +2320,7 @@ class ScraperController extends Controller
 
                 $key = (string) \Str::of($competition)->lower()->ascii()
                     ->replaceMatches('/\s+/', ' ')->trim();
-                if (isset($existentes[$key])) continue;
+                //if (isset($existentes[$key])) continue;
 
                 list($tipo, $ambito) = $clasificar($competition);
 
