@@ -252,6 +252,11 @@
                 .trim();
         }
 
+        // Show an empty input when the value is 0/null/empty (so zeros don't clutter the form).
+        function vacioSiCero(v) {
+            return (v === 0 || v === '0' || v === null || v === undefined || v === '') ? '' : v;
+        }
+
         function clean(texto) {
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
         }
@@ -495,36 +500,36 @@
 
                         <div class="row">
                             <div class="form-group col-md-1"><label class="small mb-0">PJ</label>
-                                <input type="number" class="form-control form-control-sm f-partidos" value="${c.partidos}"></div>
+                                <input type="number" class="form-control form-control-sm f-partidos" value="${vacioSiCero(c.partidos)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Pos.</label>
-                                <input type="number" class="form-control form-control-sm f-posicion" value="${c.posicion}"></div>
+                                <input type="number" class="form-control form-control-sm f-posicion" value="${vacioSiCero(c.posicion)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Cabeza</label>
-                                <input type="number" class="form-control form-control-sm f-goles_cabeza" value="0"></div>
+                                <input type="number" class="form-control form-control-sm f-goles_cabeza" value=""></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Jugada</label>
-                                <input type="number" class="form-control form-control-sm f-goles_jugada" value="${c.goles_jugada}"></div>
+                                <input type="number" class="form-control form-control-sm f-goles_jugada" value="${vacioSiCero(c.goles_jugada)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Penal</label>
-                                <input type="number" class="form-control form-control-sm f-goles_penal" value="0"></div>
+                                <input type="number" class="form-control form-control-sm f-goles_penal" value=""></div>
                             <div class="form-group col-md-1"><label class="small mb-0">T.Libre</label>
-                                <input type="number" class="form-control form-control-sm f-goles_tiro_libre" value="0"></div>
+                                <input type="number" class="form-control form-control-sm f-goles_tiro_libre" value=""></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Contra</label>
-                                <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${c.goles_en_contra}"></div>
+                                <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${vacioSiCero(c.goles_en_contra)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Amar.</label>
-                                <input type="number" class="form-control form-control-sm f-amarillas" value="${c.amarillas}"></div>
+                                <input type="number" class="form-control form-control-sm f-amarillas" value="${vacioSiCero(c.amarillas)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Rojas</label>
-                                <input type="number" class="form-control form-control-sm f-rojas" value="${c.rojas}"></div>
+                                <input type="number" class="form-control form-control-sm f-rojas" value="${vacioSiCero(c.rojas)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">P.Err</label>
-                                <input type="number" class="form-control form-control-sm f-penales_errados" value="0"></div>
+                                <input type="number" class="form-control form-control-sm f-penales_errados" value=""></div>
                             <div class="form-group col-md-1"><label class="small mb-0">P.Ataj</label>
-                                <input type="number" class="form-control form-control-sm f-penales_atajados" value="0"></div>
+                                <input type="number" class="form-control form-control-sm f-penales_atajados" value=""></div>
                         </div>
 
                         <div class="row">
                             <div class="form-group col-md-2"><label class="small mb-0">G. Recibidos</label>
-                                <input type="number" class="form-control form-control-sm f-goles_recibidos" value="${esArquero ? c.goles_recibidos : 0}"></div>
+                                <input type="number" class="form-control form-control-sm f-goles_recibidos" value="${esArquero ? vacioSiCero(c.goles_recibidos) : ''}"></div>
                             <div class="form-group col-md-2"><label class="small mb-0">V. Invictas</label>
-                                <input type="number" class="form-control form-control-sm f-vallas_invictas" value="${esArquero ? c.vallas_invictas : 0}"></div>
+                                <input type="number" class="form-control form-control-sm f-vallas_invictas" value="${esArquero ? vacioSiCero(c.vallas_invictas) : ''}"></div>
                             <div class="form-group col-md-2"><label class="small mb-0">P. Atajó (arq)</label>
-                                <input type="number" class="form-control form-control-sm f-penales_atajo" value="0"></div>
+                                <input type="number" class="form-control form-control-sm f-penales_atajo" value=""></div>
                         </div>
                     </div>
                 </div>`;
