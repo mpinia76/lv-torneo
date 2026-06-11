@@ -1242,7 +1242,7 @@ class ScraperController extends Controller
                     'vallas_invictas' => $vallasInvictas,   // ← antes era 0
                     'amarillas'       => $amarillas,
                     'rojas'           => $rojas,
-                    'torneo_logo'     => null,
+                    'torneo_logo'     => $this->logoTorneo($competition),
                     'tipo'            => $tipo,
                     'ambito'          => $ambito,
                 ];
@@ -2030,7 +2030,7 @@ class ScraperController extends Controller
 
     // Map a TM competition name -> logo filename you already have in public/images/torneos/.
     // The year is stripped before matching, so "Campeonato Brasileiro Série A 2010/11" -> brasileirao.
-    private function logoTorneo($competitionConAnio)
+        private function logoTorneo($competitionConAnio)
     {
         $nombre = preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competitionConAnio);
         $key = (string) \Str::of($nombre)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
@@ -2073,16 +2073,18 @@ class ScraperController extends Controller
             return null;
         };
 
-        $tec = \App\TecnicoEstadisticaManual::whereNotNull('torneo_logo')
-            ->where('torneo_logo', '!=', '')
-            ->orderByDesc('id')->get(['torneo_nombre', 'torneo_logo']);
-        $hit = $buscar($tec);
-        if ($hit) return $hit;
-
-        $eq = \App\EquipoEstadisticaManual::whereNotNull('torneo_logo')
-            ->where('torneo_logo', '!=', '')
-            ->orderByDesc('id')->get(['torneo_nombre', 'torneo_logo']);
-        return $buscar($eq);
+        foreach ([
+                     \App\TecnicoEstadisticaManual::class,
+                     \App\EquipoEstadisticaManual::class,
+                     \App\JugadorEstadisticaManual::class,   // 👈 sumar jugadores
+                 ] as $modelo) {
+            $rows = $modelo::whereNotNull('torneo_logo')
+                ->where('torneo_logo', '!=', '')
+                ->orderByDesc('id')->get(['torneo_nombre', 'torneo_logo']);
+            $hit = $buscar($rows);
+            if ($hit) return $hit;
+        }
+        return null;
     }
 
     public function tecnicoWikipedia(Request $request)

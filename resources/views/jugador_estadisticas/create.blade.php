@@ -414,6 +414,7 @@
                         vallas_invictas:  0,
                         tipo:             row.tipo ?? '',
                         ambito:           row.ambito ?? '',
+                        torneo_logo:      row.torneo_logo ?? '',
                     };
                 }
                 torneos[key].partidos        += parseInt(row.partidos ?? 0);
@@ -449,7 +450,10 @@
 
             lista.forEach((c, idx) => {
                 let equipoMatch = matchEquipoId(c.equipo);
-
+                let baseImg = "{{ url('images') }}";
+                let logoPreview = c.torneo_logo
+                    ? '<img src="' + baseImg + '/' + c.torneo_logo + '" alt="logo" height="28" class="d-block mb-1">'
+                    : '';
                 html += `
                 <div class="card mb-3 fila-torneo" data-idx="${idx}">
                     <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
@@ -483,7 +487,9 @@
                             </div>
                             <div class="form-group col-md-2">
                                 <label class="small mb-0">Logo</label>
+                                ${logoPreview}
                                 <input type="file" class="form-control-file form-control-sm f-logo_file">
+                                <input type="hidden" class="f-torneo_logo" value="${c.torneo_logo ?? ''}">
                             </div>
                         </div>
 
@@ -744,7 +750,7 @@
                 'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_en_contra',
                 'amarillas', 'rojas',
                 'penales_errados', 'penales_atajados',
-                'goles_recibidos', 'vallas_invictas', 'penales_atajo',
+                'goles_recibidos', 'vallas_invictas', 'penales_atajo', 'torneo_logo',
             ];
 
             // Build multipart FormData so each row can carry its uploaded logo file.
