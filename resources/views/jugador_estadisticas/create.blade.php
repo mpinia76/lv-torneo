@@ -471,6 +471,7 @@
                             <div class="form-group col-md-3">
                                 <label class="small mb-0">Equipo</label>
                                 <select class="form-control form-control-sm f-equipo_id select2-equipo" style="width:100%">${opcionesEquipos(equipoMatch)}</select>
+                                <small class="text-muted d-block mt-1">Scrapeado: <strong>${clean(c.equipo)}</strong></small>
                             </div>
                             <div class="form-group col-md-2">
                                 <label class="small mb-0">Tipo</label>
