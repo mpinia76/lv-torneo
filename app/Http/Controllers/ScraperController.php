@@ -1218,7 +1218,7 @@ class ScraperController extends Controller
                 $tipo = $esLiga ? 'Liga' : 'Copa';
 
 // Fix 3: filtrar selecciones por palabras clave en clubName
-                $selecciones = ['argentina', 'brasil', 'españa', 'france', 'italia', 'alemania',
+                /*$selecciones = ['argentina', 'brasil', 'españa', 'france', 'italia', 'alemania',
                     'germany', 'england', 'portugal', 'colombia', 'uruguay', 'chile',
                     'mexico', 'peru', 'venezuela', 'ecuador', 'paraguay', 'bolivia',
                     'estados unidos', 'usa', 'netherlands', 'holanda', 'belgica',
@@ -1229,7 +1229,7 @@ class ScraperController extends Controller
                 foreach ($selecciones as $pais) {
                     if (strpos($clubLower, $pais) !== false) { $esSeleccion = true; break; }
                 }
-                if ($esSeleccion) continue;
+                if ($esSeleccion) continue;*/
 
                 $data[] = [
                     'competition'     => $competition,
