@@ -83,7 +83,15 @@
                         @endif
                     </div>
                 </div>
-
+                @if($tipo=='' && ($totalManuales ?? 0) > 0)
+                    <div class="row mt-2">
+                        <div class="col-12 text-center">
+                            <small class="text-muted">
+                                Incluye {{ $totalManuales }} partidos cargados manualmente, no listados en la tabla.
+                            </small>
+                        </div>
+                    </div>
+                @endif
                 {{-- Tabla de partidos --}}
                 <div class="row mt-4">
                     <div class="col-md-12">

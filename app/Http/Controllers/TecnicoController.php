@@ -935,9 +935,29 @@ WHERE (tecnicos.id = ".$id.")";
 
         $i=$offSet+1;
 
+// Add manual stats. Unlike player manuals, coach manuals store the full
+// win/draw/loss breakdown, so they can be merged into every counter and the
+// pie chart stays consistent. Manuals don't belong to a real torneo, so
+// they're only added when not filtering by a specific torneo.
+        if (!$idTorneo) {
+            $manuales = DB::table('tecnico_estadistica_manuals')
+                ->where('tecnico_id', $id)
+                ->get();
 
+            foreach ($manuales as $m) {
+                $totalJugados   += $m->partidos;
+                $totalGanados   += $m->ganados;
+                $totalEmpatados += $m->empatados;
+                $totalPerdidos  += $m->perdidos;
+            }
+        }
 
-        return view('tecnicos.jugados', compact('tecnico','torneo','totalJugados','totalGanados','totalEmpatados','totalPerdidos','partidos','tipo'));
+        $totalManuales = 0;
+        if (!$idTorneo) {
+            $totalManuales = $manuales->sum('partidos');
+        }
+
+        return view('tecnicos.jugados', compact('tecnico','torneo','totalJugados','totalGanados','totalEmpatados','totalPerdidos','partidos','tipo','totalManuales'));
     }
 
     public function importar(Request $request)
