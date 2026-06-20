@@ -95,13 +95,14 @@
                             $escudos = array_unique(explode(',', $jugador->escudo));
                         @endphp
                         @foreach($escudos as $escudo)
-
                             @if($escudo!='')
                                 @php
-                                    $escudoArr = explode('_',$escudo);
+                                    $escudoArr = explode('_', $escudo);
+                                    $nombreEquipo = $escudoArr[2] ?? '';
                                 @endphp
                                 <a href="{{route('equipos.ver', array('equipoId' => $escudoArr[1]))}}" >
-                                    <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25">
+                                    <img id="original" src="{{ url('images/'.$escudoArr[0]) }}" height="25"
+                                         title="{{ $nombreEquipo }}" alt="{{ $nombreEquipo }}">
                                 </a>
                             @endif
                         @endforeach
@@ -113,13 +114,14 @@
                             $escs = array_unique(explode(',', $jugador->jugando));
                         @endphp
                         @foreach($escs as $esc)
-
                             @if($esc!='')
                                 @php
-                                    $escArr = explode('_',$esc);
+                                    $escArr = explode('_', $esc);
+                                    $nombreEquipo = $escArr[2] ?? '';
                                 @endphp
                                 <a href="{{route('equipos.ver', array('equipoId' => $escArr[1]))}}" >
-                                    <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25">
+                                    <img id="original" src="{{ url('images/'.$escArr[0]) }}" height="25"
+                                         title="{{ $nombreEquipo }}" alt="{{ $nombreEquipo }}">
                                 </a>
                             @endif
                         @endforeach

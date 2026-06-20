@@ -4599,7 +4599,7 @@ group by jugador_id, jugador, foto, nacionalidad';
 
             $eid = $manual->equipo_id;
             if (!isset($equipos[$eid])) {
-                $equipos[$eid] = ['escudo' => $manual->escudo];
+                $equipos[$eid] = ['escudo' => $manual->escudo, 'nombre' => $manual->nombre];
             }
 
             if (str_contains($manual->torneo_nombre, $year)) {
@@ -4610,7 +4610,7 @@ group by jugador_id, jugador, foto, nacionalidad';
         // Rebuild escudo string
         $j->escudo = '';
         foreach ($equipos as $id => $data) {
-            $j->escudo .= $data['escudo'] . '_' . $id . ',';
+            $j->escudo .= $data['escudo'] . '_' . $id . '_' . ($data['nombre'] ?? '') . ',';
         }
     }
 
@@ -4620,7 +4620,7 @@ group by jugador_id, jugador, foto, nacionalidad';
     private function cargarDatosRealesJugador($jugador, $year)
     {
         // Current-year teams
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
         FROM alineacions
         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
         INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -4631,12 +4631,39 @@ group by jugador_id, jugador, foto, nacionalidad';
         INNER JOIN torneos ON torneos.id = grupos.torneo_id
         WHERE torneos.year LIKE '%" . $year . "%' AND jugadors.id = " . $jugador->jugador_id;
 
+        // Parse the existing 'jugando' string (it may already contain current-year
+        // teams added from manual stats) into an array indexed by equipo_id, so the
+        // same club is never shown twice in the "Actual" column.
+        $jugandoEquipos = [];
+        if (!empty($jugador->jugando)) {
+            foreach (explode(',', trim($jugador->jugando, ',')) as $item) {
+                if (!$item) continue;
+                $parts = explode('_', $item);
+                if (count($parts) < 2) continue;
+                // 0 = escudo, 1 = equipo_id, 2 = nombre (may be missing in old entries)
+                $jugandoEquipos[$parts[1]] = [
+                    'escudo' => $parts[0],
+                    'nombre' => $parts[2] ?? '',
+                ];
+            }
+        }
+
         foreach (DB::select(DB::raw($sqlJugando)) as $e) {
-            $jugador->jugando .= $e->escudo . '_' . $e->equipo_id . ',';
+            if (!isset($jugandoEquipos[$e->equipo_id])) {
+                $jugandoEquipos[$e->equipo_id] = [
+                    'escudo' => $e->escudo,
+                    'nombre' => $e->nombre,
+                ];
+            }
+        }
+
+        $jugador->jugando = '';
+        foreach ($jugandoEquipos as $id => $data) {
+            $jugador->jugando .= $data['escudo'] . '_' . $id . '_' . $data['nombre'] . ',';
         }
 
         // All historic teams — merge with manual escudos if present
-        $sql2 = 'SELECT DISTINCT escudo, equipo_id
+        $sql2 = 'SELECT DISTINCT escudo, equipo_id, equipos.nombre
         FROM equipos
         INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
         INNER JOIN partidos ON partidos.id = alineacions.partido_id
@@ -4648,21 +4675,26 @@ group by jugador_id, jugador, foto, nacionalidad';
                 if (!$item) continue;
                 $parts = explode('_', $item);
                 if (count($parts) < 2) continue;
-                [$esc, $id] = $parts;
-                $equipos[$id] = ['escudo' => $esc];
+                $equipos[$parts[1]] = [
+                    'escudo' => $parts[0],
+                    'nombre' => $parts[2] ?? '',
+                ];
             }
         }
 
         foreach (DB::select(DB::raw($sql2)) as $escudo) {
             $eid = $escudo->equipo_id;
             if (!isset($equipos[$eid])) {
-                $equipos[$eid] = ['escudo' => $escudo->escudo];
+                $equipos[$eid] = [
+                    'escudo' => $escudo->escudo,
+                    'nombre' => $escudo->nombre,
+                ];
             }
         }
 
         $jugador->escudo = '';
         foreach ($equipos as $id => $data) {
-            $jugador->escudo .= $data['escudo'] . '_' . $id . ',';
+            $jugador->escudo .= $data['escudo'] . '_' . $id . '_' . $data['nombre'] . ',';
         }
     }
 
