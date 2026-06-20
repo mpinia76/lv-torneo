@@ -46,11 +46,11 @@
                             {{-- Cards de Jugados/Ganados/Empatados/Perdidos --}}
                             @php
                                 $opciones = [
-                                    '' => ['label' => 'Jugados', 'total' => $totalJugados],
-                                    'Ganados' => ['label' => 'Ganados', 'total' => $totalGanados],
-                                    'Empatados' => ['label' => 'Empatados', 'total' => $totalEmpatados],
-                                    'Perdidos' => ['label' => 'Perdidos', 'total' => $totalPerdidos],
-                                ];
+                                        '' => ['label' => 'Jugados', 'total' => $totalJugados + ($totalManuales ?? 0)],
+                                        'Ganados' => ['label' => 'Ganados', 'total' => $totalGanados],
+                                        'Empatados' => ['label' => 'Empatados', 'total' => $totalEmpatados],
+                                        'Perdidos' => ['label' => 'Perdidos', 'total' => $totalPerdidos],
+                                    ];
                             @endphp
 
                             @foreach($opciones as $tipoClave => $opcion)
@@ -80,6 +80,17 @@
                                     </div>
                                 </div>
                             </div>
+
+                            @if(($totalManuales ?? 0) > 0)
+                                <div class="row mt-2">
+                                    <div class="col-12 text-center">
+                                        <small class="text-muted">
+                                            Incluye {{ $totalManuales }} partidos cargados manualmente sin detalle de resultado,
+                                            no representados en el gráfico ni en la tabla.
+                                        </small>
+                                    </div>
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </div>

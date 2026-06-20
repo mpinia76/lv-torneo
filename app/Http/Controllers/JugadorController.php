@@ -1247,6 +1247,17 @@ group by tecnico_id
             ->paginate(15)
             ->appends($request->query());
 
+        // Manual matches: stored as an aggregated count with no win/draw/loss
+// breakdown and no real torneo, so they're kept separate from the real
+// totals (which feed the pie chart) and only counted when not filtering
+// by a specific torneo.
+        $totalManuales = 0;
+        if (!$idTorneo) {
+            $totalManuales = (int) DB::table('jugador_estadistica_manuals')
+                ->where('jugador_id', $id)
+                ->sum('partidos');
+        }
+
         return view('jugadores.jugados', compact(
             'jugador',
             'torneo',
@@ -1254,6 +1265,7 @@ group by tecnico_id
             'totalGanados',
             'totalEmpatados',
             'totalPerdidos',
+            'totalManuales',
             'partidos',
             'tipo'
         ));
