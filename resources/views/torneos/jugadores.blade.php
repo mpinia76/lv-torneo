@@ -92,7 +92,7 @@
                     {{$jugador->jugador}} <img id="original" src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}"></td>
                 <td>@if($jugador->escudo)
                         @php
-                            $escudos = explode(',',$jugador->escudo);
+                            $escudos = array_unique(explode(',', $jugador->escudo));
                         @endphp
                         @foreach($escudos as $escudo)
 
@@ -110,7 +110,7 @@
                     </td>
                 <td>@if($jugador->jugando)
                         @php
-                            $escs = explode(',',$jugador->jugando);
+                            $escs = array_unique(explode(',', $jugador->jugando));
                         @endphp
                         @foreach($escs as $esc)
 
