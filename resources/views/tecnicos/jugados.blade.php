@@ -53,6 +53,14 @@
                                 ];
                             @endphp
 
+                            @php
+                                $manualesActivos = [
+                                    '' => $totalManualesJugados ?? 0,
+                                    'Ganados' => $totalManualesGanados ?? 0,
+                                    'Empatados' => $totalManualesEmpatados ?? 0,
+                                    'Perdidos' => $totalManualesPerdidos ?? 0,
+                                ][$tipo] ?? 0;
+                            @endphp
                             @foreach($opciones as $tipoClave => $opcion)
                                 <div class="col-6 col-md-3 mb-2">
                                     <a href="{{ route('tecnicos.jugados', array_filter([
@@ -83,11 +91,13 @@
                         @endif
                     </div>
                 </div>
-                @if($tipo=='' && ($totalManuales ?? 0) > 0)
+                @if($manualesActivos > 0)
                     <div class="row mt-2">
                         <div class="col-12 text-center">
                             <small class="text-muted">
-                                Incluye {{ $totalManuales }} partidos cargados manualmente, no listados en la tabla.
+                                {{ $manualesActivos }}
+                                {{ $manualesActivos == 1 ? 'partido cargado manualmente no está' : 'partidos cargados manualmente no están' }}
+                                listados en la tabla.
                             </small>
                         </div>
                     </div>
