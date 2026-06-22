@@ -2459,4 +2459,115 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+    public function jugadorFbref(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json([]);
+
+        $html = HttpHelper::getHtmlContent($url, false);
+        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
+        if (!$html) return response()->json(['error' => 'No se pudo obtener la página de FBref']);
+
+        // FBref esconde tablas dentro de comentarios HTML (lazy-load) -> destapar.
+        $html = str_replace(['<!--', '-->'], '', $html);
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+        $xpath = new \DOMXPath($dom);
+
+        $jugadorId = $request->jugador_id;
+
+        $existentes = collect()
+            ->merge(
+                $jugadorId
+                    ? \App\JugadorEstadisticaManual::where('jugador_id', $jugadorId)->pluck('torneo_nombre')
+                    : collect()
+            )
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->unique()->flip()->toArray();
+
+        // Lee una celda por data-stat (con aliases por las dudas).
+        $cell = function ($row, array $stats) use ($xpath) {
+            foreach ($stats as $s) {
+                $n = $xpath->query(".//*[@data-stat='{$s}']", $row)->item(0);
+                if ($n) return trim($n->textContent);
+            }
+            return '';
+        };
+        $int = fn ($v) => $v === '' ? 0 : (int) preg_replace('/\D/', '', $v);
+
+        $rows = $xpath->query("//table[contains(@id,'stats_standard')]/tbody/tr[not(contains(@class,'thead'))]");
+
+        $data = [];
+        $seen = [];
+
+        foreach ($rows as $row) {
+            $season = $cell($row, ['season', 'year_id']);
+            if (!preg_match('/(\d{4})/', $season, $my)) continue;
+            $year = $my[1];
+            if ((int) $year < 2000) continue;
+
+            $club = $cell($row, ['team', 'squad']);
+            $comp = $cell($row, ['comp_level', 'comp']);
+            if ($club === '' || $comp === '') continue;
+
+            $pj = $int($cell($row, ['games', 'matches_played']));
+            if ($pj === 0) continue;
+
+            // Dedup (FBref repite temporada en dom_lg y en all-comps).
+            $key = $season . '|' . $comp . '|' . $club;
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+
+            if ($this->debeExcluirCompetencia($comp)) continue;
+            if ($this->debeExcluirEquipo($club))      continue;
+
+            // --- stats ---
+            $goles       = $int($cell($row, ['goals']));
+            $amarillas   = $int($cell($row, ['cards_yellow']));
+            $rojas       = $int($cell($row, ['cards_red']));
+            $pensMade    = $int($cell($row, ['pens_made']));
+            $pensAtt     = $int($cell($row, ['pens_att']));
+            $pensErrados = max(0, $pensAtt - $pensMade);
+
+            $competition = $comp . ' ' . $year;
+            $keyDedup = (string) \Str::of($competition)->lower()->ascii()
+                ->replaceMatches('/\s+/', ' ')->trim();
+            if (isset($existentes[$keyDedup])) continue;
+
+            // tipo/ambito con tu misma heurística.
+            list($tipo, $ambito) = $this->clasificarCompetencia($comp);
+
+            $data[] = [
+                'competition'     => $competition,
+                'equipo'          => $club,
+                'posicion'        => 0,
+                'partidos'        => $pj,
+                // FBref no desglosa por tipo -> todo a "jugada", como con FDB.
+                'goles_jugada'    => $goles,
+                'goles_en_contra' => 0,
+                'goles_recibidos' => 0,
+                'vallas_invictas' => 0,
+                'amarillas'       => $amarillas,
+                'rojas'           => $rojas,
+                'penales_errados' => $pensErrados,
+                'torneo_logo'     => $this->logoTorneo($competition),
+                'tipo'            => $tipo,
+                'ambito'          => $ambito,
+            ];
+        }
+
+        return response()->json($data);
+    }
+
 }
