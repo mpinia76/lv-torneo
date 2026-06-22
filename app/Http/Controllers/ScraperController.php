@@ -2504,7 +2504,9 @@ class ScraperController extends Controller
             }
             return '';
         };
-        $int = fn ($v) => $v === '' ? 0 : (int) preg_replace('/\D/', '', $v);
+        $int = function ($v) {
+            return $v === '' ? 0 : (int) preg_replace('/\D/', '', $v);
+        };
 
         $rows = $xpath->query("//table[contains(@id,'stats_standard')]/tbody/tr[not(contains(@class,'thead'))]");
 
