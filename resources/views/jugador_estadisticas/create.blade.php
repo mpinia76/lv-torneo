@@ -65,17 +65,7 @@
                 </button>
             </div>
         </div>
-        {{-- Importar desde FBref --}}
-        <div class="mb-3">
-            <label>Importar desde FBref</label>
-            <div class="d-flex">
-                <input type="text" id="fbrefUrl" class="form-control mr-2"
-                       placeholder="https://fbref.com/en/players/e0abe95e/Gabriel-Hauche">
-                <button type="button" class="btn btn-info" onclick="scrapearFbref()" style="white-space:nowrap;">
-                    📊 Scrapear
-                </button>
-            </div>
-        </div>
+
         <div id="loadingScraper" style="display:none;" class="alert alert-info">
             ⏳ Cargando datos, puede tardar unos segundos...
         </div>
@@ -427,7 +417,6 @@
                         rojas:            0,
                         goles_recibidos:  0,
                         vallas_invictas:  0,
-                        penales_errados: 0,
                         tipo:             row.tipo ?? '',
                         ambito:           row.ambito ?? '',
                         torneo_logo:      row.torneo_logo ?? '',
@@ -441,7 +430,6 @@
                 torneos[key].rojas           += parseInt(row.rojas ?? 0);
                 torneos[key].goles_recibidos += parseInt(row.goles_recibidos ?? 0);
                 torneos[key].vallas_invictas += parseInt(row.vallas_invictas ?? 0);
-                torneos[key].penales_errados += parseInt(row.penales_errados ?? 0);
             });
 
             let lista = Object.values(torneos);
@@ -847,39 +835,6 @@
                 resumen.innerHTML = '<span style="color:#a94442">Error guardando.</span>';
             }
         }
-
-        function scrapearFbref() {
-            let url = document.getElementById('fbrefUrl').value.trim();
-            if (!url) {
-                alert('Ingresá la URL del jugador en FBref');
-                return;
-            }
-
-            document.getElementById('loadingScraper').style.display = 'block';
-            document.getElementById('resultadoScraper').innerHTML = '';
-
-            let jugadorId = document.querySelector('[name="jugador_id"]').value;
-            fetch("{{ url('/admin/scraper/jugador-fbref') }}?url=" + encodeURIComponent(url)
-                + "&jugador_id=" + jugadorId)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
-                        document.getElementById('resultadoScraper').innerHTML =
-                            '<div class="alert alert-danger">' + data.error + '</div>';
-                        return;
-                    }
-                    renderResultados(data);
-                })
-                .catch(err => {
-                    console.error(err);
-                    document.getElementById('resultadoScraper').innerHTML =
-                        '<div class="alert alert-danger">Error scrapeando FBref</div>';
-                })
-                .finally(() => {
-                    document.getElementById('loadingScraper').style.display = 'none';
-                });
-        }
-
     </script>
 
 @endsection

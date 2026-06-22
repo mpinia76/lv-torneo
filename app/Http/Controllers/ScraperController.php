@@ -2504,9 +2504,7 @@ class ScraperController extends Controller
             }
             return '';
         };
-        $int = function ($v) {
-            return $v === '' ? 0 : (int) preg_replace('/\D/', '', $v);
-        };
+        $int = fn ($v) => $v === '' ? 0 : (int) preg_replace('/\D/', '', $v);
 
         $rows = $xpath->query("//table[contains(@id,'stats_standard')]/tbody/tr[not(contains(@class,'thead'))]");
 
@@ -2535,11 +2533,11 @@ class ScraperController extends Controller
             if ($this->debeExcluirEquipo($club))      continue;
 
             // --- stats ---
-            $goles       = $int($cell($row, ['goals']));
-            $amarillas   = $int($cell($row, ['cards_yellow']));
-            $rojas       = $int($cell($row, ['cards_red']));
-            $pensMade    = $int($cell($row, ['pens_made']));
-            $pensAtt     = $int($cell($row, ['pens_att']));
+            $goles      = $int($cell($row, ['goals']));
+            $amarillas  = $int($cell($row, ['cards_yellow']));
+            $rojas      = $int($cell($row, ['cards_red']));
+            $pensMade   = $int($cell($row, ['pens_made']));
+            $pensAtt    = $int($cell($row, ['pens_att']));
             $pensErrados = max(0, $pensAtt - $pensMade);
 
             $competition = $comp . ' ' . $year;
@@ -2555,14 +2553,14 @@ class ScraperController extends Controller
                 'equipo'          => $club,
                 'posicion'        => 0,
                 'partidos'        => $pj,
-                // FBref no desglosa por tipo -> todo a "jugada", como con FDB.
+                // FBref no desglosa por tipo -> todo a "jugada", como hacés con FDB.
                 'goles_jugada'    => $goles,
                 'goles_en_contra' => 0,
                 'goles_recibidos' => 0,
                 'vallas_invictas' => 0,
                 'amarillas'       => $amarillas,
                 'rojas'           => $rojas,
-                'penales_errados' => $pensErrados,
+                'penales_errados' => $pensErrados,   // 👈 el campo que TM/FDB no te daban
                 'torneo_logo'     => $this->logoTorneo($competition),
                 'tipo'            => $tipo,
                 'ambito'          => $ambito,
