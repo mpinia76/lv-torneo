@@ -235,6 +235,26 @@
             return m ? parseInt(m[0]) : null;
         }
 
+        // Returns the set of calendar years a label refers to.
+        // "2012" -> [2012] ; "2011/12" -> [2011, 2012] ; "2005/06" -> [2005, 2006]
+        function aniosDe(txt) {
+            let s = (txt || '');
+            let cross = s.match(/\b((?:19|20)\d{2})\/(\d{2})\b/);   // "2011/12"
+            if (cross) {
+                let y1 = parseInt(cross[1]);
+                let y2 = parseInt(cross[1].slice(0, 2) + cross[2]); // 20|11/12 -> 2012
+                return [y1, y2];
+            }
+            let single = s.match(/\b((?:19|20)\d{2})\b/);
+            return single ? [parseInt(single[1])] : [];
+        }
+
+        // Two year-sets match if they share at least one calendar year.
+        function aniosSeSolapan(a, b) {
+            if (!a.length || !b.length) return false;   // si falta el año en alguno, no comparamos por año
+            return a.some(y => b.includes(y));
+        }
+
         // Dice coefficient on bigrams: cheap, no deps. Good for "copa do brasil" vs "copa de brasil".
         function similitud(a, b) {
             if (a === b) return 1;
@@ -271,22 +291,45 @@
             return similitud(x, y) >= 0.88;
         }
 
+        // Tournament-name matcher: tolerates abbreviations where one name is a shorter
+        // form of the other ("Serie A" ⊂ "Campeonato Brasileiro Série A"), on top of
+        // fuzzy similarity for spelling variants ("copa do/de brasil", "serie/série").
+        function mismoTorneo(a, b) {
+            let x = nombreSinAnio(a);
+            let y = nombreSinAnio(b);
+            if (!x || !y) return false;
+            if (x === y) return true;
+
+            // Containment by words: every word of the shorter name appears in the longer.
+            let corto = x.length <= y.length ? x : y;
+            let largo = x.length <= y.length ? y : x;
+            let palabrasCorto = corto.split(' ').filter(w => w.length >= 2);
+            if (palabrasCorto.length) {
+                let todasPresentes = palabrasCorto.every(w => largo.includes(w));
+                // Require the short name to be meaningful (not just "a" / "copa"): at least
+                // 2 shared words, or one long distinctive word (>=5 chars).
+                let distintivo = palabrasCorto.length >= 2
+                    || palabrasCorto.some(w => w.length >= 5);
+                if (todasPresentes && distintivo) return true;
+            }
+
+            // Spelling variants of similar length.
+            return similitud(x, y) >= 0.82;
+        }
+
         // Returns { ref, sim } if `competition`+`equipo` looks like an existing entry, else null.
         function buscarSimilar(competition, equipo, referencias) {
-            let n = nombreSinAnio(competition);
-            let y = anioDe(competition);
-            if (!n) return null;
+            let yA = aniosDe(competition);
+            if (!nombreSinAnio(competition)) return null;
 
             for (let ref of referencias) {
-                let nr = nombreSinAnio(ref.competition);
-                let yr = anioDe(ref.competition);
+                let yB = aniosDe(ref.competition);
 
-                let sim = similitud(n, nr);
-                if (sim < 0.82) continue;                              // 1) name (fuzzy)
-                if (y === null || yr === null || y !== yr) continue;   // 2) same year (exact)
-                if (!mismoClub(equipo, ref.equipo)) continue;          // 3) same club (flexible)
+                if (!mismoTorneo(competition, ref.competition)) continue;  // 1) nombre (contención + fuzzy)
+                if (!aniosSeSolapan(yA, yB)) continue;                     // 2) año (solapamiento)
+                if (!mismoClub(equipo, ref.equipo)) continue;              // 3) club
 
-                return { ref: ref.competition, sim };
+                return { ref: ref.competition, sim: 1 };
             }
             return null;
         }
