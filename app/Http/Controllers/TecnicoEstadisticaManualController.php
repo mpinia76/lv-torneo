@@ -44,8 +44,12 @@ class TecnicoEstadisticaManualController extends Controller
         $tecnico = Tecnico::findOrFail($tecnicoId);
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
         $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
-
-        return view('tecnico_estadisticas.create', compact('tecnico', 'equipos'));
+// Torneos ya guardados de este técnico, para avisar duplicados al scrapear.
+        $yaGuardados = \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnico->id)
+            ->pluck('torneo_nombre')
+            ->filter()
+            ->values();
+        return view('tecnico_estadisticas.create', compact('tecnico', 'equipos','yaGuardados'));
     }
 
     /**

@@ -180,7 +180,9 @@
 
         </form>
     </div>
-
+    <script>
+        window.TORNEOS_GUARDADOS = @json($yaGuardados);
+    </script>
     <script>
         // Build the <option> list for the team selects, reusing the page's main equipo select.
         function opcionesEquipos(selectedId) {
@@ -210,6 +212,50 @@
                 .replace(/\./g, "")
                 .replace(/club|fc|de|la|el/g, "")
                 .trim();
+        }
+
+        // Strip year + accents + noise so "Série A 2005/06" and "Serie A 2006" collapse together.
+        function nombreSinAnio(txt) {
+            return (txt || '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/\b(19|20)\d{2}(\/\d{2})?\b/g, '')   // drop years / ranges
+                .replace(/[^a-z0-9 ]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function anioDe(txt) {
+            let m = (txt || '').match(/\b(19|20)\d{2}\b/);
+            return m ? parseInt(m[0]) : null;
+        }
+
+        // Dice coefficient on bigrams: cheap, no deps, good for "copa do brasil" vs "copa de brasil".
+        function similitud(a, b) {
+            if (a === b) return 1;
+            if (a.length < 2 || b.length < 2) return 0;
+            let bg = s => { let r = []; for (let i = 0; i < s.length - 1; i++) r.push(s.slice(i, i + 2)); return r; };
+            let A = bg(a), B = bg(b), inter = 0, used = B.slice();
+            A.forEach(g => { let i = used.indexOf(g); if (i >= 0) { inter++; used[i] = null; } });
+            return (2 * inter) / (A.length + B.length);
+        }
+
+        // Returns the matching reference (or null) if competition looks like a dup.
+        function buscarSimilar(competition, referencias) {
+            let n = nombreSinAnio(competition);
+            let y = anioDe(competition);
+            if (!n) return null;
+
+            for (let ref of referencias) {
+                let nr = nombreSinAnio(ref);
+                let yr = anioDe(ref);
+                let sim = similitud(n, nr);
+
+                // Same/very close name AND year within ±1 (covers TM's South-American offset).
+                let anioOk = (y === null || yr === null) ? true : Math.abs(y - yr) <= 1;
+                if (sim >= 0.82 && anioOk) return { ref, sim };
+            }
+            return null;
         }
 
         function clean(texto) {
@@ -299,7 +345,7 @@
         }
 
         // Build the markup for a single tournament card.
-        function cardTorneo(c, idx) {
+        function cardTorneo(c, idx, similar = null) {
             let equipoMatch = matchEquipoId(c.equipo);
 
             let baseImg = "{{ url('images') }}";
@@ -308,10 +354,12 @@
                 : '';
 
             return `
-        <div class="card mb-3 fila-torneo" data-idx="${idx}">
+        <div class="card mb-3 fila-torneo ${similar ? 'border-warning' : ''}" data-idx="${idx}">
             <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
                 <input type="checkbox" class="check-torneo mr-2" value="${idx}">
                 <strong style="color: darkgreen;">${clean(c.competition)}</strong>
+${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar.ref}">
+    ⚠ Posible duplicado (${Math.round(similar.sim * 100)}%)</span>` : ''}
                 <span class="ml-auto">
                     <button type="button" onclick='excluirCompetencia(${JSON.stringify(c.competition)}, this)'
                         class="btn btn-danger btn-sm" title="No mostrar más esta competencia">🚫 Comp.</button>
@@ -405,7 +453,14 @@
             });
 
             Object.values(torneos).forEach(c => {
-                lista.insertAdjacentHTML('beforeend', cardTorneo(c, _idxTorneo++));
+                // Referencias = guardados en DB + cards ya pintadas en esta tanda.
+                let refs = (window.TORNEOS_GUARDADOS || []).slice();
+                document.querySelectorAll('#listaTorneos .f-torneo_nombre').forEach(i => {
+                    if (i.value) refs.push(i.value);
+                });
+
+                let hit = buscarSimilar(c.competition, refs);
+                lista.insertAdjacentHTML('beforeend', cardTorneo(c, _idxTorneo++, hit));
             });
 
             // Init Select2 only on the newly added selects (avoid re-init).

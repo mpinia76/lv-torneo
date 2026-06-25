@@ -832,8 +832,6 @@ class ScraperController extends Controller
 
             if ($this->debeExcluirEquipo($club)) continue;
 
-            $detalleComp = $this->detalleCompetenciasFBDB($xpath, $row);
-
             $competencias = [
                 'champ' => ['tipo' => 'Liga', 'ambito' => 'Nacional'],
                 'cont'  => ['tipo' => 'Copa', 'ambito' => 'Internacional'],
@@ -925,72 +923,79 @@ class ScraperController extends Controller
                     }
                 }
 
-                // cont/cup: the summary bucket is a season-total over several cups. Split it
-// using the real per-competition PJ from the detail, prorating the rest.
-                if ($suffix === 'cont' || $suffix === 'cup') {
+                // For cont/cup: parse multiple competitions from lastRoundsRaw
+                // Format: "- Copa Libertadores2e t2e tour - Copa Sudamericana1er 1er tour"
+                if (($suffix === 'cont' || $suffix === 'cup') && $lastRoundsRaw) {
+                    // Split on " - " keeping each competition block
+                    $parts = preg_split('/\s+-\s+/', $lastRoundsRaw, -1, PREG_SPLIT_NO_EMPTY);
 
-                    $delBucket = [];
-                    foreach ($detalleComp as $dc) {
-                        list($tDc, $aDc) = $this->clasificarCompetencia($dc['comp']);
-                        $esCup  = ($suffix === 'cup'  && $aDc === 'Nacional' && $tDc === 'Copa');
-                        $esCont = ($suffix === 'cont' && $aDc === 'Internacional');
-                        if ($esCup || $esCont) $delBucket[] = $dc;
-                    }
+                    $competitionsFound = [];
+                    foreach ($parts as $part) {
+                        $part = trim($part);
+                        if (!$part) continue;
 
-                    if (!empty($delBucket)) {
-                        $bucketTot = ['pj' => $pj, 'v' => $v, 'e' => $e, 'd' => $d, 'gf' => $gf, 'gc' => $gc];
+                        // Strip round suffixes — everything after the comp name
+                        // Patterns: "1/2 finales", "1/4 de finale", "FinaFinale", "Grou Groupe X",
+                        //           "2e t2e tour", "1er 1er tour", "Tour préliminaire", etc.
+                        $name = preg_replace(
+                            '/\s*(Fina\s*Finale?|Final|1\/2.*|1\/4.*|1\/8.*|1\/16.*|1\/32.*|\d+[a-z]*\s*[a-z]*\s*tour.*|Grou.*|Tour.*|Group.*|Phase.*|Round.*|\d+\s*de\s*finale.*|Journee.*)/i',
+                            '',
+                            $part
+                        );
+                        $name = trim($name);
 
-                        foreach ($this->repartirBucketFBDB($bucketTot, $delBucket) as $part) {
-                            if ($this->debeExcluirCompetencia($part['comp'])) continue;
-
-                            list($tipoComp, $ambitoComp) = $this->clasificarCompetencia($part['comp']);
-                            $competition = $part['comp'] . ' ' . $year;
-                            $key = (string) \Str::of($competition)->lower()->ascii()
-                                ->replaceMatches('/\s+/', ' ')->trim();
-                            if (isset($existentes[$key])) continue;
-
-                            $data[] = [
-                                'competition' => $competition,
-                                'equipo'      => $club,
-                                'posicion'    => null,
-                                'partidos'    => $part['pj'],
-                                'ganados'     => $part['v'],
-                                'empatados'   => $part['e'],
-                                'perdidos'    => $part['d'],
-                                'gf'          => $part['gf'],
-                                'ge'          => $part['gc'],
-                                'torneo_logo' => null,
-                                'tipo'        => $tipoComp,
-                                'ambito'      => $ambitoComp,
-                            ];
+                        if (strlen($name) > 2) {
+                            $competitionsFound[] = $name;
                         }
-                        continue;
                     }
 
-                    // Fallback (no usable detail): ONE entry with the bucket total.
-                    // Never duplicate the total across guessed names.
-                    if (!$compName) $compName = $meta['tipo'];
-                    if ($this->debeExcluirCompetencia($compName)) continue;
+                    if (empty($competitionsFound) && $compName) {
+                        $competitionsFound[] = $compName;
+                    }
 
-                    $competition = $compName . ' ' . $year;
-                    $key = (string) \Str::of($competition)->lower()->ascii()
-                        ->replaceMatches('/\s+/', ' ')->trim();
-                    if (isset($existentes[$key])) continue;
+                    if (empty($competitionsFound)) {
+                        $competitionsFound[] = $meta['tipo'];
+                    }
 
-                    $data[] = [
-                        'competition' => $competition,
-                        'equipo'      => $club,
-                        'posicion'    => null,
-                        'partidos'    => $pj,
-                        'ganados'     => $v,
-                        'empatados'   => $e,
-                        'perdidos'    => $d,
-                        'gf'          => $gf,
-                        'ge'          => $gc,
-                        'torneo_logo' => null,
-                        'tipo'        => $meta['tipo'],
-                        'ambito'      => $meta['ambito'],
-                    ];
+                    // Determine ambito per competition name
+                    $internacionalKw = ['champions', 'libertadores', 'sudamericana', 'europa league',
+                        'concacaf', 'mundial', 'intercontinental', 'club world', 'recopa', 'leagues cup'];
+
+                    foreach ($competitionsFound as $cName) {
+
+                        if ($this->debeExcluirCompetencia($cName)) {
+                            continue;
+                        }
+
+                        $competition = $cName . ' ' . $year;
+                        $key = (string) \Str::of($competition)->lower()->ascii()
+                            ->replaceMatches('/\s+/', ' ')->trim();
+
+                        if (isset($existentes[$key])) continue;
+
+                        $ambitoComp = 'Nacional';
+                        foreach ($internacionalKw as $kw) {
+                            if (stripos($cName, $kw) !== false) { $ambitoComp = 'Internacional'; break; }
+                        }
+
+                        $data[] = [
+                            'competition' => $competition,
+                            'equipo'      => $club,
+                            'posicion'    => null,
+                            'partidos'    => $pj,
+                            'ganados'     => $v,
+                            'empatados'   => $e,
+                            'perdidos'    => $d,
+                            'gf'          => $gf,
+                            'ge'          => $gc,
+                            'torneo_logo' => null,
+                            'tipo'        => 'Copa',
+                            'ambito'      => $ambitoComp,
+                        ];
+
+                    }
+
+                    // Skip the generic single-entry below for cont/cup
                     continue;
                 }
 
@@ -2452,78 +2457,6 @@ class ScraperController extends Controller
         }
 
         return response()->json($data);
-    }
-
-    /**
-     * Read the per-competition breakdown from the season's "morecareer" detail row.
-     * Same source jugadorFootballDatabase uses. Returns [ ['comp'=>string,'pj'=>int], ... ].
-     */
-    private function detalleCompetenciasFBDB($xpath, $seasonRow)
-    {
-        // The detail row is the next element sibling, id="morecareer_..._N".
-        $detailRow = null;
-        $next = $seasonRow->nextSibling;
-        while ($next) {
-            if ($next->nodeType === XML_ELEMENT_NODE) {
-                if (strpos($next->getAttribute('id'), 'morecareer') === 0) $detailRow = $next;
-                break;
-            }
-            $next = $next->nextSibling;
-        }
-        if (!$detailRow) return [];
-
-        $out = [];
-        $dRows = $xpath->query('.//table[contains(@class,"moreinformations")]//tr[td]', $detailRow);
-        foreach ($dRows as $dRow) {
-            $cols = $dRow->getElementsByTagName('td');
-            if ($cols->length < 3) continue;
-            $comp = trim($cols->item(1)->textContent); // col 1 = competition
-            $pj   = (int) trim($cols->item(2)->textContent); // col 2 = PJ
-            if ($comp === '' || $pj === 0) continue;
-            $out[] = ['comp' => $comp, 'pj' => $pj];
-        }
-        return $out;
-    }
-
-    /**
-     * Split a bucket season-total across competitions in proportion to each
-     * competition's real PJ. PJ stays exact (from the detail); V/E/D/GF/GC are
-     * prorated with largest-remainder rounding so the grand totals match exactly.
-     *
-     * @param array $bucket ['pj','v','e','d','gf','gc']
-     * @param array $comps  [ ['comp'=>string,'pj'=>int], ... ]
-     */
-    private function repartirBucketFBDB(array $bucket, array $comps)
-    {
-        $totalPj = array_sum(array_column($comps, 'pj'));
-        if ($totalPj <= 0) return [];
-
-        $campos = ['v', 'e', 'd', 'gf', 'gc'];
-        $out = [];
-        $remainders = [];
-
-        // 1) PJ exact; the rest floored proportionally, tracking fractional parts.
-        foreach ($comps as $i => $c) {
-            $row = ['comp' => $c['comp'], 'pj' => $c['pj']];
-            foreach ($campos as $f) {
-                $exact   = $bucket[$f] * $c['pj'] / $totalPj;
-                $row[$f] = (int) floor($exact);
-                $remainders[$f][] = ['i' => $i, 'frac' => $exact - $row[$f]];
-            }
-            $out[$i] = $row;
-        }
-
-        // 2) Hand leftovers to the largest fractions so each field sums to the total.
-        foreach ($campos as $f) {
-            $left = $bucket[$f] - array_sum(array_column($out, $f));
-            if ($left <= 0) continue;
-            usort($remainders[$f], function ($a, $b) { return $b['frac'] <=> $a['frac']; });
-            for ($k = 0; $k < $left && $k < count($remainders[$f]); $k++) {
-                $out[$remainders[$f][$k]['i']][$f] += 1;
-            }
-        }
-
-        return array_values($out);
     }
 
 
