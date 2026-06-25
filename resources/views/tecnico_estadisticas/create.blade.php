@@ -214,7 +214,12 @@
                 .trim();
         }
 
-        // Strip year + accents + noise so "Série A 2005/06" and "Serie A 2006" collapse together.
+        // ------------------------------------------------------------------
+        // Duplicate detection across scrapers (footballdb + Transfermarkt).
+        // Rule: same tournament name + same year + same club = duplicate.
+        // ------------------------------------------------------------------
+
+        // Strip year + accents + noise so "Série A 2005/06" and "Serie A 2006" collapse.
         function nombreSinAnio(txt) {
             return (txt || '')
                 .toLowerCase()
@@ -230,7 +235,7 @@
             return m ? parseInt(m[0]) : null;
         }
 
-        // Dice coefficient on bigrams: cheap, no deps, good for "copa do brasil" vs "copa de brasil".
+        // Dice coefficient on bigrams: cheap, no deps. Good for "copa do brasil" vs "copa de brasil".
         function similitud(a, b) {
             if (a === b) return 1;
             if (a.length < 2 || b.length < 2) return 0;
@@ -240,20 +245,48 @@
             return (2 * inter) / (A.length + B.length);
         }
 
-        // Returns the matching reference (or null) if competition looks like a dup.
-        function buscarSimilar(competition, referencias) {
+        // Flexible club matcher: tolerates FC/SC/AD/EC noise, accents, and "Goiás" vs
+        // "Goiás - GO", WITHOUT collapsing distinct clubs. The state suffix is KEPT
+        // (normalized) so homonyms like "Atlético-MG" vs "Atlético-PR" stay distinct.
+        function mismoClub(a, b) {
+            let limpiar = s => normalizar(s)                       // lower, no accents, drops club/fc/de/la/el
+                .replace(/\b(sc|ec|ad|sa|cf|afc|cd|sad)\b/g, ' ')  // common acronyms as noise
+                .replace(/\s*-\s*([a-z]{2})\b/g, ' $1')            // "- mg" -> "mg" (kept, not deleted)
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            let x = limpiar(a), y = limpiar(b);
+            if (!x || !y) return false;
+            if (x === y) return true;
+
+            // Containment only if the shared core is substantial: shorter must be fully
+            // inside the longer AND be most of it (blocks "sao" in "sao paulo" vs "sao caetano").
+            let corto = x.length <= y.length ? x : y;
+            let largo = x.length <= y.length ? y : x;
+            if (largo.includes(corto) && corto.length >= 4 && corto.length / largo.length >= 0.6) {
+                return true;
+            }
+
+            // Last resort: strict bigram similarity.
+            return similitud(x, y) >= 0.88;
+        }
+
+        // Returns { ref, sim } if `competition`+`equipo` looks like an existing entry, else null.
+        function buscarSimilar(competition, equipo, referencias) {
             let n = nombreSinAnio(competition);
             let y = anioDe(competition);
             if (!n) return null;
 
             for (let ref of referencias) {
-                let nr = nombreSinAnio(ref);
-                let yr = anioDe(ref);
-                let sim = similitud(n, nr);
+                let nr = nombreSinAnio(ref.competition);
+                let yr = anioDe(ref.competition);
 
-                // Same/very close name AND year within ±1 (covers TM's South-American offset).
-                let anioOk = (y === null || yr === null) ? true : Math.abs(y - yr) <= 1;
-                if (sim >= 0.82 && anioOk) return { ref, sim };
+                let sim = similitud(n, nr);
+                if (sim < 0.82) continue;                              // 1) name (fuzzy)
+                if (y === null || yr === null || y !== yr) continue;   // 2) same year (exact)
+                if (!mismoClub(equipo, ref.equipo)) continue;          // 3) same club (flexible)
+
+                return { ref: ref.competition, sim };
             }
             return null;
         }
@@ -453,13 +486,16 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
             });
 
             Object.values(torneos).forEach(c => {
-                // Referencias = guardados en DB + cards ya pintadas en esta tanda.
+                // References = saved in DB + cards already rendered in this batch (with their selected club).
                 let refs = (window.TORNEOS_GUARDADOS || []).slice();
-                document.querySelectorAll('#listaTorneos .f-torneo_nombre').forEach(i => {
-                    if (i.value) refs.push(i.value);
+                document.querySelectorAll('#listaTorneos .fila-torneo').forEach(card => {
+                    let nomb  = card.querySelector('.f-torneo_nombre');
+                    let selEq = card.querySelector('.f-equipo_id');
+                    let eqTxt = selEq && selEq.selectedIndex >= 0 ? selEq.options[selEq.selectedIndex].text : '';
+                    if (nomb && nomb.value) refs.push({ competition: nomb.value, equipo: eqTxt });
                 });
 
-                let hit = buscarSimilar(c.competition, refs);
+                let hit = buscarSimilar(c.competition, c.equipo, refs);
                 lista.insertAdjacentHTML('beforeend', cardTorneo(c, _idxTorneo++, hit));
             });
 
