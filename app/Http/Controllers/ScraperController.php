@@ -1252,6 +1252,207 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+    /**
+     * Rendimiento de jugador desde la API interna de Transfermarkt (tmapi).
+     *
+     * La página /detaillierteleistungsdaten ya NO trae la tabla en el HTML:
+     * la arma en el cliente consumiendo https://tmapi.transfermarkt.technology.
+     * El endpoint player/{id}/performance-game devuelve datos POR PARTIDO,
+     * así que replicamos la agregación (temporada + competición + club) que
+     * hace la web y cruzamos los IDs contra /competitions y /clubs.
+     *
+     * Devuelve el MISMO formato que jugadorFootballDatabase.
+     */
+    public function jugadorTransfermarkt(Request $request)
+    {
+        set_time_limit(0);
+
+        $url = trim($request->url);
+        if (!$url) return response()->json([]);
+
+        // ID del jugador desde cualquier URL de TM (.../spieler/28112)
+        if (!preg_match('#/spieler/(\d+)#', $url, $m)) {
+            return response()->json(['error' => 'URL inválida de Transfermarkt']);
+        }
+        $playerId = $m[1];
+
+        $base = 'https://tmapi.transfermarkt.technology';
+
+        // 1) Rendimiento por partido (JSON)
+        $perf = HttpHelper::getJson("{$base}/player/{$playerId}/performance-game");
+        if (!$perf || empty($perf['data']['performance']) || !is_array($perf['data']['performance'])) {
+            return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
+        }
+
+        // 2) Agregar por temporada|competición|club
+        $agg     = [];
+        $compIds = [];
+        $clubIds = [];
+
+        foreach ($perf['data']['performance'] as $g) {
+            $gi   = $g['gameInformation'] ?? [];
+            $gen  = $g['statistics']['generalStatistics'] ?? [];
+            $goal = $g['statistics']['goalStatistics'] ?? [];
+            $card = $g['statistics']['cardStatistics'] ?? [];
+            $time = $g['statistics']['playingTimeStatistics'] ?? [];
+            $seasonObj = $g['season'] ?? [];
+
+            $compId = $gi['competitionId'] ?? null;
+            // primaryClubId = club por el que jugó ese partido
+            $clubId = $gen['primaryClubId'] ?? ($g['clubsInformation']['club']['clubId'] ?? null);
+            if (!$compId || !$clubId) continue;
+
+            // Año: preferimos el nombre de temporada de 4 dígitos (AR = año calendario);
+            // fallback al id de temporada (año de inicio para ligas europeas).
+            $display = (string) ($seasonObj['cyclicalName'] ?? $seasonObj['display'] ?? '');
+            if (preg_match('/(\d{4})/', $display, $my)) {
+                $year = (int) $my[1];
+            } else {
+                $year = (int) ($seasonObj['id'] ?? 0);
+            }
+            if ($year < 2000) continue;
+
+            // Presencia: jugó minutos o fue titular
+            $minutes  = $time['playedMinutes'] ?? null;
+            $starting = $time['isStarting'] ?? false;
+            $played   = (($minutes !== null && (int) $minutes > 0) || $starting === true);
+            if (!$played) continue;
+
+            $key = $year . '|' . $compId . '|' . $clubId;
+            if (!isset($agg[$key])) {
+                $agg[$key] = [
+                    'year'      => $year,
+                    'compId'    => $compId,
+                    'clubId'    => $clubId,
+                    'partidos'  => 0,
+                    'goles'     => 0,
+                    'own'       => 0,
+                    'amarillas' => 0,
+                    'rojas'     => 0,
+                    'minutos'   => 0,
+                ];
+                $compIds[$compId] = true;
+                $clubIds[$clubId] = true;
+            }
+
+            $agg[$key]['partidos']  += 1;
+            $agg[$key]['goles']     += (int) ($goal['goalsScoredTotal'] ?? 0);
+            $agg[$key]['own']       += (int) ($goal['ownGoalsScored'] ?? 0);
+            $agg[$key]['amarillas'] += (int) ($card['yellowCardGross'] ?? 0);
+            // TM no expone en esta API un conteo directo de rojas -> queda en 0.
+            $agg[$key]['minutos']   += (int) ($minutes ?? 0);
+        }
+
+        if (empty($agg)) return response()->json([]);
+
+        // 3) Resolver nombres de competiciones y clubes (IDs -> nombre)
+        $compNames = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
+        $clubNames = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds));
+
+        // 4) Dedup contra torneos existentes (igual que footballdatabase)
+        $jugadorId = $request->jugador_id;
+        $existentes = collect()
+            ->merge(
+                $jugadorId
+                    ? \App\JugadorEstadisticaManual::where('jugador_id', $jugadorId)->pluck('torneo_nombre')
+                    : collect()
+            )
+            ->merge(\App\Torneo::all()->map(function ($t) {
+                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
+            }))
+            ->filter()
+            ->map(function ($v) {
+                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+            })
+            ->unique()->flip()->toArray();
+
+        // 5) Armar payload
+        $data = [];
+        foreach ($agg as $row) {
+            $compName = $compNames[$row['compId']] ?? null;
+            $clubName = $clubNames[$row['clubId']] ?? null;
+            if (!$compName || !$clubName) continue;
+
+            if ($this->debeExcluirCompetencia($compName)) continue;
+            if ($this->debeExcluirEquipo($clubName)) continue;
+
+            $competition = trim($compName) . ' ' . $row['year'];
+            $key = (string) \Str::of($competition)->lower()->ascii()
+                ->replaceMatches('/\s+/', ' ')->trim();
+
+            if (isset($existentes[$key])) continue;
+
+            list($tipo, $ambito) = $this->clasificarCompetencia($compName);
+
+            $data[] = [
+                'competition'     => $competition,
+                'equipo'          => $clubName,
+                'posicion'        => 0,
+                'partidos'        => $row['partidos'],
+                'goles_jugada'    => $row['goles'],
+                'goles_en_contra' => $row['own'],
+                'goles_recibidos' => 0,   // solo aplica a arqueros (otro endpoint)
+                'vallas_invictas' => 0,   // solo aplica a arqueros
+                'amarillas'       => $row['amarillas'],
+                'rojas'           => $row['rojas'],
+                'torneo_logo'     => $this->logoTorneo($competition),
+                'tipo'            => $tipo,
+                'ambito'          => $ambito,
+            ];
+        }
+
+        // Orden: año desc, luego competición
+        usort($data, function ($a, $b) {
+            preg_match('/(\d{4})\s*$/', $a['competition'], $ya);
+            preg_match('/(\d{4})\s*$/', $b['competition'], $yb);
+            $cmp = ((int) ($yb[1] ?? 0)) <=> ((int) ($ya[1] ?? 0));
+            return $cmp !== 0 ? $cmp : strcmp($a['competition'], $b['competition']);
+        });
+
+        return response()->json($data);
+    }
+
+    /**
+     * Resuelve nombres desde tmapi para /competitions o /clubs por IDs.
+     * Tolerante al formato de respuesta y a la clave del nombre.
+     */
+    private function tmResolveNames($endpoint, array $ids)
+    {
+        $map = [];
+        if (empty($ids)) return $map;
+
+        // En lotes para no armar URLs gigantes
+        foreach (array_chunk($ids, 50) as $chunk) {
+            $qs = implode('&', array_map(function ($id) {
+                return 'ids[]=' . urlencode($id);
+            }, $chunk));
+
+            $json = HttpHelper::getJson($endpoint . '?' . $qs);
+            if (!$json) continue;
+
+            // Puede venir como {data:[...]} o como lista directa
+            $items = $json['data'] ?? $json;
+            if (!is_array($items)) continue;
+
+            foreach ($items as $item) {
+                if (!is_array($item)) continue;
+                $id = $item['id'] ?? null;
+                if ($id === null) continue;
+
+                $name = $item['name']
+                    ?? $item['fullName']
+                    ?? $item['officialName']
+                    ?? $item['shortName']
+                    ?? $item['display']
+                    ?? null;
+
+                if ($name) $map[$id] = trim($name);
+            }
+        }
+
+        return $map;
+    }
+
     private function resolveCompetitionFromClubPage($clubUrl, $suffix)
     {
         $html = HttpHelper::getHtmlContent($clubUrl, false);

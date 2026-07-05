@@ -334,4 +334,63 @@ class HttpHelper
 
         return $response;
     }
+
+    // ---------------------------------------------------
+    // GET JSON — para APIs (ej: tmapi.transfermarkt.technology).
+    // Devuelve el array decodificado o null.
+    // ---------------------------------------------------
+    public static function getJson(string $url)
+    {
+        $url = trim($url);
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        $headers = [
+            'Accept: application/json',
+            'Accept-Language: es-AR,es;q=0.9,en;q=0.8',
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_ENCODING, ''); // gzip/deflate/br
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_errno($ch);
+        curl_close($ch);
+
+        // Retry simple ante fallo transitorio
+        if ($curlErr || $httpCode >= 400 || empty($response)) {
+            for ($i = 1; $i <= 2; $i++) {
+                sleep($i);
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                curl_setopt($ch, CURLOPT_ENCODING, '');
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr  = curl_errno($ch);
+                curl_close($ch);
+                if (!$curlErr && $httpCode < 400 && !empty($response)) break;
+            }
+        }
+
+        if ($curlErr || $httpCode >= 400 || empty($response)) {
+            return null;
+        }
+
+        $decoded = json_decode($response, true);
+        return is_array($decoded) ? $decoded : null;
+    }
 }

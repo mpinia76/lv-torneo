@@ -191,6 +191,7 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('/scraper/tecnico-footballdb', 'ScraperController@tecnicoFootballDatabase');
     Route::get('/scraper/jugador-footballdb', [App\Http\Controllers\ScraperController::class, 'jugadorFootballDatabase']);
+    Route::get('/scraper/jugador-transfermarkt', [App\Http\Controllers\ScraperController::class, 'jugadorTransfermarkt']);
     Route::get('/scraper/tecnico-transfermarkt', [App\Http\Controllers\ScraperController::class, 'tecnicoTransfermarkt']);
     Route::get('/scraper/tecnico-wikipedia', 'ScraperController@tecnicoWikipedia');
 

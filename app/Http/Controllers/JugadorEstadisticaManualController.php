@@ -44,7 +44,19 @@ class JugadorEstadisticaManualController extends Controller
         $equipos = Equipo::orderBy('nombre', 'asc')->get();
         $equipos = $equipos->pluck('nombre', 'id')->prepend('','');
 
-        return view('jugador_estadisticas.create', compact('jugador', 'equipos'));
+        // Torneos ya guardados de este jugador (nombre + club), para avisar duplicados al scrapear.
+        $yaGuardados = \App\JugadorEstadisticaManual::where('jugador_id', $jugador->id)
+            ->with('equipo')
+            ->get()
+            ->map(function ($e) {
+                return [
+                    'competition' => $e->torneo_nombre,
+                    'equipo'      => optional($e->equipo)->nombre ?? '',
+                ];
+            })
+            ->values();
+
+        return view('jugador_estadisticas.create', compact('jugador', 'equipos', 'yaGuardados'));
     }
 
     /**

@@ -261,6 +261,102 @@
             return texto ? texto.trim().replace(/\s+/g, ' ') : '';
         }
 
+        // ------------------------------------------------------------------
+        // Detección de duplicados (igual que el scraper de DTs).
+        // Regla: mismo nombre de torneo + mismo año + mismo club = duplicado.
+        // Referencias = torneos ya guardados de este jugador (window.TORNEOS_GUARDADOS).
+        // ------------------------------------------------------------------
+        window.TORNEOS_GUARDADOS = @json($yaGuardados ?? []);
+
+        function nombreSinAnio(txt) {
+            return (txt || '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/\b(19|20)\d{2}(\/\d{2})?\b/g, '')   // saca años / rangos
+                .replace(/[^a-z0-9 ]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        // Años a los que refiere una etiqueta: "2012"->[2012] ; "2011/12"->[2011,2012]
+        function aniosDe(txt) {
+            let s = (txt || '');
+            let cross = s.match(/\b((?:19|20)\d{2})\/(\d{2})\b/);
+            if (cross) {
+                let y1 = parseInt(cross[1]);
+                let y2 = parseInt(cross[1].slice(0, 2) + cross[2]);
+                return [y1, y2];
+            }
+            let single = s.match(/\b((?:19|20)\d{2})\b/);
+            return single ? [parseInt(single[1])] : [];
+        }
+
+        function aniosSeSolapan(a, b) {
+            if (!a.length || !b.length) return false;
+            return a.some(y => b.includes(y));
+        }
+
+        // Coeficiente de Dice sobre bigramas (sin dependencias).
+        function similitud(a, b) {
+            if (a === b) return 1;
+            if (a.length < 2 || b.length < 2) return 0;
+            let bg = s => { let r = []; for (let i = 0; i < s.length - 1; i++) r.push(s.slice(i, i + 2)); return r; };
+            let A = bg(a), B = bg(b), inter = 0, used = B.slice();
+            A.forEach(g => { let i = used.indexOf(g); if (i >= 0) { inter++; used[i] = null; } });
+            return (2 * inter) / (A.length + B.length);
+        }
+
+        function mismoClub(a, b) {
+            let limpiar = s => normalizar(s)
+                .replace(/\b(sc|ec|ad|sa|cf|afc|cd|sad)\b/g, ' ')
+                .replace(/\s*-\s*([a-z]{2})\b/g, ' $1')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            let x = limpiar(a), y = limpiar(b);
+            if (!x || !y) return false;
+            if (x === y) return true;
+
+            let corto = x.length <= y.length ? x : y;
+            let largo = x.length <= y.length ? y : x;
+            if (largo.includes(corto) && corto.length >= 4 && corto.length / largo.length >= 0.6) {
+                return true;
+            }
+            return similitud(x, y) >= 0.88;
+        }
+
+        function mismoTorneo(a, b) {
+            let x = nombreSinAnio(a);
+            let y = nombreSinAnio(b);
+            if (!x || !y) return false;
+            if (x === y) return true;
+
+            let corto = x.length <= y.length ? x : y;
+            let largo = x.length <= y.length ? y : x;
+            let palabrasCorto = corto.split(' ').filter(w => w.length >= 2);
+            if (palabrasCorto.length) {
+                let todasPresentes = palabrasCorto.every(w => largo.includes(w));
+                let distintivo = palabrasCorto.length >= 2 || palabrasCorto.some(w => w.length >= 5);
+                if (todasPresentes && distintivo) return true;
+            }
+            return similitud(x, y) >= 0.82;
+        }
+
+        // Devuelve { ref, sim } si (competition + equipo) ya existe, o null.
+        function buscarSimilar(competition, equipo, referencias) {
+            let yA = aniosDe(competition);
+            if (!nombreSinAnio(competition)) return null;
+
+            for (let ref of referencias) {
+                let yB = aniosDe(ref.competition);
+                if (!mismoTorneo(competition, ref.competition)) continue;
+                if (!aniosSeSolapan(yA, yB)) continue;
+                if (!mismoClub(equipo, ref.equipo)) continue;
+                return { ref: ref.competition, sim: 1 };
+            }
+            return null;
+        }
+
         // Resolve a DB equipo_id from a scraped team name using the same fuzzy match as usarDato().
         function matchEquipoId(nombreEquipo) {
             let select = document.querySelector('[name="equipo_id"]');
@@ -459,11 +555,22 @@
                 let logoPreview = c.torneo_logo
                     ? '<img src="' + baseImg + '/' + c.torneo_logo + '" alt="logo" height="28" class="d-block mb-1">'
                     : '';
+
+                // Aviso de duplicado: comparo contra lo ya guardado + tarjetas previas de este lote.
+                let refs = (window.TORNEOS_GUARDADOS || []).slice();
+                lista.slice(0, idx).forEach(prev => {
+                    let eqPrev = matchEquipoId(prev.equipo);
+                    let opt = eqPrev ? document.querySelector('[name="equipo_id"] option[value="' + eqPrev + '"]') : null;
+                    refs.push({ competition: prev.competition, equipo: opt ? opt.text : prev.equipo });
+                });
+                let hit = buscarSimilar(c.competition, c.equipo, refs);
+
                 html += `
-                <div class="card mb-3 fila-torneo" data-idx="${idx}">
+                <div class="card mb-3 fila-torneo ${hit ? 'border-warning' : ''}" data-idx="${idx}">
                     <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
                         <input type="checkbox" class="check-torneo mr-2" value="${idx}">
                         <strong style="color: darkgreen;">${clean(c.competition)}</strong>
+                        ${hit ? `<span class="badge badge-warning ml-2" title="Parecido a: ${hit.ref}">⚠ Posible duplicado</span>` : ''}
                         <span class="ml-auto">
                             <button type="button" onclick='excluirCompetencia(${JSON.stringify(c.competition)}, this)'
                                 class="btn btn-danger btn-sm" title="No mostrar más esta competencia">🚫 Comp.</button>
