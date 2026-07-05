@@ -1295,7 +1295,12 @@ class ScraperController extends Controller
             $goal = $g['statistics']['goalStatistics'] ?? [];
             $card = $g['statistics']['cardStatistics'] ?? [];
             $time = $g['statistics']['playingTimeStatistics'] ?? [];
-            $seasonObj = $g['season'] ?? [];
+            // OJO: season viene anidado dentro de gameInformation.
+            $seasonObj = $gi['season'] ?? [];
+
+            // Solo cuentan las presencias reales (TM: participationState = "played").
+            $ps = strtolower((string) ($gen['participationState'] ?? ''));
+            if ($ps !== 'played') continue;
 
             $compId = $gi['competitionId'] ?? null;
             // primaryClubId = club por el que jugó ese partido
@@ -1312,11 +1317,7 @@ class ScraperController extends Controller
             }
             if ($year < 2000) continue;
 
-            // Presencia: jugó minutos o fue titular
-            $minutes  = $time['playedMinutes'] ?? null;
-            $starting = $time['isStarting'] ?? false;
-            $played   = (($minutes !== null && (int) $minutes > 0) || $starting === true);
-            if (!$played) continue;
+            $minutes = $time['playedMinutes'] ?? 0;
 
             $key = $year . '|' . $compId . '|' . $clubId;
             if (!isset($agg[$key])) {
@@ -1345,22 +1346,14 @@ class ScraperController extends Controller
 
         // 🐞 DEBUG: ?debug=1 -> diagnóstico (antes de cualquier corte).
         if ($request->debug) {
-            $estados = [];
-            $jugados = [];
-            foreach ($perf['data']['performance'] as $gg) {
-                $ps = $gg['statistics']['generalStatistics']['participationState'] ?? '(sin dato)';
-                $estados[$ps] = ($estados[$ps] ?? 0) + 1;
-                $ps2 = strtolower((string) $ps);
-                if ($ps2 !== 'not in squad' && count($jugados) < 3) {
-                    $jugados[] = $gg;
-                }
-            }
-            arsort($estados);
             return response()->json([
-                'games_total'          => count($perf['data']['performance']),
-                'agg_count'            => count($agg),
-                'participation_states' => $estados,
-                'sample_jugados'       => $jugados,
+                'games_total'      => count($perf['data']['performance']),
+                'agg_count'        => count($agg),
+                'compIds'          => array_keys($compIds),
+                'clubIds'          => array_keys($clubIds),
+                'sample_agg'       => array_slice(array_values($agg), 0, 5),
+                'raw_competitions' => !empty($compIds) ? HttpHelper::getJson("{$base}/competitions?ids[]=" . urlencode((string) array_key_first($compIds))) : null,
+                'raw_clubs'        => !empty($clubIds) ? HttpHelper::getJson("{$base}/clubs?ids[]=" . urlencode((string) array_key_first($clubIds))) : null,
             ]);
         }
 
