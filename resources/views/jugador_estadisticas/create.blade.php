@@ -49,10 +49,18 @@
 
         <div class="mb-3">
             <label>URL Transfermarkt</label>
-            <input type="text"
-                   id="transfermarktUrl"
-                   class="form-control"
-                   placeholder="https://www.transfermarkt.com.ar/lionel-messi/profil/spieler/28003">
+            <div class="d-flex">
+                <input type="text"
+                       id="transfermarktUrl"
+                       class="form-control mr-2"
+                       placeholder="https://www.transfermarkt.com.ar/lionel-messi/profil/spieler/28003">
+                <button type="button" class="btn btn-warning mr-2" onclick="scrapearTransfermarktRendimiento()" style="white-space:nowrap;">
+                    🌐 Scrapear
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="scrapearTransfermarkt()" style="white-space:nowrap;" title="Solo goles por tipo (cabeza, penal, tiro libre)">
+                    ⚽ Goles
+                </button>
+            </div>
         </div>
         {{-- Importar desde FootballDatabase --}}
         <div class="mb-3">
@@ -678,6 +686,41 @@
                     console.error(err);
                     document.getElementById('resultadoScraper').innerHTML =
                         '<div class="alert alert-danger">Error scrapeando</div>';
+                })
+                .finally(() => {
+                    document.getElementById('loadingScraper').style.display = 'none';
+                });
+        }
+
+        // Scraper de RENDIMIENTO por competición desde Transfermarkt (tmapi).
+        // Devuelve el mismo formato que footballdb y se renderiza como tarjetas,
+        // con el aviso de posible duplicado.
+        function scrapearTransfermarktRendimiento() {
+            let url = document.getElementById('transfermarktUrl').value.trim();
+            if (!url) {
+                alert('Ingresá la URL del jugador en Transfermarkt');
+                return;
+            }
+
+            document.getElementById('loadingScraper').style.display = 'block';
+            document.getElementById('resultadoScraper').innerHTML = '';
+
+            let jugadorId = document.querySelector('[name="jugador_id"]').value;
+            fetch("{{ url('/admin/scraper/jugador-transfermarkt') }}?url=" + encodeURIComponent(url)
+                + "&jugador_id=" + jugadorId)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('resultadoScraper').innerHTML =
+                            '<div class="alert alert-danger">' + data.error + '</div>';
+                        return;
+                    }
+                    renderResultados(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('resultadoScraper').innerHTML =
+                        '<div class="alert alert-danger">Error scrapeando Transfermarkt</div>';
                 })
                 .finally(() => {
                     document.getElementById('loadingScraper').style.display = 'none';
