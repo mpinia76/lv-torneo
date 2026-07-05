@@ -1343,26 +1343,23 @@ class ScraperController extends Controller
             $agg[$key]['minutos']   += (int) ($minutes ?? 0);
         }
 
+        // 🐞 DEBUG: ?debug=1 -> diagnóstico (antes de cualquier corte).
+        if ($request->debug) {
+            return response()->json([
+                'games_total' => count($perf['data']['performance']),
+                'agg_count'   => count($agg),
+                'compIds'     => array_keys($compIds),
+                'clubIds'     => array_keys($clubIds),
+                'sample_agg'  => array_slice(array_values($agg), 0, 5),
+                'sample_raw'  => array_slice($perf['data']['performance'], 0, 3),
+            ]);
+        }
+
         if (empty($agg)) return response()->json([]);
 
         // 3) Resolver nombres de competiciones y clubes (IDs -> nombre)
         $compNames = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
         $clubNames = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds));
-
-        // 🐞 DEBUG: ?debug=1 muestra el diagnóstico de la agregación y el cruce de nombres.
-        if ($request->debug) {
-            return response()->json([
-                'games_total'   => count($perf['data']['performance']),
-                'agg_count'     => count($agg),
-                'compIds'       => array_keys($compIds),
-                'clubIds'       => array_keys($clubIds),
-                'compNames'     => $compNames,
-                'clubNames'     => $clubNames,
-                'sample_agg'    => array_slice(array_values($agg), 0, 5),
-                'raw_competitions' => HttpHelper::getJson("{$base}/competitions?ids[]=" . urlencode((string) array_key_first($compIds))),
-                'raw_clubs'        => HttpHelper::getJson("{$base}/clubs?ids[]=" . urlencode((string) array_key_first($clubIds))),
-            ]);
-        }
 
         // 4) Dedup contra torneos existentes (igual que footballdatabase)
         $jugadorId = $request->jugador_id;
