@@ -1345,13 +1345,22 @@ class ScraperController extends Controller
 
         // 🐞 DEBUG: ?debug=1 -> diagnóstico (antes de cualquier corte).
         if ($request->debug) {
+            $estados = [];
+            $jugados = [];
+            foreach ($perf['data']['performance'] as $gg) {
+                $ps = $gg['statistics']['generalStatistics']['participationState'] ?? '(sin dato)';
+                $estados[$ps] = ($estados[$ps] ?? 0) + 1;
+                $ps2 = strtolower((string) $ps);
+                if ($ps2 !== 'not in squad' && count($jugados) < 3) {
+                    $jugados[] = $gg;
+                }
+            }
+            arsort($estados);
             return response()->json([
-                'games_total' => count($perf['data']['performance']),
-                'agg_count'   => count($agg),
-                'compIds'     => array_keys($compIds),
-                'clubIds'     => array_keys($clubIds),
-                'sample_agg'  => array_slice(array_values($agg), 0, 5),
-                'sample_raw'  => array_slice($perf['data']['performance'], 0, 3),
+                'games_total'          => count($perf['data']['performance']),
+                'agg_count'            => count($agg),
+                'participation_states' => $estados,
+                'sample_jugados'       => $jugados,
             ]);
         }
 
