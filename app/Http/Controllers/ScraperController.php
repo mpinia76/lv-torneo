@@ -1284,6 +1284,35 @@ class ScraperController extends Controller
             return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
         }
 
+        // 🐞 DEBUG TARJETAS: ?debugcards=1 -> qué campos de tarjeta trae la data en vivo.
+        if ($request->debugcards) {
+            $cardKeys = [];
+            $timeKeys = [];
+            $ejemplos = [];
+            foreach ($perf['data']['performance'] as $gg) {
+                $cs = $gg['statistics']['cardStatistics'] ?? [];
+                $ts = $gg['statistics']['playingTimeStatistics'] ?? [];
+                foreach (array_keys($cs) as $k) $cardKeys[$k] = ($cardKeys[$k] ?? 0) + 1;
+                foreach (array_keys($ts) as $k) $timeKeys[$k] = ($timeKeys[$k] ?? 0) + 1;
+                // Guardar ejemplos donde alguna tarjeta tenga valor > 0
+                $tieneAlgo = false;
+                foreach ($cs as $v) { if (is_numeric($v) && $v > 0) { $tieneAlgo = true; break; } }
+                if ($tieneAlgo && count($ejemplos) < 8) {
+                    $ejemplos[] = [
+                        'season'   => $gg['gameInformation']['season']['nonCyclicalName'] ?? null,
+                        'comp'     => $gg['gameInformation']['competitionId'] ?? null,
+                        'cards'    => $cs,
+                        'time'     => $ts,
+                    ];
+                }
+            }
+            return response()->json([
+                'card_keys' => $cardKeys,
+                'time_keys' => $timeKeys,
+                'ejemplos'  => $ejemplos,
+            ]);
+        }
+
         // 2) Agregar por temporada|competición|club
         $agg     = [];
         $compIds = [];
@@ -1312,13 +1341,11 @@ class ScraperController extends Controller
             // temporada y eso partía filas (ej: Clausura con 3 partidos en otro bucket).
             $seasonId = (int) ($gi['seasonId'] ?? $seasonObj['id'] ?? 0);
 
-            // Año para la etiqueta (dedup usa "nombre year"): 4 dígitos de cyclicalName/display.
-            $display = (string) ($seasonObj['cyclicalName'] ?? $seasonObj['display'] ?? '');
-            if (preg_match('/(\d{4})/', $display, $my)) {
-                $year = (int) $my[1];
-            } else {
-                $year = $seasonId;
-            }
+            // Año de la etiqueta = año de INICIO de la temporada TM (seasonId),
+            // igual que el "06" de "06/07" en el sitio.
+            // Ej: Clausura 06/07 -> "Torneo Clausura 2006" (la fila de 16 PJ).
+            // (cyclicalName daría 2007, el año en que se disputa el Clausura.)
+            $year = $seasonId;
             if ($year < 2000) continue;
 
             $minutes = $time['playedMinutes'] ?? 0;
