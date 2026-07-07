@@ -1372,7 +1372,10 @@ class ScraperController extends Controller
             $agg[$key]['goles']     += (int) ($goal['goalsScoredTotal'] ?? 0);
             $agg[$key]['own']       += (int) ($goal['ownGoalsScored'] ?? 0);
             $agg[$key]['amarillas'] += (int) ($card['yellowCardGross'] ?? 0);
-            // TM no expone en esta API un conteo directo de rojas -> queda en 0.
+            // Rojas = expulsiones: roja directa (redCard) + doble amarilla (yellowRedCard).
+            // Estos campos solo aparecen en el partido donde ocurrieron.
+            $agg[$key]['rojas']     += (!empty($card['redCard']) ? 1 : 0)
+                                     + (!empty($card['yellowRedCard']) ? 1 : 0);
             $agg[$key]['minutos']   += (int) ($minutes ?? 0);
         }
 
