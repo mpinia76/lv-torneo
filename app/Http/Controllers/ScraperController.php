@@ -1307,19 +1307,24 @@ class ScraperController extends Controller
             $clubId = $gen['primaryClubId'] ?? ($g['clubsInformation']['club']['clubId'] ?? null);
             if (!$compId || !$clubId) continue;
 
-            // Año: preferimos el nombre de temporada de 4 dígitos (AR = año calendario);
-            // fallback al id de temporada (año de inicio para ligas europeas).
+            // Temporada REAL de TM. Agrupamos por seasonId (no por el año parseado),
+            // porque TM guarda el año de forma inconsistente dentro de una misma
+            // temporada y eso partía filas (ej: Clausura con 3 partidos en otro bucket).
+            $seasonId = (int) ($gi['seasonId'] ?? $seasonObj['id'] ?? 0);
+
+            // Año para la etiqueta (dedup usa "nombre year"): 4 dígitos de cyclicalName/display.
             $display = (string) ($seasonObj['cyclicalName'] ?? $seasonObj['display'] ?? '');
             if (preg_match('/(\d{4})/', $display, $my)) {
                 $year = (int) $my[1];
             } else {
-                $year = (int) ($seasonObj['id'] ?? 0);
+                $year = $seasonId;
             }
             if ($year < 2000) continue;
 
             $minutes = $time['playedMinutes'] ?? 0;
 
-            $key = $year . '|' . $compId . '|' . $clubId;
+            // Clave por temporada TM (seasonId) -> filas 1:1 con el sitio.
+            $key = $seasonId . '|' . $compId . '|' . $clubId;
             if (!isset($agg[$key])) {
                 $agg[$key] = [
                     'year'      => $year,
