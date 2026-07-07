@@ -1382,24 +1382,10 @@ class ScraperController extends Controller
             ]);
         }
 
-        // 4) Dedup contra torneos existentes (igual que footballdatabase)
-        $jugadorId = $request->jugador_id;
-        $existentes = collect()
-            ->merge(
-                $jugadorId
-                    ? \App\JugadorEstadisticaManual::where('jugador_id', $jugadorId)->pluck('torneo_nombre')
-                    : collect()
-            )
-            ->merge(\App\Torneo::all()->map(function ($t) {
-                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
-            }))
-            ->filter()
-            ->map(function ($v) {
-                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
-            })
-            ->unique()->flip()->toArray();
-
-        // 5) Armar payload
+        // 4) Armar payload.
+        //    Mostramos TODOS los torneos (incluidas copas e internacionales).
+        //    Los duplicados NO se ocultan acá: el front los marca con
+        //    "⚠ Posible duplicado" para que el usuario decida.
         $data = [];
         foreach ($agg as $row) {
             $compName = $compNames[$row['compId']] ?? null;
@@ -1410,10 +1396,6 @@ class ScraperController extends Controller
             if ($this->debeExcluirEquipo($clubName)) continue;
 
             $competition = trim($compName) . ' ' . $row['year'];
-            $key = (string) \Str::of($competition)->lower()->ascii()
-                ->replaceMatches('/\s+/', ' ')->trim();
-
-            if (isset($existentes[$key])) continue;
 
             list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
