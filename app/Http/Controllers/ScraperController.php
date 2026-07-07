@@ -1284,35 +1284,6 @@ class ScraperController extends Controller
             return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
         }
 
-        // 🐞 DEBUG TARJETAS: ?debugcards=1 -> qué campos de tarjeta trae la data en vivo.
-        if ($request->debugcards) {
-            $cardKeys = [];
-            $timeKeys = [];
-            $ejemplos = [];
-            foreach ($perf['data']['performance'] as $gg) {
-                $cs = $gg['statistics']['cardStatistics'] ?? [];
-                $ts = $gg['statistics']['playingTimeStatistics'] ?? [];
-                foreach (array_keys($cs) as $k) $cardKeys[$k] = ($cardKeys[$k] ?? 0) + 1;
-                foreach (array_keys($ts) as $k) $timeKeys[$k] = ($timeKeys[$k] ?? 0) + 1;
-                // Guardar ejemplos donde alguna tarjeta tenga valor > 0
-                $tieneAlgo = false;
-                foreach ($cs as $v) { if (is_numeric($v) && $v > 0) { $tieneAlgo = true; break; } }
-                if ($tieneAlgo && count($ejemplos) < 8) {
-                    $ejemplos[] = [
-                        'season'   => $gg['gameInformation']['season']['nonCyclicalName'] ?? null,
-                        'comp'     => $gg['gameInformation']['competitionId'] ?? null,
-                        'cards'    => $cs,
-                        'time'     => $ts,
-                    ];
-                }
-            }
-            return response()->json([
-                'card_keys' => $cardKeys,
-                'time_keys' => $timeKeys,
-                'ejemplos'  => $ejemplos,
-            ]);
-        }
-
         // 2) Agregar por temporada|competición|club
         $agg     = [];
         $compIds = [];
@@ -1384,33 +1355,6 @@ class ScraperController extends Controller
         // 3) Resolver nombres de competiciones y clubes (IDs -> nombre)
         $compNames = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
         $clubNames = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds));
-
-        // 🐞 DEBUG: ?debug=1 -> lista completa de filas + motivo de descarte.
-        if ($request->debug) {
-            $rows = [];
-            foreach ($agg as $k => $r) {
-                $cn = $compNames[$r['compId']] ?? null;
-                $qn = $clubNames[$r['clubId']] ?? null;
-                $rows[] = [
-                    'key'         => $k,
-                    'year'        => $r['year'],
-                    'compId'      => $r['compId'],
-                    'comp'        => $cn,
-                    'clubId'      => $r['clubId'],
-                    'club'        => $qn,
-                    'pj'          => $r['partidos'],
-                    'goles'       => $r['goles'],
-                    'amar'        => $r['amarillas'],
-                    'sin_nombre'  => (!$cn || !$qn),
-                    'excl_comp'   => $cn ? (bool) $this->debeExcluirCompetencia($cn) : null,
-                    'excl_equipo' => $qn ? (bool) $this->debeExcluirEquipo($qn) : null,
-                ];
-            }
-            return response()->json([
-                'agg_count' => count($agg),
-                'rows'      => $rows,
-            ]);
-        }
 
         // 4) Armar payload.
         //    Mostramos TODOS los torneos (incluidas copas e internacionales).
