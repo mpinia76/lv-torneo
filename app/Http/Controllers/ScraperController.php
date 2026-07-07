@@ -1349,24 +1349,38 @@ class ScraperController extends Controller
             $agg[$key]['minutos']   += (int) ($minutes ?? 0);
         }
 
-        // 🐞 DEBUG: ?debug=1 -> diagnóstico (antes de cualquier corte).
-        if ($request->debug) {
-            return response()->json([
-                'games_total'      => count($perf['data']['performance']),
-                'agg_count'        => count($agg),
-                'compIds'          => array_keys($compIds),
-                'clubIds'          => array_keys($clubIds),
-                'sample_agg'       => array_slice(array_values($agg), 0, 5),
-                'raw_competitions' => !empty($compIds) ? HttpHelper::getJson("{$base}/competitions?ids[]=" . urlencode((string) array_key_first($compIds))) : null,
-                'raw_clubs'        => !empty($clubIds) ? HttpHelper::getJson("{$base}/clubs?ids[]=" . urlencode((string) array_key_first($clubIds))) : null,
-            ]);
-        }
-
         if (empty($agg)) return response()->json([]);
 
         // 3) Resolver nombres de competiciones y clubes (IDs -> nombre)
         $compNames = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
         $clubNames = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds));
+
+        // 🐞 DEBUG: ?debug=1 -> lista completa de filas + motivo de descarte.
+        if ($request->debug) {
+            $rows = [];
+            foreach ($agg as $k => $r) {
+                $cn = $compNames[$r['compId']] ?? null;
+                $qn = $clubNames[$r['clubId']] ?? null;
+                $rows[] = [
+                    'key'         => $k,
+                    'year'        => $r['year'],
+                    'compId'      => $r['compId'],
+                    'comp'        => $cn,
+                    'clubId'      => $r['clubId'],
+                    'club'        => $qn,
+                    'pj'          => $r['partidos'],
+                    'goles'       => $r['goles'],
+                    'amar'        => $r['amarillas'],
+                    'sin_nombre'  => (!$cn || !$qn),
+                    'excl_comp'   => $cn ? (bool) $this->debeExcluirCompetencia($cn) : null,
+                    'excl_equipo' => $qn ? (bool) $this->debeExcluirEquipo($qn) : null,
+                ];
+            }
+            return response()->json([
+                'agg_count' => count($agg),
+                'rows'      => $rows,
+            ]);
+        }
 
         // 4) Dedup contra torneos existentes (igual que footballdatabase)
         $jugadorId = $request->jugador_id;
