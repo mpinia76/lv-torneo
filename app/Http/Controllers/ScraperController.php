@@ -1997,7 +1997,8 @@ class ScraperController extends Controller
         // Leagues: explicit names + generic "league"/"liga"/"division".
         $ligaKw = ['laliga', 'la liga', 'liga', 'league', 'primera', 'segunda', 'serie a', 'serie b',
             'premier', 'bundesliga', 'ligue', 'eredivisie', 'mls', 'primeira',
-            'brasileiro', 'brasileir', 'division', 'división', 'championship', 'ekstraklasa', 'liguilla'];
+            'brasileiro', 'brasileir', 'division', 'división', 'championship', 'ekstraklasa', 'liguilla',
+            'apertura', 'clausura', 'inicial', 'transicion', 'transición'];
         foreach ($ligaKw as $kw) {
             if (str_contains($n, $kw)) return ['Liga', 'Nacional'];
         }
