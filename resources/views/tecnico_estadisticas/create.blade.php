@@ -571,13 +571,18 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
             let tecnicoId = document.querySelector('[name="tecnico_id"]').value;
             fetch("{{ url('/admin/scraper/tecnico-footballdb') }}?url=" + encodeURIComponent(url) + "&tecnico_id=" + tecnicoId)
                 .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
+                .then(resp => {
+                    if (resp.error) {
                         document.getElementById('resultadoScraper').innerHTML =
-                            '<div class="alert alert-danger">' + data.error + '</div>';
+                            '<div class="alert alert-danger">' + resp.error + '</div>';
                         return;
                     }
-                    renderResultados(data);
+                    let filas = Array.isArray(resp) ? resp : (resp.data || []);
+                    renderResultados(filas);
+                    mostrarExcluidos(
+                        Array.isArray(resp) ? [] : (resp.excluidos || []),
+                        Array.isArray(resp) ? [] : (resp.duplicados || [])
+                    );
                 })
                 .catch(err => {
                     console.error(err);
@@ -621,6 +626,7 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
 
             // Phase B: one fetch per club (filtered), append cards.
             let total = 0;
+            let excluidosAll = [], duplicadosAll = [];
             for (let i = 0; i < clubes.length; i++) {
                 let c = clubes[i];
                 progreso.innerHTML = `⏳ ${i + 1}/${clubes.length} — <strong>${c.nombre}</strong> (${total} torneos)`;
@@ -629,9 +635,12 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
                         + `&verein_id=${encodeURIComponent(c.id)}&equipo_nombre=${encodeURIComponent(c.nombre)}`);
                     let r = await res.json();
                     if (r.data && r.data.length) { agregarCards(r.data); total += r.data.length; }
+                    if (r.excluidos)  excluidosAll  = excluidosAll.concat(r.excluidos);
+                    if (r.duplicados) duplicadosAll = duplicadosAll.concat(r.duplicados);
                 } catch (e) { console.error('Club ' + c.nombre, e); }
             }
 
+            mostrarExcluidos(excluidosAll, duplicadosAll);
             progreso.innerHTML = `✅ Listo. ${total} torneos de ${clubes.length} clubes.`;
         }
 
@@ -825,6 +834,30 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
                 resumen.innerHTML = '<span style="color:#a94442">Error guardando.</span>';
             }
         }
+        // Alert con torneos NO mostrados: excluidos (campeonatos AR / copas sudamericanas
+        // / equipos argentinos) y repetidos (ya cargados). Línea por línea, al final.
+        function mostrarExcluidos(excluidos, duplicados) {
+            excluidos  = excluidos  || [];
+            duplicados = duplicados || [];
+            if (!excluidos.length && !duplicados.length) return;
+
+            let lista = arr => '<ul style="margin:4px 0 0 0; padding-left:20px;">'
+                + arr.map(x => '<li>' + clean(x) + '</li>').join('') + '</ul>';
+
+            let html = '<div class="alert alert-warning" style="font-size:0.85rem; max-height:280px; overflow:auto;">';
+            if (excluidos.length) {
+                html += '<strong>🚫 Excluidos (campeonatos argentinos / copas sudamericanas / equipos argentinos) — '
+                      + excluidos.length + ':</strong>' + lista(excluidos);
+            }
+            if (duplicados.length) {
+                html += (excluidos.length ? '<hr class="my-2">' : '')
+                      + '<strong>♻️ Ya cargados (no se vuelven a mostrar) — '
+                      + duplicados.length + ':</strong>' + lista(duplicados);
+            }
+            html += '</div>';
+            document.getElementById('resultadoScraper').insertAdjacentHTML('beforeend', html);
+        }
+
         function scrapearWikipedia() {
             let url = document.getElementById('wikiUrlTecnico').value.trim();
             if (!url) { alert('Pegá la URL de Wikipedia'); return; }
@@ -835,13 +868,18 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
 
             fetch("{{ url('/admin/scraper/tecnico-wikipedia') }}?url=" + encodeURIComponent(url) + "&tecnico_id=" + tecnicoId)
                 .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
+                .then(resp => {
+                    if (resp.error) {
                         document.getElementById('resultadoScraper').innerHTML =
-                            '<div class="alert alert-danger">' + data.error + '</div>';
+                            '<div class="alert alert-danger">' + resp.error + '</div>';
                         return;
                     }
-                    renderResultados(data);
+                    let filas = Array.isArray(resp) ? resp : (resp.data || []);
+                    renderResultados(filas);
+                    mostrarExcluidos(
+                        Array.isArray(resp) ? [] : (resp.excluidos || []),
+                        Array.isArray(resp) ? [] : (resp.duplicados || [])
+                    );
                 })
                 .catch(err => {
                     console.error(err);

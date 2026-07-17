@@ -792,23 +792,14 @@ class ScraperController extends Controller
 
         $tecnicoId = $request->tecnico_id;
 
-        $existentes = collect()
-            ->merge(
-                $tecnicoId
-                    ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
-                    : collect()
-            )
-            ->merge(\App\Torneo::all()->map(function ($t) {
-                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
-            }))
-            ->filter()
-            ->map(function ($v) {
-                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
-            })
-            ->unique()->flip()->toArray();
-
-        //\Log::info("[FBDB EXISTENTES] tecnicoId={$tecnicoId} | total=" . count($existentes));   // 🆕
-
+        // Ya cargados para ESTE técnico (para avisar los repetidos, no ocultarlos en silencio).
+        $yaCargados = collect(
+            $tecnicoId
+                ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
+                : []
+        )->filter()->map(function ($v) {
+            return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+        })->flip()->toArray();
 
         $rows = $xpath->query('//tr[contains(@class,"line") and not(contains(@class,"total"))]');
         $data = [];
@@ -823,14 +814,12 @@ class ScraperController extends Controller
             if (!$year || (int)$year < 2000) continue;
 
             $clubCell = $cols->item(1);
-            /*$flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
-            $country  = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
-            if (strtolower($country) === 'argentina') continue;*/
+            // País del club desde la bandera (dato del scraper, no de la DB).
+            $flagSpan = $xpath->query('.//span[@class="real_flag"]', $clubCell)->item(0);
+            $clubPais = $flagSpan ? trim($flagSpan->getAttribute('title')) : '';
 
             $clubLink = $xpath->query('.//a', $clubCell)->item(0);
             $club = $clubLink ? trim($clubLink->textContent) : trim($clubCell->textContent);
-
-            if ($this->debeExcluirEquipo($club)) continue;
 
             $competencias = [
                 'champ' => ['tipo' => 'Liga', 'ambito' => 'Nacional'],
@@ -963,15 +952,7 @@ class ScraperController extends Controller
 
                     foreach ($competitionsFound as $cName) {
 
-                        if ($this->debeExcluirCompetencia($cName)) {
-                            continue;
-                        }
-
                         $competition = $cName . ' ' . $year;
-                        $key = (string) \Str::of($competition)->lower()->ascii()
-                            ->replaceMatches('/\s+/', ' ')->trim();
-
-                        if (isset($existentes[$key])) continue;
 
                         $ambitoComp = 'Nacional';
                         foreach ($internacionalKw as $kw) {
@@ -981,6 +962,7 @@ class ScraperController extends Controller
                         $data[] = [
                             'competition' => $competition,
                             'equipo'      => $club,
+                            'pais'        => $clubPais,
                             'posicion'    => null,
                             'partidos'    => $pj,
                             'ganados'     => $v,
@@ -1002,25 +984,12 @@ class ScraperController extends Controller
                 // For champ: single entry
                 if (!$compName) $compName = $meta['tipo'];
 
-
-
-                if ($this->debeExcluirCompetencia($compName)) {
-                    continue;
-                }
-
                 $competition = $compName . ' ' . $year;
-                $key = (string) \Str::of($competition)->lower()->ascii()
-                    ->replaceMatches('/\s+/', ' ')->trim();
-
-                if (isset($existentes[$key])) continue;
-
-                if ($this->debeExcluirCompetencia($compName)) {
-                    continue;
-                }
 
                 $data[] = [
                     'competition' => $competition,
                     'equipo'      => $club,
+                    'pais'        => $clubPais,
                     'posicion'    => $posicion,
                     'partidos'    => $pj,
                     'ganados'     => $v,
@@ -1032,11 +1001,10 @@ class ScraperController extends Controller
                     'tipo'        => $meta['tipo'],
                     'ambito'      => $meta['ambito'],
                 ];
-               // \Log::info("[BOLIVAR champ] AGREGADO comp='{$competition}' key='{$key}' equipo='{$club}'");
             }
         }
 
-        return response()->json($data);
+        return response()->json($this->partirTorneos($data, $yaCargados));
     }
 
     public function jugadorFootballDatabase(Request $request)
@@ -2066,6 +2034,78 @@ class ScraperController extends Controller
         return ['Copa', 'Nacional']; // default
     }
 
+    /**
+     * Palabras clave a excluir: campeonatos argentinos + copas sudamericanas (CONMEBOL).
+     * Centralizado para que jugador y DTs usen la misma lista.
+     */
+    private function torneosExcluidosKw()
+    {
+        return [
+            'copa argentina', 'supercopa argentina', 'copa maradona', 'supercopa internacional',
+            'primera nacional', 'primera division argentina',
+            'libertadores', 'sudamericana', 'conmebol',
+        ];
+    }
+
+    /**
+     * Parte filas de torneos en data / excluidos / duplicados según las reglas:
+     *  - campeonatos AR + copas sudamericanas (keyword)
+     *  - club argentino (dato del scraper: campo 'pais' == "Argentina" o 'es_argentino')
+     *  - exclusiones configuradas del sistema (CompetenciaExcluida / EquipoExcluido)
+     *  - ya cargados (mapa normalizado $yaCargados de "nombre year")
+     *
+     * Cada fila debe tener 'competition' (nombre + año) y 'equipo' (nombre del club).
+     */
+    private function partirTorneos(array $rows, array $yaCargados)
+    {
+        $norm = function ($v) {
+            return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+        };
+        $kw = $this->torneosExcluidosKw();
+
+        $data = [];
+        $excluidos = [];
+        $duplicados = [];
+
+        foreach ($rows as $row) {
+            $comp = trim($row['competition'] ?? '');
+            $club = trim($row['equipo'] ?? '');
+            if ($comp === '' || $club === '') continue;
+
+            $esArg = !empty($row['es_argentino'])
+                || (isset($row['pais']) && $norm($row['pais']) === 'argentina');
+
+            $excl = $esArg
+                || $this->debeExcluirCompetencia($comp)
+                || $this->debeExcluirEquipo($club);
+            if (!$excl) {
+                $cNorm = $norm($comp);
+                foreach ($kw as $k) {
+                    if (str_contains($cNorm, $k)) { $excl = true; break; }
+                }
+            }
+            if ($excl) {
+                $excluidos[] = $comp . ' — ' . $club . ($esArg ? ' (equipo argentino)' : '');
+                continue;
+            }
+
+            if (isset($yaCargados[$norm($comp)])) {
+                $duplicados[] = $comp . ' — ' . $club;
+                continue;
+            }
+
+            // Limpiamos campos auxiliares que no van al front.
+            unset($row['pais'], $row['es_argentino']);
+            $data[] = $row;
+        }
+
+        return [
+            'data'       => array_values($data),
+            'excluidos'  => $excluidos,
+            'duplicados' => $duplicados,
+        ];
+    }
+
     public function tecnicoTransfermarkt(Request $request)
     {
         set_time_limit(0);
@@ -2209,45 +2249,47 @@ class ScraperController extends Controller
             $stats[$key]['ge'] += $ge;
         }
 
-        // Dedup + payload.
-        $tecnicoId = $request->tecnico_id;
-        $existentes = collect()
-            ->merge($tecnicoId ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre') : collect())
-            ->merge(\App\Torneo::all()->map(function ($t) { return ($t->nombre ?? '') . ' ' . ($t->year ?? ''); }))
-            ->filter()
-            ->map(function ($v) { return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim(); })
-            ->unique()->flip()->toArray();
+        // Ya cargados para el técnico + país del club (por verein_id vía tmapi).
+        $tecnicoId  = $request->tecnico_id;
+        $yaCargados = collect(
+            $tecnicoId ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre') : []
+        )->filter()->map(function ($v) {
+            return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+        })->flip()->toArray();
+
+        $clubCountries = [];
+        $this->tmResolveNames('https://tmapi.transfermarkt.technology/clubs', [$vereinId], $clubCountries);
+        $clubEsArg = (($clubCountries[$vereinId] ?? null) === 9); // 9 = Argentina
 
         $data = [];
         foreach ($stats as $s) {
             list($tipo, $ambito) = $this->clasificarCompetencia($s['competition']);
             $competition = trim($s['competition']) . ' ' . $year;
-            $key = (string) \Str::of($competition)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
-
-            // LOG ANTES del dedup para ver TODAS, incluso las ya cargadas
-            /*\Log::info('[LOGO] comp="' . $competition . '" key="'
-                . (string) \Str::of(preg_replace('/\s+\d{4}(\/\d{2})?\s*$/', '', $competition))->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim()
-                . '" logo=' . ($this->logoTorneo($competition) ?? 'NULL')
-                . ' dedup=' . (isset($existentes[$key]) ? 'YA_EXISTE' : 'no'));*/
-            if (isset($existentes[$key])) continue;
 
             $data[] = [
-                'competition' => $competition,
-                'equipo'      => $s['equipo'],
-                'posicion'    => null,
-                'partidos'    => $s['partidos'],
-                'ganados'     => $s['ganados'],
-                'empatados'   => $s['empatados'],
-                'perdidos'    => $s['perdidos'],
-                'gf'          => $s['gf'],
-                'ge'          => $s['ge'],
-                'torneo_logo' => $this->logoTorneo($competition),
-                'tipo'        => $tipo,
-                'ambito'      => $ambito,
+                'competition'  => $competition,
+                'equipo'       => $s['equipo'],
+                'es_argentino' => $clubEsArg,
+                'posicion'     => null,
+                'partidos'     => $s['partidos'],
+                'ganados'      => $s['ganados'],
+                'empatados'    => $s['empatados'],
+                'perdidos'     => $s['perdidos'],
+                'gf'           => $s['gf'],
+                'ge'           => $s['ge'],
+                'torneo_logo'  => $this->logoTorneo($competition),
+                'tipo'         => $tipo,
+                'ambito'       => $ambito,
             ];
         }
 
-        return response()->json(['fase' => 'B', 'data' => $data]);
+        $part = $this->partirTorneos($data, $yaCargados);
+        return response()->json([
+            'fase'       => 'B',
+            'data'       => $part['data'],
+            'excluidos'  => $part['excluidos'],
+            'duplicados' => $part['duplicados'],
+        ]);
     }
 
 // Year from the saison_id select (or URL fallback). Reused by both phases.
@@ -2460,21 +2502,12 @@ class ScraperController extends Controller
             'otros' => 20,  // PD G E P
         ];
 
-        $tecnicoId = $request->tecnico_id;
-        $existentes = collect()
-            ->merge(
-                $tecnicoId
-                    ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre')
-                    : collect()
-            )
-            ->merge(\App\Torneo::all()->map(function ($t) {
-                return ($t->nombre ?? '') . ' ' . ($t->year ?? '');
-            }))
-            ->filter()
-            ->map(function ($v) {
-                return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
-            })
-            ->unique()->flip()->toArray();
+        $tecnicoId  = $request->tecnico_id;
+        $yaCargados = collect(
+            $tecnicoId ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre') : []
+        )->filter()->map(function ($v) {
+            return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+        })->flip()->toArray();
 
         $txt = function ($node) {
             return $node ? trim(preg_replace('/\s+/u', ' ', $node->textContent)) : '';
@@ -2570,6 +2603,9 @@ class ScraperController extends Controller
                 $club = $ultimoClub;
                 if (!$club) continue;
 
+                // País del club (para excluir equipos argentinos, dato del scraper).
+                $clubPais = preg_match('/\bArgentina\b/u', $txt($cEquipo)) ? 'Argentina' : '';
+
                 // Competition name = visible TEXT of the Torneo link (per user choice).
                 $aTor = $xpath->query('.//a', $cTorneo)->item(0);
                 $competition = $aTor ? trim(preg_replace('/\s+/u', ' ', $aTor->textContent)) : $txt($cTorneo);
@@ -2588,15 +2624,12 @@ class ScraperController extends Controller
                 $gf = $num($txt($fila[$idxPJ + 4] ?? null)) ?? 0;
                 $gc = $num($txt($fila[$idxPJ + 5] ?? null)) ?? 0;
 
-                $key = (string) \Str::of($competition)->lower()->ascii()
-                    ->replaceMatches('/\s+/', ' ')->trim();
-                if (isset($existentes[$key])) continue;
-
                 list($tipo, $ambito) = $clasificar($competition);
 
                 $data[] = [
                     'competition' => $competition,
                     'equipo'      => $club,
+                    'pais'        => $clubPais,
                     'posicion'    => null,
                     'partidos'    => $pj,
                     'ganados'     => $g,
@@ -2610,11 +2643,12 @@ class ScraperController extends Controller
                 ];
             }
 
-            return response()->json($data);
+            return response()->json($this->partirTorneos($data, $yaCargados));
         }
 
         $data = [];
         $ultimoClub = null;
+        $ultimoPais = null;
 
         foreach ($grid as $r => $fila) {
             if (count($fila) < 8) continue;
@@ -2638,6 +2672,8 @@ class ScraperController extends Controller
             }
             $club = $ultimoClub;
             if (!$club) continue;
+            // País del club (para excluir equipos argentinos, dato del scraper).
+            $clubPais = ($clubCell && preg_match('/\bArgentina\b/u', $txt($clubCell))) ? 'Argentina' : '';
 
             // Temporada: keep the full label for the name ("2015-16", "2002-03",
             // "2025-A"). Extract the first 4-digit year ONLY to apply the <2000 filter.
@@ -2648,7 +2684,7 @@ class ScraperController extends Controller
 
             // Helper to build one entry for a competition block.
             $pushBloque = function ($baseCol, $tipo, $ambito, $nombreFallback, $posCol = null, $posicion = null)
-            use (&$data, $fila, $col, $txt, $num, $nombreDeLink, $club, $temporada, $cTemp, &$existentes) {
+            use (&$data, $fila, $col, $txt, $num, $nombreDeLink, $club, $temporada, $cTemp, $clubPais) {
 
                 $pdCell = $fila[$baseCol] ?? null;
                 $pd = $num($txt($pdCell));
@@ -2669,13 +2705,11 @@ class ScraperController extends Controller
                 if (!$nombre) $nombre = $nombreFallback;
 
                 $competition = $nombre . ' ' . $temporada;
-                $key = (string) \Str::of($competition)->lower()->ascii()
-                    ->replaceMatches('/\s+/', ' ')->trim();
-                if (isset($existentes[$key])) return;
 
                 $data[] = [
                     'competition' => $competition,
                     'equipo'      => $club,
+                    'pais'        => $clubPais,
                     'posicion'    => $posicion,
                     'partidos'    => $pd,
                     'ganados'     => $g,
@@ -2707,7 +2741,7 @@ class ScraperController extends Controller
             $pushBloque($col['otros'], 'Copa', 'Internacional', 'Otros');
         }
 
-        return response()->json($data);
+        return response()->json($this->partirTorneos($data, $yaCargados));
     }
 
 
