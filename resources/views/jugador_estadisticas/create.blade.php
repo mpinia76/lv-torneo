@@ -709,13 +709,19 @@
             fetch("{{ url('/admin/scraper/jugador-transfermarkt') }}?url=" + encodeURIComponent(url)
                 + "&jugador_id=" + jugadorId)
                 .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
+                .then(resp => {
+                    if (resp.error) {
                         document.getElementById('resultadoScraper').innerHTML =
-                            '<div class="alert alert-danger">' + data.error + '</div>';
+                            '<div class="alert alert-danger">' + resp.error + '</div>';
                         return;
                     }
-                    renderResultados(data);
+                    // Nuevo formato: { data, excluidos, duplicados }
+                    let filas = Array.isArray(resp) ? resp : (resp.data || []);
+                    renderResultados(filas);
+                    mostrarExcluidos(
+                        Array.isArray(resp) ? [] : (resp.excluidos || []),
+                        Array.isArray(resp) ? [] : (resp.duplicados || [])
+                    );
                 })
                 .catch(err => {
                     console.error(err);
@@ -725,6 +731,29 @@
                 .finally(() => {
                     document.getElementById('loadingScraper').style.display = 'none';
                 });
+        }
+
+        // Alert con los torneos que NO se muestran: excluidos (campeonatos argentinos
+        // / copas sudamericanas) y repetidos (ya cargados para este jugador).
+        function mostrarExcluidos(excluidos, duplicados) {
+            excluidos  = excluidos  || [];
+            duplicados = duplicados || [];
+            if (!excluidos.length && !duplicados.length) return;
+
+            let html = '<div class="alert alert-warning" style="font-size:0.9rem;">';
+            if (excluidos.length) {
+                html += '<strong>🚫 Excluidos (campeonatos argentinos / copas sudamericanas):</strong>'
+                      + '<div>' + excluidos.map(clean).join(' · ') + '</div>';
+            }
+            if (duplicados.length) {
+                html += (excluidos.length ? '<hr class="my-2">' : '')
+                      + '<strong>♻️ Ya cargados (no se vuelven a mostrar):</strong>'
+                      + '<div>' + duplicados.map(clean).join(' · ') + '</div>';
+            }
+            html += '</div>';
+
+            let cont = document.getElementById('resultadoScraper');
+            cont.insertAdjacentHTML('afterbegin', html);
         }
 
         function excluirCompetencia(nombre, btn) {

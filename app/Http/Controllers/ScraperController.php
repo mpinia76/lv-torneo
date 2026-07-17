@@ -1356,20 +1356,60 @@ class ScraperController extends Controller
         $compNames = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
         $clubNames = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds));
 
-        // 4) Armar payload.
-        //    Mostramos TODOS los torneos (incluidas copas e internacionales).
-        //    Los duplicados NO se ocultan acá: el front los marca con
-        //    "⚠ Posible duplicado" para que el usuario decida.
-        $data = [];
+        // 4) Reglas de negocio:
+        //    - NO se muestran campeonatos argentinos ni copas sudamericanas (CONMEBOL).
+        //    - NO se muestran los ya cargados para este jugador (repetidos).
+        //    Ambos grupos se devuelven en listas aparte para avisar con un alert.
+        $norm = function ($v) {
+            return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+        };
+
+        // Ya cargados para ESTE jugador (mismo scraper / carga previa).
+        $jugadorId  = $request->jugador_id;
+        $yaCargados = collect(
+            $jugadorId
+                ? \App\JugadorEstadisticaManual::where('jugador_id', $jugadorId)->pluck('torneo_nombre')
+                : []
+        )->filter()->map($norm)->flip()->toArray();
+
+        // Campeonatos argentinos (ojo: "Torneo Apertura/Clausura" es AR; "Liga MX
+        // Apertura/Clausura" es de México y NO entra) + copas sudamericanas.
+        $excluirKw = [
+            'torneo apertura', 'torneo clausura', 'torneo inicial', 'torneo final',
+            'primera nacional', 'liga profesional', 'primera division argentina',
+            'primera division', 'transicion', 'campeonato de primera',
+            'libertadores', 'sudamericana', 'recopa', 'conmebol',
+        ];
+
+        $data       = [];
+        $excluidos  = [];
+        $duplicados = [];
+
         foreach ($agg as $row) {
             $compName = $compNames[$row['compId']] ?? null;
             $clubName = $clubNames[$row['clubId']] ?? null;
             if (!$compName || !$clubName) continue;
 
-            if ($this->debeExcluirCompetencia($compName)) continue;
-            if ($this->debeExcluirEquipo($clubName)) continue;
-
             $competition = trim($compName) . ' ' . $row['year'];
+
+            // ¿Excluido por regla (arg/conmebol) o por config del sistema?
+            $excl = $this->debeExcluirCompetencia($compName) || $this->debeExcluirEquipo($clubName);
+            if (!$excl) {
+                $cNorm = $norm($compName);
+                foreach ($excluirKw as $kw) {
+                    if (str_contains($cNorm, $kw)) { $excl = true; break; }
+                }
+            }
+            if ($excl) {
+                $excluidos[] = $competition . ' — ' . $clubName;
+                continue;
+            }
+
+            // ¿Ya cargado para este jugador?
+            if (isset($yaCargados[$norm($competition)])) {
+                $duplicados[] = $competition . ' — ' . $clubName;
+                continue;
+            }
 
             list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
@@ -1398,7 +1438,11 @@ class ScraperController extends Controller
             return $cmp !== 0 ? $cmp : strcmp($a['competition'], $b['competition']);
         });
 
-        return response()->json($data);
+        return response()->json([
+            'data'       => array_values($data),
+            'excluidos'  => $excluidos,
+            'duplicados' => $duplicados,
+        ]);
     }
 
     /**
