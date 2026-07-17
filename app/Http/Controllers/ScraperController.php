@@ -1375,10 +1375,9 @@ class ScraperController extends Controller
         // Campeonatos argentinos (ojo: "Torneo Apertura/Clausura" es AR; "Liga MX
         // Apertura/Clausura" es de México y NO entra) + copas sudamericanas.
         $excluirKw = [
-            'torneo apertura', 'torneo clausura', 'torneo inicial', 'torneo final',
-            'primera nacional', 'liga profesional', 'primera division argentina',
-            'primera division', 'transicion', 'campeonato de primera',
-            'libertadores', 'sudamericana', 'recopa', 'conmebol',
+            'copa argentina', 'supercopa argentina', 'copa maradona', 'supercopa internacional',
+            'primera nacional', 'primera division argentina',
+            'libertadores', 'sudamericana', 'conmebol',
         ];
 
         $data       = [];

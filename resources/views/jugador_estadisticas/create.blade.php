@@ -740,20 +740,23 @@
             duplicados = duplicados || [];
             if (!excluidos.length && !duplicados.length) return;
 
-            let html = '<div class="alert alert-warning" style="font-size:0.9rem;">';
+            let lista = arr => '<ul style="margin:4px 0 0 0; padding-left:20px;">'
+                + arr.map(x => '<li>' + clean(x) + '</li>').join('') + '</ul>';
+
+            let html = '<div class="alert alert-warning" style="font-size:0.85rem; max-height:280px; overflow:auto;">';
             if (excluidos.length) {
-                html += '<strong>🚫 Excluidos (campeonatos argentinos / copas sudamericanas):</strong>'
-                      + '<div>' + excluidos.map(clean).join(' · ') + '</div>';
+                html += '<strong>🚫 Excluidos (campeonatos argentinos / copas sudamericanas) — '
+                      + excluidos.length + ':</strong>' + lista(excluidos);
             }
             if (duplicados.length) {
                 html += (excluidos.length ? '<hr class="my-2">' : '')
-                      + '<strong>♻️ Ya cargados (no se vuelven a mostrar):</strong>'
-                      + '<div>' + duplicados.map(clean).join(' · ') + '</div>';
+                      + '<strong>♻️ Ya cargados (no se vuelven a mostrar) — '
+                      + duplicados.length + ':</strong>' + lista(duplicados);
             }
             html += '</div>';
 
             let cont = document.getElementById('resultadoScraper');
-            cont.insertAdjacentHTML('afterbegin', html);
+            cont.insertAdjacentHTML('beforeend', html);
         }
 
         function excluirCompetencia(nombre, btn) {
