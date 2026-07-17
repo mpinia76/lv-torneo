@@ -1352,9 +1352,11 @@ class ScraperController extends Controller
 
         if (empty($agg)) return response()->json([]);
 
-        // 3) Resolver nombres de competiciones y clubes (IDs -> nombre)
-        $compNames = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
-        $clubNames = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds));
+        // 3) Resolver nombres de competiciones y clubes (IDs -> nombre).
+        //    De los clubes también sacamos el país (countryId), dato del scraper.
+        $compNames     = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
+        $clubCountries = [];
+        $clubNames     = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds), $clubCountries);
 
         // 4) Reglas de negocio:
         //    - NO se muestran campeonatos argentinos ni copas sudamericanas (CONMEBOL).
@@ -1391,8 +1393,13 @@ class ScraperController extends Controller
 
             $competition = trim($compName) . ' ' . $row['year'];
 
-            // ¿Excluido por regla (arg/conmebol) o por config del sistema?
-            $excl = $this->debeExcluirCompetencia($compName) || $this->debeExcluirEquipo($clubName);
+            // Equipo argentino (countryId 9) según la API -> excluir (sin tocar la DB).
+            $esClubArg = (($clubCountries[$row['clubId']] ?? null) === 9);
+
+            // ¿Excluido por regla (arg/conmebol), equipo argentino o config del sistema?
+            $excl = $esClubArg
+                || $this->debeExcluirCompetencia($compName)
+                || $this->debeExcluirEquipo($clubName);
             if (!$excl) {
                 $cNorm = $norm($compName);
                 foreach ($excluirKw as $kw) {
@@ -1400,7 +1407,8 @@ class ScraperController extends Controller
                 }
             }
             if ($excl) {
-                $excluidos[] = $competition . ' — ' . $clubName;
+                $excluidos[] = $competition . ' — ' . $clubName
+                    . ($esClubArg ? ' (equipo argentino)' : '');
                 continue;
             }
 
@@ -1448,7 +1456,7 @@ class ScraperController extends Controller
      * Resuelve nombres desde tmapi para /competitions o /clubs por IDs.
      * Tolerante al formato de respuesta y a la clave del nombre.
      */
-    private function tmResolveNames($endpoint, array $ids)
+    private function tmResolveNames($endpoint, array $ids, &$countries = null)
     {
         $map = [];
         if (empty($ids)) return $map;
@@ -1479,6 +1487,15 @@ class ScraperController extends Controller
                     ?? null;
 
                 if ($name) $map[$id] = trim($name);
+
+                // País (para clubes: baseDetails.countryId; para competiciones: originDetails.countryId).
+                if ($countries !== null) {
+                    $cid = $item['baseDetails']['countryId']
+                        ?? $item['originDetails']['countryId']
+                        ?? $item['countryId']
+                        ?? null;
+                    if ($cid !== null) $countries[$id] = (int) $cid;
+                }
             }
         }
 
