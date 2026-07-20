@@ -1252,6 +1252,35 @@ class ScraperController extends Controller
             return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
         }
 
+        // 🐞 DEBUG ARQUERO: ?debuggk=1 -> campos de goalStatistics + bloques de stats.
+        if ($request->debuggk) {
+            $goalKeys   = [];
+            $statBlocks = [];
+            $ejemplos   = [];
+            foreach ($perf['data']['performance'] as $gg) {
+                $st = $gg['statistics'] ?? [];
+                foreach (array_keys($st) as $b) $statBlocks[$b] = ($statBlocks[$b] ?? 0) + 1;
+                $gs = $st['goalStatistics'] ?? [];
+                foreach ($gs as $k => $v) {
+                    if (!isset($goalKeys[$k])) $goalKeys[$k] = 0;
+                    if ($v !== null && $v !== 0) $goalKeys[$k]++;
+                }
+                $ps = strtolower($st['generalStatistics']['participationState'] ?? '');
+                if ($ps === 'played' && count($ejemplos) < 5) {
+                    $ejemplos[] = [
+                        'season' => $gg['gameInformation']['season']['nonCyclicalName'] ?? null,
+                        'goal'   => $gs,
+                        'time'   => $st['playingTimeStatistics'] ?? [],
+                    ];
+                }
+            }
+            return response()->json([
+                'stat_blocks' => $statBlocks,  // ¿hay un bloque tipo goalkeeperStatistics?
+                'goal_keys'   => $goalKeys,    // campos de goalStatistics (conteo de no-nulos)
+                'ejemplos'    => $ejemplos,
+            ]);
+        }
+
         // 2) Agregar por temporada|competición|club
         $agg     = [];
         $compIds = [];
