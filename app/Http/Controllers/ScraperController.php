@@ -1252,6 +1252,13 @@ class ScraperController extends Controller
             return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
         }
 
+        // ¿Es arquero? Goles recibidos / vallas invictas SOLO aplican a arqueros.
+        $esArquero = false;
+        if ($request->jugador_id) {
+            $jug = \App\Jugador::find($request->jugador_id);
+            $esArquero = $jug && mb_stripos((string) ($jug->tipoJugador ?? ''), 'arquero') !== false;
+        }
+
         // 🐞 DEBUG ARQUERO: ?debuggk=1 -> campos de goalStatistics + bloques de stats.
         if ($request->debuggk) {
             $goalKeys   = [];
@@ -1331,6 +1338,8 @@ class ScraperController extends Controller
                     'amarillas' => 0,
                     'rojas'     => 0,
                     'minutos'   => 0,
+                    'recibidos' => 0,
+                    'vallas'    => 0,
                 ];
                 $compIds[$compId] = true;
                 $clubIds[$clubId] = true;
@@ -1345,6 +1354,16 @@ class ScraperController extends Controller
             $agg[$key]['rojas']     += (!empty($card['redCard']) ? 1 : 0)
                                      + (!empty($card['yellowRedCard']) ? 1 : 0);
             $agg[$key]['minutos']   += (int) ($minutes ?? 0);
+
+            // SOLO arqueros: goles recibidos = goles del rival con él en cancha;
+            // valla invicta = partido jugado con 0 goles recibidos.
+            if ($esArquero) {
+                $oppGoals = $goal['opponentGoalsOnThePitch'] ?? null;
+                $agg[$key]['recibidos'] += (int) ($oppGoals ?? 0);
+                if ($oppGoals !== null && (int) $oppGoals === 0) {
+                    $agg[$key]['vallas'] += 1;
+                }
+            }
         }
 
         if (empty($agg)) return response()->json([]);
@@ -1424,8 +1443,8 @@ class ScraperController extends Controller
                 'partidos'        => $row['partidos'],
                 'goles_jugada'    => $row['goles'],
                 'goles_en_contra' => $row['own'],
-                'goles_recibidos' => 0,   // solo aplica a arqueros (otro endpoint)
-                'vallas_invictas' => 0,   // solo aplica a arqueros
+                'goles_recibidos' => $row['recibidos'],   // arquero (el front lo muestra solo si aplica)
+                'vallas_invictas' => $row['vallas'],      // arquero
                 'amarillas'       => $row['amarillas'],
                 'rojas'           => $row['rojas'],
                 'torneo_logo'     => $this->logoTorneo($competition),
