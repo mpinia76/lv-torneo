@@ -2271,6 +2271,35 @@ class ScraperController extends Controller
         $clubCountries = [];
         $clubNames     = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds), $clubCountries);
 
+        // 🐞 DEBUG POSICIÓN: ?debugpos=1 -> cómo se calculó cada posición + finales detectadas.
+        if ($request->debugpos) {
+            $buckets = [];
+            foreach ($agg as $r) {
+                $cn = $compNames[$r['compId']] ?? $r['compId'];
+                $buckets[] = [
+                    'comp' => $cn, 'year' => $r['year'], 'compId' => $r['compId'],
+                    'tipo' => $this->clasificarCompetencia($cn)[0],
+                    'PJ' => $r['partidos'], 'G' => $r['ganados'], 'E' => $r['empatados'], 'P' => $r['perdidos'],
+                    'GF' => $r['gf'], 'GE' => $r['ge'],
+                    'posLiga' => $r['posLiga'],
+                    'finTiene' => $r['finTiene'], 'finGf' => $r['finGf'], 'finGe' => $r['finGe'],
+                ];
+            }
+            $finales = [];
+            foreach ($perf['data']['performance'] as $g) {
+                $gi = $g['gameInformation'] ?? [];
+                $grp = (string) ($gi['competitionGroupId'] ?? '');
+                if (stripos($grp, 'FF') !== 0) continue;
+                $c = $g['clubsInformation']['club'] ?? [];
+                $cid = $gi['competitionId'] ?? '';
+                $finales[] = [
+                    'comp' => $compNames[$cid] ?? $cid, 'seasonId' => $gi['seasonId'] ?? null,
+                    'groupId' => $grp, 'gf' => $c['goalsTotal'] ?? null, 'ge' => $c['opponentGoalsTotal'] ?? null,
+                ];
+            }
+            return response()->json(['buckets' => $buckets, 'finales_FF' => $finales]);
+        }
+
         // 4) Ya cargados para este técnico.
         $tecnicoId  = $request->tecnico_id;
         $yaCargados = collect(
