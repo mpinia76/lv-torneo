@@ -595,11 +595,9 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
         }
 
         // ------------------------------------------------------------------
-        // Transfermarkt: phase A lists the directed clubs, then one fetch per
-        // club appends its tournaments. Can be stopped mid-way.
+        // Transfermarkt (DT): una sola llamada a tmapi (coach/{id}/performance-game).
+        // TM migró la página HTML a componente JS, así que ya no se parsea HTML.
         // ------------------------------------------------------------------
-
-
         async function scrapearTransfermarktTecnico() {
             let url = document.getElementById('tmUrlTecnico').value.trim();
             if (!url) { alert('Pegá la URL del DT en Transfermarkt'); return; }
@@ -608,40 +606,24 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
             let endpoint  = "{{ url('/admin/scraper/tecnico-transfermarkt') }}";
             let progreso  = document.getElementById('tmProgresoTecnico');
 
-            iniciarResultados();
-            progreso.innerHTML = '⏳ Leyendo clubes de la temporada...';
+            progreso.innerHTML = '⏳ Trayendo datos del DT...';
 
-            // Phase A: get clubs.
-            let faseA;
             try {
-                let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`);
-                faseA = await res.json();
-                if (faseA.error) { progreso.innerHTML = `<span style="color:#a94442">${faseA.error}</span>`; return; }
+                let res  = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`);
+                let resp = await res.json();
+                if (resp.error) { progreso.innerHTML = `<span style="color:#a94442">${resp.error}</span>`; return; }
+
+                let filas = Array.isArray(resp) ? resp : (resp.data || []);
+                renderResultados(filas);
+                mostrarExcluidos(
+                    Array.isArray(resp) ? [] : (resp.excluidos || []),
+                    Array.isArray(resp) ? [] : (resp.duplicados || [])
+                );
+                progreso.innerHTML = `✅ Listo. ${filas.length} torneos.`;
             } catch (e) {
-                console.error(e); progreso.innerHTML = '<span style="color:#a94442">Error leyendo clubes</span>'; return;
+                console.error(e);
+                progreso.innerHTML = '<span style="color:#a94442">Error scrapeando</span>';
             }
-
-            let clubes = faseA.clubes || [];
-            if (!clubes.length) { progreso.innerHTML = '<span style="color:#856404">No se encontraron clubes.</span>'; return; }
-
-            // Phase B: one fetch per club (filtered), append cards.
-            let total = 0;
-            let excluidosAll = [], duplicadosAll = [];
-            for (let i = 0; i < clubes.length; i++) {
-                let c = clubes[i];
-                progreso.innerHTML = `⏳ ${i + 1}/${clubes.length} — <strong>${c.nombre}</strong> (${total} torneos)`;
-                try {
-                    let res = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`
-                        + `&verein_id=${encodeURIComponent(c.id)}&equipo_nombre=${encodeURIComponent(c.nombre)}`);
-                    let r = await res.json();
-                    if (r.data && r.data.length) { agregarCards(r.data); total += r.data.length; }
-                    if (r.excluidos)  excluidosAll  = excluidosAll.concat(r.excluidos);
-                    if (r.duplicados) duplicadosAll = duplicadosAll.concat(r.duplicados);
-                } catch (e) { console.error('Club ' + c.nombre, e); }
-            }
-
-            mostrarExcluidos(excluidosAll, duplicadosAll);
-            progreso.innerHTML = `✅ Listo. ${total} torneos de ${clubes.length} clubes.`;
         }
 
         function excluirCompetencia(nombre, btn) {

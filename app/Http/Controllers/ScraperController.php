@@ -2164,171 +2164,65 @@ class ScraperController extends Controller
             return response()->json(['error' => 'URL inválida (falta /trainer/{id})']);
         }
 
-        // 🐞 DIAGNÓSTICO: ?debughtml=1 -> baja la página RENDERIZADA y reporta qué trae.
-        if ($request->debughtml) {
-            $h = HttpHelper::getHtmlContent($url, true); // forzar render (ScraperAPI)
-            if (!$h) return response()->json(['error' => 'sin html']);
-            $dom = new \DOMDocument();
-            libxml_use_internal_errors(true);
-            $dom->loadHTML($h);
-            libxml_clear_errors();
-            $xp = new \DOMXPath($dom);
+        $coachId = $mId[1];
+        $base    = 'https://tmapi.transfermarkt.technology';
 
-            $selects = [];
-            foreach ($xp->query('//select') as $s) {
-                $selects[] = [
-                    'name'    => $s->getAttribute('name'),
-                    'class'   => $s->getAttribute('class'),
-                    'options' => $xp->query('.//option', $s)->length,
-                ];
-            }
-            $tables = [];
-            foreach ($xp->query('//table') as $t) $tables[] = $t->getAttribute('class');
-
-            return response()->json([
-                'html_len'    => strlen($h),
-                'selects'     => $selects,
-                'tables'      => array_slice($tables, 0, 20),
-                'grid_rows'   => $xp->query('//div[contains(@class,"grid-row")]')->length,
-                'tm_grid'     => $xp->query('//div[contains(@class,"tm-grid")]')->length,
-                'verein_opts' => $xp->query("//select[@name='verein_id']/option")->length,
-            ]);
+        // 1) Rendimiento por partido del DT (JSON). TM migró la página HTML a un
+        //    componente JS, así que leemos la API (igual que el scraper de jugador).
+        $perf = HttpHelper::getJson("{$base}/coach/{$coachId}/performance-game");
+        if (!$perf || empty($perf['data']['performance']) || !is_array($perf['data']['performance'])) {
+            return response()->json(['error' => 'No se pudo obtener el rendimiento del DT (tmapi)']);
         }
 
-        // Strip any pre-existing filter params from the pasted URL; we set them ourselves.
-        $base = preg_replace('#[?&](verein_id|wettbewerb_id|gegner_id|liga|trainer_id)=[^&]*#', '', $url);
+        // 2) Agregar por temporada (seasonId) + competición + club dirigido.
+        $agg = []; $compIds = []; $clubIds = [];
+        foreach ($perf['data']['performance'] as $g) {
+            $gi        = $g['gameInformation'] ?? [];
+            $club      = $g['clubsInformation']['club'] ?? [];   // el club que dirigió
+            $seasonObj = $gi['season'] ?? [];
 
-        // Ensure there's a saison_id (year) so we can build filtered URLs.
-        // (kept as-is from the pasted URL or its select; see below)
+            $compId = $gi['competitionId'] ?? null;
+            $clubId = $club['clubId'] ?? null;
+            if (!$compId || !$clubId) continue;
 
-        // ---- PHASE A: no verein_id -> return the season's clubs + competitions ----
-        if (!$request->filled('verein_id')) {
-            $html = HttpHelper::getHtmlContent($url, false);
-            if (!$html) return response()->json(['error' => 'No se pudo obtener la página']);
+            // Año = año de inicio de la temporada TM (seasonId), como en jugador.
+            $seasonId = (int) ($gi['seasonId'] ?? $seasonObj['id'] ?? 0);
+            $year     = $seasonId;
+            if ($year < 2000) continue;
 
-            $dom = new \DOMDocument();
-            libxml_use_internal_errors(true);
-            $dom->loadHTML($html);
-            libxml_clear_errors();
-            $xpath = new \DOMXPath($dom);
+            $gf = $club['goalsTotal'] ?? null;
+            $ge = $club['opponentGoalsTotal'] ?? null;
+            if ($gf === null || $ge === null) continue; // partido sin resultado
+            $gf = (int) $gf; $ge = (int) $ge;
 
-            $year = $this->anioDesdeSelect($xpath, $url);
-
-            $clubes = [];
-            foreach ($xpath->query("//select[@name='verein_id']/option") as $o) {
-                $v = trim($o->getAttribute('value'));
-                $t = trim($o->textContent);
-                if ($v !== '' && $t !== '') $clubes[] = ['id' => $v, 'nombre' => $t];
-            }
-
-            $competiciones = [];
-            foreach ($xpath->query("//select[@name='wettbewerb_id']/option") as $o) {
-                $v = trim($o->getAttribute('value'));
-                $t = trim($o->textContent);
-                if ($v !== '' && $t !== '' && stripos($t, 'Competicion') === false) {
-                    $competiciones[] = ['id' => $v, 'nombre' => $t];
-                }
-            }
-
-            return response()->json([
-                'fase'          => 'A',
-                'base'          => $base,
-                'year'          => $year,
-                'clubes'        => $clubes,
-                'competiciones' => $competiciones,
-            ]);
-        }
-
-        // ---- PHASE B: verein_id (+ optional wettbewerb_id) -> scrape that combo ----
-        $vereinId  = $request->verein_id;
-        $wettId    = $request->wettbewerb_id;
-        $equipoTM  = trim($request->equipo_nombre ?? ''); // display name passed from phase A
-
-        // Build the filtered TM URL.
-        $sep = strpos($base, '?') !== false ? '&' : '?';
-        $filtUrl = $base . $sep . 'verein_id=' . urlencode($vereinId);
-        if ($wettId) $filtUrl .= '&wettbewerb_id=' . urlencode($wettId);
-
-        $html = HttpHelper::getHtmlContent($filtUrl, false);
-        if (!$html) return response()->json([]);
-
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML($html);
-        libxml_clear_errors();
-        $xpath = new \DOMXPath($dom);
-
-        $year = $this->anioDesdeSelect($xpath, $url);
-
-        $statsTable = null; $bestGoals = 0;
-        foreach ($xpath->query('//table[contains(@class,"items")]') as $t) {
-            $g = 0;
-            foreach ($xpath->query('.//td', $t) as $td) {
-                if (preg_match('/^\s*\d+\s*:\s*\d+\s*$/', trim($td->textContent))) $g++;
-            }
-            if ($g > $bestGoals) { $bestGoals = $g; $statsTable = $t; }
-        }
-        if (!$statsTable) return response()->json([]);
-
-        // Aggregate. Now the club is FIXED (filtered by verein_id), so for every row
-        // we just need to know which side is our club to read gf/ge correctly.
-        $stats = [];
-        foreach ($xpath->query('.//tbody/tr', $statsTable) as $row) {
-
-            // Result (first NN:NN; penalties counted as the shown score — can't disambiguate here).
-            $resStr = null;
-            $resLink = $xpath->query(".//a[contains(@class,'ergebnis-link')]", $row)->item(0);
-            if ($resLink && preg_match('/(\d+)\s*:\s*(\d+)/', trim($resLink->textContent), $mRes)) {
-                $resStr = $mRes[1] . ':' . $mRes[2];
-            }
-            if ($resStr === null) continue;
-
-            // Competition name (icon title).
-            $comp = '';
-            $compImg = $xpath->query('.//img[contains(@class,"wappen-position-grid-view")]', $row)->item(0);
-            if (!$compImg) $compImg = $xpath->query('.//img[@title]', $row)->item(0);
-            if ($compImg) $comp = trim($compImg->getAttribute('title'));
-            $comp = trim(preg_replace('/\s*\(-?\d{2}\/\d{2}\)\s*$/', '', $comp));
-            if ($comp === '') $comp = 'Sin competencia';
-
-            // Find which side is OUR club (by verein id in the link).
-            $home = $away = ''; $homeId = $awayId = null;
-            foreach ($xpath->query(".//a[contains(@href,'/verein/')]", $row) as $a) {
-                $txt = trim($a->textContent);
-                if ($txt === '') continue;
-                $vid = null;
-                if (preg_match('#/verein/(\d+)#', $a->getAttribute('href'), $mvid)) $vid = $mvid[1];
-                if ($home === '') { $home = $txt; $homeId = $vid; }
-                elseif ($away === '') { $away = $txt; $awayId = $vid; break; }
-            }
-            if (!$home || !$away) continue;
-
-            list($hg, $ag) = array_map('intval', explode(':', $resStr));
-
-            // Our club's perspective.
-            if ((string) $homeId === (string) $vereinId)      { $gf = $hg; $ge = $ag; $eq = $home; }
-            elseif ((string) $awayId === (string) $vereinId)  { $gf = $ag; $ge = $hg; $eq = $away; }
-            else { $gf = $hg; $ge = $ag; $eq = $equipoTM ?: $home; } // fallback
-
-            $res = $gf > $ge ? 'W' : ($gf < $ge ? 'L' : 'D');
-
-            $key = $comp;
-            if (!isset($stats[$key])) {
-                $stats[$key] = [
-                    'competition' => $comp, 'equipo' => $equipoTM ?: $eq,
+            $key = $seasonId . '|' . $compId . '|' . $clubId;
+            if (!isset($agg[$key])) {
+                $agg[$key] = [
+                    'year' => $year, 'compId' => $compId, 'clubId' => $clubId,
                     'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
                     'perdidos' => 0, 'gf' => 0, 'ge' => 0,
                 ];
+                $compIds[$compId] = true;
+                $clubIds[$clubId] = true;
             }
-            $stats[$key]['partidos']++;
-            $stats[$key]['ganados']   += $res === 'W' ? 1 : 0;
-            $stats[$key]['empatados'] += $res === 'D' ? 1 : 0;
-            $stats[$key]['perdidos']  += $res === 'L' ? 1 : 0;
-            $stats[$key]['gf'] += $gf;
-            $stats[$key]['ge'] += $ge;
+            $agg[$key]['partidos']  += 1;
+            $agg[$key]['ganados']   += ($gf > $ge) ? 1 : 0;
+            $agg[$key]['empatados'] += ($gf === $ge) ? 1 : 0;
+            $agg[$key]['perdidos']  += ($gf < $ge) ? 1 : 0;
+            $agg[$key]['gf']        += $gf;
+            $agg[$key]['ge']        += $ge;
         }
 
-        // Ya cargados para el técnico + país del club (por verein_id vía tmapi).
+        if (empty($agg)) {
+            return response()->json(['data' => [], 'excluidos' => [], 'duplicados' => []]);
+        }
+
+        // 3) Nombres + país del club (dato del scraper).
+        $compNames     = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
+        $clubCountries = [];
+        $clubNames     = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds), $clubCountries);
+
+        // 4) Ya cargados para este técnico.
         $tecnicoId  = $request->tecnico_id;
         $yaCargados = collect(
             $tecnicoId ? \App\TecnicoEstadisticaManual::where('tecnico_id', $tecnicoId)->pluck('torneo_nombre') : []
@@ -2336,39 +2230,41 @@ class ScraperController extends Controller
             return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
         })->flip()->toArray();
 
-        $clubCountries = [];
-        $this->tmResolveNames('https://tmapi.transfermarkt.technology/clubs', [$vereinId], $clubCountries);
-        $clubEsArg = (($clubCountries[$vereinId] ?? null) === 9); // 9 = Argentina
+        // 5) Armar filas y aplicar reglas de exclusión (mismo helper que los demás).
+        $rows = [];
+        foreach ($agg as $r) {
+            $compName = $compNames[$r['compId']] ?? null;
+            $clubName = $clubNames[$r['clubId']] ?? null;
+            if (!$compName || !$clubName) continue;
 
-        $data = [];
-        foreach ($stats as $s) {
-            list($tipo, $ambito) = $this->clasificarCompetencia($s['competition']);
-            $competition = trim($s['competition']) . ' ' . $year;
+            $competition = trim($compName) . ' ' . $r['year'];
+            list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
-            $data[] = [
+            $rows[] = [
                 'competition'  => $competition,
-                'equipo'       => $s['equipo'],
-                'es_argentino' => $clubEsArg,
+                'equipo'       => $clubName,
+                'es_argentino' => (($clubCountries[$r['clubId']] ?? null) === 9),
                 'posicion'     => null,
-                'partidos'     => $s['partidos'],
-                'ganados'      => $s['ganados'],
-                'empatados'    => $s['empatados'],
-                'perdidos'     => $s['perdidos'],
-                'gf'           => $s['gf'],
-                'ge'           => $s['ge'],
+                'partidos'     => $r['partidos'],
+                'ganados'      => $r['ganados'],
+                'empatados'    => $r['empatados'],
+                'perdidos'     => $r['perdidos'],
+                'gf'           => $r['gf'],
+                'ge'           => $r['ge'],
                 'torneo_logo'  => $this->logoTorneo($competition),
                 'tipo'         => $tipo,
                 'ambito'       => $ambito,
             ];
         }
 
-        $part = $this->partirTorneos($data, $yaCargados);
-        return response()->json([
-            'fase'       => 'B',
-            'data'       => $part['data'],
-            'excluidos'  => $part['excluidos'],
-            'duplicados' => $part['duplicados'],
-        ]);
+        usort($rows, function ($a, $b) {
+            preg_match('/(\d{4})\s*$/', $a['competition'], $ya);
+            preg_match('/(\d{4})\s*$/', $b['competition'], $yb);
+            $c = ((int) ($yb[1] ?? 0)) <=> ((int) ($ya[1] ?? 0));
+            return $c !== 0 ? $c : strcmp($a['competition'], $b['competition']);
+        });
+
+        return response()->json($this->partirTorneos($rows, $yaCargados));
     }
 
 // Year from the saison_id select (or URL fallback). Reused by both phases.
