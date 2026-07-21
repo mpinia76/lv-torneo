@@ -53,6 +53,7 @@
                 <input type="text"
                        id="transfermarktUrl"
                        class="form-control mr-2"
+                       value="{{ $jugador->transfermarkt_url ?? '' }}"
                        placeholder="https://www.transfermarkt.com.ar/lionel-messi/profil/spieler/28003">
                 <button type="button" class="btn btn-warning mr-2" onclick="scrapearTransfermarktRendimiento()" style="white-space:nowrap;">
                     🌐 Scrapear

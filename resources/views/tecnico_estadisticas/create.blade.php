@@ -65,6 +65,7 @@
             <label>Importar desde Transfermarkt</label>
             <div class="d-flex">
                 <input type="text" id="tmUrlTecnico" class="form-control mr-2"
+                       value="{{ $tecnico->transfermarkt_url ?? '' }}"
                        placeholder="https://www.transfermarkt.com.ar/<slug>/leistungsdatenDetail/trainer/17428?saison_id=2024">
                 <button type="button" class="btn btn-warning" onclick="scrapearTransfermarktTecnico()" style="white-space:nowrap;">🌐 Scrapear TM</button>
             </div>
