@@ -149,6 +149,41 @@ class ScraperController extends Controller
         return response()->json($data);
     }
 
+    /**
+     * Pantalla "Torneos nuevos": lista jugadores y DTs que tienen URL de TM guardada.
+     * El front recorre cada uno llamando al scraper y muestra los torneos nuevos a cargar.
+     */
+    public function nuevosTorneos()
+    {
+        $jugadores = \App\Jugador::with('persona')
+            ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
+            ->get()
+            ->map(function ($j) {
+                return [
+                    'tipo'   => 'jugador',
+                    'id'     => $j->id,
+                    'nombre' => optional($j->persona)->name ?: ('Jugador #' . $j->id),
+                    'url'    => $j->transfermarkt_url,
+                ];
+            });
+
+        $tecnicos = \App\Tecnico::with('persona')
+            ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'tipo'   => 'tecnico',
+                    'id'     => $t->id,
+                    'nombre' => optional($t->persona)->name ?: ('DT #' . $t->id),
+                    'url'    => $t->transfermarkt_url,
+                ];
+            });
+
+        $entidades = $jugadores->concat($tecnicos)->values();
+
+        return view('scraper.nuevos_torneos', compact('entidades'));
+    }
+
     function normalizeTeam($str) {
         // 1️⃣ Pasar a ASCII, eliminar acentos
         $str = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $str);
@@ -1252,6 +1287,12 @@ class ScraperController extends Controller
             return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
         }
 
+        // Guardar la URL de TM en el jugador (para el chequeo de torneos nuevos).
+        if ($request->jugador_id) {
+            try { \App\Jugador::where('id', $request->jugador_id)->update(['transfermarkt_url' => $url]); }
+            catch (\Throwable $e) { /* columna aún no migrada: no rompemos el scrape */ }
+        }
+
         // ¿Es arquero? Goles recibidos / vallas invictas SOLO aplican a arqueros.
         $esArquero = false;
         if ($request->jugador_id) {
@@ -1401,6 +1442,13 @@ class ScraperController extends Controller
             'libertadores', 'sudamericana', 'conmebol',
         ];
 
+        // Si jugó en 2+ clubes en la MISMA competición+temporada (transferido), el
+        // clubRank de su último partido no es la posición final de esa liga.
+        $clubesPorTorneo = [];
+        foreach ($agg as $r) {
+            $clubesPorTorneo[$r['year'] . '|' . $r['compId']][$r['clubId']] = true;
+        }
+
         $data       = [];
         $excluidos  = [];
         $duplicados = [];
@@ -1439,12 +1487,14 @@ class ScraperController extends Controller
 
             list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
-            // Posición: campeón/subcampeón por la final (copa) o rank de tabla (liga).
+            // Posición: campeón/subcampeón por la final (copa) o rank de tabla (liga),
+            // pero la de liga solo si NO cambió de club en esa competición+temporada.
+            $unSoloClub = count($clubesPorTorneo[$row['year'] . '|' . $row['compId']] ?? []) <= 1;
             $posicion = 0;
             if ($row['finTiene']) {
                 $posicion = ($row['finGf'] > $row['finGe']) ? 1
                     : (($row['finGf'] < $row['finGe']) ? 2 : 0);
-            } elseif ($tipo === 'Liga' && $row['posLiga'] !== null) {
+            } elseif ($tipo === 'Liga' && $row['posLiga'] !== null && $unSoloClub) {
                 $posicion = $row['posLiga'];
             }
 
@@ -2184,6 +2234,12 @@ class ScraperController extends Controller
         $perf = HttpHelper::getJson("{$base}/coach/{$coachId}/performance-game");
         if (!$perf || empty($perf['data']['performance']) || !is_array($perf['data']['performance'])) {
             return response()->json(['error' => 'No se pudo obtener el rendimiento del DT (tmapi)']);
+        }
+
+        // Guardar la URL de TM en el técnico (para el chequeo de torneos nuevos).
+        if ($request->tecnico_id) {
+            try { \App\Tecnico::where('id', $request->tecnico_id)->update(['transfermarkt_url' => $url]); }
+            catch (\Throwable $e) { /* columna aún no migrada: no rompemos el scrape */ }
         }
 
         // 2) Agregar por temporada (seasonId) + competición + club dirigido.

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Jugador extends Model
 {
-    protected $fillable = ['tipoJugador','pie','persona_id','url_nombre'];
+    protected $fillable = ['tipoJugador','pie','persona_id','url_nombre','transfermarkt_url'];
 
     public function persona() {
         return $this->belongsTo('App\Persona');
