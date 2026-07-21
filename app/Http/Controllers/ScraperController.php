@@ -2267,6 +2267,13 @@ class ScraperController extends Controller
             return (string) \Str::of($v)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
         })->flip()->toArray();
 
+        // Si el DT dirigió 2+ clubes en la MISMA competición+temporada, no terminó la
+        // temporada con ninguno -> el clubRank de su último partido no es la posición final.
+        $clubesPorTorneo = [];
+        foreach ($agg as $r) {
+            $clubesPorTorneo[$r['year'] . '|' . $r['compId']][$r['clubId']] = true;
+        }
+
         // 5) Armar filas y aplicar reglas de exclusión (mismo helper que los demás).
         $rows = [];
         foreach ($agg as $r) {
@@ -2277,12 +2284,14 @@ class ScraperController extends Controller
             $competition = trim($compName) . ' ' . $r['year'];
             list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
-            // Posición: campeón/subcampeón por la final (copa) o rank de tabla (liga).
+            // Posición: campeón/subcampeón por la final (copa) o rank de tabla (liga),
+            // pero la de liga solo si NO cambió de club en esa competición+temporada.
+            $unSoloClub = count($clubesPorTorneo[$r['year'] . '|' . $r['compId']] ?? []) <= 1;
             $posicion = null;
             if ($r['finTiene']) {
                 $posicion = ($r['finGf'] > $r['finGe']) ? 1
                     : (($r['finGf'] < $r['finGe']) ? 2 : null);
-            } elseif ($tipo === 'Liga' && $r['posLiga'] !== null) {
+            } elseif ($tipo === 'Liga' && $r['posLiga'] !== null && $unSoloClub) {
                 $posicion = $r['posLiga'];
             }
 
