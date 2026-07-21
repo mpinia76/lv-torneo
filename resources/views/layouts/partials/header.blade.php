@@ -47,6 +47,10 @@
                                 {{ __('Torneos') }}
                             </a>
                         </li>
+                        <li><a class="dropdown-item" href="{{ route('scraper.nuevos-torneos') }}">
+                                {{ __('Torneos nuevos (TM)') }}
+                            </a>
+                        </li>
 
 
 

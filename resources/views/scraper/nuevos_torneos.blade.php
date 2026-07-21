@@ -4,29 +4,66 @@
 
 @section('content')
     <div class="container">
-        <h3 class="mb-3">Torneos nuevos a cargar</h3>
+        <h3 class="mb-1">Torneos nuevos a cargar</h3>
         <p class="text-muted">
-            Recorre los jugadores y DTs que tienen URL de Transfermarkt guardada y busca torneos
-            que todavía no cargaste (los que trae el scraper, sin contar los excluidos ni los ya cargados).
+            Recorre los jugadores y DTs con URL de Transfermarkt guardada y busca torneos que
+            todavía no cargaste (sin contar excluidos ni ya cargados).
         </p>
 
-        <div class="d-flex align-items-center mb-3">
-            <button type="button" id="btnBuscar" class="btn btn-primary mr-3" onclick="buscarNuevos()">
-                🔎 Buscar torneos nuevos
-            </button>
-            <span id="progreso" class="text-muted"></span>
-        </div>
+        {{-- Pestañas Jugadores / DTs --}}
+        <ul class="nav nav-tabs mb-3" id="tabs">
+            <li class="nav-item">
+                <a class="nav-link active" data-toggle="tab" href="#tab-jugadores">
+                    👤 Jugadores <span class="badge badge-secondary" id="cnt-jugador">0</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#tab-tecnicos">
+                    🎽 DTs <span class="badge badge-secondary" id="cnt-tecnico">0</span>
+                </a>
+            </li>
+        </ul>
 
-        <div id="resumen" class="mb-3"></div>
-        <div id="resultado"></div>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-jugadores">
+                <div class="d-flex align-items-center mb-3">
+                    <button type="button" class="btn btn-primary mr-3" onclick="buscarNuevos('jugador')">
+                        🔎 Buscar torneos nuevos (jugadores)
+                    </button>
+                    <span id="progreso-jugador" class="text-muted"></span>
+                </div>
+                <div id="resumen-jugador" class="mb-3"></div>
+                <div id="resultado-jugador"></div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-tecnicos">
+                <div class="d-flex align-items-center mb-3">
+                    <button type="button" class="btn btn-primary mr-3" onclick="buscarNuevos('tecnico')">
+                        🔎 Buscar torneos nuevos (DTs)
+                    </button>
+                    <span id="progreso-tecnico" class="text-muted"></span>
+                </div>
+                <div id="resumen-tecnico" class="mb-3"></div>
+                <div id="resultado-tecnico"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         const ENTIDADES   = @json($entidades);
-        const EP_JUGADOR  = "{{ url('/admin/scraper/jugador-transfermarkt') }}";
-        const EP_TECNICO  = "{{ url('/admin/scraper/tecnico-transfermarkt') }}";
-        const URL_JUGADOR = "{{ url('/admin/jugador-estadisticas/createPorJugador') }}";
-        const URL_TECNICO = "{{ url('/admin/tecnico-estadisticas/createPorTecnico') }}";
+        const EP = {
+            jugador: "{{ url('/admin/scraper/jugador-transfermarkt') }}",
+            tecnico: "{{ url('/admin/scraper/tecnico-transfermarkt') }}",
+        };
+        const URL_FICHA = {
+            jugador: "{{ url('/admin/jugador-estadisticas/createPorJugador') }}",
+            tecnico: "{{ url('/admin/tecnico-estadisticas/createPorTecnico') }}",
+        };
+        const ICONO = { jugador: '👤', tecnico: '🎽' };
+
+        // Contadores por tipo
+        document.getElementById('cnt-jugador').textContent = ENTIDADES.filter(e => e.tipo === 'jugador').length;
+        document.getElementById('cnt-tecnico').textContent = ENTIDADES.filter(e => e.tipo === 'tecnico').length;
 
         function esc(s) {
             return (s == null ? '' : String(s)).replace(/[&<>"']/g, m => ({
@@ -34,32 +71,30 @@
             }[m]));
         }
 
-        async function buscarNuevos() {
-            const btn = document.getElementById('btnBuscar');
-            const prog = document.getElementById('progreso');
-            const cont = document.getElementById('resultado');
-            const resumen = document.getElementById('resumen');
+        async function buscarNuevos(tipo) {
+            const lista = ENTIDADES.filter(e => e.tipo === tipo);
+            const prog    = document.getElementById('progreso-' + tipo);
+            const cont    = document.getElementById('resultado-' + tipo);
+            const resumen = document.getElementById('resumen-' + tipo);
 
-            if (!ENTIDADES.length) {
-                resumen.innerHTML = '<div class="alert alert-warning">No hay jugadores ni DTs con URL de Transfermarkt guardada. Scrapeá alguno primero y su URL queda guardada sola.</div>';
+            if (!lista.length) {
+                resumen.innerHTML = '<div class="alert alert-warning">No hay ' +
+                    (tipo === 'jugador' ? 'jugadores' : 'DTs') +
+                    ' con URL de Transfermarkt guardada. Scrapeá alguno primero y la URL queda guardada sola.</div>';
                 return;
             }
 
-            btn.disabled = true;
             cont.innerHTML = '';
             resumen.innerHTML = '';
             let conNuevos = 0, alDia = 0, errores = 0, totalTorneos = 0;
 
-            for (let i = 0; i < ENTIDADES.length; i++) {
-                const e = ENTIDADES[i];
-                prog.innerHTML = `⏳ ${i + 1}/${ENTIDADES.length} — ${esc(e.nombre)}`;
-
-                const ep  = e.tipo === 'jugador' ? EP_JUGADOR : EP_TECNICO;
-                const idp = e.tipo === 'jugador' ? 'jugador_id' : 'tecnico_id';
-                const base = e.tipo === 'jugador' ? URL_JUGADOR : URL_TECNICO;
+            for (let i = 0; i < lista.length; i++) {
+                const e = lista[i];
+                prog.innerHTML = `⏳ ${i + 1}/${lista.length} — ${esc(e.nombre)}`;
+                const idp = tipo === 'jugador' ? 'jugador_id' : 'tecnico_id';
 
                 try {
-                    const res = await fetch(`${ep}?url=${encodeURIComponent(e.url)}&${idp}=${e.id}`);
+                    const res = await fetch(`${EP[tipo]}?url=${encodeURIComponent(e.url)}&${idp}=${e.id}`);
                     const r = await res.json();
                     const data = Array.isArray(r) ? r : (r.data || []);
 
@@ -72,9 +107,9 @@
                         cont.insertAdjacentHTML('beforeend', `
                             <div class="card mb-2">
                                 <div class="card-header d-flex align-items-center" style="background:#f1f8f1;">
-                                    <strong>${e.tipo === 'jugador' ? '👤' : '🎽'} ${esc(e.nombre)}</strong>
+                                    <strong>${ICONO[tipo]} ${esc(e.nombre)}</strong>
                                     <span class="badge badge-success ml-2">${data.length} nuevo(s)</span>
-                                    <a href="${base}/${e.id}" target="_blank" class="btn btn-sm btn-primary ml-auto">Cargar ▸</a>
+                                    <a href="${URL_FICHA[tipo]}/${e.id}" target="_blank" class="btn btn-sm btn-primary ml-auto">Cargar ▸</a>
                                 </div>
                                 <div class="card-body py-2">
                                     <ul class="mb-0" style="font-size:0.9rem;">${filas}</ul>
@@ -90,9 +125,8 @@
             }
 
             prog.innerHTML = '';
-            btn.disabled = false;
             resumen.innerHTML = `<div class="alert alert-info">
-                Revisados <strong>${ENTIDADES.length}</strong> ·
+                Revisados <strong>${lista.length}</strong> ·
                 <strong>${conNuevos}</strong> con torneos nuevos (${totalTorneos} en total) ·
                 <strong>${alDia}</strong> al día` +
                 (errores ? ` · <span class="text-danger">${errores} con error</span>` : '') +
