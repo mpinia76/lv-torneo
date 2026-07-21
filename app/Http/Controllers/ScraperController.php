@@ -2164,6 +2164,37 @@ class ScraperController extends Controller
             return response()->json(['error' => 'URL inválida (falta /trainer/{id})']);
         }
 
+        // 🐞 DIAGNÓSTICO: ?debughtml=1 -> baja la página RENDERIZADA y reporta qué trae.
+        if ($request->debughtml) {
+            $h = HttpHelper::getHtmlContent($url, true); // forzar render (ScraperAPI)
+            if (!$h) return response()->json(['error' => 'sin html']);
+            $dom = new \DOMDocument();
+            libxml_use_internal_errors(true);
+            $dom->loadHTML($h);
+            libxml_clear_errors();
+            $xp = new \DOMXPath($dom);
+
+            $selects = [];
+            foreach ($xp->query('//select') as $s) {
+                $selects[] = [
+                    'name'    => $s->getAttribute('name'),
+                    'class'   => $s->getAttribute('class'),
+                    'options' => $xp->query('.//option', $s)->length,
+                ];
+            }
+            $tables = [];
+            foreach ($xp->query('//table') as $t) $tables[] = $t->getAttribute('class');
+
+            return response()->json([
+                'html_len'    => strlen($h),
+                'selects'     => $selects,
+                'tables'      => array_slice($tables, 0, 20),
+                'grid_rows'   => $xp->query('//div[contains(@class,"grid-row")]')->length,
+                'tm_grid'     => $xp->query('//div[contains(@class,"tm-grid")]')->length,
+                'verein_opts' => $xp->query("//select[@name='verein_id']/option")->length,
+            ]);
+        }
+
         // Strip any pre-existing filter params from the pasted URL; we set them ourselves.
         $base = preg_replace('#[?&](verein_id|wettbewerb_id|gegner_id|liga|trainer_id)=[^&]*#', '', $url);
 
