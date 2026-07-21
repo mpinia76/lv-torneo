@@ -1361,8 +1361,16 @@ class ScraperController extends Controller
             $agg[$key]['minutos']   += (int) ($minutes ?? 0);
 
             // Posición: liga = clubRank del último partido; copa = resultado de la final (FF*).
-            $clubInfo = $g['clubsInformation']['club'] ?? [];
-            $rank     = $clubInfo['clubRank'] ?? null;
+            // Tomamos el lado del jugador (por clubId), no siempre el local.
+            $ci = $g['clubsInformation'] ?? [];
+            if ((string) ($ci['club']['clubId'] ?? '') === (string) $clubId) {
+                $clubInfo = $ci['club'];
+            } elseif ((string) ($ci['opponent']['clubId'] ?? '') === (string) $clubId) {
+                $clubInfo = $ci['opponent'];
+            } else {
+                $clubInfo = $ci['club'] ?? [];
+            }
+            $rank = $clubInfo['clubRank'] ?? null;
             $gdate    = (string) ($gi['date']['dateTimeUTC'] ?? '');
             $groupId  = (string) ($gi['competitionGroupId'] ?? '');
             if ($rank !== null && $gdate > $agg[$key]['posDate']) {
@@ -2210,8 +2218,17 @@ class ScraperController extends Controller
         // 2) Agregar por temporada (seasonId) + competición + club dirigido.
         $agg = []; $compIds = []; $clubIds = [];
         foreach ($perf['data']['performance'] as $g) {
-            $gi        = $g['gameInformation'] ?? [];
-            $club      = $g['clubsInformation']['club'] ?? [];   // el club que dirigió
+            $gi = $g['gameInformation'] ?? [];
+            // El lado del DT es el que tiene su coachId (club = local, opponent = visitante).
+            // Si tomáramos siempre 'club' (local), los partidos de visitante saldrían invertidos.
+            $ci = $g['clubsInformation'] ?? [];
+            if ((string) ($ci['club']['coachId'] ?? '') === (string) $coachId) {
+                $club = $ci['club'];
+            } elseif ((string) ($ci['opponent']['coachId'] ?? '') === (string) $coachId) {
+                $club = $ci['opponent'];
+            } else {
+                $club = $ci['club'] ?? [];
+            }
             $seasonObj = $gi['season'] ?? [];
 
             $compId = $gi['competitionId'] ?? null;
