@@ -1340,6 +1340,11 @@ class ScraperController extends Controller
                     'minutos'   => 0,
                     'recibidos' => 0,
                     'vallas'    => 0,
+                    'posLiga'   => null,  // rank del último partido (liga)
+                    'posDate'   => '',
+                    'finGf'     => 0,     // goles en la final (copa)
+                    'finGe'     => 0,
+                    'finTiene'  => false,
                 ];
                 $compIds[$compId] = true;
                 $clubIds[$clubId] = true;
@@ -1354,6 +1359,25 @@ class ScraperController extends Controller
             $agg[$key]['rojas']     += (!empty($card['redCard']) ? 1 : 0)
                                      + (!empty($card['yellowRedCard']) ? 1 : 0);
             $agg[$key]['minutos']   += (int) ($minutes ?? 0);
+
+            // Posición: liga = clubRank del último partido; copa = resultado de la final (FF*).
+            $clubInfo = $g['clubsInformation']['club'] ?? [];
+            $rank     = $clubInfo['clubRank'] ?? null;
+            $gdate    = (string) ($gi['date']['dateTimeUTC'] ?? '');
+            $groupId  = (string) ($gi['competitionGroupId'] ?? '');
+            if ($rank !== null && $gdate > $agg[$key]['posDate']) {
+                $agg[$key]['posDate'] = $gdate;
+                $agg[$key]['posLiga'] = (int) $rank;
+            }
+            if (stripos($groupId, 'FF') === 0) { // FF / FFH / FFR = final (ida/vuelta)
+                $cgf = $clubInfo['goalsTotal'] ?? null;
+                $cge = $clubInfo['opponentGoalsTotal'] ?? null;
+                if ($cgf !== null && $cge !== null) {
+                    $agg[$key]['finTiene'] = true;
+                    $agg[$key]['finGf']   += (int) $cgf;
+                    $agg[$key]['finGe']   += (int) $cge;
+                }
+            }
 
             // SOLO arqueros: goles recibidos = goles del rival con él en cancha;
             // valla invicta = partido jugado con 0 goles recibidos.
@@ -1436,10 +1460,19 @@ class ScraperController extends Controller
 
             list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
+            // Posición: campeón/subcampeón por la final (copa) o rank de tabla (liga).
+            $posicion = 0;
+            if ($row['finTiene']) {
+                $posicion = ($row['finGf'] > $row['finGe']) ? 1
+                    : (($row['finGf'] < $row['finGe']) ? 2 : 0);
+            } elseif ($tipo === 'Liga' && $row['posLiga'] !== null) {
+                $posicion = $row['posLiga'];
+            }
+
             $data[] = [
                 'competition'     => $competition,
                 'equipo'          => $clubName,
-                'posicion'        => 0,
+                'posicion'        => $posicion,
                 'partidos'        => $row['partidos'],
                 'goles_jugada'    => $row['goles'],
                 'goles_en_contra' => $row['own'],
@@ -2201,6 +2234,8 @@ class ScraperController extends Controller
                     'year' => $year, 'compId' => $compId, 'clubId' => $clubId,
                     'partidos' => 0, 'ganados' => 0, 'empatados' => 0,
                     'perdidos' => 0, 'gf' => 0, 'ge' => 0,
+                    'posLiga' => null, 'posDate' => '',
+                    'finGf' => 0, 'finGe' => 0, 'finTiene' => false,
                 ];
                 $compIds[$compId] = true;
                 $clubIds[$clubId] = true;
@@ -2211,6 +2246,20 @@ class ScraperController extends Controller
             $agg[$key]['perdidos']  += ($gf < $ge) ? 1 : 0;
             $agg[$key]['gf']        += $gf;
             $agg[$key]['ge']        += $ge;
+
+            // Posición: liga = clubRank del último partido; copa = final (FF*).
+            $rank    = $club['clubRank'] ?? null;
+            $gdate   = (string) ($gi['date']['dateTimeUTC'] ?? '');
+            $groupId = (string) ($gi['competitionGroupId'] ?? '');
+            if ($rank !== null && $gdate > $agg[$key]['posDate']) {
+                $agg[$key]['posDate'] = $gdate;
+                $agg[$key]['posLiga'] = (int) $rank;
+            }
+            if (stripos($groupId, 'FF') === 0) { // FF / FFH / FFR = final
+                $agg[$key]['finTiene'] = true;
+                $agg[$key]['finGf']   += $gf;
+                $agg[$key]['finGe']   += $ge;
+            }
         }
 
         if (empty($agg)) {
@@ -2240,11 +2289,20 @@ class ScraperController extends Controller
             $competition = trim($compName) . ' ' . $r['year'];
             list($tipo, $ambito) = $this->clasificarCompetencia($compName);
 
+            // Posición: campeón/subcampeón por la final (copa) o rank de tabla (liga).
+            $posicion = null;
+            if ($r['finTiene']) {
+                $posicion = ($r['finGf'] > $r['finGe']) ? 1
+                    : (($r['finGf'] < $r['finGe']) ? 2 : null);
+            } elseif ($tipo === 'Liga' && $r['posLiga'] !== null) {
+                $posicion = $r['posLiga'];
+            }
+
             $rows[] = [
                 'competition'  => $competition,
                 'equipo'       => $clubName,
                 'es_argentino' => (($clubCountries[$r['clubId']] ?? null) === 9),
-                'posicion'     => null,
+                'posicion'     => $posicion,
                 'partidos'     => $r['partidos'],
                 'ganados'      => $r['ganados'],
                 'empatados'    => $r['empatados'],
