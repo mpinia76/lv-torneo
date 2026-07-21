@@ -2314,7 +2314,7 @@ class ScraperController extends Controller
                     'groupId' => $grp, 'gf' => $c['goalsTotal'] ?? null, 'ge' => $c['opponentGoalsTotal'] ?? null,
                 ];
             }
-            return response()->json(['buckets' => $buckets, 'finales_FF' => $finales]);
+            return response()->json(['version' => 'lado-coach-v2', 'buckets' => $buckets, 'finales_FF' => $finales]);
         }
 
         // 4) Ya cargados para este técnico.
