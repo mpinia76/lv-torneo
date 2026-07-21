@@ -1259,35 +1259,6 @@ class ScraperController extends Controller
             $esArquero = $jug && mb_stripos((string) ($jug->tipoJugador ?? ''), 'arquero') !== false;
         }
 
-        // 🐞 DEBUG ARQUERO: ?debuggk=1 -> campos de goalStatistics + bloques de stats.
-        if ($request->debuggk) {
-            $goalKeys   = [];
-            $statBlocks = [];
-            $ejemplos   = [];
-            foreach ($perf['data']['performance'] as $gg) {
-                $st = $gg['statistics'] ?? [];
-                foreach (array_keys($st) as $b) $statBlocks[$b] = ($statBlocks[$b] ?? 0) + 1;
-                $gs = $st['goalStatistics'] ?? [];
-                foreach ($gs as $k => $v) {
-                    if (!isset($goalKeys[$k])) $goalKeys[$k] = 0;
-                    if ($v !== null && $v !== 0) $goalKeys[$k]++;
-                }
-                $ps = strtolower($st['generalStatistics']['participationState'] ?? '');
-                if ($ps === 'played' && count($ejemplos) < 5) {
-                    $ejemplos[] = [
-                        'season' => $gg['gameInformation']['season']['nonCyclicalName'] ?? null,
-                        'goal'   => $gs,
-                        'time'   => $st['playingTimeStatistics'] ?? [],
-                    ];
-                }
-            }
-            return response()->json([
-                'stat_blocks' => $statBlocks,  // ¿hay un bloque tipo goalkeeperStatistics?
-                'goal_keys'   => $goalKeys,    // campos de goalStatistics (conteo de no-nulos)
-                'ejemplos'    => $ejemplos,
-            ]);
-        }
-
         // 2) Agregar por temporada|competición|club
         $agg     = [];
         $compIds = [];
@@ -2287,35 +2258,6 @@ class ScraperController extends Controller
         $compNames     = $this->tmResolveNames("{$base}/competitions", array_keys($compIds));
         $clubCountries = [];
         $clubNames     = $this->tmResolveNames("{$base}/clubs", array_keys($clubIds), $clubCountries);
-
-        // 🐞 DEBUG POSICIÓN: ?debugpos=1 -> cómo se calculó cada posición + finales detectadas.
-        if ($request->debugpos) {
-            $buckets = [];
-            foreach ($agg as $r) {
-                $cn = $compNames[$r['compId']] ?? $r['compId'];
-                $buckets[] = [
-                    'comp' => $cn, 'year' => $r['year'], 'compId' => $r['compId'],
-                    'tipo' => $this->clasificarCompetencia($cn)[0],
-                    'PJ' => $r['partidos'], 'G' => $r['ganados'], 'E' => $r['empatados'], 'P' => $r['perdidos'],
-                    'GF' => $r['gf'], 'GE' => $r['ge'],
-                    'posLiga' => $r['posLiga'],
-                    'finTiene' => $r['finTiene'], 'finGf' => $r['finGf'], 'finGe' => $r['finGe'],
-                ];
-            }
-            $finales = [];
-            foreach ($perf['data']['performance'] as $g) {
-                $gi = $g['gameInformation'] ?? [];
-                $grp = (string) ($gi['competitionGroupId'] ?? '');
-                if (stripos($grp, 'FF') !== 0) continue;
-                $c = $g['clubsInformation']['club'] ?? [];
-                $cid = $gi['competitionId'] ?? '';
-                $finales[] = [
-                    'comp' => $compNames[$cid] ?? $cid, 'seasonId' => $gi['seasonId'] ?? null,
-                    'groupId' => $grp, 'gf' => $c['goalsTotal'] ?? null, 'ge' => $c['opponentGoalsTotal'] ?? null,
-                ];
-            }
-            return response()->json(['version' => 'lado-coach-v2', 'buckets' => $buckets, 'finales_FF' => $finales]);
-        }
 
         // 4) Ya cargados para este técnico.
         $tecnicoId  = $request->tecnico_id;
