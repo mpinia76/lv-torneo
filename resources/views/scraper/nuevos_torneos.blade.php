@@ -10,47 +10,32 @@
             todavía no cargaste (sin contar excluidos ni ya cargados).
         </p>
 
-        {{-- Pestañas Jugadores / DTs --}}
-        <ul class="nav nav-tabs mb-3" id="tabs">
-            <li class="nav-item">
-                <a class="nav-link active" data-toggle="tab" href="#tab-jugadores">
-                    👤 Jugadores <span class="badge badge-secondary" id="cnt-jugador">0</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-toggle="tab" href="#tab-tecnicos">
-                    🎽 DTs <span class="badge badge-secondary" id="cnt-tecnico">0</span>
-                </a>
-            </li>
-        </ul>
-
-        <div class="tab-content">
-            <div class="tab-pane fade show active" id="tab-jugadores">
-                <div class="d-flex align-items-center mb-3">
-                    <button type="button" class="btn btn-primary mr-3" onclick="buscarNuevos('jugador')">
-                        🔎 Buscar torneos nuevos (jugadores)
-                    </button>
-                    <span id="progreso-jugador" class="text-muted"></span>
-                </div>
-                <div id="resumen-jugador" class="mb-3"></div>
-                <div id="resultado-jugador"></div>
-            </div>
-
-            <div class="tab-pane fade" id="tab-tecnicos">
-                <div class="d-flex align-items-center mb-3">
-                    <button type="button" class="btn btn-primary mr-3" onclick="buscarNuevos('tecnico')">
-                        🔎 Buscar torneos nuevos (DTs)
-                    </button>
-                    <span id="progreso-tecnico" class="text-muted"></span>
-                </div>
-                <div id="resumen-tecnico" class="mb-3"></div>
-                <div id="resultado-tecnico"></div>
-            </div>
+        {{-- Pestañas (toggle propio, sin depender de Bootstrap) --}}
+        <div class="btn-group mb-3" role="group">
+            <button type="button" id="tab-btn-jugador" class="btn btn-outline-primary active" onclick="mostrarTab('jugador')">
+                👤 Jugadores <span class="badge badge-light" id="cnt-jugador">0</span>
+            </button>
+            <button type="button" id="tab-btn-tecnico" class="btn btn-outline-primary" onclick="mostrarTab('tecnico')">
+                🎽 DTs <span class="badge badge-light" id="cnt-tecnico">0</span>
+            </button>
         </div>
+
+        @foreach (['jugador' => 'jugadores', 'tecnico' => 'DTs'] as $tipo => $label)
+            <div id="seccion-{{ $tipo }}" class="seccion-tab" style="{{ $tipo === 'jugador' ? '' : 'display:none;' }}">
+                <div class="d-flex align-items-center mb-3">
+                    <button type="button" class="btn btn-primary mr-3" onclick="buscarNuevos('{{ $tipo }}')">
+                        🔎 Buscar torneos nuevos ({{ $label }})
+                    </button>
+                    <span id="progreso-{{ $tipo }}" class="text-muted"></span>
+                </div>
+                <div id="resumen-{{ $tipo }}" class="mb-3"></div>
+                <div id="resultado-{{ $tipo }}"></div>
+            </div>
+        @endforeach
     </div>
 
     <script>
-        const ENTIDADES   = @json($entidades);
+        const ENTIDADES = @json($entidades);
         const EP = {
             jugador: "{{ url('/admin/scraper/jugador-transfermarkt') }}",
             tecnico: "{{ url('/admin/scraper/tecnico-transfermarkt') }}",
@@ -61,9 +46,15 @@
         };
         const ICONO = { jugador: '👤', tecnico: '🎽' };
 
-        // Contadores por tipo
         document.getElementById('cnt-jugador').textContent = ENTIDADES.filter(e => e.tipo === 'jugador').length;
         document.getElementById('cnt-tecnico').textContent = ENTIDADES.filter(e => e.tipo === 'tecnico').length;
+
+        function mostrarTab(tipo) {
+            document.getElementById('seccion-jugador').style.display = (tipo === 'jugador') ? '' : 'none';
+            document.getElementById('seccion-tecnico').style.display = (tipo === 'tecnico') ? '' : 'none';
+            document.getElementById('tab-btn-jugador').classList.toggle('active', tipo === 'jugador');
+            document.getElementById('tab-btn-tecnico').classList.toggle('active', tipo === 'tecnico');
+        }
 
         function esc(s) {
             return (s == null ? '' : String(s)).replace(/[&<>"']/g, m => ({
@@ -72,7 +63,7 @@
         }
 
         async function buscarNuevos(tipo) {
-            const lista = ENTIDADES.filter(e => e.tipo === tipo);
+            const lista   = ENTIDADES.filter(e => e.tipo === tipo);
             const prog    = document.getElementById('progreso-' + tipo);
             const cont    = document.getElementById('resultado-' + tipo);
             const resumen = document.getElementById('resumen-' + tipo);
