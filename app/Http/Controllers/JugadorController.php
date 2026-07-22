@@ -1710,6 +1710,20 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
 
 
+    /**
+     * Tabla local de IDs de país de Transfermarkt -> nombre (en español).
+     * La tmapi solo devuelve nationalityId, sin el nombre, así que lo resolvemos acá.
+     * Confirmados: 9 = Argentina (usado en ScraperController), 36 = Costa Rica (del JSON del perfil).
+     * El resto se irá agregando a medida que aparezcan en el log ("nationalityId sin mapear = X").
+     */
+    public static function paisesTM(): array
+    {
+        return [
+            9  => 'Argentina',
+            36 => 'Costa Rica',
+        ];
+    }
+
     public function importarProcess_new(Request $request)
     {
         set_time_limit(0);
@@ -1743,22 +1757,72 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
             $insert = [];
 
-            // Nombre completo y separación nombre / apellido.
-            $name = trim($datos['name'] ?? '');
-            // El apellido se deduce del shortName ("F. Calvo" -> "Calvo").
-            $apellido  = '';
+            // ── Nombre / apellido (soporta compuestos) ─────────────────────
+            // Fuentes de la tmapi:
+            //   name        -> "Francisco Calvo"                 (display corto)
+            //   shortName   -> "F. Calvo"                        (inicial + apellido primario)
+            //   passportName-> "Francisco Javier Calvo Quesada"  (nombre completo real)
+            //
+            // Estrategia: tomamos el nombre COMPLETO de passportName y usamos el
+            // apellido primario del shortName ("Calvo") como ancla para saber dónde
+            // termina el nombre y empiezan los apellidos. Así "Francisco Javier" queda
+            // como nombre y "Calvo Quesada" como apellido.
+            $nameField = trim($datos['name'] ?? '');
             $shortName = trim($datos['shortName'] ?? '');
-            if ($shortName !== '') {
-                $apellido = trim(preg_replace('/^(\p{Lu}\.\s*)+/u', '', $shortName));
+            $passport  = trim($datos['nationalityDetails']['passportName'] ?? '');
+
+            // Nombre completo: preferimos passportName; si no hay, caemos a name.
+            $completo = $passport !== '' ? $passport : $nameField;
+
+            // Ancla de apellido: quitamos las iniciales del shortName ("F. Calvo" -> "Calvo").
+            $anclaApellido = $shortName !== ''
+                ? trim(preg_replace('/^(\p{Lu}\p{Ll}?\.\s*)+/u', '', $shortName))
+                : '';
+
+            $nombre = '';
+            $apellido = '';
+
+            if ($anclaApellido !== '' && $completo !== '') {
+                // Primera palabra del apellido primario (ej. "Calvo").
+                $primerApellido = preg_split('/\s+/', $anclaApellido)[0];
+                $palabras = preg_split('/\s+/', $completo);
+
+                // Ubicamos esa palabra dentro del nombre completo (sin distinguir may/min ni acentos).
+                $norm = function ($s) {
+                    if (function_exists('iconv')) {
+                        $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+                        if ($conv !== false) { $s = $conv; }
+                    }
+                    return mb_strtolower(trim($s ?? ''));
+                };
+                $idx = null;
+                foreach ($palabras as $i => $p) {
+                    if ($norm($p) === $norm($primerApellido)) { $idx = $i; break; }
+                }
+
+                if ($idx !== null && $idx > 0) {
+                    $nombre   = trim(implode(' ', array_slice($palabras, 0, $idx)));
+                    $apellido = trim(implode(' ', array_slice($palabras, $idx)));
+                }
             }
-            if ($apellido === '' && $name !== '') {
-                // Fallback: última palabra del nombre.
-                $partes   = preg_split('/\s+/', $name);
-                $apellido = end($partes);
+
+            // Fallback: si no pudimos anclar, separamos por la última palabra del
+            // nombre completo (preferimos passportName sobre el display corto).
+            if ($apellido === '') {
+                $baseSplit = $completo !== '' ? $completo : $nameField;
+                $palabras  = preg_split('/\s+/', trim($baseSplit));
+                if (count($palabras) >= 2) {
+                    $apellido = array_pop($palabras);
+                    $nombre   = implode(' ', $palabras);
+                } else {
+                    $nombre   = $baseSplit;
+                    $apellido = '';
+                }
             }
-            $nombre = trim(str_replace($apellido, '', $name));
-            if ($nombre === '') { $nombre = $name; }
-            if ($name === '')   { $name = trim($nombre . ' ' . $apellido); }
+
+            // Campo "name" (el que se muestra): usamos shortName; si no hay, name.
+            $name = $shortName !== '' ? $shortName : $nameField;
+            if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
 
             // Fecha de nacimiento (ya viene en Y-m-d) y de fallecimiento.
             $nacimiento = null;
@@ -1777,19 +1841,19 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             // Lugar de nacimiento.
             $ciudad = trim($datos['birthPlaceDetails']['placeOfBirth'] ?? '') ?: null;
 
-            // Nacionalidad: la API da el ID, resolvemos el nombre vía /countries.
+            // Nacionalidad: la API da solo el ID (la tmapi no expone el nombre del
+            // país), así que lo resolvemos con una tabla local -> self::paisesTM().
+            // Si el ID no está mapeado, se registra en el log y queda vacío
+            // (nunca cargamos una nacionalidad "adivinada" e incorrecta).
             $nacionalidad = null;
-            $nacId = $datos['nationalityDetails']['nationalities']['nationalityId'] ?? 0;
+            $nacId = (int)($datos['nationalityDetails']['nationalities']['nationalityId'] ?? 0);
             if ($nacId) {
-                $cResp = HttpHelper::getJson("{$base}/countries?ids[]=" . urlencode($nacId));
-                $items = $cResp['data'] ?? $cResp ?? [];
-                if (is_array($items)) {
-                    foreach ($items as $item) {
-                        if (is_array($item) && (int)($item['id'] ?? 0) === (int)$nacId) {
-                            $nacionalidad = trim($item['name'] ?? $item['shortName'] ?? '') ?: null;
-                            break;
-                        }
-                    }
+                $nacionalidad = self::paisesTM()[$nacId] ?? null;
+                if ($nacionalidad === null) {
+                    Log::warning('Import TM: nationalityId sin mapear = ' . $nacId . ' (jugador: ' . $name . ')', []);
+                    // Aviso visible para el usuario: país no reconocido, cargar a mano o reportar el código.
+                    $success .= '⚠️ Nacionalidad no reconocida (código de país Transfermarkt: ' . $nacId
+                        . '). Cargala manualmente o pasá este código para agregarlo.<br>';
                 }
             }
 
