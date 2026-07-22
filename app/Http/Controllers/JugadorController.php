@@ -2021,12 +2021,16 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             // apellido primario del shortName ("Calvo") como ancla para saber dónde
             // termina el nombre y empiezan los apellidos. Así "Francisco Javier" queda
             // como nombre y "Calvo Quesada" como apellido.
-            $nameField = trim($datos['name'] ?? '');
-            $shortName = trim($datos['shortName'] ?? '');
-            $passport  = trim($datos['nationalityDetails']['passportName'] ?? '');
+            $nameField   = trim($datos['name'] ?? '');
+            $shortName   = trim($datos['shortName'] ?? '');
+            $passport    = trim($datos['nationalityDetails']['passportName'] ?? '');
+            $displayName = trim($datos['displayName'] ?? '');
 
-            // Nombre completo: preferimos passportName; si no hay, caemos a name.
-            $completo = $passport !== '' ? $passport : $nameField;
+            // Nombre completo: preferimos passportName (nombre legal); si viene vacío,
+            // usamos displayName (ej. brasileños: "Nadson Juan Maia da Silva de Souza");
+            // y como último recurso, el name corto.
+            $completo = $passport !== '' ? $passport
+                      : ($displayName !== '' ? $displayName : $nameField);
 
             // Ancla de apellido: quitamos las iniciales del shortName ("F. Calvo" -> "Calvo").
             $anclaApellido = $shortName !== ''
@@ -2062,11 +2066,18 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
             // Fallback: si no pudimos anclar, separamos por la última palabra del
             // nombre completo (preferimos passportName sobre el display corto).
+            // Arrastramos las partículas (de, da, van, etc.) al apellido para no
+            // dejarlas colgando al final del nombre.
             if ($apellido === '') {
                 $baseSplit = $completo !== '' ? $completo : $nameField;
                 $palabras  = preg_split('/\s+/', trim($baseSplit));
                 if (count($palabras) >= 2) {
+                    $particulas = ['de','da','do','dos','das','del','della','di','la','las','los',
+                                   'van','von','der','den','du','le','bin','al'];
                     $apellido = array_pop($palabras);
+                    while (!empty($palabras) && in_array(mb_strtolower(end($palabras)), $particulas, true)) {
+                        $apellido = array_pop($palabras) . ' ' . $apellido;
+                    }
                     $nombre   = implode(' ', $palabras);
                 } else {
                     $nombre   = $baseSplit;
