@@ -1723,6 +1723,10 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                 // Obtener el contenido de la URL
                 //$htmlContent = file_get_contents($url);
                 $htmlContent =  HttpHelper::getHtmlContent($url);
+                // Diagnóstico: ver qué HTML recibe realmente el servidor (¿página real o bloqueo?)
+                Log::info('Import TM diag - bytes: ' . strlen($htmlContent ?: '')
+                    . ' | title: ' . (preg_match('/<title>(.*?)<\/title>/is', $htmlContent ?: '', $m) ? trim($m[1]) : 'SIN TITLE')
+                    . ' | tiene_data-header: ' . (str_contains($htmlContent ?: '', 'data-header__headline-wrapper') ? 'SI' : 'NO'), []);
                 // Crear un nuevo DOMDocument
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
@@ -1856,14 +1860,18 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             $posicion = $posicion->length > 0 ? trim($posicion->item(0)->textContent) : null;
             $arrPosicion = explode("-", $posicion);
             $tipo = trim($arrPosicion[0]);
-            switch ($tipo) {
+            // Normalizar: la posición puede venir como "Defensa central" (sin guion),
+            // así que comparamos por la primera palabra en vez de coincidencia exacta.
+            $tipoBase = trim(explode(' ', $tipo)[0]);
+            switch ($tipoBase) {
                 case 'Portero':
                     $tipo = 'Arquero';
                     break;
                 case 'Defensa':
                     $tipo = 'Defensor';
                     break;
-                case 'Medio campo':
+                case 'Medio':
+                case 'Mediocampo':
                     $tipo = 'Medio';
                     break;
                 case 'Delantero':
@@ -1896,7 +1904,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             Log::info('Nacimiento: ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad.' - '.$altura.' - '.$tipo.' - '.$pie, []);
 
             // Descarga y guarda la imagen si no es el avatar por defecto
-            if (!str_contains($imageUrl, 'default.jpg')) {
+            if (!empty($imageUrl) && filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_contains($imageUrl, 'default.jpg')) {
                 $client = new Client();
                 $response = $client->get($imageUrl);
 
