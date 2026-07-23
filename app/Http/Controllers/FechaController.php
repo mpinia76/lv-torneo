@@ -8099,7 +8099,12 @@ private function normalizarMinuto(string $texto): int
                 // Extra minute
                 $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $goalNode);
                 if ($extraNode->length) {
-                    $minute += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    $extra = (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    // El añadido del 1er tiempo (45+X) se colapsa a 45 para no caer en el 2do tiempo
+                    // ni alterar el orden con los goles del minuto 46+. El 90+X sí se suma.
+                    if ($minute != 45) {
+                        $minute += $extra;
+                    }
                 }
 
                 $class = $goalNode->getAttribute('class');
@@ -8141,7 +8146,8 @@ private function normalizarMinuto(string $texto): int
                 $subIn = isset($matches[0]) ? (int)$matches[0] : null;
                 $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $subInNode->item(0));
                 if ($extraNode->length) {
-                    $subIn += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    $extra = (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    if ($subIn != 45) { $subIn += $extra; } // 45+X del 1er tiempo se queda en 45
                 }
             }
 
@@ -8152,7 +8158,8 @@ private function normalizarMinuto(string $texto): int
                 $subOut = isset($matches[0]) ? (int)$matches[0] : null;
                 $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $subOutNode->item(0));
                 if ($extraNode->length) {
-                    $subOut += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    $extra = (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    if ($subOut != 45) { $subOut += $extra; } // 45+X del 1er tiempo se queda en 45
                 }
             }
 
@@ -8163,7 +8170,8 @@ private function normalizarMinuto(string $texto): int
                 $minute = isset($matches[0]) ? (int)$matches[0] : 0;
                 $extraNode = $xpath->query(".//span[contains(@class,'extra-minute')]", $cardNode);
                 if ($extraNode->length) {
-                    $minute += (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    $extra = (int) str_replace('+','', $extraNode->item(0)->textContent);
+                    if ($minute != 45) { $minute += $extra; } // 45+X del 1er tiempo se queda en 45
                 }
 
                 $class = $cardNode->getAttribute('class');
@@ -8233,7 +8241,8 @@ private function normalizarMinuto(string $texto): int
             preg_match('/(\d+)(?:\+(\d+))?/', $minuteRaw, $matches);
 
             $minuto = isset($matches[1]) ? (int)$matches[1] : 0;
-            if (isset($matches[2])) {
+            // 45+X del 1er tiempo se queda en 45; el resto (90+X) se suma
+            if (isset($matches[2]) && $minuto != 45) {
                 $minuto += (int)$matches[2];
             }
 
@@ -8290,7 +8299,8 @@ private function normalizarMinuto(string $texto): int
             $minuteRaw = trim($xpath->evaluate("string(.//div[contains(@class,'match_event-minute')])", $node));
             preg_match('/(\d+)(?:\+(\d+))?/', $minuteRaw, $matches);
             $minuto = isset($matches[1]) ? (int)$matches[1] : 0;
-            if (isset($matches[2])) {
+            // 45+X del 1er tiempo se queda en 45; el resto (90+X) se suma
+            if (isset($matches[2]) && $minuto != 45) {
                 $minuto += (int)$matches[2];
             }
 
@@ -9371,6 +9381,7 @@ private function normalizarMinuto(string $texto): int
 
                                 switch ($gType) {
                                     case 'own-goal':
+                                    case 'En Contra': // getGolesConTipo devuelve este valor para autogoles
                                         $incidencias[] = ['Gol en propia meta', $minute];
                                         break;
                                     case 'Cabeza':
@@ -9380,6 +9391,7 @@ private function normalizarMinuto(string $texto): int
                                         $incidencias[] = ['Penal', $minute];
                                         break;
                                     case 'Tiro libre':
+                                    case 'Tiro Libre': // getGolesConTipo lo devuelve con L mayúscula
                                         $incidencias[] = ['Tiro libre', $minute];
                                         break;
                                     default:
