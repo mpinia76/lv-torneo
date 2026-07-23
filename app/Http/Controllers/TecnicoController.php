@@ -1293,22 +1293,65 @@ WHERE (tecnicos.id = ".$id.")";
 
             $insert = [];
 
-            // ── Nombre del DT ──────────────────────────────────────────────
-            // No separamos nombre/apellido: en Transfermarkt muchos técnicos
-            // (portugueses/brasileños) se muestran por su nombre futbolístico
-            // (ej. "Pedro Emanuel"), donde la 2da palabra NO es el apellido.
-            // Igual que el importador de técnicos de livefutbol, guardamos el
-            // nombre mostrado completo tanto en 'name' como en 'apellido'.
-            // Preferimos el nombre común (name / displayName) por sobre el
-            // shortName abreviado ("P. Emanuel") y el nombre legal largo.
-            $nombreMostrado = trim($datos['name'] ?? '');
-            if ($nombreMostrado === '') { $nombreMostrado = trim($datos['displayName'] ?? ''); }
-            if ($nombreMostrado === '') { $nombreMostrado = trim($datos['nationalityDetails']['passportName'] ?? ''); }
-            if ($nombreMostrado === '') { $nombreMostrado = trim($datos['shortName'] ?? ''); }
+            // ── Nombre / apellido (misma estrategia que en jugador) ────────
+            $nameField   = trim($datos['name'] ?? '');
+            $shortName   = trim($datos['shortName'] ?? '');
+            $passport    = trim($datos['nationalityDetails']['passportName'] ?? '');
+            $displayName = trim($datos['displayName'] ?? '');
 
-            $name     = $nombreMostrado;
-            $apellido = $nombreMostrado;
+            $completo = $passport !== '' ? $passport
+                      : ($displayName !== '' ? $displayName : $nameField);
+
+            $anclaApellido = $shortName !== ''
+                ? trim(preg_replace('/^(\p{Lu}\p{Ll}?\.\s*)+/u', '', $shortName))
+                : '';
+
             $nombre   = '';
+            $apellido = '';
+
+            if ($anclaApellido !== '' && $completo !== '') {
+                $primerApellido = preg_split('/\s+/', $anclaApellido)[0];
+                $palabras = preg_split('/\s+/', $completo);
+
+                $norm = function ($s) {
+                    if (function_exists('iconv')) {
+                        $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+                        if ($conv !== false) { $s = $conv; }
+                    }
+                    return mb_strtolower(trim($s ?? ''));
+                };
+                $idx = null;
+                foreach ($palabras as $i => $p) {
+                    if ($norm($p) === $norm($primerApellido)) { $idx = $i; break; }
+                }
+
+                if ($idx !== null && $idx > 0) {
+                    $nombre   = trim(implode(' ', array_slice($palabras, 0, $idx)));
+                    $apellido = trim(implode(' ', array_slice($palabras, $idx)));
+                }
+            }
+
+            // Fallback: separar por la última palabra, arrastrando partículas al apellido.
+            if ($apellido === '') {
+                $baseSplit = $completo !== '' ? $completo : $nameField;
+                $palabras  = preg_split('/\s+/', trim($baseSplit));
+                if (count($palabras) >= 2) {
+                    $particulas = ['de','da','do','dos','das','del','della','di','la','las','los',
+                                   'van','von','der','den','du','le','bin','al'];
+                    $apellido = array_pop($palabras);
+                    while (!empty($palabras) && in_array(mb_strtolower(end($palabras)), $particulas, true)) {
+                        $apellido = array_pop($palabras) . ' ' . $apellido;
+                    }
+                    $nombre   = implode(' ', $palabras);
+                } else {
+                    $nombre   = $baseSplit;
+                    $apellido = '';
+                }
+            }
+
+            // Campo "name" mostrado: shortName; si no hay, name; si no, nombre+apellido.
+            $name = $shortName !== '' ? $shortName : $nameField;
+            if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
 
             // Fecha de nacimiento / fallecimiento (ya vienen en Y-m-d).
             $nacimiento = null;
