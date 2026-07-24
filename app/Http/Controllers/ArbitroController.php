@@ -874,25 +874,28 @@ class ArbitroController extends Controller
             if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
 
             // Fecha de nacimiento / fallecimiento (ya vienen en Y-m-d).
+            // El endpoint /referee/{id} las trae planas (dateOfBirth), no dentro de lifeDates.
             $nacimiento = null;
-            $rawNac = $datos['lifeDates']['dateOfBirth'] ?? null;
+            $rawNac = $datos['dateOfBirth'] ?? ($datos['lifeDates']['dateOfBirth'] ?? null);
             if ($rawNac) {
                 try { $nacimiento = Carbon::parse($rawNac)->format('Y-m-d'); }
                 catch (\Exception $e) { $nacimiento = null; }
             }
             $fallecimiento = null;
-            $rawFall = $datos['lifeDates']['dateOfDeath'] ?? null;
+            $rawFall = $datos['dateOfDeath'] ?? ($datos['lifeDates']['dateOfDeath'] ?? null);
             if ($rawFall) {
                 try { $fallecimiento = Carbon::parse($rawFall)->format('Y-m-d'); }
                 catch (\Exception $e) { $fallecimiento = null; }
             }
 
-            // Lugar de nacimiento.
-            $ciudad = trim($datos['birthPlaceDetails']['placeOfBirth'] ?? '') ?: null;
+            // Lugar de nacimiento (el endpoint de árbitros no lo trae; queda null).
+            $ciudad = trim($datos['placeOfBirth'] ?? ($datos['birthPlaceDetails']['placeOfBirth'] ?? '')) ?: null;
 
             // Nacionalidad: la API da solo el ID -> lo resolvemos con la tabla de JugadorController.
+            // Árbitros: nationalities.nationalityId (plano). Jugadores/DT: nationalityDetails.nationalities.nationalityId.
             $nacionalidad = null;
-            $nacId = (int)($datos['nationalityDetails']['nationalities']['nationalityId'] ?? 0);
+            $nacId = (int)($datos['nationalities']['nationalityId']
+                ?? ($datos['nationalityDetails']['nationalities']['nationalityId'] ?? 0));
             if ($nacId) {
                 $nacionalidad = \App\Http\Controllers\JugadorController::paisesTM()[$nacId] ?? null;
                 if ($nacionalidad === null) {
