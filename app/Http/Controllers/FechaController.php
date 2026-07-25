@@ -8855,27 +8855,29 @@ private function normalizarMinuto(string $texto): int
         };
 
         foreach ((isset($d['actions']) ? $d['actions'] : []) as $a) {
-            $min    = $minuteOf($a);
-            $reason = (int) (isset($a['actionReasonId']) ? $a['actionReasonId'] : 0);
-            $det    = isset($a['details']) ? $a['details'] : [];
-            $tipoAcc = isset($a['type']) ? $a['type'] : '';
-            $active  = isset($a['activePlayerId']) ? $a['activePlayerId'] : null;
-            $passive = isset($a['passivePlayerId']) ? $a['passivePlayerId'] : null;
+            $min      = $minuteOf($a);
+            $actionId = (int) (isset($a['actionId']) ? $a['actionId'] : 0);
+            $det      = isset($a['details']) ? $a['details'] : [];
+            $tipoAcc  = isset($a['type']) ? $a['type'] : '';
+            $active   = isset($a['activePlayerId']) ? $a['activePlayerId'] : null;
+            $passive  = isset($a['passivePlayerId']) ? $a['passivePlayerId'] : null;
 
             if ($tipoAcc === 'GOAL') {
-                // Subtipo best-effort (la API no siempre lo distingue). Por defecto, gol de jugada.
-                if (!empty($det['ownGoal']) || in_array($reason, [110, 500, 501], true)) {
-                    $tipo = 'Gol en propia meta';
-                } elseif (!empty($det['penalty']) || in_array($reason, [201], true)) {
-                    $tipo = 'Penal';
-                } else {
-                    $tipo = 'Gol';
+                // El tipo de gol está en actionId (actionReasonId es la asistencia):
+                // 203=cabeza, 204=penal, 206=en propia puerta, 207=tiro libre directo; resto=jugada.
+                switch ($actionId) {
+                    case 203: $tipo = 'Cabeza'; break;
+                    case 204: $tipo = 'Penal'; break;
+                    case 206: $tipo = 'Gol en propia meta'; break;
+                    case 207: $tipo = 'Tiro libre'; break;
+                    default:  $tipo = 'Gol';
                 }
                 $addEv($active, $tipo, $min);
             } elseif ($tipoAcc === 'CARD') {
-                if (!empty($det['seasonRedCard']) || $reason === 303) {
+                // 301=amarilla, 302=doble amarilla (roja), 303=roja directa.
+                if ($actionId === 303 || !empty($det['seasonRedCard'])) {
                     $tipo = 'Tarjeta roja';
-                } elseif (!empty($det['seasonYellowRedCard']) || !empty($det['seasonSecondYellowCard']) || $reason === 302) {
+                } elseif ($actionId === 302 || !empty($det['seasonYellowRedCard']) || !empty($det['seasonSecondYellowCard'])) {
                     $tipo = 'Expulsado por doble amarilla';
                 } else {
                     $tipo = 'Tarjeta amarilla';
