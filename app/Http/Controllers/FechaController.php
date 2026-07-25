@@ -9380,10 +9380,17 @@ private function normalizarMinuto(string $texto): int
                             } else {
                                 Gol::create($goldata);
                             }
-                            if ($eq['equipo'] === $strLocal) {
-                                $golesLocalesCargados++;
-                            } elseif ($eq['equipo'] === $strVisitante) {
-                                $golesVisitantesCargados++;
+                            // El gol en contra ('En Contra') se acredita al equipo RIVAL.
+                            if ($eq['equipo'] === $strLocal || $eq['equipo'] === $strVisitante) {
+                                $sumaLocal = ($eq['equipo'] === $strLocal);
+                                if ($tipogol === 'En Contra') {
+                                    $sumaLocal = !$sumaLocal;
+                                }
+                                if ($sumaLocal) {
+                                    $golesLocalesCargados++;
+                                } else {
+                                    $golesVisitantesCargados++;
+                                }
                             }
                         } catch (QueryException $ex) {
                             $error .= 'Error gol: ' . $jugador['nombre'] . ' min ' . $minutoInc . '<br>';
