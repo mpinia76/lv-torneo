@@ -8945,11 +8945,27 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
+        // 6b. TÉCNICOS (DT) — la API los trae por ID en coaches.home/away.
+        $tecnicos = [];
+        $coaches  = isset($d['coaches']) ? $d['coaches'] : [];
+        $homeCoachId = isset($coaches['home']['coachId']) ? $coaches['home']['coachId'] : null;
+        $awayCoachId = isset($coaches['away']['coachId']) ? $coaches['away']['coachId'] : null;
+        $coachIds    = array_values(array_filter([$homeCoachId, $awayCoachId]));
+        if (!empty($coachIds)) {
+            $coachNames = $this->tmResolvePersonNames($base . '/coaches', $coachIds);
+            if ($homeCoachId && !empty($coachNames[(string) $homeCoachId])) {
+                $tecnicos[] = ['equipo_id' => $partido->equipol->id, 'equipo' => $strLocal, 'nombre' => $coachNames[(string) $homeCoachId]];
+            }
+            if ($awayCoachId && !empty($coachNames[(string) $awayCoachId])) {
+                $tecnicos[] = ['equipo_id' => $partido->equipov->id, 'equipo' => $strVisitante, 'nombre' => $coachNames[(string) $awayCoachId]];
+            }
+        }
+
         // 7-11. Validar + guardar (lógica compartida con resultados-futbol)
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $localTitulares, $visitanteTitulares, $equipos,
-            $success, 1, '', 3
+            $success, 1, '', 3, $tecnicos
         );
     }
 
@@ -8988,7 +9004,7 @@ private function normalizarMinuto(string $texto): int
         return $map;
     }
 
-    private function guardarIncidenciasImportadas($partido, $fecha, $grupo, $strLocal, $strVisitante, array $jueces, array $localTitulares, array $visitanteTitulares, array $equipos, $success = '', $ok = 1, $error = '', $juecesEsperados = 3)
+    private function guardarIncidenciasImportadas($partido, $fecha, $grupo, $strLocal, $strVisitante, array $jueces, array $localTitulares, array $visitanteTitulares, array $equipos, $success = '', $ok = 1, $error = '', $juecesEsperados = 3, $tecnicos = null)
     {
         // -----------------------------------------------------------------------
         // 7. VALIDATE
@@ -9012,8 +9028,46 @@ private function normalizarMinuto(string $texto): int
             $success .= '⚠️ WARNING: ' . $strVisitante . ' tiene solo ' . $titularesVisitante . ' titular/es (se esperan 11).<br>';
         }
 
-        // AGREGAR:
-        $success .= '<span style="color:orange">⚠️ WARNING: Técnicos no importados. Verificar manualmente.</span><br>';
+        // TÉCNICOS (DT): resultados-futbol no los importa; transfermarkt sí (via API).
+        if ($tecnicos === null) {
+            $success .= '<span style="color:orange">⚠️ WARNING: Técnicos no importados. Verificar manualmente.</span><br>';
+        } else {
+            foreach ($tecnicos as $t) {
+                $partesDt = array_values(array_filter(explode(' ', trim($t['nombre'])), function ($p) { return strlen(trim($p)) > 0; }));
+                if (count($partesDt) < 2) {
+                    $success .= '⚠️ WARNING: Técnico con nombre incompleto: ' . $t['nombre'] . '<br>';
+                    continue;
+                }
+                $tecnico = Tecnico::select('tecnicos.*')
+                    ->join('personas', 'personas.id', '=', 'tecnicos.persona_id')
+                    ->where('personas.nombre', 'like', '%' . $partesDt[0] . '%')
+                    ->where('personas.apellido', 'like', '%' . $partesDt[1] . '%')
+                    ->first();
+                if (empty($tecnico)) {
+                    $success .= '⚠️ WARNING: Técnico NO encontrado: ' . $t['nombre'] . ' (' . $t['equipo'] . ')<br>';
+                    continue;
+                }
+                $data3 = [
+                    'partido_id' => $partido->id,
+                    'equipo_id'  => $t['equipo_id'],
+                    'tecnico_id' => $tecnico->id,
+                ];
+                $partido_tecnico = PartidoTecnico::where('partido_id', $partido->id)
+                    ->where('equipo_id', $t['equipo_id'])
+                    ->first();
+                try {
+                    if (!empty($partido_tecnico)) {
+                        $partido_tecnico->update($data3);
+                    } else {
+                        PartidoTecnico::create($data3);
+                    }
+                    $success .= 'DT importado: ' . $t['nombre'] . ' (' . $t['equipo'] . ')<br>';
+                } catch (QueryException $ex) {
+                    $error .= 'Error guardando técnico ' . $t['nombre'] . ': ' . $ex->getMessage() . '<br>';
+                    $ok = 0;
+                }
+            }
+        }
         // -----------------------------------------------------------------------
         // 8. SAVE REFEREES
         // -----------------------------------------------------------------------
