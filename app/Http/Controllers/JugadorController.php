@@ -2226,7 +2226,8 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                     $errorCode = $ex->errorInfo[1];
 
                     if ($errorCode == 1062) {
-                        $error = 'Jugador repetido';
+                        // Ya existía: los datos se actualizaron arriba; sólo avisamos.
+                        $success .= 'Jugador repetido';
                     }
                 }
             }

@@ -55,13 +55,20 @@ class NombreHelper
         if ($primerApellido !== '' && $completo !== '') {
             $palabras = preg_split('/\s+/', $completo);
 
-            // Ubicamos la palabra dentro del nombre completo (sin distinguir may/min ni acentos).
+            // Ubicamos la palabra dentro del nombre completo (sin distinguir may/min
+            // ni acentos). Quitamos acentos con una tabla portable: iconv con
+            // 'ASCII//TRANSLIT' es poco fiable (según el locale convierte "í" en
+            // "'i" y la comparación falla, ej. "García" vs "Garcia").
             $norm = function ($s) {
-                if (function_exists('iconv')) {
-                    $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
-                    if ($conv !== false) { $s = $conv; }
-                }
-                return mb_strtolower(trim($s ?? ''));
+                $s = mb_strtolower(trim($s ?? ''), 'UTF-8');
+                return strtr($s, [
+                    'á'=>'a','à'=>'a','ä'=>'a','â'=>'a','ã'=>'a','å'=>'a',
+                    'é'=>'e','è'=>'e','ë'=>'e','ê'=>'e',
+                    'í'=>'i','ì'=>'i','ï'=>'i','î'=>'i',
+                    'ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','õ'=>'o',
+                    'ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u',
+                    'ñ'=>'n','ç'=>'c','ý'=>'y','ÿ'=>'y',
+                ]);
             };
             $idx = null;
             foreach ($palabras as $i => $p) {

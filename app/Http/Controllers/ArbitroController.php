@@ -957,7 +957,8 @@ class ArbitroController extends Controller
                     } catch (QueryException $ex) {
                         $errorCode = $ex->errorInfo[1];
                         if ($errorCode == 1062) {
-                            $error = 'Arbitro repetido';
+                            // Ya existía: los datos se actualizaron arriba; sólo avisamos.
+                            $success .= 'Arbitro repetido';
                         }
                     }
                 }

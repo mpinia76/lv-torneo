@@ -1434,7 +1434,8 @@ WHERE (tecnicos.id = ".$id.")";
                     } catch (QueryException $ex) {
                         $errorCode = $ex->errorInfo[1];
                         if ($errorCode == 1062) {
-                            $error = 'Tecnico repetido';
+                            // Ya existía: los datos se actualizaron arriba; sólo avisamos.
+                            $success .= 'Tecnico repetido';
                         }
                     }
                 }
