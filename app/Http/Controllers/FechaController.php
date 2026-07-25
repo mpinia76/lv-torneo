@@ -9042,15 +9042,28 @@ private function normalizarMinuto(string $texto): int
                     $success .= '<span style="color:orange">⚠️ WARNING: No hay DT en transfermarkt para ' . $t['equipo'] . '. Cargar manualmente.</span><br>';
                     continue;
                 }
-                $partesDt = array_values(array_filter(explode(' ', trim($t['nombre'])), function ($p) { return strlen(trim($p)) > 0; }));
-                if (count($partesDt) < 2) {
-                    $success .= '⚠️ WARNING: Técnico con nombre incompleto: ' . $t['nombre'] . '<br>';
+                // Matcheo robusto: cada parte significativa del nombre debe aparecer
+                // en nombre, apellido o name (soporta nombres/apellidos compuestos,
+                // ej. "Juan Pablo Vojvoda" vs nombre "Juan Pablo" / apellido "Vojvoda Rizzo").
+                $partesDt = array_values(array_filter(
+                    array_map(function ($p) { return trim($p, '.'); }, explode(' ', trim($t['nombre']))),
+                    function ($p) { return strlen($p) > 2; }
+                ));
+                if (empty($partesDt)) {
+                    $success .= '⚠️ WARNING: Técnico con nombre inválido: ' . $t['nombre'] . '<br>';
                     continue;
                 }
                 $tecnico = Tecnico::select('tecnicos.*')
                     ->join('personas', 'personas.id', '=', 'tecnicos.persona_id')
-                    ->where('personas.nombre', 'like', '%' . $partesDt[0] . '%')
-                    ->where('personas.apellido', 'like', '%' . $partesDt[1] . '%')
+                    ->where(function ($query) use ($partesDt) {
+                        foreach ($partesDt as $parte) {
+                            $query->where(function ($q) use ($parte) {
+                                $q->where('personas.nombre', 'LIKE', "%$parte%")
+                                    ->orWhere('personas.apellido', 'LIKE', "%$parte%")
+                                    ->orWhere('personas.name', 'LIKE', "%$parte%");
+                            });
+                        }
+                    })
                     ->first();
                 if (empty($tecnico)) {
                     $success .= '⚠️ WARNING: Técnico NO encontrado: ' . $t['nombre'] . ' (' . $t['equipo'] . ')<br>';
