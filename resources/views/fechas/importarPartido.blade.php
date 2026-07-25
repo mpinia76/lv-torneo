@@ -82,8 +82,9 @@
             </div>
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-6">
-                    {{ Form::label('url2', 'URL resultados-futbol.com') }}
-                    {{ Form::text('url2', '', ['class' => 'form-control', 'placeholder' => 'https://www.resultados-futbol.com/partido/...']) }}
+                    {{ Form::label('url2', 'URL transfermarkt (spielbericht)') }}
+                    {{ Form::text('url2', '', ['class' => 'form-control', 'placeholder' => 'https://www.transfermarkt.com.ar/spielbericht/index/spielbericht/...']) }}
+                    <small class="text-muted">También acepta URL de resultados-futbol.com como alternativa.</small>
                 </div>
             </div>
             <div class="row">
