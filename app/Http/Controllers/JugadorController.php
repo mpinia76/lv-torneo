@@ -2011,83 +2011,13 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
             $insert = [];
 
-            // ── Nombre / apellido (soporta compuestos) ─────────────────────
-            // Fuentes de la tmapi:
-            //   name        -> "Francisco Calvo"                 (display corto)
-            //   shortName   -> "F. Calvo"                        (inicial + apellido primario)
-            //   passportName-> "Francisco Javier Calvo Quesada"  (nombre completo real)
-            //
-            // Estrategia: tomamos el nombre COMPLETO de passportName y usamos el
-            // apellido primario del shortName ("Calvo") como ancla para saber dónde
-            // termina el nombre y empiezan los apellidos. Así "Francisco Javier" queda
-            // como nombre y "Calvo Quesada" como apellido.
-            $nameField   = trim($datos['name'] ?? '');
-            $shortName   = trim($datos['shortName'] ?? '');
-            $passport    = trim($datos['nationalityDetails']['passportName'] ?? '');
-            $displayName = trim($datos['displayName'] ?? '');
-
-            // Nombre completo: preferimos passportName (nombre legal); si viene vacío,
-            // usamos displayName (ej. brasileños: "Nadson Juan Maia da Silva de Souza");
-            // y como último recurso, el name corto.
-            $completo = $passport !== '' ? $passport
-                      : ($displayName !== '' ? $displayName : $nameField);
-
-            // Ancla de apellido: quitamos las iniciales del shortName ("F. Calvo" -> "Calvo").
-            $anclaApellido = $shortName !== ''
-                ? trim(preg_replace('/^(\p{Lu}\p{Ll}?\.\s*)+/u', '', $shortName))
-                : '';
-
-            $nombre = '';
-            $apellido = '';
-
-            if ($anclaApellido !== '' && $completo !== '') {
-                // Primera palabra del apellido primario (ej. "Calvo").
-                $primerApellido = preg_split('/\s+/', $anclaApellido)[0];
-                $palabras = preg_split('/\s+/', $completo);
-
-                // Ubicamos esa palabra dentro del nombre completo (sin distinguir may/min ni acentos).
-                $norm = function ($s) {
-                    if (function_exists('iconv')) {
-                        $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
-                        if ($conv !== false) { $s = $conv; }
-                    }
-                    return mb_strtolower(trim($s ?? ''));
-                };
-                $idx = null;
-                foreach ($palabras as $i => $p) {
-                    if ($norm($p) === $norm($primerApellido)) { $idx = $i; break; }
-                }
-
-                if ($idx !== null && $idx > 0) {
-                    $nombre   = trim(implode(' ', array_slice($palabras, 0, $idx)));
-                    $apellido = trim(implode(' ', array_slice($palabras, $idx)));
-                }
-            }
-
-            // Fallback: si no pudimos anclar, separamos por la última palabra del
-            // nombre completo (preferimos passportName sobre el display corto).
-            // Arrastramos las partículas (de, da, van, etc.) al apellido para no
-            // dejarlas colgando al final del nombre.
-            if ($apellido === '') {
-                $baseSplit = $completo !== '' ? $completo : $nameField;
-                $palabras  = preg_split('/\s+/', trim($baseSplit));
-                if (count($palabras) >= 2) {
-                    $particulas = ['de','da','do','dos','das','del','della','di','la','las','los',
-                                   'van','von','der','den','du','le','bin','al'];
-                    $apellido = array_pop($palabras);
-                    while (!empty($palabras) && in_array(mb_strtolower(end($palabras)), $particulas, true)) {
-                        $apellido = array_pop($palabras) . ' ' . $apellido;
-                    }
-                    $nombre   = implode(' ', $palabras);
-                } else {
-                    $nombre   = $baseSplit;
-                    $apellido = '';
-                }
-            }
-
-            // Campo "name" (el que se muestra): usamos shortName; si no hay, name.
-            $name = $shortName !== '' ? $shortName : $nameField;
-            if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
+            // ── Nombre / apellido ──────────────────────────────────────────
+            // Separación centralizada en NombreHelper (soporta "F. Calvo",
+            // "Tomás Uribe", compuestos y partículas). Ver App\Services\NombreHelper.
+            $tmNombre = \App\Services\NombreHelper::separarTM($datos);
+            $name     = $tmNombre['name'];
+            $nombre   = $tmNombre['nombre'];
+            $apellido = $tmNombre['apellido'];
 
             // Fecha de nacimiento (ya viene en Y-m-d) y de fallecimiento.
             $nacimiento = null;

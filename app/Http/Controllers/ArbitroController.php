@@ -813,65 +813,12 @@ class ArbitroController extends Controller
 
             $insert = [];
 
-            // ── Nombre / apellido (misma estrategia que en jugador/DT) ─────
-            $nameField   = trim($datos['name'] ?? '');
-            $shortName   = trim($datos['shortName'] ?? '');
-            $passport    = trim($datos['nationalityDetails']['passportName'] ?? '');
-            $displayName = trim($datos['displayName'] ?? '');
-
-            $completo = $passport !== '' ? $passport
-                      : ($displayName !== '' ? $displayName : $nameField);
-
-            $anclaApellido = $shortName !== ''
-                ? trim(preg_replace('/^(\p{Lu}\p{Ll}?\.\s*)+/u', '', $shortName))
-                : '';
-
-            $nombre   = '';
-            $apellido = '';
-
-            if ($anclaApellido !== '' && $completo !== '') {
-                $primerApellido = preg_split('/\s+/', $anclaApellido)[0];
-                $palabras = preg_split('/\s+/', $completo);
-
-                $norm = function ($s) {
-                    if (function_exists('iconv')) {
-                        $conv = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
-                        if ($conv !== false) { $s = $conv; }
-                    }
-                    return mb_strtolower(trim($s ?? ''));
-                };
-                $idx = null;
-                foreach ($palabras as $i => $p) {
-                    if ($norm($p) === $norm($primerApellido)) { $idx = $i; break; }
-                }
-
-                if ($idx !== null && $idx > 0) {
-                    $nombre   = trim(implode(' ', array_slice($palabras, 0, $idx)));
-                    $apellido = trim(implode(' ', array_slice($palabras, $idx)));
-                }
-            }
-
-            // Fallback: separar por la última palabra, arrastrando partículas al apellido.
-            if ($apellido === '') {
-                $baseSplit = $completo !== '' ? $completo : $nameField;
-                $palabras  = preg_split('/\s+/', trim($baseSplit));
-                if (count($palabras) >= 2) {
-                    $particulas = ['de','da','do','dos','das','del','della','di','la','las','los',
-                                   'van','von','der','den','du','le','bin','al'];
-                    $apellido = array_pop($palabras);
-                    while (!empty($palabras) && in_array(mb_strtolower(end($palabras)), $particulas, true)) {
-                        $apellido = array_pop($palabras) . ' ' . $apellido;
-                    }
-                    $nombre   = implode(' ', $palabras);
-                } else {
-                    $nombre   = $baseSplit;
-                    $apellido = '';
-                }
-            }
-
-            // Campo "name" mostrado: shortName; si no hay, name; si no, nombre+apellido.
-            $name = $shortName !== '' ? $shortName : $nameField;
-            if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
+            // ── Nombre / apellido ──────────────────────────────────────────
+            // Separación centralizada en NombreHelper (misma que jugador/DT).
+            $tmNombre = \App\Services\NombreHelper::separarTM($datos);
+            $name     = $tmNombre['name'];
+            $nombre   = $tmNombre['nombre'];
+            $apellido = $tmNombre['apellido'];
 
             // Fecha de nacimiento / fallecimiento (ya vienen en Y-m-d).
             // El endpoint /referee/{id} las trae planas (dateOfBirth), no dentro de lifeDates.
