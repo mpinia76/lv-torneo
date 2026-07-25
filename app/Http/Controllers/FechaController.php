@@ -8992,6 +8992,29 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
+        // DIAGNÓSTICO TEMPORAL: si no se parseó nada, mostrar qué recibió el servidor.
+        if (empty($jueces) && empty($localTitulares) && empty($visitanteTitulares)) {
+            DB::rollback();
+            $marca = function ($needle) use ($html) { return strpos($html, $needle) !== false ? 'SI' : 'NO'; };
+            $inicio = htmlspecialchars(mb_substr(preg_replace('/\s+/', ' ', $html), 0, 500));
+            $diag = '<b>DIAGNÓSTICO TM</b><br>'
+                . 'bytes=' . strlen($html) . '<br>'
+                . 'contiene "sb-aktion": ' . $marca('sb-aktion') . '<br>'
+                . 'contiene "formation-player-container": ' . $marca('formation-player-container') . '<br>'
+                . 'contiene "sb-zusatzinfos": ' . $marca('sb-zusatzinfos') . '<br>'
+                . 'contiene "spieler/": ' . $marca('spieler/') . '<br>'
+                . 'teamBoxes detectadas: ' . $teamBoxes->length . '<br>'
+                . 'muro/consent: ' . (
+                    (stripos($html, 'Just a moment') !== false
+                        || stripos($html, 'Attention Required') !== false
+                        || stripos($html, 'consent') !== false
+                        || stripos($html, 'sp_message') !== false
+                        || stripos($html, 'cf-browser') !== false) ? 'SI' : 'no'
+                ) . '<br>'
+                . 'HTTP guardado (primeros 500 chars): <code>' . $inicio . '</code>';
+            return redirect()->route('fechas.show', $partido->fecha->id)->with('error', $diag);
+        }
+
         // 7-11. Validar + guardar (logica compartida con resultados-futbol)
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
