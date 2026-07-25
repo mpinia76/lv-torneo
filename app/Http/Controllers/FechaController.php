@@ -8946,20 +8946,25 @@ private function normalizarMinuto(string $texto): int
         }
 
         // 6b. TÉCNICOS (DT) — la API los trae por ID en coaches.home/away.
-        $tecnicos = [];
-        $coaches  = isset($d['coaches']) ? $d['coaches'] : [];
+        // Se arma siempre una entrada por equipo: si no hay DT, queda con nombre vacío
+        // y el helper avisa para cargarlo manualmente.
+        $coaches     = isset($d['coaches']) ? $d['coaches'] : [];
         $homeCoachId = isset($coaches['home']['coachId']) ? $coaches['home']['coachId'] : null;
         $awayCoachId = isset($coaches['away']['coachId']) ? $coaches['away']['coachId'] : null;
         $coachIds    = array_values(array_filter([$homeCoachId, $awayCoachId]));
-        if (!empty($coachIds)) {
-            $coachNames = $this->tmResolvePersonNames($base . '/coaches', $coachIds);
-            if ($homeCoachId && !empty($coachNames[(string) $homeCoachId])) {
-                $tecnicos[] = ['equipo_id' => $partido->equipol->id, 'equipo' => $strLocal, 'nombre' => $coachNames[(string) $homeCoachId]];
-            }
-            if ($awayCoachId && !empty($coachNames[(string) $awayCoachId])) {
-                $tecnicos[] = ['equipo_id' => $partido->equipov->id, 'equipo' => $strVisitante, 'nombre' => $coachNames[(string) $awayCoachId]];
-            }
-        }
+        $coachNames  = !empty($coachIds) ? $this->tmResolvePersonNames($base . '/coaches', $coachIds) : [];
+        $tecnicos = [
+            [
+                'equipo_id' => $partido->equipol->id,
+                'equipo'    => $strLocal,
+                'nombre'    => ($homeCoachId && !empty($coachNames[(string) $homeCoachId])) ? $coachNames[(string) $homeCoachId] : '',
+            ],
+            [
+                'equipo_id' => $partido->equipov->id,
+                'equipo'    => $strVisitante,
+                'nombre'    => ($awayCoachId && !empty($coachNames[(string) $awayCoachId])) ? $coachNames[(string) $awayCoachId] : '',
+            ],
+        ];
 
         // 7-11. Validar + guardar (lógica compartida con resultados-futbol)
         return $this->guardarIncidenciasImportadas(
@@ -9033,6 +9038,10 @@ private function normalizarMinuto(string $texto): int
             $success .= '<span style="color:orange">⚠️ WARNING: Técnicos no importados. Verificar manualmente.</span><br>';
         } else {
             foreach ($tecnicos as $t) {
+                if (trim($t['nombre']) === '') {
+                    $success .= '<span style="color:orange">⚠️ WARNING: No hay DT en transfermarkt para ' . $t['equipo'] . '. Cargar manualmente.</span><br>';
+                    continue;
+                }
                 $partesDt = array_values(array_filter(explode(' ', trim($t['nombre'])), function ($p) { return strlen(trim($p)) > 0; }));
                 if (count($partesDt) < 2) {
                     $success .= '⚠️ WARNING: Técnico con nombre incompleto: ' . $t['nombre'] . '<br>';
