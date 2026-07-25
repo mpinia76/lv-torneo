@@ -9070,7 +9070,6 @@ private function normalizarMinuto(string $texto): int
                     } else {
                         PartidoTecnico::create($data3);
                     }
-                    $success .= 'DT importado: ' . $t['nombre'] . ' (' . $t['equipo'] . ')<br>';
                 } catch (QueryException $ex) {
                     $error .= 'Error guardando técnico ' . $t['nombre'] . ': ' . $ex->getMessage() . '<br>';
                     $ok = 0;
