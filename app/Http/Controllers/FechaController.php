@@ -9069,6 +9069,23 @@ private function normalizarMinuto(string $texto): int
                     $success .= '⚠️ WARNING: Técnico NO encontrado: ' . $t['nombre'] . ' (' . $t['equipo'] . ')<br>';
                     continue;
                 }
+
+                // Aviso si es la primera vez que dirige a este equipo en el torneo.
+                $torneoId = optional($partido->fecha->grupo)->torneo_id;
+                if ($torneoId) {
+                    $yaDirigio = PartidoTecnico::join('partidos', 'partidos.id', '=', 'partido_tecnicos.partido_id')
+                        ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+                        ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+                        ->where('partido_tecnicos.equipo_id', $t['equipo_id'])
+                        ->where('partido_tecnicos.tecnico_id', $tecnico->id)
+                        ->where('grupos.torneo_id', $torneoId)
+                        ->where('partido_tecnicos.partido_id', '!=', $partido->id)
+                        ->exists();
+                    if (!$yaDirigio) {
+                        $success .= "Nunca lo dirigió: {$t['nombre']} ({$t['equipo']})<br>";
+                    }
+                }
+
                 $data3 = [
                     'partido_id' => $partido->id,
                     'equipo_id'  => $t['equipo_id'],
