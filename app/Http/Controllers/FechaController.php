@@ -8767,11 +8767,11 @@ private function normalizarMinuto(string $texto): int
     }
 
     /**
-     * Importa incidencias de un partido desde transfermarkt (pagina spielbericht).
-     * Reemplaza a resultados-futbol como fuente principal.
-     * Vincula cada evento con su jugador por el ID de "spieler" del enlace (robusto
-     * ante acentos y apellidos repetidos). El minuto se decodifica del sprite CSS
-     * del reloj: minuto = 10*(|bgY|/36) + (|bgX|/36).
+     * Importa incidencias de un partido desde transfermarkt usando la API interna
+     * (tmapi.transfermarkt.technology). El HTML de spielbericht está detrás de un WAF
+     * (AWS) que bloquea al servidor; la API JSON no lo está y devuelve todo el reporte:
+     * formaciones (titulares/suplentes con dorsal), goles, tarjetas, cambios y árbitros,
+     * con minutos exactos. Reemplaza a resultados-futbol como fuente principal.
      */
     public function importarPartidoProcess_TM(Request $request)
     {
@@ -8787,170 +8787,123 @@ private function normalizarMinuto(string $texto): int
         $strLocal     = $partido->equipol->nombre;
         $strVisitante = $partido->equipov->nombre;
 
+        // ID del partido desde la URL (…/spielbericht/index/spielbericht/4889667)
+        if (!preg_match('/(\d+)\D*$/', $url, $mId)) {
+            return redirect()->route('fechas.show', $partido->fecha->id)
+                ->with('error', 'No se pudo extraer el ID del partido de la URL de transfermarkt.');
+        }
+        $gameId = $mId[1];
+
+        // 1. API interna (evita el WAF del HTML). Un solo request trae todo el reporte.
+        $base = 'https://tmapi.transfermarkt.technology';
+        $resp = HttpHelper::getJson($base . '/game/' . $gameId);
+        if (!$resp || empty($resp['data'])) {
+            return redirect()->route('fechas.show', $partido->fecha->id)
+                ->with('error', 'No se pudo obtener el reporte desde la API de transfermarkt (id ' . $gameId . ').');
+        }
+        $d = $resp['data'];
+
         DB::beginTransaction();
 
-        // 1. FETCH
-        $html = HttpHelper::getHtmlContent($url);
-        if (!$html) $html = HttpHelper::getHtmlContent($url, true);
-        if (!$html) {
-            DB::rollback();
-            return redirect()->route('fechas.show', $partido->fecha->id)
-                ->with('error', 'No se pudo obtener el HTML de transfermarkt. Verifica la URL.');
+        // 2. FORMACIONES (homeClub = local, awayClub = visitante)
+        $mapPlayers = function ($arr) {
+            $out = [];
+            foreach (($arr ?: []) as $p) {
+                if (empty($p['id'])) continue;
+                $out[] = [
+                    'dorsal' => isset($p['shirtNumber']) ? (string) $p['shirtNumber'] : '',
+                    'sid'    => (string) $p['id'],
+                    'nombre' => '',
+                ];
+            }
+            return $out;
+        };
+        $homeLineup = isset($d['homeClub']['lineup']) ? $d['homeClub']['lineup'] : [];
+        $awayLineup = isset($d['awayClub']['lineup']) ? $d['awayClub']['lineup'] : [];
+
+        $localTitulares     = $mapPlayers(isset($homeLineup['players']) ? $homeLineup['players'] : []);
+        $localSuplentes     = $mapPlayers(isset($homeLineup['substitutes']) ? $homeLineup['substitutes'] : []);
+        $visitanteTitulares = $mapPlayers(isset($awayLineup['players']) ? $awayLineup['players'] : []);
+        $visitanteSuplentes = $mapPlayers(isset($awayLineup['substitutes']) ? $awayLineup['substitutes'] : []);
+
+        // 3. RESOLVER NOMBRES de jugadores (batch)
+        $playerIds = [];
+        foreach ([$localTitulares, $localSuplentes, $visitanteTitulares, $visitanteSuplentes] as $lst) {
+            foreach ($lst as $p) $playerIds[$p['sid']] = true;
         }
-
-        // 2. DOM
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
-        libxml_clear_errors();
-        $xp = new \DOMXPath($dom);
-
-        // Helpers
-        $spielerId = function ($href) {
-            return preg_match('#/spieler/(\d+)#', (string) $href, $m) ? $m[1] : null;
+        $nombres = $this->tmResolvePersonNames($base . '/players', array_keys($playerIds));
+        $aplicarNombres = function (&$lst) use ($nombres) {
+            foreach ($lst as &$p) { $p['nombre'] = isset($nombres[$p['sid']]) ? $nombres[$p['sid']] : ''; }
+            unset($p);
         };
-        $decodeMinute = function ($style) {
-            if (preg_match('/background-position:\s*(-?\d+)px\s+(-?\d+)px/i', (string) $style, $m)) {
-                $x = abs((int) $m[1]) / 36;
-                $y = abs((int) $m[2]) / 36;
-                return (int) round(10 * $y + $x);
-            }
-            return 0;
-        };
-        $minuteOf = function ($li) use ($xp, $decodeMinute) {
-            $s = $xp->query(".//*[contains(@class,'sb-sprite-uhr')]", $li)->item(0);
-            return $s ? $decodeMinute($s->getAttribute('style')) : 0;
-        };
-        $firstPlayer = function ($li) use ($xp, $spielerId) {
-            $a = $xp->query(".//a[contains(@class,'wichtig') and contains(@href,'/spieler/')]", $li)->item(0);
-            if (!$a) $a = $xp->query(".//a[contains(@href,'/spieler/')]", $li)->item(0);
-            if (!$a) return [null, ''];
-            return [$spielerId($a->getAttribute('href')), trim($a->textContent)];
-        };
-        $findEventUl = function ($headerText) use ($xp) {
-            foreach ($xp->query("//div[contains(@class,'box')][.//h2]") as $box) {
-                $h = $xp->query(".//h2", $box)->item(0);
-                if (!$h || trim($h->textContent) !== $headerText) continue;
-                $uls = $xp->query(".//ul[.//*[contains(@class,'sb-aktion')]]", $box);
-                if ($uls->length) return $uls->item(0);
-            }
-            return null;
-        };
-
-        // 3. ARBITRO (transfermarkt solo publica el arbitro principal)
-        $jueces = [];
-        $zNode  = $xp->query("//*[contains(@class,'sb-zusatzinfos')]")->item(0);
-        if ($zNode) {
-            $ztext = preg_replace('/\s+/u', ' ', $zNode->textContent);
-            if (mb_strpos($ztext, 'Árbitro:') !== false || mb_strpos($ztext, 'Arbitro:') !== false) {
-                $after = trim(preg_replace('/^.*?(?:Árbitro:|Arbitro:)\s*/us', '', $ztext));
-                $after = preg_split('/\s+(?:Espectadores|Estadio|Asistencia|Recaudación|Público|Cuarto)\b/u', $after)[0];
-                $after = trim(preg_replace('/\s*\d.*$/us', '', $after));
-                if ($after !== '') $jueces[] = ['tipo' => 'Principal', 'nombre' => $after];
-            }
-        }
+        $aplicarNombres($localTitulares);
+        $aplicarNombres($localSuplentes);
+        $aplicarNombres($visitanteTitulares);
+        $aplicarNombres($visitanteSuplentes);
 
         // 4. EVENTOS -> incidencias por spielerId
         $eventosPorId = [];
-        $push = function ($sid, $tipo, $min) use (&$eventosPorId) {
-            if ($sid === null) return;
-            $eventosPorId[$sid][] = [$tipo, $min];
+        $addEv = function ($sid, $tipo, $min) use (&$eventosPorId) {
+            if (empty($sid)) return;
+            $eventosPorId[(string) $sid][] = [$tipo, $min];
+        };
+        $minuteOf = function ($a) {
+            $m   = (int) (isset($a['minute']) ? $a['minute'] : 0);
+            $add = (int) (isset($a['addedTime']) ? $a['addedTime'] : 0);
+            if ($m != 45 && $add > 0) $m += $add; // mismo criterio de minuto que resultados-futbol
+            return $m;
         };
 
-        // Goles
-        if ($golUl = $findEventUl('Goles')) {
-            foreach ($xp->query("li", $golUl) as $li) {
-                $min = $minuteOf($li);
-                list($sid, $name) = $firstPlayer($li); // primer anchor = autor del gol
-                $t = mb_strtolower($li->textContent);
-                if (preg_match('/propia|en contra|autogol/u', $t))           $tipo = 'Gol en propia meta';
-                elseif (preg_match('/penal|penalti/u', $t))                  $tipo = 'Penal';
-                elseif (preg_match('/libre directo|tiro libre|falta/u', $t)) $tipo = 'Tiro libre';
-                elseif (preg_match('/cabeza/u', $t))                         $tipo = 'Cabeza';
-                else                                                         $tipo = 'Gol';
-                $push($sid, $tipo, $min);
-            }
-        }
+        foreach ((isset($d['actions']) ? $d['actions'] : []) as $a) {
+            $min    = $minuteOf($a);
+            $reason = (int) (isset($a['actionReasonId']) ? $a['actionReasonId'] : 0);
+            $det    = isset($a['details']) ? $a['details'] : [];
+            $tipoAcc = isset($a['type']) ? $a['type'] : '';
+            $active  = isset($a['activePlayerId']) ? $a['activePlayerId'] : null;
+            $passive = isset($a['passivePlayerId']) ? $a['passivePlayerId'] : null;
 
-        // Amonestaciones (tarjetas)
-        if ($cardUl = $findEventUl('Amonestaciones')) {
-            foreach ($xp->query("li", $cardUl) as $li) {
-                $min = $minuteOf($li);
-                list($sid, $name) = $firstPlayer($li);
-                $color = '';
-                foreach ($xp->query(".//span[contains(@class,'sb-sprite')]", $li) as $sp) {
-                    if (preg_match('/sb-(gelb-rot|gelbrot|gelb|rot)/', $sp->getAttribute('class'), $mm)) { $color = $mm[1]; break; }
+            if ($tipoAcc === 'GOAL') {
+                // Subtipo best-effort (la API no siempre lo distingue). Por defecto, gol de jugada.
+                if (!empty($det['ownGoal']) || in_array($reason, [110, 500, 501], true)) {
+                    $tipo = 'Gol en propia meta';
+                } elseif (!empty($det['penalty']) || in_array($reason, [201], true)) {
+                    $tipo = 'Penal';
+                } else {
+                    $tipo = 'Gol';
                 }
-                if (preg_match('/2\.\s*Tarjeta amarilla/u', $li->textContent) || $color === 'gelb-rot' || $color === 'gelbrot') {
-                    $tipo = 'Expulsado por doble amarilla';
-                } elseif ($color === 'rot') {
+                $addEv($active, $tipo, $min);
+            } elseif ($tipoAcc === 'CARD') {
+                if (!empty($det['seasonRedCard']) || $reason === 303) {
                     $tipo = 'Tarjeta roja';
+                } elseif (!empty($det['seasonYellowRedCard']) || !empty($det['seasonSecondYellowCard']) || $reason === 302) {
+                    $tipo = 'Expulsado por doble amarilla';
                 } else {
                     $tipo = 'Tarjeta amarilla';
                 }
-                $push($sid, $tipo, $min);
+                $addEv($active, $tipo, $min);
+            } elseif ($tipoAcc === 'SUBSTITUTE') {
+                $addEv($active, 'Sale', $min);   // activePlayerId = jugador que SALE
+                $addEv($passive, 'Entra', $min); // passivePlayerId = jugador que ENTRA
             }
         }
 
-        // Cambios
-        if ($subUl = $findEventUl('Cambios')) {
-            foreach ($xp->query("li", $subUl) as $li) {
-                $min  = $minuteOf($li);
-                $einA = $xp->query(".//*[contains(@class,'sb-aktion-wechsel-ein')]//a[contains(@href,'/spieler/')]", $li)->item(0);
-                $ausA = $xp->query(".//*[contains(@class,'sb-aktion-wechsel-aus')]//a[contains(@href,'/spieler/')]", $li)->item(0);
-                if (!$einA && !$ausA) {
-                    $as   = $xp->query(".//a[contains(@href,'/spieler/')]", $li);
-                    $einA = $as->item(0);
-                    $ausA = $as->item(1);
-                }
-                if ($einA) $push($spielerId($einA->getAttribute('href')), 'Entra', $min);
-                if ($ausA) $push($spielerId($ausA->getAttribute('href')), 'Sale', $min);
-            }
+        // 5. ÁRBITROS (principal + asistentes)
+        $jueces = [];
+        $rIds   = isset($d['refereeIds']) ? $d['refereeIds'] : [];
+        $refMap = [
+            'refereeId'                => 'Principal',
+            'firstRefereeAssistantId'  => 'Línea 1',
+            'secondRefereeAssistantId' => 'Línea 2',
+        ];
+        $refIdTipo = [];
+        foreach ($refMap as $k => $tipo) {
+            if (!empty($rIds[$k])) $refIdTipo[(string) $rIds[$k]] = $tipo;
         }
-
-        // 5. FORMACIONES (dos cajas .large-6.columns: [0]=local, [1]=visitante)
-        $teamBoxes = $xp->query("//div[contains(@class,'large-6') and contains(@class,'columns') and .//div[contains(@class,'formation-player-container')]]");
-
-        $parseStarters = function ($box) use ($xp, $spielerId) {
-            $players = [];
-            foreach ($xp->query(".//div[contains(@class,'formation-player-container')]", $box) as $fpc) {
-                $numNode = $xp->query(".//*[contains(@class,'tm-shirt-number')]", $fpc)->item(0);
-                $dorsal  = ($numNode && preg_match('/^\s*(\d+)/', $numNode->textContent, $m)) ? $m[1] : '';
-                $a       = $xp->query(".//a[contains(@href,'/spieler/')]", $fpc)->item(0);
-                if (!$a) continue;
-                $players[] = [
-                    'dorsal' => $dorsal,
-                    'nombre' => trim($a->textContent),
-                    'sid'    => $spielerId($a->getAttribute('href')),
-                ];
+        if (!empty($refIdTipo)) {
+            $refNames = $this->tmResolvePersonNames($base . '/referees', array_keys($refIdTipo));
+            foreach ($refIdTipo as $rid => $tipo) {
+                if (!empty($refNames[$rid])) $jueces[] = ['tipo' => $tipo, 'nombre' => $refNames[$rid]];
             }
-            return $players;
-        };
-        $parseBench = function ($box) use ($xp, $spielerId) {
-            $players = [];
-            foreach ($xp->query(".//table[contains(@class,'ersatzbank')]//tr", $box) as $tr) {
-                $a = $xp->query(".//a[contains(@href,'/spieler/')]", $tr)->item(0);
-                if (!$a) continue; // salta la fila del entrenador
-                $numNode = $xp->query(".//*[contains(@class,'tm-shirt-number') or contains(@class,'rn_nummer')]", $tr)->item(0);
-                $dorsal  = ($numNode && preg_match('/(\d+)/', $numNode->textContent, $m)) ? $m[1] : '';
-                if ($dorsal === '') continue;
-                $players[] = [
-                    'dorsal' => $dorsal,
-                    'nombre' => trim($a->textContent),
-                    'sid'    => $spielerId($a->getAttribute('href')),
-                ];
-            }
-            return $players;
-        };
-
-        $localTitulares = $visitanteTitulares = $localSuplentes = $visitanteSuplentes = [];
-        if ($teamBoxes->length >= 1) {
-            $localTitulares = $parseStarters($teamBoxes->item(0));
-            $localSuplentes = $parseBench($teamBoxes->item(0));
-        }
-        if ($teamBoxes->length >= 2) {
-            $visitanteTitulares = $parseStarters($teamBoxes->item(1));
-            $visitanteSuplentes = $parseBench($teamBoxes->item(1));
         }
 
         // 6. ARMAR $equipos con incidencias asignadas por spielerId
@@ -8959,7 +8912,7 @@ private function normalizarMinuto(string $texto): int
             foreach ([['Titular', $starters], ['Suplente', $bench]] as $grp) {
                 foreach ($grp[1] as $p) {
                     $inc = [];
-                    if ($p['sid'] !== null && isset($eventosPorId[$p['sid']])) {
+                    if (!empty($p['sid']) && isset($eventosPorId[$p['sid']])) {
                         foreach ($eventosPorId[$p['sid']] as $e) $inc[] = [$e[0], $e[1]];
                     }
                     $out[] = [
@@ -8972,55 +8925,67 @@ private function normalizarMinuto(string $texto): int
             }
             return $out;
         };
-
         $equipos = [
             ['equipo' => $strLocal,     'jugadores' => $buildJugadores($localTitulares, $localSuplentes)],
             ['equipo' => $strVisitante, 'jugadores' => $buildJugadores($visitanteTitulares, $visitanteSuplentes)],
         ];
 
-        // Aviso: eventos de jugadores que no aparecen en la formacion
+        // Aviso: eventos de jugadores fuera de la formación
         $success = '';
-        $idsFormacion = [];
+        $idsForm = [];
         foreach (array_merge($localTitulares, $localSuplentes, $visitanteTitulares, $visitanteSuplentes) as $p) {
-            if ($p['sid'] !== null) $idsFormacion[$p['sid']] = true;
+            if (!empty($p['sid'])) $idsForm[$p['sid']] = true;
         }
         foreach ($eventosPorId as $sid => $evs) {
-            if (!isset($idsFormacion[$sid])) {
+            if (!isset($idsForm[$sid])) {
                 foreach ($evs as $e) {
-                    $success .= '⚠️ WARNING: Evento "' . $e[0] . '" min ' . $e[1] . ' de un jugador fuera de la formacion (id TM ' . $sid . ').<br>';
+                    $nm = isset($nombres[$sid]) ? $nombres[$sid] : ('id TM ' . $sid);
+                    $success .= '⚠️ WARNING: Evento "' . $e[0] . '" min ' . $e[1] . ' de ' . $nm . ' (fuera de la formación).<br>';
                 }
             }
         }
 
-        // DIAGNÓSTICO TEMPORAL: si no se parseó nada, mostrar qué recibió el servidor.
-        if (empty($jueces) && empty($localTitulares) && empty($visitanteTitulares)) {
-            DB::rollback();
-            $marca = function ($needle) use ($html) { return strpos($html, $needle) !== false ? 'SI' : 'NO'; };
-            $inicio = htmlspecialchars(mb_substr(preg_replace('/\s+/', ' ', $html), 0, 500));
-            $diag = '<b>DIAGNÓSTICO TM</b><br>'
-                . 'bytes=' . strlen($html) . '<br>'
-                . 'contiene "sb-aktion": ' . $marca('sb-aktion') . '<br>'
-                . 'contiene "formation-player-container": ' . $marca('formation-player-container') . '<br>'
-                . 'contiene "sb-zusatzinfos": ' . $marca('sb-zusatzinfos') . '<br>'
-                . 'contiene "spieler/": ' . $marca('spieler/') . '<br>'
-                . 'teamBoxes detectadas: ' . $teamBoxes->length . '<br>'
-                . 'muro/consent: ' . (
-                    (stripos($html, 'Just a moment') !== false
-                        || stripos($html, 'Attention Required') !== false
-                        || stripos($html, 'consent') !== false
-                        || stripos($html, 'sp_message') !== false
-                        || stripos($html, 'cf-browser') !== false) ? 'SI' : 'no'
-                ) . '<br>'
-                . 'HTTP guardado (primeros 500 chars): <code>' . $inicio . '</code>';
-            return redirect()->route('fechas.show', $partido->fecha->id)->with('error', $diag);
-        }
-
-        // 7-11. Validar + guardar (logica compartida con resultados-futbol)
+        // 7-11. Validar + guardar (lógica compartida con resultados-futbol)
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $localTitulares, $visitanteTitulares, $equipos,
-            $success, 1, '', 1
+            $success, 1, '', 3
         );
+    }
+
+    /**
+     * Resuelve nombres desde tmapi (endpoints /players o /referees) por IDs, en lotes.
+     * Devuelve un mapa [id => nombre].
+     */
+    private function tmResolvePersonNames($endpoint, array $ids)
+    {
+        $map = [];
+        $ids = array_values(array_unique(array_filter($ids, function ($x) {
+            return $x !== '' && $x !== null;
+        })));
+        if (empty($ids)) return $map;
+
+        foreach (array_chunk($ids, 50) as $chunk) {
+            $qs = implode('&', array_map(function ($id) {
+                return 'ids[]=' . urlencode($id);
+            }, $chunk));
+
+            $json = HttpHelper::getJson($endpoint . '?' . $qs);
+            if (!$json) continue;
+
+            $items = isset($json['data']) ? $json['data'] : $json;
+            if (!is_array($items)) continue;
+
+            foreach ($items as $item) {
+                if (!is_array($item)) continue;
+                $id   = isset($item['id']) ? $item['id'] : null;
+                $name = isset($item['name']) ? $item['name']
+                    : (isset($item['fullName']) ? $item['fullName']
+                    : (isset($item['shortName']) ? $item['shortName'] : null));
+                if ($id !== null && $name) $map[(string) $id] = trim($name);
+            }
+        }
+        return $map;
     }
 
     private function guardarIncidenciasImportadas($partido, $fecha, $grupo, $strLocal, $strVisitante, array $jueces, array $localTitulares, array $visitanteTitulares, array $equipos, $success = '', $ok = 1, $error = '', $juecesEsperados = 3)
