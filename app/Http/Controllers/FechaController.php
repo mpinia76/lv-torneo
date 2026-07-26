@@ -431,6 +431,7 @@ class FechaController extends Controller
     public function importprocess_new(Request $request)
     {
         $url2 = $request->get('url2');
+        $grupoId = $request->get('grupoSelect_id') ?? $request->query('grupoId');
         $ok=1;
         DB::beginTransaction();
         $error='';
