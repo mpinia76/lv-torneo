@@ -451,6 +451,25 @@ class FechaController extends Controller
             $html2='';
         }
         //dd($html2);
+
+        // Detectar página vacía o bloqueo de Cloudflare y avisar en vez de "success" en blanco.
+        $bloqueoCF = $html2 && (
+            strpos($html2, 'Attention Required') !== false
+            || strpos($html2, 'cf-wrapper') !== false
+            || strpos($html2, 'Just a moment') !== false
+            || strpos($html2, '/cdn-cgi/') !== false
+        );
+        if (!$html2 || $bloqueoCF) {
+            DB::rollback();
+            $msj = (!$html2)
+                ? 'No se pudo obtener la página: el servidor recibió una respuesta vacía. '
+                : 'La página respondió con un bloqueo de Cloudflare (HTTP 403 "Attention Required"). ';
+            $msj .= 'El sitio está bloqueando al servidor, por eso no se importó ningún partido. '
+                  . 'Importá esa fecha desde el navegador (bookmarklet → CSV).';
+            return redirect()->route('fechas.index', array('grupoId' => $grupoId))
+                ->with('error', $msj);
+        }
+
         if ($html2) {
             // Crea un nuevo DOMDocument
             $dom = new \DOMDocument();
@@ -775,6 +794,13 @@ class FechaController extends Controller
 
 
             }
+        }
+        // Se obtuvo la página pero no se importó nada (sin partidos o sin jornada):
+        // avisar en vez de mostrar un "success" vacío.
+        if ($ok && trim($success) === '' && trim($error) === '') {
+            $ok = 0;
+            $error = 'Se obtuvo la página pero no se importó ningún partido. '
+                   . 'No se detectaron partidos o el número de jornada (la estructura del sitio pudo cambiar).';
         }
         if ($ok){
 
