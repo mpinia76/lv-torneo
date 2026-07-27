@@ -1296,6 +1296,7 @@ class FechaController extends Controller
                 DB::beginTransaction();
                 $ok=1;
                 $success='';
+                $error='';
                 foreach($importData_arr as $importData){
                     //Log::channel('mi_log')->info('Fecha: '.$importData[0]);
                     $golesL = null;
@@ -1306,7 +1307,12 @@ class FechaController extends Controller
                         ? intval($importData[1])
                         : intval($request->get('grupoSelect_id'));
                      if($numero){
-                         $dia = $importData[2].' '.$importData[3];
+                         // Aceptar fecha en YYYY-MM-DD o DD/MM/YYYY (Excel suele convertirla).
+                         $fechaCsv = trim($importData[2]);
+                         if (preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $fechaCsv, $mf)) {
+                             $fechaCsv = $mf[3].'-'.$mf[2].'-'.$mf[1];
+                         }
+                         $dia = $fechaCsv.' '.$importData[3];
                          $strEquipoL = ($importData[4]);
                          $resultado = $importData[5];
                          $goles = explode(":", $resultado);
@@ -1443,7 +1449,7 @@ class FechaController extends Controller
 
                                 }catch(Exception $e){
                                     //if email or phone exist before in db redirect with error messages
-                                    $error = $ex->getMessage();
+                                    $error = $e->getMessage();
                                     $ok=0;
                                     continue;
                                 }
