@@ -1333,6 +1333,36 @@ class FechaController extends Controller
                                 $success .='Equipo NO encontrado: '.$numero.'-'.$dia.'-'.$strEquipoL.'<br>';
                             }
                             else{
+                                // --- Verificar grupo: igual que el import por URL, solo guardar
+                                //     el partido si ambos equipos pertenecen al grupo elegido.
+                                //     Así el mismo CSV se importa 2 veces (Grupo A y Grupo B) y
+                                //     cada zona se queda con sus partidos.
+                                $idLocal = $equipol->id;
+                                $idVisitante = $equipoV->id;
+                                $guardarPartido = true;
+                                if ($request->get('verificado')) {
+                                    $guardarPartido = false;
+                                    $localEnGrupo = \App\Plantilla::where('grupo_id', $grupo_id)->where('equipo_id', $idLocal)->exists();
+                                    $visitEnGrupo = \App\Plantilla::where('grupo_id', $grupo_id)->where('equipo_id', $idVisitante)->exists();
+                                    if ($localEnGrupo && $visitEnGrupo) {
+                                        $guardarPartido = true;
+                                    } elseif ($localEnGrupo || $visitEnGrupo) {
+                                        // interzonal: guardar una sola vez (si no existe ya ese día)
+                                        $partidoExistente = Partido::whereDate('dia', $dia)
+                                            ->where(function ($q) use ($idLocal, $idVisitante) {
+                                                $q->where(function ($q2) use ($idLocal, $idVisitante) {
+                                                    $q2->where('equipol_id', $idLocal)->where('equipov_id', $idVisitante);
+                                                })->orWhere(function ($q2) use ($idLocal, $idVisitante) {
+                                                    $q2->where('equipol_id', $idVisitante)->where('equipov_id', $idLocal);
+                                                });
+                                            })->exists();
+                                        if (!$partidoExistente) { $guardarPartido = true; }
+                                    }
+                                }
+                                if (!$guardarPartido) {
+                                    $success .= 'Fuera del grupo: '.$strEquipoL.' - '.$strEquipoV.'<br>';
+                                    continue;
+                                }
                                 /*$strArbitro = utf8_encode($importData[9]);
                                 $arrArbitro = explode(" ", $strArbitro);
 
