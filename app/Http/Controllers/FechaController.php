@@ -526,7 +526,14 @@ class FechaController extends Controller
                 }
                 //dd($partidos);
                 // Buscar el div que contiene la jornada o fase
-                $jornadaNode = $xpath->query('//div[contains(@class,"hs-head--round")]');
+                // livefutbol renombró el encabezado de la ronda: antes era
+                // "hs-head--round"; ahora el número de jornada está en el header del
+                // bloque de partidos (ej: <h2 class="hs-block-header">1. Jornada</h2>).
+                $jornadaNode = $xpath->query('//*[contains(@class,"hs-block-header")][contains(normalize-space(.),"Jornada") or contains(normalize-space(.),"Spieltag") or contains(normalize-space(.),"Matchday")]');
+                if ($jornadaNode->length == 0) {
+                    // compatibilidad con la estructura anterior
+                    $jornadaNode = $xpath->query('//div[contains(@class,"hs-head--round")]');
+                }
                 if ($jornadaNode->length > 0) {
                     $jornadaText = trim($jornadaNode[0]->textContent);
 
@@ -1268,7 +1275,10 @@ class FechaController extends Controller
                     $golesL = null;
                     $golesV = null;
                      $numero=$importData[0];
-                    $grupo_id=intval($importData[1]);
+                    // Si el CSV no trae grupo_id (columna vacía), usar el grupo elegido en el formulario.
+                    $grupo_id = (isset($importData[1]) && trim($importData[1]) !== '')
+                        ? intval($importData[1])
+                        : intval($request->get('grupoSelect_id'));
                      if($numero){
                          $dia = $importData[2].' '.$importData[3];
                          $strEquipoL = ($importData[4]);
