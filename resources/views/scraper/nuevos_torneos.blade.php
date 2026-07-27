@@ -7,7 +7,7 @@
         <h3 class="mb-1">Torneos nuevos a cargar</h3>
         <p class="text-muted">
             Recorre los jugadores y DTs con URL de Transfermarkt guardada y busca torneos que
-            todavía no cargaste (sin contar excluidos ni ya cargados).
+            todavía no cargaste. Abajo de cada uno, los que <strong>faltan</strong> (sin URL).
         </p>
 
         {{-- Pestañas (toggle propio, sin depender de Bootstrap) --}}
@@ -21,7 +21,15 @@
         </div>
 
         @foreach (['jugador' => 'jugadores', 'tecnico' => 'DTs'] as $tipo => $label)
+            @php
+                $sinUrl   = $tipo === 'jugador' ? $sinUrlJug : $sinUrlTec;
+                $qActual  = $tipo === 'jugador' ? $qj : $qt;
+                $qParam   = $tipo === 'jugador' ? 'qj' : 'qt';
+                $rutaFicha = $tipo === 'jugador' ? 'jugador-estadisticas.createPorJugador' : 'tecnico-estadisticas.createPorTecnico';
+            @endphp
             <div id="seccion-{{ $tipo }}" class="seccion-tab" style="{{ $tipo === 'jugador' ? '' : 'display:none;' }}">
+
+                {{-- Buscar torneos nuevos (los que tienen URL) --}}
                 <div class="d-flex align-items-center mb-3">
                     <button type="button" class="btn btn-primary mr-3" onclick="buscarNuevos('{{ $tipo }}')">
                         🔎 Buscar torneos nuevos ({{ $label }})
@@ -30,6 +38,34 @@
                 </div>
                 <div id="resumen-{{ $tipo }}" class="mb-3"></div>
                 <div id="resultado-{{ $tipo }}"></div>
+
+                {{-- Faltan cargar URL --}}
+                <hr>
+                <h5 class="mb-2">Faltan cargar URL <span class="badge badge-warning">{{ $sinUrl->total() }}</span></h5>
+                <form method="GET" class="form-inline mb-2">
+                    <input type="hidden" name="tab" value="{{ $tipo }}">
+                    <input type="text" name="{{ $qParam }}" value="{{ $qActual }}" class="form-control form-control-sm mr-2"
+                           placeholder="Buscar por nombre…">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Buscar</button>
+                    @if ($qActual !== '')
+                        <a href="{{ route('scraper.nuevos-torneos', ['tab' => $tipo]) }}" class="btn btn-sm btn-link">limpiar</a>
+                    @endif
+                </form>
+
+                @if ($sinUrl->count())
+                    <ul class="list-unstyled" style="font-size:0.9rem;">
+                        @foreach ($sinUrl as $item)
+                            <li class="d-flex align-items-center py-1 border-bottom">
+                                <span>{{ optional($item->persona)->name ?: ('#'.$item->id) }}</span>
+                                <a href="{{ route($rutaFicha, $item->id) }}" target="_blank"
+                                   class="btn btn-sm btn-outline-primary ml-auto">Cargar URL ▸</a>
+                            </li>
+                        @endforeach
+                    </ul>
+                    {{ $sinUrl->links() }}
+                @else
+                    <div class="alert alert-success">No falta ninguno.</div>
+                @endif
             </div>
         @endforeach
     </div>
@@ -45,16 +81,34 @@
             tecnico: "{{ url('/admin/tecnico-estadisticas/createPorTecnico') }}",
         };
         const ICONO = { jugador: '👤', tecnico: '🎽' };
+        let tabActual = 'jugador';
 
         document.getElementById('cnt-jugador').textContent = ENTIDADES.filter(e => e.tipo === 'jugador').length;
         document.getElementById('cnt-tecnico').textContent = ENTIDADES.filter(e => e.tipo === 'tecnico').length;
 
         function mostrarTab(tipo) {
+            tabActual = tipo;
             document.getElementById('seccion-jugador').style.display = (tipo === 'jugador') ? '' : 'none';
             document.getElementById('seccion-tecnico').style.display = (tipo === 'tecnico') ? '' : 'none';
             document.getElementById('tab-btn-jugador').classList.toggle('active', tipo === 'jugador');
             document.getElementById('tab-btn-tecnico').classList.toggle('active', tipo === 'tecnico');
         }
+
+        // Mantener la pestaña al paginar/buscar (viene en ?tab=)
+        (function () {
+            const t = new URLSearchParams(location.search).get('tab');
+            if (t === 'tecnico') mostrarTab('tecnico');
+        })();
+
+        // Al paginar, preservar la pestaña activa
+        document.addEventListener('click', function (ev) {
+            const a = ev.target.closest('.pagination a');
+            if (!a || !a.href) return;
+            ev.preventDefault();
+            const u = new URL(a.href);
+            u.searchParams.set('tab', tabActual);
+            window.location.href = u.toString();
+        });
 
         function esc(s) {
             return (s == null ? '' : String(s)).replace(/[&<>"']/g, m => ({
@@ -71,7 +125,7 @@
             if (!lista.length) {
                 resumen.innerHTML = '<div class="alert alert-warning">No hay ' +
                     (tipo === 'jugador' ? 'jugadores' : 'DTs') +
-                    ' con URL de Transfermarkt guardada. Scrapeá alguno primero y la URL queda guardada sola.</div>';
+                    ' con URL guardada todavía. Cargá alguno abajo (en "Faltan cargar URL").</div>';
                 return;
             }
 

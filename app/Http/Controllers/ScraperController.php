@@ -153,8 +153,9 @@ class ScraperController extends Controller
      * Pantalla "Torneos nuevos": lista jugadores y DTs que tienen URL de TM guardada.
      * El front recorre cada uno llamando al scraper y muestra los torneos nuevos a cargar.
      */
-    public function nuevosTorneos()
+    public function nuevosTorneos(Request $request)
     {
+        // --- CON URL: se recorren para buscar torneos nuevos (lado JS) ---
         $jugadores = \App\Jugador::with('persona')
             ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
             ->get()
@@ -181,7 +182,27 @@ class ScraperController extends Controller
 
         $entidades = $jugadores->concat($tecnicos)->values();
 
-        return view('scraper.nuevos_torneos', compact('entidades'));
+        // --- SIN URL: los que faltan cargar, paginados + búsqueda por nombre ---
+        $qj = trim((string) $request->get('qj', ''));
+        $qt = trim((string) $request->get('qt', ''));
+
+        $sinUrlJug = \App\Jugador::with('persona')
+            ->where(function ($w) { $w->whereNull('transfermarkt_url')->orWhere('transfermarkt_url', ''); })
+            ->when($qj !== '', function ($q) use ($qj) {
+                $q->whereHas('persona', function ($p) use ($qj) { $p->where('name', 'like', "%{$qj}%"); });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate(50, ['*'], 'jug')->withQueryString();
+
+        $sinUrlTec = \App\Tecnico::with('persona')
+            ->where(function ($w) { $w->whereNull('transfermarkt_url')->orWhere('transfermarkt_url', ''); })
+            ->when($qt !== '', function ($q) use ($qt) {
+                $q->whereHas('persona', function ($p) use ($qt) { $p->where('name', 'like', "%{$qt}%"); });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate(50, ['*'], 'tec')->withQueryString();
+
+        return view('scraper.nuevos_torneos', compact('entidades', 'sinUrlJug', 'sinUrlTec', 'qj', 'qt'));
     }
 
     function normalizeTeam($str) {
