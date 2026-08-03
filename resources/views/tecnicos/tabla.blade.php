@@ -83,6 +83,7 @@
     <!-- Totales -->
     <tr>
         <td></td><td></td><td><strong>Totales</strong></td>
+        <td><strong>{{$totalPuntaje}}</strong></td>
         <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id])}}">{{$totalJugados}}</a></strong></td>
         <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'tipo'=>'Ganados'])}}">{{$totalGanados}}</a></strong></td>
         <td><strong><a href="{{route('tecnicos.jugados', ['tecnicoId'=>$tecnico->id,'tipo'=>'Empatados'])}}">{{$totalEmpatados}}</a></strong></td>
@@ -90,8 +91,7 @@
         <td><strong>{{$totalFavor}}</strong></td>
         <td><strong>{{$totalContra}}</strong></td>
         <td><strong>{{$totalFavor-$totalContra}}</strong></td>
-        <td><strong>{{$totalPuntaje}}</strong></td>
-        <td><strong>{{round($totalPuntaje*100/($totalJugados*3),2)}}%</strong></td>
+        <td><strong>{{$totalJugados > 0 ? round($totalPuntaje*100/($totalJugados*3),2) : 0}}%</strong></td>
     </tr>
     </tbody>
 </table>
