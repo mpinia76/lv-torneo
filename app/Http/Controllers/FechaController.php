@@ -1575,6 +1575,107 @@ class FechaController extends Controller
 
         $verificado = $request->get('verificado');
 
+        // Equipos del torneo (con plantilla en algún grupo), indexados por nombre
+        // normalizado, para matchear los nombres de promiedos (que difieren de tu base,
+        // que está al estilo livefutbol). La normalización saca acentos, paréntesis,
+        // espacios y puntuación: así "Sarmiento Junín" (promiedos) matchea
+        // "Sarmiento (Junín)" (tu base) sin necesidad de alias.
+        $norm = function ($s) {
+            $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $s);
+            $s = strtolower($s);
+            return preg_replace('/[^a-z0-9]/', '', $s);
+        };
+        $idsTorneo   = Plantilla::whereIn('grupo_id', $grupos)->pluck('equipo_id')->unique()->toArray();
+        $mapaEquipos = array();
+        foreach (Equipo::whereIn('id', $idsTorneo)->get() as $e) {
+            $mapaEquipos[$norm($e->nombre)] = $e;
+        }
+
+        // Resuelve automáticamente un equipo de promiedos a tu base probando el nombre
+        // normalizado contra name / short_name / url_name. Lo que no matchea acá lo
+        // elige el usuario en la pantalla de resolución.
+        $resolver = function ($t) use ($norm, $mapaEquipos) {
+            if (!is_array($t)) return null;
+            foreach (array('name', 'short_name', 'url_name') as $k) {
+                if (!empty($t[$k])) {
+                    $c = $norm($t[$k]);
+                    if ($c !== '' && isset($mapaEquipos[$c])) return $mapaEquipos[$c];
+                }
+            }
+            return null;
+        };
+
+        // Mapa manual que llega del formulario de resolución: [clavePromiedos => equipoId].
+        $manual = $request->get('pm_map', array());
+        if (!is_array($manual)) $manual = array();
+
+        // Clave estable de un equipo de promiedos (url_name; si no, name).
+        $pmKey = function ($t) {
+            if (!is_array($t)) return '';
+            if (!empty($t['url_name'])) return $t['url_name'];
+            return isset($t['name']) ? $t['name'] : '';
+        };
+
+        // Resolución final: primero lo que ya elegiste a mano, luego el automático.
+        $resolverFull = function ($t) use ($resolver, $manual, $pmKey) {
+            $k = $pmKey($t);
+            if ($k !== '' && isset($manual[$k]) && $manual[$k] !== '') {
+                $e = Equipo::find($manual[$k]);
+                if ($e) return $e;
+            }
+            return $resolver($t);
+        };
+
+        // Pre-pasada: juntar los equipos de promiedos que NO matchean, para que los elijas.
+        $noMatch = array();
+        foreach ($round['games'] as $gm) {
+            foreach (array(0, 1) as $i) {
+                $t = isset($gm['teams'][$i]) ? $gm['teams'][$i] : null;
+                if (!$t || empty($t['name'])) continue;
+                $k = $pmKey($t);
+                if ($k !== '' && !isset($noMatch[$k]) && !$resolverFull($t)) {
+                    $noMatch[$k] = $t;
+                }
+            }
+        }
+
+        // Si hay equipos sin resolver, mostrar la pantalla para elegir (similares primero).
+        if (!empty($noMatch)) {
+            $pool = array();
+            foreach ($mapaEquipos as $e) { $pool[] = array('id' => $e->id, 'nombre' => $e->nombre); }
+
+            $pendientes = array();
+            foreach ($noMatch as $k => $t) {
+                // Ordenar por la MEJOR similitud contra name / short_name / url_name
+                // (url_name suele ser el más parecido a tu nombre: "estudiantes-rio-cuarto").
+                $targets = array();
+                foreach (array('name', 'short_name', 'url_name') as $kk) {
+                    if (!empty($t[$kk])) $targets[] = $norm($t[$kk]);
+                }
+                $ops = $pool;
+                usort($ops, function ($a, $b) use ($norm, $targets) {
+                    $sa = 0; $sb = 0;
+                    $na = $norm($a['nombre']); $nb = $norm($b['nombre']);
+                    foreach ($targets as $tg) {
+                        $p = 0; similar_text($tg, $na, $p); if ($p > $sa) $sa = $p;
+                        $q = 0; similar_text($tg, $nb, $q); if ($q > $sb) $sb = $q;
+                    }
+                    if ($sa == $sb) return 0;
+                    return ($sa > $sb) ? -1 : 1;
+                });
+                $pendientes[] = array('key' => $k, 'nombre' => $t['name'], 'opciones' => $ops);
+            }
+
+            return view('fechas.resolver_pm', array(
+                'grupoId'     => $grupoId,
+                'grupo'       => $grupo,
+                'url2'        => $url,
+                'numeroFecha' => $numeroFecha,
+                'verificado'  => $verificado,
+                'pendientes'  => $pendientes,
+            ));
+        }
+
         DB::beginTransaction();
         $ok = 1; $success = ''; $error = '';
 
@@ -1595,39 +1696,23 @@ class FechaController extends Controller
                 $golesV = (int) $gm['scores'][1];
             }
 
-            // --- LOCAL: resolver via plantilla del torneo (igual que livefutbol) ---
-            $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->get();
-            if ($equipol->isEmpty()) {
+            // --- LOCAL: automático + lo que elegiste a mano ---
+            $eqLocal = $resolverFull($gm['teams'][0]);
+            if (!$eqLocal) {
                 $error .= 'Equipo NO encontrado: Fecha ' . $numeroFecha . ' - ' . $strEquipoL . '<br>';
                 $ok = 0;
                 continue;
             }
-            $plantillaL = Plantilla::whereIn('grupo_id', $grupos)
-                ->whereIn('equipo_id', $equipol->pluck('id')->toArray())
-                ->first();
-            if (!$plantillaL) {
-                $error .= 'Equipo sin plantilla: ' . $strEquipoL . '<br>';
-                $ok = 0;
-                continue;
-            }
-            $idLocal = $plantillaL->equipo->id;
+            $idLocal = $eqLocal->id;
 
             // --- VISITANTE: idem ---
-            $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->get();
-            if ($equipoV->isEmpty()) {
+            $eqVisita = $resolverFull($gm['teams'][1]);
+            if (!$eqVisita) {
                 $error .= 'Equipo NO encontrado: Fecha ' . $numeroFecha . ' - ' . $strEquipoV . '<br>';
                 $ok = 0;
                 continue;
             }
-            $plantillaV = Plantilla::whereIn('grupo_id', $grupos)
-                ->whereIn('equipo_id', $equipoV->pluck('id')->toArray())
-                ->first();
-            if (!$plantillaV) {
-                $error .= 'Equipo sin plantilla: ' . $strEquipoV . '<br>';
-                $ok = 0;
-                continue;
-            }
-            $idVisitante = $plantillaV->equipo->id;
+            $idVisitante = $eqVisita->id;
 
             // Fecha (por numero + grupo).
             $fecha = Fecha::where('grupo_id', '=', "$grupoId")->where('numero', '=', "$nro")->first();
