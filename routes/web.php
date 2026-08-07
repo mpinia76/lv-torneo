@@ -282,3 +282,95 @@ Route::get('/ejecutar-actualizar-nombres', function (Request $request) {
 
     return '✅ Comando ejecutado correctamente.';
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| TEMPORAL: diagnostico de conectividad a la API de ESPN desde el servidor.
+| Objetivo: ver si la IP del cPanel puede leer site.api.espn.com sin proxy.
+| Uso: https://TU-DOMINIO/espn-test?token=Zp4rV9kN2qM7LbXy
+| BORRAR esta ruta despues de decidir la fuente.
+|--------------------------------------------------------------------------
+*/
+Route::get('/espn-test', function (Request $request) {
+    if ($request->query('token') !== 'Zp4rV9kN2qM7LbXy') {
+        abort(403, 'Acceso no autorizado');
+    }
+
+    set_time_limit(60);
+
+    // Fetch propio para poder reportar el codigo HTTP (getJson lo oculta).
+    $fetch = function ($url) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_ENCODING, '');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: application/json',
+            'Referer: https://www.espn.com/',
+        ));
+        $body = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+        return array('code' => $code, 'body' => $body, 'err' => $err);
+    };
+
+    $out  = "=== TEST ESPN API desde el servidor ===\n";
+    $out .= 'PHP: ' . PHP_VERSION . ' | curl: ' . (function_exists('curl_init') ? 'SI' : 'NO') . "\n\n";
+
+    $ligas = array(
+        'Liga Profesional (arg.1)'     => 'https://site.api.espn.com/apis/site/v2/sports/soccer/arg.1/scoreboard',
+        'Libertadores (conmebol.lib)'  => 'https://site.api.espn.com/apis/site/v2/sports/soccer/conmebol.libertadores/scoreboard',
+        'Sudamericana (conmebol.suda)' => 'https://site.api.espn.com/apis/site/v2/sports/soccer/conmebol.sudamericana/scoreboard',
+    );
+
+    $primerEventId = null;
+
+    foreach ($ligas as $nombre => $url) {
+        $r   = $fetch($url);
+        $len = is_string($r['body']) ? strlen($r['body']) : 0;
+        $out .= "[$nombre] -> HTTP {$r['code']} | bytes: $len";
+        if ($r['err']) $out .= " | error: {$r['err']}";
+        $out .= "\n";
+
+        if ($r['code'] == 200 && $len > 0) {
+            $json = json_decode($r['body'], true);
+            if (isset($json['events']) && is_array($json['events'])) {
+                $out .= '   eventos en el scoreboard: ' . count($json['events']) . "\n";
+                foreach ($json['events'] as $ev) {
+                    $ename = isset($ev['name']) ? $ev['name'] : '(sin nombre)';
+                    $eid   = isset($ev['id']) ? $ev['id'] : '?';
+                    $out  .= "   - id=$eid | $ename\n";
+                    if ($primerEventId === null) $primerEventId = $eid;
+                }
+            }
+        }
+        $out .= "\n";
+    }
+
+    if ($primerEventId !== null) {
+        $out .= "=== DETALLE del partido id=$primerEventId (summary) ===\n";
+        $sumUrl = 'https://site.api.espn.com/apis/site/v2/sports/soccer/arg.1/summary?event=' . urlencode($primerEventId);
+        $r = $fetch($sumUrl);
+        $out .= "summary -> HTTP {$r['code']}\n";
+        if ($r['code'] == 200) {
+            $j = json_decode($r['body'], true);
+            $out .= '  rosters (alineaciones): ' . (isset($j['rosters']) ? 'SI (' . count($j['rosters']) . ')' : 'no') . "\n";
+            $out .= '  keyEvents (goles/tarjetas/cambios): ' . (isset($j['keyEvents']) ? 'SI (' . count($j['keyEvents']) . ')' : 'no') . "\n";
+            $out .= '  commentary: ' . (isset($j['commentary']) ? 'SI' : 'no') . "\n";
+            $out .= '  gameInfo.officials (arbitros): ' . (isset($j['gameInfo']['officials']) ? 'SI (' . count($j['gameInfo']['officials']) . ')' : 'no') . "\n";
+        }
+    } else {
+        $out .= "No hubo partidos hoy para sacar un event id de muestra.\n";
+        $out .= "Lo que importa arriba es el HTTP de cada liga (200 = tu server puede leer ESPN).\n";
+    }
+
+    $out .= "\n=== FIN. Acordate de BORRAR esta ruta. ===\n";
+
+    return response($out, 200)->header('Content-Type', 'text/plain; charset=utf-8');
+});
