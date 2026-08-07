@@ -9287,11 +9287,13 @@ private function normalizarMinuto(string $texto): int
             ['equipo_id' => $partido->equipov->id, 'equipo' => $strVisitante, 'nombre' => $dt[2]],
         ];
 
-        // 7-11. Validar + guardar (logica compartida). juecesEsperados=1: promiedos solo trae el principal.
+        // 7-11. Validar + guardar (logica compartida). juecesEsperados=3 (igual que las
+        // demas fuentes): promiedos solo trae el principal, asi que el helper avisa que
+        // faltan los de linea para cargarlos a mano, con el mismo alert de siempre.
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $roster[1]['titulares'], $roster[2]['titulares'], $equipos,
-            $avisoAutogol, 1, '', 1, $tecnicos
+            $avisoAutogol, 1, '', 3, $tecnicos
         );
     }
 
