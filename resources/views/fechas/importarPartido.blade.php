@@ -82,6 +82,13 @@
             </div>
             <div class="row">
                 <div class="form-group col-xs-12 col-sm-6 col-md-6">
+                    {{ Form::label('url_pm', 'URL promiedos (fuente principal)') }}
+                    {{ Form::text('url_pm', '', ['class' => 'form-control', 'placeholder' => 'https://www.promiedos.com.ar/game/local-vs-visitante/xxxxx']) }}
+                    <small class="text-muted">Pegá la URL del partido en promiedos. Trae formaciones, goles, tarjetas, cambios, DT y árbitro.</small>
+                </div>
+            </div>
+            <div class="row">
+                <div class="form-group col-xs-12 col-sm-6 col-md-6">
                     {{ Form::label('url2', 'URL transfermarkt (spielbericht)') }}
                     {{ Form::text('url2', '', ['class' => 'form-control', 'placeholder' => 'https://www.transfermarkt.com.ar/spielbericht/index/spielbericht/...']) }}
                     <small class="text-muted">También acepta URL de resultados-futbol.com como alternativa.</small>

@@ -339,7 +339,7 @@ class HttpHelper
     // GET JSON — para APIs (ej: tmapi.transfermarkt.technology).
     // Devuelve el array decodificado o null.
     // ---------------------------------------------------
-    public static function getJson(string $url)
+    public static function getJson(string $url, array $extraHeaders = [])
     {
         $url = trim($url);
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
@@ -351,6 +351,11 @@ class HttpHelper
             'Accept-Language: es-AR,es;q=0.9,en;q=0.8',
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         ];
+
+        // Headers extra por fuente (ej: promiedos requiere/espera 'X-VER').
+        if (!empty($extraHeaders)) {
+            $headers = array_merge($headers, $extraHeaders);
+        }
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);

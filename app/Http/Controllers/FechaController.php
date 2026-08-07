@@ -8458,10 +8458,20 @@ private function normalizarMinuto(string $texto): int
 
     public function importarPartidoProcess(Request $request)
     {
-        $url2 = rtrim(trim($request->get('url2')), '/');
-        $url3 = rtrim(trim($request->get('url3')), '/');
+        $url2  = rtrim(trim($request->get('url2')), '/');
+        $url3  = rtrim(trim($request->get('url3')), '/');
+        $urlPm = rtrim(trim($request->get('url_pm')), '/');
 
-        // Transfermarkt es la fuente principal
+        // Promiedos es la fuente principal (API de Opta, sin proxy).
+        if (strpos($urlPm, 'promiedos') !== false || strpos($url2, 'promiedos') !== false || strpos($url3, 'promiedos') !== false) {
+            if (strpos($urlPm, 'promiedos') === false) {
+                $urlPm = (strpos($url2, 'promiedos') !== false) ? $url2 : $url3;
+                $request->merge(['url_pm' => $urlPm]);
+            }
+            return $this->importarPartidoProcess_PM($request);
+        }
+
+        // Transfermarkt (fuente anterior)
         if (strpos($url2, 'transfermarkt') !== false || strpos($url3, 'transfermarkt') !== false) {
             if (strpos($url2, 'transfermarkt') === false && strpos($url3, 'transfermarkt') !== false) {
                 $request->merge(['url2' => $url3]);
@@ -9046,6 +9056,242 @@ private function normalizarMinuto(string $texto): int
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $localTitulares, $visitanteTitulares, $equipos,
             $success, 1, '', 3, $tecnicos
+        );
+    }
+
+    /**
+     * Importa incidencias de un partido desde PROMIEDOS (datos de Opta).
+     * La API JSON (api.promiedos.com.ar) responde directo desde el servidor, sin
+     * proxy, a diferencia de livefutbol/footballdatabase (Cloudflare) y ESPN
+     * (bloqueo por IP de datacenter). Un request a /gamecenter/{id} trae todo el
+     * reporte: formaciones (titulares/suplentes con dorsal), goles, tarjetas,
+     * cambios (con minuto), DT, arbitro principal y estadio. Reemplaza a
+     * transfermarkt como fuente principal del import de partidos.
+     *
+     * URL esperada: https://www.promiedos.com.ar/game/{slug}/{id}
+     */
+    public function importarPartidoProcess_PM(Request $request)
+    {
+        set_time_limit(0);
+
+        $partido_id = $request->get('partido_id');
+        $url        = rtrim(trim($request->get('url_pm')), '/');
+
+        $partido = Partido::findOrFail($partido_id);
+        $fecha   = Fecha::findOrFail($partido->fecha->id);
+        $grupo   = Grupo::findOrFail($fecha->grupo->id);
+
+        $strLocal     = $partido->equipol->nombre;
+        $strVisitante = $partido->equipov->nombre;
+
+        // ID del partido: en /game/{slug}/{id}[/subtab] es el segmento tras el slug.
+        $path = parse_url($url, PHP_URL_PATH);
+        $path = ($path !== null && $path !== false) ? $path : $url;
+        $segs = array_values(array_filter(explode('/', $path), function ($s) {
+            return $s !== '';
+        }));
+        $gameId = '';
+        $idxGame = array_search('game', $segs, true);
+        if ($idxGame !== false && isset($segs[$idxGame + 2])) {
+            $gameId = $segs[$idxGame + 2];   // game / slug / ID
+        } elseif (!empty($segs)) {
+            $gameId = end($segs);            // por si pegan solo el id
+        }
+
+        if (!preg_match('/^[a-z0-9]{3,12}$/', $gameId)) {
+            return redirect()->route('fechas.show', $partido->fecha->id)
+                ->with('error', 'No se pudo extraer el ID del partido de la URL de promiedos.');
+        }
+
+        // 1. API JSON: un request trae todo el gamecenter.
+        $base = 'https://api.promiedos.com.ar';
+        $resp = HttpHelper::getJson(
+            $base . '/gamecenter/' . $gameId,
+            ['X-VER: 1.11.7.5', 'Referer: https://www.promiedos.com.ar/']
+        );
+        if (!$resp || empty($resp['game'])) {
+            return redirect()->route('fechas.show', $partido->fecha->id)
+                ->with('error', 'No se pudo obtener el partido desde promiedos (id ' . $gameId . ').');
+        }
+        $g = $resp['game'];
+
+        DB::beginTransaction();
+
+        // Normalizador para matchear nombres (los cambios no traen dorsal).
+        $norm = function ($s) {
+            $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $s);
+            $s = mb_strtolower($s);
+            return preg_replace('/[^a-z0-9]+/', '', $s);
+        };
+
+        // ¿Es la fila del DT? (viene dentro de la formacion como "Entrenador").
+        $esEntrenador = function ($p) {
+            $fp = isset($p['formation_position']) ? $p['formation_position'] : '';
+            $po = isset($p['position']) ? $p['position'] : '';
+            return (stripos($fp, 'Entrenador') !== false) || (stripos($po, 'Direcci') !== false);
+        };
+
+        // 2. FORMACIONES: game.players.lineups.teams[] (team_num 1=local, 2=visitante).
+        $lineupTeams = isset($g['players']['lineups']['teams']) ? $g['players']['lineups']['teams'] : [];
+
+        $roster   = [1 => ['titulares' => [], 'suplentes' => []], 2 => ['titulares' => [], 'suplentes' => []]];
+        $dt       = [1 => '', 2 => ''];
+        $redType  = [1 => [], 2 => []]; // team_num => [dorsal => red_type]  (2 = doble amarilla)
+        $ownGoal  = [1 => [], 2 => []]; // team_num => [dorsal => true]  (autogol)
+
+        foreach ($lineupTeams as $lt) {
+            $tn = isset($lt['team_num']) ? (int) $lt['team_num'] : 0;
+            if ($tn !== 1 && $tn !== 2) continue;
+
+            foreach ([['starting', 'titulares', 'Titular'], ['bench', 'suplentes', 'Suplente']] as $grp) {
+                $arr = isset($lt[$grp[0]]) ? $lt[$grp[0]] : [];
+                foreach ($arr as $p) {
+                    if ($esEntrenador($p)) {
+                        if ($dt[$tn] === '' && !empty($p['name'])) $dt[$tn] = trim($p['name']);
+                        continue;
+                    }
+                    $dorsal = isset($p['jersey_num']) ? (string) $p['jersey_num'] : '';
+                    $roster[$tn][$grp[1]][] = [
+                        'dorsal' => $dorsal,
+                        'nombre' => isset($p['name']) ? trim($p['name']) : '',
+                        'tipo'   => $grp[2],
+                    ];
+                    if ($dorsal !== '') {
+                        $rt = isset($p['events']['cards']['red_type']) ? (int) $p['events']['cards']['red_type'] : -1;
+                        $redType[$tn][$dorsal] = $rt;
+                        $og = isset($p['events']['goals']['own_goals']) ? (int) $p['events']['goals']['own_goals'] : 0;
+                        if ($og > 0) $ownGoal[$tn][$dorsal] = true;
+                    }
+                }
+            }
+
+            // DT: viene en staff[] con formation_position "Entrenador".
+            foreach ((isset($lt['staff']) ? $lt['staff'] : []) as $s) {
+                if ($esEntrenador($s) && $dt[$tn] === '' && !empty($s['name'])) {
+                    $dt[$tn] = trim($s['name']);
+                }
+            }
+        }
+
+        // 3. EVENTOS: timeline game.events[] -> stages -> rows -> events[].
+        $flat = [];
+        foreach ((isset($g['events']) ? $g['events'] : []) as $stage) {
+            foreach ((isset($stage['rows']) ? $stage['rows'] : []) as $row) {
+                foreach ((isset($row['events']) ? $row['events'] : []) as $ev) {
+                    $flat[] = $ev;
+                }
+            }
+        }
+
+        // Minuto: "12'", "45'+2", "90'+3". Suma el adicionado salvo en el 45 (igual criterio que TM).
+        $minOf = function ($t) {
+            $base = 0; $add = 0;
+            if (preg_match('/(\d+)/', (string) $t, $m)) $base = (int) $m[1];
+            if (preg_match('/\+\s*(\d+)/', (string) $t, $m2)) $add = (int) $m2[1];
+            if ($base != 45 && $add > 0) $base += $add;
+            return $base;
+        };
+
+        // Marcadores de penal (type 7): el gol type 1 gemelo (mismo equipo/dorsal/min) se marca 'Penal'.
+        $penales = [];
+        foreach ($flat as $ev) {
+            if ((int) (isset($ev['type']) ? $ev['type'] : 0) === 7) {
+                $jn = isset($ev['player_jersey_num']) ? (string) $ev['player_jersey_num'] : '';
+                $penales[(int) $ev['team'] . '|' . $jn . '|' . $minOf(isset($ev['time']) ? $ev['time'] : '')] = true;
+            }
+        }
+
+        // Incidencias por equipo, indexadas por clave de jugador (dorsal o nombre normalizado).
+        $inc = [1 => [], 2 => []];
+        $addInc = function ($tn, $key, $tipo, $min) use (&$inc) {
+            if ($tn !== 1 && $tn !== 2) return;
+            $inc[$tn][$key][] = [$tipo, $min];
+        };
+
+        $avisoAutogol = '';
+        foreach ($flat as $ev) {
+            $type = (int) (isset($ev['type']) ? $ev['type'] : 0);
+            $tn   = (int) (isset($ev['team']) ? $ev['team'] : 0);
+            if ($tn !== 1 && $tn !== 2) continue;
+
+            $min   = $minOf(isset($ev['time']) ? $ev['time'] : '');
+            $jn    = isset($ev['player_jersey_num']) ? (string) $ev['player_jersey_num'] : '';
+            $texts = (isset($ev['texts']) && is_array($ev['texts'])) ? $ev['texts'] : [];
+
+            if ($type === 1) {
+                // Gol. Autogol si el jugador tiene own_goals>0; penal si hay type 7 gemelo.
+                if ($jn !== '' && isset($ownGoal[$tn][$jn])) {
+                    $tipo = 'Gol en propia meta';
+                    $avisoAutogol .= '⚠️ Autogol detectado (dorsal ' . $jn . ', min ' . $min . '). Verificar acreditación.<br>';
+                } elseif (isset($penales[$tn . '|' . $jn . '|' . $min])) {
+                    $tipo = 'Penal';
+                } else {
+                    $tipo = 'Gol';
+                }
+                $addInc($tn, 'j:' . $jn, $tipo, $min);
+            } elseif ($type === 4) {
+                $addInc($tn, 'j:' . $jn, 'Tarjeta amarilla', $min);
+            } elseif ($type === 6) {
+                $rt   = isset($redType[$tn][$jn]) ? $redType[$tn][$jn] : -1;
+                $tipo = ($rt === 2) ? 'Expulsado por doble amarilla' : 'Tarjeta roja';
+                $addInc($tn, 'j:' . $jn, $tipo, $min);
+            } elseif ($type === 15) {
+                // texts[0] = entra, texts[1] = sale. Sin dorsal -> se matchea por nombre.
+                if (isset($texts[0]) && $texts[0] !== '') $addInc($tn, 'n:' . $norm($texts[0]), 'Entra', $min);
+                if (isset($texts[1]) && $texts[1] !== '') $addInc($tn, 'n:' . $norm($texts[1]), 'Sale', $min);
+            }
+            // type 7 (penal) ya consumido; type 2 es marcador interno de cambio, se ignora.
+        }
+
+        // 4. ARMAR $equipos: cada jugador con sus incidencias (busca por dorsal y por nombre).
+        $armar = function ($tn) use ($roster, $inc, $norm) {
+            $out = [];
+            foreach (['titulares', 'suplentes'] as $grp) {
+                foreach ($roster[$tn][$grp] as $p) {
+                    $incs = [];
+                    if ($p['dorsal'] !== '' && isset($inc[$tn]['j:' . $p['dorsal']])) {
+                        foreach ($inc[$tn]['j:' . $p['dorsal']] as $e) $incs[] = $e;
+                    }
+                    $kN = 'n:' . $norm($p['nombre']);
+                    if (isset($inc[$tn][$kN])) {
+                        foreach ($inc[$tn][$kN] as $e) $incs[] = $e;
+                    }
+                    $out[] = [
+                        'dorsal'      => $p['dorsal'],
+                        'nombre'      => $p['nombre'],
+                        'tipo'        => $p['tipo'],
+                        'incidencias' => $incs,
+                    ];
+                }
+            }
+            return $out;
+        };
+
+        $equipos = [
+            ['equipo' => $strLocal,     'jugadores' => $armar(1)],
+            ['equipo' => $strVisitante, 'jugadores' => $armar(2)],
+        ];
+
+        // 5. ARBITRO (promiedos da solo el principal, en game.game_info[]).
+        $jueces = [];
+        foreach ((isset($g['game_info']) ? $g['game_info'] : []) as $gi) {
+            if (isset($gi['name'], $gi['value']) && stripos($gi['name'], 'rbitro') !== false && trim($gi['value']) !== '') {
+                $jueces[] = ['tipo' => 'Principal', 'nombre' => trim($gi['value'])];
+                break;
+            }
+        }
+
+        // 6. TECNICOS (DT) por equipo.
+        $tecnicos = [
+            ['equipo_id' => $partido->equipol->id, 'equipo' => $strLocal,     'nombre' => $dt[1]],
+            ['equipo_id' => $partido->equipov->id, 'equipo' => $strVisitante, 'nombre' => $dt[2]],
+        ];
+
+        // 7-11. Validar + guardar (logica compartida). juecesEsperados=1: promiedos solo trae el principal.
+        return $this->guardarIncidenciasImportadas(
+            $partido, $fecha, $grupo, $strLocal, $strVisitante,
+            $jueces, $roster[1]['titulares'], $roster[2]['titulares'], $equipos,
+            $avisoAutogol, 1, '', 1, $tecnicos
         );
     }
 

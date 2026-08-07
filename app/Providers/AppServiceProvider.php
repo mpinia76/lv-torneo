@@ -33,5 +33,6 @@ class AppServiceProvider extends ServiceProvider
                 Log::debug("DB: " . $query->sql . "[".  implode(",",$query->bindings). "]");
             });*/
         DB::statement("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));");
+
     }
 }
