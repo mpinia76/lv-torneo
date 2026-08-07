@@ -663,6 +663,9 @@ class FechaController extends Controller
                                         $nro = str_replace('. Jornada', '', $fechaNumero); // Elimina ". Jornada"
                                         $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
 
+                                        // 'orden' solo si la fecha es numérica (las fases no se tocan).
+                                        $ordenFecha = $this->ordenFecha($nro);
+
                                         $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
 
                                         try {
@@ -674,11 +677,15 @@ class FechaController extends Controller
                                                     'numero'=>$nro,
                                                     'grupo_id'=>$grupo_id
                                                 );
+                                                if ($ordenFecha !== null) $data1['orden'] = $ordenFecha;
                                                 //Log::debug(print_r($data1),[]);
                                                 //Log::debug(print_r($data1, true));
                                                 $fecha = fecha::create($data1);
 
 
+                                            } elseif ($ordenFecha !== null && (int) $fecha->orden !== (int) $ordenFecha) {
+                                                $fecha->orden = $ordenFecha;
+                                                $fecha->save();
                                             }
                                             $lastid=$fecha->id;
 
@@ -1075,6 +1082,9 @@ class FechaController extends Controller
                                         $nro = str_replace('. Jornada', '', $fechaNumero); // Elimina ". Jornada"
                                         $nro= str_pad($nro, 2, "0", STR_PAD_LEFT);
 
+                                        // 'orden' solo si la fecha es numérica (las fases no se tocan).
+                                        $ordenFecha = $this->ordenFecha($nro);
+
                                         $fecha=Fecha::where('grupo_id','=',"$grupo_id")->where('numero','=',"$nro")->first();
 
                                         try {
@@ -1086,11 +1096,15 @@ class FechaController extends Controller
                                                     'numero'=>$nro,
                                                     'grupo_id'=>$grupo_id
                                                 );
+                                                if ($ordenFecha !== null) $data1['orden'] = $ordenFecha;
                                                 //Log::debug(print_r($data1),[]);
                                                 //Log::debug(print_r($data1, true));
                                                 $fecha = fecha::create($data1);
 
 
+                                            } elseif ($ordenFecha !== null && (int) $fecha->orden !== (int) $ordenFecha) {
+                                                $fecha->orden = $ordenFecha;
+                                                $fecha->save();
                                             }
                                             $lastid=$fecha->id;
 
@@ -1534,13 +1548,22 @@ class FechaController extends Controller
                 ->with('error', 'No se pudo extraer el ID de liga de la URL de promiedos.');
         }
 
-        // Numero de fecha a importar (una por vez).
-        $numeroFecha = (int) preg_replace('/\D/', '', (string) $request->get('fecha_pm'));
-        if ($numeroFecha <= 0) {
+        // Fecha o fase a importar (una por vez): un número ("5") o una fase ("Cuartos de final").
+        $entradaFecha = trim((string) $request->get('fecha_pm'));
+        if ($entradaFecha === '') {
             return redirect()->route('fechas.index', array('grupoId' => $grupoId))
-                ->with('error', 'Indicá el número de fecha a importar de promiedos.');
+                ->with('error', 'Indicá la fecha (número) o la fase (ej: Cuartos de final) a importar.');
         }
-        $nro = str_pad($numeroFecha, 2, '0', STR_PAD_LEFT);
+        $esNumero = (bool) preg_match('/^\d+$/', $entradaFecha);
+        $numFecha = $esNumero ? (int) $entradaFecha : 0;
+
+        // Normalizador (saca acentos, paréntesis, espacios y puntuación). Se reusa para
+        // matchear la fase y, más abajo, los nombres de equipos.
+        $norm = function ($s) {
+            $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $s);
+            $s = strtolower($s);
+            return preg_replace('/[^a-z0-9]/', '', $s);
+        };
 
         $base = 'https://api.promiedos.com.ar';
         $hdr  = array('X-VER: 1.11.7.5', 'Referer: https://www.promiedos.com.ar/');
@@ -1552,39 +1575,55 @@ class FechaController extends Controller
             return redirect()->route('fechas.index', array('grupoId' => $grupoId))
                 ->with('error', 'No se pudo leer el fixture de promiedos para la liga "' . $ligaId . '".');
         }
-        $key = '';
+        // Puede haber varias fechas/fases con el mismo nombre (Apertura y Clausura comparten
+        // nombres). El torneo ACTUAL es el de stage más alto: clave "72_228_{stage}_{fecha}".
+        // Si pediste un número -> "Fecha N"; si pediste texto -> la fase (ej "Cuartos de Final").
+        $key = ''; $bestStage = -1; $nombreFecha = '';
+        $ne = $norm($entradaFecha);
         foreach ($filtros as $f) {
-            if (isset($f['name'], $f['key'])
-                && preg_match('/Fecha\s+(\d+)/i', $f['name'], $mm)
-                && (int) $mm[1] === $numeroFecha) {
-                $key = $f['key'];
-                break;
+            if (!isset($f['name'], $f['key'])) continue;
+            $nombre = $f['name'];
+            if ($nombre === '' || $f['key'] === 'latest') continue;
+
+            $coincide = false;
+            if ($esNumero) {
+                if (preg_match('/Fecha\s+(\d+)/i', $nombre, $mm) && (int) $mm[1] === $numFecha) {
+                    $coincide = true;
+                }
+            } else {
+                // Fase: el nombre del filtro EMPIEZA con lo que escribiste (evita que
+                // "final" matchee "semifinales" o "cuartos de final").
+                if ($ne !== '' && strpos($norm($nombre), $ne) === 0) $coincide = true;
             }
+            if (!$coincide) continue;
+
+            $parts = explode('_', $f['key']);
+            $stage = (count($parts) >= 2) ? (int) $parts[count($parts) - 2] : 0; // penúltimo = stage
+            if ($stage > $bestStage) { $bestStage = $stage; $key = $f['key']; $nombreFecha = $nombre; }
         }
         if ($key === '') {
             return redirect()->route('fechas.index', array('grupoId' => $grupoId))
-                ->with('error', 'No se encontró la Fecha ' . $numeroFecha . ' en promiedos para esa liga.');
+                ->with('error', 'No se encontró "' . $entradaFecha . '" en promiedos para esa liga.');
         }
+
+        // numero de la Fecha: número padded ("05") o el nombre de la fase ("Cuartos de Final").
+        // orden: el número si es numérica; si es fase, un rango que la ubica DESPUÉS de las fechas.
+        $nro        = $esNumero ? str_pad($numFecha, 2, '0', STR_PAD_LEFT) : $nombreFecha;
+        $orden      = $this->ordenFecha($esNumero ? (string) $numFecha : $nombreFecha);
+        $fechaLabel = $esNumero ? ('Fecha ' . $numFecha) : $nombreFecha;
 
         // 2. Partidos de esa fecha.
         $round = HttpHelper::getJson($base . '/league/games/' . rawurlencode($ligaId) . '/' . rawurlencode($key), $hdr);
         if (!$round || empty($round['games'])) {
             return redirect()->route('fechas.index', array('grupoId' => $grupoId))
-                ->with('error', 'No se obtuvieron partidos de la Fecha ' . $numeroFecha . ' de promiedos.');
+                ->with('error', 'No se obtuvieron partidos de "' . $fechaLabel . '" de promiedos.');
         }
 
         $verificado = $request->get('verificado');
 
-        // Equipos del torneo (con plantilla en algún grupo), indexados por nombre
-        // normalizado, para matchear los nombres de promiedos (que difieren de tu base,
-        // que está al estilo livefutbol). La normalización saca acentos, paréntesis,
-        // espacios y puntuación: así "Sarmiento Junín" (promiedos) matchea
-        // "Sarmiento (Junín)" (tu base) sin necesidad de alias.
-        $norm = function ($s) {
-            $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $s);
-            $s = strtolower($s);
-            return preg_replace('/[^a-z0-9]/', '', $s);
-        };
+        // Equipos del torneo (con plantilla en algún grupo), indexados por nombre normalizado
+        // (reusa $norm de arriba) para matchear los nombres de promiedos, que difieren de tu
+        // base (estilo livefutbol): "Sarmiento Junín" -> "Sarmiento (Junín)".
         $idsTorneo   = Plantilla::whereIn('grupo_id', $grupos)->pluck('equipo_id')->unique()->toArray();
         $mapaEquipos = array();
         foreach (Equipo::whereIn('id', $idsTorneo)->get() as $e) {
@@ -1670,7 +1709,8 @@ class FechaController extends Controller
                 'grupoId'     => $grupoId,
                 'grupo'       => $grupo,
                 'url2'        => $url,
-                'numeroFecha' => $numeroFecha,
+                'fechaLabel'  => $fechaLabel,   // para mostrar (ej "Fecha 5" o "Cuartos de Final")
+                'fechaInput'  => $entradaFecha,  // lo que se reenvía en fecha_pm
                 'verificado'  => $verificado,
                 'pendientes'  => $pendientes,
             ));
@@ -1688,10 +1728,12 @@ class FechaController extends Controller
             // dia: "DD-MM-YYYY HH:MM" -> "YYYY-MM-DD HH:MM:00"
             $dia = $this->pmFecha(isset($gm['start_time']) ? $gm['start_time'] : '');
 
-            // Resultado: solo si el partido ya tiene marcador. Fase de liga ("Fecha N")
-            // no tiene penales, por eso quedan en null.
+            // Resultado: SOLO si el partido no está programado (status enum 1 = "Prog.").
+            // Los partidos que no se jugaron quedan sin resultado (null). Fase de liga
+            // ("Fecha N") no tiene penales, por eso quedan en null.
             $golesL = null; $golesV = null; $penalesL = null; $penalesV = null;
-            if (isset($gm['scores'][0], $gm['scores'][1])) {
+            $enum = isset($gm['status']['enum']) ? (int) $gm['status']['enum'] : 0;
+            if ($enum !== 1 && isset($gm['scores'][0], $gm['scores'][1])) {
                 $golesL = (int) $gm['scores'][0];
                 $golesV = (int) $gm['scores'][1];
             }
@@ -1699,7 +1741,7 @@ class FechaController extends Controller
             // --- LOCAL: automático + lo que elegiste a mano ---
             $eqLocal = $resolverFull($gm['teams'][0]);
             if (!$eqLocal) {
-                $error .= 'Equipo NO encontrado: Fecha ' . $numeroFecha . ' - ' . $strEquipoL . '<br>';
+                $error .= 'Equipo NO encontrado: ' . $fechaLabel . ' - ' . $strEquipoL . '<br>';
                 $ok = 0;
                 continue;
             }
@@ -1708,16 +1750,21 @@ class FechaController extends Controller
             // --- VISITANTE: idem ---
             $eqVisita = $resolverFull($gm['teams'][1]);
             if (!$eqVisita) {
-                $error .= 'Equipo NO encontrado: Fecha ' . $numeroFecha . ' - ' . $strEquipoV . '<br>';
+                $error .= 'Equipo NO encontrado: ' . $fechaLabel . ' - ' . $strEquipoV . '<br>';
                 $ok = 0;
                 continue;
             }
             $idVisitante = $eqVisita->id;
 
-            // Fecha (por numero + grupo).
+            // Fecha (por numero + grupo). El 'orden' solo se guarda si la fecha es numérica.
             $fecha = Fecha::where('grupo_id', '=', "$grupoId")->where('numero', '=', "$nro")->first();
             if (!$fecha) {
-                $fecha = Fecha::create(array('numero' => $nro, 'grupo_id' => $grupoId));
+                $datosFecha = array('numero' => $nro, 'grupo_id' => $grupoId);
+                if ($orden !== null) $datosFecha['orden'] = $orden;
+                $fecha = Fecha::create($datosFecha);
+            } elseif ($orden !== null && (int) $fecha->orden !== (int) $orden) {
+                $fecha->orden = $orden;
+                $fecha->save();
             }
             $lastid = $fecha->id;
 
@@ -1790,7 +1837,7 @@ class FechaController extends Controller
 
         if ($ok && trim($success) === '' && trim($error) === '') {
             $ok = 0;
-            $error = 'No se importó ningún partido de la Fecha ' . $numeroFecha . '. Revisá la URL o que los equipos tengan plantilla en el torneo.';
+            $error = 'No se importó ningún partido de "' . $fechaLabel . '". Revisá la URL o que los equipos tengan plantilla en el torneo.';
         }
 
         if ($ok) {
@@ -1804,6 +1851,19 @@ class FechaController extends Controller
         }
 
         return redirect()->route('fechas.index', array('grupoId' => $grupoId))->with($respuestaID, $respuestaMSJ);
+    }
+
+    /**
+     * Orden de una Fecha para ordenarlas en la zona (campo 'orden').
+     * - Si es numérica ("5" / "05") -> el número (1..N).
+     * - Si NO es numérica (una fase: "Cuartos de final", "Octavos", etc.) -> null:
+     *   no se guarda orden. Compartido por el import de promiedos y el de livefutbol.
+     */
+    private function ordenFecha($numero)
+    {
+        $numero = trim((string) $numero);
+        if (preg_match('/^\d+$/', $numero)) return (int) $numero; // solo numéricas
+        return null; // fases: no se toca el orden
     }
 
     /**

@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="container">
-        <h1 class="display-6">Resolver equipos — Fecha {{ $numeroFecha }} ({{ $grupo->nombre }} de {{ $grupo->torneo->nombre }} {{ $grupo->torneo->year }})</h1>
+        <h1 class="display-6">Resolver equipos — {{ $fechaLabel }} ({{ $grupo->nombre }} de {{ $grupo->torneo->nombre }} {{ $grupo->torneo->year }})</h1>
 
         <hr/>
 
@@ -19,7 +19,7 @@
         {{ Form::hidden('url2', $url2) }}
         {{ Form::hidden('grupoSelect_id', $grupoId) }}
         {{ Form::hidden('grupo_id', $grupoId) }}
-        {{ Form::hidden('fecha_pm', $numeroFecha) }}
+        {{ Form::hidden('fecha_pm', $fechaInput) }}
         @if($verificado)
             {{ Form::hidden('verificado', 1) }}
         @endif
@@ -37,9 +37,8 @@
                     <td>{{ $p['nombre'] }}</td>
                     <td>
                         <select name="pm_map[{{ $p['key'] }}]" class="form-control" required>
-                            <option value="">— elegir equipo —</option>
                             @foreach($p['opciones'] as $op)
-                                <option value="{{ $op['id'] }}">{{ $op['nombre'] }}</option>
+                                <option value="{{ $op['id'] }}" {{ $loop->first ? 'selected' : '' }}>{{ $op['nombre'] }}</option>
                             @endforeach
                         </select>
                     </td>
