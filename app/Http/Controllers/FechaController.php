@@ -1717,7 +1717,7 @@ class FechaController extends Controller
         }
 
         DB::beginTransaction();
-        $ok = 1; $success = ''; $error = '';
+        $ok = 1; $success = ''; $error = ''; $guardados = 0;
 
         foreach ($round['games'] as $gm) {
             if (empty($gm['teams'][0]['name']) || empty($gm['teams'][1]['name'])) continue;
@@ -1820,6 +1820,7 @@ class FechaController extends Controller
                     } else {
                         $partido = Partido::create($data2);
                     }
+                    $guardados++;
                 } catch (QueryException $ex) {
                     if ($ex->errorInfo[1] == 1062) { // Duplicate entry
                         $success .= 'Equipo repetido en partido ' . $strEquipoL . ' - ' . $strEquipoV . '<br>';
@@ -1835,7 +1836,7 @@ class FechaController extends Controller
             }
         }
 
-        if ($ok && trim($success) === '' && trim($error) === '') {
+        if ($ok && $guardados === 0 && trim($success) === '' && trim($error) === '') {
             $ok = 0;
             $error = 'No se importó ningún partido de "' . $fechaLabel . '". Revisá la URL o que los equipos tengan plantilla en el torneo.';
         }
