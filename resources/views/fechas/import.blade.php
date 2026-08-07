@@ -44,9 +44,14 @@
                 {{ Form::label('grupoSelect_id', 'Grupo') }}
                 {{ Form::select('grupoSelect_id', $grupos, $grupo->id, ['class' => 'form-control']) }}
             </div>
-            <div class="form-group col-xs-12 col-sm-6 col-md-6">
-                {{ Form::label('url2', 'URL') }}
-                {{ Form::text('url2', '', ['class' => 'form-control']) }}
+            <div class="form-group col-xs-12 col-sm-6 col-md-5">
+                {{ Form::label('url2', 'URL (livefutbol o promiedos)') }}
+                {{ Form::text('url2', '', ['class' => 'form-control', 'placeholder' => 'https://www.promiedos.com.ar/league/liga-profesional/hc']) }}
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('fecha_pm', 'Fecha Nº') }}
+                {{ Form::text('fecha_pm', '', ['class' => 'form-control', 'placeholder' => 'ej: 5']) }}
+                <small class="text-muted">Solo promiedos</small>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{ Form::label('verificado', 'Verificar grupo', ['class' => 'control-label']) }}
@@ -56,8 +61,6 @@
                     </label>
                 </div>
             </div>
-
-
         </div>
 
         <!-- build the submission button -->

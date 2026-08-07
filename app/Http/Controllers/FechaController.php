@@ -1229,8 +1229,12 @@ class FechaController extends Controller
 
         set_time_limit(0);
 
-
         $url2 = $request->get('url2');
+
+        // Promiedos: si la URL es de promiedos, importa esa fecha desde la API (Opta).
+        if ($url2 && strpos($url2, 'promiedos') !== false) {
+            return $this->importprocess_PM($request);
+        }
 
         if ($url2){
             return $this->importprocess_new($request);
@@ -1499,6 +1503,236 @@ class FechaController extends Controller
 
         //
         return redirect()->route('fechas.index', array('grupoId' => $grupo_id))->with($respuestaID,$respuestaMSJ);
+    }
+
+    /**
+     * Importa los partidos de TODAS las fechas del grupo desde PROMIEDOS.
+     * Reemplaza al CSV / a la URL de livefutbol: con el ID de liga guardado en el
+     * grupo (ej "hc" Liga Prof., "bac" Libertadores, "dij" Sudamericana) recorre
+     * los filtros de fecha de la liga y, por cada "Fecha N", baja los partidos
+     * (equipos, dia y resultado) y crea/actualiza Fecha + Partido. Mantiene el
+     * matcheo de equipos por nombre y el filtro "Verificar grupo" del CSV.
+     */
+    public function importprocess_PM(Request $request)
+    {
+        set_time_limit(0);
+
+        // Grupo destino (igual que livefutbol: grupoSelect_id).
+        $grupoId = $request->get('grupoSelect_id') ?? $request->query('grupoId') ?? $request->get('grupo_id');
+        $grupo   = Grupo::findOrFail($grupoId);
+        $torneo  = Torneo::findOrFail($grupo->torneo->id);
+        $grupos  = Grupo::where('torneo_id', '=', $grupo->torneo->id)->pluck('id')->toArray();
+
+        // ID de liga desde la URL pegada: /league/{slug}/{ligaId} (ej: .../liga-profesional/hc).
+        $url  = rtrim(trim($request->get('url2')), '/');
+        $path = parse_url($url, PHP_URL_PATH);
+        $path = ($path !== null && $path !== false) ? $path : $url;
+        $segs = array_values(array_filter(explode('/', $path), function ($s) { return $s !== ''; }));
+        $ligaId = !empty($segs) ? end($segs) : '';
+        if (!preg_match('/^[a-z0-9]{2,12}$/', $ligaId)) {
+            return redirect()->route('fechas.index', array('grupoId' => $grupoId))
+                ->with('error', 'No se pudo extraer el ID de liga de la URL de promiedos.');
+        }
+
+        // Numero de fecha a importar (una por vez).
+        $numeroFecha = (int) preg_replace('/\D/', '', (string) $request->get('fecha_pm'));
+        if ($numeroFecha <= 0) {
+            return redirect()->route('fechas.index', array('grupoId' => $grupoId))
+                ->with('error', 'Indicá el número de fecha a importar de promiedos.');
+        }
+        $nro = str_pad($numeroFecha, 2, '0', STR_PAD_LEFT);
+
+        $base = 'https://api.promiedos.com.ar';
+        $hdr  = array('X-VER: 1.11.7.5', 'Referer: https://www.promiedos.com.ar/');
+
+        // 1. Buscar la clave de esa fecha en los filtros de la liga (viven en games.filters).
+        $liga = HttpHelper::getJson($base . '/league/tables_and_fixtures/' . rawurlencode($ligaId), $hdr);
+        $filtros = isset($liga['games']['filters']) ? $liga['games']['filters'] : array();
+        if (empty($filtros)) {
+            return redirect()->route('fechas.index', array('grupoId' => $grupoId))
+                ->with('error', 'No se pudo leer el fixture de promiedos para la liga "' . $ligaId . '".');
+        }
+        $key = '';
+        foreach ($filtros as $f) {
+            if (isset($f['name'], $f['key'])
+                && preg_match('/Fecha\s+(\d+)/i', $f['name'], $mm)
+                && (int) $mm[1] === $numeroFecha) {
+                $key = $f['key'];
+                break;
+            }
+        }
+        if ($key === '') {
+            return redirect()->route('fechas.index', array('grupoId' => $grupoId))
+                ->with('error', 'No se encontró la Fecha ' . $numeroFecha . ' en promiedos para esa liga.');
+        }
+
+        // 2. Partidos de esa fecha.
+        $round = HttpHelper::getJson($base . '/league/games/' . rawurlencode($ligaId) . '/' . rawurlencode($key), $hdr);
+        if (!$round || empty($round['games'])) {
+            return redirect()->route('fechas.index', array('grupoId' => $grupoId))
+                ->with('error', 'No se obtuvieron partidos de la Fecha ' . $numeroFecha . ' de promiedos.');
+        }
+
+        $verificado = $request->get('verificado');
+
+        DB::beginTransaction();
+        $ok = 1; $success = ''; $error = '';
+
+        foreach ($round['games'] as $gm) {
+            if (empty($gm['teams'][0]['name']) || empty($gm['teams'][1]['name'])) continue;
+
+            $strEquipoL = trim($gm['teams'][0]['name']);
+            $strEquipoV = trim($gm['teams'][1]['name']);
+
+            // dia: "DD-MM-YYYY HH:MM" -> "YYYY-MM-DD HH:MM:00"
+            $dia = $this->pmFecha(isset($gm['start_time']) ? $gm['start_time'] : '');
+
+            // Resultado: solo si el partido ya tiene marcador. Fase de liga ("Fecha N")
+            // no tiene penales, por eso quedan en null.
+            $golesL = null; $golesV = null; $penalesL = null; $penalesV = null;
+            if (isset($gm['scores'][0], $gm['scores'][1])) {
+                $golesL = (int) $gm['scores'][0];
+                $golesV = (int) $gm['scores'][1];
+            }
+
+            // --- LOCAL: resolver via plantilla del torneo (igual que livefutbol) ---
+            $equipol = Equipo::where('nombre', 'like', "%$strEquipoL%")->get();
+            if ($equipol->isEmpty()) {
+                $error .= 'Equipo NO encontrado: Fecha ' . $numeroFecha . ' - ' . $strEquipoL . '<br>';
+                $ok = 0;
+                continue;
+            }
+            $plantillaL = Plantilla::whereIn('grupo_id', $grupos)
+                ->whereIn('equipo_id', $equipol->pluck('id')->toArray())
+                ->first();
+            if (!$plantillaL) {
+                $error .= 'Equipo sin plantilla: ' . $strEquipoL . '<br>';
+                $ok = 0;
+                continue;
+            }
+            $idLocal = $plantillaL->equipo->id;
+
+            // --- VISITANTE: idem ---
+            $equipoV = Equipo::where('nombre', 'like', "%$strEquipoV%")->get();
+            if ($equipoV->isEmpty()) {
+                $error .= 'Equipo NO encontrado: Fecha ' . $numeroFecha . ' - ' . $strEquipoV . '<br>';
+                $ok = 0;
+                continue;
+            }
+            $plantillaV = Plantilla::whereIn('grupo_id', $grupos)
+                ->whereIn('equipo_id', $equipoV->pluck('id')->toArray())
+                ->first();
+            if (!$plantillaV) {
+                $error .= 'Equipo sin plantilla: ' . $strEquipoV . '<br>';
+                $ok = 0;
+                continue;
+            }
+            $idVisitante = $plantillaV->equipo->id;
+
+            // Fecha (por numero + grupo).
+            $fecha = Fecha::where('grupo_id', '=', "$grupoId")->where('numero', '=', "$nro")->first();
+            if (!$fecha) {
+                $fecha = Fecha::create(array('numero' => $nro, 'grupo_id' => $grupoId));
+            }
+            $lastid = $fecha->id;
+
+            $data2 = array(
+                'fecha_id'   => $lastid,
+                'dia'        => $dia,
+                'equipol_id' => $idLocal,
+                'equipov_id' => $idVisitante,
+                'golesl'     => $golesL,
+                'golesv'     => $golesV,
+                'penalesl'   => $penalesL,
+                'penalesv'   => $penalesV,
+                'neutral'    => $torneo->neutral,
+            );
+
+            // --- Verificar grupo: idéntico a livefutbol ---
+            $guardarPartido = true;
+            if ($verificado) {
+                $guardarPartido = false;
+                $plantillaLocalGrupo = Plantilla::where('grupo_id', $grupoId)
+                    ->where('equipo_id', $idLocal)
+                    ->exists();
+                $plantillaVisitanteGrupo = Plantilla::where('grupo_id', $grupoId)
+                    ->where('equipo_id', $idVisitante)
+                    ->exists();
+
+                if ($plantillaLocalGrupo && $plantillaVisitanteGrupo) {
+                    $guardarPartido = true;
+                } elseif (
+                    ($plantillaLocalGrupo && !$plantillaVisitanteGrupo) ||
+                    (!$plantillaLocalGrupo && $plantillaVisitanteGrupo)
+                ) {
+                    $partidoExistente = Partido::whereDate('dia', $dia)
+                        ->where(function ($q) use ($idLocal, $idVisitante) {
+                            $q->where(function ($q2) use ($idLocal, $idVisitante) {
+                                $q2->where('equipol_id', $idLocal)->where('equipov_id', $idVisitante);
+                            })->orWhere(function ($q2) use ($idLocal, $idVisitante) {
+                                $q2->where('equipol_id', $idVisitante)->where('equipov_id', $idLocal);
+                            });
+                        })->exists();
+                    if (!$partidoExistente) { $guardarPartido = true; }
+                }
+            }
+
+            if ($guardarPartido) {
+                $partido = Partido::where('fecha_id', '=', "$lastid")
+                    ->where('equipol_id', '=', "$idLocal")
+                    ->where('equipov_id', '=', "$idVisitante")
+                    ->first();
+                try {
+                    if (!empty($partido)) {
+                        $partido->update($data2);
+                    } else {
+                        $partido = Partido::create($data2);
+                    }
+                } catch (QueryException $ex) {
+                    if ($ex->errorInfo[1] == 1062) { // Duplicate entry
+                        $success .= 'Equipo repetido en partido ' . $strEquipoL . ' - ' . $strEquipoV . '<br>';
+                        $ok = 1;
+                    } else {
+                        $error = $ex->getMessage();
+                        $ok = 0;
+                    }
+                    continue;
+                }
+            } else {
+                $success .= 'No se guardo el partido ' . $strEquipoL . ' - ' . $strEquipoV . '<br>';
+            }
+        }
+
+        if ($ok && trim($success) === '' && trim($error) === '') {
+            $ok = 0;
+            $error = 'No se importó ningún partido de la Fecha ' . $numeroFecha . '. Revisá la URL o que los equipos tengan plantilla en el torneo.';
+        }
+
+        if ($ok) {
+            DB::commit();
+            $respuestaID = 'success';
+            $respuestaMSJ = $success;
+        } else {
+            DB::rollback();
+            $respuestaID = 'error';
+            $respuestaMSJ = $error;
+        }
+
+        return redirect()->route('fechas.index', array('grupoId' => $grupoId))->with($respuestaID, $respuestaMSJ);
+    }
+
+    /**
+     * Convierte "DD-MM-YYYY HH:MM" (promiedos) a "YYYY-MM-DD HH:MM:00".
+     */
+    private function pmFecha($startTime)
+    {
+        $startTime = trim((string) $startTime);
+        if ($startTime === '') return null;
+        if (preg_match('#^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{1,2}):(\d{2}))?#', $startTime, $m)) {
+            $hora = (isset($m[4]) && $m[4] !== '') ? sprintf('%02d:%02d:00', (int) $m[4], (int) $m[5]) : '00:00:00';
+            return $m[3] . '-' . $m[2] . '-' . $m[1] . ' ' . $hora;
+        }
+        return null;
     }
 
     public function importincidenciasprocess(Request $request)
