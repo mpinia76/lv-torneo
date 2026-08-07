@@ -1866,8 +1866,18 @@ class FechaController extends Controller
         return null; // fases: no se toca el orden
     }
 
+    // Corrección horaria del import de promiedos.
+    // Promiedos localiza la hora del partido según la IP de quien consulta. Desde el
+    // navegador (Argentina) devuelve la hora correcta —por eso el CSV anda bien—, pero
+    // desde el servidor (fuera de Argentina) la devuelve 2 horas MENOS. Por eso al
+    // importar se le suman 2 horas. Solo afecta a promiedos (no al CSV ni a livefutbol).
+    // NOTA: si alguna vez las horas quedan corridas (ej: por horario de verano de la
+    // zona del servidor), ajustar este valor.
+    const PM_HORAS_CORRECCION = 2;
+
     /**
-     * Convierte "DD-MM-YYYY HH:MM" (promiedos) a "YYYY-MM-DD HH:MM:00".
+     * Convierte "DD-MM-YYYY HH:MM" (promiedos) a "YYYY-MM-DD HH:MM:00",
+     * aplicando la corrección horaria PM_HORAS_CORRECCION.
      */
     private function pmFecha($startTime)
     {
@@ -1875,7 +1885,19 @@ class FechaController extends Controller
         if ($startTime === '') return null;
         if (preg_match('#^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{1,2}):(\d{2}))?#', $startTime, $m)) {
             $hora = (isset($m[4]) && $m[4] !== '') ? sprintf('%02d:%02d:00', (int) $m[4], (int) $m[5]) : '00:00:00';
-            return $m[3] . '-' . $m[2] . '-' . $m[1] . ' ' . $hora;
+            $iso  = $m[3] . '-' . $m[2] . '-' . $m[1] . ' ' . $hora;
+
+            if (self::PM_HORAS_CORRECCION !== 0) {
+                try {
+                    $dt = new \DateTime($iso);
+                    $signo = self::PM_HORAS_CORRECCION >= 0 ? '+' : '-';
+                    $dt->modify($signo . abs(self::PM_HORAS_CORRECCION) . ' hours');
+                    return $dt->format('Y-m-d H:i:s');
+                } catch (\Exception $e) {
+                    return $iso;
+                }
+            }
+            return $iso;
         }
         return null;
     }
