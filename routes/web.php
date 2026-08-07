@@ -286,13 +286,14 @@ Route::get('/ejecutar-actualizar-nombres', function (Request $request) {
 
 /*
 |--------------------------------------------------------------------------
-| TEMPORAL: diagnostico de conectividad a la API de ESPN desde el servidor.
-| Objetivo: ver si la IP del cPanel puede leer site.api.espn.com sin proxy.
-| Uso: https://TU-DOMINIO/espn-test?token=Zp4rV9kN2qM7LbXy
+| TEMPORAL: diagnostico de conectividad a la API de PROMIEDOS desde el server.
+| Objetivo: confirmar que la IP del cPanel puede leer api.promiedos.com.ar
+| (fuente candidata para el import de partidos). Con ESPN el server dio 403.
+| Uso: https://TU-DOMINIO/fuentes-test?token=Zp4rV9kN2qM7LbXy
 | BORRAR esta ruta despues de decidir la fuente.
 |--------------------------------------------------------------------------
 */
-Route::get('/espn-test', function (Request $request) {
+Route::get('/fuentes-test', function (Request $request) {
     if ($request->query('token') !== 'Zp4rV9kN2qM7LbXy') {
         abort(403, 'Acceso no autorizado');
     }
@@ -311,7 +312,8 @@ Route::get('/espn-test', function (Request $request) {
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept: application/json',
-            'Referer: https://www.espn.com/',
+            'X-VER: 1.11.7.5',
+            'Referer: https://www.promiedos.com.ar/',
         ));
         $body = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -320,57 +322,55 @@ Route::get('/espn-test', function (Request $request) {
         return array('code' => $code, 'body' => $body, 'err' => $err);
     };
 
-    $out  = "=== TEST ESPN API desde el servidor ===\n";
+    $base = 'https://api.promiedos.com.ar';
+    $out  = "=== TEST PROMIEDOS API desde el servidor ===\n";
     $out .= 'PHP: ' . PHP_VERSION . ' | curl: ' . (function_exists('curl_init') ? 'SI' : 'NO') . "\n\n";
 
-    $ligas = array(
-        'Liga Profesional (arg.1)'     => 'https://site.api.espn.com/apis/site/v2/sports/soccer/arg.1/scoreboard',
-        'Libertadores (conmebol.lib)'  => 'https://site.api.espn.com/apis/site/v2/sports/soccer/conmebol.libertadores/scoreboard',
-        'Sudamericana (conmebol.suda)' => 'https://site.api.espn.com/apis/site/v2/sports/soccer/conmebol.sudamericana/scoreboard',
-    );
+    // 1) Partidos de hoy (lista) -> prueba de conectividad basica.
+    $r   = $fetch($base . '/games/today');
+    $len = is_string($r['body']) ? strlen($r['body']) : 0;
+    $out .= "[/games/today] -> HTTP {$r['code']} | bytes: $len";
+    if ($r['err']) $out .= " | error: {$r['err']}";
+    $out .= "\n\n";
 
-    $primerEventId = null;
+    // 2) Detalle de un partido FINALIZADO conocido (Sarmiento 2-1 Ind. Rivadavia).
+    //    Confirma si trae alineaciones, eventos, goles, arbitro y estadio.
+    $gid = 'egdddje';
+    $r   = $fetch($base . '/gamecenter/' . $gid);
+    $out .= "[/gamecenter/$gid] -> HTTP {$r['code']} | bytes: " . strlen((string) $r['body']) . "\n";
 
-    foreach ($ligas as $nombre => $url) {
-        $r   = $fetch($url);
-        $len = is_string($r['body']) ? strlen($r['body']) : 0;
-        $out .= "[$nombre] -> HTTP {$r['code']} | bytes: $len";
-        if ($r['err']) $out .= " | error: {$r['err']}";
-        $out .= "\n";
+    if ($r['code'] == 200) {
+        $j = json_decode($r['body'], true);
+        $g = isset($j['game']) ? $j['game'] : array();
 
-        if ($r['code'] == 200 && $len > 0) {
-            $json = json_decode($r['body'], true);
-            if (isset($json['events']) && is_array($json['events'])) {
-                $out .= '   eventos en el scoreboard: ' . count($json['events']) . "\n";
-                foreach ($json['events'] as $ev) {
-                    $ename = isset($ev['name']) ? $ev['name'] : '(sin nombre)';
-                    $eid   = isset($ev['id']) ? $ev['id'] : '?';
-                    $out  .= "   - id=$eid | $ename\n";
-                    if ($primerEventId === null) $primerEventId = $eid;
+        $tieneAlin   = isset($g['lineups']['teams'][0]['starting']);
+        $tieneEventos = isset($g['events']) && is_array($g['events']);
+        $tieneGoles  = isset($g['teams'][0]['goals']);
+
+        // Arbitro/estadio viven en game_info: [{name, value}, ...]
+        $arbitro = null; $estadio = null;
+        if (isset($g['game_info']) && is_array($g['game_info'])) {
+            foreach ($g['game_info'] as $gi) {
+                if (isset($gi['name'], $gi['value'])) {
+                    if (stripos($gi['name'], 'rbitro') !== false) $arbitro = $gi['value'];
+                    if (stripos($gi['name'], 'stadio') !== false) $estadio = $gi['value'];
                 }
             }
         }
-        $out .= "\n";
-    }
 
-    if ($primerEventId !== null) {
-        $out .= "=== DETALLE del partido id=$primerEventId (summary) ===\n";
-        $sumUrl = 'https://site.api.espn.com/apis/site/v2/sports/soccer/arg.1/summary?event=' . urlencode($primerEventId);
-        $r = $fetch($sumUrl);
-        $out .= "summary -> HTTP {$r['code']}\n";
-        if ($r['code'] == 200) {
-            $j = json_decode($r['body'], true);
-            $out .= '  rosters (alineaciones): ' . (isset($j['rosters']) ? 'SI (' . count($j['rosters']) . ')' : 'no') . "\n";
-            $out .= '  keyEvents (goles/tarjetas/cambios): ' . (isset($j['keyEvents']) ? 'SI (' . count($j['keyEvents']) . ')' : 'no') . "\n";
-            $out .= '  commentary: ' . (isset($j['commentary']) ? 'SI' : 'no') . "\n";
-            $out .= '  gameInfo.officials (arbitros): ' . (isset($j['gameInfo']['officials']) ? 'SI (' . count($j['gameInfo']['officials']) . ')' : 'no') . "\n";
-        }
-    } else {
-        $out .= "No hubo partidos hoy para sacar un event id de muestra.\n";
-        $out .= "Lo que importa arriba es el HTTP de cada liga (200 = tu server puede leer ESPN).\n";
+        $out .= '  partido: '
+              . (isset($g['teams'][0]['name']) ? $g['teams'][0]['name'] : '?') . ' vs '
+              . (isset($g['teams'][1]['name']) ? $g['teams'][1]['name'] : '?')
+              . ' | resultado: ' . (isset($g['scores']) ? implode('-', $g['scores']) : '?') . "\n";
+        $out .= '  alineaciones: ' . ($tieneAlin ? 'SI' : 'no') . "\n";
+        $out .= '  eventos (goles/tarjetas/cambios): ' . ($tieneEventos ? 'SI' : 'no') . "\n";
+        $out .= '  goles por equipo: ' . ($tieneGoles ? 'SI' : 'no') . "\n";
+        $out .= '  arbitro: ' . ($arbitro !== null ? $arbitro : 'no') . "\n";
+        $out .= '  estadio: ' . ($estadio !== null ? $estadio : 'no') . "\n";
     }
 
     $out .= "\n=== FIN. Acordate de BORRAR esta ruta. ===\n";
+    $out .= "Si arriba ves HTTP 200 y 'alineaciones: SI', tu server puede usar promiedos.\n";
 
     return response($out, 200)->header('Content-Type', 'text/plain; charset=utf-8');
 });
