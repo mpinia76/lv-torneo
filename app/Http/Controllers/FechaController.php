@@ -9539,7 +9539,7 @@ private function normalizarMinuto(string $texto): int
         $roster   = [1 => ['titulares' => [], 'suplentes' => []], 2 => ['titulares' => [], 'suplentes' => []]];
         $dt       = [1 => '', 2 => ''];
         $redType  = [1 => [], 2 => []]; // team_num => [dorsal => red_type]  (2 = doble amarilla)
-        $ownGoal  = [1 => [], 2 => []]; // team_num => [dorsal => true]  (autogol)
+        $ownGoal  = [1 => [], 2 => []]; // team_num => [dorsal => cantidad]  (autogol del jugador)
 
         foreach ($lineupTeams as $lt) {
             $tn = isset($lt['team_num']) ? (int) $lt['team_num'] : 0;
@@ -9562,7 +9562,7 @@ private function normalizarMinuto(string $texto): int
                         $rt = isset($p['events']['cards']['red_type']) ? (int) $p['events']['cards']['red_type'] : -1;
                         $redType[$tn][$dorsal] = $rt;
                         $og = isset($p['events']['goals']['own_goals']) ? (int) $p['events']['goals']['own_goals'] : 0;
-                        if ($og > 0) $ownGoal[$tn][$dorsal] = true;
+                        if ($og > 0) $ownGoal[$tn][$dorsal] = $og;
                     }
                 }
             }
@@ -9585,6 +9585,38 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
+        // ===== DEBUG TEMPORAL (QUITAR): volcado de eventos de gol/penal y de las
+        // estadísticas de goles por jugador, para diagnosticar el import de promiedos. =====
+        $dbgPM = '<hr><b>DEBUG eventos (type 1=gol, 6=roja, 7=penal):</b><br><pre>';
+        foreach ($flat as $ev) {
+            $t = (int) (isset($ev['type']) ? $ev['type'] : 0);
+            if (in_array($t, [1, 6, 7], true)) {
+                $dbgPM .= 'type=' . $t
+                    . ' team=' . (isset($ev['team']) ? $ev['team'] : '?')
+                    . ' jn=' . (isset($ev['player_jersey_num']) ? $ev['player_jersey_num'] : '?')
+                    . ' time=' . (isset($ev['time']) ? $ev['time'] : '?')
+                    . ' texts=' . (isset($ev['texts']) ? json_encode($ev['texts'], JSON_UNESCAPED_UNICODE) : '?')
+                    . "\n";
+            }
+        }
+        $dbgPM .= "\n<b>Stats goles por jugador:</b>\n";
+        foreach ((isset($g['players']['lineups']['teams']) ? $g['players']['lineups']['teams'] : []) as $lt) {
+            $tnD = isset($lt['team_num']) ? (int) $lt['team_num'] : 0;
+            foreach ([['starting'], ['bench']] as $grpD) {
+                foreach ((isset($lt[$grpD[0]]) ? $lt[$grpD[0]] : []) as $p) {
+                    $gls = isset($p['events']['goals']) ? $p['events']['goals'] : null;
+                    if ($gls && array_filter((array) $gls)) {
+                        $dbgPM .= 'team=' . $tnD
+                            . ' dorsal=' . (isset($p['jersey_num']) ? $p['jersey_num'] : '?')
+                            . ' ' . (isset($p['name']) ? $p['name'] : '?')
+                            . ' goals=' . json_encode($gls, JSON_UNESCAPED_UNICODE) . "\n";
+                    }
+                }
+            }
+        }
+        $dbgPM .= '</pre>';
+        // ===== FIN DEBUG TEMPORAL =====
+
         // Minuto: "12'", "45'+2", "90'+3". Suma el adicionado salvo en el 45 (igual criterio que TM).
         $minOf = function ($t) {
             $base = 0; $add = 0;
@@ -9594,12 +9626,19 @@ private function normalizarMinuto(string $texto): int
             return $base;
         };
 
-        // Marcadores de penal (type 7): el gol type 1 gemelo (mismo equipo/dorsal/min) se marca 'Penal'.
-        $penales = [];
+        // Marcadores de penal (type 7): el gol type 1 gemelo (mismo equipo/min) se marca 'Penal'.
+        // Se guardan dos claves: una con dorsal (match exacto) y otra sin dorsal (equipo|min),
+        // porque el marcador de penal a veces trae el dorsal vacío o distinto al del gol y así
+        // no matcheaba, dejando el penal como 'Gol' común.
+        $penales   = []; // 'equipo|dorsal|min' -> true
+        $penalesTM = []; // 'equipo|min'        -> true  (fallback sin dorsal)
         foreach ($flat as $ev) {
             if ((int) (isset($ev['type']) ? $ev['type'] : 0) === 7) {
-                $jn = isset($ev['player_jersey_num']) ? (string) $ev['player_jersey_num'] : '';
-                $penales[(int) $ev['team'] . '|' . $jn . '|' . $minOf(isset($ev['time']) ? $ev['time'] : '')] = true;
+                $jp = isset($ev['player_jersey_num']) ? (string) $ev['player_jersey_num'] : '';
+                $mp = $minOf(isset($ev['time']) ? $ev['time'] : '');
+                $tp = (int) (isset($ev['team']) ? $ev['team'] : 0);
+                if ($jp !== '') $penales[$tp . '|' . $jp . '|' . $mp] = true;
+                $penalesTM[$tp . '|' . $mp] = true;
             }
         }
 
@@ -9621,16 +9660,26 @@ private function normalizarMinuto(string $texto): int
             $texts = (isset($ev['texts']) && is_array($ev['texts'])) ? $ev['texts'] : [];
 
             if ($type === 1) {
-                // Gol. Autogol si el jugador tiene own_goals>0; penal si hay type 7 gemelo.
-                if ($jn !== '' && isset($ownGoal[$tn][$jn])) {
-                    $tipo = 'Gol en propia meta';
+                // Gol. Autogol si el jugador (dorsal $jn) tiene own_goals>0. OJO: promiedos
+                // pone el evento del gol del lado del equipo que se BENEFICIA, mientras que
+                // own_goals figura en el equipo del jugador que lo hace. Por eso el dorsal se
+                // busca como autogol en el equipo del evento Y en el rival. Cada autogol se
+                // consume (contador) para no confundirlo con un gol normal del mismo dorsal.
+                $rival = 3 - $tn;
+                if ($jn !== '' && !empty($ownGoal[$tn][$jn])) {
+                    $ownGoal[$tn][$jn]--;
+                    $addInc($tn, 'j:' . $jn, 'Gol en propia meta', $min);
                     $avisoAutogol .= '⚠️ Autogol detectado (dorsal ' . $jn . ', min ' . $min . '). Verificar acreditación.<br>';
-                } elseif (isset($penales[$tn . '|' . $jn . '|' . $min])) {
-                    $tipo = 'Penal';
+                } elseif ($jn !== '' && !empty($ownGoal[$rival][$jn])) {
+                    // Evento del lado del beneficiario: el autor es del equipo rival.
+                    $ownGoal[$rival][$jn]--;
+                    $addInc($rival, 'j:' . $jn, 'Gol en propia meta', $min);
+                    $avisoAutogol .= '⚠️ Autogol detectado (dorsal ' . $jn . ', min ' . $min . '). Verificar acreditación.<br>';
+                } elseif (isset($penales[$tn . '|' . $jn . '|' . $min]) || isset($penalesTM[$tn . '|' . $min])) {
+                    $addInc($tn, 'j:' . $jn, 'Penal', $min);
                 } else {
-                    $tipo = 'Gol';
+                    $addInc($tn, 'j:' . $jn, 'Gol', $min);
                 }
-                $addInc($tn, 'j:' . $jn, $tipo, $min);
             } elseif ($type === 4) {
                 $addInc($tn, 'j:' . $jn, 'Tarjeta amarilla', $min);
             } elseif ($type === 6) {
@@ -9643,6 +9692,18 @@ private function normalizarMinuto(string $texto): int
                 if (isset($texts[1]) && $texts[1] !== '') $addInc($tn, 'n:' . $norm($texts[1]), 'Sale', $min);
             }
             // type 7 (penal) ya consumido; type 2 es marcador interno de cambio, se ignora.
+        }
+
+        // Red de seguridad: autogoles que figuran en las estadísticas del jugador pero que
+        // la timeline no expuso con dorsal (o con un formato que no matcheó). Se cargan igual
+        // en el minuto 0 para que no se pierdan; el aviso pide verificar el minuto a mano.
+        foreach ([1, 2] as $tnOG) {
+            foreach ($ownGoal[$tnOG] as $dorsalOG => $cntOG) {
+                for ($kOG = 0; $kOG < (int) $cntOG; $kOG++) {
+                    $addInc($tnOG, 'j:' . $dorsalOG, 'Gol en propia meta', 0);
+                    $avisoAutogol .= '⚠️ Autogol (dorsal ' . $dorsalOG . ') sin minuto en la timeline; cargado en min 0. Verificar minuto.<br>';
+                }
+            }
         }
 
         // 4. ARMAR $equipos: cada jugador con sus incidencias (busca por dorsal y por nombre).
@@ -9695,7 +9756,7 @@ private function normalizarMinuto(string $texto): int
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $roster[1]['titulares'], $roster[2]['titulares'], $equipos,
-            $avisoAutogol, 1, '', 3, $tecnicos
+            $avisoAutogol . $dbgPM, 1, '', 3, $tecnicos
         );
     }
 
