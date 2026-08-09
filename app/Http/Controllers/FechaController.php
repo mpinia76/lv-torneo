@@ -9610,6 +9610,17 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
+        // Goles por equipo|min (type 1 = jugada, type 3 = gol de penal). Sirve para saber
+        // si un penal (type 7) terminó en gol. Un type 7 SIN gol en el mismo equipo|min
+        // = penal errado/atajado (promiedos no distingue cuál; se carga como 'Errado').
+        $golMin = [];
+        foreach ($flat as $ev) {
+            $t = (int) (isset($ev['type']) ? $ev['type'] : 0);
+            if ($t === 1 || $t === 3) {
+                $golMin[(int) (isset($ev['team']) ? $ev['team'] : 0) . '|' . $minOf(isset($ev['time']) ? $ev['time'] : '')] = true;
+            }
+        }
+
         // Incidencias por equipo, indexadas por clave de jugador (dorsal o nombre normalizado).
         $inc = [1 => [], 2 => []];
         $addInc = function ($tn, $key, $tipo, $min) use (&$inc) {
@@ -9691,9 +9702,16 @@ private function normalizarMinuto(string $texto): int
                 // texts[0] = entra, texts[1] = sale. Sin dorsal -> se matchea por nombre.
                 if (isset($texts[0]) && $texts[0] !== '') $addInc($tn, 'n:' . $norm($texts[0]), 'Entra', $min);
                 if (isset($texts[1]) && $texts[1] !== '') $addInc($tn, 'n:' . $norm($texts[1]), 'Sale', $min);
+            } elseif ($type === 7) {
+                // Penal ejecutado. Si NO hay gol del mismo equipo en ese minuto, no se
+                // convirtió: penal errado o atajado. Se carga como 'Penal errado' (tipo
+                // 'Errado'); promiedos no distingue errado de atajado -> verificar a mano.
+                if ($jn !== '' && !isset($golMin[$tn . '|' . $min])) {
+                    $addInc($tn, 'j:' . $jn, 'Penal errado', $min);
+                }
             }
             // Tipos de evento promiedos: 1=gol de jugada, 2=autogol, 3=gol de penal,
-            // 4=amarilla, 6=roja, 15=cambio. (type 7 no existe en esta API.)
+            // 4=amarilla, 6=roja, 7=penal (si no hay gol gemelo=errado), 15=cambio.
         }
 
         // Red de seguridad: autogoles que figuran en las estadísticas del jugador pero que
