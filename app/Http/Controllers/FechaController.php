@@ -9649,6 +9649,18 @@ private function normalizarMinuto(string $texto): int
             $inc[$tn][$key][] = [$tipo, $min];
         };
 
+        // Mapa nombre_normalizado -> dorsal por equipo. Necesario para los autogoles
+        // (type 2), que promiedos trae SIN dorsal (player_jersey_num=null) y solo con
+        // el nombre del autor en texts[0].
+        $dorsalByName = [1 => [], 2 => []];
+        foreach ([1, 2] as $tnm) {
+            foreach (['titulares', 'suplentes'] as $grp) {
+                foreach ($roster[$tnm][$grp] as $p) {
+                    if ($p['nombre'] !== '') $dorsalByName[$tnm][$norm($p['nombre'])] = $p['dorsal'];
+                }
+            }
+        }
+
         $avisoAutogol = '';
         foreach ($flat as $ev) {
             $type = (int) (isset($ev['type']) ? $ev['type'] : 0);
@@ -9680,6 +9692,27 @@ private function normalizarMinuto(string $texto): int
                 } else {
                     $addInc($tn, 'j:' . $jn, 'Gol', $min);
                 }
+            } elseif ($type === 3) {
+                // Gol de penal. promiedos usa type 3 (NO type 7). Trae dorsal y minuto.
+                $addInc($tn, 'j:' . $jn, 'Penal', $min);
+            } elseif ($type === 2) {
+                // Autogol. promiedos coloca el evento del lado del equipo BENEFICIADO,
+                // con player_jersey_num=null y texts[0] = nombre del autor (que pertenece
+                // al equipo rival). Se acredita al autor por dorsal (resuelto por nombre) y
+                // se descuenta del contador de own_goals para que la red de seguridad no lo
+                // vuelva a cargar en el minuto 0.
+                $rival = 3 - $tn;
+                $nomOG = isset($texts[0]) ? $texts[0] : '';
+                $keyOG = $norm($nomOG);
+                $dorOG = ($keyOG !== '' && isset($dorsalByName[$rival][$keyOG])) ? $dorsalByName[$rival][$keyOG] : '';
+                if ($dorOG !== '') {
+                    $addInc($rival, 'j:' . $dorOG, 'Gol en propia meta', $min);
+                    if (!empty($ownGoal[$rival][$dorOG])) $ownGoal[$rival][$dorOG]--;
+                } elseif ($keyOG !== '') {
+                    // No se encontró el dorsal: se acredita por nombre para no perderlo.
+                    $addInc($rival, 'n:' . $keyOG, 'Gol en propia meta', $min);
+                }
+                $avisoAutogol .= '⚠️ Autogol de ' . $nomOG . ' (min ' . $min . '). Verificar acreditación.<br>';
             } elseif ($type === 4) {
                 $addInc($tn, 'j:' . $jn, 'Tarjeta amarilla', $min);
             } elseif ($type === 6) {
@@ -9691,7 +9724,8 @@ private function normalizarMinuto(string $texto): int
                 if (isset($texts[0]) && $texts[0] !== '') $addInc($tn, 'n:' . $norm($texts[0]), 'Entra', $min);
                 if (isset($texts[1]) && $texts[1] !== '') $addInc($tn, 'n:' . $norm($texts[1]), 'Sale', $min);
             }
-            // type 7 (penal) ya consumido; type 2 es marcador interno de cambio, se ignora.
+            // Tipos de evento promiedos: 1=gol de jugada, 2=autogol, 3=gol de penal,
+            // 4=amarilla, 6=roja, 15=cambio. (type 7 no existe en esta API.)
         }
 
         // Red de seguridad: autogoles que figuran en las estadísticas del jugador pero que
