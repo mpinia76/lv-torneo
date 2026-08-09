@@ -1,72 +1,75 @@
 <?php
 /**
- * Diagnóstico tmapi de Transfermarkt — standalone, NO toca la base de datos.
- * Uso:  http://209.217.241.186/~torneospinia/public/tm_diag.php?id=4889642
- * Borrar este archivo cuando termines de diagnosticar.
+ * Diagnóstico TLS tmapi — standalone, NO toca la base de datos.
+ * http://209.217.241.186/~torneospinia/public/tm_diag.php?id=4889642
+ * Borrar cuando termines.
  */
 header('Content-Type: text/plain; charset=utf-8');
+set_time_limit(120);
 
 $id   = isset($_GET['id']) ? preg_replace('/\D+/', '', $_GET['id']) : '4889642';
 $base = 'https://tmapi.transfermarkt.technology';
 
-// Endpoints a probar (mismo que usa la app + variantes por si cambió la ruta)
-$urls = [
-    'game (falla)'     => "$base/game/$id",
-    'player (funciona)'=> "$base/player/189448",  // control: import jugador anda con este host
-    'game_report'      => "$base/game/$id/report", // por si movieron el reporte a subruta
-];
-
-$headers = [
-    'Accept: application/json',
-    'Accept-Language: es-AR,es;q=0.9,en;q=0.8',
-    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-];
-
-echo "== Diagnóstico tmapi ==\n";
-echo "PHP: " . PHP_VERSION . "   curl: " . (function_exists('curl_init') ? curl_version()['version'] : 'NO DISPONIBLE') . "\n";
-echo "game id probado: $id\n";
+$v = curl_version();
+echo "== Diagnóstico TLS ==\n";
+echo "PHP:  " . PHP_VERSION . "\n";
+echo "curl: " . $v['version'] . "\n";
+echo "SSL:  " . $v['ssl_version'] . "\n";   // <-- clave: contra qué OpenSSL está linkeado
+echo "protocolos: " . implode(',', $v['protocols']) . "\n";
 echo str_repeat('-', 60) . "\n\n";
 
-foreach ($urls as $label => $url) {
-    echo "### $label\n$url\n";
+// Combinaciones de TLS a probar contra tmapi
+$tests = [
+    'default'        => [],
+    'TLS 1.2 forzado'=> [CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2],
+    'TLS 1.3 forzado'=> defined('CURL_SSLVERSION_TLSv1_3') ? [CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_3] : null,
+    'cipher moderno' => [CURLOPT_SSL_CIPHER_LIST => 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384'],
+];
+
+// Hosts de control para saber si el TLS del server anda en general
+$controles = [
+    'CONTROL google'        => 'https://www.google.com',
+    'CONTROL tm web'        => 'https://www.transfermarkt.com.ar',
+    'CONTROL scrape proxy'  => 'https://scrape-prod.up.railway.app',
+];
+
+function probar($url, $opts) {
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT        => 30,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_ENCODING       => '',
+        CURLOPT_NOBODY         => true,   // solo handshake + headers
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_CONNECTTIMEOUT => 15,
         CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HEADER         => true,   // incluir headers de respuesta
-    ]);
-    $t0   = microtime(true);
-    $resp = curl_exec($ch);
-    $ms   = round((microtime(true) - $t0) * 1000);
-    $info = curl_getinfo($ch);
-    $err  = curl_error($ch);
-    $errno = curl_errno($ch);
-    $hlen = $info['header_size'] ?? 0;
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    ] + ($opts ?: []));
+    $t0 = microtime(true);
+    curl_exec($ch);
+    $ms = round((microtime(true) - $t0) * 1000);
+    $i  = curl_getinfo($ch);
+    $en = curl_errno($ch);
+    $er = curl_error($ch);
     curl_close($ch);
-
-    $respHeaders = $resp !== false ? substr($resp, 0, $hlen) : '';
-    $body        = $resp !== false ? substr($resp, $hlen) : '';
-
-    echo "HTTP:        " . ($info['http_code'] ?? 0) . "\n";
-    echo "curl errno:  $errno" . ($errno ? "  ($err)" : '') . "\n";
-    echo "tiempo:      {$ms} ms\n";
-    echo "size body:   " . strlen($body) . " bytes\n";
-    echo "content-type:" . ($info['content_type'] ?? '') . "\n";
-    echo "IP resuelta: " . ($info['primary_ip'] ?? '') . "\n";
-    if ($respHeaders) echo "--- headers ---\n" . trim($respHeaders) . "\n";
-    echo "--- body (primeros 800) ---\n" . substr($body, 0, 800) . "\n";
-    // ¿Es JSON válido con 'data'?
-    $j = json_decode($body, true);
-    if (is_array($j)) {
-        echo "JSON válido. keys: " . implode(', ', array_slice(array_keys($j), 0, 10)) . "\n";
-        echo "tiene 'data': " . (isset($j['data']) && !empty($j['data']) ? 'SÍ' : 'NO / vacío') . "\n";
-    } else {
-        echo "JSON: NO parseable\n";
-    }
-    echo str_repeat('=', 60) . "\n\n";
+    return sprintf("HTTP %-3d  errno %-2d  %5dms  ip:%-15s  %s",
+        $i['http_code'] ?? 0, $en, $ms, $i['primary_ip'] ?? '-', $en ? $er : 'OK');
 }
+
+echo "### tmapi: $base/player/189448\n";
+foreach ($tests as $label => $opts) {
+    if ($opts === null) { echo sprintf("  %-16s : (no soportado por este curl)\n", $label); continue; }
+    echo sprintf("  %-16s : %s\n", $label, probar("$base/player/189448", $opts));
+}
+echo "\n### tmapi: $base/game/$id\n";
+foreach ($tests as $label => $opts) {
+    if ($opts === null) { echo sprintf("  %-16s : (no soportado)\n", $label); continue; }
+    echo sprintf("  %-16s : %s\n", $label, probar("$base/game/$id", $opts));
+}
+
+echo "\n### Controles (para saber si el TLS del server anda en general)\n";
+foreach ($controles as $label => $url) {
+    echo sprintf("  %-20s : %s\n", $label, probar($url, []));
+}
+echo "\nFIN\n";
