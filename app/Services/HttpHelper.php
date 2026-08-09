@@ -5,6 +5,12 @@ use Illuminate\Support\Facades\Log;
 
 class HttpHelper
 {
+    // ScraperAPI: usado como fallback cuando el origen bloquea a nuestro server.
+    // tmapi.transfermarkt.technology quedó geo-bloqueado por CloudFront (403 para AR);
+    // saliendo desde la UE en modo básico (1 crédito) devuelve el JSON normal.
+    const SCRAPERAPI_KEY     = 'a36c0383b6153a740f783cc5ba9bd54c';
+    const SCRAPERAPI_COUNTRY = 'eu';
+
     public static function getHtmlContent_new(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
@@ -346,6 +352,14 @@ class HttpHelper
             return null;
         }
 
+        // Orígenes de Transfermarkt (tmapi) quedaron geo-bloqueados por CloudFront
+        // (403 para AR). Salimos por ScraperAPI desde la UE. NO afecta a promiedos
+        // ni a ninguna otra fuente: solo se enruta lo que apunta a transfermarkt.
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if ($host !== '' && strpos($host, 'transfermarkt') !== false) {
+            return self::getJsonViaScraper($url, $extraHeaders);
+        }
+
         $headers = [
             'Accept: application/json',
             'Accept-Language: es-AR,es;q=0.9,en;q=0.8',
@@ -397,5 +411,65 @@ class HttpHelper
 
         $decoded = json_decode($response, true);
         return is_array($decoded) ? $decoded : null;
+    }
+
+    // ---------------------------------------------------
+    // GET JSON vía ScraperAPI saliendo desde la UE (modo básico, 1 crédito).
+    // Para orígenes geo-bloqueados por CloudFront (ej: tmapi.transfermarkt.technology,
+    // que rechaza a Argentina con un 403). Devuelve el array decodificado o null.
+    // ---------------------------------------------------
+    private static function getJsonViaScraper(string $url, array $extraHeaders = [])
+    {
+        $params = [
+            'api_key'      => self::SCRAPERAPI_KEY,
+            'url'          => $url,
+            'country_code' => self::SCRAPERAPI_COUNTRY, // 'eu' pasa el geo-block de tmapi
+        ];
+        $endpoint = 'https://api.scraperapi.com/?' . http_build_query($params);
+
+        $headers = array_merge(['Accept: application/json'], $extraHeaders);
+
+        $response = false;
+        $httpCode = 0;
+        $curlErr  = 0;
+
+        // Hasta 3 intentos: ScraperAPI a veces devuelve 500 transitorio en el primer hit.
+        for ($i = 0; $i < 3; $i++) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 70);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_errno($ch);
+            curl_close($ch);
+            if (!$curlErr && $httpCode < 400 && !empty($response)) break;
+            sleep(1);
+        }
+
+        if ($curlErr || $httpCode >= 400 || empty($response)) {
+            Log::warning('getJsonViaScraper: falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ') para ' . $url, []);
+            return null;
+        }
+
+        $decoded = json_decode($response, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        // ScraperAPI a veces envuelve el JSON en HTML (<pre>…</pre>): lo extraemos.
+        if (preg_match('/\{.*\}/s', $response, $m)) {
+            $decoded = json_decode($m[0], true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        Log::warning('getJsonViaScraper: respuesta no era JSON para ' . $url, []);
+        return null;
     }
 }

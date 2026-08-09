@@ -68,4 +68,24 @@ if ($ganador) {
 } else {
     echo ">>> Ningún país pasó en modo básico. Puede requerir premium+country_code (plan pago).\n";
 }
+// -----------------------------------------------------------------
+// PRUEBA HTML: ¿la web transfermarkt.com.ar vuelve usable en básico+eu?
+// (esto define si los scrapers de HTML —goles por tipo, plantilla— se
+//  pueden arreglar gratis o si necesitan render premium = plan pago)
+// -----------------------------------------------------------------
+echo "\n== HTML transfermarkt.com.ar (básico + country_code=eu) ==\n";
+echo str_repeat('-', 60) . "\n";
+$htmlUrl = 'https://www.transfermarkt.com.ar/juan-gabriel-rodriguez/profil/spieler/189448';
+list($body, $code, $en) = scraperapi_get($apiKey, $htmlUrl, ['country_code' => 'eu']);
+$len   = is_string($body) ? strlen($body) : 0;
+$esReto = is_string($body) && (stripos($body, 'Just a moment') !== false
+        || stripos($body, 'challenge-platform') !== false
+        || stripos($body, 'cf-browser-verification') !== false);
+$tieneContenido = is_string($body) && (stripos($body, 'Rodr') !== false || stripos($body, 'data-header') !== false
+        || stripos($body, 'spielerdaten') !== false || stripos($body, 'transfermarkt') !== false && $len > 20000);
+echo sprintf("HTTP %d  errno %d  size:%d\n", $code, $en, $len);
+echo "¿Cloudflare challenge?: " . ($esReto ? 'SÍ (necesita render premium)' : 'no') . "\n";
+echo "¿HTML con contenido real?: " . ($tieneContenido && !$esReto ? 'SÍ ✅ (se arregla gratis)' : 'no/dudoso') . "\n";
+echo "primeros 200: " . substr(trim((string)$body), 0, 200) . "\n";
+
 echo "\nFIN\n";
