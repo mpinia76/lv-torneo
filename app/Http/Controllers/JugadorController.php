@@ -1994,17 +1994,25 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
         // ─────────────────────────────────────────────────────────────
         $base  = 'https://tmapi.transfermarkt.technology';
         $datos = null;
+        $tmError = null;
 
         if ($url && preg_match('#/spieler/(\d+)#', $url, $mId)) {
             $playerId = $mId[1];
             $resp = HttpHelper::getJson("{$base}/player/{$playerId}");
             if (!empty($resp['data'])) {
                 $datos = $resp['data'];
+            } else {
+                $tmError = 'La API de Transfermarkt (tmapi) no devolvió datos para el jugador '
+                    . $playerId . '. El servidor pudo conectar? Revisá el log; probablemente '
+                    . 'tmapi esté rechazando el acceso (handshake TLS) o el perfil no esté disponible.';
             }
+        } else {
+            $tmError = 'La URL no tiene el formato esperado de Transfermarkt (…/spieler/NNN): ' . $url;
         }
 
         if (!$datos) {
-            Log::info('Import TM: no se pudo obtener el perfil desde tmapi para: ' . $url, []);
+            Log::warning('Import TM: no se pudo obtener el perfil desde tmapi para: ' . $url
+                . ' — ' . ($tmError ?: 'sin detalle'), []);
         }
 
         if ($datos) {
@@ -2233,8 +2241,10 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             }
             }
         } else {
-            Log::info('No se encontró la URL: ' . $url, []);
-            $error = 'No se encontró la URL: ' . $url;
+            // tmapi no devolvió datos: NO era éxito. Abortamos y mostramos el error real.
+            $ok = 0;
+            $error = $tmError ?: ('No se pudo obtener el perfil desde Transfermarkt: ' . $url);
+            Log::warning('Import TM jugador abortado: ' . $error, []);
         }
 
         if ($ok) {
