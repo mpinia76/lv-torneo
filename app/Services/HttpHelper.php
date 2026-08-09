@@ -11,6 +11,12 @@ class HttpHelper
     const SCRAPERAPI_KEY     = 'a36c0383b6153a740f783cc5ba9bd54c';
     const SCRAPERAPI_COUNTRY = 'eu';
 
+    // Proxy propio en la UE (respaldo cuando se agotan los créditos de ScraperAPI).
+    // Dejar TM_PROXY_URL vacío para desactivarlo. Cuando subas proxy.php a un host
+    // europeo, pegá acá su URL y el MISMO token que pusiste en proxy.php.
+    const TM_PROXY_URL   = 'https://palegoldenrod-dotterel-587880.hostingersite.com/proxy.php';
+    const TM_PROXY_TOKEN = 'lvt_7f3aK9pQ2xR8vM5nZ_CAMBIAME';
+
     public static function getHtmlContent_new(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
@@ -187,6 +193,14 @@ class HttpHelper
         if (!filter_var($urlOriginal, FILTER_VALIDATE_URL)) {
             //Log::channel('mi_log')->error("URL inválida recibida: [$urlOriginal]");
             return false;
+        }
+
+        // Transfermarkt quedó geo-bloqueado por CloudFront (403 para AR/EE.UU.). Su HTML
+        // vuelve bien vía ScraperAPI saliendo desde la UE en modo básico (1 crédito).
+        // Solo se enruta transfermarkt; livefutbol/footballdatabase/etc. siguen igual.
+        $hostHtml = strtolower((string) parse_url($urlOriginal, PHP_URL_HOST));
+        if ($hostHtml !== '' && strpos($hostHtml, 'transfermarkt') !== false) {
+            return self::getHtmlViaScraper($urlOriginal);
         }
 
         if ($usarScraperRemoto) {
@@ -448,10 +462,22 @@ class HttpHelper
             $curlErr  = curl_errno($ch);
             curl_close($ch);
             if (!$curlErr && $httpCode < 400 && !empty($response)) break;
+            // Créditos agotados: no tiene sentido reintentar, vamos directo al proxy.
+            if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) break;
             sleep(1);
         }
 
         if ($curlErr || $httpCode >= 400 || empty($response)) {
+            // ScraperAPI falló o sin créditos → probamos el proxy propio en la UE (si está configurado).
+            $viaProxy = self::tmProxyGet($url);
+            if ($viaProxy !== false) {
+                $dp = json_decode($viaProxy, true);
+                if (is_array($dp)) return $dp;
+                if (preg_match('/\{.*\}/s', $viaProxy, $mp)) {
+                    $dp = json_decode($mp[0], true);
+                    if (is_array($dp)) return $dp;
+                }
+            }
             Log::warning('getJsonViaScraper: falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ') para ' . $url, []);
             return null;
         }
@@ -471,5 +497,87 @@ class HttpHelper
 
         Log::warning('getJsonViaScraper: respuesta no era JSON para ' . $url, []);
         return null;
+    }
+
+    // ---------------------------------------------------
+    // GET HTML vía ScraperAPI saliendo desde la UE (modo básico, 1 crédito).
+    // Para páginas de transfermarkt.com.ar geo-bloqueadas por CloudFront.
+    // Devuelve el HTML crudo o false.
+    // ---------------------------------------------------
+    private static function getHtmlViaScraper(string $url)
+    {
+        $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
+            'api_key'      => self::SCRAPERAPI_KEY,
+            'url'          => $url,
+            'country_code' => self::SCRAPERAPI_COUNTRY, // 'eu' pasa el geo-block de TM
+        ]);
+
+        $response = false;
+        $httpCode = 0;
+        $curlErr  = 0;
+
+        for ($i = 0; $i < 3; $i++) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 70);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_errno($ch);
+            curl_close($ch);
+            if (!$curlErr && $httpCode < 400 && !empty($response)) {
+                return $response;
+            }
+            // Créditos agotados: cortamos y vamos al proxy.
+            if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) break;
+            sleep(1);
+        }
+
+        // ScraperAPI falló o sin créditos → proxy propio en la UE (si está configurado).
+        $viaProxy = self::tmProxyGet($url);
+        if ($viaProxy !== false) {
+            return $viaProxy;
+        }
+
+        Log::warning('getHtmlViaScraper: falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ') para ' . $url, []);
+        return false;
+    }
+
+    // ---------------------------------------------------
+    // Proxy propio en la UE (respaldo cuando ScraperAPI se queda sin créditos).
+    // Devuelve el cuerpo crudo (JSON o HTML) o false si no está configurado / falla.
+    // ---------------------------------------------------
+    private static function tmProxyGet(string $url)
+    {
+        if (self::TM_PROXY_URL === '') {
+            return false; // proxy no configurado todavía
+        }
+
+        $sep      = (strpos(self::TM_PROXY_URL, '?') === false) ? '?' : '&';
+        $endpoint = self::TM_PROXY_URL . $sep
+            . 'token=' . urlencode(self::TM_PROXY_TOKEN)
+            . '&url='  . urlencode($url);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $endpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 70);
+        curl_setopt($ch, CURLOPT_ENCODING, '');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $body    = curl_exec($ch);
+        $code    = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_errno($ch);
+        curl_close($ch);
+
+        if ($curlErr || $code >= 400 || empty($body)) {
+            Log::warning('tmProxyGet: falló (HTTP ' . $code . ', errno ' . $curlErr . ') para ' . $url, []);
+            return false;
+        }
+
+        return $body;
     }
 }

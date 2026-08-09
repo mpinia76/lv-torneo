@@ -1300,18 +1300,29 @@ class ScraperController extends Controller
         }
         $playerId = $m[1];
 
+        // Guardar la URL de TM en el jugador (siempre, aunque el resultado venga de cache).
+        if ($request->jugador_id) {
+            try { \App\Jugador::where('id', $request->jugador_id)->update(['transfermarkt_url' => $url]); }
+            catch (\Throwable $e) { /* columna aún no migrada: no rompemos el scrape */ }
+        }
+
+        // CACHE: el rendimiento del jugador cambia poco entre consultas. Guardamos el
+        // resultado 2 días para no re-gastar créditos de ScraperAPI si se abre el mismo
+        // jugador varias veces. Para forzar datos frescos, agregá &refresh=1 a la URL.
+        $cacheKey = 'tm_rendimiento_' . $playerId;
+        if (!$request->get('refresh')) {
+            $cacheHit = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            if ($cacheHit !== null) {
+                return response()->json($cacheHit);
+            }
+        }
+
         $base = 'https://tmapi.transfermarkt.technology';
 
         // 1) Rendimiento por partido (JSON)
         $perf = HttpHelper::getJson("{$base}/player/{$playerId}/performance-game");
         if (!$perf || empty($perf['data']['performance']) || !is_array($perf['data']['performance'])) {
             return response()->json(['error' => 'No se pudo obtener el rendimiento (tmapi)']);
-        }
-
-        // Guardar la URL de TM en el jugador (para el chequeo de torneos nuevos).
-        if ($request->jugador_id) {
-            try { \App\Jugador::where('id', $request->jugador_id)->update(['transfermarkt_url' => $url]); }
-            catch (\Throwable $e) { /* columna aún no migrada: no rompemos el scrape */ }
         }
 
         // ¿Es arquero? Goles recibidos / vallas invictas SOLO aplican a arqueros.
@@ -1544,11 +1555,16 @@ class ScraperController extends Controller
             return $cmp !== 0 ? $cmp : strcmp($a['competition'], $b['competition']);
         });
 
-        return response()->json([
+        $payload = [
             'data'       => array_values($data),
             'excluidos'  => $excluidos,
             'duplicados' => $duplicados,
-        ]);
+        ];
+
+        // Guardar en cache 2 días (ver nota arriba). Solo cacheamos resultados válidos.
+        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addDays(2));
+
+        return response()->json($payload);
     }
 
     /**

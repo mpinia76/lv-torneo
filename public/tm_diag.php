@@ -40,10 +40,13 @@ function verData($body) {
     return is_array($j) ? $j : null;
 }
 
-// Países a probar (básico, sin premium). Alemania primero: transfermarkt es alemán.
-$paises = ['(default)' => [], 'de' => ['country_code'=>'de'], 'eu' => ['country_code'=>'eu'],
-           'us' => ['country_code'=>'us'], 'es' => ['country_code'=>'es'], 'gb' => ['country_code'=>'gb'],
-           'fr' => ['country_code'=>'fr'], 'it' => ['country_code'=>'it']];
+// Países que ofrece Hostinger como datacenter EU real (Lituania, Reino Unido, Francia).
+// eu = control (sabemos que anda). Buscamos cuál devuelve DATA SÍ.
+$paises = ['eu (control)' => ['country_code'=>'eu'],
+           'lt (Lituania)' => ['country_code'=>'lt'],
+           'gb (Reino Unido)' => ['country_code'=>'gb'],
+           'fr (Francia)' => ['country_code'=>'fr'],
+           'ie (Irlanda)' => ['country_code'=>'ie']];
 
 echo "== tmapi player/189448 — probando países (modo básico) ==\n";
 echo str_repeat('-', 60) . "\n";
