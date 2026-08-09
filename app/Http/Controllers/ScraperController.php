@@ -2300,6 +2300,9 @@ class ScraperController extends Controller
 
         // 2) Agregar por temporada (seasonId) + competición + club dirigido.
         $agg = []; $compIds = []; $clubIds = [];
+        // Diagnóstico: contamos por qué se descarta cada partido (para detectar
+        // cambios de esquema en el endpoint del DT). Se vuelca al log si agg queda vacío.
+        $diag = ['total' => count($perf['data']['performance']), 'sin_compclub' => 0, 'season' => 0, 'sin_result' => 0, 'ok' => 0];
         foreach ($perf['data']['performance'] as $g) {
             $gi = $g['gameInformation'] ?? [];
             // El lado del DT es el que tiene su coachId (club = local, opponent = visitante).
@@ -2316,17 +2319,18 @@ class ScraperController extends Controller
 
             $compId = $gi['competitionId'] ?? null;
             $clubId = $club['clubId'] ?? null;
-            if (!$compId || !$clubId) continue;
+            if (!$compId || !$clubId) { $diag['sin_compclub']++; continue; }
 
             // Año = año de inicio de la temporada TM (seasonId), como en jugador.
             $seasonId = (int) ($gi['seasonId'] ?? $seasonObj['id'] ?? 0);
             $year     = $seasonId;
-            if ($year < 2000) continue;
+            if ($year < 2000) { $diag['season']++; continue; }
 
             $gf = $club['goalsTotal'] ?? null;
             $ge = $club['opponentGoalsTotal'] ?? null;
-            if ($gf === null || $ge === null) continue; // partido sin resultado
+            if ($gf === null || $ge === null) { $diag['sin_result']++; continue; } // partido sin resultado
             $gf = (int) $gf; $ge = (int) $ge;
+            $diag['ok']++;
 
             $key = $seasonId . '|' . $compId . '|' . $clubId;
             if (!isset($agg[$key])) {
@@ -2363,6 +2367,15 @@ class ScraperController extends Controller
         }
 
         if (empty($agg)) {
+            // Volcamos por qué quedó vacío + la estructura del primer partido, para
+            // detectar si tmapi renombró los campos del endpoint del DT.
+            $first = $perf['data']['performance'][0] ?? [];
+            Log::warning('tecnicoTransfermarkt: 0 torneos para coach ' . $coachId
+                . ' | descartes=' . json_encode($diag)
+                . ' | keys_partido=' . json_encode(array_keys($first))
+                . ' | keys_gameInformation=' . json_encode(array_keys($first['gameInformation'] ?? []))
+                . ' | keys_clubsInformation=' . json_encode(array_keys($first['clubsInformation'] ?? []))
+                . ' | primer_partido=' . mb_substr(json_encode($first), 0, 1500));
             return response()->json(['data' => [], 'excluidos' => [], 'duplicados' => []]);
         }
 
