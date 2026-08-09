@@ -9585,38 +9585,6 @@ private function normalizarMinuto(string $texto): int
             }
         }
 
-        // ===== DEBUG TEMPORAL (QUITAR): volcado de eventos de gol/penal y de las
-        // estadísticas de goles por jugador, para diagnosticar el import de promiedos. =====
-        $dbgPM = '<hr><b>DEBUG eventos (type 1=gol, 6=roja, 7=penal):</b><br><pre>';
-        foreach ($flat as $ev) {
-            $t = (int) (isset($ev['type']) ? $ev['type'] : 0);
-            if (in_array($t, [1, 6, 7], true)) {
-                $dbgPM .= 'type=' . $t
-                    . ' team=' . (isset($ev['team']) ? $ev['team'] : '?')
-                    . ' jn=' . (isset($ev['player_jersey_num']) ? $ev['player_jersey_num'] : '?')
-                    . ' time=' . (isset($ev['time']) ? $ev['time'] : '?')
-                    . ' texts=' . (isset($ev['texts']) ? json_encode($ev['texts'], JSON_UNESCAPED_UNICODE) : '?')
-                    . "\n";
-            }
-        }
-        $dbgPM .= "\n<b>Stats goles por jugador:</b>\n";
-        foreach ((isset($g['players']['lineups']['teams']) ? $g['players']['lineups']['teams'] : []) as $lt) {
-            $tnD = isset($lt['team_num']) ? (int) $lt['team_num'] : 0;
-            foreach ([['starting'], ['bench']] as $grpD) {
-                foreach ((isset($lt[$grpD[0]]) ? $lt[$grpD[0]] : []) as $p) {
-                    $gls = isset($p['events']['goals']) ? $p['events']['goals'] : null;
-                    if ($gls && array_filter((array) $gls)) {
-                        $dbgPM .= 'team=' . $tnD
-                            . ' dorsal=' . (isset($p['jersey_num']) ? $p['jersey_num'] : '?')
-                            . ' ' . (isset($p['name']) ? $p['name'] : '?')
-                            . ' goals=' . json_encode($gls, JSON_UNESCAPED_UNICODE) . "\n";
-                    }
-                }
-            }
-        }
-        $dbgPM .= '</pre>';
-        // ===== FIN DEBUG TEMPORAL =====
-
         // Minuto: "12'", "45'+2", "90'+3". Suma el adicionado salvo en el 45 (igual criterio que TM).
         $minOf = function ($t) {
             $base = 0; $add = 0;
@@ -9790,7 +9758,7 @@ private function normalizarMinuto(string $texto): int
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $roster[1]['titulares'], $roster[2]['titulares'], $equipos,
-            $avisoAutogol . $dbgPM, 1, '', 3, $tecnicos
+            $avisoAutogol, 1, '', 3, $tecnicos
         );
     }
 
