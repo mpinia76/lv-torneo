@@ -442,6 +442,20 @@ class HttpHelper
     // Para orígenes geo-bloqueados por CloudFront (ej: tmapi.transfermarkt.technology,
     // que rechaza a Argentina con un 403). Devuelve el array decodificado o null.
     // ---------------------------------------------------
+    // Detecta el desafío de AWS WAF (HTML con window.awsWafCookie) que tmapi
+    // devuelve, de forma intermitente por IP, en vez del JSON. Requiere JS para
+    // resolverse, así que si aparece hay que reintentar (otra IP) o renderizar.
+    private static function esWafChallenge($resp): bool
+    {
+        if (!is_string($resp) || $resp === '') return false;
+        $head = ltrim(substr($resp, 0, 600));
+        return stripos($resp, 'awsWaf') !== false
+            || stripos($resp, 'aws-waf-token') !== false
+            || stripos($resp, 'challenge-container') !== false
+            || stripos($head, '<!DOCTYPE html') === 0
+            || stripos($head, '<html') === 0;
+    }
+
     private static function getJsonViaScraper(string $url, array $extraHeaders = [])
     {
         self::$lastJsonError = null;
@@ -460,8 +474,11 @@ class HttpHelper
         $httpCode = 0;
         $curlErr  = 0;
 
-        // 2 intentos con timeout acotado para NO pasar el gateway del server (~60s).
-        for ($i = 0; $i < 2; $i++) {
+        // Hasta 4 intentos en modo básico (1 crédito c/u). OJO: el challenge de AWS
+        // WAF llega con HTTP 200 y cuerpo no vacío, por eso lo detectamos aparte y
+        // NO cortamos el bucle: cada request de ScraperAPI sale por otra IP, y
+        // reintentando suele caer en una IP sin WAF (sin gastar render=true).
+        for ($i = 0; $i < 4; $i++) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $endpoint);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -474,12 +491,13 @@ class HttpHelper
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlErr  = curl_errno($ch);
             curl_close($ch);
-            if (!$curlErr && $httpCode < 400 && !empty($response)) break;
+            if (!$curlErr && $httpCode < 400 && !empty($response) && !self::esWafChallenge($response)) break;
             // Créditos agotados: no tiene sentido reintentar, vamos directo al proxy.
             if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) {
                 $sinCreditos = true;
                 break;
             }
+            usleep(300000); // 0,3s entre intentos → fuerza rotación de IP en ScraperAPI
         }
 
         // ScraperAPI devuelve 200 con un cuerpo de "créditos agotados": lo tratamos como fallo real.
@@ -487,7 +505,37 @@ class HttpHelper
             $sinCreditos = true;
         }
 
-        if ($curlErr || $httpCode >= 400 || empty($response) || $sinCreditos) {
+        // Si tras los reintentos por IP sigue el challenge de AWS WAF, último recurso:
+        // un único intento con render=true (headless browser) que ejecuta el JS del
+        // WAF. Cuesta más créditos, por eso solo se hace acá y una sola vez.
+        if (!$sinCreditos && self::esWafChallenge($response)) {
+            $renderEndpoint = 'https://api.scraperapi.com/?' . http_build_query(array_merge($params, [
+                'render'  => 'true',
+                'premium' => 'true',
+            ]));
+            Log::info('getJsonViaScraper: WAF persistente por IP, intento final con render=true para ' . $url, []);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $renderEndpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 55);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_errno($ch);
+            curl_close($ch);
+            if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) {
+                $sinCreditos = true;
+            }
+        }
+
+        // ¿El WAF sobrevivió incluso al render? Lo tratamos como fallo (no intentamos
+        // extraer JSON de la página del challenge, que daría basura).
+        $wafPersiste = self::esWafChallenge($response);
+
+        if ($curlErr || $httpCode >= 400 || empty($response) || $sinCreditos || $wafPersiste) {
             // ScraperAPI falló o sin créditos → probamos el proxy propio en la UE (si está configurado).
             $viaProxy = self::tmProxyGet($url);
             if ($viaProxy !== false) {
@@ -498,12 +546,15 @@ class HttpHelper
                     if (is_array($dp)) return $dp;
                 }
             }
+            $code = $sinCreditos ? 'sin_creditos' : ($wafPersiste ? 'waf' : 'http_error');
             self::$lastJsonError = [
-                'code'    => $sinCreditos ? 'sin_creditos' : 'http_error',
+                'code'    => $code,
                 'http'    => (int) $httpCode,
                 'message' => $sinCreditos
                     ? 'ScraperAPI se quedó sin créditos del mes.'
-                    : ('ScraperAPI falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ').'),
+                    : ($wafPersiste
+                        ? 'AWS WAF bloqueó tmapi incluso tras reintentos y render=true.'
+                        : ('ScraperAPI falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ').')),
                 'snippet' => is_string($response) ? substr($response, 0, 300) : '',
             ];
             Log::warning('getJsonViaScraper: falló (' . self::$lastJsonError['code']
