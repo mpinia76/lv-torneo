@@ -9905,6 +9905,9 @@ private function normalizarMinuto(string $texto): int
         foreach ($jueces as $juez) {
             $nombreCompleto = $juez['nombre'];
             $tipoJuez       = $juez['tipo'];
+            // Promiedos agrega la nacionalidad entre paréntesis (ej: "Yael Falcón (Argentina)").
+            // La quitamos para que no rompa el match (si no, "(Argentina)" no coincide con nadie).
+            $nombreCompleto = trim(preg_replace('/\s*\([^)]*\)/', '', $nombreCompleto));
             $partesNombre  = array_map(function($p) { return trim($p, '.'); }, explode(' ', $nombreCompleto));
             $partesMayores = array_values(array_filter($partesNombre, function($p) { return strlen($p) > 2; }));
 
