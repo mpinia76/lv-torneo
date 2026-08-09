@@ -447,13 +447,13 @@ class HttpHelper
         $httpCode = 0;
         $curlErr  = 0;
 
-        // Hasta 3 intentos: ScraperAPI a veces devuelve 500 transitorio en el primer hit.
-        for ($i = 0; $i < 3; $i++) {
+        // 2 intentos con timeout acotado para NO pasar el gateway del server (~60s).
+        for ($i = 0; $i < 2; $i++) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $endpoint);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 70);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 25);
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_ENCODING, '');
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -464,7 +464,6 @@ class HttpHelper
             if (!$curlErr && $httpCode < 400 && !empty($response)) break;
             // Créditos agotados: no tiene sentido reintentar, vamos directo al proxy.
             if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) break;
-            sleep(1);
         }
 
         if ($curlErr || $httpCode >= 400 || empty($response)) {
@@ -516,12 +515,12 @@ class HttpHelper
         $httpCode = 0;
         $curlErr  = 0;
 
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 2; $i++) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $endpoint);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 70);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 25);
             curl_setopt($ch, CURLOPT_ENCODING, '');
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             $response = curl_exec($ch);
@@ -533,7 +532,6 @@ class HttpHelper
             }
             // Créditos agotados: cortamos y vamos al proxy.
             if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) break;
-            sleep(1);
         }
 
         // ScraperAPI falló o sin créditos → proxy propio en la UE (si está configurado).
