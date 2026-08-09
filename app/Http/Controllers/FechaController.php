@@ -9371,6 +9371,12 @@ private function normalizarMinuto(string $texto): int
             } elseif ($tipoAcc === 'SUBSTITUTE') {
                 $addEv($active, 'Sale', $min);   // activePlayerId = jugador que SALE
                 $addEv($passive, 'Entra', $min); // passivePlayerId = jugador que ENTRA
+            } elseif ($tipoAcc === 'MISSED_PENALTY') {
+                // Penal no convertido. active = el que pateó. Si hay passivePlayerId,
+                // ese es el ARQUERO que lo atajó -> 'Penal atajado'; si no, fue errado
+                // (afuera/palo) -> 'Penal errado'. Se guardan en la tabla Penal.
+                $tipo = !empty($passive) ? 'Penal atajado' : 'Penal errado';
+                $addEv($active, $tipo, $min);
             }
         }
 
