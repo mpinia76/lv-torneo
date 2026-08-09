@@ -2268,9 +2268,28 @@ class ScraperController extends Controller
 
         // 1) Rendimiento por partido del DT (JSON). TM migró la página HTML a un
         //    componente JS, así que leemos la API (igual que el scraper de jugador).
-        $perf = HttpHelper::getJson("{$base}/coach/{$coachId}/performance-game");
+        $perfUrl = "{$base}/coach/{$coachId}/performance-game";
+        $perf = HttpHelper::getJson($perfUrl);
         if (!$perf || empty($perf['data']['performance']) || !is_array($perf['data']['performance'])) {
-            return response()->json(['error' => 'No se pudo obtener el rendimiento del DT (tmapi)']);
+            // Distinguimos la causa real para mostrar algo accionable en vez de un genérico.
+            $err = HttpHelper::getLastJsonError();
+            if (is_array($err) && ($err['code'] ?? '') === 'sin_creditos') {
+                $msg = 'No se pudo obtener el rendimiento del DT: ScraperAPI se quedó sin créditos del mes. '
+                     . 'Renová el plan o cambiá la API key en HttpHelper (SCRAPERAPI_KEY).';
+            } elseif (is_array($err) && ($err['code'] ?? '') === 'http_error') {
+                $msg = 'No se pudo obtener el rendimiento del DT: ScraperAPI respondió con error (HTTP '
+                     . ($err['http'] ?? '?') . '). Reintentá en unos minutos.';
+            } elseif (is_array($err) && ($err['code'] ?? '') === 'no_json') {
+                $msg = 'No se pudo obtener el rendimiento del DT: tmapi no devolvió JSON válido '
+                     . '(es probable que haya cambiado el endpoint /coach/{id}/performance-game).';
+            } elseif ($perf && empty($perf['data']['performance'])) {
+                $msg = 'tmapi respondió, pero este DT (id ' . $coachId . ') no tiene datos de rendimiento por partido.';
+            } else {
+                $msg = 'No se pudo obtener el rendimiento del DT (tmapi).';
+            }
+            Log::warning('tecnicoTransfermarkt: fallo para ' . $perfUrl
+                . ' | causa=' . (is_array($err) ? json_encode($err) : 'desconocida'));
+            return response()->json(['error' => $msg]);
         }
 
         // Guardar la URL de TM en el técnico (para el chequeo de torneos nuevos).

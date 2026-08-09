@@ -17,6 +17,16 @@ class HttpHelper
     const TM_PROXY_URL   = ''; // proxy propio desactivado (Hostinger no tiene un país que tmapi permita)
     const TM_PROXY_TOKEN = 'lvt_7f3aK9pQ2xR8vM5nZ_CAMBIAME';
 
+    // Guarda la causa del último fallo de getJson/getJsonViaScraper, para que el
+    // controlador pueda mostrar un mensaje específico en vez de uno genérico.
+    // Estructura: ['code' => string, 'http' => int, 'message' => string, 'snippet' => string]
+    private static $lastJsonError = null;
+
+    public static function getLastJsonError()
+    {
+        return self::$lastJsonError;
+    }
+
     public static function getHtmlContent_new(string $urlOriginal, bool $usarScraperRemoto = false)
     {
         $urlOriginal = trim($urlOriginal);
@@ -434,6 +444,9 @@ class HttpHelper
     // ---------------------------------------------------
     private static function getJsonViaScraper(string $url, array $extraHeaders = [])
     {
+        self::$lastJsonError = null;
+        $sinCreditos = false;
+
         $params = [
             'api_key'      => self::SCRAPERAPI_KEY,
             'url'          => $url,
@@ -463,10 +476,18 @@ class HttpHelper
             curl_close($ch);
             if (!$curlErr && $httpCode < 400 && !empty($response)) break;
             // Créditos agotados: no tiene sentido reintentar, vamos directo al proxy.
-            if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) break;
+            if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) {
+                $sinCreditos = true;
+                break;
+            }
         }
 
-        if ($curlErr || $httpCode >= 400 || empty($response)) {
+        // ScraperAPI devuelve 200 con un cuerpo de "créditos agotados": lo tratamos como fallo real.
+        if (is_string($response) && stripos($response, 'exhausted the API Credits') !== false) {
+            $sinCreditos = true;
+        }
+
+        if ($curlErr || $httpCode >= 400 || empty($response) || $sinCreditos) {
             // ScraperAPI falló o sin créditos → probamos el proxy propio en la UE (si está configurado).
             $viaProxy = self::tmProxyGet($url);
             if ($viaProxy !== false) {
@@ -477,7 +498,17 @@ class HttpHelper
                     if (is_array($dp)) return $dp;
                 }
             }
-            Log::warning('getJsonViaScraper: falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ') para ' . $url, []);
+            self::$lastJsonError = [
+                'code'    => $sinCreditos ? 'sin_creditos' : 'http_error',
+                'http'    => (int) $httpCode,
+                'message' => $sinCreditos
+                    ? 'ScraperAPI se quedó sin créditos del mes.'
+                    : ('ScraperAPI falló (HTTP ' . $httpCode . ', errno ' . $curlErr . ').'),
+                'snippet' => is_string($response) ? substr($response, 0, 300) : '',
+            ];
+            Log::warning('getJsonViaScraper: falló (' . self::$lastJsonError['code']
+                . ', HTTP ' . $httpCode . ', errno ' . $curlErr . ') para ' . $url
+                . ' | ' . self::$lastJsonError['snippet'], []);
             return null;
         }
 
@@ -494,7 +525,14 @@ class HttpHelper
             }
         }
 
-        Log::warning('getJsonViaScraper: respuesta no era JSON para ' . $url, []);
+        self::$lastJsonError = [
+            'code'    => 'no_json',
+            'http'    => (int) $httpCode,
+            'message' => 'La respuesta de ScraperAPI/tmapi no era JSON (¿cambió el endpoint del DT?).',
+            'snippet' => is_string($response) ? substr($response, 0, 300) : '',
+        ];
+        Log::warning('getJsonViaScraper: respuesta no era JSON (HTTP ' . $httpCode . ') para ' . $url
+            . ' | ' . self::$lastJsonError['snippet'], []);
         return null;
     }
 
