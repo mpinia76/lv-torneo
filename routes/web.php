@@ -212,6 +212,10 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::post('/equipos-excluidos/excluir-rapido', 'EquipoExcluidoController@excluirRapido');
 
+    // Lista de equipos en JSON (id, nombre) para refrescar los desplegables del
+    // scraper sin recargar la página tras dar de alta un club en el ABM.
+    Route::get('/equipos-json', 'EquipoController@json')->name('equipos.json');
+
     Route::get('/scraper/equipo-transfermarkt', 'ScraperController@equipoTransfermarkt');
     Route::post('equipo-estadisticas/store-masivo', 'EquipoEstadisticaManualController@storeMasivo')
         ->name('equipo-estadisticas.storeMasivo');

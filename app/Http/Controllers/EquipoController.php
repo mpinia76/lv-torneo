@@ -27,6 +27,20 @@ class EquipoController extends Controller
     }
 
     /**
+     * Lista de equipos (id, nombre) en JSON. La usa el scraper para refrescar
+     * los desplegables de "Equipo" sin recargar la página, después de dar de
+     * alta un club nuevo en el ABM. Mismo orden que el select maestro.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function json()
+    {
+        return response()->json(
+            Equipo::orderBy('nombre', 'asc')->get(['id', 'nombre'])
+        );
+    }
+
+    /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response

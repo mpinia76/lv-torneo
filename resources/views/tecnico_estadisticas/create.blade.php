@@ -196,6 +196,55 @@
             return html;
         }
 
+        // Refresca la lista de equipos desde el servidor (sin recargar la página)
+        // y actualiza el select maestro + los desplegables de cada card. Sirve para
+        // cuando el club scrapeado no existía y lo diste de alta en el ABM: tocás el
+        // botón y aparece en los combos, sin volver a scrapear.
+        async function actualizarEquipos(btn) {
+            let prevHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Actualizando...'; }
+            try {
+                let res = await fetch("{{ url('/admin/equipos-json') }}", { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                let equipos = await res.json();
+
+                // 1) Reconstruimos el select maestro (respetando su valor actual).
+                let master = document.querySelector('[name="equipo_id"]');
+                let prevMaster = master.value;
+                master.innerHTML = '<option value=""></option>' +
+                    equipos.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+                master.value = prevMaster;
+                if (window.jQuery) $(master).trigger('change.select2');
+
+                // 2) Actualizamos cada card: conservamos lo ya elegido; si estaba sin
+                //    elegir, reintentamos el match con el nombre scrapeado (por si el
+                //    club recién creado ahora sí matchea).
+                let nuevos = 0;
+                document.querySelectorAll('#resultadoScraper .f-equipo_id').forEach(sel => {
+                    let usaS2 = window.jQuery && $.fn.select2 && $(sel).hasClass('select2-hidden-accessible');
+                    let actual = sel.value;
+                    let destino = (actual && actual !== '')
+                        ? actual
+                        : (matchEquipoId(sel.dataset.scrapeado || '') || '');
+                    if (usaS2) $(sel).select2('destroy');
+                    sel.innerHTML = opcionesEquipos(destino);
+                    if (usaS2) $(sel).select2({ width: '100%' });
+                    if ((!actual || actual === '') && destino) nuevos++;
+                });
+
+                let resumen = document.getElementById('resumenMasivo');
+                if (resumen) {
+                    resumen.innerHTML = `<span style="color:#3c763d">✅ Lista actualizada (${equipos.length} equipos${nuevos ? `, ${nuevos} match nuevo/s` : ''}).</span>`;
+                    setTimeout(() => { resumen.innerHTML = ''; }, 4000);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('No se pudo actualizar la lista de equipos. Probá de nuevo.');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = prevHtml || '🔄 Actualizar equipos'; }
+            }
+        }
+
         function opcionesSelect(valores, seleccionado) {
             let html = '';
             valores.forEach(v => {
@@ -416,6 +465,10 @@
                 <label class="mb-0">
                     <input type="checkbox" id="checkTodos" onclick="toggleTodos(this)"> Seleccionar todos
                 </label>
+                <button type="button" class="btn btn-outline-secondary btn-sm ml-3" onclick="actualizarEquipos(this)"
+                    title="Si diste de alta un club en el ABM, refrescá la lista sin re-scrapear">
+                    🔄 Actualizar equipos
+                </button>
                 <span id="resumenMasivo" class="ml-3"></span>
             </div>
             <div id="listaTorneos"></div>`;
@@ -452,7 +505,7 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
                     </div>
                     <div class="form-group col-md-3">
                         <label class="small mb-0">Equipo</label>
-                        <select class="form-control form-control-sm f-equipo_id select2-equipo" style="width:100%">${opcionesEquipos(equipoMatch)}</select>
+                        <select class="form-control form-control-sm f-equipo_id select2-equipo" style="width:100%" data-scrapeado="${clean(c.equipo)}">${opcionesEquipos(equipoMatch)}</select>
                         <small class="text-muted d-block mt-1">Scrapeado: <strong>${clean(c.equipo)}</strong></small>
                     </div>
                     <div class="form-group col-md-2">
