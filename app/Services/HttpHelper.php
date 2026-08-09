@@ -14,7 +14,7 @@ class HttpHelper
     // Proxy propio en la UE (respaldo cuando se agotan los créditos de ScraperAPI).
     // Dejar TM_PROXY_URL vacío para desactivarlo. Cuando subas proxy.php a un host
     // europeo, pegá acá su URL y el MISMO token que pusiste en proxy.php.
-    const TM_PROXY_URL   = 'https://palegoldenrod-dotterel-587880.hostingersite.com/proxy.php';
+    const TM_PROXY_URL   = ''; // proxy propio desactivado (Hostinger no tiene un país que tmapi permita)
     const TM_PROXY_TOKEN = 'lvt_7f3aK9pQ2xR8vM5nZ_CAMBIAME';
 
     public static function getHtmlContent_new(string $urlOriginal, bool $usarScraperRemoto = false)
