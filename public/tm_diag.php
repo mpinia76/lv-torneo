@@ -9,7 +9,9 @@ set_time_limit(180);
 
 $id      = isset($_GET['id']) ? preg_replace('/\D+/', '', $_GET['id']) : '4889642';
 $base    = 'https://tmapi.transfermarkt.technology';
-$apiKey  = '44182b1d4649eb00f3c41258721c4884'; // misma key que usa HttpHelper::fetchRemoto
+// Pasá tu key de prueba por la URL:  ...tm_diag.php?id=4889642&key=TU_KEY_NUEVA
+$apiKey  = isset($_GET['key']) ? preg_replace('/[^a-zA-Z0-9]/', '', $_GET['key']) : '44182b1d4649eb00f3c41258721c4884';
+echo "(key usada: " . substr($apiKey, 0, 6) . "…)\n";
 
 function scraperapi_get($apiKey, $targetUrl, $extra = []) {
     $params = array_merge([
