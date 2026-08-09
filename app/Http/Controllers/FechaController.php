@@ -9752,6 +9752,11 @@ private function normalizarMinuto(string $texto): int
             ['equipo_id' => $partido->equipov->id, 'equipo' => $strVisitante, 'nombre' => $dt[2]],
         ];
 
+        // Recordatorio fijo: promiedos NO distingue el tipo de gol.
+        $avisoAutogol .= 'ℹ️ Recordá: promiedos no distingue goles de <strong>cabeza</strong> ni de '
+            . '<strong>tiro libre</strong> — se cargan como gol de jugada. Si necesitás ese desglose, '
+            . 'cargalo a mano.<br>';
+
         // 7-11. Validar + guardar (logica compartida). juecesEsperados=3 (igual que las
         // demas fuentes): promiedos solo trae el principal, asi que el helper avisa que
         // faltan los de linea para cargarlos a mano, con el mismo alert de siempre.
