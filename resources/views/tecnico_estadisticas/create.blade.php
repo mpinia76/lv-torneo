@@ -608,6 +608,8 @@ ${similar ? `<span class="badge badge-warning ml-2" title="Parecido a: ${similar
             let progreso  = document.getElementById('tmProgresoTecnico');
 
             progreso.innerHTML = '⏳ Trayendo datos del DT...';
+            // Limpiamos el resultado anterior (ej: "Sin resultados.") mientras carga.
+            document.getElementById('resultadoScraper').innerHTML = '';
 
             try {
                 let res  = await fetch(`${endpoint}?url=${encodeURIComponent(url)}&tecnico_id=${tecnicoId}`);
