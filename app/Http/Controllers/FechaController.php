@@ -9700,7 +9700,10 @@ private function normalizarMinuto(string $texto): int
                 $avisoAutogol .= '⚠️ Autogol de ' . $nomOG . ' (min ' . $min . '). Verificar acreditación.<br>';
             } elseif ($type === 4) {
                 $addInc($tn, 'j:' . $jn, 'Tarjeta amarilla', $min);
-            } elseif ($type === 6) {
+            } elseif ($type === 5 || $type === 6) {
+                // Expulsión. promiedos usa type 5 = roja directa y type 6 = doble amarilla,
+                // pero no es fiable: se desambigua con red_type de la ficha del jugador
+                // (1 = roja directa, 2 = doble amarilla) para no depender del tipo de evento.
                 $rt   = isset($redType[$tn][$jn]) ? $redType[$tn][$jn] : -1;
                 $tipo = ($rt === 2) ? 'Expulsado por doble amarilla' : 'Tarjeta roja';
                 $addInc($tn, 'j:' . $jn, $tipo, $min);
@@ -9717,7 +9720,8 @@ private function normalizarMinuto(string $texto): int
                 }
             }
             // Tipos de evento promiedos: 1=gol de jugada, 2=autogol, 3=gol de penal,
-            // 4=amarilla, 6=roja, 7=penal (si no hay gol gemelo=errado), 15=cambio.
+            // 4=amarilla, 5=roja directa, 6=doble amarilla, 7=penal (si no hay gol
+            // gemelo=errado), 15=cambio.
         }
 
         // Red de seguridad: autogoles que figuran en las estadísticas del jugador pero que
