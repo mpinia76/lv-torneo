@@ -9854,6 +9854,22 @@ private function normalizarMinuto(string $texto): int
             $success .= '⚠️ WARNING: ' . $strVisitante . ' tiene solo ' . $titularesVisitante . ' titular/es (se esperan 11).<br>';
         }
 
+        // -----------------------------------------------------------------------
+        // 7.b RESET: reimportar reemplaza TODO lo que el import controla al 100%.
+        // Se borran alineaciones y eventos (goles, tarjetas, cambios) previos del
+        // partido antes de reinsertarlos, para no arrastrar filas huérfanas cuando
+        // cambia el jugador detrás de un dorsal (se corrige la plantilla) o cuando
+        // promiedos deja de reportar un evento. Va dentro de la transacción del
+        // caller: si el import falla, el rollback restaura todo.
+        // NO se borran: jueces (2 de 3 se cargan a mano), penales (la definición
+        // por penales es manual y comparte tabla sin distintivo) ni técnicos (se
+        // actualizan por equipo). OJO: el desglose manual de goles (cabeza/tiro
+        // libre) se pierde al reimportar y hay que volver a cargarlo.
+        Alineacion::where('partido_id', $partido->id)->delete();
+        Gol::where('partido_id', $partido->id)->delete();
+        Tarjeta::where('partido_id', $partido->id)->delete();
+        Cambio::where('partido_id', $partido->id)->delete();
+
         // TÉCNICOS (DT): resultados-futbol no los importa; transfermarkt sí (via API).
         if ($tecnicos === null) {
             $success .= '<span style="color:orange">⚠️ WARNING: Técnicos no importados. Verificar manualmente.</span><br>';
@@ -10152,9 +10168,23 @@ private function normalizarMinuto(string $texto): int
                     'orden'      => $orden,
                 ];
 
-                $alineacion = Alineacion::where('partido_id', '=', $partido->id)
-                    ->where('jugador_id', '=', $jugador_id)
-                    ->first();
+                // La fila se busca por la MISMA clave única de la tabla
+                // (partido_id, equipo_id, dorsal); si no, cuando cambia el jugador
+                // detrás de un dorsal (ej. se corrige la plantilla) el chequeo por
+                // jugador_id no encuentra la fila vieja e intenta un INSERT que choca
+                // con el índice único. Sin dorsal se cae a (partido_id, jugador_id).
+                $alineacion = null;
+                if (!empty($jugador['dorsal'])) {
+                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)
+                        ->where('equipo_id', '=', $equipo->id)
+                        ->where('dorsal', '=', $jugador['dorsal'])
+                        ->first();
+                }
+                if (empty($alineacion)) {
+                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)
+                        ->where('jugador_id', '=', $jugador_id)
+                        ->first();
+                }
 
                 try {
                     if (!empty($alineacion)) {
