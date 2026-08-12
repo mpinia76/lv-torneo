@@ -9700,7 +9700,10 @@ private function normalizarMinuto(string $texto): int
                 $avisoAutogol .= '⚠️ Autogol de ' . $nomOG . ' (min ' . $min . '). Verificar acreditación.<br>';
             } elseif ($type === 4) {
                 $addInc($tn, 'j:' . $jn, 'Tarjeta amarilla', $min);
-            } elseif ($type === 6) {
+            } elseif ($type === 5 || $type === 6) {
+                // Expulsión. promiedos usa type 5 = roja directa y type 6 = doble amarilla,
+                // pero no es fiable: se desambigua con red_type de la ficha del jugador
+                // (1 = roja directa, 2 = doble amarilla) para no depender del tipo de evento.
                 $rt   = isset($redType[$tn][$jn]) ? $redType[$tn][$jn] : -1;
                 $tipo = ($rt === 2) ? 'Expulsado por doble amarilla' : 'Tarjeta roja';
                 $addInc($tn, 'j:' . $jn, $tipo, $min);
@@ -9717,7 +9720,8 @@ private function normalizarMinuto(string $texto): int
                 }
             }
             // Tipos de evento promiedos: 1=gol de jugada, 2=autogol, 3=gol de penal,
-            // 4=amarilla, 6=roja, 7=penal (si no hay gol gemelo=errado), 15=cambio.
+            // 4=amarilla, 5=roja directa, 6=doble amarilla, 7=penal (si no hay gol
+            // gemelo=errado), 15=cambio.
         }
 
         // Red de seguridad: autogoles que figuran en las estadísticas del jugador pero que
@@ -9849,6 +9853,22 @@ private function normalizarMinuto(string $texto): int
         if ($titularesVisitante < 11) {
             $success .= '⚠️ WARNING: ' . $strVisitante . ' tiene solo ' . $titularesVisitante . ' titular/es (se esperan 11).<br>';
         }
+
+        // -----------------------------------------------------------------------
+        // 7.b RESET: reimportar reemplaza TODO lo que el import controla al 100%.
+        // Se borran alineaciones y eventos (goles, tarjetas, cambios) previos del
+        // partido antes de reinsertarlos, para no arrastrar filas huérfanas cuando
+        // cambia el jugador detrás de un dorsal (se corrige la plantilla) o cuando
+        // promiedos deja de reportar un evento. Va dentro de la transacción del
+        // caller: si el import falla, el rollback restaura todo.
+        // NO se borran: jueces (2 de 3 se cargan a mano), penales (la definición
+        // por penales es manual y comparte tabla sin distintivo) ni técnicos (se
+        // actualizan por equipo). OJO: el desglose manual de goles (cabeza/tiro
+        // libre) se pierde al reimportar y hay que volver a cargarlo.
+        Alineacion::where('partido_id', $partido->id)->delete();
+        Gol::where('partido_id', $partido->id)->delete();
+        Tarjeta::where('partido_id', $partido->id)->delete();
+        Cambio::where('partido_id', $partido->id)->delete();
 
         // TÉCNICOS (DT): resultados-futbol no los importa; transfermarkt sí (via API).
         if ($tecnicos === null) {
@@ -10148,9 +10168,23 @@ private function normalizarMinuto(string $texto): int
                     'orden'      => $orden,
                 ];
 
-                $alineacion = Alineacion::where('partido_id', '=', $partido->id)
-                    ->where('jugador_id', '=', $jugador_id)
-                    ->first();
+                // La fila se busca por la MISMA clave única de la tabla
+                // (partido_id, equipo_id, dorsal); si no, cuando cambia el jugador
+                // detrás de un dorsal (ej. se corrige la plantilla) el chequeo por
+                // jugador_id no encuentra la fila vieja e intenta un INSERT que choca
+                // con el índice único. Sin dorsal se cae a (partido_id, jugador_id).
+                $alineacion = null;
+                if (!empty($jugador['dorsal'])) {
+                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)
+                        ->where('equipo_id', '=', $equipo->id)
+                        ->where('dorsal', '=', $jugador['dorsal'])
+                        ->first();
+                }
+                if (empty($alineacion)) {
+                    $alineacion = Alineacion::where('partido_id', '=', $partido->id)
+                        ->where('jugador_id', '=', $jugador_id)
+                        ->first();
+                }
 
                 try {
                     if (!empty($alineacion)) {
