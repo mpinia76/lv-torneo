@@ -2113,30 +2113,40 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
             // Descarga y guarda la imagen si no es el avatar por defecto
             if (!empty($imageUrl) && filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_contains($imageUrl, 'default.jpg')) {
-                $client = new Client();
-                $response = $client->get($imageUrl);
+                try {
+                    $client = new Client();
+                    // http_errors=false: no lanzar excepción si Transfermarkt devuelve 4xx/5xx
+                    $response = $client->get($imageUrl, [
+                        'http_errors' => false,
+                        'timeout'     => 15,
+                    ]);
 
-                if ($response->getStatusCode() === 200) {
-                    $imageData = $response->getBody()->getContents();
-                    $parsedUrl = parse_url($imageUrl);
-                    $pathInfo = pathinfo($parsedUrl['path']);
-                    $nombreArchivo = $pathInfo['filename'];
-                    $extension = $pathInfo['extension'];
+                    if ($response->getStatusCode() === 200) {
+                        $imageData = $response->getBody()->getContents();
+                        $parsedUrl = parse_url($imageUrl);
+                        $pathInfo = pathinfo($parsedUrl['path']);
+                        $nombreArchivo = $pathInfo['filename'];
+                        $extension = $pathInfo['extension'];
 
-                    if (strrchr($nombreArchivo, '.') === '.') {
-                        $nombreArchivo = substr($nombreArchivo, 0, -1);
+                        if (strrchr($nombreArchivo, '.') === '.') {
+                            $nombreArchivo = substr($nombreArchivo, 0, -1);
+                        }
+
+                        // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
+                        $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                        Log::info('URL de la foto: ' . $localFilePath, []);
+                        $insert['foto'] = "$nombreArchivo.$extension";
+
+                        file_put_contents($localFilePath, $imageData);
+                        Log::info('Foto subida', []);
+                    } else {
+                        Log::info('Foto no subida (HTTP ' . $response->getStatusCode() . '): ' . $imageUrl, []);
+                        $success .='Foto no subida (la imagen no está disponible en Transfermarkt)<br>';
                     }
-
-                    // Define la ubicación donde deseas guardar la imagen en tu sistema de archivos
-                    $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
-                    Log::info('URL de la foto: ' . $localFilePath, []);
-                    $insert['foto'] = "$nombreArchivo.$extension";
-
-                    file_put_contents($localFilePath, $imageData);
-                    Log::info('Foto subida', []);
-                } else {
-                    Log::info('Foto no subida (HTTP ' . $response->getStatusCode() . '): ' . $imageUrl, []);
-                    $success .='Foto no subida<br>';
+                } catch (\Exception $e) {
+                    // Un fallo al descargar la foto no debe abortar la importación del jugador
+                    Log::warning('Error al descargar la foto: ' . $imageUrl . ' - ' . $e->getMessage(), []);
+                    $success .='Foto no subida (no se pudo descargar la imagen)<br>';
                 }
             } else {
                 Log::info('No tiene foto: ' . $imageUrl, []);
