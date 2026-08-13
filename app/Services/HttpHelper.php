@@ -456,6 +456,75 @@ class HttpHelper
             || stripos($head, '<html') === 0;
     }
 
+    // ---------------------------------------------------
+    // Descarga BINARIA (imágenes) con la misma estrategia que el JSON:
+    // los hosts de Transfermarkt están geo-bloqueados para nuestro server
+    // (dan 502/504 aunque en el navegador de casa se vean bien), así que la
+    // imagen se baja saliendo por la UE vía ScraperAPI. Otros hosts van directo.
+    // Devuelve: ['ok'=>bool, 'body'=>string, 'http'=>int, 'contentType'=>string, 'error'=>string]
+    // ---------------------------------------------------
+    public static function getBinary(string $url): array
+    {
+        $url = trim($url);
+        $out = ['ok' => false, 'body' => '', 'http' => 0, 'contentType' => '', 'error' => ''];
+
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            $out['error'] = 'url_invalida';
+            return $out;
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $viaScraper = ($host !== '' && strpos($host, 'transfermarkt') !== false);
+
+        $endpoint = $viaScraper
+            ? ('https://api.scraperapi.com/?' . http_build_query([
+                'api_key'      => self::SCRAPERAPI_KEY,
+                'url'          => $url,
+                'country_code' => self::SCRAPERAPI_COUNTRY,
+              ]))
+            : $url;
+
+        $headers = [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+            'Referer: https://www.transfermarkt.com/',
+        ];
+
+        $body = false; $httpCode = 0; $contentType = ''; $curlErr = 0;
+
+        // Hasta 3 intentos: cada request de ScraperAPI sale por otra IP.
+        for ($i = 0; $i < 3; $i++) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_ENCODING, '');
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $body        = curl_exec($ch);
+            $httpCode    = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $curlErr     = curl_errno($ch);
+            curl_close($ch);
+
+            if (!$curlErr && $httpCode === 200 && !empty($body) && strpos($contentType, 'image') !== false) {
+                return ['ok' => true, 'body' => $body, 'http' => $httpCode, 'contentType' => $contentType, 'error' => ''];
+            }
+            // Créditos de ScraperAPI agotados: no tiene sentido reintentar.
+            if (is_string($body) && stripos($body, 'exhausted the API Credits') !== false) {
+                $out['http'] = $httpCode; $out['error'] = 'sin_creditos';
+                return $out;
+            }
+            usleep(300000); // 0,3s → fuerza rotación de IP en ScraperAPI
+        }
+
+        $out['http']        = $httpCode;
+        $out['contentType'] = $contentType;
+        $out['error']       = $curlErr ? ('curl_errno_' . $curlErr) : ('http_' . $httpCode);
+        return $out;
+    }
+
     private static function getJsonViaScraper(string $url, array $extraHeaders = [])
     {
         self::$lastJsonError = null;
