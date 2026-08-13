@@ -2115,10 +2115,19 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             if (!empty($imageUrl) && filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_contains($imageUrl, 'default.jpg')) {
                 try {
                     $client = new Client();
-                    // http_errors=false: no lanzar excepción si Transfermarkt devuelve 4xx/5xx
+                    // Transfermarkt bloquea (502/403) los pedidos de imagen que no
+                    // parecen venir de un navegador. Mandamos los mismos headers que
+                    // usa HttpHelper para el JSON, que sí funcionan.
+                    // http_errors=false: no lanzar excepción si devuelve 4xx/5xx.
                     $response = $client->get($imageUrl, [
-                        'http_errors' => false,
-                        'timeout'     => 15,
+                        'http_errors'     => false,
+                        'timeout'         => 15,
+                        'verify'          => false,
+                        'headers'         => [
+                            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                            'Accept'     => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                            'Referer'    => 'https://www.transfermarkt.com/',
+                        ],
                     ]);
 
                     if ($response->getStatusCode() === 200) {
