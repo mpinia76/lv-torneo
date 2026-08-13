@@ -2114,28 +2114,32 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
             // Descarga y guarda la imagen si no es el avatar por defecto
             if (!empty($imageUrl) && filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_contains($imageUrl, 'default.jpg')) {
                 try {
-                    $client = new Client();
-                    // Transfermarkt bloquea (502/403) los pedidos de imagen que no
-                    // parecen venir de un navegador. Mandamos los mismos headers que
-                    // usa HttpHelper para el JSON, que sí funcionan.
-                    // http_errors=false: no lanzar excepción si devuelve 4xx/5xx.
-                    $response = $client->get($imageUrl, [
-                        'http_errors'     => false,
-                        'timeout'         => 15,
-                        'verify'          => false,
-                        'headers'         => [
-                            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                            'Accept'     => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-                            'Referer'    => 'https://www.transfermarkt.com/',
-                        ],
+                    // Descargamos la imagen con curl + User-Agent de navegador, igual
+                    // que HttpHelper hace con el JSON (que SÍ funciona desde el server).
+                    // Guzzle sin estos headers recibe 502/403 del CDN de Transfermarkt.
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $imageUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+                    curl_setopt($ch, CURLOPT_ENCODING, '');
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        'Accept: image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                        'Referer: https://www.transfermarkt.com/',
                     ]);
+                    $imageData = curl_exec($ch);
+                    $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                    $curlErr   = curl_error($ch);
+                    curl_close($ch);
 
-                    if ($response->getStatusCode() === 200) {
-                        $imageData = $response->getBody()->getContents();
+                    if ($httpCode === 200 && !empty($imageData) && str_contains($contentType, 'image')) {
                         $parsedUrl = parse_url($imageUrl);
                         $pathInfo = pathinfo($parsedUrl['path']);
                         $nombreArchivo = $pathInfo['filename'];
-                        $extension = $pathInfo['extension'];
+                        $extension = $pathInfo['extension'] ?? 'jpg';
 
                         if (strrchr($nombreArchivo, '.') === '.') {
                             $nombreArchivo = substr($nombreArchivo, 0, -1);
@@ -2149,8 +2153,11 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                         file_put_contents($localFilePath, $imageData);
                         Log::info('Foto subida', []);
                     } else {
-                        Log::info('Foto no subida (HTTP ' . $response->getStatusCode() . '): ' . $imageUrl, []);
-                        $success .='Foto no subida (la imagen no está disponible en Transfermarkt)<br>';
+                        Log::info('Foto no subida (HTTP ' . $httpCode . ' / ' . $contentType
+                            . ' / ' . $curlErr . '): ' . $imageUrl, []);
+                        $success .= 'Foto no subida — HTTP ' . $httpCode
+                            . ($curlErr ? ' (' . $curlErr . ')' : '')
+                            . ' desde: ' . $imageUrl . '<br>';
                     }
                 } catch (\Exception $e) {
                     // Un fallo al descargar la foto no debe abortar la importación del jugador
