@@ -313,20 +313,20 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                     ->orderBy('dia', 'DESC')
                     ->first();
 
-                    $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$id)->first();
+                $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$id)->first();
                 //print_r($partidoTecnico);
-                    if(!empty($partidoTecnico)) {
-                        //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                        if ($torneo->ambito == 'Nacional') {
-                            if ($torneo->tipo == 'Copa') {
-                                $titulosTecnicoCopa++;
-                            } else {
-                                $titulosTecnicoLiga++;
-                            }
-                        }else {
-                            $titulosTecnicoInternacional++;
+                if(!empty($partidoTecnico)) {
+                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
+                    if ($torneo->ambito == 'Nacional') {
+                        if ($torneo->tipo == 'Copa') {
+                            $titulosTecnicoCopa++;
+                        } else {
+                            $titulosTecnicoLiga++;
                         }
+                    }else {
+                        $titulosTecnicoInternacional++;
                     }
+                }
                 //}
             }
 
@@ -631,7 +631,7 @@ ORDER BY torneos.year DESC';
                             INNER JOIN jugadors ON jugadors.id = alineacions.jugador_id
                             WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND jugadors.persona_id = ".$tecnico->persona_id. " GROUP BY alineacions.jugador_id";
 
-                                        //echo $sql3;
+            //echo $sql3;
 
             $jugados = DB::select(DB::raw($sqlTitular));
 
@@ -1263,6 +1263,63 @@ WHERE (tecnicos.id = ".$id.")";
      * y el {id} del /trainer/ es el mismo coachId que usa la API en /coach/{id}.
      * Es el equivalente para técnicos de JugadorController::importarProcess_new().
      */
+    /**
+     * Lee el nombre legal completo del DT desde la ficha "DATOS DEL PERFIL" de la
+     * página pública de Transfermarkt, que es una tabla con filas del tipo:
+     *
+     *     <tr><th>Nombre completo:</th><td>Marco Aurélio de Oliveira</td></tr>
+     *
+     * Hace falta porque la API /coach/{id} no expone ese dato (passportName llega
+     * vacío y sólo trae el nombre corto, ej. "Marcão"). El HTML sale por ScraperAPI
+     * dentro de HttpHelper::getHtmlContent, igual que el resto de lo que scrapeamos
+     * de Transfermarkt. Si falla, devuelve '' y el import sigue con el nombre corto.
+     */
+    private function nombreCompletoDesdeHtml($url)
+    {
+        if (empty($url)) {
+            return '';
+        }
+
+        try {
+            $html = HttpHelper::getHtmlContent($url);
+            if (empty($html)) {
+                return '';
+            }
+
+            $dom = new \DOMDocument();
+            libxml_use_internal_errors(true);
+            $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+            libxml_clear_errors();
+            $xpath = new \DOMXPath($dom);
+
+            // Etiquetas según el dominio que haya pegado el usuario (.com.ar, .com, .de…).
+            $etiquetas = ['nombre completo', 'nombre en pais de origen', 'full name',
+                'name in home country', 'nome completo', 'vollstandiger name'];
+
+            foreach ($xpath->query('//th') as $th) {
+                $label = mb_strtolower(trim($th->textContent), 'UTF-8');
+                $label = strtr($label, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u',
+                    'ñ'=>'n','ü'=>'u','ä'=>'a','ö'=>'o','ç'=>'c']);
+
+                foreach ($etiquetas as $etiqueta) {
+                    if (strpos($label, $etiqueta) !== false) {
+                        $td = $xpath->query('following-sibling::td[1]', $th)->item(0);
+                        $valor = $td ? trim(preg_replace('/\s+/u', ' ', $td->textContent)) : '';
+                        if ($valor !== '') {
+                            Log::info('Import TM (DT): nombre completo desde HTML = ' . $valor, []);
+                            return $valor;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Import TM (DT): no se pudo leer el nombre completo del HTML ('
+                . $url . '): ' . $e->getMessage(), []);
+        }
+
+        return '';
+    }
+
     public function importarProcess_new(Request $request)
     {
         set_time_limit(0);
@@ -1302,6 +1359,26 @@ WHERE (tecnicos.id = ".$id.")";
             $insert = [];
 
             // ── Nombre / apellido ──────────────────────────────────────────
+            // A diferencia del endpoint de jugador, /coach NO trae el nombre legal
+            // completo: passportName viene vacío y no hay displayName, sólo el
+            // nombre artístico ("Marcão"). El nombre completo sí está en la ficha
+            // "DATOS DEL PERFIL" de la página pública, así que lo leemos de ahí y
+            // se lo inyectamos al helper como passportName. El nombre corto de la
+            // API queda como shortName: es lo que va en "Mostrar" y además sirve
+            // de ancla para saber dónde arranca el apellido.
+            if (trim($datos['nationalityDetails']['passportName'] ?? '') === '') {
+                $nombreCompleto = $this->nombreCompletoDesdeHtml($url);
+                if ($nombreCompleto !== '') {
+                    $datos['nationalityDetails']['passportName'] = $nombreCompleto;
+                    if (trim($datos['shortName'] ?? '') === '') {
+                        $datos['shortName'] = trim($datos['name'] ?? '');
+                    }
+                } else {
+                    Log::info('Import TM (DT): sin nombre completo en el HTML, se usa el nombre de la API: '
+                        . ($datos['name'] ?? ''), []);
+                }
+            }
+
             // Separación centralizada en NombreHelper (misma que jugador/árbitro).
             $tmNombre = \App\Services\NombreHelper::separarTM($datos);
             $name     = $tmNombre['name'];
