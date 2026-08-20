@@ -32,7 +32,7 @@ class NombreHelper
         // (ej. brasileños: "Nadson Juan Maia da Silva de Souza"); y como último
         // recurso, el name corto.
         $completo = $passport !== '' ? $passport
-                  : ($displayName !== '' ? $displayName : $nameField);
+            : ($displayName !== '' ? $displayName : $nameField);
 
         // Ancla de apellido: con qué palabra ARRANCA el apellido dentro del shortName.
         $primerApellido = '';
@@ -88,19 +88,21 @@ class NombreHelper
             $palabras  = preg_split('/\s+/', trim($baseSplit));
             if (count($palabras) >= 2) {
                 $particulas = ['de','da','do','dos','das','del','della','di','la','las','los',
-                               'van','von','der','den','du','le','bin','al'];
+                    'van','von','der','den','du','le','bin','al'];
                 $apellido = array_pop($palabras);
                 while (!empty($palabras) && in_array(mb_strtolower(end($palabras)), $particulas, true)) {
                     $apellido = array_pop($palabras) . ' ' . $apellido;
                 }
                 $nombre   = implode(' ', $palabras);
             } else {
-                // Mononimo (ej: "Marcão", "Tite", "Ronaldinho"): el campo que la
-                // ficha exige y por el que ordena la grilla es el apellido, así
-                // que el único token va al apellido y no al nombre. Antes quedaba
-                // en $nombre, el apellido salía vacío y el import se abortaba con
-                // "No se pudieron extraer los datos...".
-                $nombre   = '';
+                // Mononimo (ej: "Marcão", "Tite", "Ronaldinho"): el único token va
+                // a los dos campos, igual que hacía el importador viejo. Antes
+                // quedaba sólo en $nombre y el apellido salía vacío, con dos
+                // consecuencias: el import se abortaba con "No se pudieron extraer
+                // los datos..." y, como `nombre` quedaba NULL, el índice único de
+                // personas no saltaba (MySQL trata dos NULL como distintos) y se
+                // cargaba un duplicado en cada intento.
+                $nombre   = trim($baseSplit);
                 $apellido = trim($baseSplit);
             }
         }

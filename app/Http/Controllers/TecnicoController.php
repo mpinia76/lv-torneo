@@ -23,7 +23,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class TecnicoController extends Controller
 {
@@ -1262,98 +1261,9 @@ WHERE (tecnicos.id = ".$id.")";
      *
      * La URL del perfil es del tipo:  .../perfil/profil/trainer/{id}
      * y el {id} del /trainer/ es el mismo coachId que usa la API en /coach/{id}.
-     * Es el equivalente para técnicos de JugadorController::importarProcess_new().
+     * Es el equivalente para técnicos de JugadorController::importarProcess_new()
+     * y sigue exactamente los mismos pasos.
      */
-    /**
-     * Lee el nombre legal completo del DT desde la ficha "DATOS DEL PERFIL" de la
-     * página pública de Transfermarkt, que en el HTML crudo es una fila así:
-     *
-     *     <tr><th>Nombre completo:</th><td>Marco Aurélio de Oliveira</td></tr>
-     *
-     * Hace falta porque la API /coach/{id} no expone ese dato: passportName llega
-     * vacío y sólo trae el nombre corto ("Marcão"). Los perfiles de JUGADOR sí lo
-     * traen (passportName / displayName / artistName), por eso allá no hizo falta.
-     *
-     * Primero se intenta con el ScraperAPI en modo básico (1 crédito, lo mismo que
-     * usa el resto de lo que scrapeamos de TM) y, si vuelve vacío o con el desafío
-     * de Cloudflare en vez de la ficha, se reintenta en modo premium + render.
-     * Si igual falla devuelve '' y el import sigue adelante con el nombre corto.
-     */
-    private function nombreCompletoDesdeHtml($url)
-    {
-        if (empty($url)) {
-            return '';
-        }
-
-        try {
-            // 1) Modo básico.
-            $html  = HttpHelper::getHtmlContent($url);
-            $valor = $this->buscarNombreCompletoEnHtml($html);
-            if ($valor !== '') {
-                Log::info('Import TM (DT): nombre completo desde HTML (básico) = ' . $valor, []);
-                return $valor;
-            }
-
-            Log::warning('Import TM (DT): el HTML básico no traía la ficha (bytes='
-                . strlen((string) $html) . ') para ' . $url . '. Reintento premium.', []);
-
-            // 2) Modo premium + render (resuelve el desafío de Cloudflare).
-            $html  = HttpHelper::getHtmlPremium($url);
-            $valor = $this->buscarNombreCompletoEnHtml($html);
-            if ($valor !== '') {
-                Log::info('Import TM (DT): nombre completo desde HTML (premium) = ' . $valor, []);
-                return $valor;
-            }
-
-            Log::warning('Import TM (DT): tampoco con premium se pudo leer la ficha (bytes='
-                . strlen((string) $html) . ') para ' . $url, []);
-        } catch (\Throwable $e) {
-            Log::warning('Import TM (DT): error leyendo el nombre completo del HTML ('
-                . $url . '): ' . $e->getMessage(), []);
-        }
-
-        return '';
-    }
-
-    /**
-     * Saca el valor de la fila «Nombre completo» del HTML crudo de Transfermarkt.
-     * Se hace con regex y no con DOMDocument a propósito: el HTML de TM es enorme
-     * y viene con etiquetas mal cerradas, y loadHTML() se come parte del árbol.
-     * Contempla las etiquetas de los idiomas que sirve TM según el dominio.
-     */
-    private function buscarNombreCompletoEnHtml($html)
-    {
-        if (empty($html) || !is_string($html)) {
-            return '';
-        }
-
-        $etiquetas = 'nombre\s+completo'
-            . '|nombre\s+en\s+pa[ií]s\s+de\s+origen'
-            . '|full\s+name'
-            . '|name\s+in\s+home\s+country'
-            . '|nome\s+completo'
-            . '|vollst[äa]ndiger\s+name';
-
-        $patron = '#<th[^>]*>\s*(?:' . $etiquetas . ')\s*:?\s*</th>\s*<td[^>]*>(.*?)</td>#is';
-
-        // Con /u si el HTML es UTF-8 válido; si preg falla por bytes inválidos,
-        // se reintenta sin el modificador para no perder el dato.
-        $m = [];
-        $encontrado = @preg_match($patron . 'u', $html, $m);
-        if ($encontrado !== 1) {
-            $encontrado = @preg_match($patron, $html, $m);
-        }
-
-        if ($encontrado !== 1 || !isset($m[1])) {
-            return '';
-        }
-
-        $valor = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $valor = preg_replace('/\s+/u', ' ', $valor);
-
-        return trim((string) $valor);
-    }
-
     public function importarProcess_new(Request $request)
     {
         set_time_limit(0);
@@ -1363,12 +1273,16 @@ WHERE (tecnicos.id = ".$id.")";
         $success = '';
         $error   = '';
 
-        $base    = 'https://tmapi.transfermarkt.technology';
-        $datos   = null;
+        // ─────────────────────────────────────────────────────────────
+        // Import vía API interna de Transfermarkt (tmapi), NO scraping de HTML.
+        // La página /profil/trainer la bloquea Cloudflare y devuelve una página
+        // vacía, pero la API JSON (la misma que usan los scrapers de
+        // estadísticas) responde siempre.
+        // ─────────────────────────────────────────────────────────────
+        $base  = 'https://tmapi.transfermarkt.technology';
+        $datos = null;
         $tmError = null;
 
-        // El id del DT aparece como /trainer/{id} en la URL pública y como
-        // coachId en la API: /coach/{id}.
         if ($url && preg_match('#/(?:trainer|coach)/(\d+)#', $url, $mId)) {
             $coachId = $mId[1];
             $resp = HttpHelper::getJson("{$base}/coach/{$coachId}");
@@ -1376,8 +1290,8 @@ WHERE (tecnicos.id = ".$id.")";
                 $datos = $resp['data'];
             } else {
                 $tmError = 'La API de Transfermarkt (tmapi) no devolvió datos para el DT '
-                    . $coachId . '. Revisá el log; probablemente tmapi esté rechazando el '
-                    . 'acceso (handshake TLS / WAF) o el perfil no esté disponible.';
+                    . $coachId . '. El servidor pudo conectar? Revisá el log; probablemente '
+                    . 'tmapi esté rechazando el acceso (handshake TLS) o el perfil no esté disponible.';
             }
         } else {
             $tmError = 'La URL no tiene el formato esperado de Transfermarkt (…/trainer/NNN): ' . $url;
@@ -1393,35 +1307,14 @@ WHERE (tecnicos.id = ".$id.")";
             $insert = [];
 
             // ── Nombre / apellido ──────────────────────────────────────────
-            // A diferencia del endpoint de jugador, /coach NO trae el nombre legal
-            // completo: passportName viene vacío y no hay displayName, sólo el
-            // nombre artístico ("Marcão"). El nombre completo sí está en la ficha
-            // "DATOS DEL PERFIL" de la página pública, así que lo leemos de ahí y
-            // se lo inyectamos al helper como passportName. El nombre corto de la
-            // API queda como shortName: es lo que va en "Mostrar" y además sirve
-            // de ancla para saber dónde arranca el apellido.
-            if (trim($datos['nationalityDetails']['passportName'] ?? '') === '') {
-                $nombreCompleto = $this->nombreCompletoDesdeHtml($url);
-                if ($nombreCompleto !== '') {
-                    $datos['nationalityDetails']['passportName'] = $nombreCompleto;
-                    if (trim($datos['shortName'] ?? '') === '') {
-                        $datos['shortName'] = trim($datos['name'] ?? '');
-                    }
-                } else {
-                    Log::warning('Import TM (DT): no se pudo leer «Nombre completo» del HTML de ' . $url
-                        . '; se usa el nombre corto de la API: ' . ($datos['name'] ?? ''), []);
-                    $success .= '⚠️ No se pudo leer el nombre completo desde Transfermarkt '
-                        . '(quedó sólo el nombre corto). Completá Nombre/Apellido a mano si hace falta.<br>';
-                }
-            }
-
-            // Separación centralizada en NombreHelper (misma que jugador/árbitro).
+            // Separación centralizada en NombreHelper (soporta "F. Calvo",
+            // "Tomás Uribe", compuestos, partículas y mononímicos).
             $tmNombre = \App\Services\NombreHelper::separarTM($datos);
             $name     = $tmNombre['name'];
             $nombre   = $tmNombre['nombre'];
             $apellido = $tmNombre['apellido'];
 
-            // Fecha de nacimiento / fallecimiento (ya vienen en Y-m-d).
+            // Fecha de nacimiento (ya viene en Y-m-d) y de fallecimiento.
             $nacimiento = null;
             $rawNac = $datos['lifeDates']['dateOfBirth'] ?? null;
             if ($rawNac) {
@@ -1438,7 +1331,8 @@ WHERE (tecnicos.id = ".$id.")";
             // Lugar de nacimiento.
             $ciudad = trim($datos['birthPlaceDetails']['placeOfBirth'] ?? '') ?: null;
 
-            // Nacionalidad: la API da solo el ID -> lo resolvemos con la tabla de JugadorController.
+            // Nacionalidad: la API da solo el ID (la tmapi no expone el nombre del
+            // país), así que lo resolvemos con la tabla de JugadorController.
             $nacionalidad = null;
             $nacId = (int)($datos['nationalityDetails']['nationalities']['nationalityId'] ?? 0);
             if ($nacId) {
@@ -1453,13 +1347,15 @@ WHERE (tecnicos.id = ".$id.")";
             // Foto de perfil.
             $imageUrl = trim($datos['portraitUrl'] ?? '') ?: null;
 
-            // Descarga y guarda la imagen si no es el avatar por defecto.
+            Log::info('Nacimiento: ' . $nacimiento.' - '.$fallecimiento.' - '.$ciudad.' - '.$nacionalidad, []);
+
+            // Descarga y guarda la imagen si no es el avatar por defecto
             if (!empty($imageUrl) && filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_contains($imageUrl, 'default.jpg')) {
                 try {
-                    // Los hosts de imágenes de Transfermarkt están geo-bloqueados
-                    // para nuestro server (dan 502/504 aunque en el navegador se
-                    // vean bien). HttpHelper::getBinary las baja saliendo por la UE
-                    // vía ScraperAPI, igual que ya hace JugadorController.
+                    // Los hosts de imágenes de Transfermarkt están geo-bloqueados para
+                    // nuestro server (dan 502/504 aunque en el navegador se vean bien).
+                    // HttpHelper::getBinary las baja saliendo por la UE vía ScraperAPI,
+                    // igual que ya hace con el JSON.
                     $img = \App\Services\HttpHelper::getBinary($imageUrl);
 
                     if ($img['ok']) {
@@ -1474,10 +1370,11 @@ WHERE (tecnicos.id = ".$id.")";
                         }
 
                         $localFilePath = public_path('images/') . $nombreArchivo . '.' . $extension;
+                        Log::info('URL de la foto: ' . $localFilePath, []);
                         $insert['foto'] = "$nombreArchivo.$extension";
 
                         file_put_contents($localFilePath, $imageData);
-                        Log::info('Foto subida (DT): ' . $localFilePath, []);
+                        Log::info('Foto subida', []);
                     } else {
                         Log::info('Foto no subida (HTTP ' . $img['http'] . ' / ' . $img['contentType']
                             . ' / ' . $img['error'] . '): ' . $imageUrl, []);
@@ -1485,137 +1382,101 @@ WHERE (tecnicos.id = ".$id.")";
                             . ' (' . $img['error'] . ') desde: ' . $imageUrl . '<br>';
                     }
                 } catch (\Exception $e) {
-                    // Que falle la foto no debe abortar la importación del DT.
-                    Log::warning('Error al descargar la foto del DT: ' . $imageUrl . ' - ' . $e->getMessage(), []);
-                    $success .= 'Foto no subida (no se pudo descargar la imagen)<br>';
+                    // Un fallo al descargar la foto no debe abortar la importación del DT
+                    Log::warning('Error al descargar la foto: ' . $imageUrl . ' - ' . $e->getMessage(), []);
+                    $success .='Foto no subida (no se pudo descargar la imagen)<br>';
                 }
             } else {
-                Log::info('DT sin foto: ' . $imageUrl, []);
-                $success .= 'No tiene foto<br>';
+                Log::info('No tiene foto: ' . $imageUrl, []);
+                $success .='No tiene foto: ' . $imageUrl.'<br>';
             }
 
-            // ── Armar el insert ────────────────────────────────────────────
+            // Insertar los datos de la persona
+
             if ($name) {
                 $insert['name'] = trim($name);
             } else {
-                Log::info('Falta el name (DT)', []);
-                $success .= 'Falta el name <br>';
+                Log::info('Falta el name', []);
+                $success .='Falta el name <br>';
             }
+
             if ($nombre) {
                 $insert['nombre'] = trim($nombre);
+            } else {
+                Log::info('Falta el nombre', []);
+                $success .='Falta el nombre <br>';
             }
+
             if ($apellido) {
                 $insert['apellido'] = trim($apellido);
             } else {
-                Log::info('Falta el apellido (DT)', []);
-                $success .= 'Falta el apellido <br>';
+                Log::info('Falta el apellido', []);
+                $success .='Falta el apellido <br>';
             }
+
             if ($ciudad) {
                 $insert['ciudad'] = trim($ciudad);
             }
             if ($nacionalidad) {
                 $insert['nacionalidad'] = preg_replace('/^[\pZ\pC]+|[\pZ\pC]+$/u', '', $nacionalidad);
             } else {
-                Log::info('Falta la nacionalidad (DT)', []);
-                $success .= 'Falta la nacionalidad <br>';
+                Log::info('Falta la nacionalidad', []);
+                $success .='Falta la nacionalidad <br>';
             }
             if ($nacimiento) {
                 $insert['nacimiento'] = trim($nacimiento);
             } else {
-                Log::info('Falta la fecha de nacimiento (DT)', []);
-                $success .= 'Falta la fecha de nacimiento <br>';
+                Log::info('Falta la fecha de nacimiento', []);
+                $success .='Falta la fecha de nacimiento <br>';
             }
             if ($fallecimiento) {
                 $insert['fallecimiento'] = trim($fallecimiento);
             }
 
-            $request->session()->put('nombre_filtro_tecnico', $apellido ?: $name);
+            $request->session()->put('nombre_filtro_tecnico', $apellido);
 
             if (empty($insert['name']) || empty($insert['apellido'])) {
-                // No se pudo extraer la info del DT (página bloqueada o estructura cambiada).
+                // No se pudo extraer la información del DT (página bloqueada o
+                // estructura cambiada). Abortamos sin intentar guardar para no romper.
                 $ok = 0;
                 $error = 'No se pudieron extraer los datos del DT desde la URL. '
                     . 'Verificá que Transfermarkt no esté bloqueando el acceso.';
-                Log::warning('Import TM (DT): sin datos suficientes para guardar. Claves recibidas: '
-                    . implode(', ', array_keys($datos)), []);
+                Log::warning('Import TM: sin datos suficientes para guardar', []);
             } else {
                 // Guardamos también la URL de Transfermarkt en el técnico.
                 $insert['transfermarkt_url'] = $url;
-
-                // ── Anti-duplicados ────────────────────────────────────────
-                // Antes se confiaba en que Persona::create() reventara con un
-                // 1062 (índice único) para detectar el repetido. Con los
-                // mononímicos eso no pasa: `nombre` queda NULL y MySQL trata
-                // dos NULL como distintos, así que el índice no salta y se
-                // creaba un DT nuevo en cada import. Ahora lo buscamos a mano
-                // antes de insertar: primero por la URL de Transfermarkt (que
-                // es unívoca) y si no, por apellido + fecha de nacimiento.
                 try {
-                    $persona = null;
-
-                    if (!empty($url) && Schema::hasColumn('personas', 'transfermarkt_url')) {
-                        $persona = Persona::where('transfermarkt_url', '=', $url)->first();
-                    }
-
-                    if (empty($persona) && Schema::hasColumn('tecnicos', 'transfermarkt_url')) {
-                        $tecnicoExistente = Tecnico::where('transfermarkt_url', '=', $url)->first();
-                        if (!empty($tecnicoExistente)) {
-                            $persona = Persona::find($tecnicoExistente->persona_id);
-                        }
-                    }
-
-                    if (empty($persona)) {
-                        $buscar = Persona::where('apellido', '=', $insert['apellido']);
-
-                        if (!empty($insert['nombre'])) {
-                            $buscar->where('nombre', '=', $insert['nombre']);
-                        } else {
-                            $buscar->where(function ($q) {
-                                $q->whereNull('nombre')->orWhere('nombre', '=', '');
-                            });
-                        }
-
-                        if (!empty($insert['nacimiento'])) {
-                            $buscar->where('nacimiento', '=', $insert['nacimiento']);
-                        }
-
-                        $persona = $buscar->first();
-                    }
-
-                    if (!empty($persona)) {
-                        // Ya estaba: actualizamos en lugar de crear otro.
-                        if (!empty($persona->nacionalidad)) {
-                            unset($insert['nacionalidad']);
-                        }
-                        $persona->update($insert);
-
-                        $tecnicoExistente = $persona->tecnico()->first();
-                        if (!empty($tecnicoExistente)) {
-                            $tecnicoExistente->update($insert);
-                            $success .= 'El DT ya existía: se actualizaron sus datos.<br>';
-                        } else {
-                            $persona->tecnico()->create($insert);
-                            $success .= 'La persona ya existía: se le agregó la ficha de DT.<br>';
-                        }
-                    } else {
-                        $persona = Persona::create($insert);
-                        $persona->tecnico()->create($insert);
-                    }
+                    $persona = Persona::create($insert);
+                    $persona->tecnico()->create($insert);
                 } catch (QueryException $ex) {
-                    $errorCode = $ex->errorInfo[1] ?? 0;
-                    if ($errorCode == 1062) {
-                        $success .= 'Tecnico repetido';
-                    } else {
-                        $ok = 0;
-                        $error = 'Error al guardar el DT: ' . $ex->getMessage();
-                        Log::error('Import TM (DT): ' . $ex->getMessage(), []);
+                    try {
+                        $persona = Persona::where('nombre', '=', $insert['nombre'])
+                            ->where('apellido', '=', $insert['apellido'])
+                            ->where('nacimiento', '=', $insert['nacimiento'])
+                            ->first();
+
+                        if (!empty($persona)) {
+                            if (!empty($persona->nacionalidad)) {
+                                unset($insert['nacionalidad']);
+                            }
+                            $persona->update($insert);
+                            $persona->tecnico()->create($insert);
+                        }
+                    } catch (QueryException $ex) {
+                        //$ok = 0;
+                        $errorCode = $ex->errorInfo[1];
+
+                        if ($errorCode == 1062) {
+                            // Ya existía: los datos se actualizaron arriba; sólo avisamos.
+                            $success .= 'Tecnico repetido';
+                        }
                     }
                 }
             }
         } else {
+            // tmapi no devolvió datos: NO era éxito. Abortamos y mostramos el error real.
             $ok = 0;
-            $error = $tmError ?: ('No se pudo obtener el perfil del DT desde Transfermarkt. '
-                . 'Revisá la URL (debe contener /trainer/{id}): ' . $url);
+            $error = $tmError ?: ('No se pudo obtener el perfil desde Transfermarkt: ' . $url);
             Log::warning('Import TM DT abortado: ' . $error, []);
         }
 
@@ -1626,7 +1487,7 @@ WHERE (tecnicos.id = ".$id.")";
         } else {
             DB::rollback();
             $respuestaID = 'error';
-            $respuestaMSJ = $error . '<br>' . $success;
+            $respuestaMSJ=$error.'<br>'.$success;
         }
 
         return redirect()->route('tecnicos.index')->with($respuestaID, $respuestaMSJ);
