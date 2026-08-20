@@ -1272,8 +1272,9 @@ WHERE (tecnicos.id = ".$id.")";
         $success = '';
         $error   = '';
 
-        $base  = 'https://tmapi.transfermarkt.technology';
-        $datos = null;
+        $base    = 'https://tmapi.transfermarkt.technology';
+        $datos   = null;
+        $tmError = null;
 
         // El id del DT aparece como /trainer/{id} en la URL pública y como
         // coachId en la API: /coach/{id}.
@@ -1282,11 +1283,18 @@ WHERE (tecnicos.id = ".$id.")";
             $resp = HttpHelper::getJson("{$base}/coach/{$coachId}");
             if (!empty($resp['data'])) {
                 $datos = $resp['data'];
+            } else {
+                $tmError = 'La API de Transfermarkt (tmapi) no devolvió datos para el DT '
+                    . $coachId . '. Revisá el log; probablemente tmapi esté rechazando el '
+                    . 'acceso (handshake TLS / WAF) o el perfil no esté disponible.';
             }
+        } else {
+            $tmError = 'La URL no tiene el formato esperado de Transfermarkt (…/trainer/NNN): ' . $url;
         }
 
         if (!$datos) {
-            Log::info('Import TM (DT): no se pudo obtener el perfil desde tmapi para: ' . $url, []);
+            Log::warning('Import TM (DT): no se pudo obtener el perfil desde tmapi para: ' . $url
+                . ' — ' . ($tmError ?: 'sin detalle'), []);
         }
 
         if ($datos) {
@@ -1335,11 +1343,14 @@ WHERE (tecnicos.id = ".$id.")";
             // Descarga y guarda la imagen si no es el avatar por defecto.
             if (!empty($imageUrl) && filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_contains($imageUrl, 'default.jpg')) {
                 try {
-                    $client = new Client();
-                    $response = $client->get($imageUrl, ['http_errors' => false, 'timeout' => 10]);
+                    // Los hosts de imágenes de Transfermarkt están geo-bloqueados
+                    // para nuestro server (dan 502/504 aunque en el navegador se
+                    // vean bien). HttpHelper::getBinary las baja saliendo por la UE
+                    // vía ScraperAPI, igual que ya hace JugadorController.
+                    $img = \App\Services\HttpHelper::getBinary($imageUrl);
 
-                    if ($response->getStatusCode() === 200) {
-                        $imageData = $response->getBody()->getContents();
+                    if ($img['ok']) {
+                        $imageData = $img['body'];
                         $parsedUrl = parse_url($imageUrl);
                         $pathInfo = pathinfo($parsedUrl['path']);
                         $nombreArchivo = $pathInfo['filename'];
@@ -1355,12 +1366,15 @@ WHERE (tecnicos.id = ".$id.")";
                         file_put_contents($localFilePath, $imageData);
                         Log::info('Foto subida (DT): ' . $localFilePath, []);
                     } else {
-                        Log::info('Foto no subida (HTTP ' . $response->getStatusCode() . '): ' . $imageUrl, []);
-                        $success .= 'Foto no subida<br>';
+                        Log::info('Foto no subida (HTTP ' . $img['http'] . ' / ' . $img['contentType']
+                            . ' / ' . $img['error'] . '): ' . $imageUrl, []);
+                        $success .= 'Foto no subida — HTTP ' . $img['http']
+                            . ' (' . $img['error'] . ') desde: ' . $imageUrl . '<br>';
                     }
-                } catch (RequestException $e) {
-                    Log::error('Error al obtener la imagen del DT: ' . $e->getMessage(), []);
-                    $insert['foto'] = null;
+                } catch (\Exception $e) {
+                    // Que falle la foto no debe abortar la importación del DT.
+                    Log::warning('Error al descargar la foto del DT: ' . $imageUrl . ' - ' . $e->getMessage(), []);
+                    $success .= 'Foto no subida (no se pudo descargar la imagen)<br>';
                 }
             } else {
                 Log::info('DT sin foto: ' . $imageUrl, []);
@@ -1442,8 +1456,9 @@ WHERE (tecnicos.id = ".$id.")";
             }
         } else {
             $ok = 0;
-            Log::info('No se encontró la URL (DT): ' . $url, []);
-            $error = 'No se pudo obtener el perfil del DT desde Transfermarkt. Revisá la URL (debe contener /trainer/{id}).';
+            $error = $tmError ?: ('No se pudo obtener el perfil del DT desde Transfermarkt. '
+                . 'Revisá la URL (debe contener /trainer/{id}): ' . $url);
+            Log::warning('Import TM DT abortado: ' . $error, []);
         }
 
         if ($ok) {

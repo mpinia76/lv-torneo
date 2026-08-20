@@ -95,8 +95,13 @@ class NombreHelper
                 }
                 $nombre   = implode(' ', $palabras);
             } else {
-                $nombre   = $baseSplit;
-                $apellido = '';
+                // Mononimo (ej: "Marcão", "Tite", "Ronaldinho"): el campo que la
+                // ficha exige y por el que ordena la grilla es el apellido, así
+                // que el único token va al apellido y no al nombre. Antes quedaba
+                // en $nombre, el apellido salía vacío y el import se abortaba con
+                // "No se pudieron extraer los datos...".
+                $nombre   = '';
+                $apellido = trim($baseSplit);
             }
         }
 
