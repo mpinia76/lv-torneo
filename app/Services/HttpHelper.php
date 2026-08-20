@@ -438,6 +438,50 @@ class HttpHelper
     }
 
     // ---------------------------------------------------
+    // HTML vía ScraperAPI en modo premium + render (ejecuta el JS del desafío
+    // de Cloudflare). Gasta bastantes más créditos que el modo básico, así que
+    // se usa SOLO como último recurso, cuando getHtmlContent() volvió vacío o
+    // con la página de desafío en vez del contenido real.
+    // Devuelve el HTML o false.
+    // ---------------------------------------------------
+    public static function getHtmlPremium(string $url)
+    {
+        $url = trim($url);
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
+                'api_key'      => self::SCRAPERAPI_KEY,
+                'url'          => $url,
+                'country_code' => self::SCRAPERAPI_COUNTRY,
+                'render'       => 'true',
+                'premium'      => 'true',
+            ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $endpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 90); // render=true tarda bastante más
+        curl_setopt($ch, CURLOPT_ENCODING, '');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_errno($ch);
+        $curlMsg  = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr || $httpCode >= 400 || empty($response)) {
+            Log::warning('getHtmlPremium: falló (HTTP ' . $httpCode . ', errno ' . $curlErr
+                . ' ' . $curlMsg . ') para ' . $url, []);
+            return false;
+        }
+
+        return $response;
+    }
+
+    // ---------------------------------------------------
     // GET JSON vía ScraperAPI saliendo desde la UE (modo básico, 1 crédito).
     // Para orígenes geo-bloqueados por CloudFront (ej: tmapi.transfermarkt.technology,
     // que rechaza a Argentina con un 403). Devuelve el array decodificado o null.
@@ -478,10 +522,10 @@ class HttpHelper
 
         $endpoint = $viaScraper
             ? ('https://api.scraperapi.com/?' . http_build_query([
-                'api_key'      => self::SCRAPERAPI_KEY,
-                'url'          => $url,
-                'country_code' => self::SCRAPERAPI_COUNTRY,
-              ]))
+                    'api_key'      => self::SCRAPERAPI_KEY,
+                    'url'          => $url,
+                    'country_code' => self::SCRAPERAPI_COUNTRY,
+                ]))
             : $url;
 
         $headers = [
@@ -579,9 +623,9 @@ class HttpHelper
         // WAF. Cuesta más créditos, por eso solo se hace acá y una sola vez.
         if (!$sinCreditos && self::esWafChallenge($response)) {
             $renderEndpoint = 'https://api.scraperapi.com/?' . http_build_query(array_merge($params, [
-                'render'  => 'true',
-                'premium' => 'true',
-            ]));
+                    'render'  => 'true',
+                    'premium' => 'true',
+                ]));
             Log::info('getJsonViaScraper: WAF persistente por IP, intento final con render=true para ' . $url, []);
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $renderEndpoint);
@@ -664,10 +708,10 @@ class HttpHelper
     private static function getHtmlViaScraper(string $url)
     {
         $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
-            'api_key'      => self::SCRAPERAPI_KEY,
-            'url'          => $url,
-            'country_code' => self::SCRAPERAPI_COUNTRY, // 'eu' pasa el geo-block de TM
-        ]);
+                'api_key'      => self::SCRAPERAPI_KEY,
+                'url'          => $url,
+                'country_code' => self::SCRAPERAPI_COUNTRY, // 'eu' pasa el geo-block de TM
+            ]);
 
         $response = false;
         $httpCode = 0;
