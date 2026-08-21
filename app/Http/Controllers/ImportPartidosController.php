@@ -170,10 +170,53 @@ class ImportPartidosController extends Controller
                 }
             }
 
+            // Los nombres de los jugadores de la alineación no vienen en el partido:
+            // probamos cómo resolverlos.
+            if ($ruta === "/game/{$gameId}" && (string) $request->get('jugadores', '0') === '1') {
+                $html .= $this->probarJugadores($data);
+            }
+
             $html .= '<div class="diag">' . $this->arbolClaves($data) . '</div>';
         }
 
         return $this->pagina('Sondeo de partido', $html);
+    }
+
+    /** Prueba cómo resolver el nombre de los jugadores de la alineación. */
+    private function probarJugadores(array $data)
+    {
+        $ids = [];
+        foreach (['homeClub', 'awayClub'] as $lado) {
+            if (!isset($data[$lado]['lineup']['players'])) continue;
+            foreach ($data[$lado]['lineup']['players'] as $p) {
+                if (!empty($p['id'])) $ids[] = (string) $p['id'];
+                if (count($ids) >= 3) break 2;
+            }
+        }
+        if (empty($ids)) return '<p class="err">No encontré ids de jugadores en la alineación.</p>';
+
+        $html = '<h3>Resolver nombres de jugadores</h3><p class="sub">Ids de prueba: <code>'
+            . e(implode(', ', $ids)) . '</code></p>';
+
+        $qs = implode('&', array_map(function ($id) { return 'ids[]=' . urlencode($id); }, $ids));
+        $pruebas = [
+            '/players?' . $qs,
+            '/player/' . $ids[0],
+        ];
+
+        foreach ($pruebas as $ruta) {
+            $json = HttpHelper::getJson(self::TMAPI . $ruta);
+            $html .= '<h4><code>' . e($ruta) . '</code></h4>';
+            if (!is_array($json) || empty($json)) {
+                $err = HttpHelper::getLastJsonError();
+                $html .= '<p class="sub">Sin datos' . (is_array($err) ? ' — ' . e(json_encode($err, JSON_UNESCAPED_UNICODE)) : '') . '</p>';
+                continue;
+            }
+            $d = isset($json['data']) ? $json['data'] : $json;
+            $html .= '<pre>' . e(mb_substr(json_encode($d, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, 4000)) . '</pre>';
+        }
+
+        return $html;
     }
 
     /** Imprime una rama del JSON (ruta con puntos), mostrando los primeros N elementos. */
