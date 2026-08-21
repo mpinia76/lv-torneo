@@ -82,6 +82,111 @@ class ImportPartidosController extends Controller
         return $this->pagina('Carga de partidos', $html);
     }
 
+    // ═══════════════════ SONDEO DE UN PARTIDO (descubrimiento) ═══════════════════
+
+    /**
+     * Prueba los endpoints de tmapi para un partido y muestra qué devuelve cada uno.
+     * No escribe nada: sirve para saber de dónde salen alineaciones, goles,
+     * tarjetas, cambios y árbitro antes de escribir el importador.
+     *
+     *   /admin/import-partidos/partido?game_id=2480728
+     *   /admin/import-partidos/partido?partido_id=24803   (busca el gameId en el staging)
+     */
+    public function partido(Request $request)
+    {
+        set_time_limit(0);
+
+        $gameId = trim((string) $request->get('game_id', ''));
+        $fila = null;
+
+        if ($gameId === '' && $request->filled('partido_id')) {
+            $fila = DB::table('import_partidos')->where('partido_id', (int) $request->get('partido_id'))->first();
+            if ($fila) $gameId = (string) $fila->external_id;
+        }
+        if ($gameId === '') {
+            // Si no dijo nada, agarramos el primer partido aplicado que tengamos.
+            $fila = DB::table('import_partidos')->whereNotNull('external_id')
+                ->where('estado', 'aplicado')->orderBy('dia', 'desc')->first();
+            if ($fila) $gameId = (string) $fila->external_id;
+        }
+        if ($gameId === '') {
+            return $this->pagina('Sondeo de partido',
+                '<p class="err">Pasá <code>?game_id=</code> o <code>?partido_id=</code>.</p>');
+        }
+
+        $candidatos = [
+            "/game/{$gameId}",
+            "/game/{$gameId}/lineup",
+            "/game/{$gameId}/lineups",
+            "/game/{$gameId}/events",
+            "/game/{$gameId}/incidents",
+            "/game/{$gameId}/statistics",
+            "/game/{$gameId}/report",
+            "/match/{$gameId}",
+        ];
+
+        $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a></p>'
+            . '<h1>Sondeo de partido · gameId ' . e($gameId) . '</h1>';
+
+        if ($fila) {
+            $html .= '<p class="sub">' . e($fila->club_nombre . ' vs ' . $fila->rival_nombre)
+                . ' · ' . e(substr((string) $fila->dia, 0, 10))
+                . ' · ' . e((string) $fila->competencia_nombre)
+                . ($fila->partido_id ? ' · partido #' . (int) $fila->partido_id : '') . '</p>';
+        }
+        $html .= '<p class="sub">Cada endpoint es una llamada a ScraperAPI. Los que respondan con datos son los '
+            . 'que vamos a usar para alineaciones e incidencias.</p>';
+
+        foreach ($candidatos as $ruta) {
+            $json = HttpHelper::getJson(self::TMAPI . $ruta);
+
+            $html .= '<h2><code>' . e($ruta) . '</code></h2>';
+
+            if (!is_array($json) || empty($json)) {
+                $err = HttpHelper::getLastJsonError();
+                $html .= '<p class="sub">Sin datos' . (is_array($err) ? ' — ' . e(json_encode($err, JSON_UNESCAPED_UNICODE)) : '') . '</p>';
+                continue;
+            }
+
+            $data = isset($json['data']) ? $json['data'] : $json;
+            $html .= '<div class="diag">' . $this->arbolClaves($data) . '</div>';
+        }
+
+        return $this->pagina('Sondeo de partido', $html);
+    }
+
+    /** Muestra las claves de un JSON hasta cierta profundidad, con el JSON crudo al final. */
+    private function arbolClaves($data, $prof = 0)
+    {
+        if (!is_array($data)) return '<code>' . e(mb_substr((string) $data, 0, 120)) . '</code>';
+
+        $lineas = [];
+        $esLista = array_keys($data) === range(0, count($data) - 1);
+
+        if ($esLista) {
+            $lineas[] = '<strong>lista de ' . count($data) . ' elementos</strong>';
+            if (isset($data[0]) && is_array($data[0])) {
+                $lineas[] = '&nbsp;&nbsp;claves: <code>' . e(implode(', ', array_keys($data[0]))) . '</code>';
+            }
+        } else {
+            $lineas[] = '<strong>claves:</strong> <code>' . e(implode(', ', array_keys($data))) . '</code>';
+            if ($prof < 2) {
+                foreach ($data as $k => $v) {
+                    if (!is_array($v)) continue;
+                    $lineas[] = '&nbsp;&nbsp;↳ <em>' . e($k) . '</em>: ' . $this->arbolClaves($v, $prof + 1);
+                }
+            }
+        }
+
+        if ($prof === 0) {
+            $lineas[] = '<details><summary>JSON crudo</summary><pre>'
+                . e(mb_substr(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, 20000))
+                . '</pre></details>';
+        }
+
+        return implode('<br>', $lineas);
+    }
+
     // ═══════════════════════════════ SONDEO ═══════════════════════════════
 
     public function sondear(Request $request)
@@ -177,7 +282,7 @@ class ImportPartidosController extends Controller
         }
 
         $cont = ['total' => count($filas), 'excluido' => 0, 'duplicado' => 0,
-                 'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0];
+            'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0];
         foreach ($filas as $f) {
             if (isset($cont[$f['estado']])) $cont[$f['estado']]++;
             if ($f['estado'] === 'duplicado' && strpos((string) $f['motivo'], 'falta el DT') !== false) $cont['falta_dt']++;
@@ -261,7 +366,7 @@ class ImportPartidosController extends Controller
         $nombreDT = optional($tecnico->persona)->name ?: ('DT #' . $tecnico->id);
 
         $volver = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a> · '
-                . '<a href="' . e(route('import_partidos.sondear', ['tecnico_id' => $tecnicoId])) . '">Volver al sondeo</a></p>';
+            . '<a href="' . e(route('import_partidos.sondear', ['tecnico_id' => $tecnicoId])) . '">Volver al sondeo</a></p>';
 
         // ── Revisar/corregir la localía de lo ya aplicado ───────────────────
         if ((string) $request->get('arreglar_localia', '0') === '1') {
@@ -322,9 +427,9 @@ class ImportPartidosController extends Controller
             $k = $r->competencia_external_id . '|' . $r->temporada;
             if (!isset($grupos[$k])) {
                 $grupos[$k] = ['comp' => $r->competencia_external_id, 'temp' => $r->temporada,
-                               'nombre' => $r->competencia_nombre, 'n' => 0,
-                               'desde' => $r->dia, 'hasta' => $r->dia, 'equipos' => [],
-                               'equipo_id' => $r->equipo_id];
+                    'nombre' => $r->competencia_nombre, 'n' => 0,
+                    'desde' => $r->dia, 'hasta' => $r->dia, 'equipos' => [],
+                    'equipo_id' => $r->equipo_id];
             }
             $grupos[$k]['n']++;
             if ($r->dia < $grupos[$k]['desde']) $grupos[$k]['desde'] = $r->dia;
@@ -335,9 +440,9 @@ class ImportPartidosController extends Controller
         $torneos = \App\Torneo::orderBy('year', 'desc')->orderBy('nombre')->get();
 
         $html .= '<p class="sub">Cada competencia+temporada va a un torneo. Elegí uno de los tuyos; si no existe, '
-              . '«Crear torneo» abre el alta de siempre con el nombre, el año, el tipo y el ámbito ya cargados. '
-              . 'Lo guardás, volvés acá, refrescás y ya aparece en la lista.</p>'
-              . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Temp. TM</th><th>Partidos</th><th>Período</th><th>Equipo(s)</th><th>Torneo destino</th></tr></thead><tbody>';
+            . '«Crear torneo» abre el alta de siempre con el nombre, el año, el tipo y el ámbito ya cargados. '
+            . 'Lo guardás, volvés acá, refrescás y ya aparece en la lista.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Temp. TM</th><th>Partidos</th><th>Período</th><th>Equipo(s)</th><th>Torneo destino</th></tr></thead><tbody>';
 
         foreach ($grupos as $g) {
             // Ojo: la temporada de Transfermarkt no es el año del torneo. El Clausura 2026
@@ -374,7 +479,7 @@ class ImportPartidosController extends Controller
                         $yaSel = true;
                     }
                     $opts .= '<option value="' . $t->id . '"' . $sel . '>'
-                          . e($t->nombre . ' ' . $t->year . ' · ' . $etiqueta) . '</option>';
+                        . e($t->nombre . ' ' . $t->year . ' · ' . $etiqueta) . '</option>';
                 }
                 $opts .= '</optgroup>';
             }
@@ -421,8 +526,8 @@ class ImportPartidosController extends Controller
         {
             if ($torneoId === '' || $torneoId === 'nuevo') {
                 $g = ['comp' => $comp, 'temp' => $temp, 'nombre' => $primera->competencia_nombre,
-                      'desde' => $primera->dia, 'hasta' => $filas->last()->dia,
-                      'equipo_id' => $primera->equipo_id];
+                    'desde' => $primera->dia, 'hasta' => $filas->last()->dia,
+                    'equipo_id' => $primera->equipo_id];
                 return $this->pagina('Aplicar', $volver
                     . '<h1>Falta elegir el torneo</h1>'
                     . '<p class="sub">No se crea ningún torneo automáticamente. Creá el torneo con el alta de siempre '
@@ -497,12 +602,12 @@ class ImportPartidosController extends Controller
                 $ya = \App\Partido::where('fecha_id', $fecha->id)
                     ->where(function ($q) use ($equipolId, $equipovId) {
                         $q->where('equipol_id', $equipolId)->orWhere('equipov_id', $equipolId)
-                          ->orWhere('equipol_id', $equipovId)->orWhere('equipov_id', $equipovId);
+                            ->orWhere('equipol_id', $equipovId)->orWhere('equipov_id', $equipovId);
                     })->first();
 
                 if ($ya) {
                     $errores[] = 'Choque en la fecha «' . $numero . '»: ya hay un partido de ' . $r->club_nombre
-                               . ' ahí (partido #' . $ya->id . '). Ese quedó sin crear.';
+                        . ' ahí (partido #' . $ya->id . '). Ese quedó sin crear.';
                     continue;
                 }
 
@@ -693,7 +798,7 @@ class ImportPartidosController extends Controller
             }
 
             $antes = $this->nombreEquipo($partido->equipol_id) . ' ' . $partido->golesl . ':' . $partido->golesv
-                   . ' ' . $this->nombreEquipo($partido->equipov_id);
+                . ' ' . $this->nombreEquipo($partido->equipov_id);
 
             $partido->forceFill([
                 'equipol_id' => $equipolId,
@@ -776,7 +881,7 @@ class ImportPartidosController extends Controller
     {
         $n = mb_strtolower($this->normalizaTexto($nombre));
         $inter = ['libertadores', 'sudamericana', 'recopa', 'champions', 'mundial', 'intercontinental',
-                  'concacaf', 'club world', 'europa league', 'conference', 'merconorte', 'mercosur'];
+            'concacaf', 'club world', 'europa league', 'conference', 'merconorte', 'mercosur'];
         $ambito = 'Nacional';
         foreach ($inter as $k) if (strpos($n, $k) !== false) { $ambito = 'Internacional'; break; }
         $tipo = (strpos($n, 'copa') !== false || strpos($n, 'cup') !== false || $ambito === 'Internacional') ? 'Copa' : 'Liga';
@@ -929,7 +1034,7 @@ class ImportPartidosController extends Controller
             // Se buscan por par de equipos + localía + resultado exacto en una ventana amplia.
             if (!$partido && $equipoId && $rivalId) {
                 $partido = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
-                                                        (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda']);
+                    (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda']);
                 if ($partido) {
                     $corrido = (int) round((strtotime(substr($partido->dia, 0, 10)) - strtotime(substr($f['dia'], 0, 10))) / 86400);
                 }
@@ -991,19 +1096,19 @@ class ImportPartidosController extends Controller
         $q = \App\Partido::whereBetween('dia', [$d0, $d1]);
         if ($local === true) {
             $q->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
-              ->where('golesl', $gf)->where('golesv', $gc);
+                ->where('golesl', $gf)->where('golesv', $gc);
         } elseif ($local === false) {
             $q->where('equipol_id', $rivalId)->where('equipov_id', $equipoId)
-              ->where('golesl', $gc)->where('golesv', $gf);
+                ->where('golesl', $gc)->where('golesv', $gf);
         } else {
             // Sin localía conocida: cualquiera de los dos órdenes, con el resultado que corresponda.
             $q->where(function ($w) use ($equipoId, $rivalId, $gf, $gc) {
                 $w->where(function ($x) use ($equipoId, $rivalId, $gf, $gc) {
                     $x->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
-                      ->where('golesl', $gf)->where('golesv', $gc);
+                        ->where('golesl', $gf)->where('golesv', $gc);
                 })->orWhere(function ($x) use ($equipoId, $rivalId, $gf, $gc) {
                     $x->where('equipol_id', $rivalId)->where('equipov_id', $equipoId)
-                      ->where('golesl', $gc)->where('golesv', $gf);
+                        ->where('golesl', $gc)->where('golesv', $gf);
                 });
             });
         }
@@ -1070,7 +1175,7 @@ class ImportPartidosController extends Controller
 
             if ($f['estado'] === 'duplicado' && $f['equipo_id'] && $f['rival_id']) {
                 foreach ([[$f['club_external_id'], $f['equipo_id'], $f['club_nombre']],
-                          [$f['rival_external_id'], $f['rival_id'], $f['rival_nombre']]] as $par) {
+                             [$f['rival_external_id'], $f['rival_id'], $f['rival_nombre']]] as $par) {
                     if ($par[0] && !isset($mapaTm[(string) $par[0]])) {
                         $this->guardarMapeo($par[0], $par[1], $par[2], 'nombre');
                         $mapaTm[(string) $par[0]] = $par[1];
@@ -1132,7 +1237,7 @@ class ImportPartidosController extends Controller
         DB::table('equipo_tm')->updateOrInsert(
             ['tm_club_id' => (string) $tmClubId],
             ['equipo_id' => (int) $equipoId, 'nombre_tm' => $nombre, 'origen' => $origen,
-             'updated_at' => now(), 'created_at' => now()]
+                'updated_at' => now(), 'created_at' => now()]
         );
     }
 
@@ -1287,7 +1392,7 @@ class ImportPartidosController extends Controller
         $clave = ['fuente' => 'transfermarkt', 'external_id' => $f['external_id'], 'tecnico_id' => $tecnicoId ?: null];
         if (!$f['external_id']) {
             $clave = ['fuente' => 'transfermarkt', 'tecnico_id' => $tecnicoId ?: null,
-                      'club_nombre' => $f['club_nombre'], 'rival_nombre' => $f['rival_nombre'], 'dia' => $f['dia']];
+                'club_nombre' => $f['club_nombre'], 'rival_nombre' => $f['rival_nombre'], 'dia' => $f['dia']];
         }
 
         // Una fila ya aplicada no se pisa… salvo que el partido que había creado
@@ -1379,7 +1484,7 @@ class ImportPartidosController extends Controller
     {
         $q = $request->query();
         unset($q['guardar'], $q['aprender'], $q['estado'], $q['limite'], $q['cache'],
-              $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre']);
+            $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre']);
         return $request->url() . '?' . http_build_query($q);
     }
 
@@ -1396,17 +1501,17 @@ class ImportPartidosController extends Controller
             if ($k === '') continue;
             if (!isset($mal[$k])) {
                 $mal[$k] = ['nombre' => $f['rival_nombre'], 'actual' => $f['rival_id'],
-                            'real' => $f['rival_real_id'], 'n' => 0];
+                    'real' => $f['rival_real_id'], 'n' => 0];
             }
             $mal[$k]['n']++;
         }
         if (empty($mal)) return '';
 
         $out = '<h2 class="err">Mapeos que no cierran <span class="sub">(' . count($mal) . ')</span></h2>'
-             . '<p class="sub">Estos clubes están mapeados a un equipo tuyo, pero el partido de esa fecha en tu base '
-             . 'es contra otro rival. Casi siempre es un homónimo mal enganchado. Corregilo y el partido pasa a «ya cargado».</p>'
-             . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Mapeado hoy a</th>'
-             . '<th>Debería ser</th><th>Partidos</th><th></th></tr></thead><tbody>';
+            . '<p class="sub">Estos clubes están mapeados a un equipo tuyo, pero el partido de esa fecha en tu base '
+            . 'es contra otro rival. Casi siempre es un homónimo mal enganchado. Corregilo y el partido pasa a «ya cargado».</p>'
+            . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Mapeado hoy a</th>'
+            . '<th>Debería ser</th><th>Partidos</th><th></th></tr></thead><tbody>';
 
         foreach ($mal as $tmId => $d) {
             $q = $request->query();
@@ -1418,10 +1523,10 @@ class ImportPartidosController extends Controller
             $href = $request->url() . '?' . http_build_query($q);
 
             $out .= '<tr class="err"><td>' . e($d['nombre']) . '</td><td class="num">' . e($tmId) . '</td>'
-                 . '<td>' . e($this->nombreEquipo($d['actual'])) . ' <span class="id">#' . (int) $d['actual'] . '</span></td>'
-                 . '<td><b>' . e($this->nombreEquipo($d['real'])) . '</b> <span class="id">#' . (int) $d['real'] . '</span></td>'
-                 . '<td class="num">' . $d['n'] . '</td>'
-                 . '<td><a class="boton" href="' . e($href) . '">Corregir</a></td></tr>';
+                . '<td>' . e($this->nombreEquipo($d['actual'])) . ' <span class="id">#' . (int) $d['actual'] . '</span></td>'
+                . '<td><b>' . e($this->nombreEquipo($d['real'])) . '</b> <span class="id">#' . (int) $d['real'] . '</span></td>'
+                . '<td class="num">' . $d['n'] . '</td>'
+                . '<td><a class="boton" href="' . e($href) . '">Corregir</a></td></tr>';
         }
         return $out . '</tbody></table></div>';
     }
@@ -1432,7 +1537,7 @@ class ImportPartidosController extends Controller
         foreach ($filas as $f) {
             if ($f['estado'] !== 'conflicto') continue;
             foreach ([[$f['club_external_id'], $f['club_nombre'], $f['equipo_id']],
-                      [$f['rival_external_id'], $f['rival_nombre'], $f['rival_id']]] as $c) {
+                         [$f['rival_external_id'], $f['rival_nombre'], $f['rival_id']]] as $c) {
                 if ($c[2] || !$c[0]) continue;
                 $k = (string) $c[0];
                 if (!isset($pend[$k])) $pend[$k] = ['nombre' => $c[1], 'n' => 0];
@@ -1450,26 +1555,26 @@ class ImportPartidosController extends Controller
         }
 
         $out = '<h2>Clubes sin mapear <span class="sub">(' . count($pend) . ')</span></h2>'
-             . '<p class="sub">Elegí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
-             . 'Si el club no existe en tu base, «Crear equipo» lo abre en otra pestaña; cuando volvés acá y refrescás, '
-             . 'aparece en la lista <b>sin volver a bajar nada de Transfermarkt</b>.</p>'
-             . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
+            . '<p class="sub">Elegí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
+            . 'Si el club no existe en tu base, «Crear equipo» lo abre en otra pestaña; cuando volvés acá y refrescás, '
+            . 'aparece en la lista <b>sin volver a bajar nada de Transfermarkt</b>.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
 
         foreach ($pend as $tmId => $d) {
             $out .= '<tr><td>' . e($d['nombre']) . '</td><td class="num">' . e($tmId) . '</td><td class="num">' . $d['n'] . '</td>'
-                 . '<td><form method="get" action="' . e($request->url()) . '">';
+                . '<td><form method="get" action="' . e($request->url()) . '">';
             foreach ($request->query() as $k => $v) {
                 if (in_array($k, ['mapear_tm', 'mapear_equipo', 'mapear_nombre', 'guardar', 'aprender'], true)) continue;
                 if (is_array($v)) continue;
                 $out .= '<input type="hidden" name="' . e($k) . '" value="' . e($v) . '">';
             }
             $out .= '<input type="hidden" name="mapear_tm" value="' . e($tmId) . '">'
-                 . '<input type="hidden" name="mapear_nombre" value="' . e($d['nombre']) . '">'
-                 . '<input type="hidden" name="cache" value="1">'
-                 . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select>'
-                 . ' <button>Mapear</button></form>'
-                 . '<a class="boton-sec" href="' . e(route('equipos.create')) . '" target="_blank">Crear equipo ↗</a>'
-                 . '</td></tr>';
+                . '<input type="hidden" name="mapear_nombre" value="' . e($d['nombre']) . '">'
+                . '<input type="hidden" name="cache" value="1">'
+                . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select>'
+                . ' <button>Mapear</button></form>'
+                . '<a class="boton-sec" href="' . e(route('equipos.create')) . '" target="_blank">Crear equipo ↗</a>'
+                . '</td></tr>';
         }
         return $out . '</tbody></table></div>';
     }
