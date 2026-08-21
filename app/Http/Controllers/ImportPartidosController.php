@@ -114,16 +114,16 @@ class ImportPartidosController extends Controller
                 '<p class="err">Pasá <code>?game_id=</code> o <code>?partido_id=</code>.</p>');
         }
 
-        $candidatos = [
-            "/game/{$gameId}",
-            "/game/{$gameId}/lineup",
-            "/game/{$gameId}/lineups",
-            "/game/{$gameId}/events",
-            "/game/{$gameId}/incidents",
-            "/game/{$gameId}/statistics",
-            "/game/{$gameId}/report",
-            "/match/{$gameId}",
-        ];
+        // /game/{id} trae todo (lineup, actions, referees). Los demás dan 404:
+        // solo se prueban si se los pide expresamente con &todos=1.
+        $candidatos = ["/game/{$gameId}"];
+        if ((string) $request->get('todos', '0') === '1') {
+            $candidatos = array_merge($candidatos, [
+                "/game/{$gameId}/lineup", "/game/{$gameId}/lineups", "/game/{$gameId}/events",
+                "/game/{$gameId}/incidents", "/game/{$gameId}/statistics", "/game/{$gameId}/report",
+                "/match/{$gameId}",
+            ]);
+        }
 
         $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a></p>'
             . '<h1>Sondeo de partido · gameId ' . e($gameId) . '</h1>';
@@ -137,6 +137,9 @@ class ImportPartidosController extends Controller
         $html .= '<p class="sub">Cada endpoint es una llamada a ScraperAPI. Los que respondan con datos son los '
             . 'que vamos a usar para alineaciones e incidencias.</p>';
 
+        $rama = trim((string) $request->get('rama', ''));
+        $cuantos = max(1, (int) $request->get('n', 3));
+
         foreach ($candidatos as $ruta) {
             $json = HttpHelper::getJson(self::TMAPI . $ruta);
 
@@ -149,10 +152,46 @@ class ImportPartidosController extends Controller
             }
 
             $data = isset($json['data']) ? $json['data'] : $json;
+
+            // Atajos para mirar una rama concreta sin abrir el JSON entero.
+            if ($ruta === "/game/{$gameId}") {
+                $ramas = ['homeClub.lineup.players', 'homeClub.lineup.substitutes', 'homeClub.actions.goals',
+                    'homeClub.actions.cards', 'homeClub.actions.substitutes', 'homeClub.tactic',
+                    'actions', 'refereeIds', 'playerIds', 'coaches', 'score', 'baseDetails'];
+                $links = [];
+                foreach ($ramas as $r) {
+                    $links[] = '<a href="' . e($request->url() . '?' . http_build_query(
+                                array_merge($request->query(), ['rama' => $r, 'n' => $cuantos]))) . '">' . e($r) . '</a>';
+                }
+                $html .= '<p class="acciones">Ver rama: ' . implode(' · ', $links) . '</p>';
+
+                if ($rama !== '') {
+                    $html .= '<h3><code>' . e($rama) . '</code></h3>' . $this->verRama($data, $rama, $cuantos);
+                }
+            }
+
             $html .= '<div class="diag">' . $this->arbolClaves($data) . '</div>';
         }
 
         return $this->pagina('Sondeo de partido', $html);
+    }
+
+    /** Imprime una rama del JSON (ruta con puntos), mostrando los primeros N elementos. */
+    private function verRama($data, $rama, $cuantos)
+    {
+        $actual = $data;
+        foreach (explode('.', $rama) as $paso) {
+            if (!is_array($actual) || !array_key_exists($paso, $actual)) {
+                return '<p class="err">No existe esa rama.</p>';
+            }
+            $actual = $actual[$paso];
+        }
+
+        $esLista = is_array($actual) && array_keys($actual) === range(0, max(0, count($actual) - 1));
+        $muestra = $esLista ? array_slice($actual, 0, $cuantos) : $actual;
+
+        return '<pre>' . e(json_encode($muestra, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
+            . '</pre>' . ($esLista ? '<p class="sub">' . count($actual) . ' elementos en total.</p>' : '');
     }
 
     /** Muestra las claves de un JSON hasta cierta profundidad, con el JSON crudo al final. */
