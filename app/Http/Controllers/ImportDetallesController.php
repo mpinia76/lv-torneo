@@ -52,6 +52,8 @@ class ImportDetallesController extends Controller
             }
         }
 
+        $fechas = $this->mapaFechas($ids);
+
         $pendientes = [];
         $listos = 0;
         foreach ($filas as $f) {
@@ -150,6 +152,7 @@ class ImportDetallesController extends Controller
         foreach ($pendientes as $f) {
             if ($n++ >= 400) break;
             $tiene = isset($conAlineacion[(int) $f->partido_id]);
+            $inc = $this->linkIncidencias(isset($fechas[(int) $f->partido_id]) ? $fechas[(int) $f->partido_id] : null);
             $cuerpo .= '<tr>'
                 . '<td class="num">' . e($f->dia ? substr($f->dia, 0, 10) : '—') . '</td>'
                 . '<td>' . e($f->competencia_nombre) . '</td>'
@@ -163,6 +166,7 @@ class ImportDetallesController extends Controller
                 . '<td><a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $f->partido_id])) . '">Ver</a>'
                 . ' · <a href="' . e(route('import_detalles.bajar', ['partido_id' => (int) $f->partido_id])) . '"><b>Bajar</b></a>'
                 . ($tiene ? ' · <a href="' . e(route('import_detalles.bajar', ['partido_id' => (int) $f->partido_id, 'forzar' => 1])) . '" class="err">Rehacer</a>' : '')
+                . ($inc !== '' ? ' · ' . $inc : '')
                 . '</td></tr>';
         }
         $cuerpo .= '</tbody></table></div>';
@@ -215,9 +219,13 @@ class ImportDetallesController extends Controller
             . '<h1>' . ($escribir ? 'Detalle cargado' : 'Vista previa') . ' · partido #' . $partidoId . '</h1>';
 
         if ($fila) {
+            $mapa = $this->mapaFechas([$partidoId]);
+            $inc  = $this->linkIncidencias(isset($mapa[$partidoId]) ? $mapa[$partidoId] : null,
+                'Incidencias del partido →');
             $cuerpo .= '<p class="sub">' . e($fila->club_nombre . ' vs ' . $fila->rival_nombre)
                 . ' · ' . e(substr((string) $fila->dia, 0, 10)) . ' · ' . e((string) $fila->competencia_nombre)
-                . ' · gameId ' . e($gameId) . ' · ' . (int) $r['llamadas'] . ' llamada(s) a la API</p>';
+                . ' · gameId ' . e($gameId) . ' · ' . (int) $r['llamadas'] . ' llamada(s) a la API'
+                . ($inc !== '' ? ' · ' . $inc : '') . '</p>';
         }
 
         if ($r['error']) {
@@ -339,6 +347,8 @@ class ImportDetallesController extends Controller
 
         $filas = $q->orderBy('dia', 'desc')->offset($rehacer ? $desde : 0)->limit($n)->get();
 
+        $fechas = $this->mapaFechas($filas->pluck('partido_id')->all());
+
         $imp = new TmDetallePartido;
         $ok = 0; $fallaron = 0; $llamadas = 0; $nuevos = 0;
         $detalle = '';
@@ -351,6 +361,7 @@ class ImportDetallesController extends Controller
 
             $etiqueta = e($f->club_nombre . ' vs ' . $f->rival_nombre) . ' <span class="id">'
                 . e(substr((string) $f->dia, 0, 10)) . ' · partido #' . (int) $f->partido_id . '</span>';
+            $inc = $this->linkIncidencias(isset($fechas[(int) $f->partido_id]) ? $fechas[(int) $f->partido_id] : null);
 
             if ($r['escrito']) {
                 $ok++;
@@ -360,7 +371,8 @@ class ImportDetallesController extends Controller
                     . count($r['plan']['tarjetas']) . ' tarjetas, '
                     . count($r['plan']['cambios']) . ' cambios'
                     . (count($r['plan']['arbitros']) ? ', ' . count($r['plan']['arbitros']) . ' árbitros' : '')
-                    . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $f->partido_id])) . '">ver</a></div>';
+                    . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $f->partido_id])) . '">ver</a>'
+                    . ($inc !== '' ? ' · ' . $inc : '') . '</div>';
             } else {
                 $fallaron++;
                 $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
@@ -608,6 +620,30 @@ class ImportDetallesController extends Controller
     }
 
     // ═══════════════════════════ AUXILIARES ═══════════════════════════
+
+    /**
+     * partido_id => fecha_id, para linkear a "Datos complementarios"
+     * (`fechas.show`): la pantalla desde donde se editan alineaciones, goles,
+     * tarjetas, jueces, sustituciones y penales de cada partido.
+     */
+    private function mapaFechas(array $partidoIds)
+    {
+        $mapa = [];
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        foreach (array_chunk($ids, 500) as $trozo) {
+            foreach (DB::table('partidos')->whereIn('id', $trozo)->select('id', 'fecha_id')->get() as $p) {
+                $mapa[(int) $p->id] = (int) $p->fecha_id;
+            }
+        }
+        return $mapa;
+    }
+
+    /** Link a las incidencias del partido. Vacío si no sabemos la fecha. */
+    private function linkIncidencias($fechaId, $texto = 'Incidencias')
+    {
+        if (!$fechaId) return '';
+        return '<a href="' . e(route('fechas.show', (int) $fechaId)) . '" target="_blank">' . e($texto) . '</a>';
+    }
 
     private function tecnicosConPartidos()
     {

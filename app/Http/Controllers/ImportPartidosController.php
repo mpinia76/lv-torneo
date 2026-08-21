@@ -727,7 +727,8 @@ class ImportPartidosController extends Controller
                     . '<td class="num">' . $golesl . ':' . $golesv . '</td>'
                     . '<td>' . e($this->nombreEquipo($equipovId)) . '</td>'
                     . '<td class="num">' . ($local ? 'L' : 'V') . '</td>'
-                    . '<td class="num">#' . $partido->id . '</td></tr>';
+                    . '<td class="num"><span class="id">#' . $partido->id . '</span> '
+                    . $this->linkIncidencias($fecha->id) . '</td></tr>';
                 $creados++;
             } catch (\Throwable $ex) {
                 $errores[] = 'Error en ' . $r->club_nombre . ' vs ' . $r->rival_nombre . ': ' . $ex->getMessage();
@@ -1692,11 +1693,41 @@ class ImportPartidosController extends Controller
         return '<div class="card ' . $tono . '"><b>' . (int) $n . '</b><span>' . e($label) . '</span></div>';
     }
 
+    /**
+     * partido_id => fecha_id, para poder linkear a "Datos complementarios"
+     * (`fechas.show`), que es la pantalla desde donde se cargan alineaciones,
+     * goles, tarjetas, jueces, sustituciones y penales de cada partido.
+     */
+    private function mapaFechas(array $partidoIds)
+    {
+        $mapa = [];
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        foreach (array_chunk($ids, 500) as $trozo) {
+            foreach (DB::table('partidos')->whereIn('id', $trozo)->select('id', 'fecha_id')->get() as $p) {
+                $mapa[(int) $p->id] = (int) $p->fecha_id;
+            }
+        }
+        return $mapa;
+    }
+
+    /** Link a las incidencias del partido. Vacío si no sabemos la fecha. */
+    private function linkIncidencias($fechaId, $texto = 'Incidencias')
+    {
+        if (!$fechaId) return '';
+        return '<a href="' . e(route('fechas.show', (int) $fechaId)) . '" target="_blank">' . e($texto) . '</a>';
+    }
+
     private function tabla(array $filas, $limite, $filtro = '')
     {
         $out = '<div class="scroll"><table><thead><tr>'
             . '<th>Fecha</th><th>Competencia</th><th>Año</th><th>Temp. TM</th><th>Fecha nº</th><th>Club</th><th></th><th>Rival</th>'
             . '<th>Res.</th><th>gameId</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>';
+
+        // Para los que ya están en la base, link directo a sus incidencias.
+        $idsPartido = [];
+        foreach ($filas as $f) if (!empty($f['partido_id'])) $idsPartido[] = $f['partido_id'];
+        $fechas = $this->mapaFechas($idsPartido);
+
         $n = 0;
         foreach ($filas as $f) {
             if ($filtro !== '' && $f['estado'] !== $filtro) continue;
@@ -1714,7 +1745,11 @@ class ImportPartidosController extends Controller
                 . '<td class="num">' . e($f['goles_favor']) . ':' . e($f['goles_contra']) . '</td>'
                 . '<td class="num">' . e($f['external_id'] ?: '—') . '</td>'
                 . '<td>' . e($f['estado']) . '</td>'
-                . '<td>' . e($f['motivo']) . ($f['partido_id'] ? ' <span class="id">partido #' . $f['partido_id'] . '</span>' : '') . '</td>'
+                . '<td>' . e($f['motivo'])
+                . ($f['partido_id']
+                    ? ' <span class="id">partido #' . $f['partido_id'] . '</span> '
+                    . $this->linkIncidencias(isset($fechas[(int) $f['partido_id']]) ? $fechas[(int) $f['partido_id']] : null)
+                    : '') . '</td>'
                 . '</tr>';
         }
         return $out . '</tbody></table></div>';

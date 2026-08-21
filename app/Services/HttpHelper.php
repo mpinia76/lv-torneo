@@ -13,6 +13,11 @@ class HttpHelper
     // NO volver a hardcodearlas acá: este archivo va a git.
     // Si cambiás el .env acordate de correr `php artisan config:clear`.
 
+    /** Texto del error cuando no hay clave configurada. */
+    const SIN_CLAVE = 'Falta SCRAPERAPI_KEY en el .env de ESTE servidor '
+        . '(ojo: el .env no viaja por git, hay que cargarlo a mano en cada entorno). '
+        . 'Si ya está, corré php artisan config:clear o borrá bootstrap/cache/config.php.';
+
     /** Clave principal: modo básico, 1 crédito (tmapi, HTML de TM, fotos). */
     private static function apiKey()
     {
@@ -546,6 +551,12 @@ class HttpHelper
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
         $viaScraper = ($host !== '' && strpos($host, 'transfermarkt') !== false);
 
+        if ($viaScraper && self::apiKey() === '') {
+            $out['error'] = 'sin_api_key';
+            Log::error('HttpHelper: ' . self::SIN_CLAVE);
+            return $out;
+        }
+
         $endpoint = $viaScraper
             ? ('https://api.scraperapi.com/?' . http_build_query([
                     'api_key'      => self::apiKey(),
@@ -599,6 +610,15 @@ class HttpHelper
     {
         self::$lastJsonError = null;
         $sinCreditos = false;
+
+        // Sin clave, ScraperAPI devuelve un 401 que parece un problema de la
+        // cuenta y en realidad es de configuración. Lo decimos claro acá.
+        if (self::apiKey() === '') {
+            self::$lastJsonError = ['code' => 'sin_api_key', 'http' => 0,
+                'message' => self::SIN_CLAVE, 'snippet' => ''];
+            Log::error('HttpHelper: ' . self::SIN_CLAVE);
+            return false;
+        }
 
         $params = [
             'api_key'      => self::apiKey(),
@@ -733,6 +753,11 @@ class HttpHelper
     // ---------------------------------------------------
     private static function getHtmlViaScraper(string $url)
     {
+        if (self::apiKey() === '') {
+            Log::error('HttpHelper: ' . self::SIN_CLAVE);
+            return false;
+        }
+
         $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
                 'api_key'      => self::apiKey(),
                 'url'          => $url,
