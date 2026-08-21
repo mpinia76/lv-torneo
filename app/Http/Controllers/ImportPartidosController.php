@@ -526,9 +526,15 @@ class ImportPartidosController extends Controller
                 DB::table('import_partidos')->where('id', $r->id)
                     ->update(['estado' => 'aplicado', 'partido_id' => $partido->id, 'motivo' => null, 'updated_at' => now()]);
 
+                // Ojo: local y visitante son los que corresponden por venue, NO
+                // "club dirigido vs rival". Imprimir el club siempre a la izquierda
+                // hacía parecer que todos los partidos eran de local.
                 $detalle .= '<tr><td class="num">' . e(substr($r->dia, 0, 10)) . '</td><td class="num">' . e($numero) . '</td>'
-                    . '<td>' . e($r->club_nombre) . '</td><td class="num">' . $golesl . ':' . $golesv . '</td>'
-                    . '<td>' . e($r->rival_nombre) . '</td><td class="num">#' . $partido->id . '</td></tr>';
+                    . '<td>' . e($this->nombreEquipo($equipolId)) . '</td>'
+                    . '<td class="num">' . $golesl . ':' . $golesv . '</td>'
+                    . '<td>' . e($this->nombreEquipo($equipovId)) . '</td>'
+                    . '<td class="num">' . ($local ? 'L' : 'V') . '</td>'
+                    . '<td class="num">#' . $partido->id . '</td></tr>';
                 $creados++;
             } catch (\Throwable $ex) {
                 $errores[] = 'Error en ' . $r->club_nombre . ' vs ' . $r->rival_nombre . ': ' . $ex->getMessage();
@@ -547,7 +553,7 @@ class ImportPartidosController extends Controller
             $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>' . e(implode(' — ', $errores)) . '</p>';
         }
         if ($detalle) {
-            $html .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Fecha nº</th><th>Local</th><th>Res.</th><th>Visitante</th><th>Partido</th></tr></thead><tbody>'
+            $html .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Fecha nº</th><th>Local</th><th>Res.</th><th>Visitante</th><th>El DT jugó de</th><th>Partido</th></tr></thead><tbody>'
                 . $detalle . '</tbody></table></div>';
         }
         $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId])) . '">Seguir con el resto →</a></p>';
@@ -645,11 +651,33 @@ class ImportPartidosController extends Controller
             ->whereNotNull('partido_id')->get();
 
         $corregidos = 0; $revisados = 0; $detalle = '';
+        $sinPayload = 0; $payloadRoto = 0; $sinLocalia = 0; $diag = '';
 
         foreach ($filas as $r) {
             $revisados++;
+
+            if (empty($r->payload)) {
+                $sinPayload++;
+            } elseif (!is_array(json_decode($r->payload, true))) {
+                $payloadRoto++;
+            }
+
             $datos = $this->datosPartido($r);
-            if ($datos['local'] === null || !$r->equipo_id || !$r->rival_id) continue;
+
+            if (count(explode('<tr>', $diag)) <= 6) {
+                $p = \App\Partido::find($r->partido_id);
+                $diag .= '<tr><td class="num">' . e(substr($r->dia, 0, 10)) . '</td>'
+                    . '<td>' . e($r->club_nombre) . ' vs ' . e($r->rival_nombre) . '</td>'
+                    . '<td class="num">' . ($datos['local'] === null ? '?' : ($datos['local'] ? 'L' : 'V'))
+                    . ' ' . (int) $datos['gf'] . ':' . (int) $datos['gc'] . '</td>'
+                    . '<td class="num">' . (empty($r->payload) ? 'sin payload' : (is_array(json_decode($r->payload, true)) ? 'ok' : 'roto')) . '</td>'
+                    . '<td class="num">' . ($r->local === null ? 'null' : (int) $r->local) . '</td>'
+                    . '<td>' . ($p ? e($this->nombreEquipo($p->equipol_id) . ' ' . $p->golesl . ':' . $p->golesv . ' ' . $this->nombreEquipo($p->equipov_id)) : 'sin partido') . '</td>'
+                    . '</tr>';
+            }
+
+            if ($datos['local'] === null) { $sinLocalia++; continue; }
+            if (!$r->equipo_id || !$r->rival_id) continue;
 
             $partido = \App\Partido::find($r->partido_id);
             if (!$partido) continue;
@@ -685,7 +713,20 @@ class ImportPartidosController extends Controller
 
         $html = '<h1>Localía revisada</h1>'
             . '<p class="ok-box">Revisé ' . $revisados . ' partidos ya aplicados de este DT. '
-            . ($corregidos ? ('Corregí <b>' . $corregidos . '</b>.') : 'Estaban todos bien.') . '</p>';
+            . ($corregidos ? ('Corregí <b>' . $corregidos . '</b>.') : 'No hubo nada que corregir.') . '</p>';
+
+        if ($sinPayload || $payloadRoto || $sinLocalia) {
+            $html .= '<p class="err-box">Ojo: ' . $sinPayload . ' sin payload · ' . $payloadRoto
+                . ' con payload ilegible · ' . $sinLocalia . ' sin localía. '
+                . 'En esos casos no puedo recalcular nada y por eso quedan como están.</p>';
+        }
+
+        if ($diag) {
+            $html .= '<h2>Qué está comparando</h2>'
+                . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Partido en TM</th>'
+                . '<th>Recalculado</th><th>Payload</th><th>Columna local</th><th>Partido en tu base</th>'
+                . '</tr></thead><tbody>' . $diag . '</tbody></table></div>';
+        }
 
         if ($detalle) {
             $html .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Estaba</th><th>Quedó</th><th>Partido</th></tr></thead><tbody>'
