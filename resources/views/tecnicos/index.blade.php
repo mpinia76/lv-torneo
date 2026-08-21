@@ -74,6 +74,10 @@
                            class="btn btn-warning m-1">
                             Estadísticas
                         </a>
+                        <a href="{{ route('import_partidos.sondear', ['tecnico_id' => $tecnico->id, 'aprender' => 1, 'guardar' => 1]) }}"
+                           class="btn btn-success m-1" target="_blank">
+                            Partidos
+                        </a>
                     </div>
 
                 </td>

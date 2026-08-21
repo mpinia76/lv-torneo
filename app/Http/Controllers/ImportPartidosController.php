@@ -73,9 +73,8 @@ class ImportPartidosController extends Controller
         }
 
         $html = '<h1>Carga de partidos · DT por DT</h1>'
-            . '<p class="sub">' . $tecnicos->count() . ' DTs con URL de Transfermarkt. '
-            . '«Sondear» baja sus partidos, aprende el mapeo de clubes y los deja en staging. '
-            . '«Aplicar» crea los que faltan.</p>'
+            . '<p class="sub">Estos son los DTs que ya pasaron por el sondeo. El botón <b>Partidos</b> de la lista de técnicos '
+            . 'baja los partidos del DT y los deja en staging; necesita que el DT tenga cargado el slug de Transfermarkt.</p>'
             . '<form method="get" style="margin:12px 0"><input name="q" value="' . e($q) . '" placeholder="buscar DT…" size="30"> <button>Buscar</button></form>'
             . '<div class="scroll"><table><thead><tr><th>DT</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th>Aplicados</th><th></th></tr></thead>'
             . '<tbody>' . $filas . '</tbody></table></div>';
@@ -111,11 +110,27 @@ class ImportPartidosController extends Controller
         }
 
         $nombreDT = null;
+        $tecnico = null;
         if ($tecnicoId) {
             $tecnico = \App\Tecnico::with('persona')->find($tecnicoId);
             if (!$tecnico) return $this->pagina('Sondeo', '<p class="err">No existe el técnico #' . (int) $tecnicoId . '</p>');
             $nombreDT = optional($tecnico->persona)->name ?: ('DT #' . $tecnico->id);
-            if ($url === '') $url = (string) $tecnico->transfermarkt_url;
+            if ($url === '') $url = trim((string) $tecnico->transfermarkt_url);
+
+            if ($url !== '') {
+                $avisos[] = 'Slug de Transfermarkt <b>ya cargado</b>: <code>' . e($url) . '</code> '
+                    . '<a href="' . e($url) . '" target="_blank">ver perfil ↗</a>';
+            }
+
+            // Sin slug no hay nada que hacer: lo cargás vos desde la pantalla de estadísticas.
+            if ($url === '') {
+                return $this->pagina('Sondeo',
+                    '<h1>' . e($nombreDT) . '</h1>'
+                    . '<p class="err-box">Este DT no tiene cargado el slug de Transfermarkt.<br>'
+                    . 'Buscalo y pegalo en <b>Importar desde Transfermarkt</b> '
+                    . '(<a href="' . e(route('tecnico-estadisticas.createPorTecnico', $tecnico->id)) . '">abrir la pantalla del DT</a>), '
+                    . 'y volvé a apretar <b>Partidos</b>.</p>');
+            }
         }
         if ($url === '') {
             return $this->pagina('Sondeo', '<p class="err">Falta <code>?tecnico_id=</code> o <code>?url=</code>.</p>');
