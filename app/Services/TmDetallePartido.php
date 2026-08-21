@@ -1513,6 +1513,142 @@ class TmDetallePartido
     }
 
     /**
+     * Rearma las plantillas de partidos que YA tienen la alineación cargada,
+     * sin gastar una sola llamada a Transfermarkt.
+     *
+     * Los partidos que se importaron antes de que el detalle empezara a escribir
+     * `plantilla_jugadors` quedaron con la alineación completa pero fuera de la
+     * plantilla del torneo: se ven bien en la ficha, pero `/admin/alineaciones`
+     * no los ofrece en los desplegables. Como la alineación ya está guardada,
+     * la plantilla se reconstruye desde la base misma.
+     *
+     * @param  array $partidoIds
+     * @param  bool  $escribir   false = sólo informa qué faltaría
+     * @return array
+     */
+    public static function plantillasDesdeAlineaciones(array $partidoIds, $escribir = false)
+    {
+        $out = ['alineaciones' => 0, 'partidos' => 0, 'faltantes' => [], 'agregados' => 0,
+            'plantillas_nuevas' => 0, 'fallidas' => 0, 'avisos' => []];
+
+        $partidoIds = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        if (empty($partidoIds)) return $out;
+
+        // Alineaciones ya cargadas, con el torneo y el grupo de cada partido.
+        $filas = [];
+        foreach (array_chunk($partidoIds, 500) as $trozo) {
+            $rows = DB::table('alineacions')
+                ->join('partidos', 'partidos.id', '=', 'alineacions.partido_id')
+                ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+                ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+                ->whereIn('alineacions.partido_id', $trozo)
+                ->whereNotNull('alineacions.jugador_id')
+                ->whereNotNull('alineacions.equipo_id')
+                ->select('alineacions.partido_id', 'alineacions.jugador_id', 'alineacions.equipo_id',
+                    'alineacions.dorsal', 'grupos.id AS grupo_id', 'grupos.torneo_id')
+                ->get();
+            foreach ($rows as $r) $filas[] = $r;
+        }
+        $out['alineaciones'] = count($filas);
+        if (empty($filas)) return $out;
+
+        $porPartido = [];
+        $torneos = []; $equipos = [];
+        foreach ($filas as $r) {
+            $porPartido[(int) $r->partido_id] = true;
+            $torneos[(int) $r->torneo_id] = true;
+            $equipos[(int) $r->equipo_id] = true;
+        }
+        $out['partidos'] = count($porPartido);
+
+        // Una plantilla por equipo y por torneo, esté en el grupo que esté
+        // (mismo criterio que grabarPlantillas y que AlineacionController).
+        $plantillaDe = [];
+        foreach (DB::table('plantillas')
+                     ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+                     ->whereIn('grupos.torneo_id', array_keys($torneos))
+                     ->whereIn('plantillas.equipo_id', array_keys($equipos))
+                     ->orderBy('plantillas.id')
+                     ->select('grupos.torneo_id', 'plantillas.equipo_id', 'plantillas.id')
+                     ->get() as $p) {
+            $k = (int) $p->torneo_id . '-' . (int) $p->equipo_id;
+            if (!isset($plantillaDe[$k])) $plantillaDe[$k] = (int) $p->id;
+        }
+
+        $yaEsta = [];
+        if (!empty($plantillaDe)) {
+            foreach (array_chunk(array_values($plantillaDe), 500) as $trozo) {
+                foreach (DB::table('plantilla_jugadors')->whereIn('plantilla_id', $trozo)
+                             ->select('plantilla_id', 'jugador_id')->get() as $pj) {
+                    $yaEsta[(int) $pj->plantilla_id . '-' . (int) $pj->jugador_id] = true;
+                }
+            }
+        }
+
+        $vistos = []; $pendientes = []; $nuevas = [];
+        foreach ($filas as $r) {
+            $clave = (int) $r->torneo_id . '-' . (int) $r->equipo_id;
+            $k = $clave . '-' . (int) $r->jugador_id;
+            if (isset($vistos[$k])) continue;
+            $vistos[$k] = true;
+
+            $pl = isset($plantillaDe[$clave]) ? $plantillaDe[$clave] : null;
+            if ($pl && isset($yaEsta[$pl . '-' . (int) $r->jugador_id])) continue;
+            if (!$pl) $nuevas[$clave] = true;
+
+            $pendientes[] = [
+                'torneo_id'  => (int) $r->torneo_id,
+                'grupo_id'   => (int) $r->grupo_id,
+                'equipo_id'  => (int) $r->equipo_id,
+                'jugador_id' => (int) $r->jugador_id,
+                'dorsal'     => $r->dorsal,
+                'partido_id' => (int) $r->partido_id,
+                '_plantilla' => $pl,
+            ];
+        }
+
+        if (empty($pendientes)) return $out;
+
+        // Nombres, sólo para los que hay que mostrar.
+        $ids = []; $eqs = [];
+        foreach ($pendientes as $p) { $ids[$p['jugador_id']] = true; $eqs[$p['equipo_id']] = true; }
+        $nombres = [];
+        foreach (DB::table('jugadors')->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+                     ->whereIn('jugadors.id', array_keys($ids))
+                     ->select('jugadors.id', 'personas.name')->get() as $j) {
+            $nombres[(int) $j->id] = $j->name;
+        }
+        $nomEquipo = [];
+        foreach (DB::table('equipos')->whereIn('id', array_keys($eqs))->select('id', 'nombre')->get() as $e) {
+            $nomEquipo[(int) $e->id] = $e->nombre;
+        }
+        $nomTorneo = [];
+        foreach (DB::table('torneos')->whereIn('id', array_keys($torneos))->select('id', 'nombre', 'year')->get() as $t) {
+            $nomTorneo[(int) $t->id] = trim($t->nombre . ' ' . $t->year);
+        }
+        foreach ($pendientes as $i => $p) {
+            $pendientes[$i]['_nombre'] = isset($nombres[$p['jugador_id']]) ? $nombres[$p['jugador_id']] : ('#' . $p['jugador_id']);
+            $pendientes[$i]['_equipo'] = isset($nomEquipo[$p['equipo_id']]) ? $nomEquipo[$p['equipo_id']] : ('#' . $p['equipo_id']);
+            $pendientes[$i]['_torneo'] = isset($nomTorneo[$p['torneo_id']]) ? $nomTorneo[$p['torneo_id']] : ('#' . $p['torneo_id']);
+        }
+
+        $out['faltantes'] = $pendientes;
+        $out['plantillas_nuevas'] = count($nuevas);
+
+        if ($escribir) {
+            $svc = new self();
+            $svc->avisos   = [];
+            $svc->fallidas = 0;
+            $svc->grabarPlantillas($pendientes);
+            $out['avisos']    = $svc->avisos;
+            $out['fallidas']  = $svc->fallidas;
+            $out['agregados'] = count($pendientes) - $svc->fallidas;
+        }
+
+        return $out;
+    }
+
+    /**
      * Suma los jugadores a la plantilla del equipo en ese grupo.
      *
      * Sin esto el detalle "se ve" en la ficha del partido pero la pantalla de

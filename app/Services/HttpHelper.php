@@ -8,14 +8,40 @@ class HttpHelper
     // ScraperAPI: usado como fallback cuando el origen bloquea a nuestro server.
     // tmapi.transfermarkt.technology quedó geo-bloqueado por CloudFront (403 para AR);
     // saliendo desde la UE en modo básico (1 crédito) devuelve el JSON normal.
-    const SCRAPERAPI_KEY     = 'a36c0383b6153a740f783cc5ba9bd54c';
-    const SCRAPERAPI_COUNTRY = 'eu';
+    //
+    // Las claves y el país viven en el .env y se leen vía config/scraper.php.
+    // NO volver a hardcodearlas acá: este archivo va a git.
+    // Si cambiás el .env acordate de correr `php artisan config:clear`.
 
-    // Proxy propio en la UE (respaldo cuando se agotan los créditos de ScraperAPI).
-    // Dejar TM_PROXY_URL vacío para desactivarlo. Cuando subas proxy.php a un host
-    // europeo, pegá acá su URL y el MISMO token que pusiste en proxy.php.
-    const TM_PROXY_URL   = ''; // proxy propio desactivado (Hostinger no tiene un país que tmapi permita)
-    const TM_PROXY_TOKEN = 'lvt_7f3aK9pQ2xR8vM5nZ_CAMBIAME';
+    /** Clave principal: modo básico, 1 crédito (tmapi, HTML de TM, fotos). */
+    private static function apiKey()
+    {
+        return (string) config('scraper.key', '');
+    }
+
+    /** Clave para render+premium (25 créditos). Si no hay, cae a la principal. */
+    private static function apiKeyRender()
+    {
+        $k = (string) config('scraper.key_render', '');
+        return $k !== '' ? $k : self::apiKey();
+    }
+
+    /** País de salida. 'eu' es el que pasa el geo-block de tmapi. */
+    private static function country()
+    {
+        return (string) config('scraper.country', 'eu');
+    }
+
+    /** Proxy propio en la UE. Vacío = desactivado (ver config/scraper.php). */
+    private static function proxyUrl()
+    {
+        return (string) config('scraper.proxy_url', '');
+    }
+
+    private static function proxyToken()
+    {
+        return (string) config('scraper.proxy_token', '');
+    }
 
     // Guarda la causa del último fallo de getJson/getJsonViaScraper, para que el
     // controlador pueda mostrar un mensaje específico en vez de uno genérico.
@@ -119,7 +145,7 @@ class HttpHelper
     private static function fetchRemoto(string $url)
     {
         $params = [
-            'api_key'      => 'a36c0383b6153a740f783cc5ba9bd54c',
+            'api_key'      => self::apiKey(),
             'url'          => $url,
             'render'       => 'true',
             'premium'      => 'true',
@@ -217,7 +243,7 @@ class HttpHelper
             $urlOriginal = trim($urlOriginal); // elimina espacios invisibles o newlines
 
             $scraperEndpoint = 'http://api.scraperapi.com?' . http_build_query([
-                    'api_key' => '44182b1d4649eb00f3c41258721c4884',
+                    'api_key' => self::apiKeyRender(),
                     'url'     => $urlOriginal,
                     'render'  => 'true',
                     'premium' => 'true',
@@ -452,9 +478,9 @@ class HttpHelper
         }
 
         $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
-                'api_key'      => self::SCRAPERAPI_KEY,
+                'api_key'      => self::apiKey(),
                 'url'          => $url,
-                'country_code' => self::SCRAPERAPI_COUNTRY,
+                'country_code' => self::country(),
                 'render'       => 'true',
                 'premium'      => 'true',
             ]);
@@ -522,9 +548,9 @@ class HttpHelper
 
         $endpoint = $viaScraper
             ? ('https://api.scraperapi.com/?' . http_build_query([
-                    'api_key'      => self::SCRAPERAPI_KEY,
+                    'api_key'      => self::apiKey(),
                     'url'          => $url,
-                    'country_code' => self::SCRAPERAPI_COUNTRY,
+                    'country_code' => self::country(),
                 ]))
             : $url;
 
@@ -575,9 +601,9 @@ class HttpHelper
         $sinCreditos = false;
 
         $params = [
-            'api_key'      => self::SCRAPERAPI_KEY,
+            'api_key'      => self::apiKey(),
             'url'          => $url,
-            'country_code' => self::SCRAPERAPI_COUNTRY, // 'eu' pasa el geo-block de tmapi
+            'country_code' => self::country(), // 'eu' pasa el geo-block de tmapi
         ];
         $endpoint = 'https://api.scraperapi.com/?' . http_build_query($params);
 
@@ -708,9 +734,9 @@ class HttpHelper
     private static function getHtmlViaScraper(string $url)
     {
         $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
-                'api_key'      => self::SCRAPERAPI_KEY,
+                'api_key'      => self::apiKey(),
                 'url'          => $url,
-                'country_code' => self::SCRAPERAPI_COUNTRY, // 'eu' pasa el geo-block de TM
+                'country_code' => self::country(), // 'eu' pasa el geo-block de TM
             ]);
 
         $response = false;
@@ -752,13 +778,13 @@ class HttpHelper
     // ---------------------------------------------------
     private static function tmProxyGet(string $url)
     {
-        if (self::TM_PROXY_URL === '') {
+        if (self::proxyUrl() === '') {
             return false; // proxy no configurado todavía
         }
 
-        $sep      = (strpos(self::TM_PROXY_URL, '?') === false) ? '?' : '&';
-        $endpoint = self::TM_PROXY_URL . $sep
-            . 'token=' . urlencode(self::TM_PROXY_TOKEN)
+        $sep      = (strpos(self::proxyUrl(), '?') === false) ? '?' : '&';
+        $endpoint = self::proxyUrl() . $sep
+            . 'token=' . urlencode(self::proxyToken())
             . '&url='  . urlencode($url);
 
         $ch = curl_init();

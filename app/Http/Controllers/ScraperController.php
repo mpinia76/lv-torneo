@@ -2275,7 +2275,7 @@ class ScraperController extends Controller
             $err = HttpHelper::getLastJsonError();
             if (is_array($err) && ($err['code'] ?? '') === 'sin_creditos') {
                 $msg = 'No se pudo obtener el rendimiento del DT: ScraperAPI se quedó sin créditos del mes. '
-                     . 'Renová el plan o cambiá la API key en HttpHelper (SCRAPERAPI_KEY).';
+                     . 'Renová el plan o cambiá SCRAPERAPI_KEY en el .env (y corré php artisan config:clear).';
             } elseif (is_array($err) && ($err['code'] ?? '') === 'http_error') {
                 $msg = 'No se pudo obtener el rendimiento del DT: ScraperAPI respondió con error (HTTP '
                      . ($err['http'] ?? '?') . '). Reintentá en unos minutos.';

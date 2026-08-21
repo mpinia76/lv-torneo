@@ -117,7 +117,19 @@ class ImportDetallesController extends Controller
             . '<p class="acciones">'
             . '<a class="boton-sec" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm desde las URLs</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar (' . $porRevisar . ')</a>'
+            . '<a class="boton-sec" href="' . e(route('import_detalles.plantillas', array_filter(['tecnico_id' => $tecnicoId ?: null])))
+            . '">Completar plantillas de lo ya cargado</a>'
             . '</p>';
+
+        if ($listos) {
+            $paraRehacer = min(10, $listos);
+            $cuerpo .= '<p class="acciones"><a class="boton-sec" href="'
+                . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                    'n' => $paraRehacer, 'rehacer' => 1])))
+                . '">Rehacer el detalle de los ' . $paraRehacer . ' más nuevos</a>'
+                . ' <span class="sub">vuelve a bajarlos de Transfermarkt y pisa lo que ya tenían '
+                . '(' . $paraRehacer . ' llamadas)</span></p>';
+        }
 
         if (empty($pendientes)) {
             $cuerpo .= '<div class="ok-box">No queda ningún partido sin detalle' . ($tecnicoId ? ' para este DT' : '') . '.</div>';
@@ -306,22 +318,34 @@ class ImportDetallesController extends Controller
 
         $tecnicoId = (int) $request->get('tecnico_id', 0);
         $n = max(1, min(50, (int) $request->get('n', 10)));
+        // rehacer=1: en vez de los que faltan, vuelve a bajar los que YA tienen
+        // detalle. Sirve cuando el importador aprendió algo nuevo (plantillas,
+        // técnicos, un tipo de gol) después de haberlos cargado.
+        $rehacer = (string) $request->get('rehacer', '0') === '1';
+        $desde   = (int) $request->get('offset', 0);
 
         $q = DB::table('import_partidos')
-            ->whereNotNull('partido_id')->whereNotNull('external_id')->where('estado', 'aplicado')
-            ->whereNotIn('partido_id', function ($sub) {
+            ->whereNotNull('partido_id')->whereNotNull('external_id')->where('estado', 'aplicado');
+        if ($rehacer) {
+            $q->whereIn('partido_id', function ($sub) {
                 $sub->from('alineacions')->select('partido_id')->distinct();
             });
+        } else {
+            $q->whereNotIn('partido_id', function ($sub) {
+                $sub->from('alineacions')->select('partido_id')->distinct();
+            });
+        }
         if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
 
-        $filas = $q->orderBy('dia', 'desc')->limit($n)->get();
+        $filas = $q->orderBy('dia', 'desc')->offset($rehacer ? $desde : 0)->limit($n)->get();
 
         $imp = new TmDetallePartido;
         $ok = 0; $fallaron = 0; $llamadas = 0; $nuevos = 0;
         $detalle = '';
 
         foreach ($filas as $f) {
-            $r = $imp->importar((int) $f->partido_id, (string) $f->external_id, ['escribir' => true]);
+            $r = $imp->importar((int) $f->partido_id, (string) $f->external_id,
+                ['escribir' => true, 'forzar' => $rehacer]);
             $llamadas += (int) $r['llamadas'];
             $nuevos   += count($r['creados']['jugadores']);
 
@@ -347,7 +371,11 @@ class ImportDetallesController extends Controller
         }
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null]))) . '">← Detalle de los partidos</a></p>'
-            . '<h1>Tanda de detalles</h1>'
+            . '<h1>' . ($rehacer ? 'Rehacer detalles' : 'Tanda de detalles') . '</h1>'
+            . ($rehacer ? '<p class="sub">Se vuelve a bajar el detalle de partidos que <b>ya lo tenían</b>: '
+                . 'reemplaza alineación, goles, tarjetas, cambios y árbitros, y completa lo que el importador '
+                . 'no sabía hacer cuando los cargaste (plantillas, técnicos). Van del ' . ($desde + 1)
+                . ' al ' . ($desde + $n) . ' de la lista, del más nuevo al más viejo.</p>' : '')
             . '<div class="cards">'
             . $this->card($ok, 'Cargados', 'ok')
             . $this->card($fallaron, 'Con problema', $fallaron ? 'err' : '')
@@ -359,13 +387,107 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<div class="ok-box">No quedaban partidos sin detalle.</div>';
         } else {
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
-                . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null, 'n' => $n])))
-                . '">Otra tanda de ' . $n . '</a>'
+                . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null, 'n' => $n,
+                    'rehacer' => $rehacer ? 1 : null, 'offset' => $rehacer ? ($desde + $n) : null])))
+                . '">' . ($rehacer ? 'Rehacer los ' . $n . ' siguientes' : 'Otra tanda de ' . $n) . '</a>'
                 . '<a class="boton-sec" href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null]))) . '">Volver a la lista</a></p>'
                 . '<div class="diag">' . $detalle . '</div>';
         }
 
         return $this->pagina('Tanda de detalles', $cuerpo);
+    }
+
+    // ═══════════════════════════ PLANTILLAS ═══════════════════════════
+
+    /**
+     * Completa las plantillas de los partidos que YA tienen la alineación
+     * cargada. No toca Transfermarkt: todo sale de `alineacions`.
+     *
+     * Los partidos que se importaron antes de que el detalle escribiera
+     * `plantilla_jugadors` quedaron con la alineación bien pero fuera de la
+     * plantilla del torneo, y por eso `/admin/alineaciones` no los deja editar.
+     * Esto los repara sin volver a bajar nada.
+     */
+    public function plantillas(Request $request)
+    {
+        set_time_limit(0);
+
+        $tecnicoId = (int) $request->get('tecnico_id', 0);
+        $aplicar   = (string) $request->get('aplicar', '0') === '1';
+
+        $q = DB::table('import_partidos')
+            ->whereNotNull('partido_id')->where('estado', 'aplicado');
+        if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        $ids = $q->pluck('partido_id')->all();
+
+        $r = TmDetallePartido::plantillasDesdeAlineaciones($ids, $aplicar);
+
+        $volver = array_filter(['tecnico_id' => $tecnicoId ?: null]);
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', $volver)) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Plantillas de lo ya cargado</h1>'
+            . '<p class="sub">Los partidos que cargaste antes de que el importador escribiera plantillas quedaron con '
+            . 'la alineación completa pero sus jugadores fuera de la <b>plantilla del torneo</b>. Se ven bien en la ficha, '
+            . 'pero <code>/admin/alineaciones</code> no los ofrece en los desplegables y no se pueden editar a mano. '
+            . 'Esto lo arregla leyendo las alineaciones que ya están en tu base: <b>no gasta ninguna llamada a la API</b>.</p>';
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($r['partidos'], 'Partidos con alineación')
+            . $this->card($r['alineaciones'], 'Filas de alineación')
+            . $this->card(count($r['faltantes']), 'Fuera de la plantilla', count($r['faltantes']) ? 'warn' : 'ok')
+            . $this->card($r['plantillas_nuevas'], 'Plantillas a crear', $r['plantillas_nuevas'] ? 'warn' : '')
+            . ($aplicar ? $this->card($r['agregados'], 'Agregados', 'ok') : '')
+            . ($aplicar && $r['fallidas'] ? $this->card($r['fallidas'], 'Rechazados', 'err') : '')
+            . '</div>';
+
+        if ($aplicar) {
+            $cuerpo .= $r['fallidas']
+                ? '<div class="err-box">Se agregaron ' . (int) $r['agregados'] . ', pero la base rechazó '
+                . (int) $r['fallidas'] . '. Mirá los avisos.</div>'
+                : '<div class="ok-box">Listo: ' . (int) $r['agregados'] . ' jugador(es) sumados a su plantilla.</div>';
+
+            if (!empty($r['avisos'])) {
+                $cuerpo .= '<h2>Avisos</h2><div class="diag">';
+                foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . e($a) . '</div>';
+                $cuerpo .= '</div>';
+            }
+            $cuerpo .= '<p class="acciones">'
+                . '<a class="boton" href="' . e(route('import_detalles.index', $volver)) . '">Volver a la lista</a>'
+                . '<a class="boton-sec" href="' . e(route('import_detalles.plantillas', $volver)) . '">Volver a revisar</a></p>';
+            return $this->pagina('Plantillas', $cuerpo);
+        }
+
+        if (empty($r['faltantes'])) {
+            $cuerpo .= '<div class="ok-box">No falta nadie: todos los jugadores de las alineaciones ya están en la '
+                . 'plantilla de su equipo en ese torneo' . ($tecnicoId ? ' (para este DT)' : '') . '.</div>';
+            return $this->pagina('Plantillas', $cuerpo);
+        }
+
+        $params = $volver;
+        $params['aplicar'] = 1;
+        $cuerpo .= '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.plantillas', $params))
+            . '">Sumarlos a la plantilla (' . count($r['faltantes']) . ')</a>'
+            . ' <span class="sub">no se le toca el dorsal a nadie que ya esté cargado</span></p>';
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th>Torneo</th><th>Equipo</th><th>Jugador</th>'
+            . '<th>Dorsal</th><th>Plantilla</th><th>Partido</th></tr></thead><tbody>';
+        $n = 0;
+        foreach ($r['faltantes'] as $f) {
+            if ($n++ >= 500) break;
+            $cuerpo .= '<tr>'
+                . '<td>' . e($f['_torneo']) . '</td>'
+                . '<td>' . e($f['_equipo']) . '</td>'
+                . '<td>' . e($f['_nombre']) . '</td>'
+                . '<td class="num">' . e($f['dorsal'] === null || $f['dorsal'] === '' ? '—' : $f['dorsal']) . '</td>'
+                . '<td class="num">' . ($f['_plantilla'] ? '<span class="id">#' . (int) $f['_plantilla'] . '</span>' : '<span class="warn">se crea</span>') . '</td>'
+                . '<td class="num"><span class="id">#' . (int) $f['partido_id'] . '</span></td>'
+                . '</tr>';
+        }
+        $cuerpo .= '</tbody></table></div>';
+        if (count($r['faltantes']) > 500) {
+            $cuerpo .= '<p class="sub">Se muestran 500 de ' . count($r['faltantes']) . '. Se aplican todos igual.</p>';
+        }
+
+        return $this->pagina('Plantillas', $cuerpo);
     }
 
     // ═══════════════════════════ MAPEO Y REVISIÓN ═══════════════════════════
