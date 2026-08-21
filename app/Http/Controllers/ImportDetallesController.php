@@ -209,9 +209,14 @@ class ImportDetallesController extends Controller
         } elseif ($escribir && $r['escrito']) {
             $cuerpo .= '<div class="ok-box">Guardado.</div>';
         } elseif (!$escribir) {
+            // Si el partido ya tiene detalle, el único guardado posible es
+            // rehacerlo: el botón lo dice y lleva forzar=1.
+            $yaTiene = DB::table('alineacions')->where('partido_id', $partidoId)->exists();
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
-                . e(route('import_detalles.bajar', array_filter(['partido_id' => $partidoId, 'forzar' => $forzar ? 1 : null])))
-                . '">Guardar esto</a></p>';
+                . e(route('import_detalles.bajar', ['partido_id' => $partidoId, 'forzar' => ($yaTiene || $forzar) ? 1 : null]))
+                . '">' . ($yaTiene ? 'Rehacer y guardar' : 'Guardar esto') . '</a>'
+                . ($yaTiene ? ' <span class="sub">reemplaza alineación, goles, tarjetas, cambios y árbitros de este partido</span>' : '')
+                . '</p>';
         }
 
         $p = $r['plan'];

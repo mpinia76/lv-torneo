@@ -132,10 +132,18 @@ class TmDetallePartido
             return $informe;
         }
 
-        if (!$forzar && Alineacion::where('partido_id', $partido->id)->exists()) {
-            $informe['error'] = 'El partido #' . $partido->id . ' ya tiene alineación cargada. '
-                . 'Si querés reemplazarla, pedilo con forzar=1.';
-            return $informe;
+        // El candado es para ESCRIBIR, no para mirar: la vista previa no toca la
+        // base, así que siempre muestra lo que haría, avisando que ya hay datos.
+        $yaCargado = Alineacion::where('partido_id', $partido->id)->count();
+        if ($yaCargado && !$forzar) {
+            if ($escribir) {
+                $informe['error'] = 'El partido #' . $partido->id . ' ya tiene alineación cargada ('
+                    . $yaCargado . ' jugadores). Para reemplazarla usá "Rehacer".';
+                return $informe;
+            }
+            $this->aviso('Este partido ya tiene detalle cargado (' . $yaCargado . ' en la alineación). '
+                . 'Lo de abajo es lo que quedaría si lo rehacés: se borra lo actual y se escribe esto. '
+                . 'Los técnicos del partido no se borran nunca.');
         }
 
         // ── 1) El partido entero, en una sola llamada ──────────────────────
