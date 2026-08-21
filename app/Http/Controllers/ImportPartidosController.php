@@ -209,6 +209,170 @@ class ImportPartidosController extends Controller
         return $this->pagina('Carga de partidos', $html);
     }
 
+    // ═══════════════════════════ CREAR EQUIPO DESDE TM ═══════════════════════════
+
+    /**
+     * Crea un equipo que NO existe en la base, con lo que da tmapi, y lo deja
+     * mapeado en `equipo_tm`. Después redirige a la edición para completar lo
+     * que Transfermarkt no tiene.
+     *
+     * Sólo corre sobre clubes nuevos: si el id de TM ya está mapeado, no toca
+     * nada y te lleva al equipo existente. Nunca pisa datos cargados a mano.
+     *
+     * De `/clubs?ids[]=` salen: nombre, siglas (clubCode), país (countryId) y
+     * escudo (crestUrl). NO vienen fundación, estadio, socios ni historia:
+     * ésos se completan a mano en la pantalla a la que caés.
+     *
+     * Cuesta 2 llamadas: una por los datos y otra por el escudo.
+     */
+    public function crearEquipo(Request $request)
+    {
+        set_time_limit(0);
+
+        $tmId = trim((string) $request->get('tm_id', ''));
+        $volverA = $request->get('volver');
+
+        if ($tmId === '') {
+            return redirect()->route('import_partidos.index')->with('error', 'Falta el id de Transfermarkt.');
+        }
+
+        // ¿Ya está mapeado? Entonces no hay nada que crear.
+        $yaMapeado = DB::table('equipo_tm')->where('tm_club_id', $tmId)->value('equipo_id');
+        if ($yaMapeado && \App\Equipo::where('id', $yaMapeado)->exists()) {
+            $links = $this->urlsClubTm($tmId, null);
+            return redirect()->route('equipos.edit', $yaMapeado)
+                ->with('error', 'El club de TM ' . e($tmId) . ' ya estaba mapeado a este equipo, así que no creé nada '
+                    . 'ni toqué ningún dato. Si querés completarlo a mano: '
+                    . '<a href="' . e($links['datos']) . '" target="_blank"><b>Datos y hechos ↗</b></a> · '
+                    . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a>');
+        }
+
+        $json = HttpHelper::getJson(self::TMAPI . '/clubs?ids[]=' . urlencode($tmId));
+        $club = null;
+        if (is_array($json)) {
+            $data = isset($json['data']) ? $json['data'] : $json;
+            if (isset($data['clubs']) && is_array($data['clubs'])) $data = $data['clubs'];
+            foreach ((array) $data as $item) {
+                if (!is_array($item)) continue;
+                if ((string) (isset($item['id']) ? $item['id'] : '') === (string) $tmId) { $club = $item; break; }
+            }
+            if ($club === null && isset($data['id']) && (string) $data['id'] === (string) $tmId) $club = $data;
+        }
+
+        if (!is_array($club)) {
+            $err = HttpHelper::getLastJsonError();
+            return redirect()->to($volverA ?: route('import_partidos.index'))
+                ->with('error', 'No pude traer el club ' . e($tmId) . ' de Transfermarkt. '
+                    . e(is_array($err) ? json_encode($err, JSON_UNESCAPED_UNICODE) : 'sin detalle'));
+        }
+
+        $base = isset($club['baseDetails']) && is_array($club['baseDetails']) ? $club['baseDetails'] : [];
+
+        // Nombre: el largo oficial del club "superior" suele ser el bueno
+        // ("Club Atlético Vélez Sársfield"); si no está, el corto de la ficha.
+        $nombre = trim((string) (isset($base['superiorClub']['name']) ? $base['superiorClub']['name'] : ''));
+        if ($nombre === '') $nombre = trim((string) (isset($club['name']) ? $club['name'] : ''));
+        if ($nombre === '') {
+            return redirect()->to($volverA ?: route('import_partidos.index'))
+                ->with('error', 'El club ' . e($tmId) . ' vino sin nombre. No lo creé.');
+        }
+
+        $siglas = trim((string) (isset($club['preferences']['clubCode']) ? $club['preferences']['clubCode'] : ''));
+        if ($siglas === '') $siglas = trim((string) (isset($base['abbreviation']) ? $base['abbreviation'] : ''));
+
+        $pais = null;
+        $paisId = (int) (isset($base['countryId']) ? $base['countryId'] : 0);
+        if ($paisId) {
+            $paises = \App\Http\Controllers\JugadorController::paisesTM();
+            $pais = isset($paises[$paisId]) ? $paises[$paisId] : null;
+        }
+
+        $escudo = $this->bajarEscudo(isset($club['crestUrl']) ? $club['crestUrl'] : null);
+
+        try {
+            $equipo = \App\Equipo::create([
+                'nombre'     => $nombre,
+                'siglas'     => $siglas !== '' ? $siglas : null,
+                'pais'       => $pais,
+                'escudo'     => $escudo,
+                'socios'     => 0,        // la columna es NOT NULL; se completa a mano
+                'url_nombre' => Str::slug($nombre),
+            ]);
+        } catch (\Exception $e) {
+            return redirect()->to($volverA ?: route('import_partidos.index'))
+                ->with('error', 'No pude crear el equipo: ' . e($e->getMessage()));
+        }
+
+        $this->guardarMapeo($tmId, $equipo->id, $nombre, 'club_tm');
+
+        $falta = [];
+        if (!$pais)   $falta[] = 'país';
+        if (!$escudo) $falta[] = 'escudo';
+        $falta[] = 'fundación';
+        $falta[] = 'estadio';
+        $falta[] = 'socios';
+        $falta[] = 'historia';
+
+        $links = $this->urlsClubTm($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
+
+        $msg = 'Creé <b>' . e($nombre) . '</b> desde Transfermarkt y lo dejé mapeado al club ' . e($tmId)
+            . ', así que en el sondeo ya no va a figurar como conflicto (refrescá esa pestaña).<br>'
+            . 'Transfermarkt <b>no</b> trae estos datos por la API: <b>' . e(implode(', ', $falta)) . '</b>.<br>'
+            . 'Los tenés en la página del club — abrila al lado y completá a mano:<br>'
+            . '<a href="' . e($links['datos']) . '" target="_blank"><b>Datos y hechos ↗</b></a> '
+            . '<span style="opacity:.7">(fundación, estadio, socios)</span> · '
+            . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a>';
+
+        return redirect()->route('equipos.edit', $equipo->id)->with('success', $msg);
+    }
+
+    /**
+     * URLs del club en la web de Transfermarkt. La API no trae fundación,
+     * estadio ni socios: eso está en la pestaña "Datos y hechos" del club,
+     * así que siempre damos el link para completarlo a mano.
+     *
+     * `relativeUrl` viene como "/ca-velez-sarsfield/startseite/verein/1029".
+     * Si no la tenemos, el guión anda igual: TM resuelve por el id.
+     */
+    private function urlsClubTm($tmId, $relativeUrl)
+    {
+        $base = 'https://www.transfermarkt.es';
+        $rel  = trim((string) $relativeUrl);
+
+        if ($rel === '' || strpos($rel, '/startseite/') === false) {
+            return [
+                'perfil' => $base . '/-/startseite/verein/' . rawurlencode($tmId),
+                'datos'  => $base . '/-/datenfakten/verein/' . rawurlencode($tmId),
+            ];
+        }
+        return [
+            'perfil' => $base . $rel,
+            'datos'  => $base . str_replace('/startseite/', '/datenfakten/', $rel),
+        ];
+    }
+
+    /** Baja el escudo del club y devuelve el nombre de archivo, o null. */
+    private function bajarEscudo($url)
+    {
+        if (empty($url)) return null;
+        try {
+            $img = HttpHelper::getBinary($url);
+            if (empty($img['ok']) || empty($img['body'])) return null;
+
+            $info = pathinfo((string) parse_url($url, PHP_URL_PATH));
+            $archivo = isset($info['filename']) ? rtrim($info['filename'], '.') : '';
+            if ($archivo === '') return null;
+            $ext = (isset($info['extension']) && $info['extension'] !== '') ? $info['extension'] : 'png';
+
+            $nombre = 'escudo_tm_' . $archivo . '.' . $ext;
+            file_put_contents(public_path('images/') . $nombre, $img['body']);
+            return $nombre;
+        } catch (\Exception $e) {
+            Log::error('bajarEscudo: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     // ═══════════════════ SONDEO DE UN PARTIDO (descubrimiento) ═══════════════════
 
     /**
@@ -1770,8 +1934,11 @@ class ImportPartidosController extends Controller
 
         $out = '<h2>Clubes sin mapear <span class="sub">(' . count($pend) . ')</span></h2>'
             . '<p class="sub">Elegí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
-            . 'Si el club no existe en tu base, «Crear equipo» lo abre en otra pestaña; cuando volvés acá y refrescás, '
-            . 'aparece en la lista <b>sin volver a bajar nada de Transfermarkt</b>.</p>'
+            . 'Si el club <b>no existe</b> en tu base, «Crear desde TM» lo da de alta con nombre, siglas, país y escudo, '
+            . 'lo mapea solo y te deja en la edición para completar fundación, estadio, socios e historia '
+            . '(eso Transfermarkt no lo tiene). Cuesta 2 llamadas. «En blanco» abre el alta de siempre. '
+            . 'Cuando volvés acá y refrescás, el club ya aparece resuelto '
+            . '<b>sin volver a bajar nada de Transfermarkt</b>.</p>'
             . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
 
         foreach ($pend as $tmId => $d) {
@@ -1787,7 +1954,9 @@ class ImportPartidosController extends Controller
                 . '<input type="hidden" name="cache" value="1">'
                 . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select>'
                 . ' <button>Mapear</button></form>'
-                . '<a class="boton-sec" href="' . e(route('equipos.create')) . '" target="_blank">Crear equipo ↗</a>'
+                . '<a class="boton-sec" target="_blank" href="' . e(route('import_partidos.crear_equipo',
+                    ['tm_id' => $tmId, 'volver' => $request->fullUrl()])) . '">Crear desde TM ↗</a>'
+                . '<a class="boton-sec" href="' . e(route('equipos.create')) . '" target="_blank">En blanco ↗</a>'
                 . '</td></tr>';
         }
         return $out . '</tbody></table></div>';

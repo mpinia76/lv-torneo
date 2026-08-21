@@ -1,344 +1,340 @@
 @extends('layouts.app')
 
 @section('pageTitle', 'Verificar personas')
-<style>
-    /* Estilos personalizados para resaltar la pestaña activa */
-    .nav-link.active {
-        background-color: #007bff; /* Cambia el color de fondo de la pestaña activa */
-        color: #fff; /* Cambia el color del texto de la pestaña activa */
-        border-color: #007bff; /* Cambia el color del borde de la pestaña activa */
-    }
 
-    /* Agrega un espacio entre las pestañas y el contenido */
-    .tab-content {
-        margin: 20px; /* Ajusta el margen superior del contenido */
-    }
-</style>
 @section('content')
-    <div class="container">
-        <h1 class="display-6">Posibles repetidos</h1>
-        @if (\Session::has('error'))
+    <style>
+        .dup-ficha { border:1px solid #e3e6ea; border-radius:.35rem; padding:.5rem; height:100%; }
+        .dup-ficha-sugerida { border-color:#28a745; background:#f4fbf6; }
+        .dup-tabla td { vertical-align: middle; }
+        .dup-puntaje { font-size:1rem; }
+        .dup-motivo { font-size:.78rem; color:#6c757d; display:block; max-width:170px; }
+        .imgCircle { width:38px; height:38px; object-fit:cover; border-radius:50%; }
+        .dup-barra { background:#f8f9fa; border:1px solid #e3e6ea; border-radius:.35rem; padding:.75rem; margin-bottom:1rem; }
+        .nav-tabs .nav-link.active { background-color:#007bff; color:#fff; border-color:#007bff; }
+    </style>
+
+    <div class="container-fluid">
+        <h1 class="display-6">Verificar personas</h1>
+
+        {{-- Los mensajes van escapados: pueden contener el texto de una excepción
+             de MySQL, y ahí adentro viajan nombres cargados por el usuario. --}}
+        @if ($errors->any())
             <div class="alert alert-danger">
-                <ul>
-                    <li>{!! \Session::get('error') !!}</li>
+                <ul class="mb-0">
+                    @foreach ($errors->all() as $e)
+                        <li>{{ $e }}</li>
+                    @endforeach
                 </ul>
             </div>
         @endif
         @if (\Session::has('success'))
-            <div class="alert alert-success">
-                <ul>
-                    <li>{!! \Session::get('success') !!}</li>
-                </ul>
+            <div class="alert alert-success">{{ \Session::get('success') }}</div>
+        @endif
+
+        @if(!$indexado)
+            <div class="alert alert-warning">
+                Todavía hay personas sin indexar. Apretá <strong>Recalcular</strong> acá abajo, o corré
+                <code>php artisan personas:duplicados</code> desde la consola (es lo recomendado para la primera pasada
+                sobre toda la base, así no depende del tiempo máximo del navegador).
             </div>
         @endif
 
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
+        {{-- ------------------------------------------------------------------
+             Barra de filtros y de recálculo
+        ------------------------------------------------------------------- --}}
+        <div class="dup-barra">
+            <div class="row">
+                <div class="col-md-8">
+                    <form method="GET" action="{{ route('jugadores.verificarPersonas') }}" class="form-inline">
+                        <input type="hidden" name="tab" value="{{ $tab }}">
+
+                        <label class="mr-1">Estado</label>
+                        <select name="estado" class="form-control form-control-sm mr-2">
+                            <option value="pendiente"  @if($estado=='pendiente') selected @endif>Pendientes</option>
+                            <option value="descartado" @if($estado=='descartado') selected @endif>Descartados</option>
+                            <option value="todos"      @if($estado=='todos') selected @endif>Todos</option>
+                        </select>
+
+                        <label class="mr-1">Puntaje mínimo</label>
+                        <input type="number" name="umbral" min="1" max="100" value="{{ $umbral }}"
+                               class="form-control form-control-sm mr-2" style="width:80px;">
+
+                        <input type="text" name="q" value="{{ $buscar }}" placeholder="buscar apellido..."
+                               class="form-control form-control-sm mr-2">
+
+                        <button class="btn btn-sm btn-primary">Filtrar</button>
+                    </form>
+                    <small class="text-muted">
+                        100 = nombre idéntico. Por debajo de 70 empiezan a aparecer homónimos que no son la misma persona.
+                    </small>
+                </div>
+
+                <div class="col-md-4 text-right">
+                    <form method="POST" action="{{ route('personas.duplicados.recalcular') }}"
+                          onsubmit="return confirm('Recalcular puede tardar un rato. ¿Seguimos?')">
+                        @csrf
+                        <input type="hidden" name="umbral" value="{{ $umbral }}">
+                        <input type="hidden" name="reindexar" value="0">
+                        <label class="small mr-2" title="Recalcula las claves y los tokens de todas las personas. Sacale el tilde si solo cambiaste el umbral.">
+                            <input type="checkbox" name="reindexar" value="1" checked> reconstruir índice
+                        </label>
+                        <button class="btn btn-sm btn-dark">Recalcular</button>
+                    </form>
+                    <small class="text-muted d-block mt-1">{{ $conteos['fusiones'] }} fusiones hechas hasta ahora</small>
+                </div>
+            </div>
+        </div>
+
+        {{-- ------------------------------------------------------------------
+             Pestañas (son enlaces: cada una carga solo sus propios datos)
+        ------------------------------------------------------------------- --}}
+        @php
+            $qs = ['estado' => $estado, 'umbral' => $umbral, 'q' => $buscar];
+        @endphp
+        <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
-                <a class="nav-link active" id="principal-tab" data-toggle="tab" href="#principal" role="tab" aria-controls="principal" aria-selected="true">Similares</a>
+                <a class="nav-link @if($tab!='sin-nombre' && $tab!='nacionalidad') active @endif"
+                   href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'repetidos']) }}">
+                    Posibles repetidos <span class="badge badge-light">{{ $conteos['pendiente'] }}</span>
+                </a>
             </li>
-
             <li class="nav-item">
-                <a class="nav-link" id="tres-tab" data-toggle="tab" href="#tres" role="tab" aria-controls="tres" aria-selected="false">Sin nombre/apellido</a>
+                <a class="nav-link @if($tab=='sin-nombre') active @endif"
+                   href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-nombre']) }}">
+                    Sin nombre/apellido <span class="badge badge-light">{{ $conteos['sinNombre'] }}</span>
+                </a>
             </li>
-
             <li class="nav-item">
-                <a class="nav-link" id="sin-tab" data-toggle="tab" href="#sin" role="tab" aria-controls="sin" aria-selected="false">Problema en nacionalidad</a>
+                <a class="nav-link @if($tab=='nacionalidad') active @endif"
+                   href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'nacionalidad']) }}">
+                    Problema en nacionalidad <span class="badge badge-light">{{ $conteos['sinBandera'] }}</span>
+                </a>
             </li>
-
-
         </ul>
-        <div class="tab-content" id="myTabContent">
-            <div role="tabpanel" class="tab-pane active" id="principal">
 
-                <div class="row">
+        {{-- ================================================================
+             Pestaña 1: pares repetidos
+        ================================================================= --}}
+        @if($tab != 'sin-nombre' && $tab != 'nacionalidad')
 
-                    <div class="form-group col-md-12">
-        <table class="table">
-            <thead>
-            <th></th>
-            <th>Id</th>
-            <th>Mostrar</th>
-            <th>Apellido</th>
-            <th>Nombre</th>
-
-            <th>Edad</th>
-            <th>Posición</th>
-            <th>Jugador</th>
-            <th>Técnico</th>
-
-            <th>Arbitro</th>
-            <th></th>
-            </thead>
-            @php
-                $i = 0;
-            @endphp
-            @foreach($similaresNombreApellido as $personaSimilares)
-                @php
-                    $i++;
-
-//dd($personaSimilares);
-                @endphp
-
-                <tr>
-                    <td>{{$i}} @if($personaSimilares->foto)
-                            <img id="original" class="imgCircle" src="{{ url('images/'.$personaSimilares->foto) }}" >
-                        @else
-                            @if($personaSimilares->jugador)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                            @elseif($personaSimilares->tecnico)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
-                            @elseif($personaSimilares->arbitro)
-                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
-                            @endif
-                        @endif
-                        <img id="original" src="{{ $personaSimilares->bandera_url }}" alt="{{ $personaSimilares->nacionalidad }}">
-                    </td>
-                    <td>  {{$personaSimilares->id}}</td>
-                    <td>{{$personaSimilares->name}}</td>
-                    <td>{{$personaSimilares->apellido}}</td>
-                    <td>{{$personaSimilares->nombre}}</td>
-
-
-                    <td>{{($personaSimilares->nacimiento)?$personaSimilares->getAgeWithDateAttribute():''}}</td>
-                    <td>{{($personaSimilares->jugador)?$personaSimilares->jugador->tipoJugador:''}}</td>
-                    <td>{{($personaSimilares->jugador)?$personaSimilares->jugador->id:''}}</td>
-                    <td>{{($personaSimilares->tecnico)?$personaSimilares->tecnico->id:''}}</td>
-                    <td>{{($personaSimilares->arbitro)?$personaSimilares->arbitro->id:''}}</td>
-                    <td>
-                        <div class="d-flex" style="align-items: center;">
-                        @if($personaSimilares->jugador)
-                            <a href="{{route('jugadores.reasignar', $personaSimilares->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
-                            <a href="{{route('jugadores.edit', $personaSimilares->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
-
-                            <form action="{{ route('jugadores.destroy', $personaSimilares->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
-                                <input type="hidden" name="_method" value="DELETE">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                <button class="btn btn-danger m-1">Eliminar</button>
-                            </form>
-                        @elseif($personaSimilares->tecnico)
-                                <a href="{{route('tecnicos.reasignar', $personaSimilares->tecnico->id)}}" class="btn btn-info m-1">Reasignar</a>
-                            <a href="{{route('tecnicos.edit', $personaSimilares->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
-                        @elseif($personaSimilares->arbitro)
-                            <a href="{{route('arbitros.edit', $personaSimilares->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
-                        @endif
-                        @if($personaSimilares->simil_id)
-                            <!-- Botón para verificar similitud -->
-                            <form action="{{ route('jugadores.verificarSimilitud') }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
-                                @csrf
-                                <input type="hidden" name="persona_id" value="{{ $personaSimilares->id }}">
-                                <input type="hidden" name="simil_id" value="{{ $personaSimilares->simil_id }}">
-
-                                <button type="submit" class="btn btn-success m-1">Verificado</button>
-                            </form>
-                            @endif
-                        </div>
-                    </td>
-                </tr>
-            @endforeach
-        </table>
-                    </div>
-                    <div class="row">
-                        <div class="form-group col-xs-12 col-sm-6 col-md-9">
-                            {{ $personas->links() }}
-                        </div>
-                        <div class="form-group col-xs-12 col-sm-6 col-md-2">
-                            <strong>Total: {{ $personas->total() }}</strong>
-                        </div>
-                    </div>
-
-            </div>
-            </div>
-
-            <div role="tabpanel" class="tab-pane" id="tres">
-
-                <div class="row">
-
-                    <div class="form-group col-md-12">
-                        <table class="table">
-                            <thead>
-                            <th></th>
-                            <th>Id</th>
-                            <th>Mostrar</th>
-                            <th>Apellido</th>
-                            <th>Nombre</th>
-
-                            <th>Edad</th>
-
-                            <th>Jugador</th>
-                            <th>Técnico</th>
-
-                            <th>Arbitro</th>
-                            <th></th>
-                            </thead>
-                            @php
-                                $i = 0;
-                            @endphp
-                            @foreach($personasSinNombreApellido as $sinNombreApellido)
-                                @php
-                                    $i++;
-
-                //dd($sinNombreApellido);
-                                @endphp
-
-                                <tr>
-                                    <td>{{$i}} @if($sinNombreApellido->foto)
-                                            <img id="original" class="imgCircle" src="{{ url('images/'.$sinNombreApellido->foto) }}" >
-                                        @else
-                                            @if($sinNombreApellido->jugador)
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                            @elseif($sinNombreApellido->tecnico)
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
-                                            @elseif($sinNombreApellido->arbitro)
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
-                                            @endif
-                                        @endif
-                                        <img id="original" src="{{ $sinNombreApellido->bandera_url }}" alt="{{ $sinNombreApellido->nacionalidad }}">
-                                    </td>
-                                    <td>  {{$sinNombreApellido->id}}</td>
-                                    <td>{{$sinNombreApellido->name}}</td>
-                                    <td>{{$sinNombreApellido->apellido}}</td>
-                                    <td>{{$sinNombreApellido->nombre}}</td>
-
-
-                                    <td>{{($sinNombreApellido->nacimiento)?$sinNombreApellido->getAgeWithDateAttribute():''}}</td>
-
-
-                                    <td>{{($sinNombreApellido->jugador)?$sinNombreApellido->jugador->id:''}}</td>
-                                    <td>{{($sinNombreApellido->tecnico)?$sinNombreApellido->tecnico->id:''}}</td>
-                                    <td>{{($sinNombreApellido->arbitro)?$sinNombreApellido->arbitro->id:''}}</td>
-                                    <td>
-                                        <div class="d-flex" style="align-items: center;">
-                                            @if($sinNombreApellido->jugador)
-                                                <a href="{{route('jugadores.reasignar', $sinNombreApellido->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
-                                                <a href="{{route('jugadores.edit', $sinNombreApellido->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
-
-                                                <form action="{{ route('jugadores.destroy', $sinNombreApellido->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
-                                                    <input type="hidden" name="_method" value="DELETE">
-                                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-danger m-1">Eliminar</button>
-                                                </form>
-                                            @elseif($sinNombreApellido->tecnico)
-                                                <a href="{{route('tecnicos.edit', $sinNombreApellido->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
-                                            @elseif($sinNombreApellido->arbitro)
-                                                <a href="{{route('arbitros.edit', $sinNombreApellido->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
-                                            @endif
-
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </table>
-                    </div>
-
-
+            @if($pares->total() == 0)
+                <div class="alert alert-info">
+                    No hay pares para mostrar con este filtro.
+                    @if($conteos['pendiente'] == 0 && $conteos['descartado'] == 0)
+                        Todavía no se calcularon los candidatos: apretá <strong>Recalcular</strong>.
+                    @endif
                 </div>
-            </div>
+            @else
+                {{-- El formulario de lote va suelto y las casillas de la tabla lo
+                     referencian con form="formLote": así cada fila puede tener sus
+                     propios formularios sin anidarlos (HTML no lo permite). --}}
+                <form id="formLote" method="POST" action="{{ route('personas.duplicados.lote') }}"
+                      onsubmit="return confirmarLote(this, event)"></form>
+                <input type="hidden" name="_token" value="{{ csrf_token() }}" form="formLote">
 
-            <div role="tabpanel" class="tab-pane" id="sin">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <label class="small mb-0"><input type="checkbox" id="tildarTodos"> tildar todo lo visible</label>
+                    </div>
+                    <div>
+                        <button form="formLote" name="accion" value="descartar" class="btn btn-sm btn-outline-secondary"
+                                onclick="window.__accionLote='descartar'">
+                            Marcar los tildados como personas distintas
+                        </button>
+                        <button form="formLote" name="accion" value="fusionar" class="btn btn-sm btn-outline-danger"
+                                onclick="window.__accionLote='fusionar'">
+                            Fusionar los tildados (queda el sugerido)
+                        </button>
+                    </div>
+                </div>
+
+                <table class="table table-sm dup-tabla">
+                    <thead>
+                        <tr>
+                            <th style="width:28px;"></th>
+                            <th style="width:180px;">Coincidencia</th>
+                            <th>Persona A</th>
+                            <th>Persona B</th>
+                            <th style="width:230px;">Qué hago</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($pares as $par)
+                        @php
+                            $a = $personas->get($par->persona_id);
+                            $b = $personas->get($par->simil_id);
+                        @endphp
+                        @continue(!$a || !$b)
+                        @php
+                            $pesoA = $peso[$par->persona_id] ?? ['registros'=>0,'campos'=>0,'roles'=>[]];
+                            $pesoB = $peso[$par->simil_id]  ?? ['registros'=>0,'campos'=>0,'roles'=>[]];
+                            $ganadorSugerido = \App\Http\Controllers\PersonaDuplicadoController::sugerirGanador(
+                                $par->persona_id, $par->simil_id, $peso
+                            );
+                            $colorPuntaje = $par->puntaje >= 95 ? 'danger' : ($par->puntaje >= 80 ? 'warning' : 'secondary');
+                        @endphp
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="pares[]" value="{{ $par->id }}" form="formLote" class="tildable">
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ $colorPuntaje }} dup-puntaje">{{ $par->puntaje }}</span>
+                                @if($par->estado == 'descartado')
+                                    <span class="badge badge-light">descartado</span>
+                                @endif
+                                <span class="dup-motivo">{{ $par->motivo }}</span>
+                            </td>
+                            <td style="width:30%;">
+                                @include('jugadores._personaCelda', [
+                                    'p' => $a, 'otro' => $b, 'info' => $pesoA,
+                                    'sugerido' => $ganadorSugerido == $par->persona_id,
+                                ])
+                            </td>
+                            <td style="width:30%;">
+                                @include('jugadores._personaCelda', [
+                                    'p' => $b, 'otro' => $a, 'info' => $pesoB,
+                                    'sugerido' => $ganadorSugerido == $par->simil_id,
+                                ])
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ route('personas.duplicados.fusionar') }}" class="mb-1"
+                                      onsubmit="return confirm('Se va a conservar la persona #{{ $par->persona_id }} y se borra la #{{ $par->simil_id }}, moviéndole todos los partidos, goles y planteles. ¿Confirmás?')">
+                                    @csrf
+                                    <input type="hidden" name="ganador_id"  value="{{ $par->persona_id }}">
+                                    <input type="hidden" name="perdedor_id" value="{{ $par->simil_id }}">
+                                    <button class="btn btn-sm btn-danger btn-block">
+                                        Quedarme con A (#{{ $par->persona_id }})
+                                        @if($ganadorSugerido == $par->persona_id) ★ @endif
+                                    </button>
+                                </form>
+
+                                <form method="POST" action="{{ route('personas.duplicados.fusionar') }}" class="mb-1"
+                                      onsubmit="return confirm('Se va a conservar la persona #{{ $par->simil_id }} y se borra la #{{ $par->persona_id }}, moviéndole todos los partidos, goles y planteles. ¿Confirmás?')">
+                                    @csrf
+                                    <input type="hidden" name="ganador_id"  value="{{ $par->simil_id }}">
+                                    <input type="hidden" name="perdedor_id" value="{{ $par->persona_id }}">
+                                    <button class="btn btn-sm btn-danger btn-block">
+                                        Quedarme con B (#{{ $par->simil_id }})
+                                        @if($ganadorSugerido == $par->simil_id) ★ @endif
+                                    </button>
+                                </form>
+
+                                @if($par->estado == 'descartado')
+                                    <form method="POST" action="{{ route('personas.duplicados.reabrir') }}">
+                                        @csrf
+                                        <input type="hidden" name="id" value="{{ $par->id }}">
+                                        <button class="btn btn-sm btn-outline-secondary btn-block">Volver a pendientes</button>
+                                    </form>
+                                @else
+                                    <form method="POST" action="{{ route('personas.duplicados.descartar') }}">
+                                        @csrf
+                                        <input type="hidden" name="persona_id" value="{{ $par->persona_id }}">
+                                        <input type="hidden" name="simil_id"   value="{{ $par->simil_id }}">
+                                        <button class="btn btn-sm btn-success btn-block">Son personas distintas</button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
 
                 <div class="row">
-
-                    <div class="form-group col-md-12">
-                        <table class="table">
-                            <thead>
-                            <th></th>
-                            <th>Id</th>
-                            <th>Mostrar</th>
-                            <th>Apellido</th>
-                            <th>Nombre</th>
-
-                            <th>Edad</th>
-
-                            <th>Jugador</th>
-                            <th>Técnico</th>
-
-                            <th>Arbitro</th>
-                            <th></th>
-                            </thead>
-                            @php
-                                $i = 0;
-                            @endphp
-                            @foreach($personasSinBandera as $SinBandera)
-                                @php
-                                    $i++;
-
-                //dd($SinBandera);
-                                @endphp
-
-                                <tr>
-                                    <td>{{$i}} @if($SinBandera->foto)
-                                            <img id="original" class="imgCircle" src="{{ url('images/'.$SinBandera->foto) }}" >
-                                        @else
-                                            @if($SinBandera->jugador)
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
-                                            @elseif($SinBandera->tecnico)
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
-                                            @elseif($SinBandera->arbitro)
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
-                                            @endif
-                                        @endif
-                                        <img id="original" src="{{ $SinBandera->bandera_url }}" alt="{{ $SinBandera->nacionalidad }}">
-                                    </td>
-                                    <td>  {{$SinBandera->id}}</td>
-                                    <td>{{$SinBandera->name}}</td>
-                                    <td>{{$SinBandera->apellido}}</td>
-                                    <td>{{$SinBandera->nombre}}</td>
-
-
-                                    <td>{{($SinBandera->nacimiento)?$SinBandera->getAgeWithDateAttribute():''}}</td>
-
-
-                                    <td>{{($SinBandera->jugador)?$SinBandera->jugador->id:''}}</td>
-                                    <td>{{($SinBandera->tecnico)?$SinBandera->tecnico->id:''}}</td>
-                                    <td>{{($SinBandera->arbitro)?$SinBandera->arbitro->id:''}}</td>
-                                    <td>
-                                        <div class="d-flex" style="align-items: center;">
-                                            @if($SinBandera->jugador)
-                                                <a href="{{route('jugadores.reasignar', $SinBandera->jugador->id)}}" class="btn btn-info m-1">Reasignar</a>
-                                                <a href="{{route('jugadores.edit', $SinBandera->jugador->id)}}" class="btn btn-primary m-1">Editar</a>
-
-                                                <form action="{{ route('jugadores.destroy', $SinBandera->jugador->id) }}" method="POST" onsubmit="return  ConfirmDelete()" style="margin: 0;">
-                                                    <input type="hidden" name="_method" value="DELETE">
-                                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                                    <button class="btn btn-danger m-1">Eliminar</button>
-                                                </form>
-                                            @elseif($SinBandera->tecnico)
-                                                <a href="{{route('tecnicos.edit', $SinBandera->tecnico->id)}}" class="btn btn-primary m-1">Editar</a>
-                                            @elseif($SinBandera->arbitro)
-                                                <a href="{{route('arbitros.edit', $SinBandera->arbitro->id)}}" class="btn btn-primary m-1">Editar</a>
-                                            @endif
-
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </table>
-                    </div>
-
-
+                    <div class="col-md-9">{{ $pares->links() }}</div>
+                    <div class="col-md-3 text-right"><strong>Total: {{ $pares->total() }} pares</strong></div>
                 </div>
+            @endif
+        @endif
+
+        {{-- ================================================================
+             Pestaña 2: sin nombre / apellido
+        ================================================================= --}}
+        @if($tab == 'sin-nombre')
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
+                        <th>Nacionalidad</th><th>Edad</th><th>Jugador</th><th>Técnico</th><th>Árbitro</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach($sinNombre as $p)
+                    @include('jugadores._personaFila', ['p' => $p])
+                @endforeach
+                </tbody>
+            </table>
+            <div class="row">
+                <div class="col-md-9">{{ $sinNombre->links() }}</div>
+                <div class="col-md-3 text-right"><strong>Total: {{ $sinNombre->total() }}</strong></div>
             </div>
+        @endif
 
+        {{-- ================================================================
+             Pestaña 3: nacionalidad sin bandera
+        ================================================================= --}}
+        @if($tab == 'nacionalidad')
+            <p class="text-muted small">
+                Son las personas cuya nacionalidad no tiene un <code>.gif</code> en <code>public/images</code>.
+                Suele ser un error de tipeo en la nacionalidad, o una bandera que falta subir.
+            </p>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
+                        <th>Nacionalidad</th><th>Edad</th><th>Jugador</th><th>Técnico</th><th>Árbitro</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach($sinBandera as $p)
+                    @include('jugadores._personaFila', ['p' => $p])
+                @endforeach
+                </tbody>
+            </table>
+            <div class="row">
+                <div class="col-md-9">{{ $sinBandera->links() }}</div>
+                <div class="col-md-3 text-right"><strong>Total: {{ $sinBandera->total() }}</strong></div>
+            </div>
+        @endif
+    </div>
 
-    </div>
-    </div>
     <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var todos = document.getElementById('tildarTodos');
+            if (todos) {
+                todos.addEventListener('change', function () {
+                    document.querySelectorAll('.tildable').forEach(function (c) { c.checked = todos.checked; });
+                });
+            }
+        });
 
-
-        function enviarForm() {
-
-            $('#formulario').submit();
-        }
-
-
-        function ConfirmDelete()
-        {
-            var x = confirm("Está seguro?");
-            if (x)
-                return true;
-            else
+        function confirmarLote(form, evento) {
+            var n = document.querySelectorAll('.tildable:checked').length;
+            if (n === 0) {
+                alert('No tildaste ningún par.');
                 return false;
-        }
+            }
 
+            // La acción se toma del botón que realmente disparó el envío.
+            // No se usa document.activeElement: en Safari/iOS un <button> no
+            // queda enfocado al clickearlo y el cartel diría una cosa mientras
+            // se ejecuta la otra (y una de las dos borra personas).
+            var accion = '';
+            if (evento && evento.submitter && evento.submitter.value) {
+                accion = evento.submitter.value;
+            } else if (window.__accionLote) {
+                accion = window.__accionLote;
+            }
+
+            if (accion === 'fusionar') {
+                return confirm('Se van a FUSIONAR ' + n + ' pares, conservando en cada uno la persona sugerida (★) y BORRANDO la otra. ¿Confirmás?');
+            }
+            if (accion === 'descartar') {
+                return confirm('Marcar ' + n + ' pares como personas distintas?');
+            }
+
+            alert('No se pudo determinar la acción. Probá de nuevo apretando directamente uno de los dos botones.');
+            return false;
+        }
     </script>
 @endsection

@@ -426,8 +426,9 @@ class ImportDetallesController extends Controller
         $tipo = (string) $request->get('tipo', 'arbitro');
         if (!in_array($tipo, ['arbitro', 'tecnico', 'jugador', 'equipo'], true)) $tipo = 'arbitro';
 
-        $perfilTm = ['arbitro' => 'schiedsrichter', 'tecnico' => 'trainer',
-            'jugador' => 'spieler', 'equipo' => 'verein'];
+        // Los clubes no usan /profil/: van por /startseite/.
+        $perfilTm = ['arbitro' => 'profil/schiedsrichter', 'tecnico' => 'profil/trainer',
+            'jugador' => 'profil/spieler', 'equipo' => 'startseite/verein'];
 
         $opts = '';
         foreach (['arbitro' => 'Árbitro', 'tecnico' => 'DT',
@@ -454,8 +455,12 @@ class ImportDetallesController extends Controller
         $r = TmDetallePartido::diagnosticarPersonaTm($tmId, $tipo);
 
         $cuerpo .= '<p class="sub">' . (int) $r['llamadas'] . ' llamada(s) a la API · '
-            . '<a target="_blank" href="https://www.transfermarkt.es/-/profil/' . e($perfilTm[$tipo]) . '/' . e($tmId)
-            . '">ver el perfil en TM ↗</a></p>';
+            . '<a target="_blank" href="https://www.transfermarkt.es/-/' . $perfilTm[$tipo] . '/' . e($tmId)
+            . '">ver el perfil en TM ↗</a>'
+            . ($tipo === 'equipo'
+                ? ' · <a target="_blank" href="https://www.transfermarkt.es/-/datenfakten/verein/' . e($tmId)
+                  . '">Datos y hechos ↗</a> <span class="sub">(fundación, estadio, socios: no están en la API)</span>'
+                : '') . '</p>';
 
         if (empty($r['perfil'])) {
             $cuerpo .= '<div class="err-box">Ninguna ruta devolvió un perfil para ese id. '

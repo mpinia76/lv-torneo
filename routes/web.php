@@ -88,8 +88,11 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('personas/duplicados/fusionar', 'PersonaDuplicadoController@fusionar')->name('personas.duplicados.fusionar');
     Route::post('personas/duplicados/lote', 'PersonaDuplicadoController@lote')->name('personas.duplicados.lote');
 
-    // Se mantiene por compatibilidad con la pantalla anterior.
-    Route::post('verificar-similitud', 'JugadorController@verificarSimilitud')->name('jugadores.verificarSimilitud');
+    // Se mantiene el nombre de ruta por compatibilidad, pero apunta al controller
+    // nuevo: JugadorController@verificarSimilitud escribia SOLO en
+    // `personas_verificadas`, asi que un par descartado por ahi reaparecia como
+    // pendiente en `persona_duplicados`. descartar() actualiza las dos tablas.
+    Route::post('verificar-similitud', 'PersonaDuplicadoController@descartar')->name('jugadores.verificarSimilitud');
 
 
 
@@ -233,6 +236,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-partidos/sondear', 'ImportPartidosController@sondear')->name('import_partidos.sondear');
     Route::get('/import-partidos/aplicar', 'ImportPartidosController@aplicar')->name('import_partidos.aplicar');
     Route::get('/import-partidos/partido', 'ImportPartidosController@partido')->name('import_partidos.partido');
+    Route::get('/import-partidos/crear-equipo', 'ImportPartidosController@crearEquipo')->name('import_partidos.crear_equipo');
 
     // Segunda etapa: el detalle de cada partido (alineaciones, goles, tarjetas,
     // cambios, árbitros). Ver ImportDetallesController.
