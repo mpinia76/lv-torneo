@@ -140,17 +140,34 @@ class ImportPartidosController extends Controller
         }
         $coachId = $m[1];
 
-        $games = $this->traerPartidos($coachId);
-        if (is_string($games)) return $this->pagina('Sondeo', '<p class="err">' . $games . '</p>');
-
+        // ── Datos: del staging si ya los bajamos, o de Transfermarkt ────────
+        // Después de mapear un club no hace falta volver a scrapear: las filas
+        // ya están guardadas con todo lo necesario.
+        $usarCache = (string) $request->get('cache', '0') === '1';
+        $games = null;
         $filas = [];
-        $temporadas = [];
-        foreach ($games as $g) {
-            $f = $this->normalizar($g, $coachId);
-            if ($f['temporada'] !== null) $temporadas[] = (int) $f['temporada'];
-            $filas[] = $f;
+
+        if ($usarCache && $tecnicoId) {
+            $filas = $this->filasDesdeStaging($tecnicoId);
+            if (empty($filas)) $usarCache = false;
+        } else {
+            $usarCache = false;
         }
-        $filas = $this->completarNombres($filas);
+
+        if (!$usarCache) {
+            $games = $this->traerPartidos($coachId);
+            if (is_string($games)) return $this->pagina('Sondeo', '<p class="err">' . $games . '</p>');
+            $filas = [];
+            foreach ($games as $g) {
+                $filas[] = $this->normalizar($g, $coachId);
+            }
+            $filas = $this->completarNombres($filas);
+        }
+
+        $temporadas = [];
+        foreach ($filas as $f) {
+            if ($f['temporada'] !== null) $temporadas[] = (int) $f['temporada'];
+        }
         $filas = $this->clasificar($filas, $desde);
 
         $aprendidos = [];
@@ -169,7 +186,6 @@ class ImportPartidosController extends Controller
         $guardadas = 0;
         if ($guardar) {
             foreach ($filas as $f) {
-                if ($f['estado'] === 'excluido') continue;
                 $guardadas += $this->persistir($f, $coachId, $tecnicoId) ? 1 : 0;
             }
         }
@@ -192,11 +208,18 @@ class ImportPartidosController extends Controller
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
             . '</div>';
 
+        if ($usarCache) {
+            $html .= '<p class="sub">Datos tomados de <code>import_partidos</code>: no se volvió a bajar nada de Transfermarkt.</p>';
+        }
+
         $base = $this->urlBase($request);
+        $cache = $usarCache ? '&cache=1' : '';
         $html .= '<p class="acciones">'
-            . '<a href="' . e($base . '&aprender=1&guardar=1') . '">Aprender mapeo y guardar</a> · '
-            . '<a href="' . e($base . '&estado=conflicto&limite=300') . '">Ver solo conflictos</a> · '
-            . '<a href="' . e($base . '&estado=nuevo&limite=300') . '">Ver solo nuevos</a>';
+            . '<a href="' . e($base . '&aprender=1&guardar=1' . $cache) . '">Aprender mapeo y guardar</a> · '
+            . '<a href="' . e($base . '&estado=conflicto&limite=300' . $cache) . '">Ver solo conflictos</a> · '
+            . '<a href="' . e($base . '&estado=nuevo&limite=300' . $cache) . '">Ver solo nuevos</a> · '
+            . '<a href="' . e($base . '&cache=1&aprender=1&guardar=1') . '">Refrescar sin bajar</a> · '
+            . '<a href="' . e($base . '&aprender=1&guardar=1') . '">Volver a bajar de Transfermarkt</a>';
         if ($tecnicoId) {
             $html .= ' · <a class="boton" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId])) . '">Aplicar los nuevos →</a>';
         } else {
@@ -215,7 +238,9 @@ class ImportPartidosController extends Controller
 
         $titulo = $filtro !== '' ? ('Partidos con estado «' . e($filtro) . '»') : ('Primeros ' . $limite . ' partidos');
         $html .= '<h2>' . $titulo . '</h2>' . $this->tabla($filas, $limite, $filtro);
-        $html .= '<h2>Estructura del JSON</h2>' . $this->diagnosticar($games[0]);
+        if (!empty($games)) {
+            $html .= '<h2>Estructura del JSON</h2>' . $this->diagnosticar($games[0]);
+        }
 
         return $this->pagina('Sondeo de partidos', $html);
     }
@@ -538,6 +563,46 @@ class ImportPartidosController extends Controller
     }
 
     // ═══════════════════════════ FUENTE / CLASIFICACIÓN ═══════════════════════════
+
+    /**
+     * Reconstruye las filas desde import_partidos, sin tocar Transfermarkt.
+     * Se usa después de mapear un club o de crear un equipo: los datos del DT
+     * ya los bajamos una vez, no hace falta gastar otra llamada.
+     */
+    private function filasDesdeStaging($tecnicoId)
+    {
+        $filas = [];
+        $rows = DB::table('import_partidos')->where('tecnico_id', $tecnicoId)->orderBy('dia', 'desc')->get();
+        foreach ($rows as $r) {
+            $filas[] = [
+                'external_id'             => $r->external_id,
+                'competencia_external_id' => $r->competencia_external_id,
+                'competencia_nombre'      => $r->competencia_nombre,
+                'temporada'               => $r->temporada,
+                'ronda'                   => $r->ronda,
+                'arbitro_external_id'     => null,
+                'club_external_id'        => $r->club_external_id,
+                'club_nombre'             => $r->club_nombre,
+                'rival_external_id'       => $r->rival_external_id,
+                'rival_nombre'            => $r->rival_nombre,
+                'local'                   => (int) $r->local === 1,
+                'dia'                     => $r->dia,
+                'goles_favor'             => $r->goles_favor === null ? null : (int) $r->goles_favor,
+                'goles_contra'            => $r->goles_contra === null ? null : (int) $r->goles_contra,
+                'anio'                    => $r->dia ? substr($r->dia, 0, 4) : null,
+                'equipo_id'               => null,
+                'rival_id'                => null,
+                'rival_real_id'           => null,
+                'partido_id'              => null,
+                'estado'                  => $r->estado === 'aplicado' ? 'aplicado' : 'nuevo',
+                'motivo'                  => null,
+                'payload'                 => $r->payload,
+                'aplicado'                => $r->estado === 'aplicado',
+                'partido_aplicado'        => $r->partido_id,
+            ];
+        }
+        return $filas;
+    }
 
     private function traerPartidos($coachId)
     {
@@ -974,7 +1039,7 @@ class ImportPartidosController extends Controller
     private function urlBase(Request $request)
     {
         $q = $request->query();
-        unset($q['guardar'], $q['aprender'], $q['estado'], $q['limite'],
+        unset($q['guardar'], $q['aprender'], $q['estado'], $q['limite'], $q['cache'],
               $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre']);
         return $request->url() . '?' . http_build_query($q);
     }
@@ -1010,6 +1075,7 @@ class ImportPartidosController extends Controller
             $q['mapear_tm'] = $tmId;
             $q['mapear_nombre'] = $d['nombre'];
             $q['mapear_equipo'] = $d['real'];
+            $q['cache'] = 1;
             $href = $request->url() . '?' . http_build_query($q);
 
             $out .= '<tr class="err"><td>' . e($d['nombre']) . '</td><td class="num">' . e($tmId) . '</td>'
@@ -1046,7 +1112,8 @@ class ImportPartidosController extends Controller
 
         $out = '<h2>Clubes sin mapear <span class="sub">(' . count($pend) . ')</span></h2>'
              . '<p class="sub">Elegí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
-             . 'Si el club no existe en tu base, crealo primero desde Equipos.</p>'
+             . 'Si el club no existe en tu base, «Crear equipo» lo abre en otra pestaña; cuando volvés acá y refrescás, '
+             . 'aparece en la lista <b>sin volver a bajar nada de Transfermarkt</b>.</p>'
              . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
 
         foreach ($pend as $tmId => $d) {
@@ -1059,8 +1126,11 @@ class ImportPartidosController extends Controller
             }
             $out .= '<input type="hidden" name="mapear_tm" value="' . e($tmId) . '">'
                  . '<input type="hidden" name="mapear_nombre" value="' . e($d['nombre']) . '">'
+                 . '<input type="hidden" name="cache" value="1">'
                  . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select>'
-                 . ' <button>Mapear</button></form></td></tr>';
+                 . ' <button>Mapear</button></form>'
+                 . '<a class="boton-sec" href="' . e(route('equipos.create')) . '" target="_blank">Crear equipo ↗</a>'
+                 . '</td></tr>';
         }
         return $out . '</tbody></table></div>';
     }
@@ -1122,6 +1192,8 @@ class ImportPartidosController extends Controller
             a{color:#15714e}
             a.boton,.acciones a.boton{display:inline-block;background:#15714e;color:#fff;padding:5px 12px;text-decoration:none;font-weight:600}
             a.boton:hover{background:#0f5a3d}
+            a.boton-sec{display:inline-block;margin-left:8px;padding:4px 10px;border:1px solid #c7cec7;background:#eef1ec;color:#15714e;text-decoration:none;font-size:12px}
+            a.boton-sec:hover{background:#e2e8e1}
             .diag{background:#fff;border:1px solid #dde2dd;padding:14px 16px;font-size:13px}
             .diag code{background:#eef1ec;padding:1px 5px;font-size:12px}
             pre{font-size:11px;max-height:340px;overflow:auto;background:#f0f3ef;padding:10px}
