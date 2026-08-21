@@ -383,9 +383,7 @@ class ImportPartidosController extends Controller
         sort($temporadas);
         $rango = empty($temporadas) ? '?' : (reset($temporadas) . ' – ' . end($temporadas));
 
-        $html  = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a>'
-            . ($tecnicoId ? ' · <a href="' . e(route('import_detalles.index', ['tecnico_id' => $tecnicoId]))
-                . '">Detalle de los partidos →</a>' : '') . '</p>';
+        $html  = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a></p>';
         $html .= '<h1>Sondeo · ' . e($nombreDT ?: ('coach ' . $coachId)) . '</h1>';
         $html .= '<p class="sub">coach ' . e($coachId) . ' · ' . $cont['total'] . ' partidos · temporadas ' . e($rango) . ' · corte en ' . $desde . '</p>';
 
@@ -415,6 +413,8 @@ class ImportPartidosController extends Controller
             . '<a href="' . e($base . '&aprender=1&guardar=1') . '">Volver a bajar de Transfermarkt</a>';
         if ($tecnicoId) {
             $html .= ' · <a class="boton" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId])) . '">Aplicar los nuevos →</a>';
+            $html .= ' · <a class="boton-sec" href="' . e(route('import_detalles.index', ['tecnico_id' => $tecnicoId]))
+                . '" title="Alineaciones, goles, tarjetas, cambios y árbitros de los partidos ya cargados">Detalles de los partidos →</a>';
         } else {
             $html .= ' <span class="sub">(para aplicar hace falta entrar con <code>?tecnico_id=</code>)</span>';
         }

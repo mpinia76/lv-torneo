@@ -78,11 +78,6 @@
                            class="btn btn-success m-1" target="_blank">
                             Partidos
                         </a>
-                        <a href="{{ route('import_detalles.index', ['tecnico_id' => $tecnico->id]) }}"
-                           class="btn btn-outline-success m-1" target="_blank"
-                           title="Alineaciones, goles, tarjetas, cambios y árbitros de los partidos ya cargados">
-                            Detalles
-                        </a>
                     </div>
 
                 </td>
