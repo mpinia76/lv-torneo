@@ -235,6 +235,7 @@ class ImportDetallesController extends Controller
             . $this->card(count($p['cambios']), 'Cambios')
             . $this->card(count($p['arbitros']), 'Árbitros')
             . $this->card(count(isset($p['tecnicos']) ? $p['tecnicos'] : []), 'Técnicos')
+            . $this->card(count(isset($p['plantillas']) ? $p['plantillas'] : []), 'A la plantilla')
             . $this->card(count($r['creados']['jugadores']), 'Jugadores nuevos', count($r['creados']['jugadores']) ? 'warn' : '')
             . '</div>';
 
@@ -265,7 +266,8 @@ class ImportDetallesController extends Controller
         }
 
         $cuerpo .= $this->bloque('Alineación', $p['alineacions'], ['_equipo' => 'Equipo', 'tipo' => 'Tipo',
-            'orden' => 'Orden', 'dorsal' => 'Dorsal', '_nombre' => 'Jugador']);
+            '_nombre' => 'Jugador', 'dorsal' => 'Dorsal', '_fuente' => 'De dónde sale el dorsal',
+            'orden' => 'Puesto']);
         $cuerpo .= $this->bloque('Goles', $p['gols'], ['minuto' => 'Min', '_nombre' => 'Jugador',
             '_equipo' => 'Equipo', 'tipo' => 'Tipo', '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Tarjetas', $p['tarjetas'], ['minuto' => 'Min', '_nombre' => 'Jugador',
@@ -275,6 +277,15 @@ class ImportDetallesController extends Controller
         $cuerpo .= $this->bloque('Árbitros', $p['arbitros'], ['tipo' => 'Rol', '_nombre' => 'Árbitro']);
         $cuerpo .= $this->bloque('Técnicos', isset($p['tecnicos']) ? $p['tecnicos'] : [],
             ['_equipo' => 'Equipo', '_nombre' => 'DT', '_estado' => 'Estado']);
+
+        if (!empty($p['plantillas'])) {
+            $cuerpo .= '<p class="sub" style="margin-top:24px">Los ' . count($p['plantillas']) . ' jugadores de arriba '
+                . 'también se suman a la <b>plantilla</b> de su equipo en este torneo. Sin eso, la pantalla de '
+                . '<code>/admin/alineaciones</code> no los ofrece en los desplegables y no se puede editar el partido a mano. '
+                . 'Se usa la plantilla que el equipo ya tenga en <b>cualquier grupo del torneo</b> —una por torneo, aunque '
+                . 'después pase de zona a fase final— y sólo se crea una nueva si no existía ninguna. '
+                . 'A los que ya estén en la plantilla no se les toca el dorsal.</p>';
+        }
 
         if ((string) $request->get('crudo', '0') === '1' && $r['crudo']) {
             $cuerpo .= '<h2>JSON crudo</h2><pre>' . e(json_encode($r['crudo'],

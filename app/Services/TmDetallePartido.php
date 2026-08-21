@@ -92,6 +92,8 @@ class TmDetallePartido
     private $mapaTecnicos  = null;
     /** En la vista previa los jugadores que se crearían llevan un id negativo. */
     private $nombresPreview = [];
+    private $tiposPreview   = [];
+    private $cacheTipos     = [];
     private $proximoPreview = -1;
     /** tm_club_id -> equipo_id sacado de la fila de import_partidos del partido. */
     private $mapaStaging = [];
@@ -129,7 +131,7 @@ class TmDetallePartido
             'avisos'      => [],
             'fallidas'    => 0,
             'plan'        => ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
-                'arbitros' => [], 'tecnicos' => []],
+                'arbitros' => [], 'tecnicos' => [], 'plantillas' => []],
             'creados'     => ['jugadores' => [], 'arbitros' => [], 'tecnicos' => []],
             'llamadas'    => 0,
             'crudo'       => null,
@@ -225,7 +227,13 @@ class TmDetallePartido
 
         // ── 5) Armar el plan ───────────────────────────────────────────────
         $plan = ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
-            'arbitros' => [], 'tecnicos' => []];
+            'arbitros' => [], 'tecnicos' => [], 'plantillas' => []];
+
+        // La plantilla de un equipo se carga UNA sola vez por torneo, en un
+        // grupo, aunque después el equipo pase a otro (zona -> fase final). Por
+        // eso lo que manda es el torneo; el grupo sólo se usa si hay que crearla.
+        $grupoId  = optional($partido->fecha)->grupo_id;
+        $torneoId = optional(optional($partido->fecha)->grupo)->torneo_id;
 
         // Controles que valen para los dos equipos a la vez.
         //   $jugadoresPuestos: nadie puede estar dos veces en la misma alineación.
@@ -234,6 +242,10 @@ class TmDetallePartido
         //                      repetido en el mismo equipo hace fallar el guardado.
         $jugadoresPuestos = [];
         $dorsalesUsados   = [];
+
+        // Los dorsales que vos cargaste en la plantilla. Son la referencia:
+        // Transfermarkt a veces manda el número cambiado o repetido.
+        $mapaDorsales = $this->dorsalesDePlantilla($partido, $lados);
 
         foreach ($lados as $iLado => $lado) {
             $equipoId = $lado['equipo_id'];
@@ -273,19 +285,48 @@ class TmDetallePartido
                 }
                 $jugadoresPuestos[$jugadorId] = $p['tm_id'];
 
-                // Dorsal repetido dentro del equipo: lo dejamos sin dorsal en vez
-                // de perder al jugador. Estar en la alineación importa más que el
-                // número, y si no el índice único hace fallar todo el partido.
-                $dorsal = $p['dorsal'];
+                // ── Dorsal ────────────────────────────────────────────────
+                // Por defecto vale el de Transfermarkt, que es el de ESE partido.
+                // Si no coincide con el de la plantilla, se avisa. Y si viene
+                // repetido dentro del equipo, ahí sí manda la plantilla: es el
+                // dato que cargaste vos y encima resuelve el choque.
+                $dorsal   = $p['dorsal'];
+                $dePlanti = isset($mapaDorsales[$equipoId . '-' . $jugadorId])
+                    ? (int) $mapaDorsales[$equipoId . '-' . $jugadorId] : null;
+                $fuente   = 'Transfermarkt';
+
+                if ($dePlanti !== null && $dorsal !== null && $dePlanti !== (int) $dorsal) {
+                    $this->aviso('Dorsal distinto para "' . $nombre . '" (' . $lado['equipo_nombre'] . '): '
+                        . 'Transfermarkt dice ' . $dorsal . ' y la plantilla dice ' . $dePlanti
+                        . '. Uso el de Transfermarkt, que es el de este partido.');
+                    $fuente = 'TM ' . $dorsal . ' ≠ plantilla ' . $dePlanti;
+                }
+
+                if ($dorsal === null && $dePlanti !== null) {
+                    $dorsal = $dePlanti;
+                    $fuente = 'plantilla (TM no lo trajo)';
+                }
+
                 $claveDorsal = $equipoId . '-' . $dorsal;
                 if ($dorsal !== null && isset($dorsalesUsados[$claveDorsal])) {
-                    $this->aviso('Dorsal ' . $dorsal . ' repetido en ' . $lado['equipo_nombre'] . ': ya lo tiene "'
-                        . $dorsalesUsados[$claveDorsal] . '", así que "' . $nombre . '" queda sin dorsal. '
-                        . 'Viene así de Transfermarkt; corregilo a mano si sabés cuál era.');
-                    $dorsal = null;
-                } elseif ($dorsal !== null) {
-                    $dorsalesUsados[$claveDorsal] = $nombre;
+                    $otro = $dorsalesUsados[$claveDorsal];
+
+                    if ($dePlanti !== null && !isset($dorsalesUsados[$equipoId . '-' . $dePlanti])) {
+                        $this->aviso('Dorsal ' . $dorsal . ' repetido en ' . $lado['equipo_nombre']
+                            . ' (ya lo tiene "' . $otro . '"): para "' . $nombre . '" uso el de la plantilla, '
+                            . $dePlanti . '.');
+                        $dorsal = $dePlanti;
+                        $fuente = 'plantilla (TM lo repetía)';
+                    } else {
+                        $this->aviso('Dorsal ' . $dorsal . ' repetido en ' . $lado['equipo_nombre']
+                            . ': ya lo tiene "' . $otro . '" y "' . $nombre . '" no lo tiene cargado en la plantilla, '
+                            . 'así que queda sin dorsal. Cargáselo en la plantilla y rehacé el partido.');
+                        $dorsal = null;
+                        $fuente = 'sin dorsal (repetido)';
+                    }
                 }
+
+                if ($dorsal !== null) $dorsalesUsados[$equipoId . '-' . $dorsal] = $nombre;
 
                 $plan['alineacions'][] = [
                     'partido_id' => $partido->id,
@@ -293,11 +334,29 @@ class TmDetallePartido
                     'equipo_id'  => $equipoId,
                     'dorsal'     => $dorsal,
                     'tipo'       => $p['tipo'],
-                    'orden'      => $p['orden'],
+                    // `orden` no es la posición en la lista: es el PUESTO.
+                    // Mismo criterio que FechaController y AlineacionController.
+                    'orden'      => $this->ordenPorPuesto($jugadorId),
                     '_nombre'    => $nombre,
                     '_equipo'    => $lado['equipo_nombre'],
-                    '_dudoso'    => ($dorsal === null && $p['dorsal'] !== null),
+                    '_fuente'    => $fuente,
+                    '_dudoso'    => ($fuente !== 'Transfermarkt'),
                 ];
+
+                // La pantalla de alineaciones arma sus <select> con la PLANTILLA
+                // del equipo en ese torneo. Si el jugador no está ahí, el select
+                // sale vacío y al guardar revienta. Así que lo sumamos.
+                if ($grupoId) {
+                    $plan['plantillas'][] = [
+                        'torneo_id'  => (int) $torneoId,
+                        'grupo_id'   => (int) $grupoId,
+                        'equipo_id'  => $equipoId,
+                        'jugador_id' => $jugadorId,
+                        'dorsal'     => $dorsal,
+                        '_nombre'    => $nombre,
+                        '_equipo'    => $lado['equipo_nombre'],
+                    ];
+                }
             }
 
             // Goles / tarjetas / cambios.
@@ -416,6 +475,10 @@ class TmDetallePartido
                         Cambio::where('partido_id', $partido->id)->delete();
                         PartidoArbitro::where('partido_id', $partido->id)->delete();
                     }
+                    // Primero la plantilla: es lo que hace que el jugador exista
+                    // para la pantalla de alineaciones del torneo.
+                    $this->grabarPlantillas($plan['plantillas']);
+
                     $this->grabarFilas(Alineacion::class,    $plan['alineacions'], 'la alineación');
                     $this->grabarFilas(Gol::class,          $plan['gols'],        'un gol');
                     $this->grabarFilas(Tarjeta::class,      $plan['tarjetas'],    'una tarjeta');
@@ -1208,6 +1271,7 @@ class TmDetallePartido
             // que igual aparezca en la alineación y en las incidencias.
             $ficticio = $this->proximoPreview--;
             $this->nombresPreview[$ficticio] = ($datos['name'] !== '' ? $datos['name'] : $datos['apellido']) . ' · nuevo';
+            $this->tiposPreview[$ficticio] = isset($datos['jugador']['tipoJugador']) ? $datos['jugador']['tipoJugador'] : '';
             return ['jugador_id' => $ficticio, 'creado' => true, 'descripcion' => $etiqueta . ' — SE CREARÍA'
                 . ($datos['nacimiento'] ? ' · ' . $datos['nacimiento'] : ' · sin fecha de nacimiento')
                 . ($datos['nacionalidad'] ? ' · ' . $datos['nacionalidad'] : ' · sin nacionalidad')
@@ -1413,6 +1477,128 @@ class TmDetallePartido
                 $this->aviso('No se pudo guardar ' . $que . $quien . ': ' . $this->mensajeCorto($e));
             }
         }
+    }
+
+    /**
+     * Los dorsales cargados en la plantilla, para los dos equipos del partido.
+     *
+     * Se miran TODOS los grupos del torneo, igual que hace `AlineacionController`
+     * al armar sus desplegables: la plantilla puede estar cargada en otro grupo
+     * del mismo torneo (zona, fase final) y sigue valiendo.
+     *
+     * Devuelve "equipoId-jugadorId" => dorsal.
+     */
+    private function dorsalesDePlantilla(Partido $partido, array $lados)
+    {
+        $mapa = [];
+        $torneoId = optional(optional($partido->fecha)->grupo)->torneo_id;
+        if (!$torneoId) return $mapa;
+
+        $equipos = [];
+        foreach ($lados as $l) $equipos[] = $l['equipo_id'];
+
+        $filas = DB::table('plantilla_jugadors')
+            ->join('plantillas', 'plantillas.id', '=', 'plantilla_jugadors.plantilla_id')
+            ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+            ->where('grupos.torneo_id', $torneoId)
+            ->whereIn('plantillas.equipo_id', $equipos)
+            ->whereNotNull('plantilla_jugadors.dorsal')
+            ->select('plantillas.equipo_id', 'plantilla_jugadors.jugador_id', 'plantilla_jugadors.dorsal')
+            ->get();
+
+        foreach ($filas as $f) {
+            $mapa[$f->equipo_id . '-' . $f->jugador_id] = $f->dorsal;
+        }
+        return $mapa;
+    }
+
+    /**
+     * Suma los jugadores a la plantilla del equipo en ese grupo.
+     *
+     * Sin esto el detalle "se ve" en la ficha del partido pero la pantalla de
+     * `/admin/alineaciones` queda inservible: sus <select> se arman con
+     * `plantilla_jugadors`, así que un jugador que no está en la plantilla sale
+     * como opción vacía y, al guardar, manda jugador_id nulo.
+     *
+     * Nunca pisa un dorsal ya cargado: si el jugador ya estaba en la plantilla
+     * se lo deja como está, y sólo se le completa el dorsal si estaba vacío.
+     */
+    private function grabarPlantillas(array $filas)
+    {
+        if (empty($filas)) return;
+
+        $plantillas = [];   // "torneo-equipo" => plantilla_id
+        foreach ($filas as $f) {
+            $clave = $f['torneo_id'] . '-' . $f['equipo_id'];
+            try {
+                if (!isset($plantillas[$clave])) {
+                    // Un equipo tiene UNA plantilla por torneo, esté en el grupo
+                    // que esté. Si ya existe en cualquier grupo del torneo, se
+                    // usa esa; recién si no hay ninguna se crea, en el grupo de
+                    // este partido.
+                    $existente = null;
+                    if ($f['torneo_id']) {
+                        $existente = DB::table('plantillas')
+                            ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+                            ->where('grupos.torneo_id', $f['torneo_id'])
+                            ->where('plantillas.equipo_id', $f['equipo_id'])
+                            ->orderBy('plantillas.id')
+                            ->value('plantillas.id');
+                    }
+                    if (!$existente) {
+                        $p = \App\Plantilla::firstOrCreate(
+                            ['grupo_id' => $f['grupo_id'], 'equipo_id' => $f['equipo_id']]
+                        );
+                        $existente = $p->id;
+                    }
+                    $plantillas[$clave] = $existente;
+                }
+
+                $pj = \App\PlantillaJugador::where('plantilla_id', $plantillas[$clave])
+                    ->where('jugador_id', $f['jugador_id'])->first();
+
+                if (!$pj) {
+                    \App\PlantillaJugador::create([
+                        'plantilla_id' => $plantillas[$clave],
+                        'jugador_id'   => $f['jugador_id'],
+                        'dorsal'       => $f['dorsal'],
+                    ]);
+                } elseif (($pj->dorsal === null || $pj->dorsal === '') && $f['dorsal'] !== null) {
+                    $pj->update(['dorsal' => $f['dorsal']]);
+                }
+            } catch (\Exception $e) {
+                $this->fallidas++;
+                $this->aviso('No se pudo sumar a la plantilla — ' . $f['_nombre'] . ': ' . $this->mensajeCorto($e));
+            }
+        }
+    }
+
+    /**
+     * `alineacions.orden` guarda el PUESTO, no la posición en la lista.
+     * Es la convención de toda la base (ver FechaController y AlineacionController):
+     * arquero 0, defensor 1, medio 2, delantero 3, y lo desconocido va como 3.
+     */
+    private function ordenPorPuesto($jugadorId)
+    {
+        $tipo = $jugadorId < 0
+            ? (isset($this->tiposPreview[$jugadorId]) ? $this->tiposPreview[$jugadorId] : '')
+            : $this->tipoJugador($jugadorId);
+
+        switch ($tipo) {
+            case 'Arquero':   return 0;
+            case 'Defensor':  return 1;
+            case 'Medio':     return 2;
+            case 'Delantero': return 3;
+            default:          return 3;
+        }
+    }
+
+    private function tipoJugador($id)
+    {
+        if (!isset($this->cacheTipos[$id])) {
+            $this->cacheTipos[$id] = (string) DB::table('jugadors')->where('id', $id)->value('tipoJugador');
+        }
+        return $this->cacheTipos[$id];
     }
 
     /** El mensaje de la excepción sin el SQL entero pegado atrás. */
