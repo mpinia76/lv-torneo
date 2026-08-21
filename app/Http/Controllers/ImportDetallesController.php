@@ -362,10 +362,23 @@ class ImportDetallesController extends Controller
             DB::table('jugador_tm')->where('id', (int) $request->get('ok'))->update(['revisar' => 0, 'updated_at' => now()]);
             return redirect()->route('import_detalles.revisar');
         }
-        if ((string) $request->get('todos', '0') === '1') {
-            DB::table('jugador_tm')->where('revisar', 1)->update(['revisar' => 0, 'updated_at' => now()]);
+        if ($request->filled('ok_arb')) {
+            DB::table('arbitro_tm')->where('id', (int) $request->get('ok_arb'))->update(['revisar' => 0, 'updated_at' => now()]);
             return redirect()->route('import_detalles.revisar');
         }
+        if ((string) $request->get('todos', '0') === '1') {
+            DB::table('jugador_tm')->where('revisar', 1)->update(['revisar' => 0, 'updated_at' => now()]);
+            DB::table('arbitro_tm')->where('revisar', 1)->update(['revisar' => 0, 'updated_at' => now()]);
+            return redirect()->route('import_detalles.revisar');
+        }
+
+        $arbitros = DB::table('arbitro_tm')
+            ->join('arbitros', 'arbitros.id', '=', 'arbitro_tm.arbitro_id')
+            ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+            ->where('arbitro_tm.revisar', 1)
+            ->select('arbitro_tm.id', 'arbitro_tm.tm_referee_id', 'arbitro_tm.arbitro_id', 'arbitro_tm.created_at',
+                'personas.name', 'personas.nombre', 'personas.apellido', 'personas.nacimiento', 'personas.nacionalidad')
+            ->orderBy('arbitro_tm.created_at', 'desc')->limit(200)->get();
 
         $filas = DB::table('jugador_tm')
             ->join('jugadors', 'jugadors.id', '=', 'jugador_tm.jugador_id')
@@ -382,9 +395,32 @@ class ImportDetallesController extends Controller
             . '<p class="sub">Se dieron de alta solos al cargar una alineación. Repasá que el nombre, la fecha de '
             . 'nacimiento y la nacionalidad estén bien, y marcalos como vistos.</p>';
 
-        if ($filas->isEmpty()) {
+        if ($filas->isEmpty() && $arbitros->isEmpty()) {
             $cuerpo .= '<div class="ok-box">No queda ninguno por revisar.</div>';
             return $this->pagina('Jugadores por revisar', $cuerpo);
+        }
+
+        if (!$arbitros->isEmpty()) {
+            $cuerpo .= '<h2>Árbitros</h2><div class="scroll"><table><thead><tr>'
+                . '<th>Alta</th><th>Nombre</th><th>Apellido, nombre</th><th>Nacimiento</th>'
+                . '<th>Nacionalidad</th><th>TM</th><th></th></tr></thead><tbody>';
+            foreach ($arbitros as $a) {
+                $cuerpo .= '<tr>'
+                    . '<td class="num">' . e(substr((string) $a->created_at, 0, 10)) . '</td>'
+                    . '<td>' . e($a->name) . '</td>'
+                    . '<td>' . e($a->apellido . ', ' . $a->nombre) . '</td>'
+                    . '<td class="num">' . e($a->nacimiento ?: '—') . '</td>'
+                    . '<td>' . e($a->nacionalidad ?: '—') . '</td>'
+                    . '<td><a target="_blank" href="https://www.transfermarkt.es/-/profil/schiedsrichter/' . e($a->tm_referee_id) . '">' . e($a->tm_referee_id) . '</a></td>'
+                    . '<td><a href="' . e(route('arbitros.edit', $a->arbitro_id)) . '">Editar</a>'
+                    . ' · <a href="' . e(route('import_detalles.revisar', ['ok_arb' => $a->id])) . '">Visto</a></td>'
+                    . '</tr>';
+            }
+            $cuerpo .= '</tbody></table></div><h2>Jugadores</h2>';
+        }
+
+        if ($filas->isEmpty()) {
+            return $this->pagina('Jugadores por revisar', $cuerpo . '<p class="sub">No queda ningún jugador por revisar.</p>');
         }
 
         $cuerpo .= '<p class="acciones"><a class="boton-sec" href="' . e(route('import_detalles.revisar', ['todos' => 1]))

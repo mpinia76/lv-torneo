@@ -705,7 +705,12 @@ class TmDetallePartido
             if (!isset($mapa[(string) $par[0]])) $faltan[] = (string) $par[0];
         }
         if (!empty($faltan)) {
-            $mapa = array_merge($mapa, $this->resolverArbitros(array_unique($faltan), $escribir, $informe));
+            // OJO: nada de array_merge acá. Las claves son ids numéricos y
+            // array_merge los renumera (0, 1, 2…), con lo cual el árbitro que
+            // acabamos de resolver deja de encontrarse por su tm_id.
+            foreach ($this->resolverArbitros(array_unique($faltan), $escribir, $informe) as $k => $v) {
+                $mapa[$k] = $v;
+            }
         }
 
         foreach ($pares as $par) {
