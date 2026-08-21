@@ -75,6 +75,8 @@ class ImportPartidosController extends Controller
         $html = '<h1>Carga de partidos · DT por DT</h1>'
             . '<p class="sub">Estos son los DTs que ya pasaron por el sondeo. El botón <b>Partidos</b> de la lista de técnicos '
             . 'baja los partidos del DT y los deja en staging; necesita que el DT tenga cargado el slug de Transfermarkt.</p>'
+            . '<p class="acciones"><a class="boton-sec" href="' . e(route('import_detalles.index')) . '">'
+            . 'Detalle de los partidos (alineaciones, goles, tarjetas, cambios)</a></p>'
             . '<form method="get" style="margin:12px 0"><input name="q" value="' . e($q) . '" placeholder="buscar DT…" size="30"> <button>Buscar</button></form>'
             . '<div class="scroll"><table><thead><tr><th>DT</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th>Aplicados</th><th></th></tr></thead>'
             . '<tbody>' . $filas . '</tbody></table></div>';
@@ -381,7 +383,9 @@ class ImportPartidosController extends Controller
         sort($temporadas);
         $rango = empty($temporadas) ? '?' : (reset($temporadas) . ' – ' . end($temporadas));
 
-        $html  = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a></p>';
+        $html  = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a>'
+            . ($tecnicoId ? ' · <a href="' . e(route('import_detalles.index', ['tecnico_id' => $tecnicoId]))
+                . '">Detalle de los partidos →</a>' : '') . '</p>';
         $html .= '<h1>Sondeo · ' . e($nombreDT ?: ('coach ' . $coachId)) . '</h1>';
         $html .= '<p class="sub">coach ' . e($coachId) . ' · ' . $cont['total'] . ' partidos · temporadas ' . e($rango) . ' · corte en ' . $desde . '</p>';
 
@@ -448,7 +452,8 @@ class ImportPartidosController extends Controller
         $nombreDT = optional($tecnico->persona)->name ?: ('DT #' . $tecnico->id);
 
         $volver = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a> · '
-            . '<a href="' . e(route('import_partidos.sondear', ['tecnico_id' => $tecnicoId])) . '">Volver al sondeo</a></p>';
+            . '<a href="' . e(route('import_partidos.sondear', ['tecnico_id' => $tecnicoId])) . '">Volver al sondeo</a> · '
+            . '<a href="' . e(route('import_detalles.index', ['tecnico_id' => $tecnicoId])) . '">Detalle de los partidos →</a></p>';
 
         // ── Revisar/corregir la localía de lo ya aplicado ───────────────────
         if ((string) $request->get('arreglar_localia', '0') === '1') {
@@ -491,7 +496,8 @@ class ImportPartidosController extends Controller
             ->where('tecnico_id', $tecnicoId)->where('estado', 'aplicado')->count();
         if ($yaAplicados) {
             $html .= '<p class="sub">Ya aplicaste <b>' . $yaAplicados . '</b> partidos de este DT. '
-                . '<a class="boton-sec" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId, 'arreglar_localia' => 1])) . '">Revisar la localía de lo aplicado</a></p>';
+                . '<a class="boton-sec" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId, 'arreglar_localia' => 1])) . '">Revisar la localía de lo aplicado</a> '
+                . '<a class="boton-sec" href="' . e(route('import_detalles.index', ['tecnico_id' => $tecnicoId])) . '">Bajar el detalle de esos partidos</a></p>';
         }
 
         if ($faltaDt) {

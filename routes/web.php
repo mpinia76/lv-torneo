@@ -224,6 +224,15 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-partidos/sondear', 'ImportPartidosController@sondear')->name('import_partidos.sondear');
     Route::get('/import-partidos/aplicar', 'ImportPartidosController@aplicar')->name('import_partidos.aplicar');
     Route::get('/import-partidos/partido', 'ImportPartidosController@partido')->name('import_partidos.partido');
+
+    // Segunda etapa: el detalle de cada partido (alineaciones, goles, tarjetas,
+    // cambios, árbitros). Ver ImportDetallesController.
+    Route::get('/import-detalles', 'ImportDetallesController@index')->name('import_detalles.index');
+    Route::get('/import-detalles/ver', 'ImportDetallesController@ver')->name('import_detalles.ver');
+    Route::get('/import-detalles/bajar', 'ImportDetallesController@bajar')->name('import_detalles.bajar');
+    Route::get('/import-detalles/tanda', 'ImportDetallesController@tanda')->name('import_detalles.tanda');
+    Route::get('/import-detalles/sembrar', 'ImportDetallesController@sembrar')->name('import_detalles.sembrar');
+    Route::get('/import-detalles/revisar', 'ImportDetallesController@revisar')->name('import_detalles.revisar');
 });
 
 
