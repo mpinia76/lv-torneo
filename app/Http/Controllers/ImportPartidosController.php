@@ -263,6 +263,11 @@ class ImportPartidosController extends Controller
         $volver = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a> · '
                 . '<a href="' . e(route('import_partidos.sondear', ['tecnico_id' => $tecnicoId])) . '">Volver al sondeo</a></p>';
 
+        // ── Revisar/corregir la localía de lo ya aplicado ───────────────────
+        if ((string) $request->get('arreglar_localia', '0') === '1') {
+            return $this->pagina('Aplicar', $volver . $this->arreglarLocalia($tecnicoId));
+        }
+
         // ── Completar el DT en partidos que ya estaban cargados ─────────────
         if ((string) $request->get('completar_dt', '0') === '1') {
             $n = $this->completarTecnicos($tecnicoId);
@@ -275,6 +280,16 @@ class ImportPartidosController extends Controller
         }
 
         // ── Pantalla: grupos pendientes ─────────────────────────────────────
+        // Filas marcadas como aplicadas cuyo partido ya no existe (borrado a mano):
+        // vuelven a estar pendientes.
+        DB::table('import_partidos')
+            ->where('tecnico_id', $tecnicoId)->where('estado', 'aplicado')
+            ->whereNotNull('partido_id')
+            ->whereNotIn('partido_id', function ($q) {
+                $q->select('id')->from('partidos');
+            })
+            ->update(['estado' => 'nuevo', 'partido_id' => null, 'motivo' => null]);
+
         $pendientes = DB::table('import_partidos')
             ->where('tecnico_id', $tecnicoId)->where('estado', 'nuevo')
             ->orderBy('dia')->get();
@@ -284,6 +299,13 @@ class ImportPartidosController extends Controller
             ->where('motivo', 'like', '%falta el DT%')->count();
 
         $html = $volver . '<h1>Aplicar partidos · ' . e($nombreDT) . '</h1>';
+
+        $yaAplicados = DB::table('import_partidos')
+            ->where('tecnico_id', $tecnicoId)->where('estado', 'aplicado')->count();
+        if ($yaAplicados) {
+            $html .= '<p class="sub">Ya aplicaste <b>' . $yaAplicados . '</b> partidos de este DT. '
+                . '<a class="boton-sec" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId, 'arreglar_localia' => 1])) . '">Revisar la localía de lo aplicado</a></p>';
+        }
 
         if ($faltaDt) {
             $html .= '<p class="ok-box">Hay <b>' . $faltaDt . '</b> partidos ya cargados donde falta este DT. '
@@ -453,15 +475,18 @@ class ImportPartidosController extends Controller
                     ])->save();
                 }
 
-                if ($r->local === null) {
+                // La localía y el resultado se recalculan SIEMPRE desde el JSON crudo:
+                // las columnas pueden haberse guardado con una lógica vieja.
+                $datos = $this->datosPartido($r);
+                if ($datos['local'] === null) {
                     $errores[] = 'Sin localía: ' . $r->club_nombre . ' vs ' . $r->rival_nombre . ' (' . substr($r->dia, 0, 10) . ')';
                     continue;
                 }
-                $local = (int) $r->local === 1;
+                $local     = $datos['local'];
                 $equipolId = $local ? (int) $r->equipo_id : (int) $r->rival_id;
                 $equipovId = $local ? (int) $r->rival_id : (int) $r->equipo_id;
-                $golesl    = $local ? (int) $r->goles_favor : (int) $r->goles_contra;
-                $golesv    = $local ? (int) $r->goles_contra : (int) $r->goles_favor;
+                $golesl    = $local ? $datos['gf'] : $datos['gc'];
+                $golesv    = $local ? $datos['gc'] : $datos['gf'];
 
                 if (!$equipolId || !$equipovId) {
                     $errores[] = 'Sin equipos resueltos: ' . $r->club_nombre . ' vs ' . $r->rival_nombre;
@@ -589,6 +614,84 @@ class ImportPartidosController extends Controller
             }
         }
         return '';
+    }
+
+    /**
+     * Localía y goles de una fila del staging, recalculados desde el JSON crudo.
+     * Si no hay payload, cae a las columnas guardadas.
+     */
+    private function datosPartido($r)
+    {
+        $g = $r->payload ? json_decode($r->payload, true) : null;
+        if (is_array($g) && !empty($g)) {
+            $f = $this->normalizar($g, $r->coach_external_id);
+            return ['local' => $f['local'], 'gf' => (int) $f['goles_favor'], 'gc' => (int) $f['goles_contra']];
+        }
+        return [
+            'local' => $r->local === null ? null : ((int) $r->local === 1),
+            'gf'    => (int) $r->goles_favor,
+            'gc'    => (int) $r->goles_contra,
+        ];
+    }
+
+    /**
+     * Repara partidos ya aplicados cuya localía se guardó al revés.
+     * Recalcula desde el JSON y da vuelta local/visitante y el resultado.
+     */
+    private function arreglarLocalia($tecnicoId)
+    {
+        $filas = DB::table('import_partidos')
+            ->where('tecnico_id', $tecnicoId)->where('estado', 'aplicado')
+            ->whereNotNull('partido_id')->get();
+
+        $corregidos = 0; $revisados = 0; $detalle = '';
+
+        foreach ($filas as $r) {
+            $revisados++;
+            $datos = $this->datosPartido($r);
+            if ($datos['local'] === null || !$r->equipo_id || !$r->rival_id) continue;
+
+            $partido = \App\Partido::find($r->partido_id);
+            if (!$partido) continue;
+
+            $equipolId = $datos['local'] ? (int) $r->equipo_id : (int) $r->rival_id;
+            $equipovId = $datos['local'] ? (int) $r->rival_id : (int) $r->equipo_id;
+            $golesl    = $datos['local'] ? $datos['gf'] : $datos['gc'];
+            $golesv    = $datos['local'] ? $datos['gc'] : $datos['gf'];
+
+            if ((int) $partido->equipol_id === $equipolId && (int) $partido->equipov_id === $equipovId
+                && (int) $partido->golesl === $golesl && (int) $partido->golesv === $golesv) {
+                continue;   // ya estaba bien
+            }
+
+            $antes = $this->nombreEquipo($partido->equipol_id) . ' ' . $partido->golesl . ':' . $partido->golesv
+                   . ' ' . $this->nombreEquipo($partido->equipov_id);
+
+            $partido->forceFill([
+                'equipol_id' => $equipolId,
+                'equipov_id' => $equipovId,
+                'golesl'     => $golesl,
+                'golesv'     => $golesv,
+            ])->save();
+
+            DB::table('import_partidos')->where('id', $r->id)
+                ->update(['local' => $datos['local'] ? 1 : 0, 'updated_at' => now()]);
+
+            $detalle .= '<tr><td class="num">' . e(substr($r->dia, 0, 10)) . '</td><td>' . e($antes) . '</td>'
+                . '<td><b>' . e($this->nombreEquipo($equipolId) . ' ' . $golesl . ':' . $golesv . ' ' . $this->nombreEquipo($equipovId)) . '</b></td>'
+                . '<td class="num">#' . $partido->id . '</td></tr>';
+            $corregidos++;
+        }
+
+        $html = '<h1>Localía revisada</h1>'
+            . '<p class="ok-box">Revisé ' . $revisados . ' partidos ya aplicados de este DT. '
+            . ($corregidos ? ('Corregí <b>' . $corregidos . '</b>.') : 'Estaban todos bien.') . '</p>';
+
+        if ($detalle) {
+            $html .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Estaba</th><th>Quedó</th><th>Partido</th></tr></thead><tbody>'
+                . $detalle . '</tbody></table></div>';
+        }
+        return $html;
     }
 
     /** Agrega el partido_tecnico en partidos que ya estaban cargados sin este DT. */
@@ -1146,9 +1249,15 @@ class ImportPartidosController extends Controller
                       'club_nombre' => $f['club_nombre'], 'rival_nombre' => $f['rival_nombre'], 'dia' => $f['dia']];
         }
 
-        // Una fila ya aplicada no se pisa.
-        $yaAplicada = DB::table('import_partidos')->where($clave)->where('estado', 'aplicado')->exists();
-        if ($yaAplicada) return false;
+        // Una fila ya aplicada no se pisa… salvo que el partido que había creado
+        // ya no exista (lo borraste a mano). En ese caso vuelve a estar disponible.
+        $aplicada = DB::table('import_partidos')->where($clave)->where('estado', 'aplicado')->first();
+        if ($aplicada) {
+            $sigue = $aplicada->partido_id && \App\Partido::where('id', $aplicada->partido_id)->exists();
+            if ($sigue) return false;
+            DB::table('import_partidos')->where('id', $aplicada->id)
+                ->update(['estado' => 'nuevo', 'partido_id' => null, 'motivo' => null, 'updated_at' => now()]);
+        }
 
         DB::table('import_partidos')->updateOrInsert($clave, [
             'coach_external_id'       => $coachId,
