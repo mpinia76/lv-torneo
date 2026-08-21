@@ -236,6 +236,12 @@ class ImportDetallesController extends Controller
             $cuerpo .= '</div>';
         }
 
+        if (!empty($r['creados']['arbitros'])) {
+            $cuerpo .= '<h2>Árbitros que no estaban en la base</h2><div class="diag">';
+            foreach ($r['creados']['arbitros'] as $a) $cuerpo .= '<div>• ' . e($a) . '</div>';
+            $cuerpo .= '</div>';
+        }
+
         $cuerpo .= $this->bloque('Alineación', $p['alineacions'], ['_equipo' => 'Equipo', 'tipo' => 'Tipo',
             'orden' => 'Orden', 'dorsal' => 'Dorsal', '_nombre' => 'Jugador']);
         $cuerpo .= $this->bloque('Goles', $p['gols'], ['minuto' => 'Min', '_nombre' => 'Jugador',
@@ -243,7 +249,7 @@ class ImportDetallesController extends Controller
         $cuerpo .= $this->bloque('Tarjetas', $p['tarjetas'], ['minuto' => 'Min', '_nombre' => 'Jugador',
             '_equipo' => 'Equipo', 'tipo' => 'Tipo', '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Cambios', $p['cambios'], ['minuto' => 'Min', 'tipo' => 'Tipo',
-            '_nombre' => 'Jugador', '_equipo' => 'Equipo']);
+            '_nombre' => 'Jugador', '_equipo' => 'Equipo', '_fuente' => 'Cómo lo deduje']);
         $cuerpo .= $this->bloque('Árbitros', $p['arbitros'], ['tipo' => 'Rol', '_nombre' => 'Árbitro']);
 
         if ((string) $request->get('crudo', '0') === '1' && $r['crudo']) {

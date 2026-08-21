@@ -46,14 +46,42 @@ class TmDetallePartido
     const GOL_CABEZA     = 'Cabeza';
     const GOL_ENCONTRA   = 'En Contra';
 
-    /** Claves candidatas: la API cambió de nombres más de una vez, probamos todas. */
-    private static $kJugador   = ['playerId', 'player_id', 'id', 'scorerId', 'goalScorerId', 'playerID'];
+    /**
+     * Claves reales del JSON de /game/{id} (confirmadas con partidos de verdad).
+     * Cada acción viene así:
+     *   {"action":"Yellow card","actionId":301,"reason":"Not reported","reasonId":300,
+     *    "minute":45,"addedTime":1,"activePlayerId":30795,"passivePlayerId":…,
+     *    "activePlayer":{"id":…,"name":…,"shortName":…}}
+     *
+     * `action` es QUÉ pasó (el tipo de gol, el color de la tarjeta) y `reason`
+     * es el CÓMO (la asistencia). Para clasificar miramos `action`, nunca
+     * `reason`: si no, un "Not reported" en reason ensucia el match.
+     *
+     * En los cambios, `activePlayerId` y `passivePlayerId` son los dos jugadores,
+     * pero cuál entra y cuál sale no está dicho: se deduce del banco (ver abajo).
+     */
+    private static $kJugador   = ['activePlayerId', 'playerId', 'player_id', 'scorerId', 'goalScorerId', 'id'];
+    private static $kOtro      = ['passivePlayerId', 'assistPlayerId', 'passivePlayer'];
     private static $kMinuto    = ['minute', 'minuto', 'min', 'time', 'gameMinute'];
+    private static $kAgregado  = ['addedTime', 'injuryTime', 'extraTime'];
     private static $kDorsal    = ['shirtNumber', 'shirtNo', 'jerseyNumber', 'number', 'dorsal', 'squadNumber'];
-    private static $kEntra     = ['playerInId', 'playerOnId', 'substituteInId', 'inId', 'playerIn', 'substituteId'];
-    private static $kSale      = ['playerOutId', 'playerOffId', 'substituteOutId', 'outId', 'playerOut', 'replacedPlayerId'];
-    private static $kDescGol   = ['action', 'reason', 'goalType', 'type', 'typeName', 'description', 'actionName'];
-    private static $kDescCard  = ['cardType', 'type', 'action', 'reason', 'typeName', 'description'];
+    private static $kDescGol   = ['action', 'goalType', 'typeName', 'description', 'actionName'];
+    private static $kDescCard  = ['action', 'cardType', 'typeName', 'description', 'actionName'];
+
+    /**
+     * actionId de Transfermarkt. 200 = gol común, 206 = gol en contra,
+     * 301 = amarilla, 400 = cambio. Los 2xx que no conocemos igual son goles;
+     * los 3xx, tarjetas. Lo que no matchee cae al texto de `action`.
+     */
+    private static $accionGol = [
+        200 => self::GOL_JUGADA,
+        201 => self::GOL_JUGADA,
+        202 => self::GOL_CABEZA,
+        203 => self::GOL_PENAL,
+        204 => self::GOL_TIROLIBRE,
+        205 => self::GOL_JUGADA,
+        206 => self::GOL_ENCONTRA,
+    ];
 
     /** Avisos y datos sin reconocer que junta la corrida (se muestran en pantalla). */
     private $avisos = [];
@@ -182,8 +210,19 @@ class TmDetallePartido
         foreach ($lados as $lado) {
             $equipoId = $lado['equipo_id'];
 
+            // Quién arrancó y quién estaba en el banco. Es lo que nos deja saber,
+            // en cada cambio, cuál de los dos jugadores entra y cuál sale:
+            // Transfermarkt los llama "activo" y "pasivo" sin decir la dirección.
+            $jugadoresLado = $this->jugadoresDelLado($game, $lado['clave']);
+            $banco = []; $titulares = []; $yaEntraron = []; $yaSalieron = [];
+            foreach ($jugadoresLado as $p) {
+                if ($p['tm_id'] === null) continue;
+                if ($p['tipo'] === 'Suplente') $banco[(string) $p['tm_id']] = true;
+                else $titulares[(string) $p['tm_id']] = true;
+            }
+
             // Alineación: titulares primero, después el banco.
-            foreach ($this->jugadoresDelLado($game, $lado['clave']) as $p) {
+            foreach ($jugadoresLado as $p) {
                 $jugadorId = isset($mapa[(string) $p['tm_id']]) ? $mapa[(string) $p['tm_id']] : null;
                 if (!$jugadorId) {
                     $this->aviso('Alineación: jugador TM ' . $p['tm_id'] . ' sin resolver, lo salteo.');
@@ -238,17 +277,55 @@ class TmDetallePartido
                         '_fuente'    => $tipo['fuente'],
                     ];
                 } elseif ($accion['clase'] === 'cambio') {
-                    $sale  = isset($mapa[(string) $accion['ids'][0]]) ? $mapa[(string) $accion['ids'][0]] : null;
-                    $entra = isset($mapa[(string) $accion['ids'][1]]) ? $mapa[(string) $accion['ids'][1]] : null;
-                    foreach ([['Sale', $sale], ['Entra', $entra]] as $par) {
-                        if (!$par[1]) { $this->aviso('Cambio con un jugador sin resolver, salteo el lado "' . $par[0] . '".'); continue; }
+                    $dir = $this->direccionCambio($accion['ids'], $banco, $titulares, $yaEntraron, $yaSalieron);
+
+                    // Control de coherencia: nadie sale sin haber estado en cancha,
+                    // nadie entra dos veces. Si algo de esto salta, la deducción se
+                    // equivocó y hay que mirar ese cambio a mano.
+                    if ($dir['sale'] !== null) {
+                        $s = (string) $dir['sale'];
+                        if (!isset($titulares[$s]) && !isset($yaEntraron[$s])) {
+                            $this->aviso('Minuto ' . $accion['minuto'] . ': sale el jugador TM ' . $s
+                                . ' pero no era titular ni lo vi entrar antes. Revisá ese cambio.');
+                            $dir['dudoso'] = true;
+                        }
+                        if (isset($yaSalieron[$s])) {
+                            $this->aviso('Minuto ' . $accion['minuto'] . ': el jugador TM ' . $s . ' sale dos veces.');
+                            $dir['dudoso'] = true;
+                        }
+                        $yaSalieron[$s] = true;
+                    }
+                    if ($dir['entra'] !== null) {
+                        $en = (string) $dir['entra'];
+                        if (isset($yaEntraron[$en])) {
+                            $this->aviso('Minuto ' . $accion['minuto'] . ': el jugador TM ' . $en . ' entra dos veces.');
+                            $dir['dudoso'] = true;
+                        }
+                        if (isset($titulares[$en])) {
+                            $this->aviso('Minuto ' . $accion['minuto'] . ': entra el jugador TM ' . $en
+                                . ' pero figura como titular. Revisá ese cambio.');
+                            $dir['dudoso'] = true;
+                        }
+                        $yaEntraron[$en] = true;
+                    }
+
+                    foreach ([['Sale', $dir['sale']], ['Entra', $dir['entra']]] as $par) {
+                        if ($par[1] === null) continue;   // cambio con un solo jugador informado
+                        $jugadorId = isset($mapa[(string) $par[1]]) ? $mapa[(string) $par[1]] : null;
+                        if (!$jugadorId) {
+                            $this->aviso('Cambio del minuto ' . $accion['minuto'] . ': jugador TM ' . $par[1]
+                                . ' sin resolver, salteo el "' . $par[0] . '".');
+                            continue;
+                        }
                         $plan['cambios'][] = [
                             'partido_id' => $partido->id,
-                            'jugador_id' => $par[1],
+                            'jugador_id' => $jugadorId,
                             'minuto'     => $accion['minuto'],
                             'tipo'       => $par[0],
-                            '_nombre'    => $this->nombreJugador($par[1]),
+                            '_nombre'    => $this->nombreJugador($jugadorId),
                             '_equipo'    => $lado['equipo_nombre'],
+                            '_fuente'    => $dir['como'],
+                            '_dudoso'    => $dir['dudoso'],
                         ];
                     }
                 }
@@ -257,7 +334,7 @@ class TmDetallePartido
 
         // Árbitros: sólo los que ya estén atados en arbitro_tm. Los que no,
         // se listan como aviso — no inventamos personas sin nombre.
-        $plan['arbitros'] = $this->planArbitros($game, $partido);
+        $plan['arbitros'] = $this->planArbitros($game, $partido, $escribir, $informe);
 
         $informe['plan']   = $plan;
         $informe['avisos'] = $this->avisos;
@@ -412,25 +489,101 @@ class TmDetallePartido
                 $minuto = $this->valor($a, self::$kMinuto);
                 $minuto = ($minuto === null || $minuto === '') ? null : (int) $minuto;
 
+                // El minuto que guardamos es el del reloj: 90+7 se carga como 90,
+                // igual que hace el import de incidencias de promiedos.
+                $activo  = $this->valor($a, self::$kJugador);
+                $pasivo  = $this->valor($a, self::$kOtro);
+
                 if ($clase === 'cambio') {
-                    $sale  = $this->valor($a, self::$kSale);
-                    $entra = $this->valor($a, self::$kEntra);
-                    if ($sale === null && $entra === null) {
-                        $this->aviso('Cambio sin ids reconocibles: ' . $this->resumenCrudo($a));
+                    if ($activo === null && $pasivo === null) {
+                        $this->aviso('Cambio sin ids de jugador: ' . $this->resumenCrudo($a));
                         continue;
                     }
-                    $out[] = ['clase' => 'cambio', 'minuto' => $minuto, 'ids' => [$sale, $entra], 'crudo' => $a];
+                    $out[] = ['clase' => 'cambio', 'minuto' => $minuto, 'ids' => [$activo, $pasivo], 'crudo' => $a];
                 } else {
-                    $id = $this->valor($a, self::$kJugador);
-                    if ($id === null) {
+                    if ($activo === null) {
                         $this->aviso(ucfirst($clase) . ' sin id de jugador: ' . $this->resumenCrudo($a));
                         continue;
                     }
-                    $out[] = ['clase' => $clase, 'minuto' => $minuto, 'ids' => [$id], 'crudo' => $a];
+                    $out[] = ['clase' => $clase, 'minuto' => $minuto, 'ids' => [$activo], 'crudo' => $a];
                 }
             }
         }
+
+        // Orden cronológico. Es IMPRESCINDIBLE para los cambios: para saber si un
+        // suplente sale, primero hay que haber visto que entró. Los sin minuto van
+        // al final. usort no es estable antes de PHP 8, así que desempatamos por
+        // la posición original para no barajar acciones del mismo minuto.
+        $i = 0;
+        foreach ($out as &$o) { $o['_i'] = $i++; }
+        unset($o);
+        usort($out, function ($x, $y) {
+            $mx = $x['minuto'] === null ? PHP_INT_MAX : $x['minuto'];
+            $my = $y['minuto'] === null ? PHP_INT_MAX : $y['minuto'];
+            if ($mx !== $my) return $mx < $my ? -1 : 1;
+            return $x['_i'] < $y['_i'] ? -1 : ($x['_i'] > $y['_i'] ? 1 : 0);
+        });
         return $out;
+    }
+
+    /**
+     * Quién entra y quién sale en un cambio.
+     *
+     * Transfermarkt da `activePlayerId` y `passivePlayerId` sin decir cuál es
+     * cuál, así que no nos fiamos del orden: lo resolvemos con la alineación.
+     *
+     * OJO: "el del banco entra" NO alcanza. Un suplente que entró a los 60 puede
+     * salir a los 80, y en ese cambio los DOS son del banco. Por eso llevamos
+     * cuenta de quién ya entró y quién ya salió, y por eso las acciones se
+     * recorren en orden cronológico (ver el sort en accionesDelLado): sin ese
+     * orden, al llegar al cambio de los 80 todavía no sabríamos que el que sale
+     * había entrado a los 60.
+     *
+     * Prioridad:
+     *   1. uno del banco y el otro titular  -> caso normal
+     *   2. los dos del banco  -> sale el que ya había entrado
+     *   3. uno de los dos ya salió de la cancha -> el otro es el que entra
+     *   4. nada de lo anterior -> activo=entra, marcado como dudoso
+     */
+    private function direccionCambio(array $ids, array $banco, array $titulares, array $yaEntraron, array $yaSalieron = [])
+    {
+        $a = $ids[0] === null ? null : (string) $ids[0];
+        $b = (!isset($ids[1]) || $ids[1] === null) ? null : (string) $ids[1];
+
+        // Un solo jugador informado: el banco decide si entró o salió, pero si
+        // ya lo habíamos visto entrar, entonces este cambio es su salida.
+        if ($a === null || $b === null) {
+            $uno = $a !== null ? $a : $b;
+            if ($uno === null) return ['entra' => null, 'sale' => null, 'como' => 'sin datos', 'dudoso' => true];
+            if (isset($yaEntraron[$uno])) return ['entra' => null, 'sale' => $uno, 'como' => 'ya había entrado', 'dudoso' => false];
+            if (isset($banco[$uno]))      return ['entra' => $uno, 'sale' => null, 'como' => 'estaba en el banco', 'dudoso' => false];
+            if (isset($titulares[$uno]))  return ['entra' => null, 'sale' => $uno, 'como' => 'era titular', 'dudoso' => false];
+            return ['entra' => $uno, 'sale' => null, 'como' => 'un solo jugador, sin alineación', 'dudoso' => true];
+        }
+
+        $aBanco = isset($banco[$a]); $bBanco = isset($banco[$b]);
+        $aTit   = isset($titulares[$a]); $bTit = isset($titulares[$b]);
+
+        // 1) El caso normal: uno esperaba en el banco, el otro estaba jugando
+        // desde el arranque. Pero si el "del banco" ya entró antes, no puede
+        // volver a entrar: entonces el que entra es el otro.
+        if ($aBanco && $bTit && !isset($yaEntraron[$a])) return ['entra' => $a, 'sale' => $b, 'como' => 'banco/titular', 'dudoso' => false];
+        if ($bBanco && $aTit && !isset($yaEntraron[$b])) return ['entra' => $b, 'sale' => $a, 'como' => 'banco/titular', 'dudoso' => false];
+
+        // 2) Los dos salieron del banco: el reemplazado es el que ya había entrado.
+        if ($aBanco && $bBanco) {
+            if (isset($yaEntraron[$a]) && !isset($yaEntraron[$b])) return ['entra' => $b, 'sale' => $a, 'como' => 'los dos del banco: A ya había entrado', 'dudoso' => false];
+            if (isset($yaEntraron[$b]) && !isset($yaEntraron[$a])) return ['entra' => $a, 'sale' => $b, 'como' => 'los dos del banco: B ya había entrado', 'dudoso' => false];
+        }
+
+        // 3) Si uno ya salió de la cancha, no puede ser el que sale de nuevo.
+        if (isset($yaSalieron[$a]) && !isset($yaSalieron[$b])) return ['entra' => $a, 'sale' => $b, 'como' => 'el otro ya había salido', 'dudoso' => true];
+        if (isset($yaSalieron[$b]) && !isset($yaSalieron[$a])) return ['entra' => $b, 'sale' => $a, 'como' => 'el otro ya había salido', 'dudoso' => true];
+
+        // 4) Sin nada en qué apoyarse.
+        $this->aviso('Cambio entre TM ' . $a . ' y TM ' . $b . ': no pude deducir quién entra y quién sale '
+            . '(ninguno de los dos aparece en la alineación de ese equipo). Asumo que entra el primero — revisalo.');
+        return ['entra' => $a, 'sale' => $b, 'como' => 'sin alineación', 'dudoso' => true];
     }
 
     /**
@@ -442,8 +595,14 @@ class TmDetallePartido
     {
         $txt = mb_strtolower($this->juntarTexto($a, self::$kDescGol));
 
-        if ($txt === '') {
-            return ['tipo' => self::GOL_JUGADA, 'fuente' => '(vacío)', 'dudoso' => true];
+        // "Not reported" quiere decir que Transfermarkt no aclaró cómo fue el gol.
+        // No es un caso a corregir: va como Jugada y listo.
+        if ($txt === '' || mb_strpos($txt, 'not reported') !== false || mb_strpos($txt, 'nicht') !== false) {
+            $cod = (int) $this->valor($a, ['actionId', 'typeId']);
+            if ($cod && isset(self::$accionGol[$cod])) {
+                return ['tipo' => self::$accionGol[$cod], 'fuente' => 'sin detallar (actionId ' . $cod . ')', 'dudoso' => false];
+            }
+            return ['tipo' => self::GOL_JUGADA, 'fuente' => 'sin detallar', 'dudoso' => false];
         }
 
         $reglas = [
@@ -469,7 +628,13 @@ class TmDetallePartido
             }
         }
 
-        return ['tipo' => self::GOL_JUGADA, 'fuente' => $txt, 'dudoso' => true];
+        // Último recurso: el código numérico de la acción.
+        $cod = (int) $this->valor($a, ['actionId', 'typeId']);
+        if ($cod && isset(self::$accionGol[$cod])) {
+            return ['tipo' => self::$accionGol[$cod], 'fuente' => $txt . ' (actionId ' . $cod . ')', 'dudoso' => false];
+        }
+
+        return ['tipo' => self::GOL_JUGADA, 'fuente' => $txt . ($cod ? ' (actionId ' . $cod . ')' : ''), 'dudoso' => true];
     }
 
     /** Amarilla / Doble Amarilla / Roja. Si no la reconozco, no la cargo. */
@@ -488,11 +653,13 @@ class TmDetallePartido
             if (mb_strpos($txt, $aguja) !== false) return ['tipo' => 'Amarilla', 'fuente' => $txt];
         }
 
-        // Algunas versiones traen un código numérico en vez de texto.
-        $cod = $this->valor($a, ['cardTypeId', 'typeId']);
-        if ($cod !== null) {
-            $mapa = [1 => 'Amarilla', 2 => 'Doble Amarilla', 3 => 'Roja'];
-            if (isset($mapa[(int) $cod])) return ['tipo' => $mapa[(int) $cod], 'fuente' => 'código ' . $cod];
+        // Si el texto no alcanzó, el código de la acción.
+        // 301 = amarilla, 302 = doble amarilla, 303 = roja directa.
+        $cod = (int) $this->valor($a, ['actionId', 'cardTypeId', 'typeId']);
+        $mapa = [301 => 'Amarilla', 302 => 'Doble Amarilla', 303 => 'Roja',
+            1 => 'Amarilla', 2 => 'Doble Amarilla', 3 => 'Roja'];
+        if ($cod && isset($mapa[$cod])) {
+            return ['tipo' => $mapa[$cod], 'fuente' => ($txt !== '' ? $txt . ' ' : '') . '(actionId ' . $cod . ')'];
         }
 
         return ['tipo' => null, 'fuente' => $txt !== '' ? $txt : $this->resumenCrudo($a)];
@@ -503,7 +670,7 @@ class TmDetallePartido
      * `arbitro_tm`; los desconocidos quedan como aviso con su id, para que
      * los ates a mano una vez (son pocos y se repiten mucho).
      */
-    private function planArbitros(array $game, Partido $partido)
+    private function planArbitros(array $game, Partido $partido, $escribir = false, array &$informe = null)
     {
         $out  = [];
         $mapa = $this->mapaArbitros();
@@ -530,12 +697,23 @@ class TmDetallePartido
             }
         }
 
+        // Los que todavía no conocemos: los buscamos por perfil, igual que a los
+        // jugadores. Si la API no los devuelve, se saltean con un aviso.
+        $faltan = [];
+        foreach ($pares as $par) {
+            if ($par[0] === null || $par[0] === '') continue;
+            if (!isset($mapa[(string) $par[0]])) $faltan[] = (string) $par[0];
+        }
+        if (!empty($faltan)) {
+            $mapa = array_merge($mapa, $this->resolverArbitros(array_unique($faltan), $escribir, $informe));
+        }
+
         foreach ($pares as $par) {
             list($tmId, $rol) = $par;
             if ($tmId === null || $tmId === '') continue;
             if (!isset($mapa[(string) $tmId])) {
-                $this->aviso('Árbitro TM ' . $tmId . ' (' . $rol . ') no está en arbitro_tm: no lo cargo. '
-                    . 'Atalo una vez y queda para siempre.');
+                $this->aviso('Árbitro TM ' . $tmId . ' (' . $rol . '): no lo tengo mapeado y no pude traer su perfil. '
+                    . 'Cargalo a mano y atalo en arbitro_tm, o dejalo pasar: el resto del partido se guarda igual.');
                 continue;
             }
             $arbitroId = (int) $mapa[(string) $tmId];
@@ -547,6 +725,85 @@ class TmDetallePartido
             ];
         }
         return $out;
+    }
+
+    /**
+     * Trae los perfiles de los árbitros que no conocemos y los ata (o los crea).
+     * Se prueban los dos endpoints posibles; si ninguno responde, devolvemos
+     * vacío y el partido se guarda igual, sin árbitro.
+     */
+    private function resolverArbitros(array $ids, $escribir, array &$informe = null)
+    {
+        $out = [];
+        $perfiles = [];
+
+        $qs = implode('&', array_map(function ($id) { return 'ids[]=' . urlencode($id); }, $ids));
+        foreach (['/referees?' . $qs, '/officials?' . $qs] as $ruta) {
+            $json = HttpHelper::getJson(self::TMAPI . $ruta);
+            if ($informe !== null) $informe['llamadas']++;
+            if (!is_array($json) || empty($json)) continue;
+            $data = isset($json['data']) ? $json['data'] : $json;
+            if (isset($data['referees']) && is_array($data['referees'])) $data = $data['referees'];
+            foreach ($data as $clave => $perfil) {
+                if (!is_array($perfil)) continue;
+                $id = $this->valor($perfil, ['id', 'refereeId']);
+                if ($id === null && !is_int($clave)) $id = $clave;
+                if ($id !== null) $perfiles[(string) $id] = $perfil;
+            }
+            if (!empty($perfiles)) break;
+        }
+
+        if (empty($perfiles)) return $out;
+
+        foreach ($ids as $tmId) {
+            if (!isset($perfiles[(string) $tmId])) continue;
+            $datos = $this->personaDesdePerfil($perfiles[(string) $tmId]);
+            if ($datos['apellido'] === '') continue;
+
+            // ¿Ya lo tenemos? Los árbitros muchas veces no tienen fecha de
+            // nacimiento cargada, así que igualamos por apellido + nombre.
+            $existente = DB::table('arbitros')
+                ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                ->where('personas.apellido', $datos['apellido'])
+                ->where('personas.nombre', $datos['nombre'])
+                ->select('arbitros.id')->first();
+
+            if ($existente) {
+                $out[(string) $tmId] = (int) $existente->id;
+                if ($escribir) $this->guardarMapeoArbitro($tmId, $existente->id, $datos['name'], 'auto', false);
+                continue;
+            }
+
+            if (!$escribir) {
+                $ficticio = $this->proximoPreview--;
+                $this->nombresPreview[$ficticio] = $datos['name'] . ' · árbitro nuevo';
+                $out[(string) $tmId] = $ficticio;
+                $this->aviso('Se crearía el árbitro ' . $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ').');
+                continue;
+            }
+
+            try {
+                $persona = Persona::create($datos['persona']);
+                $arbitro = $persona->arbitro()->create([]);
+                $this->guardarMapeoArbitro($tmId, $arbitro->id, $datos['name'], 'auto', true);
+                $out[(string) $tmId] = (int) $arbitro->id;
+                if ($informe !== null) $informe['creados']['arbitros'][] = $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ')';
+            } catch (\Exception $e) {
+                $this->aviso('No pude crear al árbitro TM ' . $tmId . ': ' . $e->getMessage());
+            }
+        }
+
+        return $out;
+    }
+
+    private function guardarMapeoArbitro($tmId, $arbitroId, $nombre, $origen, $revisar)
+    {
+        DB::table('arbitro_tm')->updateOrInsert(
+            ['tm_referee_id' => (string) $tmId],
+            ['arbitro_id' => (int) $arbitroId, 'nombre_tm' => $nombre, 'origen' => $origen,
+                'revisar' => $revisar ? 1 : 0, 'updated_at' => now(), 'created_at' => now()]
+        );
+        if ($this->mapaArbitros !== null) $this->mapaArbitros[(string) $tmId] = (int) $arbitroId;
     }
 
     private function rolArbitro($txt)
@@ -879,6 +1136,7 @@ class TmDetallePartido
 
     private function nombreArbitro($id)
     {
+        if ($id < 0) return isset($this->nombresPreview[$id]) ? $this->nombresPreview[$id] : 'árbitro nuevo';
         $a = DB::table('arbitros')->join('personas', 'personas.id', '=', 'arbitros.persona_id')
             ->where('arbitros.id', $id)->select('personas.name')->first();
         return $a ? $a->name : ('árbitro #' . $id);
