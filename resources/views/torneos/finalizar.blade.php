@@ -31,6 +31,19 @@
                 </ul>
             </div>
         @endif
+        @if($torneo->parcial)
+            <div class="alert alert-danger">
+                <h5 class="mb-2">Ojo: este torneo está marcado como <b>parcial</b></h5>
+                <p class="mb-2">Los torneos parciales los creó el importador de partidos DT por DT, así que
+                    tienen <b>solo los partidos del equipo que dirigía ese técnico</b> — no los del resto.
+                    Una tabla de posiciones armada sobre eso no es real.</p>
+                <p class="mb-2">Y la posición 1 que guardes acá se propaga como <b>título</b> a las fichas del
+                    equipo, del técnico y de sus jugadores, y al ranking de títulos.</p>
+                <p class="mb-0">Si aun así sabés cuál fue la posición —por ejemplo una copa donde el partido
+                    de la final sí está cargado— marcá la casilla de abajo para habilitar el guardado.</p>
+            </div>
+        @endif
+
         <!-- Open the form with the store function route. -->
         {{ Form::open(['action' => ['TorneoController@guardarFinalizar'], 'method' => 'put']) }}
         <!-- Include the CRSF token -->
@@ -93,7 +106,18 @@
 
         </div>
 
-        {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
+        @if($torneo->parcial)
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="confirmo_parcial" value="1"
+                       id="confirmoParcial" onclick="document.getElementById('btnGuardarPosiciones').disabled = !this.checked;">
+                <label class="form-check-label" for="confirmoParcial">
+                    Sé que el torneo está parcial y quiero guardar estas posiciones igual.
+                </label>
+            </div>
+            {{Form::submit('Guardar', ['class' => 'btn btn-primary', 'id' => 'btnGuardarPosiciones', 'disabled' => 'disabled'])}}
+        @else
+            {{Form::submit('Guardar', ['class' => 'btn btn-primary', 'id' => 'btnGuardarPosiciones'])}}
+        @endif
 
         <a href="{{ route('torneos.show',$torneo->id) }}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}

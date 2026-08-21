@@ -4865,8 +4865,20 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
 
     public function guardarFinalizar(Request $request)
     {
-        //
-
+        // Los torneos `parcial` vienen del importador DT por DT: tienen solo los
+        // partidos del equipo de ese técnico. Una tabla armada ahí no es real, y
+        // la posición 1 se propaga como título a equipo, técnico y jugadores.
+        // Se puede guardar igual (una copa cuya final sí está cargada, por
+        // ejemplo), pero hay que confirmarlo explícitamente. La casilla de la
+        // vista no alcanza: se valida también acá.
+        $torneoParcial = Torneo::find($request->torneo_id);
+        if ($torneoParcial && $torneoParcial->parcial
+            && (string) $request->input('confirmo_parcial') !== '1') {
+            return redirect()->route('torneos.finalizar', ['torneoId' => $request->torneo_id])
+                ->with('error', 'El torneo está marcado como <b>parcial</b>: solo tiene los partidos '
+                    . 'del equipo que dirigía un técnico, así que la tabla no es real. No guardé nada. '
+                    . 'Si igual sabés la posición, marcá la casilla de confirmación.');
+        }
 
         //dd($request);
         //$this->validate($request,[ 'equipo_id'=>'required',  'grupo_id'=>'required']);
