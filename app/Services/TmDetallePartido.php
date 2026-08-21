@@ -95,6 +95,9 @@ class TmDetallePartido
     private $proximoPreview = -1;
     /** tm_club_id -> equipo_id sacado de la fila de import_partidos del partido. */
     private $mapaStaging = [];
+    /** Bajar la foto de perfil de cada persona nueva (una llamada más por cabeza). */
+    private $conFotos = true;
+    private $fotosBajadas = 0;
 
     // ═════════════════════════════════ API ═════════════════════════════════
 
@@ -109,8 +112,10 @@ class TmDetallePartido
         $escribir = !empty($opts['escribir']);
         $forzar   = !empty($opts['forzar']);
         $crear    = array_key_exists('crear_jugadores', $opts) ? (bool) $opts['crear_jugadores'] : true;
+        $this->conFotos = array_key_exists('fotos', $opts) ? (bool) $opts['fotos'] : true;
 
         $this->avisos = [];
+        $this->fotosBajadas = 0;
 
         $informe = [
             'ok'          => false,
@@ -356,8 +361,9 @@ class TmDetallePartido
         $plan['tecnicos'] = $this->planTecnicos($game, $partido, $lados, $escribir, $informe);
 
         $informe['plan']   = $plan;
-        $informe['avisos'] = $this->avisos;
-        $informe['ok']     = true;
+        $informe['avisos']   = $this->avisos;
+        $informe['ok']       = true;
+        $informe['llamadas'] += $this->fotosBajadas;   // cada foto es una llamada más
 
         // ── 6) Guardar ─────────────────────────────────────────────────────
         if ($escribir) {
@@ -395,6 +401,7 @@ class TmDetallePartido
             }
         }
 
+        $informe['avisos'] = $this->avisos;
         return $informe;
     }
 
@@ -939,6 +946,9 @@ class TmDetallePartido
             }
 
             try {
+                $foto = $this->descargarFoto($datos['portrait'], $datos['name']);
+                if ($foto) $datos['persona']['foto'] = $foto;
+
                 $persona = Persona::create($datos['persona']);
                 $tecnico = $persona->tecnico()->create([
                     'transfermarkt_url' => 'https://www.transfermarkt.es/-/profil/trainer/' . $tmId,
@@ -1030,6 +1040,9 @@ class TmDetallePartido
             }
 
             try {
+                $foto = $this->descargarFoto($datos['portrait'], $datos['name']);
+                if ($foto) $datos['persona']['foto'] = $foto;
+
                 $persona = Persona::create($datos['persona']);
                 $arbitro = $persona->arbitro()->create([]);
                 $this->guardarMapeoArbitro($tmId, $arbitro->id, $datos['name'], 'auto', true);
@@ -1156,7 +1169,8 @@ class TmDetallePartido
             $this->nombresPreview[$ficticio] = ($datos['name'] !== '' ? $datos['name'] : $datos['apellido']) . ' · nuevo';
             return ['jugador_id' => $ficticio, 'creado' => true, 'descripcion' => $etiqueta . ' — SE CREARÍA'
                 . ($datos['nacimiento'] ? ' · ' . $datos['nacimiento'] : ' · sin fecha de nacimiento')
-                . ($datos['nacionalidad'] ? ' · ' . $datos['nacionalidad'] : ' · sin nacionalidad')];
+                . ($datos['nacionalidad'] ? ' · ' . $datos['nacionalidad'] : ' · sin nacionalidad')
+                . ($datos['portrait'] ? ' · con foto' : ' · sin foto')];
         }
 
         if ($datos['name'] === '' || $datos['apellido'] === '') {
@@ -1165,6 +1179,9 @@ class TmDetallePartido
         }
 
         try {
+            $foto = $this->descargarFoto($datos['portrait'], $etiqueta);
+            if ($foto) $datos['persona']['foto'] = $foto;
+
             $persona = Persona::create($datos['persona']);
             $jugador = $persona->jugador()->create($datos['jugador']);
             $this->guardarMapeoJugador($tmId, $jugador->id, $datos['name'], 'auto', true);
@@ -1217,7 +1234,12 @@ class TmDetallePartido
                 elseif ($p === $puntaje && $p > 0) { $empatados++; }
             }
 
-            if ($mejor && $puntaje >= 1) {
+            // Hacen falta DOS palabras en común. Con una sola no alcanza: dos
+            // personas distintas pueden haber nacido el mismo día y llamarse
+            // las dos "José". Un apareo equivocado le pega los partidos de uno
+            // a la ficha del otro — es mucho peor que un duplicado, que se ve
+            // en "jugadores por revisar" y se arregla.
+            if ($mejor && $puntaje >= 2) {
                 $base = trim($mejor->apellido . ', ' . $mejor->nombre);
                 if ($empatados > 1) {
                     $this->aviso('Hay ' . $empatados . ' jugadores nacidos el ' . $datos['nacimiento']
@@ -1225,8 +1247,15 @@ class TmDetallePartido
                         . '. Uso el primero (#' . $mejor->id . ') pero revisalo.');
                 }
                 return ['jugador_id' => (int) $mejor->id, 'base' => $base,
-                    'revisar' => ($puntaje < 2 || $empatados > 1),
-                    'como' => 'misma fecha de nacimiento y ' . $puntaje . ' palabra(s) del nombre en común'];
+                    'revisar' => ($empatados > 1),
+                    'como' => 'misma fecha de nacimiento y ' . $puntaje . ' palabras del nombre en común'];
+            }
+
+            if ($mejor && $puntaje === 1) {
+                $this->aviso('Ojo: ' . trim($mejor->apellido . ', ' . $mejor->nombre) . ' (#' . $mejor->id
+                    . ') nació el mismo día que ' . $datos['apellido'] . ', ' . $datos['nombre']
+                    . ' pero sólo comparten una palabra del nombre. NO los uní: si son la misma persona, '
+                    . 'unificalos a mano.');
             }
         }
 
@@ -1321,6 +1350,100 @@ class TmDetallePartido
         return array_keys($out);
     }
 
+    /**
+     * Baja la foto de perfil y devuelve el nombre del archivo para `personas.foto`.
+     *
+     * Mismo camino que el importador de jugadores: los hosts de imágenes de
+     * Transfermarkt están geo-bloqueados para el server (dan 502/504 aunque en
+     * el navegador se vean), así que se sale por ScraperAPI con getBinary.
+     *
+     * Es UNA llamada más por persona nueva, y sólo la primera vez que aparece.
+     * Que falle nunca aborta nada: la persona se crea igual, sin foto.
+     */
+    private function descargarFoto($url, $quien)
+    {
+        if (!$this->conFotos || empty($url)) return null;
+
+        try {
+            $img = HttpHelper::getBinary($url);
+            $this->fotosBajadas++;
+
+            if (empty($img['ok'])) {
+                $this->aviso('Sin foto para ' . $quien . ' — HTTP ' . (isset($img['http']) ? $img['http'] : '?')
+                    . (empty($img['error']) ? '' : ' (' . $img['error'] . ')'));
+                return null;
+            }
+
+            $ruta      = parse_url($url, PHP_URL_PATH);
+            $info      = pathinfo((string) $ruta);
+            $archivo   = isset($info['filename']) ? $info['filename'] : '';
+            $extension = isset($info['extension']) && $info['extension'] !== '' ? $info['extension'] : 'jpg';
+            $archivo   = rtrim($archivo, '.');
+            if ($archivo === '') return null;
+
+            $nombre = $archivo . '.' . $extension;
+            file_put_contents(public_path('images/') . $nombre, $img['body']);
+            return $nombre;
+        } catch (\Exception $e) {
+            $this->aviso('Sin foto para ' . $quien . ': ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Rescata el primer apellido cuando quedó del lado de los nombres de pila.
+     *
+     * `NombreHelper::separarTM` se ancla en el shortName para saber dónde
+     * empieza el apellido. Si Transfermarkt muestra a la persona por su SEGUNDO
+     * apellido, el ancla cae demasiado a la derecha y el primero se va a los
+     * nombres:
+     *
+     *   Roberto Ariel Pereyra Legallais  ->  nombre "Roberto Ariel Pereyra"
+     *                                        apellido "Legallais"          (mal)
+     *                                    ->  nombre "Roberto Ariel"
+     *                                        apellido "Pereyra Legallais"  (bien)
+     *
+     * La pista es la forma: en el mundo hispano los nombres de pila son uno o
+     * dos, y los apellidos dos. Si quedaron tres nombres y un solo apellido, el
+     * último "nombre" en realidad es el primer apellido.
+     *
+     * Sólo se aplica a nacionalidades donde rige esa costumbre. Un brasileño
+     * llamado "Carlos Alberto Silva" tiene tres nombres y un apellido de verdad,
+     * y ahí la regla rompería en vez de arreglar.
+     *
+     * Nota: esto vive acá y NO en NombreHelper a propósito. NombreHelper lo usan
+     * los otros importadores y no conoce la nacionalidad; tocarlo cambiaría
+     * cómo se cargan nombres en flujos que hoy andan bien.
+     */
+    private function rescatarPrimerApellido(array $n, $nacionalidad)
+    {
+        static $dosApellidos = ['Argentina', 'Bolivia', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
+            'Ecuador', 'El Salvador', 'España', 'Guatemala', 'Guinea Ecuatorial', 'Honduras',
+            'México', 'Nicaragua', 'Panamá', 'Paraguay', 'Perú', 'Puerto Rico',
+            'República Dominicana', 'Uruguay', 'Venezuela'];
+
+        if ($nacionalidad === null || !in_array($nacionalidad, $dosApellidos, true)) return $n;
+
+        $nombres   = preg_split('/\s+/', trim($n['nombre']));
+        $apellidos = preg_split('/\s+/', trim($n['apellido']));
+        $nombres   = array_values(array_filter($nombres, 'strlen'));
+        $apellidos = array_values(array_filter($apellidos, 'strlen'));
+
+        if (count($nombres) < 3 || count($apellidos) !== 1) return $n;
+
+        // Las partículas se arrastran con el apellido: "…de la Cruz Pérez".
+        $particulas = ['de','da','do','dos','das','del','della','di','la','las','los','van','von','der','den','du','le'];
+        $mover = [array_pop($nombres)];
+        while (!empty($nombres) && count($nombres) >= 2
+            && in_array(mb_strtolower(end($nombres)), $particulas, true)) {
+            array_unshift($mover, array_pop($nombres));
+        }
+
+        $n['nombre']   = implode(' ', $nombres);
+        $n['apellido'] = implode(' ', $mover) . ' ' . $n['apellido'];
+        return $n;
+    }
+
     /** Traduce el perfil de la API a nuestros campos (mismo criterio que el import de jugadores). */
     private function personaDesdePerfil(array $p)
     {
@@ -1370,6 +1493,8 @@ class TmDetallePartido
         elseif ($pieRaw === 'Izquierdo') $pie = 'Izquierda';
         elseif ($pieRaw === 'Ambidiestro') $pie = 'Ambas';
 
+        $n = $this->rescatarPrimerApellido($n, $nacionalidad);
+
         $persona = ['name' => trim($n['name']), 'nombre' => trim($n['nombre']), 'apellido' => trim($n['apellido'])];
         if ($ciudad)        $persona['ciudad'] = $ciudad;
         if ($nacionalidad)  $persona['nacionalidad'] = $nacionalidad;
@@ -1383,12 +1508,33 @@ class TmDetallePartido
         $tmId = $this->valor($p, ['id', 'playerId']);
         if ($tmId) $jugador['transfermarkt_url'] = 'https://www.transfermarkt.es/-/profil/spieler/' . $tmId;
 
+        // Los nombres tal cual los mandó Transfermarkt. Sirven para entender por
+        // qué NombreHelper partió el nombre donde lo partió cuando el apellido
+        // sale mal (pasa con los apellidos compuestos: si el shortName usa el
+        // segundo apellido, el primero se va al nombre de pila).
+        // Foto de perfil. La URL se guarda acá y la imagen se baja recién al
+        // crear a la persona: en la vista previa no gastamos llamadas.
+        $portrait = trim((string) (isset($p['portraitUrl']) ? $p['portraitUrl'] : ''));
+        if ($portrait !== '' && (!filter_var($portrait, FILTER_VALIDATE_URL) || strpos($portrait, 'default.jpg') !== false)) {
+            $portrait = '';
+        }
+
+        $crudos = [];
+        foreach (['name' => 'name', 'shortName' => 'short', 'displayName' => 'display'] as $k => $et) {
+            if (!empty($p[$k])) $crudos[] = $et . '="' . $p[$k] . '"';
+        }
+        if (!empty($p['nationalityDetails']['passportName'])) {
+            $crudos[] = 'pasaporte="' . $p['nationalityDetails']['passportName'] . '"';
+        }
+
         return [
             'name'         => trim($n['name']),
             'nombre'       => trim($n['nombre']),
             'apellido'     => trim($n['apellido']),
             'nacimiento'   => $nacimiento,
             'nacionalidad' => $nacionalidad,
+            'tm_nombres'   => implode(' · ', $crudos),
+            'portrait'     => $portrait !== '' ? $portrait : null,
             'persona'      => $persona,
             'jugador'      => $jugador,
         ];

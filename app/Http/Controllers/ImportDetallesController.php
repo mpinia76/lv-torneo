@@ -193,7 +193,11 @@ class ImportDetallesController extends Controller
             return $this->pagina('Detalle', '<p class="err">Falta <code>?partido_id=</code> (y su gameId en el staging).</p>');
         }
 
-        $r = (new TmDetallePartido)->importar($partidoId, $gameId, ['escribir' => $escribir, 'forzar' => $forzar]);
+        // &fotos=0 para no gastar una llamada por cada persona nueva.
+        $fotos = (string) $request->get('fotos', '1') !== '0';
+
+        $r = (new TmDetallePartido)->importar($partidoId, $gameId,
+            ['escribir' => $escribir, 'forzar' => $forzar, 'fotos' => $fotos]);
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
             . '<h1>' . ($escribir ? 'Detalle cargado' : 'Vista previa') . ' · partido #' . $partidoId . '</h1>';
