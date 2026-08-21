@@ -437,6 +437,10 @@ class ImportPartidosController extends Controller
                     ])->save();
                 }
 
+                if ($r->local === null) {
+                    $errores[] = 'Sin localía: ' . $r->club_nombre . ' vs ' . $r->rival_nombre . ' (' . substr($r->dia, 0, 10) . ')';
+                    continue;
+                }
                 $local = (int) $r->local === 1;
                 $equipolId = $local ? (int) $r->equipo_id : (int) $r->rival_id;
                 $equipovId = $local ? (int) $r->rival_id : (int) $r->equipo_id;
@@ -587,7 +591,7 @@ class ImportPartidosController extends Controller
                 'club_nombre'             => $r->club_nombre,
                 'rival_external_id'       => $r->rival_external_id,
                 'rival_nombre'            => $r->rival_nombre,
-                'local'                   => (int) $r->local === 1,
+                'local'                   => $r->local === null ? null : ((int) $r->local === 1),
                 'dia'                     => $r->dia,
                 'goles_favor'             => $r->goles_favor === null ? null : (int) $r->goles_favor,
                 'goles_contra'            => $r->goles_contra === null ? null : (int) $r->goles_contra,
@@ -723,6 +727,10 @@ class ImportPartidosController extends Controller
                     $filas[$i]['motivo'] = 'ese día ya tenés el partido #' . $otro->id . ' contra '
                         . $this->nombreEquipo($rivalReal) . ' (#' . $rivalReal . '), no contra «' . $f['rival_nombre']
                         . '» (#' . $rivalId . '): el mapeo del rival está mal';
+                } elseif ($f['local'] === null) {
+                    // Sin localía no se puede crear: quedaría el resultado dado vuelta.
+                    $filas[$i]['estado'] = 'conflicto';
+                    $filas[$i]['motivo'] = 'no se pudo determinar si fue local o visitante';
                 } else {
                     $filas[$i]['estado'] = 'nuevo';
                 }
@@ -744,12 +752,23 @@ class ImportPartidosController extends Controller
         $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +150 days'));
 
         $q = \App\Partido::whereBetween('dia', [$d0, $d1]);
-        if ($local) {
+        if ($local === true) {
             $q->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
               ->where('golesl', $gf)->where('golesv', $gc);
-        } else {
+        } elseif ($local === false) {
             $q->where('equipol_id', $rivalId)->where('equipov_id', $equipoId)
               ->where('golesl', $gc)->where('golesv', $gf);
+        } else {
+            // Sin localía conocida: cualquiera de los dos órdenes, con el resultado que corresponda.
+            $q->where(function ($w) use ($equipoId, $rivalId, $gf, $gc) {
+                $w->where(function ($x) use ($equipoId, $rivalId, $gf, $gc) {
+                    $x->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
+                      ->where('golesl', $gf)->where('golesv', $gc);
+                })->orWhere(function ($x) use ($equipoId, $rivalId, $gf, $gc) {
+                    $x->where('equipol_id', $rivalId)->where('equipov_id', $equipoId)
+                      ->where('golesl', $gc)->where('golesv', $gf);
+                });
+            });
         }
         $cands = $q->get();
 
@@ -963,15 +982,25 @@ class ImportPartidosController extends Controller
         $gi = isset($g['gameInformation']) && is_array($g['gameInformation']) ? $g['gameInformation'] : [];
         $ci = isset($g['clubsInformation']) && is_array($g['clubsInformation']) ? $g['clubsInformation'] : [];
 
+        // En performance-game, `club` es SIEMPRE el equipo del DT y `opponent` el rival.
+        // La localía no sale del orden: sale del campo `venue` ("home" / "away").
         $club  = isset($ci['club']) ? $ci['club'] : [];
         $rival = isset($ci['opponent']) ? $ci['opponent'] : [];
-        $local = true;
+
+        // Por las dudas, si el coachId apareciera del lado del rival, damos vuelta.
         if ((string) $this->valor($rival, ['coachId']) === (string) $coachId
             && (string) $this->valor($club, ['coachId']) !== (string) $coachId) {
             $club  = isset($ci['opponent']) ? $ci['opponent'] : [];
             $rival = isset($ci['club']) ? $ci['club'] : [];
-            $local = false;
         }
+
+        $venue = mb_strtolower(trim((string) $this->valor($club, ['venue'])));
+        if ($venue === '') {
+            // Si el rival dice dónde jugó, alcanza: es al revés del nuestro.
+            $venueRival = mb_strtolower(trim((string) $this->valor($rival, ['venue'])));
+            $venue = $venueRival === '' ? '' : ($this->esLocal($venueRival) ? 'away' : 'home');
+        }
+        $local = $venue === '' ? null : $this->esLocal($venue);
 
         $fechaRaw = $this->valor($gi, ['date']);
         if (is_array($fechaRaw)) $fechaRaw = $this->valor($fechaRaw, ['dateTimeUTC', 'dateTime', 'date']);
@@ -1060,6 +1089,18 @@ class ImportPartidosController extends Controller
         foreach ($claves as $k) {
             if (array_key_exists($k, $arr) && $arr[$k] !== null && $arr[$k] !== '') return $arr[$k];
         }
+        return null;
+    }
+
+    /** Interpreta el campo venue de Transfermarkt: home / away (y variantes). */
+    private function esLocal($venue)
+    {
+        $v = mb_strtolower(trim((string) $venue));
+        if ($v === '') return null;
+        if (strpos($v, 'home') !== false || strpos($v, 'local') !== false || $v === 'h' || $v === '1') return true;
+        if (strpos($v, 'away') !== false || strpos($v, 'guest') !== false || strpos($v, 'visit') !== false
+            || $v === 'a' || $v === '2') return false;
+        if (strpos($v, 'neutral') !== false) return true;   // cancha neutral: lo dejamos como local
         return null;
     }
 
@@ -1199,6 +1240,12 @@ class ImportPartidosController extends Controller
                 $lineas[] = '<strong>' . $sub . ':</strong> <code>' . e(implode(', ', array_keys($game[$sub]))) . '</code>';
             }
         }
+        $ci = isset($game['clubsInformation']) ? $game['clubsInformation'] : [];
+        $lineas[] = '<strong>venue del primer partido:</strong> club = <code>'
+            . e((string) $this->valor(isset($ci['club']) ? $ci['club'] : [], ['venue'])) . '</code> · opponent = <code>'
+            . e((string) $this->valor(isset($ci['opponent']) ? $ci['opponent'] : [], ['venue'])) . '</code>'
+            . ' <span class="sub">(de acá sale local/visitante)</span>';
+
         $lineas[] = '<details><summary>JSON crudo del primer partido</summary><pre>'
             . e(json_encode($game, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre></details>';
         return '<div class="diag">' . implode('<br>', $lineas) . '</div>';
@@ -1226,7 +1273,7 @@ class ImportPartidosController extends Controller
                 . '<td class="num gris">' . e($f['temporada']) . '</td>'
                 . '<td class="num">' . e($f['ronda']) . '</td>'
                 . '<td>' . e($f['club_nombre']) . ($f['equipo_id'] ? ' <span class="id">#' . $f['equipo_id'] . '</span>' : '') . '</td>'
-                . '<td class="num">' . ($f['local'] ? 'L' : 'V') . '</td>'
+                . '<td class="num">' . ($f['local'] === null ? '<span class="err">?</span>' : ($f['local'] ? 'L' : 'V')) . '</td>'
                 . '<td>' . e($f['rival_nombre']) . ($f['rival_id'] ? ' <span class="id">#' . $f['rival_id'] . '</span>' : '') . '</td>'
                 . '<td class="num">' . e($f['goles_favor']) . ':' . e($f['goles_contra']) . '</td>'
                 . '<td class="num">' . e($f['external_id'] ?: '—') . '</td>'
