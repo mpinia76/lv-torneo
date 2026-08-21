@@ -89,6 +89,7 @@ class TmDetallePartido
     private $mapaJugadores = null;
     private $mapaArbitros  = null;
     private $mapaEquipos   = null;
+    private $mapaTecnicos  = null;
     /** En la vista previa los jugadores que se crearían llevan un id negativo. */
     private $nombresPreview = [];
     private $proximoPreview = -1;
@@ -118,8 +119,9 @@ class TmDetallePartido
             'partido_id'  => (int) $partidoId,
             'game_id'     => (string) $gameId,
             'avisos'      => [],
-            'plan'        => ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [], 'arbitros' => []],
-            'creados'     => ['jugadores' => [], 'arbitros' => []],
+            'plan'        => ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
+                'arbitros' => [], 'tecnicos' => []],
+            'creados'     => ['jugadores' => [], 'arbitros' => [], 'tecnicos' => []],
             'llamadas'    => 0,
             'crudo'       => null,
         ];
@@ -205,7 +207,8 @@ class TmDetallePartido
         $this->mapaJugadores = $mapa;
 
         // ── 5) Armar el plan ───────────────────────────────────────────────
-        $plan = ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [], 'arbitros' => []];
+        $plan = ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
+            'arbitros' => [], 'tecnicos' => []];
 
         foreach ($lados as $iLado => $lado) {
             $equipoId = $lado['equipo_id'];
@@ -342,6 +345,7 @@ class TmDetallePartido
         // Árbitros: sólo los que ya estén atados en arbitro_tm. Los que no,
         // se listan como aviso — no inventamos personas sin nombre.
         $plan['arbitros'] = $this->planArbitros($game, $partido, $escribir, $informe);
+        $plan['tecnicos'] = $this->planTecnicos($game, $partido, $lados, $escribir, $informe);
 
         $informe['plan']   = $plan;
         $informe['avisos'] = $this->avisos;
@@ -363,6 +367,17 @@ class TmDetallePartido
                     foreach ($plan['tarjetas'] as $r)    Tarjeta::create($this->limpiar($r));
                     foreach ($plan['cambios'] as $r)     Cambio::create($this->limpiar($r));
                     foreach ($plan['arbitros'] as $r)    PartidoArbitro::create($this->limpiar($r));
+
+                    // El DT del club dirigido ya lo pudo haber cargado el
+                    // importador de partidos: nunca pisamos ni duplicamos, sólo
+                    // agregamos el que falte.
+                    foreach ($plan['tecnicos'] as $r) {
+                        $fila = $this->limpiar($r);
+                        $existe = DB::table('partido_tecnicos')
+                            ->where('partido_id', $fila['partido_id'])
+                            ->where('equipo_id', $fila['equipo_id'])->exists();
+                        if (!$existe) \App\PartidoTecnico::create($fila);
+                    }
                 });
                 $informe['escrito'] = true;
             } catch (\Exception $e) {
@@ -740,6 +755,218 @@ class TmDetallePartido
     }
 
     /**
+     * Los DTs de los dos equipos.
+     *
+     * A diferencia de jugadores y árbitros, acá no hace falta tabla de mapeo:
+     * `tecnicos.transfermarkt_url` ya guarda la URL `.../trainer/{id}` y es la
+     * misma que usa el importador de partidos. De ahí sale el vínculo, y a los
+     * DTs que creamos les grabamos esa URL, así quedan atados para siempre y
+     * además aparecen solos en la lista de "Carga de partidos".
+     *
+     * El importador de partidos ya carga el DT del club que estás recorriendo;
+     * lo que agrega esto es el DT rival, que hasta ahora quedaba vacío.
+     */
+    private function planTecnicos(array $game, Partido $partido, array $lados, $escribir = false, array &$informe = null)
+    {
+        $out = [];
+        $mapa = $this->mapaTecnicos();
+
+        // Qué id de DT le corresponde a cada lado.
+        $porLado = [];
+        foreach ($lados as $lado) {
+            $id = $this->coachDelLado($game, $lado['clave']);
+            if ($id !== null) $porLado[$lado['clave']] = (string) $id;
+        }
+
+        if (empty($porLado)) {
+            if (isset($game['coaches'])) {
+                $this->aviso('No reconocí a los DTs dentro de "coaches": ' . $this->resumenCrudo($game['coaches']));
+            }
+            return $out;
+        }
+
+        $faltan = [];
+        foreach ($porLado as $id) { if (!isset($mapa[$id])) $faltan[] = $id; }
+        if (!empty($faltan)) {
+            foreach ($this->resolverTecnicos(array_unique($faltan), $escribir, $informe) as $k => $v) {
+                $mapa[$k] = $v;
+            }
+        }
+
+        foreach ($lados as $lado) {
+            if (!isset($porLado[$lado['clave']])) continue;
+            $tmId = $porLado[$lado['clave']];
+
+            if (!isset($mapa[$tmId])) {
+                $this->aviso('DT de ' . $lado['equipo_nombre'] . ' (TM ' . $tmId . '): no lo tengo y no pude traer su perfil.');
+                continue;
+            }
+
+            $yaEsta = DB::table('partido_tecnicos')
+                ->where('partido_id', $partido->id)->where('equipo_id', $lado['equipo_id'])->exists();
+
+            $out[] = [
+                'partido_id' => $partido->id,
+                'equipo_id'  => $lado['equipo_id'],
+                'tecnico_id' => (int) $mapa[$tmId],
+                '_nombre'    => $this->nombreTecnico($mapa[$tmId]),
+                '_equipo'    => $lado['equipo_nombre'],
+                '_estado'    => $yaEsta ? 'ya estaba cargado' : 'se agrega',
+            ];
+        }
+        return $out;
+    }
+
+    /** Busca el id del DT de un lado, probando dónde puede venir en el JSON. */
+    private function coachDelLado(array $game, $clave)
+    {
+        $club = isset($game[$clave]) && is_array($game[$clave]) ? $game[$clave] : [];
+
+        // a) colgando del club
+        $id = $this->valor($club, ['coachId', 'trainerId', 'managerId', 'coach', 'trainer']);
+        if ($id !== null) return $id;
+        if (isset($club['coaches']) && is_array($club['coaches']) && isset($club['coaches'][0])) {
+            $id = $this->valor($club['coaches'][0], ['id', 'coachId', 'trainerId']);
+            if ($id !== null) return $id;
+        }
+
+        if (!isset($game['coaches']) || !is_array($game['coaches'])) return null;
+        $coaches = $game['coaches'];
+
+        // b) mapa por lado: {"homeClub": …, "awayClub": …} o {"home": …}
+        $corto = $clave === 'homeClub' ? 'home' : 'away';
+        foreach ([$clave, $corto] as $k) {
+            if (!isset($coaches[$k])) continue;
+            if (is_array($coaches[$k])) {
+                $id = $this->valor($coaches[$k], ['id', 'coachId', 'trainerId']);
+                if ($id !== null) return $id;
+            } elseif ($coaches[$k] !== '' && $coaches[$k] !== null) {
+                return $coaches[$k];
+            }
+        }
+
+        // c) lista, emparejando por el clubId
+        $clubId = $this->valor($club, ['id', 'clubId']);
+        foreach ($coaches as $c) {
+            if (!is_array($c)) continue;
+            $cid = $this->valor($c, ['clubId', 'teamId']);
+            if ($clubId !== null && $cid !== null && (string) $cid === (string) $clubId) {
+                $id = $this->valor($c, ['id', 'coachId', 'trainerId', 'personId']);
+                if ($id !== null) return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /** tm_trainer_id -> tecnico_id, leído de tecnicos.transfermarkt_url. */
+    private function mapaTecnicos()
+    {
+        if ($this->mapaTecnicos !== null) return $this->mapaTecnicos;
+        $mapa = [];
+        $filas = DB::table('tecnicos')
+            ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
+            ->select('id', 'transfermarkt_url')->get();
+        foreach ($filas as $f) {
+            if (preg_match('#/trainer/(\d+)#', (string) $f->transfermarkt_url, $m)) {
+                $mapa[$m[1]] = (int) $f->id;
+            }
+        }
+        return $this->mapaTecnicos = $mapa;
+    }
+
+    /** Trae los perfiles de los DTs que no conocemos y los ata (o los crea). */
+    private function resolverTecnicos(array $ids, $escribir, array &$informe = null)
+    {
+        $out = [];
+        $perfiles = [];
+
+        $qs = implode('&', array_map(function ($id) { return 'ids[]=' . urlencode($id); }, $ids));
+        foreach (['/coaches?' . $qs, '/trainers?' . $qs, '/managers?' . $qs] as $ruta) {
+            $json = HttpHelper::getJson(self::TMAPI . $ruta);
+            if ($informe !== null) $informe['llamadas']++;
+            if (!is_array($json) || empty($json)) continue;
+            $data = isset($json['data']) ? $json['data'] : $json;
+            foreach (['coaches', 'trainers', 'managers'] as $rama) {
+                if (isset($data[$rama]) && is_array($data[$rama])) { $data = $data[$rama]; break; }
+            }
+            foreach ($data as $clave => $perfil) {
+                if (!is_array($perfil)) continue;
+                $id = $this->valor($perfil, ['id', 'coachId', 'trainerId']);
+                if ($id === null && !is_int($clave)) $id = $clave;
+                if ($id !== null) $perfiles[(string) $id] = $perfil;
+            }
+            if (!empty($perfiles)) break;
+        }
+
+        if (empty($perfiles)) {
+            $this->aviso('No pude traer el perfil de ' . count($ids) . ' DT(s) desde la API.');
+            return $out;
+        }
+
+        foreach ($ids as $tmId) {
+            if (!isset($perfiles[(string) $tmId])) continue;
+            $datos = $this->personaDesdePerfil($perfiles[(string) $tmId]);
+            if ($datos['apellido'] === '') continue;
+
+            $existente = $this->buscarPersonaRol('tecnicos', $datos);
+            if ($existente) {
+                $out[(string) $tmId] = (int) $existente['id'];
+                // Le grabamos la URL para que el vínculo quede guardado.
+                if ($escribir) $this->grabarUrlTecnico($existente['id'], $tmId);
+                if ($existente['revisar']) {
+                    $this->aviso('Aparejé al DT ' . $datos['apellido'] . ', ' . $datos['nombre']
+                        . ' con "' . $existente['base'] . '" (#' . $existente['id'] . '). Confirmalo.');
+                }
+                continue;
+            }
+
+            if (!$escribir) {
+                $ficticio = $this->proximoPreview--;
+                $this->nombresPreview[$ficticio] = $datos['name'] . ' · DT nuevo';
+                $out[(string) $tmId] = $ficticio;
+                if ($informe !== null) $informe['creados']['tecnicos'][] = $datos['apellido'] . ', ' . $datos['nombre']
+                    . ' (TM ' . $tmId . ') — SE CREARÍA';
+                continue;
+            }
+
+            try {
+                $persona = Persona::create($datos['persona']);
+                $tecnico = $persona->tecnico()->create([
+                    'transfermarkt_url' => 'https://www.transfermarkt.es/-/profil/trainer/' . $tmId,
+                ]);
+                $out[(string) $tmId] = (int) $tecnico->id;
+                if ($this->mapaTecnicos !== null) $this->mapaTecnicos[(string) $tmId] = (int) $tecnico->id;
+                if ($informe !== null) $informe['creados']['tecnicos'][] = $datos['apellido'] . ', ' . $datos['nombre']
+                    . ' (TM ' . $tmId . ') — creado #' . $tecnico->id;
+            } catch (\Exception $e) {
+                $this->aviso('No pude crear al DT TM ' . $tmId . ': ' . $e->getMessage());
+            }
+        }
+
+        return $out;
+    }
+
+    private function grabarUrlTecnico($tecnicoId, $tmId)
+    {
+        $actual = DB::table('tecnicos')->where('id', $tecnicoId)->value('transfermarkt_url');
+        if ($actual) return;   // ya tiene una: no la pisamos
+        DB::table('tecnicos')->where('id', $tecnicoId)->update([
+            'transfermarkt_url' => 'https://www.transfermarkt.es/-/profil/trainer/' . $tmId,
+            'updated_at' => now(),
+        ]);
+        if ($this->mapaTecnicos !== null) $this->mapaTecnicos[(string) $tmId] = (int) $tecnicoId;
+    }
+
+    private function nombreTecnico($id)
+    {
+        if ($id < 0) return isset($this->nombresPreview[$id]) ? $this->nombresPreview[$id] : 'DT nuevo';
+        $t = DB::table('tecnicos')->join('personas', 'personas.id', '=', 'tecnicos.persona_id')
+            ->where('tecnicos.id', $id)->select('personas.name')->first();
+        return $t ? $t->name : ('DT #' . $id);
+    }
+
+    /**
      * Trae los perfiles de los árbitros que no conocemos y los ata (o los crea).
      * Se prueban los dos endpoints posibles; si ninguno responde, devolvemos
      * vacío y el partido se guarda igual, sin árbitro.
@@ -775,13 +1002,13 @@ class TmDetallePartido
             // ¿Ya lo tenemos? Los árbitros casi nunca tienen fecha de nacimiento
             // cargada, así que comparamos las palabras del nombre completo
             // (mismo criterio que con los jugadores, ver tokensNombre).
-            $existente = $this->buscarArbitroExistente($datos);
+            $existente = $this->buscarPersonaRol('arbitros', $datos);
             if ($existente) {
-                $out[(string) $tmId] = (int) $existente['arbitro_id'];
-                if ($escribir) $this->guardarMapeoArbitro($tmId, $existente['arbitro_id'], $datos['name'], 'auto', $existente['revisar']);
+                $out[(string) $tmId] = (int) $existente['id'];
+                if ($escribir) $this->guardarMapeoArbitro($tmId, $existente['id'], $datos['name'], 'auto', $existente['revisar']);
                 if ($existente['revisar']) {
                     $this->aviso('Aparejé al árbitro ' . $datos['apellido'] . ', ' . $datos['nombre']
-                        . ' con "' . $existente['base'] . '" (#' . $existente['arbitro_id'] . '). Confirmalo.');
+                        . ' con "' . $existente['base'] . '" (#' . $existente['id'] . '). Confirmalo.');
                 }
                 continue;
             }
@@ -808,8 +1035,14 @@ class TmDetallePartido
         return $out;
     }
 
-    /** Igual que buscarJugadorExistente, pero para árbitros y sin fecha de nacimiento. */
-    private function buscarArbitroExistente(array $datos)
+    /**
+     * Igual que buscarJugadorExistente, pero para árbitros y DTs, que casi nunca
+     * tienen la fecha de nacimiento cargada. Sirve para las dos tablas porque el
+     * criterio es el mismo: comparar las palabras del nombre completo.
+     *
+     * @param string $tabla 'arbitros' o 'tecnicos'
+     */
+    private function buscarPersonaRol($tabla, array $datos)
     {
         $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
         if (count($tokensTm) < 2) return null;
@@ -818,13 +1051,13 @@ class TmDetallePartido
         foreach ($tokensTm as $t) { if (mb_strlen($t) > mb_strlen($ancla)) $ancla = $t; }
         if (mb_strlen($ancla) < 4) return null;
 
-        $cands = DB::table('arbitros')
-            ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+        $cands = DB::table($tabla)
+            ->join('personas', 'personas.id', '=', $tabla . '.persona_id')
             ->where(function ($q) use ($ancla) {
                 $q->where('personas.apellido', 'like', '%' . $ancla . '%')
                   ->orWhere('personas.name', 'like', '%' . $ancla . '%');
             })
-            ->select('arbitros.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
+            ->select($tabla . '.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
             ->limit(50)->get();
 
         $mejor = null; $puntaje = 0; $empatados = 0;
@@ -840,7 +1073,7 @@ class TmDetallePartido
 
         if (!$mejor || $puntaje < 2) return null;
 
-        return ['arbitro_id' => (int) $mejor->id, 'base' => trim($mejor->apellido . ', ' . $mejor->nombre),
+        return ['id' => (int) $mejor->id, 'base' => trim($mejor->apellido . ', ' . $mejor->nombre),
             'revisar' => ($empatados > 1 || $puntaje < count($tokensTm))];
     }
 

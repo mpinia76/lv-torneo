@@ -221,6 +221,7 @@ class ImportDetallesController extends Controller
             . $this->card(count($p['tarjetas']), 'Tarjetas')
             . $this->card(count($p['cambios']), 'Cambios')
             . $this->card(count($p['arbitros']), 'Árbitros')
+            . $this->card(count(isset($p['tecnicos']) ? $p['tecnicos'] : []), 'Técnicos')
             . $this->card(count($r['creados']['jugadores']), 'Jugadores nuevos', count($r['creados']['jugadores']) ? 'warn' : '')
             . '</div>';
 
@@ -242,6 +243,14 @@ class ImportDetallesController extends Controller
             $cuerpo .= '</div>';
         }
 
+        if (!empty($r['creados']['tecnicos'])) {
+            $cuerpo .= '<h2>Técnicos que no estaban en la base</h2><div class="diag">'
+                . '<p class="sub">Se crean con su URL de Transfermarkt, así que van a aparecer solos '
+                . 'en la lista de Carga de partidos y les vas a poder sondear los suyos.</p>';
+            foreach ($r['creados']['tecnicos'] as $t) $cuerpo .= '<div>• ' . e($t) . '</div>';
+            $cuerpo .= '</div>';
+        }
+
         $cuerpo .= $this->bloque('Alineación', $p['alineacions'], ['_equipo' => 'Equipo', 'tipo' => 'Tipo',
             'orden' => 'Orden', 'dorsal' => 'Dorsal', '_nombre' => 'Jugador']);
         $cuerpo .= $this->bloque('Goles', $p['gols'], ['minuto' => 'Min', '_nombre' => 'Jugador',
@@ -251,6 +260,8 @@ class ImportDetallesController extends Controller
         $cuerpo .= $this->bloque('Cambios', $p['cambios'], ['minuto' => 'Min', 'tipo' => 'Tipo',
             '_nombre' => 'Jugador', '_equipo' => 'Equipo', '_fuente' => 'Cómo lo deduje']);
         $cuerpo .= $this->bloque('Árbitros', $p['arbitros'], ['tipo' => 'Rol', '_nombre' => 'Árbitro']);
+        $cuerpo .= $this->bloque('Técnicos', isset($p['tecnicos']) ? $p['tecnicos'] : [],
+            ['_equipo' => 'Equipo', '_nombre' => 'DT', '_estado' => 'Estado']);
 
         if ((string) $request->get('crudo', '0') === '1' && $r['crudo']) {
             $cuerpo .= '<h2>JSON crudo</h2><pre>' . e(json_encode($r['crudo'],
