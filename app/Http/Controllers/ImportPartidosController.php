@@ -328,24 +328,41 @@ class ImportPartidosController extends Controller
             $anios[$g['temp'] . '/' . substr((string) ((int) $g['temp'] + 1), -2)] = true;
             $anios[$g['temp'] . '/' . ((int) $g['temp'] + 1)] = true;
 
+            // Agrupados por país (nacionales) o confederación (internacionales),
+            // para no confundir un Apertura argentino con uno chileno.
+            $porGrupo = [];
+            foreach ($torneos as $t) {
+                $etiqueta = $t->ambito === 'Internacional'
+                    ? (trim((string) $t->region) ?: 'Internacional')
+                    : (trim((string) $t->pais) ?: 'Argentina');
+                $porGrupo[$etiqueta][] = $t;
+            }
+            ksort($porGrupo);
+
             $opts = '<option value="">— elegí el torneo —</option>';
             $yaSel = false;
-            foreach ($torneos as $t) {
-                $sel = '';
-                if (!$yaSel
-                    && $this->normalizaTexto($t->nombre) === $this->normalizaTexto($g['nombre'])
-                    && isset($anios[(string) $t->year])) {
-                    $sel = ' selected';
-                    $yaSel = true;
+            foreach ($porGrupo as $etiqueta => $lista) {
+                $opts .= '<optgroup label="' . e($etiqueta) . '">';
+                foreach ($lista as $t) {
+                    $sel = '';
+                    if (!$yaSel
+                        && $this->normalizaTexto($t->nombre) === $this->normalizaTexto($g['nombre'])
+                        && isset($anios[(string) $t->year])) {
+                        $sel = ' selected';
+                        $yaSel = true;
+                    }
+                    $opts .= '<option value="' . $t->id . '"' . $sel . '>'
+                          . e($t->nombre . ' ' . $t->year . ' · ' . $etiqueta) . '</option>';
                 }
-                $opts .= '<option value="' . $t->id . '"' . $sel . '>' . e($t->nombre . ' ' . $t->year) . '</option>';
+                $opts .= '</optgroup>';
             }
             $html .= '<tr>'
                 . '<td>' . e($g['nombre'] ?: ('#' . $g['comp'])) . '</td>'
                 . '<td class="num">' . e($g['temp']) . '</td>'
                 . '<td class="num">' . $g['n'] . '</td>'
                 . '<td class="num">' . e(substr($g['desde'], 0, 10)) . ' → ' . e(substr($g['hasta'], 0, 10)) . '</td>'
-                . '<td>' . e(implode(', ', array_keys($g['equipos']))) . '</td>'
+                . '<td>' . e(implode(', ', array_keys($g['equipos'])))
+                . ($this->paisEquipo($g) ? ' <span class="id">(' . e($this->paisEquipo($g)) . ')</span>' : '') . '</td>'
                 . '<td><form method="get" action="' . e(route('import_partidos.aplicar')) . '">'
                 . '<input type="hidden" name="tecnico_id" value="' . $tecnicoId . '">'
                 . '<input type="hidden" name="comp" value="' . e($g['comp']) . '">'
@@ -511,6 +528,14 @@ class ImportPartidosController extends Controller
         $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId])) . '">Seguir con el resto →</a></p>';
 
         return $this->pagina('Aplicar partidos', $html);
+    }
+
+    /** País del equipo dirigido en ese grupo (para saber de dónde es el torneo). */
+    private function paisEquipo(array $g)
+    {
+        if (empty($g['equipo_id'])) return null;
+        $e = \App\Equipo::select('pais')->find($g['equipo_id']);
+        return $e ? trim((string) $e->pais) : null;
     }
 
     /** URL del alta de torneos con los datos del grupo ya cargados en los inputs. */
