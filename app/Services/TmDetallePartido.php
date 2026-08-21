@@ -207,8 +207,12 @@ class TmDetallePartido
         // ── 5) Armar el plan ───────────────────────────────────────────────
         $plan = ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [], 'arbitros' => []];
 
-        foreach ($lados as $lado) {
+        foreach ($lados as $iLado => $lado) {
             $equipoId = $lado['equipo_id'];
+            // El rival, para mostrar bien los goles en contra: Transfermarkt los
+            // lista en el bloque del club que se beneficia, pero el jugador que
+            // lo hizo es del otro equipo.
+            $otroNombre = $lados[$iLado === 0 ? 1 : 0]['equipo_nombre'];
 
             // Quién arrancó y quién estaba en el banco. Es lo que nos deja saber,
             // en cada cambio, cuál de los dos jugadores entra y cuál sale:
@@ -252,7 +256,10 @@ class TmDetallePartido
                         'minuto'     => $accion['minuto'],
                         'tipo'       => $tipo['tipo'],
                         '_nombre'    => $this->nombreJugador($jugadorId),
-                        '_equipo'    => $lado['equipo_nombre'],
+                        // En un gol en contra, el goleador juega para el rival.
+                        '_equipo'    => $tipo['tipo'] === self::GOL_ENCONTRA
+                            ? $otroNombre . ' → ' . $lado['equipo_nombre']
+                            : $lado['equipo_nombre'],
                         '_fuente'    => $tipo['fuente'],
                         '_dudoso'    => $tipo['dudoso'],
                     ];
