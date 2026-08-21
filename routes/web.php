@@ -234,6 +234,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-detalles/sembrar', 'ImportDetallesController@sembrar')->name('import_detalles.sembrar');
     Route::get('/import-detalles/revisar', 'ImportDetallesController@revisar')->name('import_detalles.revisar');
     Route::get('/import-detalles/plantillas', 'ImportDetallesController@plantillas')->name('import_detalles.plantillas');
+    Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');
 });
 
 

@@ -409,6 +409,96 @@ class ImportDetallesController extends Controller
         return $this->pagina('Tanda de detalles', $cuerpo);
     }
 
+    // ═══════════════════════════ DIAGNÓSTICO ═══════════════════════════
+
+    /**
+     * Qué devuelve tmapi para un árbitro, un DT o un jugador, y qué saca de ahí
+     * el parser. `personaDesdePerfil()` se escribió con el JSON de jugadores;
+     * si árbitros o DTs traen otras claves, se ve acá.
+     *
+     *   /admin/import-detalles/arbitro?tm_id=5325&tipo=arbitro
+     */
+    public function arbitro(Request $request)
+    {
+        set_time_limit(0);
+
+        $tmId = trim((string) $request->get('tm_id', ''));
+        $tipo = (string) $request->get('tipo', 'arbitro');
+        if (!in_array($tipo, ['arbitro', 'tecnico', 'jugador'], true)) $tipo = 'arbitro';
+
+        $perfilTm = ['arbitro' => 'schiedsrichter', 'tecnico' => 'trainer', 'jugador' => 'spieler'];
+
+        $opts = '';
+        foreach (['arbitro' => 'Árbitro', 'tecnico' => 'DT', 'jugador' => 'Jugador (referencia)'] as $k => $v) {
+            $opts .= '<option value="' . $k . '"' . ($tipo === $k ? ' selected' : '') . '>' . e($v) . '</option>';
+        }
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.revisar')) . '">← Jugadores y árbitros por revisar</a></p>'
+            . '<h1>Diagnóstico de perfiles de Transfermarkt</h1>'
+            . '<p class="sub">Árbitros y DTs se crean con el mismo parser que los jugadores '
+            . '(<code>personaDesdePerfil</code>). Si a alguno le falta la fecha de nacimiento o la nacionalidad, '
+            . 'es porque su JSON usa otras claves. Mirá un jugador también: ese es el que el parser SÍ entiende.</p>'
+            . '<form method="get" style="margin:12px 0">'
+            . '<select name="tipo">' . $opts . '</select> '
+            . '<input name="tm_id" value="' . e($tmId) . '" placeholder="id de TM, ej 5325" size="18"> <button>Ver</button>'
+            . ' <span class="sub">el id sale del link TM de la lista de revisión, o de la URL del perfil</span></form>';
+
+        if ($tmId === '') {
+            return $this->pagina('Diagnóstico de perfiles', $cuerpo
+                . '<div class="diag">Pegá un id de Transfermarkt para ver el JSON crudo y qué interpreta el importador. '
+                . 'Cuesta hasta 4 llamadas a la API.</div>');
+        }
+
+        $r = TmDetallePartido::diagnosticarPersonaTm($tmId, $tipo);
+
+        $cuerpo .= '<p class="sub">' . (int) $r['llamadas'] . ' llamada(s) a la API · '
+            . '<a target="_blank" href="https://www.transfermarkt.es/-/profil/' . e($perfilTm[$tipo]) . '/' . e($tmId)
+            . '">ver el perfil en TM ↗</a></p>';
+
+        if (empty($r['perfil'])) {
+            $cuerpo .= '<div class="err-box">Ninguna ruta devolvió un perfil para ese id. '
+                . 'Mirá abajo qué contestó cada una.</div>';
+        } else {
+            $d = $r['datos'];
+            $fila = function ($k, $v) {
+                return '<tr><td>' . e($k) . '</td><td>'
+                    . ($v === null || $v === '' ? '<span class="err">— vacío —</span>' : '<b>' . e($v) . '</b>')
+                    . '</td></tr>';
+            };
+            $per = isset($d['persona']) ? $d['persona'] : [];
+            $cuerpo .= '<h2>Lo que saca el parser hoy</h2>'
+                . '<div class="scroll"><table><thead><tr><th>Campo</th><th>Valor</th></tr></thead><tbody>'
+                . $fila('name', isset($d['name']) ? $d['name'] : null)
+                . $fila('nombre', isset($per['nombre']) ? $per['nombre'] : null)
+                . $fila('apellido', isset($per['apellido']) ? $per['apellido'] : null)
+                . $fila('nacimiento', isset($per['nacimiento']) ? $per['nacimiento'] : null)
+                . $fila('nacionalidad', isset($per['nacionalidad']) ? $per['nacionalidad'] : null)
+                . $fila('ciudad', isset($per['ciudad']) ? $per['ciudad'] : null)
+                . '</tbody></table></div>'
+                . '<p class="sub"><b>Ojo:</b> si nacionalidad sale vacía, la persona NO queda sin nacionalidad — '
+                . '<code>personas.nacionalidad</code> tiene DEFAULT \'Argentina\' en la base y la rellena sola. '
+                . 'Un dato faltante se convierte en un dato falso.</p>'
+                . '<h2>Perfil crudo</h2><pre>' . e(json_encode($r['perfil'],
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre>';
+        }
+
+        foreach ($r['rutas'] as $ruta => $json) {
+            $cuerpo .= '<h2>' . e($ruta) . '</h2><pre>'
+                . e($json === null || $json === false
+                    ? 'sin respuesta'
+                    : json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))
+                . '</pre>';
+        }
+
+        if (!empty($r['avisos'])) {
+            $cuerpo .= '<h2>Avisos</h2><div class="diag">';
+            foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . e($a) . '</div>';
+            $cuerpo .= '</div>';
+        }
+
+        return $this->pagina('Diagnóstico de perfiles', $cuerpo);
+    }
+
     // ═══════════════════════════ PLANTILLAS ═══════════════════════════
 
     /**
@@ -582,6 +672,7 @@ class ImportDetallesController extends Controller
                     . '<td>' . e($a->nacionalidad ?: '—') . '</td>'
                     . '<td><a target="_blank" href="https://www.transfermarkt.es/-/profil/schiedsrichter/' . e($a->tm_referee_id) . '">' . e($a->tm_referee_id) . '</a></td>'
                     . '<td><a href="' . e(route('arbitros.edit', $a->arbitro_id)) . '">Editar</a>'
+                    . ' · <a href="' . e(route('import_detalles.arbitro', ['tm_id' => $a->tm_referee_id, 'tipo' => 'arbitro'])) . '">Diagnóstico</a>'
                     . ' · <a href="' . e(route('import_detalles.revisar', ['ok_arb' => $a->id])) . '">Visto</a></td>'
                     . '</tr>';
             }
@@ -611,6 +702,7 @@ class ImportDetallesController extends Controller
                 . '<td>' . e($f->tipoJugador ?: '—') . '</td>'
                 . '<td><a target="_blank" href="https://www.transfermarkt.es/-/profil/spieler/' . e($f->tm_player_id) . '">' . e($f->tm_player_id) . '</a></td>'
                 . '<td><a href="' . e(route('jugadores.edit', $f->jugador_id)) . '">Editar</a>'
+                . ' · <a href="' . e(route('import_detalles.arbitro', ['tm_id' => $f->tm_player_id, 'tipo' => 'jugador'])) . '">Diagnóstico</a>'
                 . ' · <a href="' . e(route('import_detalles.revisar', ['ok' => $f->id])) . '">Visto</a></td>'
                 . '</tr>';
         }

@@ -1093,6 +1093,76 @@ class TmDetallePartido
      * Se prueban los dos endpoints posibles; si ninguno responde, devolvemos
      * vacío y el partido se guarda igual, sin árbitro.
      */
+    /**
+     * Diagnóstico: qué devuelve tmapi para una persona y qué saca de ahí el
+     * parser. Existe porque `personaDesdePerfil()` se escribió mirando el JSON
+     * de JUGADORES, y árbitros y DTs pueden traer otra forma: sin ver el crudo
+     * no se arregla sin adivinar (que es lo que salió mal la primera vez).
+     *
+     * Conviene mirar un jugador además del árbitro/DT: ese es el JSON que el
+     * parser SÍ entiende, y sirve de referencia para ver qué clave cambió.
+     *
+     * @param  string $tmId
+     * @param  string $tipo  'arbitro' | 'tecnico' | 'jugador'
+     * @return array
+     */
+    public static function diagnosticarPersonaTm($tmId, $tipo = 'arbitro')
+    {
+        $svc = new self();
+        $svc->avisos = [];
+
+        $qs = 'ids[]=' . urlencode($tmId);
+        $config = [
+            'arbitro' => [
+                'rutas'  => ['/referees?' . $qs, '/officials?' . $qs, '/referee/' . urlencode($tmId)],
+                'ramas'  => ['referees', 'officials'],
+                'claves' => ['id', 'refereeId'],
+            ],
+            'tecnico' => [
+                'rutas'  => ['/coaches?' . $qs, '/trainers?' . $qs, '/managers?' . $qs, '/coach/' . urlencode($tmId)],
+                'ramas'  => ['coaches', 'trainers', 'managers'],
+                'claves' => ['id', 'coachId', 'trainerId'],
+            ],
+            'jugador' => [
+                'rutas'  => ['/players?' . $qs, '/player/' . urlencode($tmId)],
+                'ramas'  => ['players'],
+                'claves' => ['id', 'playerId'],
+            ],
+        ];
+        if (!isset($config[$tipo])) $tipo = 'arbitro';
+        $cfg = $config[$tipo];
+
+        $out = ['tipo' => $tipo, 'rutas' => [], 'datos' => null, 'perfil' => null,
+            'llamadas' => 0, 'avisos' => []];
+
+        foreach ($cfg['rutas'] as $ruta) {
+            $json = HttpHelper::getJson(self::TMAPI . $ruta);
+            $out['llamadas']++;
+            $out['rutas'][$ruta] = $json;
+
+            if ($out['perfil'] !== null || !is_array($json) || empty($json)) continue;
+
+            $data = isset($json['data']) ? $json['data'] : $json;
+            foreach ($cfg['ramas'] as $rama) {
+                if (isset($data[$rama]) && is_array($data[$rama])) { $data = $data[$rama]; break; }
+            }
+            foreach ($data as $clave => $perfil) {
+                if (!is_array($perfil)) continue;
+                $id = $svc->valor($perfil, $cfg['claves']);
+                if ($id === null && !is_int($clave)) $id = $clave;
+                if ((string) $id === (string) $tmId) { $out['perfil'] = $perfil; break; }
+            }
+            // Ruta de un solo registro: el perfil puede venir suelto.
+            if ($out['perfil'] === null && isset($data['name'])) $out['perfil'] = $data;
+        }
+
+        if (is_array($out['perfil'])) {
+            $out['datos'] = $svc->personaDesdePerfil($out['perfil']);
+        }
+        $out['avisos'] = $svc->avisos;
+        return $out;
+    }
+
     private function resolverArbitros(array $ids, $escribir, array &$informe = null)
     {
         $out = [];
