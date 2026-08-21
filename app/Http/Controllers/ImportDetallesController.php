@@ -84,7 +84,17 @@ class ImportDetallesController extends Controller
                 . 'Si arrancás sin esto, el importador los va a crear de nuevo como personas duplicadas.<br>'
                 . '<a class="boton" style="margin-top:8px" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm ahora</a>'
                 . '</div>'
-                : '<div class="ok-box">Mapeo sembrado: los ' . $sembrados . ' jugadores que ya tenías con URL de Transfermarkt están atados a su id.</div>')
+                : ($conUrl === 0
+                    ? '<div class="diag"><b>No hay nada que sembrar.</b> Ningún jugador de la base tiene guardada su URL de '
+                    . 'Transfermarkt (<code>jugadors.transfermarkt_url</code>): esa columna se llena sola cuando usás el '
+                    . 'scraper de Transfermarkt en la ficha de un jugador, y hasta ahora sólo la tienen los DTs.<br>'
+                    . 'No es un problema para arrancar: al no encontrar el mapeo, el importador igual busca al jugador en '
+                    . 'la base por <b>apellido + fecha de nacimiento</b> antes de crearlo, y a partir de ahí lo deja atado '
+                    . 'a su id de Transfermarkt para siempre. El riesgo que queda es un jugador que ya tengas cargado '
+                    . 'con el apellido escrito distinto o sin fecha de nacimiento: ese se va a duplicar, y por eso las '
+                    . 'altas quedan en <a href="' . e(route('import_detalles.revisar')) . '">jugadores por revisar</a>.</div>'
+                    : '<div class="ok-box">Mapeo sembrado: los ' . $sembrados . ' jugadores que ya tenías con URL de '
+                    . 'Transfermarkt están atados a su id.</div>'))
 
             . '<div class="cards">'
             . $this->card(count($filas), 'Partidos importados')
