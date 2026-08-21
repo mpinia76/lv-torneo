@@ -3,11 +3,57 @@
 namespace App;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class Persona extends Model
 {
     protected $fillable = ['name','nombre', 'apellido','email','telefono','ciudad','observaciones','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento','nacionalidad','verificado'];
+
+    /**
+     * Mantiene al dia el indice de duplicados (clave_norm, clave_orden y
+     * persona_tokens) sin que haya que acordarse de recalcular a mano.
+     * Ver App\Services\DuplicadosPersonas.
+     */
+    protected static function booted()
+    {
+        static::saved(function ($persona) {
+            if (!self::indiceDisponible()) {
+                return;
+            }
+            if ($persona->wasRecentlyCreated || $persona->wasChanged('nombre') || $persona->wasChanged('apellido')) {
+                \App\Services\DuplicadosPersonas::indexarPersona($persona->id);
+            }
+        });
+
+        static::deleted(function ($persona) {
+            if (!self::indiceDisponible()) {
+                return;
+            }
+            DB::table('persona_tokens')->where('persona_id', $persona->id)->delete();
+            DB::table('persona_duplicados')
+                ->where('persona_id', $persona->id)
+                ->orWhere('simil_id', $persona->id)
+                ->delete();
+        });
+    }
+
+    /** Evita romper si todavia no se corrio la migracion de duplicados. */
+    protected static function indiceDisponible()
+    {
+        static $ok = null;
+
+        if ($ok === null) {
+            try {
+                $ok = Schema::hasTable('persona_tokens') && Schema::hasColumn('personas', 'clave_orden');
+            } catch (\Exception $e) {
+                $ok = false;
+            }
+        }
+
+        return $ok;
+    }
 
     public function jugador()
     {

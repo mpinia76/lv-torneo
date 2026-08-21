@@ -424,12 +424,14 @@ class ImportDetallesController extends Controller
 
         $tmId = trim((string) $request->get('tm_id', ''));
         $tipo = (string) $request->get('tipo', 'arbitro');
-        if (!in_array($tipo, ['arbitro', 'tecnico', 'jugador'], true)) $tipo = 'arbitro';
+        if (!in_array($tipo, ['arbitro', 'tecnico', 'jugador', 'equipo'], true)) $tipo = 'arbitro';
 
-        $perfilTm = ['arbitro' => 'schiedsrichter', 'tecnico' => 'trainer', 'jugador' => 'spieler'];
+        $perfilTm = ['arbitro' => 'schiedsrichter', 'tecnico' => 'trainer',
+            'jugador' => 'spieler', 'equipo' => 'verein'];
 
         $opts = '';
-        foreach (['arbitro' => 'Árbitro', 'tecnico' => 'DT', 'jugador' => 'Jugador (referencia)'] as $k => $v) {
+        foreach (['arbitro' => 'Árbitro', 'tecnico' => 'DT',
+                     'jugador' => 'Jugador (referencia)', 'equipo' => 'Club'] as $k => $v) {
             $opts .= '<option value="' . $k . '"' . ($tipo === $k ? ' selected' : '') . '>' . e($v) . '</option>';
         }
 
@@ -458,6 +460,12 @@ class ImportDetallesController extends Controller
         if (empty($r['perfil'])) {
             $cuerpo .= '<div class="err-box">Ninguna ruta devolvió un perfil para ese id. '
                 . 'Mirá abajo qué contestó cada una.</div>';
+        } elseif ($tipo === 'equipo') {
+            $cuerpo .= '<div class="ok-box">Perfil encontrado. Los clubes todavía no se importan: '
+                . 'este crudo es para ver qué campos hay (escudo, fundación, estadio, país, socios) '
+                . 'antes de escribir el importador.</div>'
+                . '<h2>Perfil crudo</h2><pre>' . e(json_encode($r['perfil'],
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre>';
         } else {
             $d = $r['datos'];
             $fila = function ($k, $v) {

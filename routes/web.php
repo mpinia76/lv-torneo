@@ -78,8 +78,17 @@ Route::group(['prefix' => 'admin'], function()
 
     Route::get('importarJugador', 'JugadorController@importar')->name('jugadores.importar');
     Route::post('importarJugadorProcess', 'JugadorController@importarProcess');
-    Route::get('verificarPersonas', 'JugadorController@verificarPersonas')->name('jugadores.verificarPersonas');
+    // Verificar personas / detectar repetidos.
+    // La pantalla ahora lee los candidatos precalculados de `persona_duplicados`
+    // en vez de escanear la tabla entera en cada carga.
+    Route::get('verificarPersonas', 'PersonaDuplicadoController@index')->name('jugadores.verificarPersonas');
+    Route::post('personas/duplicados/recalcular', 'PersonaDuplicadoController@recalcular')->name('personas.duplicados.recalcular');
+    Route::post('personas/duplicados/descartar', 'PersonaDuplicadoController@descartar')->name('personas.duplicados.descartar');
+    Route::post('personas/duplicados/reabrir', 'PersonaDuplicadoController@reabrir')->name('personas.duplicados.reabrir');
+    Route::post('personas/duplicados/fusionar', 'PersonaDuplicadoController@fusionar')->name('personas.duplicados.fusionar');
+    Route::post('personas/duplicados/lote', 'PersonaDuplicadoController@lote')->name('personas.duplicados.lote');
 
+    // Se mantiene por compatibilidad con la pantalla anterior.
     Route::post('verificar-similitud', 'JugadorController@verificarSimilitud')->name('jugadores.verificarSimilitud');
 
 

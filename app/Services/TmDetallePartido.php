@@ -1128,6 +1128,14 @@ class TmDetallePartido
                 'ramas'  => ['players'],
                 'claves' => ['id', 'playerId'],
             ],
+            // Los clubes no pasan por personaDesdePerfil: acá sólo interesa
+            // ver el crudo, para saber qué campos hay (escudo, fundación,
+            // estadio, país, socios) antes de escribir el importador.
+            'equipo' => [
+                'rutas'  => ['/clubs?' . $qs, '/club/' . urlencode($tmId)],
+                'ramas'  => ['clubs'],
+                'claves' => ['id', 'clubId'],
+            ],
         ];
         if (!isset($config[$tipo])) $tipo = 'arbitro';
         $cfg = $config[$tipo];
@@ -1156,7 +1164,8 @@ class TmDetallePartido
             if ($out['perfil'] === null && isset($data['name'])) $out['perfil'] = $data;
         }
 
-        if (is_array($out['perfil'])) {
+        // Un club no es una persona: el parser de personas no aplica.
+        if (is_array($out['perfil']) && $tipo !== 'equipo') {
             $out['datos'] = $svc->personaDesdePerfil($out['perfil']);
         }
         $out['avisos'] = $svc->avisos;
