@@ -210,6 +210,7 @@ class ImportPartidosController extends Controller
         }
         if ($guardar) $html .= '<p class="ok-box">Guardadas ' . $guardadas . ' filas en <code>import_partidos</code>.</p>';
 
+        $html .= $this->bloqueMapeosSospechosos($filas, $request);
         $html .= $this->bloqueClubesSinResolver($filas, $request);
 
         $titulo = $filtro !== '' ? ('Partidos con estado «' . e($filtro) . '»') : ('Primeros ' . $limite . ' partidos');
@@ -285,13 +286,29 @@ class ImportPartidosController extends Controller
 
         $html .= '<p class="sub">Cada competencia+temporada va a un torneo. Elegí uno existente o creá uno nuevo '
               . '(se crea marcado como <b>parcial</b>: no entra en tablas de posiciones ni promedios).</p>'
-              . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Temp.</th><th>Partidos</th><th>Período</th><th>Equipo(s)</th><th>Torneo destino</th></tr></thead><tbody>';
+              . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Temp. TM</th><th>Partidos</th><th>Período</th><th>Equipo(s)</th><th>Torneo destino</th></tr></thead><tbody>';
 
         foreach ($grupos as $g) {
+            // Ojo: la temporada de Transfermarkt no es el año del torneo. El Clausura 2026
+            // sale como seasonId 2025. Preseleccionamos mirando los años reales de los partidos.
+            $anios = [];
+            $anios[substr($g['desde'], 0, 4)] = true;
+            $anios[substr($g['hasta'], 0, 4)] = true;
+            $anios[(string) $g['temp']] = true;
+            $anios[(string) ((int) $g['temp'] + 1)] = true;
+            $anios[$g['temp'] . '/' . substr((string) ((int) $g['temp'] + 1), -2)] = true;
+            $anios[$g['temp'] . '/' . ((int) $g['temp'] + 1)] = true;
+
             $opts = '<option value="nuevo">— crear torneo nuevo —</option>';
+            $yaSel = false;
             foreach ($torneos as $t) {
-                $sel = ($this->normalizaTexto($t->nombre) === $this->normalizaTexto($g['nombre'])
-                        && (string) $t->year === (string) $g['temp']) ? ' selected' : '';
+                $sel = '';
+                if (!$yaSel
+                    && $this->normalizaTexto($t->nombre) === $this->normalizaTexto($g['nombre'])
+                    && isset($anios[(string) $t->year])) {
+                    $sel = ' selected';
+                    $yaSel = true;
+                }
                 $opts .= '<option value="' . $t->id . '"' . $sel . '>' . e($t->nombre . ' ' . $t->year) . '</option>';
             }
             $html .= '<tr>'
@@ -571,6 +588,7 @@ class ImportPartidosController extends Controller
         foreach ($filas as $i => $f) {
             $filas[$i]['equipo_id'] = null;
             $filas[$i]['rival_id'] = null;
+            $filas[$i]['rival_real_id'] = null;
             $filas[$i]['partido_id'] = null;
             $filas[$i]['motivo'] = null;
 
@@ -611,10 +629,45 @@ class ImportPartidosController extends Controller
                 if (!$rivalId)  $faltan[] = 'rival «' . $f['rival_nombre'] . '»';
                 $filas[$i]['motivo'] = 'sin mapear: ' . implode(' / ', $faltan);
             } else {
-                $filas[$i]['estado'] = 'nuevo';
+                // Antes de darlo por nuevo: ¿ese día el club ya jugó contra OTRO equipo?
+                // Si sí, el partido existe y el que está mal es el mapeo del rival.
+                $otro = $this->partidoDelDia($equipoId, $f['dia']);
+                if ($otro) {
+                    $rivalReal = ((int) $otro->equipol_id === (int) $equipoId) ? $otro->equipov_id : $otro->equipol_id;
+                    $filas[$i]['estado'] = 'conflicto';
+                    $filas[$i]['partido_id'] = $otro->id;
+                    $filas[$i]['rival_real_id'] = $rivalReal;
+                    $filas[$i]['motivo'] = 'ese día ya tenés el partido #' . $otro->id . ' contra '
+                        . $this->nombreEquipo($rivalReal) . ' (#' . $rivalReal . '), no contra «' . $f['rival_nombre']
+                        . '» (#' . $rivalId . '): el mapeo del rival está mal';
+                } else {
+                    $filas[$i]['estado'] = 'nuevo';
+                }
             }
         }
         return $filas;
+    }
+
+    /** Cualquier partido de ese equipo ese día, sin importar el rival. */
+    private function partidoDelDia($equipoId, $dia)
+    {
+        $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -1 day'));
+        $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +1 day'));
+        return \App\Partido::whereBetween('dia', [$d0, $d1])
+            ->where(function ($q) use ($equipoId) {
+                $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
+            })->first();
+    }
+
+    private function nombreEquipo($id)
+    {
+        static $cache = [];
+        if (!$id) return '?';
+        if (!isset($cache[$id])) {
+            $e = \App\Equipo::select('nombre')->find($id);
+            $cache[$id] = $e ? $e->nombre : ('#' . $id);
+        }
+        return $cache[$id];
     }
 
     private function buscarPartido($equipoId, $rivalId, $dia)
@@ -716,12 +769,22 @@ class ImportPartidosController extends Controller
         return $mapa;
     }
 
+    /**
+     * Nombre normalizado -> equipo_id. Si dos equipos comparten la misma clave
+     * (pasa con los homónimos), la clave se marca ambigua y no matchea con nadie:
+     * mejor un conflicto para resolver a mano que un partido con el rival cambiado.
+     */
     private function mapaNombres()
     {
         $mapa = [];
         foreach (\App\Equipo::select('id', 'nombre')->get() as $e) {
             foreach ($this->clavesNombre($e->nombre) as $k) {
-                if ($k !== '' && !isset($mapa[$k])) $mapa[$k] = $e->id;
+                if ($k === '') continue;
+                if (isset($mapa[$k]) && $mapa[$k] !== $e->id) {
+                    $mapa[$k] = null;      // ambigua
+                } elseif (!array_key_exists($k, $mapa)) {
+                    $mapa[$k] = $e->id;
+                }
             }
         }
         return $mapa;
@@ -731,25 +794,35 @@ class ImportPartidosController extends Controller
     {
         if ($tmId !== null && isset($mapaTm[(string) $tmId])) return $mapaTm[(string) $tmId];
         foreach ($this->clavesNombre($nombre) as $k) {
-            if ($k !== '' && isset($mapaNombres[$k])) return $mapaNombres[$k];
+            if ($k !== '' && isset($mapaNombres[$k]) && $mapaNombres[$k] !== null) return $mapaNombres[$k];
         }
         return null;
     }
 
+    /**
+     * Claves normalizadas de un nombre de club.
+     *
+     * REGLA IMPORTANTE: si el nombre trae un paréntesis aclaratorio —"Sarmiento (Junín)",
+     * "Central Córdoba (SdE)"— ese paréntesis es parte del nombre y NO se descarta.
+     * Sin esta regla, "CA Sarmiento (Junín)" matchea contra un "Sarmiento" cualquiera
+     * y termina creando partidos con el rival equivocado.
+     */
     private function clavesNombre($nombre)
     {
         $nombre = (string) $nombre;
         if (trim($nombre) === '') return [];
+
         $base = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nombre);
         if ($base === false) $base = $nombre;
         $base = mb_strtolower($base);
-        $sinParentesis = preg_replace('/\([^)]*\)/', ' ', $base);
 
-        $claves = [];
-        foreach ([$base, $sinParentesis] as $variante) {
-            $claves[] = $this->soloLetras($variante);
-            $claves[] = $this->soloLetras($this->quitarPrefijos($variante));
-        }
+        // Los paréntesis se aplanan (pasan a ser texto), no se borran.
+        $base = str_replace(['(', ')', '.', ','], ' ', $base);
+
+        $claves = [
+            $this->soloLetras($base),
+            $this->soloLetras($this->quitarPrefijos($base)),
+        ];
         return array_values(array_unique(array_filter($claves)));
     }
 
@@ -812,8 +885,10 @@ class ImportPartidosController extends Controller
             'dia'                     => $dia,
             'goles_favor'             => $gf === null ? null : (int) $gf,
             'goles_contra'            => $gc === null ? null : (int) $gc,
+            'anio'                    => $dia ? substr($dia, 0, 4) : null,
             'equipo_id'               => null,
             'rival_id'                => null,
+            'rival_real_id'           => null,
             'partido_id'              => null,
             'estado'                  => 'nuevo',
             'motivo'                  => null,
@@ -904,6 +979,48 @@ class ImportPartidosController extends Controller
         return $request->url() . '?' . http_build_query($q);
     }
 
+    /**
+     * Clubes que SÍ están mapeados pero cuyo mapeo contradice un partido ya cargado.
+     * Un clic corrige el mapeo apuntándolo al rival que realmente jugó ese día.
+     */
+    private function bloqueMapeosSospechosos(array $filas, Request $request)
+    {
+        $mal = [];
+        foreach ($filas as $f) {
+            if ($f['estado'] !== 'conflicto' || empty($f['rival_real_id'])) continue;
+            $k = (string) $f['rival_external_id'];
+            if ($k === '') continue;
+            if (!isset($mal[$k])) {
+                $mal[$k] = ['nombre' => $f['rival_nombre'], 'actual' => $f['rival_id'],
+                            'real' => $f['rival_real_id'], 'n' => 0];
+            }
+            $mal[$k]['n']++;
+        }
+        if (empty($mal)) return '';
+
+        $out = '<h2 class="err">Mapeos que no cierran <span class="sub">(' . count($mal) . ')</span></h2>'
+             . '<p class="sub">Estos clubes están mapeados a un equipo tuyo, pero el partido de esa fecha en tu base '
+             . 'es contra otro rival. Casi siempre es un homónimo mal enganchado. Corregilo y el partido pasa a «ya cargado».</p>'
+             . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Mapeado hoy a</th>'
+             . '<th>Debería ser</th><th>Partidos</th><th></th></tr></thead><tbody>';
+
+        foreach ($mal as $tmId => $d) {
+            $q = $request->query();
+            unset($q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre']);
+            $q['mapear_tm'] = $tmId;
+            $q['mapear_nombre'] = $d['nombre'];
+            $q['mapear_equipo'] = $d['real'];
+            $href = $request->url() . '?' . http_build_query($q);
+
+            $out .= '<tr class="err"><td>' . e($d['nombre']) . '</td><td class="num">' . e($tmId) . '</td>'
+                 . '<td>' . e($this->nombreEquipo($d['actual'])) . ' <span class="id">#' . (int) $d['actual'] . '</span></td>'
+                 . '<td><b>' . e($this->nombreEquipo($d['real'])) . '</b> <span class="id">#' . (int) $d['real'] . '</span></td>'
+                 . '<td class="num">' . $d['n'] . '</td>'
+                 . '<td><a class="boton" href="' . e($href) . '">Corregir</a></td></tr>';
+        }
+        return $out . '</tbody></table></div>';
+    }
+
     private function bloqueClubesSinResolver(array $filas, Request $request)
     {
         $pend = [];
@@ -970,7 +1087,7 @@ class ImportPartidosController extends Controller
     private function tabla(array $filas, $limite, $filtro = '')
     {
         $out = '<div class="scroll"><table><thead><tr>'
-            . '<th>Fecha</th><th>Competencia</th><th>Temp.</th><th>Fecha nº</th><th>Club</th><th></th><th>Rival</th>'
+            . '<th>Fecha</th><th>Competencia</th><th>Año</th><th>Temp. TM</th><th>Fecha nº</th><th>Club</th><th></th><th>Rival</th>'
             . '<th>Res.</th><th>gameId</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>';
         $n = 0;
         foreach ($filas as $f) {
@@ -980,7 +1097,8 @@ class ImportPartidosController extends Controller
             $out .= '<tr class="' . $clase . '">'
                 . '<td class="num">' . e($f['dia'] ? substr($f['dia'], 0, 10) : '—') . '</td>'
                 . '<td>' . e($f['competencia_nombre'] ?: ('#' . $f['competencia_external_id'])) . '</td>'
-                . '<td class="num">' . e($f['temporada']) . '</td>'
+                . '<td class="num"><b>' . e(isset($f['anio']) ? $f['anio'] : '') . '</b></td>'
+                . '<td class="num gris">' . e($f['temporada']) . '</td>'
                 . '<td class="num">' . e($f['ronda']) . '</td>'
                 . '<td>' . e($f['club_nombre']) . ($f['equipo_id'] ? ' <span class="id">#' . $f['equipo_id'] . '</span>' : '') . '</td>'
                 . '<td class="num">' . ($f['local'] ? 'L' : 'V') . '</td>'
