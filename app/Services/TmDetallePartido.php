@@ -1915,32 +1915,56 @@ class TmDetallePartido
     {
         $n = NombreHelper::separarTM($p);
 
-        $nacimiento = null;
-        $raw = isset($p['lifeDates']['dateOfBirth']) ? $p['lifeDates']['dateOfBirth'] : null;
-        if ($raw) {
-            try { $nacimiento = Carbon::parse($raw)->format('Y-m-d'); } catch (\Exception $e) { $nacimiento = null; }
-        }
-        $fallecimiento = null;
-        $rawF = isset($p['lifeDates']['dateOfDeath']) ? $p['lifeDates']['dateOfDeath'] : null;
-        if ($rawF) {
-            try { $fallecimiento = Carbon::parse($rawF)->format('Y-m-d'); } catch (\Exception $e) { $fallecimiento = null; }
-        }
+        // ── Dos formas conviven en tmapi ────────────────────────────────────
+        // Jugadores y DTs (/players, /coaches) vienen ANIDADOS:
+        //     lifeDates.dateOfBirth · birthPlaceDetails.placeOfBirth
+        //     nationalityDetails.nationalities.nationalityId
+        // Los árbitros (/referees) vienen PLANOS, colgando de la raíz:
+        //     dateOfBirth · nationalities.nationalityId
+        // Hay que leer las dos. Leyendo solo la anidada, todo árbitro quedaba
+        // sin fecha y sin país — y como `personas.nacionalidad` tiene DEFAULT
+        // 'Argentina' en la base, salían estampados como argentinos.
+        $aFecha = function ($raw) {
+            if (!$raw) return null;
+            try { return Carbon::parse($raw)->format('Y-m-d'); } catch (\Exception $e) { return null; }
+        };
 
-        $ciudad = trim((string) (isset($p['birthPlaceDetails']['placeOfBirth']) ? $p['birthPlaceDetails']['placeOfBirth'] : ''));
+        $nacimiento = $aFecha(isset($p['lifeDates']['dateOfBirth'])
+            ? $p['lifeDates']['dateOfBirth']
+            : (isset($p['dateOfBirth']) ? $p['dateOfBirth'] : null));
+
+        $fallecimiento = $aFecha(isset($p['lifeDates']['dateOfDeath'])
+            ? $p['lifeDates']['dateOfDeath']
+            : (isset($p['dateOfDeath']) ? $p['dateOfDeath'] : null));
+
+        $ciudad = trim((string) (isset($p['birthPlaceDetails']['placeOfBirth'])
+            ? $p['birthPlaceDetails']['placeOfBirth']
+            : (isset($p['placeOfBirth']) ? $p['placeOfBirth'] : '')));
         $ciudad = $ciudad !== '' ? $ciudad : null;
 
-        $nacionalidad = null;
-        $nacId = (int) (isset($p['nationalityDetails']['nationalities']['nationalityId'])
-            ? $p['nationalityDetails']['nationalities']['nationalityId'] : 0);
-        if (!$nacId && isset($p['nationalityDetails']['nationalities'][0]['nationalityId'])) {
-            $nacId = (int) $p['nationalityDetails']['nationalities'][0]['nationalityId'];
+        $nacId = 0;
+        $candidatos = [
+            isset($p['nationalityDetails']['nationalities']['nationalityId']) ? $p['nationalityDetails']['nationalities']['nationalityId'] : null,
+            isset($p['nationalityDetails']['nationalities'][0]['nationalityId']) ? $p['nationalityDetails']['nationalities'][0]['nationalityId'] : null,
+            isset($p['nationalities']['nationalityId']) ? $p['nationalities']['nationalityId'] : null,
+            isset($p['nationalities'][0]['nationalityId']) ? $p['nationalities'][0]['nationalityId'] : null,
+            isset($p['nationalityId']) ? $p['nationalityId'] : null,
+        ];
+        foreach ($candidatos as $cand) {
+            if ((int) $cand > 0) { $nacId = (int) $cand; break; }
         }
+
+        $nacionalidad = null;
         if ($nacId) {
             $paises = JugadorController::paisesTM();
             $nacionalidad = isset($paises[$nacId]) ? $paises[$nacId] : null;
             if ($nacionalidad === null) {
                 $this->aviso('Código de país de Transfermarkt sin mapear: ' . $nacId . ' (' . $n['name'] . ').');
             }
+        } else {
+            // No podemos dejarlo pasar en silencio: la base le pone Argentina.
+            $this->aviso('Transfermarkt no trajo nacionalidad para "' . $n['name'] . '". '
+                . 'Ojo que la base le va a poner Argentina por default: revisalo a mano.');
         }
 
         $altura = isset($p['attributes']['height']) ? $p['attributes']['height'] : null;
