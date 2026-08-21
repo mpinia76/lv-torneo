@@ -98,6 +98,8 @@ class TmDetallePartido
     /** Bajar la foto de perfil de cada persona nueva (una llamada más por cabeza). */
     private $conFotos = true;
     private $fotosBajadas = 0;
+    /** Filas que la base rechazó (índices únicos, etc.). */
+    private $fallidas = 0;
 
     // ═════════════════════════════════ API ═════════════════════════════════
 
@@ -116,6 +118,7 @@ class TmDetallePartido
 
         $this->avisos = [];
         $this->fotosBajadas = 0;
+        $this->fallidas = 0;
 
         $informe = [
             'ok'          => false,
@@ -124,6 +127,7 @@ class TmDetallePartido
             'partido_id'  => (int) $partidoId,
             'game_id'     => (string) $gameId,
             'avisos'      => [],
+            'fallidas'    => 0,
             'plan'        => ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
                 'arbitros' => [], 'tecnicos' => []],
             'creados'     => ['jugadores' => [], 'arbitros' => [], 'tecnicos' => []],
@@ -223,6 +227,14 @@ class TmDetallePartido
         $plan = ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
             'arbitros' => [], 'tecnicos' => []];
 
+        // Controles que valen para los dos equipos a la vez.
+        //   $jugadoresPuestos: nadie puede estar dos veces en la misma alineación.
+        //   $dorsalesUsados:   `alineacions` tiene un índice único
+        //                      (partido_id, equipo_id, dorsal), así que un dorsal
+        //                      repetido en el mismo equipo hace fallar el guardado.
+        $jugadoresPuestos = [];
+        $dorsalesUsados   = [];
+
         foreach ($lados as $iLado => $lado) {
             $equipoId = $lado['equipo_id'];
             // El rival, para mostrar bien los goles en contra: Transfermarkt los
@@ -248,15 +260,43 @@ class TmDetallePartido
                     $this->aviso('Alineación: jugador TM ' . $p['tm_id'] . ' sin resolver, lo salteo.');
                     continue;
                 }
+                $nombre = $this->nombreJugador($jugadorId);
+
+                // Mismo jugador dos veces: casi siempre significa que dos ids de
+                // Transfermarkt distintos terminaron apuntando al mismo jugador
+                // nuestro. Es un problema de mapeo, no de la alineación.
+                if (isset($jugadoresPuestos[$jugadorId])) {
+                    $this->aviso('"' . $nombre . '" aparece dos veces en la alineación: los jugadores TM '
+                        . $jugadoresPuestos[$jugadorId] . ' y ' . $p['tm_id'] . ' están mapeados al mismo jugador #'
+                        . $jugadorId . '. Salteo el segundo — revisá el mapeo en jugador_tm.');
+                    continue;
+                }
+                $jugadoresPuestos[$jugadorId] = $p['tm_id'];
+
+                // Dorsal repetido dentro del equipo: lo dejamos sin dorsal en vez
+                // de perder al jugador. Estar en la alineación importa más que el
+                // número, y si no el índice único hace fallar todo el partido.
+                $dorsal = $p['dorsal'];
+                $claveDorsal = $equipoId . '-' . $dorsal;
+                if ($dorsal !== null && isset($dorsalesUsados[$claveDorsal])) {
+                    $this->aviso('Dorsal ' . $dorsal . ' repetido en ' . $lado['equipo_nombre'] . ': ya lo tiene "'
+                        . $dorsalesUsados[$claveDorsal] . '", así que "' . $nombre . '" queda sin dorsal. '
+                        . 'Viene así de Transfermarkt; corregilo a mano si sabés cuál era.');
+                    $dorsal = null;
+                } elseif ($dorsal !== null) {
+                    $dorsalesUsados[$claveDorsal] = $nombre;
+                }
+
                 $plan['alineacions'][] = [
                     'partido_id' => $partido->id,
                     'jugador_id' => $jugadorId,
                     'equipo_id'  => $equipoId,
-                    'dorsal'     => $p['dorsal'],
+                    'dorsal'     => $dorsal,
                     'tipo'       => $p['tipo'],
                     'orden'      => $p['orden'],
-                    '_nombre'    => $this->nombreJugador($jugadorId),
+                    '_nombre'    => $nombre,
                     '_equipo'    => $lado['equipo_nombre'],
+                    '_dudoso'    => ($dorsal === null && $p['dorsal'] !== null),
                 ];
             }
 
@@ -376,11 +416,11 @@ class TmDetallePartido
                         Cambio::where('partido_id', $partido->id)->delete();
                         PartidoArbitro::where('partido_id', $partido->id)->delete();
                     }
-                    foreach ($plan['alineacions'] as $r) Alineacion::create($this->limpiar($r));
-                    foreach ($plan['gols'] as $r)        Gol::create($this->limpiar($r));
-                    foreach ($plan['tarjetas'] as $r)    Tarjeta::create($this->limpiar($r));
-                    foreach ($plan['cambios'] as $r)     Cambio::create($this->limpiar($r));
-                    foreach ($plan['arbitros'] as $r)    PartidoArbitro::create($this->limpiar($r));
+                    $this->grabarFilas(Alineacion::class,    $plan['alineacions'], 'la alineación');
+                    $this->grabarFilas(Gol::class,          $plan['gols'],        'un gol');
+                    $this->grabarFilas(Tarjeta::class,      $plan['tarjetas'],    'una tarjeta');
+                    $this->grabarFilas(Cambio::class,       $plan['cambios'],     'un cambio');
+                    $this->grabarFilas(PartidoArbitro::class, $plan['arbitros'],  'un árbitro');
 
                     // El DT del club dirigido ya lo pudo haber cargado el
                     // importador de partidos: nunca pisamos ni duplicamos, sólo
@@ -401,7 +441,8 @@ class TmDetallePartido
             }
         }
 
-        $informe['avisos'] = $this->avisos;
+        $informe['avisos']   = $this->avisos;
+        $informe['fallidas'] = $this->fallidas;
         return $informe;
     }
 
@@ -1348,6 +1389,39 @@ class TmDetallePartido
             $out[$t] = true;
         }
         return array_keys($out);
+    }
+
+    /**
+     * Graba las filas de a una, aguantando que alguna falle.
+     *
+     * La base tiene índices únicos propios —por ejemplo (partido_id, equipo_id,
+     * dorsal) en `alineacions`— y Transfermarkt manda lo que manda. Si una fila
+     * choca contra uno, no tiene sentido perder el partido entero: se saltea
+     * esa, queda el aviso, y el resto se guarda.
+     *
+     * En InnoDB una sentencia fallida no aborta la transacción, sólo se deshace
+     * ella, así que se puede seguir.
+     */
+    private function grabarFilas($clase, array $filas, $que)
+    {
+        foreach ($filas as $r) {
+            try {
+                $clase::create($this->limpiar($r));
+            } catch (\Exception $e) {
+                $this->fallidas++;
+                $quien = isset($r['_nombre']) ? ' — ' . $r['_nombre'] : '';
+                $this->aviso('No se pudo guardar ' . $que . $quien . ': ' . $this->mensajeCorto($e));
+            }
+        }
+    }
+
+    /** El mensaje de la excepción sin el SQL entero pegado atrás. */
+    private function mensajeCorto(\Exception $e)
+    {
+        $m = $e->getMessage();
+        $corte = strpos($m, ' (SQL:');
+        if ($corte !== false) $m = substr($m, 0, $corte);
+        return mb_substr(trim($m), 0, 300);
     }
 
     /**

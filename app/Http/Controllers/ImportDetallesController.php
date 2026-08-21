@@ -211,7 +211,11 @@ class ImportDetallesController extends Controller
         if ($r['error']) {
             $cuerpo .= '<div class="err-box">' . e($r['error']) . '</div>';
         } elseif ($escribir && $r['escrito']) {
-            $cuerpo .= '<div class="ok-box">Guardado.</div>';
+            $fallidas = isset($r['fallidas']) ? (int) $r['fallidas'] : 0;
+            $cuerpo .= $fallidas
+                ? '<div class="err-box">Guardado, pero la base rechazó <b>' . $fallidas . '</b> fila(s). '
+                . 'Mirá los avisos para saber cuáles.</div>'
+                : '<div class="ok-box">Guardado.</div>';
         } elseif (!$escribir) {
             // Si el partido ya tiene detalle, el único guardado posible es
             // rehacerlo: el botón lo dice y lleva forzar=1.
