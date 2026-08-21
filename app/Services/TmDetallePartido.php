@@ -1055,18 +1055,7 @@ class TmDetallePartido
         $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
         if (count($tokensTm) < 2) return null;
 
-        $ancla = '';
-        foreach ($tokensTm as $t) { if (mb_strlen($t) > mb_strlen($ancla)) $ancla = $t; }
-        if (mb_strlen($ancla) < 4) return null;
-
-        $cands = DB::table($tabla)
-            ->join('personas', 'personas.id', '=', $tabla . '.persona_id')
-            ->where(function ($q) use ($ancla) {
-                $q->where('personas.apellido', 'like', '%' . $ancla . '%')
-                  ->orWhere('personas.name', 'like', '%' . $ancla . '%');
-            })
-            ->select($tabla . '.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
-            ->limit(50)->get();
+        $cands = $this->candidatosPorNombre($tabla, $datos);
 
         $mejor = null; $puntaje = 0; $empatados = 0;
         foreach ($cands as $c) {
@@ -1244,21 +1233,8 @@ class TmDetallePartido
         // ── 2) En la base no tiene fecha cargada ──────────────────────────
         // Sólo aceptamos si el nombre completo es exactamente el mismo conjunto
         // de palabras. Y queda marcado para revisar igual.
-        $ancla = '';
-        foreach ($tokensTm as $t) { if (mb_strlen($t) > mb_strlen($ancla)) $ancla = $t; }
-        if ($ancla === '' || mb_strlen($ancla) < 4) return null;
-
-        $cands = DB::table('jugadors')
-            ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
-            ->whereNull('personas.nacimiento')
-            ->where(function ($q) use ($ancla) {
-                $q->where('personas.apellido', 'like', '%' . $ancla . '%')
-                  ->orWhere('personas.nombre', 'like', '%' . $ancla . '%');
-            })
-            ->select('jugadors.id', 'personas.apellido', 'personas.nombre')
-            ->limit(50)->get();
-
-        foreach ($cands as $c) {
+        foreach ($this->candidatosPorNombre('jugadors', $datos) as $c) {
+            if (!empty($c->nacimiento)) continue;   // si tiene fecha y no matcheó arriba, no es él
             $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
             sort($tokensBase);
             $tm = $tokensTm; sort($tm);
@@ -1269,6 +1245,45 @@ class TmDetallePartido
         }
 
         return null;
+    }
+
+    /**
+     * Trae de la base los candidatos que comparten alguna palabra del nombre.
+     *
+     * Ojo con dos cosas que ya me mordieron:
+     *
+     *  1. No alcanza con buscar UNA palabra (la más larga). Héctor Santiago
+     *     Tapia Urdile: la más larga es "santiago", que es un nombre de pila y
+     *     puede no estar donde uno lo busca. Buscamos con varias, y primero con
+     *     las del APELLIDO, que es lo que de verdad identifica.
+     *  2. Hay que mirar las TRES columnas —apellido, nombre y name—, porque cada
+     *     fuente parte el nombre en un lugar distinto: lo que en Transfermarkt
+     *     es apellido, en la base puede estar en el nombre.
+     *
+     * El filtro es sólo para no traer la tabla entera; quién es quién lo decide
+     * después la comparación de palabras.
+     */
+    private function candidatosPorNombre($tabla, array $datos)
+    {
+        $anclas = [];
+        foreach (array_merge($this->tokensNombre($datos['apellido']),
+                             $this->tokensNombre($datos['nombre'])) as $t) {
+            if (mb_strlen($t) >= 4 && !in_array($t, $anclas, true)) $anclas[] = $t;
+        }
+        $anclas = array_slice($anclas, 0, 4);
+        if (empty($anclas)) return collect();
+
+        return DB::table($tabla)
+            ->join('personas', 'personas.id', '=', $tabla . '.persona_id')
+            ->where(function ($q) use ($anclas) {
+                foreach ($anclas as $a) {
+                    $q->orWhere('personas.apellido', 'like', '%' . $a . '%')
+                      ->orWhere('personas.nombre', 'like', '%' . $a . '%')
+                      ->orWhere('personas.name', 'like', '%' . $a . '%');
+                }
+            })
+            ->select($tabla . '.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
+            ->limit(300)->get();
     }
 
     /**
