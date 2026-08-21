@@ -772,17 +772,17 @@ class TmDetallePartido
             $datos = $this->personaDesdePerfil($perfiles[(string) $tmId]);
             if ($datos['apellido'] === '') continue;
 
-            // ¿Ya lo tenemos? Los árbitros muchas veces no tienen fecha de
-            // nacimiento cargada, así que igualamos por apellido + nombre.
-            $existente = DB::table('arbitros')
-                ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
-                ->where('personas.apellido', $datos['apellido'])
-                ->where('personas.nombre', $datos['nombre'])
-                ->select('arbitros.id')->first();
-
+            // ¿Ya lo tenemos? Los árbitros casi nunca tienen fecha de nacimiento
+            // cargada, así que comparamos las palabras del nombre completo
+            // (mismo criterio que con los jugadores, ver tokensNombre).
+            $existente = $this->buscarArbitroExistente($datos);
             if ($existente) {
-                $out[(string) $tmId] = (int) $existente->id;
-                if ($escribir) $this->guardarMapeoArbitro($tmId, $existente->id, $datos['name'], 'auto', false);
+                $out[(string) $tmId] = (int) $existente['arbitro_id'];
+                if ($escribir) $this->guardarMapeoArbitro($tmId, $existente['arbitro_id'], $datos['name'], 'auto', $existente['revisar']);
+                if ($existente['revisar']) {
+                    $this->aviso('Aparejé al árbitro ' . $datos['apellido'] . ', ' . $datos['nombre']
+                        . ' con "' . $existente['base'] . '" (#' . $existente['arbitro_id'] . '). Confirmalo.');
+                }
                 continue;
             }
 
@@ -806,6 +806,42 @@ class TmDetallePartido
         }
 
         return $out;
+    }
+
+    /** Igual que buscarJugadorExistente, pero para árbitros y sin fecha de nacimiento. */
+    private function buscarArbitroExistente(array $datos)
+    {
+        $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
+        if (count($tokensTm) < 2) return null;
+
+        $ancla = '';
+        foreach ($tokensTm as $t) { if (mb_strlen($t) > mb_strlen($ancla)) $ancla = $t; }
+        if (mb_strlen($ancla) < 4) return null;
+
+        $cands = DB::table('arbitros')
+            ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+            ->where(function ($q) use ($ancla) {
+                $q->where('personas.apellido', 'like', '%' . $ancla . '%')
+                  ->orWhere('personas.name', 'like', '%' . $ancla . '%');
+            })
+            ->select('arbitros.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
+            ->limit(50)->get();
+
+        $mejor = null; $puntaje = 0; $empatados = 0;
+        foreach ($cands as $c) {
+            if (!empty($datos['nacimiento']) && !empty($c->nacimiento)
+                && substr((string) $c->nacimiento, 0, 10) !== $datos['nacimiento']) {
+                continue;   // fechas distintas: no es él
+            }
+            $p = count(array_intersect($tokensTm, $this->tokensNombre($c->apellido . ' ' . $c->nombre)));
+            if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
+            elseif ($p === $puntaje && $p > 0) { $empatados++; }
+        }
+
+        if (!$mejor || $puntaje < 2) return null;
+
+        return ['arbitro_id' => (int) $mejor->id, 'base' => trim($mejor->apellido . ', ' . $mejor->nombre),
+            'revisar' => ($empatados > 1 || $puntaje < count($tokensTm))];
     }
 
     private function guardarMapeoArbitro($tmId, $arbitroId, $nombre, $origen, $revisar)
@@ -869,19 +905,18 @@ class TmDetallePartido
         $datos = $this->personaDesdePerfil($perfil);
         $etiqueta = trim($datos['apellido'] . ', ' . $datos['nombre']) . ' (TM ' . $tmId . ')';
 
-        // ¿Ya lo tenemos, aunque sin mapear? Igualamos por apellido + nacimiento,
-        // que es el criterio del índice único de personas.
-        $existente = null;
-        if ($datos['apellido'] !== '' && !empty($datos['nacimiento'])) {
-            $existente = DB::table('jugadors')
-                ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
-                ->where('personas.apellido', $datos['apellido'])
-                ->where('personas.nacimiento', $datos['nacimiento'])
-                ->select('jugadors.id')->first();
-        }
+        // ¿Ya lo tenemos, aunque sin mapear?
+        $existente = $this->buscarJugadorExistente($datos);
         if ($existente) {
-            if ($escribir) $this->guardarMapeoJugador($tmId, $existente->id, $datos['name'], 'auto', false);
-            return ['jugador_id' => (int) $existente->id, 'creado' => false, 'descripcion' => $etiqueta . ' — ya existía'];
+            if ($escribir) {
+                $this->guardarMapeoJugador($tmId, $existente['jugador_id'], $datos['name'], 'auto', $existente['revisar']);
+            }
+            if ($existente['revisar']) {
+                $this->aviso('Aparejé a ' . $etiqueta . ' con el jugador #' . $existente['jugador_id']
+                    . ' (' . $existente['base'] . ') por ' . $existente['como'] . '. Confirmalo en "jugadores por revisar".');
+            }
+            return ['jugador_id' => (int) $existente['jugador_id'], 'creado' => false,
+                'descripcion' => $etiqueta . ' — ya existía como "' . $existente['base'] . '" (' . $existente['como'] . ')'];
         }
 
         if (!$escribir) {
@@ -908,6 +943,126 @@ class TmDetallePartido
             $this->aviso('No pude crear al jugador ' . $etiqueta . ': ' . $e->getMessage());
             return ['jugador_id' => null, 'creado' => false, 'descripcion' => $etiqueta];
         }
+    }
+
+    /**
+     * Busca en la base a un jugador que ya tengamos cargado, sin depender de
+     * que el nombre esté partido igual que en Transfermarkt.
+     *
+     * El problema real: los apellidos compuestos se reparten distinto en cada
+     * fuente. Marko Biskupović figura en la base como apellido
+     * "Biskupovic Venturino" / nombre "Marko Andrés", y en Transfermarkt como
+     * apellido "Venturino" / nombre "Marko Andrés Biskupović". Comparando el
+     * apellido tal cual, no matchean, y el jugador se duplica.
+     *
+     * Entonces no comparamos campo contra campo: juntamos nombre y apellido,
+     * los partimos en palabras, les sacamos acentos y diacríticos (Biskupović
+     * -> biskupovic) y contamos cuántas palabras comparten.
+     *
+     *   fecha de nacimiento igual + 2 o más palabras en común -> es él, seguro
+     *   fecha de nacimiento igual + 1 palabra                 -> probablemente,
+     *                                                            queda para revisar
+     *   sin fecha en la base + nombre completo idéntico       -> probablemente,
+     *                                                            queda para revisar
+     *
+     * Devuelve null si no hay nada parecido: ahí sí se crea.
+     */
+    private function buscarJugadorExistente(array $datos)
+    {
+        $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
+        if (count($tokensTm) < 2) return null;
+
+        // ── 1) Mismo día de nacimiento ────────────────────────────────────
+        if (!empty($datos['nacimiento'])) {
+            $cands = DB::table('jugadors')
+                ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+                ->where('personas.nacimiento', $datos['nacimiento'])
+                ->select('jugadors.id', 'personas.apellido', 'personas.nombre')
+                ->limit(50)->get();
+
+            $mejor = null; $puntaje = 0; $empatados = 0;
+            foreach ($cands as $c) {
+                $p = count(array_intersect($tokensTm, $this->tokensNombre($c->apellido . ' ' . $c->nombre)));
+                if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
+                elseif ($p === $puntaje && $p > 0) { $empatados++; }
+            }
+
+            if ($mejor && $puntaje >= 1) {
+                $base = trim($mejor->apellido . ', ' . $mejor->nombre);
+                if ($empatados > 1) {
+                    $this->aviso('Hay ' . $empatados . ' jugadores nacidos el ' . $datos['nacimiento']
+                        . ' que se parecen a ' . $datos['apellido'] . ', ' . $datos['nombre']
+                        . '. Uso el primero (#' . $mejor->id . ') pero revisalo.');
+                }
+                return ['jugador_id' => (int) $mejor->id, 'base' => $base,
+                    'revisar' => ($puntaje < 2 || $empatados > 1),
+                    'como' => 'misma fecha de nacimiento y ' . $puntaje . ' palabra(s) del nombre en común'];
+            }
+        }
+
+        // ── 2) En la base no tiene fecha cargada ──────────────────────────
+        // Sólo aceptamos si el nombre completo es exactamente el mismo conjunto
+        // de palabras. Y queda marcado para revisar igual.
+        $ancla = '';
+        foreach ($tokensTm as $t) { if (mb_strlen($t) > mb_strlen($ancla)) $ancla = $t; }
+        if ($ancla === '' || mb_strlen($ancla) < 4) return null;
+
+        $cands = DB::table('jugadors')
+            ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->whereNull('personas.nacimiento')
+            ->where(function ($q) use ($ancla) {
+                $q->where('personas.apellido', 'like', '%' . $ancla . '%')
+                  ->orWhere('personas.nombre', 'like', '%' . $ancla . '%');
+            })
+            ->select('jugadors.id', 'personas.apellido', 'personas.nombre')
+            ->limit(50)->get();
+
+        foreach ($cands as $c) {
+            $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
+            sort($tokensBase);
+            $tm = $tokensTm; sort($tm);
+            if ($tokensBase === $tm) {
+                return ['jugador_id' => (int) $c->id, 'base' => trim($c->apellido . ', ' . $c->nombre),
+                    'revisar' => true, 'como' => 'mismo nombre completo, sin fecha de nacimiento en la base'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Palabras de un nombre, normalizadas: minúsculas, sin acentos ni
+     * diacríticos (Biskupović -> biskupovic, Müller -> muller), sin partículas
+     * (de, da, van…) ni palabras de una sola letra.
+     */
+    private function tokensNombre($texto)
+    {
+        $s = mb_strtolower(trim((string) $texto), 'UTF-8');
+        $s = strtr($s, [
+            'á'=>'a','à'=>'a','ä'=>'a','â'=>'a','ã'=>'a','å'=>'a','ā'=>'a','ă'=>'a','ą'=>'a',
+            'é'=>'e','è'=>'e','ë'=>'e','ê'=>'e','ē'=>'e','ę'=>'e','ě'=>'e',
+            'í'=>'i','ì'=>'i','ï'=>'i','î'=>'i','ī'=>'i','į'=>'i',
+            'ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','õ'=>'o','ø'=>'o','ō'=>'o','ő'=>'o',
+            'ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u','ū'=>'u','ů'=>'u','ű'=>'u',
+            'ñ'=>'n','ń'=>'n','ň'=>'n',
+            'ç'=>'c','ć'=>'c','č'=>'c',
+            'š'=>'s','ś'=>'s','ş'=>'s',
+            'ž'=>'z','ź'=>'z','ż'=>'z',
+            'đ'=>'d','ď'=>'d','ð'=>'d',
+            'ý'=>'y','ÿ'=>'y','ř'=>'r','ł'=>'l','ť'=>'t','ğ'=>'g','ß'=>'ss','þ'=>'t',
+        ]);
+        $s = preg_replace('/[^a-z0-9 ]+/u', ' ', $s);
+
+        $particulas = ['de','da','do','dos','das','del','della','di','la','las','los','el',
+            'van','von','der','den','du','le','bin','al','y','e','junior','jr'];
+
+        $out = [];
+        foreach (preg_split('/\s+/', trim($s)) as $t) {
+            if ($t === '' || mb_strlen($t) < 2) continue;
+            if (in_array($t, $particulas, true)) continue;
+            $out[$t] = true;
+        }
+        return array_keys($out);
     }
 
     /** Traduce el perfil de la API a nuestros campos (mismo criterio que el import de jugadores). */
