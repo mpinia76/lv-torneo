@@ -305,7 +305,7 @@ class ImportPartidosController extends Controller
                 . '<input type="hidden" name="comp" value="' . e($g['comp']) . '">'
                 . '<input type="hidden" name="temp" value="' . e($g['temp']) . '">'
                 . '<input type="hidden" name="confirmar" value="1">'
-                . '<select name="torneo_id">' . $opts . '</select> <button>Aplicar ' . $g['n'] . '</button>'
+                . '<select name="torneo_id" class="s2" data-placeholder="elegí el torneo…">' . $opts . '</select> <button>Aplicar ' . $g['n'] . '</button>'
                 . '</form></td></tr>';
         }
 
@@ -921,15 +921,15 @@ class ImportPartidosController extends Controller
 
         uasort($pend, function ($a, $b) { return $b['n'] <=> $a['n']; });
 
-        $opciones = '';
-        foreach (\App\Equipo::select('id', 'nombre')->orderBy('nombre')->get() as $e) {
-            $opciones .= '<option value="' . $e->id . ' · ' . e($e->nombre) . '"></option>';
+        $opciones = '<option value=""></option>';
+        foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $e) {
+            $opciones .= '<option value="' . $e->id . '">' . e($e->nombre)
+                . ($e->pais ? ' (' . e($e->pais) . ')' : '') . '</option>';
         }
 
         $out = '<h2>Clubes sin mapear <span class="sub">(' . count($pend) . ')</span></h2>'
-             . '<p class="sub">Escribí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
+             . '<p class="sub">Elegí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
              . 'Si el club no existe en tu base, crealo primero desde Equipos.</p>'
-             . '<datalist id="eqs">' . $opciones . '</datalist>'
              . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
 
         foreach ($pend as $tmId => $d) {
@@ -942,7 +942,7 @@ class ImportPartidosController extends Controller
             }
             $out .= '<input type="hidden" name="mapear_tm" value="' . e($tmId) . '">'
                  . '<input type="hidden" name="mapear_nombre" value="' . e($d['nombre']) . '">'
-                 . '<input name="mapear_equipo" list="eqs" placeholder="buscar equipo…" size="28">'
+                 . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select>'
                  . ' <button>Mapear</button></form></td></tr>';
         }
         return $out . '</tbody></table></div>';
@@ -1002,7 +1002,8 @@ class ImportPartidosController extends Controller
             .sub{color:#6b7a73;margin:0 0 8px;font-size:12.5px}
             .acciones{margin:12px 0} .acciones a{color:#15714e;margin-right:2px}
             a{color:#15714e}
-            .boton{display:inline-block;background:#15714e;color:#fff;padding:5px 12px;text-decoration:none}
+            a.boton,.acciones a.boton{display:inline-block;background:#15714e;color:#fff;padding:5px 12px;text-decoration:none;font-weight:600}
+            a.boton:hover{background:#0f5a3d}
             .diag{background:#fff;border:1px solid #dde2dd;padding:14px 16px;font-size:13px}
             .diag code{background:#eef1ec;padding:1px 5px;font-size:12px}
             pre{font-size:11px;max-height:340px;overflow:auto;background:#f0f3ef;padding:10px}
@@ -1024,6 +1025,22 @@ class ImportPartidosController extends Controller
             button{cursor:pointer;background:#eef1ec}
             details summary{cursor:pointer;color:#15714e;margin-top:6px}
         ';
-        return response('<!doctype html><meta charset="utf-8"><title>' . e($titulo) . '</title><style>' . $css . '</style>' . $cuerpo);
+        $assets = '<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">'
+            . '<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.3/jquery.min.js"></script>'
+            . '<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>';
+
+        $init = '<script>$(function(){$(".s2").each(function(){'
+            . '$(this).select2({width:"260px",placeholder:$(this).data("placeholder")||"",allowClear:true});'
+            . '});});</script>';
+
+        $cssExtra = '
+            .select2-container{vertical-align:middle}
+            .select2-container--default .select2-selection--single{border-color:#c7cec7;border-radius:0;height:28px}
+            .select2-container--default .select2-selection--single .select2-selection__rendered{line-height:26px;font-size:13px}
+            .select2-container--default .select2-selection--single .select2-selection__arrow{height:26px}
+        ';
+
+        return response('<!doctype html><meta charset="utf-8"><title>' . e($titulo) . '</title>'
+            . $assets . '<style>' . $css . $cssExtra . '</style>' . $cuerpo . $init);
     }
 }
