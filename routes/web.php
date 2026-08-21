@@ -220,7 +220,9 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('equipo-estadisticas/store-masivo', 'EquipoEstadisticaManualController@storeMasivo')
         ->name('equipo-estadisticas.storeMasivo');
 
+    Route::get('/import-partidos', 'ImportPartidosController@index')->name('import_partidos.index');
     Route::get('/import-partidos/sondear', 'ImportPartidosController@sondear')->name('import_partidos.sondear');
+    Route::get('/import-partidos/aplicar', 'ImportPartidosController@aplicar')->name('import_partidos.aplicar');
 });
 
 
