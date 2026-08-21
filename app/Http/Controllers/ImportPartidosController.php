@@ -26,25 +26,24 @@ class ImportPartidosController extends Controller
 
     public function index(Request $request)
     {
-        $q = trim((string) $request->get('q', ''));
+        $q      = trim((string) $request->get('q', ''));
+        $filtro = trim((string) $request->get('estado', ''));
+        $limite = max(50, min(2000, (int) $request->get('limite', 300)));
 
-        $tecnicos = \App\Tecnico::with('persona')
-            ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
-            ->get()
+        // TODOS los DTs, tengan o no el slug de Transfermarkt. Los que no lo
+        // tienen son justamente los que hay que descubrir: sin slug no hay sondeo.
+        $tecnicos = \App\Tecnico::with('persona')->get()
             ->map(function ($t) {
                 return (object) [
                     'id'     => $t->id,
                     'nombre' => optional($t->persona)->name ?: ('DT #' . $t->id),
-                    'url'    => $t->transfermarkt_url,
+                    'url'    => trim((string) $t->transfermarkt_url),
                 ];
-            })
-            ->filter(function ($t) use ($q) {
-                return $q === '' || mb_stripos($t->nombre, $q) !== false;
             })
             ->sortBy('nombre')
             ->values();
 
-        // Contadores del staging
+        // Contadores del staging, una consulta para todos.
         $stats = [];
         foreach (DB::table('import_partidos')
                      ->select('tecnico_id', 'estado', DB::raw('COUNT(*) AS n'))
@@ -52,34 +51,160 @@ class ImportPartidosController extends Controller
             $stats[(int) $r->tecnico_id][$r->estado] = (int) $r->n;
         }
 
-        $filas = '';
-        foreach ($tecnicos as $t) {
-            $s = isset($stats[$t->id]) ? $stats[$t->id] : [];
-            $nuevo     = isset($s['nuevo']) ? $s['nuevo'] : 0;
-            $conflicto = isset($s['conflicto']) ? $s['conflicto'] : 0;
-            $aplicado  = isset($s['aplicado']) ? $s['aplicado'] : 0;
-            $duplicado = isset($s['duplicado']) ? $s['duplicado'] : 0;
-            $sondeado  = ($nuevo + $conflicto + $aplicado + $duplicado) > 0;
-
-            $filas .= '<tr>'
-                . '<td>' . e($t->nombre) . '</td>'
-                . '<td class="num">' . ($sondeado ? $duplicado : '—') . '</td>'
-                . '<td class="num">' . ($nuevo ? '<b class="ok">' . $nuevo . '</b>' : ($sondeado ? '0' : '—')) . '</td>'
-                . '<td class="num">' . ($conflicto ? '<b class="err">' . $conflicto . '</b>' : ($sondeado ? '0' : '—')) . '</td>'
-                . '<td class="num">' . ($aplicado ? '<b class="ok">' . $aplicado . '</b>' : ($sondeado ? '0' : '—')) . '</td>'
-                . '<td><a href="' . e(route('import_partidos.sondear', ['tecnico_id' => $t->id, 'aprender' => 1, 'guardar' => 1])) . '">Sondear</a>'
-                . ($nuevo ? ' · <a href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $t->id])) . '"><b>Aplicar ' . $nuevo . '</b></a>' : '')
-                . '</td></tr>';
+        // Cuántos de los aplicados ya tienen alineación cargada.
+        $conDetalle = [];
+        foreach (DB::table('import_partidos')
+                     ->whereNotNull('partido_id')->where('estado', 'aplicado')
+                     ->whereIn('partido_id', function ($sub) {
+                         $sub->from('alineacions')->select('partido_id')->distinct();
+                     })
+                     ->select('tecnico_id', DB::raw('COUNT(DISTINCT partido_id) AS n'))
+                     ->groupBy('tecnico_id')->get() as $r) {
+            $conDetalle[(int) $r->tecnico_id] = (int) $r->n;
         }
 
+        // ── Estado de cada DT ───────────────────────────────────────────────
+        $c = ['total' => 0, 'sin_url' => 0, 'sin_sondear' => 0, 'sondeados' => 0,
+            'pendientes' => 0, 'conflictos' => 0, 'sin_detalle' => 0, 'listos' => 0,
+            'partidos' => 0, 'detalle' => 0];
+        $todos = [];
+
+        foreach ($tecnicos as $t) {
+            $s = isset($stats[$t->id]) ? $stats[$t->id] : [];
+            $nuevo     = isset($s['nuevo'])     ? $s['nuevo']     : 0;
+            $conflicto = isset($s['conflicto']) ? $s['conflicto'] : 0;
+            $aplicado  = isset($s['aplicado'])  ? $s['aplicado']  : 0;
+            $duplicado = isset($s['duplicado']) ? $s['duplicado'] : 0;
+            $detalle   = isset($conDetalle[$t->id]) ? $conDetalle[$t->id] : 0;
+
+            $sinUrl   = ($t->url === '');
+            $sondeado = ($nuevo + $conflicto + $aplicado + $duplicado) > 0;
+
+            $c['total']++;
+            $c['partidos'] += $aplicado;
+            $c['detalle']  += $detalle;
+            if ($sinUrl)                 $c['sin_url']++;
+            elseif (!$sondeado)          $c['sin_sondear']++;
+            if ($sondeado)               $c['sondeados']++;
+            if ($nuevo)                  $c['pendientes']++;
+            if ($conflicto)              $c['conflictos']++;
+            if ($aplicado > $detalle)    $c['sin_detalle']++;
+            if ($sondeado && !$nuevo && !$conflicto) $c['listos']++;
+
+            $todos[] = (object) compact('t', 'nuevo', 'conflicto', 'aplicado',
+                'duplicado', 'detalle', 'sinUrl', 'sondeado');
+        }
+
+        // ── Filtros ─────────────────────────────────────────────────────────
+        $pasa = function ($f) use ($filtro) {
+            switch ($filtro) {
+                case 'sin_url':     return $f->sinUrl;
+                case 'sin_sondear': return !$f->sinUrl && !$f->sondeado;
+                case 'pendientes':  return $f->nuevo > 0;
+                case 'conflictos':  return $f->conflicto > 0;
+                case 'sin_detalle': return $f->aplicado > $f->detalle;
+                case 'listos':      return $f->sondeado && !$f->nuevo && !$f->conflicto;
+                default:            return true;
+            }
+        };
+
+        $visibles = [];
+        foreach ($todos as $f) {
+            if (!$pasa($f)) continue;
+            if ($q !== '' && mb_stripos($f->t->nombre, $q) === false) continue;
+            $visibles[] = $f;
+        }
+
+        // ── Pantalla ────────────────────────────────────────────────────────
         $html = '<h1>Carga de partidos · DT por DT</h1>'
-            . '<p class="sub">Estos son los DTs que ya pasaron por el sondeo. El botón <b>Partidos</b> de la lista de técnicos '
-            . 'baja los partidos del DT y los deja en staging; necesita que el DT tenga cargado el slug de Transfermarkt.</p>'
+            . '<p class="sub">Todos los DTs de la base y en qué punto está cada uno. Sin el slug de Transfermarkt '
+            . 'no se puede sondear: esos son los primeros a resolver.</p>'
             . '<p class="acciones"><a class="boton-sec" href="' . e(route('import_detalles.index')) . '">'
-            . 'Detalle de los partidos (alineaciones, goles, tarjetas, cambios)</a></p>'
-            . '<form method="get" style="margin:12px 0"><input name="q" value="' . e($q) . '" placeholder="buscar DT…" size="30"> <button>Buscar</button></form>'
-            . '<div class="scroll"><table><thead><tr><th>DT</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th>Aplicados</th><th></th></tr></thead>'
-            . '<tbody>' . $filas . '</tbody></table></div>';
+            . 'Detalle de los partidos (alineaciones, goles, tarjetas, cambios)</a></p>';
+
+        $html .= '<div class="cards">'
+            . $this->card($c['total'], 'DTs en la base')
+            . $this->card($c['sin_url'], 'sin slug de TM', $c['sin_url'] ? 'err' : 'ok')
+            . $this->card($c['sin_sondear'], 'con slug, sin sondear', $c['sin_sondear'] ? 'warn' : 'ok')
+            . $this->card($c['sondeados'], 'sondeados', 'ok')
+            . $this->card($c['pendientes'], 'con nuevos por aplicar', $c['pendientes'] ? 'warn' : '')
+            . $this->card($c['conflictos'], 'con conflictos', $c['conflictos'] ? 'err' : '')
+            . $this->card($c['partidos'], 'partidos aplicados', 'ok')
+            . $this->card($c['detalle'], 'con detalle', 'ok')
+            . '</div>';
+
+        // Solapas de filtro
+        $solapas = [
+            ''            => 'Todos (' . $c['total'] . ')',
+            'sin_url'     => 'Sin slug (' . $c['sin_url'] . ')',
+            'sin_sondear' => 'Sin sondear (' . $c['sin_sondear'] . ')',
+            'pendientes'  => 'Por aplicar (' . $c['pendientes'] . ')',
+            'conflictos'  => 'Con conflictos (' . $c['conflictos'] . ')',
+            'sin_detalle' => 'Sin detalle (' . $c['sin_detalle'] . ')',
+            'listos'      => 'Listos (' . $c['listos'] . ')',
+        ];
+        $html .= '<p class="acciones">';
+        foreach ($solapas as $clave => $texto) {
+            $params = array_filter(['estado' => $clave ?: null, 'q' => $q ?: null]);
+            $html .= '<a class="' . ($filtro === $clave ? 'boton' : 'boton-sec') . '" href="'
+                . e(route('import_partidos.index', $params)) . '">' . e($texto) . '</a> ';
+        }
+        $html .= '</p>';
+
+        $html .= '<form method="get" style="margin:12px 0">'
+            . '<input type="hidden" name="estado" value="' . e($filtro) . '">'
+            . '<input name="q" value="' . e($q) . '" placeholder="buscar DT…" size="30"> <button>Buscar</button>'
+            . ($q !== '' ? ' <a href="' . e(route('import_partidos.index', array_filter(['estado' => $filtro ?: null]))) . '">limpiar</a>' : '')
+            . '</form>';
+
+        if (empty($visibles)) {
+            return $this->pagina('Carga de partidos', $html . '<div class="ok-box">No hay ningún DT en este filtro.</div>');
+        }
+
+        $filas = ''; $n = 0;
+        foreach ($visibles as $f) {
+            if ($n++ >= $limite) break;
+            $t = $f->t;
+
+            if ($f->sinUrl) {
+                $estado = '<span class="err">sin slug</span>';
+                $acciones = '<a href="' . e(route('tecnico-estadisticas.createPorTecnico', $t->id)) . '" target="_blank">Cargar URL ▸</a>';
+            } else {
+                if (!$f->sondeado)          $estado = '<span class="warn">sin sondear</span>';
+                elseif ($f->conflicto)      $estado = '<span class="err">' . $f->conflicto . ' conflicto(s)</span>';
+                elseif ($f->nuevo)          $estado = '<span class="warn">' . $f->nuevo . ' por aplicar</span>';
+                elseif ($f->aplicado > $f->detalle) $estado = '<span class="warn">falta detalle</span>';
+                else                        $estado = '<span class="ok">listo</span>';
+
+                $acciones = '<a href="' . e(route('import_partidos.sondear',
+                        ['tecnico_id' => $t->id, 'aprender' => 1, 'guardar' => 1])) . '">Sondear</a>'
+                    . ($f->nuevo ? ' · <a href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $t->id]))
+                        . '"><b>Aplicar ' . $f->nuevo . '</b></a>' : '')
+                    . ($f->aplicado ? ' · <a href="' . e(route('import_detalles.index', ['tecnico_id' => $t->id]))
+                        . '">Detalle</a>' : '');
+            }
+
+            $filas .= '<tr>'
+                . '<td>' . e($t->nombre) . ' <span class="id">#' . (int) $t->id . '</span></td>'
+                . '<td>' . $estado . '</td>'
+                . '<td class="num">' . ($f->sondeado ? $f->duplicado : '—') . '</td>'
+                . '<td class="num">' . ($f->nuevo ? '<b class="warn">' . $f->nuevo . '</b>' : ($f->sondeado ? '0' : '—')) . '</td>'
+                . '<td class="num">' . ($f->conflicto ? '<b class="err">' . $f->conflicto . '</b>' : ($f->sondeado ? '0' : '—')) . '</td>'
+                . '<td class="num">' . ($f->aplicado ? '<b class="ok">' . $f->aplicado . '</b>' : ($f->sondeado ? '0' : '—')) . '</td>'
+                . '<td class="num">' . ($f->aplicado
+                    ? ($f->detalle . '/' . $f->aplicado) : '—') . '</td>'
+                . '<td>' . $acciones . '</td></tr>';
+        }
+
+        $html .= '<div class="scroll"><table><thead><tr><th>DT</th><th>Estado</th><th>Ya cargados</th>'
+            . '<th>Nuevos</th><th>Conflictos</th><th>Aplicados</th><th>Con detalle</th><th></th>'
+            . '</tr></thead><tbody>' . $filas . '</tbody></table></div>';
+
+        if (count($visibles) > $limite) {
+            $params = array_filter(['estado' => $filtro ?: null, 'q' => $q ?: null, 'limite' => $limite + 500]);
+            $html .= '<p class="sub">Se muestran ' . $limite . ' de ' . count($visibles) . '. '
+                . '<a href="' . e(route('import_partidos.index', $params)) . '">Mostrar 500 más</a></p>';
+        }
 
         return $this->pagina('Carga de partidos', $html);
     }
