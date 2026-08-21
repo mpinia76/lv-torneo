@@ -177,10 +177,11 @@ class ImportPartidosController extends Controller
         }
 
         $cont = ['total' => count($filas), 'excluido' => 0, 'duplicado' => 0,
-                 'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0];
+                 'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0];
         foreach ($filas as $f) {
             if (isset($cont[$f['estado']])) $cont[$f['estado']]++;
-            if ($f['estado'] === 'duplicado' && $f['motivo'] === 'ya cargado, le falta el DT') $cont['falta_dt']++;
+            if ($f['estado'] === 'duplicado' && strpos((string) $f['motivo'], 'falta el DT') !== false) $cont['falta_dt']++;
+            if (isset($f['corrido'])) $cont['corridos']++;
         }
 
         $guardadas = 0;
@@ -203,6 +204,7 @@ class ImportPartidosController extends Controller
             . $this->card($cont['total'], 'partidos')
             . $this->card($cont['excluido'], 'fuera de alcance', 'gris')
             . $this->card($cont['duplicado'], 'ya cargados', 'ok')
+            . $this->card($cont['corridos'], 'con fecha corrida', $cont['corridos'] ? 'warn' : '')
             . $this->card($cont['falta_dt'], 'sin el DT', 'warn')
             . $this->card($cont['nuevo'], 'nuevos a crear', 'ok')
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
@@ -680,6 +682,17 @@ class ImportPartidosController extends Controller
             }
 
             $partido = ($equipoId && $rivalId) ? $this->buscarPartido($equipoId, $rivalId, $f['dia']) : null;
+            $corrido = null;
+
+            // Partidos postergados: TM guarda la fecha original y vos la fecha real.
+            // Se buscan por par de equipos + localía + resultado exacto en una ventana amplia.
+            if (!$partido && $equipoId && $rivalId) {
+                $partido = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
+                                                        (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda']);
+                if ($partido) {
+                    $corrido = (int) round((strtotime(substr($partido->dia, 0, 10)) - strtotime(substr($f['dia'], 0, 10))) / 86400);
+                }
+            }
 
             if ($partido) {
                 $filas[$i]['partido_id'] = $partido->id;
@@ -687,6 +700,11 @@ class ImportPartidosController extends Controller
                 $tieneDt = DB::table('partido_tecnicos')
                     ->where('partido_id', $partido->id)->where('equipo_id', $equipoId)->exists();
                 $filas[$i]['motivo'] = $tieneDt ? 'ya cargado' : 'ya cargado, le falta el DT';
+                if ($corrido !== null) {
+                    $filas[$i]['motivo'] .= ' · fecha corrida ' . ($corrido > 0 ? '+' : '') . $corrido
+                        . ' días (tu base: ' . substr($partido->dia, 0, 10) . ')';
+                    $filas[$i]['corrido'] = $corrido;
+                }
             } elseif (!$equipoId || !$rivalId) {
                 $filas[$i]['estado'] = 'conflicto';
                 $faltan = [];
@@ -711,6 +729,43 @@ class ImportPartidosController extends Controller
             }
         }
         return $filas;
+    }
+
+    /**
+     * Busca un partido postergado: mismo par de equipos, misma localía y el
+     * MISMO resultado, dentro de una ventana amplia (±150 días).
+     *
+     * Si hay más de un candidato, desempata por el número de fecha. Si sigue
+     * habiendo empate, no devuelve nada: mejor que quede como conflicto.
+     */
+    private function buscarPartidoAplazado($equipoId, $rivalId, $dia, $local, $gf, $gc, $ronda)
+    {
+        $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -150 days'));
+        $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +150 days'));
+
+        $q = \App\Partido::whereBetween('dia', [$d0, $d1]);
+        if ($local) {
+            $q->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
+              ->where('golesl', $gf)->where('golesv', $gc);
+        } else {
+            $q->where('equipol_id', $rivalId)->where('equipov_id', $equipoId)
+              ->where('golesl', $gc)->where('golesv', $gf);
+        }
+        $cands = $q->get();
+
+        if ($cands->count() === 1) return $cands->first();
+        if ($cands->isEmpty()) return null;
+
+        // Desempate por número de fecha
+        if ($ronda !== null && $ronda !== '') {
+            $porRonda = $cands->filter(function ($p) use ($ronda) {
+                $fecha = \App\Fecha::find($p->fecha_id);
+                if (!$fecha) return false;
+                return (int) preg_replace('/\D/', '', (string) $fecha->numero) === (int) $ronda;
+            });
+            if ($porRonda->count() === 1) return $porRonda->first();
+        }
+        return null;
     }
 
     /** Cualquier partido de ese equipo ese día, sin importar el rival. */
