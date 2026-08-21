@@ -219,6 +219,8 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/scraper/equipo-transfermarkt', 'ScraperController@equipoTransfermarkt');
     Route::post('equipo-estadisticas/store-masivo', 'EquipoEstadisticaManualController@storeMasivo')
         ->name('equipo-estadisticas.storeMasivo');
+
+    Route::get('/import-partidos/sondear', 'ImportPartidosController@sondear')->name('import_partidos.sondear');
 });
 
 
