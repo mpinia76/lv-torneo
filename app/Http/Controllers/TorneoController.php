@@ -79,9 +79,15 @@ class TorneoController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(Request $request)
     {
-        //
+        // Si llega con datos por la URL (por ejemplo desde la carga de partidos
+        // del DT), se precargan en el formulario. Form::text toma el "old input",
+        // así que alcanza con flashearlos.
+        if ($request->query()) {
+            $request->flash();
+        }
+
         $torneos=Torneo::orderBy('year','DESC')->get();
         $torneosAnteriores = $torneos->pluck('full_name', 'id')->prepend('','');
         return view('torneos.create', compact( 'torneosAnteriores'));

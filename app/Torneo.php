@@ -10,7 +10,7 @@ class Torneo extends Model
          'sofa_season_id',
          'sofa_slug',
          'sofa_category_id',
-         'sofa_category_slug','goles_importados'];
+         'sofa_category_slug','goles_importados','pais','parcial'];
 
     public function grupoDetalle() {
         return $this->hasMany('App\Grupo');

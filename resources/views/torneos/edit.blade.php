@@ -88,9 +88,15 @@
             <legend>futbol360.com.ar</legend>
         <div class="row">
 
-                <div class="form-group col-xs-12 col-sm-6 col-md-5">
-                    {{Form::label('region', 'Región')}}
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    {{Form::label('pais', 'País')}}
+                    {{Form::text('pais', $torneo->pais, ['class' => 'form-control', 'placeholder' => 'Argentina'])}}
+                    <small class="text-muted">Solo para nacionales. En internacionales va vacío.</small>
+                </div>
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    {{Form::label('region', 'Región / Confederación')}}
                     {{Form::text('region', $torneo->region, ['class' => 'form-control'])}}
+                    <small class="text-muted">Para internacionales: Conmebol, FIFA, UEFA…</small>
                 </div>
                 <div class="form-group col-xs-12 col-sm-6 col-md-5">
                     {{Form::label('url_nombre', 'Nombre/s')}}

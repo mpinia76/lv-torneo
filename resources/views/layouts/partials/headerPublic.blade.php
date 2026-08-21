@@ -37,7 +37,7 @@
                                        placeholder="Buscar liga..." onkeyup="filterDropdown(this, 'ligaDropdownMenu')">
                             </li>
                             <div id="ligaDropdownMenu">
-                                @foreach($torneos as $torneo)
+                                @foreach($torneosMenu ?? $torneos as $torneo)
                                     @if($torneo->tipo=='Liga' && $torneo->ambito=='Nacional')
                                         <li><a class="dropdown-item" href="{{route('fechas.ver', ['torneoId' => $torneo->id])}}">
                                                 {{$torneo->nombre}} - {{$torneo->year}}
@@ -61,7 +61,7 @@
                                        placeholder="Buscar copa..." onkeyup="filterDropdown(this, 'copaDropdownMenu')">
                             </li>
                             <div id="copaDropdownMenu">
-                                @foreach($torneos as $torneo)
+                                @foreach($torneosMenu ?? $torneos as $torneo)
                                     @if($torneo->tipo=='Copa' && $torneo->ambito=='Nacional')
                                         <li><a class="dropdown-item" href="{{route('fechas.ver', ['torneoId' => $torneo->id])}}">
                                                 {{$torneo->nombre}} - {{$torneo->year}}
@@ -85,7 +85,7 @@
                                        placeholder="Buscar torneo..." onkeyup="filterDropdown(this, 'interDropdownMenu')">
                             </li>
                             <div id="interDropdownMenu">
-                                @foreach($torneos as $torneo)
+                                @foreach($torneosMenu ?? $torneos as $torneo)
                                     @if($torneo->ambito=='Internacional')
                                         <li><a class="dropdown-item" href="{{route('fechas.ver', ['torneoId' => $torneo->id])}}">
                                                 {{$torneo->nombre}} - {{$torneo->year}}

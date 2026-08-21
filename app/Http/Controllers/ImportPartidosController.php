@@ -301,7 +301,8 @@ class ImportPartidosController extends Controller
             if (!isset($grupos[$k])) {
                 $grupos[$k] = ['comp' => $r->competencia_external_id, 'temp' => $r->temporada,
                                'nombre' => $r->competencia_nombre, 'n' => 0,
-                               'desde' => $r->dia, 'hasta' => $r->dia, 'equipos' => []];
+                               'desde' => $r->dia, 'hasta' => $r->dia, 'equipos' => [],
+                               'equipo_id' => $r->equipo_id];
             }
             $grupos[$k]['n']++;
             if ($r->dia < $grupos[$k]['desde']) $grupos[$k]['desde'] = $r->dia;
@@ -311,8 +312,9 @@ class ImportPartidosController extends Controller
 
         $torneos = \App\Torneo::orderBy('year', 'desc')->orderBy('nombre')->get();
 
-        $html .= '<p class="sub">Cada competencia+temporada va a un torneo. Elegí uno existente o creá uno nuevo '
-              . '(se crea marcado como <b>parcial</b>: no entra en tablas de posiciones ni promedios).</p>'
+        $html .= '<p class="sub">Cada competencia+temporada va a un torneo. Elegí uno de los tuyos; si no existe, '
+              . '«Crear torneo» abre el alta de siempre con el nombre, el año, el tipo y el ámbito ya cargados. '
+              . 'Lo guardás, volvés acá, refrescás y ya aparece en la lista.</p>'
               . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Temp. TM</th><th>Partidos</th><th>Período</th><th>Equipo(s)</th><th>Torneo destino</th></tr></thead><tbody>';
 
         foreach ($grupos as $g) {
@@ -326,7 +328,7 @@ class ImportPartidosController extends Controller
             $anios[$g['temp'] . '/' . substr((string) ((int) $g['temp'] + 1), -2)] = true;
             $anios[$g['temp'] . '/' . ((int) $g['temp'] + 1)] = true;
 
-            $opts = '<option value="nuevo">— crear torneo nuevo —</option>';
+            $opts = '<option value="">— elegí el torneo —</option>';
             $yaSel = false;
             foreach ($torneos as $t) {
                 $sel = '';
@@ -350,7 +352,9 @@ class ImportPartidosController extends Controller
                 . '<input type="hidden" name="temp" value="' . e($g['temp']) . '">'
                 . '<input type="hidden" name="confirmar" value="1">'
                 . '<select name="torneo_id" class="s2" data-placeholder="elegí el torneo…">' . $opts . '</select> <button>Aplicar ' . $g['n'] . '</button>'
-                . '</form></td></tr>';
+                . '</form>'
+                . '<a class="boton-sec" target="_blank" href="' . e($this->urlCrearTorneo($g)) . '">Crear torneo ↗</a>'
+                . '</td></tr>';
         }
 
         return $this->pagina('Aplicar partidos', $html . '</tbody></table></div>');
@@ -374,25 +378,20 @@ class ImportPartidosController extends Controller
 
         $primera = $filas->first();
 
-        // 1. Torneo
-        if ($torneoId === 'nuevo' || $torneoId === '') {
-            $nombreTorneo = $primera->competencia_nombre ?: ('Competencia ' . $comp);
-            list($tipo, $ambito) = $this->clasificarCompetencia($nombreTorneo);
-            $torneo = new \App\Torneo();
-            $torneo->forceFill([
-                'nombre'     => $nombreTorneo,
-                'year'       => $temp,
-                'equipos'    => 0,
-                'grupos'     => 1,
-                'tipo'       => $tipo,
-                'ambito'     => $ambito,
-                'url_nombre' => Str::slug($nombreTorneo . '-' . $temp),
-                'parcial'    => 1,
-            ])->save();
-            $grupo = new \App\Grupo();
-            $grupo->forceFill(['nombre' => 'Único', 'torneo_id' => $torneo->id, 'equipos' => 0])->save();
-            $grupoId = $grupo->id;
-        } else {
+        // 1. Torneo: tiene que existir. Acá no se crea nada.
+        {
+            if ($torneoId === '' || $torneoId === 'nuevo') {
+                $g = ['comp' => $comp, 'temp' => $temp, 'nombre' => $primera->competencia_nombre,
+                      'desde' => $primera->dia, 'hasta' => $filas->last()->dia,
+                      'equipo_id' => $primera->equipo_id];
+                return $this->pagina('Aplicar', $volver
+                    . '<h1>Falta elegir el torneo</h1>'
+                    . '<p class="sub">No se crea ningún torneo automáticamente. Creá el torneo con el alta de siempre '
+                    . '—se abre con los datos ya cargados— y después volvé, refrescá y elegilo en la lista.</p>'
+                    . '<p><a class="boton" target="_blank" href="' . e($this->urlCrearTorneo($g)) . '">Crear torneo ↗</a> '
+                    . '<a class="boton-sec" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId])) . '">Volver a elegir</a></p>');
+            }
+
             $torneo = \App\Torneo::find((int) $torneoId);
             if (!$torneo) return $this->pagina('Aplicar', $volver . '<p class="err">No existe ese torneo.</p>');
 
@@ -514,6 +513,59 @@ class ImportPartidosController extends Controller
         return $this->pagina('Aplicar partidos', $html);
     }
 
+    /** URL del alta de torneos con los datos del grupo ya cargados en los inputs. */
+    private function urlCrearTorneo(array $g)
+    {
+        $nombre = $g['nombre'] ?: ('Competencia ' . $g['comp']);
+        list($tipo, $ambito) = $this->clasificarCompetencia($nombre);
+
+        // El año del torneo es el de los partidos, no la temporada de Transfermarkt.
+        $anio = !empty($g['desde']) ? substr($g['desde'], 0, 4) : (string) $g['temp'];
+        $anioFin = !empty($g['hasta']) ? substr($g['hasta'], 0, 4) : $anio;
+        if ($anioFin !== $anio) $anio = $anio . '/' . substr($anioFin, -2);
+
+        $params = [
+            'nombre'     => $nombre,
+            'year'       => $anio,
+            'tipo'       => $tipo,
+            'ambito'     => $ambito,
+            'grupos'     => 1,
+            'url_nombre' => Str::slug($nombre . '-' . $anio),
+        ];
+
+        if ($ambito === 'Internacional') {
+            $params['region'] = $this->confederacion($nombre);
+        } else {
+            // Nacional: el país sale del equipo dirigido.
+            $pais = 'Argentina';
+            if (!empty($g['equipo_id'])) {
+                $e = \App\Equipo::select('pais')->find($g['equipo_id']);
+                if ($e && trim((string) $e->pais) !== '') $pais = $e->pais;
+            }
+            $params['pais'] = $pais;
+        }
+
+        return route('torneos.create', $params);
+    }
+
+    /** Confederación probable a partir del nombre de la competencia. */
+    private function confederacion($nombre)
+    {
+        $n = $this->normalizaTexto($nombre);
+        $mapa = [
+            'Conmebol' => ['libertadores', 'sudamericana', 'recopa', 'merconorte', 'mercosur', 'conmebol'],
+            'FIFA'     => ['intercontinental', 'mundial de clubes', 'club world', 'fifa'],
+            'UEFA'     => ['champions', 'europa league', 'uefa', 'conference', 'supercopa de europa'],
+            'Concacaf' => ['concacaf', 'concachampions'],
+        ];
+        foreach ($mapa as $conf => $claves) {
+            foreach ($claves as $k) {
+                if (strpos($n, $k) !== false) return $conf;
+            }
+        }
+        return '';
+    }
+
     /** Agrega el partido_tecnico en partidos que ya estaban cargados sin este DT. */
     private function completarTecnicos($tecnicoId)
     {
@@ -580,6 +632,22 @@ class ImportPartidosController extends Controller
         $filas = [];
         $rows = DB::table('import_partidos')->where('tecnico_id', $tecnicoId)->orderBy('dia', 'desc')->get();
         foreach ($rows as $r) {
+            // Si tenemos el JSON crudo, lo volvemos a interpretar: así los arreglos
+            // de lógica (localía, fechas, etc.) valen también para lo ya guardado,
+            // sin tener que bajar todo de nuevo.
+            $g = $r->payload ? json_decode($r->payload, true) : null;
+            if (is_array($g) && !empty($g)) {
+                $f = $this->normalizar($g, $r->coach_external_id);
+                // Los nombres ya resueltos se conservan: no volvemos a pedirlos a tmapi.
+                if ($r->competencia_nombre) $f['competencia_nombre'] = $r->competencia_nombre;
+                if ($r->club_nombre)        $f['club_nombre']        = $r->club_nombre;
+                if ($r->rival_nombre)       $f['rival_nombre']       = $r->rival_nombre;
+                $f['aplicado'] = $r->estado === 'aplicado';
+                $f['partido_aplicado'] = $r->partido_id;
+                $filas[] = $f;
+                continue;
+            }
+
             $filas[] = [
                 'external_id'             => $r->external_id,
                 'competencia_external_id' => $r->competencia_external_id,
