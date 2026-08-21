@@ -64,6 +64,8 @@ class TmDetallePartido
     /** En la vista previa los jugadores que se crearían llevan un id negativo. */
     private $nombresPreview = [];
     private $proximoPreview = -1;
+    /** tm_club_id -> equipo_id sacado de la fila de import_partidos del partido. */
+    private $mapaStaging = [];
 
     // ═════════════════════════════════ API ═════════════════════════════════
 
@@ -119,7 +121,10 @@ class TmDetallePartido
         $informe['crudo'] = $game;
 
         // ── 2) Qué lado de Transfermarkt es nuestro local ──────────────────
-        $lados = $this->orientar($game, $partido);
+        // La fila de staging que creó este partido ya trae resueltos los dos
+        // clubes (a veces por nombre, sin que hayan quedado en equipo_tm).
+        $this->mapaStaging = $this->mapaDesdeStaging($partido->id);
+        $lados = $this->orientar($game, $partido, $escribir);
         if ($lados === null) {
             $informe['error'] = $this->ultimoAviso() ?: 'No pude aparear los clubes del partido con los de la base.';
             $informe['avisos'] = $this->avisos;
@@ -293,7 +298,7 @@ class TmDetallePartido
      * cada equipo nuestro. Si no coinciden, aborta: mejor no cargar nada que
      * cargar la alineación del rival.
      */
-    private function orientar(array $game, Partido $partido)
+    private function orientar(array $game, Partido $partido, $escribir = false)
     {
         $mapaEq = $this->mapaEquipos();
 
@@ -303,9 +308,39 @@ class TmDetallePartido
         $idLocal = ($tmLocal !== null && isset($mapaEq[(string) $tmLocal])) ? $mapaEq[(string) $tmLocal] : null;
         $idVisit = ($tmVisit !== null && isset($mapaEq[(string) $tmVisit])) ? $mapaEq[(string) $tmVisit] : null;
 
+        // 1er rescate: la fila de staging ya sabe a qué equipo corresponde cada
+        // club de este partido, aunque el mapeo nunca haya llegado a equipo_tm
+        // (el importador de partidos también resuelve por nombre).
+        if (!$idLocal && $tmLocal !== null && isset($this->mapaStaging[(string) $tmLocal])) {
+            $idLocal = (int) $this->mapaStaging[(string) $tmLocal];
+            $this->aprenderClub($tmLocal, $idLocal, 'staging', $escribir);
+        }
+        if (!$idVisit && $tmVisit !== null && isset($this->mapaStaging[(string) $tmVisit])) {
+            $idVisit = (int) $this->mapaStaging[(string) $tmVisit];
+            $this->aprenderClub($tmVisit, $idVisit, 'staging', $escribir);
+        }
+
+        // 2do rescate: si un lado quedó resuelto y coincide con uno de los dos
+        // equipos del partido, el otro lado es necesariamente el que sobra.
+        $pl0 = (int) $partido->equipol_id;
+        $pv0 = (int) $partido->equipov_id;
+        if ($idLocal && !$idVisit && ($idLocal === $pl0 || $idLocal === $pv0) && $tmVisit !== null) {
+            $idVisit = ($idLocal === $pl0) ? $pv0 : $pl0;
+            $this->aprenderClub($tmVisit, $idVisit, 'inferido', $escribir);
+            $this->aviso('Deduje que el club de Transfermarkt #' . $tmVisit . ' es '
+                . $this->nombreEquipo($idVisit) . ' (era el único que quedaba en el partido).');
+        } elseif ($idVisit && !$idLocal && ($idVisit === $pl0 || $idVisit === $pv0) && $tmLocal !== null) {
+            $idLocal = ($idVisit === $pl0) ? $pv0 : $pl0;
+            $this->aprenderClub($tmLocal, $idLocal, 'inferido', $escribir);
+            $this->aviso('Deduje que el club de Transfermarkt #' . $tmLocal . ' es '
+                . $this->nombreEquipo($idLocal) . ' (era el único que quedaba en el partido).');
+        }
+
         if (!$idLocal || !$idVisit) {
             $this->aviso('Club de Transfermarkt sin mapear en equipo_tm: '
-                . ($idLocal ? '' : 'local #' . $tmLocal . ' ') . ($idVisit ? '' : 'visitante #' . $tmVisit));
+                . ($idLocal ? '' : 'local #' . $tmLocal . ' ') . ($idVisit ? '' : 'visitante #' . $tmVisit)
+                . '. Atalo desde la carga de partidos (el sondeo del DT aprende los mapeos) '
+                . 'o insertá la fila a mano en equipo_tm.');
             return null;
         }
 
@@ -709,6 +744,40 @@ class TmDetallePartido
             $mapa[(string) $r->tm_club_id] = (int) $r->equipo_id;
         }
         return $this->mapaEquipos = $mapa;
+    }
+
+    /**
+     * tm_club_id -> equipo_id según la fila de `import_partidos` que originó
+     * este partido. El importador de partidos resuelve los clubes por clubId
+     * *o por nombre*, y en el segundo caso el mapeo nunca queda guardado en
+     * `equipo_tm`. Acá lo recuperamos de la fila y lo aprendemos.
+     */
+    private function mapaDesdeStaging($partidoId)
+    {
+        $mapa = [];
+        $filas = DB::table('import_partidos')->where('partido_id', (int) $partidoId)
+            ->select('club_external_id', 'equipo_id', 'rival_external_id', 'rival_id')->get();
+        foreach ($filas as $f) {
+            if ($f->club_external_id && $f->equipo_id)   $mapa[(string) $f->club_external_id]  = (int) $f->equipo_id;
+            if ($f->rival_external_id && $f->rival_id)   $mapa[(string) $f->rival_external_id] = (int) $f->rival_id;
+        }
+        return $mapa;
+    }
+
+    /** Deja el club atado en equipo_tm (sólo cuando estamos escribiendo de verdad). */
+    private function aprenderClub($tmClubId, $equipoId, $origen, $escribir)
+    {
+        if ($this->mapaEquipos !== null) $this->mapaEquipos[(string) $tmClubId] = (int) $equipoId;
+        if (!$escribir) return;
+        try {
+            DB::table('equipo_tm')->updateOrInsert(
+                ['tm_club_id' => (string) $tmClubId],
+                ['equipo_id' => (int) $equipoId, 'nombre_tm' => $this->nombreEquipo($equipoId),
+                    'origen' => $origen, 'updated_at' => now(), 'created_at' => now()]
+            );
+        } catch (\Exception $e) {
+            $this->aviso('No pude guardar el mapeo del club ' . $tmClubId . ': ' . $e->getMessage());
+        }
     }
 
     public function guardarMapeoJugador($tmId, $jugadorId, $nombre, $origen, $revisar)
