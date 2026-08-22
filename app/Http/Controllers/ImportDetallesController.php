@@ -791,50 +791,13 @@ class ImportDetallesController extends Controller
         return '<div class="card ' . $tono . '"><b>' . (int) $n . '</b><span>' . e($label) . '</span></div>';
     }
 
+    /**
+     * Estas pantallas se arman como HTML acá y se muestran dentro del layout
+     * de administración (`resources/views/import/pagina.blade.php`), para tener
+     * el menú de siempre. El CSS vive allá, prefijado con `.import-tm`.
+     */
     private function pagina($titulo, $cuerpo)
     {
-        $css = '
-            body{font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:24px 28px;color:#1a1f1c;background:#f7f8f6}
-            h1{font-size:22px;margin:0 0 4px} h2{font-size:16px;margin:28px 0 8px}
-            .sub{color:#6b7a73;margin:0 0 8px;font-size:12.5px}
-            .acciones{margin:12px 0} .acciones a{margin-right:6px}
-            a{color:#15714e}
-            a.boton{display:inline-block;background:#15714e;color:#fff;padding:5px 12px;text-decoration:none;font-weight:600}
-            a.boton:hover{background:#0f5a3d}
-            a.boton-sec{display:inline-block;padding:4px 10px;border:1px solid #c7cec7;background:#eef1ec;color:#15714e;text-decoration:none;font-size:12px}
-            a.boton-sec:hover{background:#e2e8e1}
-            .diag{background:#fff;border:1px solid #dde2dd;padding:14px 16px;font-size:13px}
-            .diag code{background:#eef1ec;padding:1px 5px;font-size:12px}
-            pre{font-size:11px;max-height:420px;overflow:auto;background:#f0f3ef;padding:10px}
-            .cards{display:flex;flex-wrap:wrap;gap:1px;background:#dde2dd;border:1px solid #dde2dd;margin:14px 0}
-            .card{background:#fff;padding:10px 16px;min-width:110px}
-            .card b{display:block;font-size:20px} .card span{font-size:11px;color:#6b7a73;text-transform:uppercase;letter-spacing:.06em}
-            .card.ok b{color:#15714e} .card.err b{color:#9c3529} .card.warn b{color:#8a5d00} .card.gris b{color:#9aa69f}
-            .ok-box{background:#ddede4;border:1px solid #15714e;padding:10px 14px}
-            .err-box{background:#f6e2de;border:1px solid #9c3529;padding:10px 14px}
-            .err{color:#9c3529} .ok{color:#15714e} .warn{color:#8a5d00}
-            tr.warn td{background:#fdf6e6}
-            .scroll{overflow:auto;border:1px solid #dde2dd;background:#fff;max-height:70vh}
-            table{border-collapse:collapse;width:100%;font-size:12.5px}
-            th,td{padding:6px 10px;border-bottom:1px solid #eceee9;text-align:left;white-space:nowrap}
-            thead th{position:sticky;top:0;background:#eef1ec;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
-            td.num{font-variant-numeric:tabular-nums}
-            .id{color:#9aa69f;font-size:11px}
-            input,button,select{font:13px inherit;padding:3px 6px;border:1px solid #c7cec7;background:#fff}
-            button{cursor:pointer;background:#eef1ec}
-            details summary{cursor:pointer;color:#15714e;margin-top:6px}
-            .select2-container{vertical-align:middle}
-            .select2-container--default .select2-selection--single{border-color:#c7cec7;border-radius:0;height:28px}
-            .select2-container--default .select2-selection--single .select2-selection__rendered{line-height:26px;font-size:13px}
-            .select2-container--default .select2-selection--single .select2-selection__arrow{height:26px}
-        ';
-        $assets = '<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">'
-            . '<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.3/jquery.min.js"></script>'
-            . '<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>';
-        $init = '<script>$(function(){$(".s2").each(function(){'
-            . '$(this).select2({width:"320px",placeholder:$(this).data("placeholder")||"",allowClear:true});});});</script>';
-
-        return response('<!doctype html><meta charset="utf-8"><title>' . e($titulo) . '</title>'
-            . $assets . '<style>' . $css . '</style>' . $cuerpo . $init);
+        return view('import.pagina', ['titulo' => $titulo, 'cuerpo' => $cuerpo]);
     }
 }
