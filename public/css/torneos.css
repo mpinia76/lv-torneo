@@ -1,0 +1,544 @@
+/* ==========================================================================
+   torneos.css — sistema visual del sitio público
+   --------------------------------------------------------------------------
+   Se carga DESPUÉS de Bootstrap 5.3 y hace dos cosas:
+     1. redefine los tokens (color, tipografía, radios) y los mapea a las
+        variables de Bootstrap, para claro y oscuro;
+     2. define las piezas propias del sitio: escudos, filas de partido,
+        tablas de datos, tira de forma, chips.
+   Regla: el acento (azul) nunca se usa para resultados. Verde/gris/rojo son
+   ganó/empató/perdió, y amarillo/rojo saturados son las tarjetas.
+   ========================================================================== */
+
+/* ---------- 1. TOKENS ---------------------------------------------------- */
+
+:root {
+    /* neutros con leve sesgo verde-gris */
+    --t-bg:            #EDEFEB;
+    --t-surface:       #FFFFFF;
+    --t-surface-2:     #F5F7F3;
+    --t-ink:           #11171A;
+    --t-ink-2:         #3C464A;
+    --t-muted:         #6B7679;
+    --t-line:          #DCE0DA;
+    --t-line-strong:   #C4CAC1;
+
+    /* acento: azul de planilla */
+    --t-accent:        #1746A2;
+    --t-accent-ink:    #FFFFFF;
+    --t-accent-soft:   #E7EDF8;
+    --t-accent-hover:  #0F3278;
+
+    /* resultado */
+    --t-win:           #1E7F4E;
+    --t-draw:          #8A8F93;
+    --t-loss:          #B0392C;
+
+    /* juego */
+    --t-amarilla:      #EAB308;
+    --t-roja:          #D33B2C;
+    --t-vivo:          #D33B2C;
+
+    --t-radius:        10px;
+    --t-radius-sm:     6px;
+    --t-shadow:        0 1px 2px rgba(17,23,26,.05), 0 6px 20px -12px rgba(17,23,26,.22);
+
+    --t-fuente-titulo: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --t-fuente-texto:  'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --t-fuente-dato:   'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+    /* mapeo a Bootstrap 5.3 */
+    --bs-body-bg:           var(--t-bg);
+    --bs-body-color:        var(--t-ink);
+    --bs-body-font-family:  var(--t-fuente-texto);
+    --bs-body-font-size:    .9375rem;
+    --bs-border-color:      var(--t-line);
+    --bs-secondary-color:   var(--t-muted);
+    --bs-emphasis-color:    var(--t-ink);
+    --bs-link-color:        var(--t-accent);
+    --bs-link-hover-color:  var(--t-accent-hover);
+    --bs-primary:           var(--t-accent);
+    --bs-primary-rgb:       23, 70, 162;
+    --bs-secondary-bg:      var(--t-surface-2);
+    --bs-tertiary-bg:       var(--t-surface-2);
+}
+
+[data-bs-theme="dark"] {
+    --t-bg:            #0D1113;
+    --t-surface:       #151A1D;
+    --t-surface-2:     #1B2124;
+    --t-ink:           #E8EDE9;
+    --t-ink-2:         #B9C2BD;
+    --t-muted:         #8A948F;
+    --t-line:          #242B2E;
+    --t-line-strong:   #333C40;
+
+    --t-accent:        #7BA5FF;
+    --t-accent-ink:    #0D1113;
+    --t-accent-soft:   #1B2534;
+    --t-accent-hover:  #9BBBFF;
+
+    --t-win:           #4CB380;
+    --t-draw:          #8A948F;
+    --t-loss:          #E0705F;
+    --t-amarilla:      #F5CE3E;
+    --t-roja:          #E0705F;
+    --t-vivo:          #E0705F;
+
+    --t-shadow:        0 1px 2px rgba(0,0,0,.4), 0 10px 26px -16px rgba(0,0,0,.8);
+
+    --bs-primary-rgb:  123, 165, 255;
+}
+
+/* ---------- 2. BASE ------------------------------------------------------ */
+
+body {
+    background: var(--t-bg);
+    color: var(--t-ink);
+    font-family: var(--t-fuente-texto);
+    font-size: .9375rem;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .h1, .h2, .h3, .h4 {
+    font-family: var(--t-fuente-titulo);
+    letter-spacing: -.015em;
+}
+h1, .h1 { font-size: 1.625rem; font-weight: 700; }
+h2, .h2 { font-size: 1.1875rem; font-weight: 700; }
+h3, .h3 { font-size: .9375rem; font-weight: 600; }
+
+a { color: var(--t-accent); text-decoration: none; }
+a:hover { color: var(--t-accent-hover); }
+
+.t-eyebrow {
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--t-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+.t-mono { font-family: var(--t-fuente-dato); }
+.t-num  { font-variant-numeric: tabular-nums; }
+
+.t-cabecera {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 18px 0 12px;
+}
+
+/* ---------- 3. PANEL (card del sitio) ------------------------------------ */
+
+.t-panel {
+    background: var(--t-surface);
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius);
+    box-shadow: var(--t-shadow);
+    overflow: hidden;
+}
+.t-panel + .t-panel { margin-top: 14px; }
+.t-panel-cuerpo { padding: 14px; }
+.t-panel-pie {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 10px 14px;
+    border-top: 1px solid var(--t-line);
+    font-size: 12px;
+    color: var(--t-muted);
+}
+
+/* ---------- 4. ESCUDOS --------------------------------------------------- */
+/* Clubes y torneos comparten la pieza: caja cuadrada, imagen contenida.
+   Cuando no hay archivo cargado, la misma caja muestra las iniciales.       */
+
+.escudo {
+    width: 22px; height: 22px;
+    flex: none;
+    object-fit: contain;
+    vertical-align: middle;
+    display: inline-block;
+}
+.escudo-sm { width: 18px; height: 18px; }
+.escudo-lg { width: 40px; height: 40px; }
+.escudo-xl { width: 56px; height: 56px; }
+
+/* en oscuro, placa clara detrás: hay escudos con mucho negro */
+[data-bs-theme="dark"] .escudo {
+    background-color: rgba(255,255,255,.90);
+    border-radius: 5px;
+    padding: 2px;
+}
+
+.escudo-txt {
+    display: inline-grid;
+    place-items: center;
+    background: var(--t-accent-soft);
+    color: var(--t-accent);
+    border-radius: 5px;
+    font-family: var(--t-fuente-dato);
+    font-size: 8.5px;
+    font-weight: 500;
+    letter-spacing: -.02em;
+    padding: 0;
+}
+.escudo-txt.escudo-sm { font-size: 7px; }
+.escudo-txt.escudo-lg { font-size: 13px; }
+.escudo-txt.escudo-xl { font-size: 18px; }
+[data-bs-theme="dark"] .escudo-txt { background: var(--t-accent-soft); padding: 0; }
+
+.bandera {
+    width: 15px; height: 11px;
+    border-radius: 2px;
+    flex: none;
+    object-fit: cover;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.18);
+    vertical-align: middle;
+}
+
+/* ---------- 5. NAVEGACIÓN ------------------------------------------------ */
+
+.t-navbar {
+    background: color-mix(in srgb, var(--t-surface) 88%, transparent);
+    border-bottom: 1px solid var(--t-line);
+    backdrop-filter: saturate(1.4) blur(10px);
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+    .t-navbar { background: var(--t-surface); }
+}
+.t-navbar .navbar-brand {
+    font-family: var(--t-fuente-titulo);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: -.02em;
+    color: var(--t-ink);
+    display: flex; align-items: center; gap: 9px;
+}
+.t-navbar .navbar-nav { flex-wrap: wrap; }
+.t-navbar .nav-link {
+    color: var(--t-ink-2);
+    font-size: .875rem;
+    font-weight: 500;
+    padding: .4rem .7rem;
+    border-radius: var(--t-radius-sm);
+}
+.t-navbar .nav-link:hover,
+.t-navbar .nav-link:focus { color: var(--t-ink); background: var(--t-surface-2); }
+.t-navbar .nav-link.active,
+.t-navbar .show > .nav-link { color: var(--t-accent); background: var(--t-accent-soft); font-weight: 600; }
+
+.t-navbar .dropdown-menu {
+    --bs-dropdown-bg: var(--t-surface);
+    --bs-dropdown-link-color: var(--t-ink-2);
+    --bs-dropdown-link-hover-bg: var(--t-surface-2);
+    --bs-dropdown-link-hover-color: var(--t-ink);
+    --bs-dropdown-border-color: var(--t-line);
+    border-radius: var(--t-radius-sm);
+    box-shadow: var(--t-shadow);
+    max-height: 70vh;
+    overflow-y: auto;
+    font-size: .875rem;
+}
+
+.t-boton-icono {
+    width: 32px; height: 32px;
+    display: grid; place-items: center;
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius-sm);
+    background: var(--t-surface);
+    color: var(--t-ink-2);
+    cursor: pointer;
+    flex: none;
+    padding: 0;
+}
+.t-boton-icono:hover { background: var(--t-surface-2); color: var(--t-ink); }
+
+.t-seg {
+    display: inline-flex;
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius-sm);
+    overflow: hidden;
+    background: var(--t-surface);
+}
+.t-seg button {
+    border: 0; background: transparent;
+    padding: 5px 9px;
+    font-size: 12px;
+    color: var(--t-muted);
+    cursor: pointer;
+}
+.t-seg button.activo { background: var(--t-accent-soft); color: var(--t-accent); font-weight: 600; }
+
+/* barra del torneo elegido */
+.t-barra-torneo {
+    background: var(--t-surface-2);
+    border-bottom: 1px solid var(--t-line);
+}
+.t-barra-torneo .t-barra-inner {
+    display: flex; align-items: center; gap: 14px;
+    min-height: 44px;
+    overflow-x: auto;
+}
+.t-barra-torneo .t-barra-titulo {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: .84375rem;
+    white-space: nowrap;
+    color: var(--t-ink);
+}
+.t-barra-torneo .nav-link {
+    padding: 5px 10px;
+    border-radius: 99px;
+    font-size: .8125rem;
+    color: var(--t-muted);
+    white-space: nowrap;
+}
+.t-barra-torneo .nav-link:hover { color: var(--t-ink); background: var(--t-surface); }
+.t-barra-torneo .nav-link.active { background: var(--t-ink); color: var(--t-bg); font-weight: 600; }
+
+/* ---------- 6. LISTA DE PARTIDOS ----------------------------------------- */
+
+.t-grupo {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 14px;
+    background: var(--t-surface-2);
+    border-bottom: 1px solid var(--t-line);
+    border-top: 1px solid var(--t-line);
+}
+.t-grupo:first-child { border-top: 0; }
+.t-grupo .t-grupo-nombre {
+    font-family: var(--t-fuente-titulo);
+    font-weight: 600;
+    font-size: .84375rem;
+    color: var(--t-ink);
+}
+.t-grupo .t-sep { color: var(--t-line-strong); }
+
+.t-partido {
+    display: grid;
+    grid-template-columns: 52px 1fr auto 1fr 96px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--t-line);
+    cursor: pointer;
+    transition: background .12s ease;
+}
+.t-partido:last-child { border-bottom: 0; }
+.t-partido:hover { background: var(--t-surface-2); }
+.t-partido .t-hora {
+    font-family: var(--t-fuente-dato);
+    font-size: 12px;
+    color: var(--t-muted);
+    font-variant-numeric: tabular-nums;
+}
+.t-partido .t-equipo {
+    display: flex; align-items: center; gap: 8px;
+    min-width: 0;
+    color: var(--t-ink-2);
+}
+.t-partido .t-equipo.local { justify-content: flex-end; text-align: right; }
+.t-partido .t-equipo a { color: inherit; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-partido .t-equipo.gana { color: var(--t-ink); }
+.t-partido .t-equipo.gana a { font-weight: 600; }
+
+.t-marcador {
+    font-family: var(--t-fuente-titulo);
+    font-weight: 700;
+    font-size: 1.0625rem;
+    font-variant-numeric: tabular-nums;
+    background: var(--t-surface-2);
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius-sm);
+    padding: 2px 10px;
+    white-space: nowrap;
+    color: var(--t-ink);
+}
+.t-marcador small { font-size: 11px; font-weight: 500; color: var(--t-muted); }
+.t-partido .t-estado { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+.t-partido .t-chevron { color: var(--t-line-strong); }
+
+@media (max-width: 640px) {
+    .t-partido {
+        grid-template-columns: 1fr auto;
+        grid-template-areas: "meta meta" "local marcador" "visita marcador";
+        gap: 4px 10px;
+        padding: 10px 12px;
+    }
+    .t-partido .t-hora { grid-area: meta; display: flex; align-items: center; gap: 8px; }
+    .t-partido .t-equipo.local { grid-area: local; justify-content: flex-start; text-align: left; }
+    .t-partido .t-equipo.visita { grid-area: visita; }
+    .t-partido .t-marcador { grid-area: marcador; align-self: center; }
+    .t-partido .t-estado { display: none; }
+}
+
+/* ---------- 7. CHIPS ----------------------------------------------------- */
+
+.t-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: var(--t-surface-2);
+    color: var(--t-muted);
+    border: 1px solid var(--t-line);
+    white-space: nowrap;
+}
+.t-chip-acento { background: var(--t-accent-soft); color: var(--t-accent); border-color: var(--t-accent-soft); }
+.t-chip-vivo   { background: var(--t-surface); color: var(--t-vivo); border-color: var(--t-vivo); }
+.t-chip-vivo .t-punto {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--t-vivo);
+    animation: t-latido 1.6s ease-in-out infinite;
+}
+@keyframes t-latido { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+@media (prefers-reduced-motion: reduce) { .t-chip-vivo .t-punto { animation: none } }
+
+/* ---------- 8. TABLAS DE DATOS ------------------------------------------- */
+
+.t-tabla-wrap { overflow-x: auto; }
+
+table.t-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .84375rem;
+    margin: 0;
+    color: var(--t-ink);
+}
+table.t-tabla th {
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--t-muted);
+    font-weight: 500;
+    text-align: right;
+    padding: 9px 8px;
+    border-bottom: 1px solid var(--t-line-strong);
+    white-space: nowrap;
+    background: var(--t-surface);
+}
+table.t-tabla th:nth-child(-n+2) { text-align: left; }
+table.t-tabla td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--t-line);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+table.t-tabla td:nth-child(-n+2) { text-align: left; }
+table.t-tabla tbody tr:hover { background: var(--t-surface-2); }
+table.t-tabla td.t-pts { font-weight: 700; font-family: var(--t-fuente-titulo); }
+table.t-tabla .t-nombre { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+
+/* franja de zona en la columna de posición */
+.t-pos {
+    position: relative;
+    padding-left: 16px !important;
+    color: var(--t-muted);
+    font-family: var(--t-fuente-dato);
+    font-size: 12px;
+}
+.t-pos::before {
+    content: "";
+    position: absolute; left: 0; top: 2px; bottom: 2px;
+    width: 3px; border-radius: 2px;
+    background: transparent;
+}
+tr.t-clasifica  .t-pos::before { background: var(--t-win); }
+tr.t-repechaje  .t-pos::before { background: var(--t-accent); }
+tr.t-desciende  .t-pos::before { background: var(--t-loss); }
+
+/* tira de últimos resultados */
+.t-forma { display: inline-flex; gap: 3px; }
+.t-forma i {
+    width: 15px; height: 15px; border-radius: 3px;
+    display: grid; place-items: center;
+    font-style: normal; font-size: 9px; font-weight: 700;
+    font-family: var(--t-fuente-titulo);
+    color: #fff;
+}
+.t-forma .g { background: var(--t-win); }
+.t-forma .e { background: var(--t-draw); }
+.t-forma .p { background: var(--t-loss); }
+
+.t-referencia { display: inline-flex; align-items: center; gap: 6px; }
+.t-referencia i { width: 3px; height: 13px; border-radius: 2px; display: block; }
+
+/* tarjetas */
+.t-tarjeta-a, .t-tarjeta-r {
+    width: 9px; height: 13px; border-radius: 1.5px;
+    display: inline-block; vertical-align: -1px;
+}
+.t-tarjeta-a { background: var(--t-amarilla); }
+.t-tarjeta-r { background: var(--t-roja); }
+
+/* ---------- 9. DENSIDAD -------------------------------------------------- */
+
+body[data-densidad="compacto"] .t-partido { padding-block: 5px; }
+body[data-densidad="compacto"] table.t-tabla td { padding-block: 4px; }
+body[data-densidad="compacto"] .table > :not(caption) > * > * { padding-block: .25rem; }
+
+/* ---------- 10. PIE ------------------------------------------------------ */
+
+.t-pie {
+    border-top: 1px solid var(--t-line);
+    margin-top: 26px;
+    padding: 18px 0;
+    color: var(--t-muted);
+    font-size: 12.5px;
+    background: var(--t-surface);
+}
+.t-pie .t-pie-inner { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* ---------- 11. HEREDADO DE app.css -------------------------------------- */
+/* Se conserva lo que las vistas todavía usan. */
+
+.imgCircle { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+.image-cropper { width: 50px; height: 50px; position: relative; overflow: hidden; border-radius: 50%; }
+
+/* sin subrayado en enlaces, como venía el sitio */
+a, a:hover { text-decoration: none; }
+
+/* sin flechitas en los inputs numéricos */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* ---------- 12. AGREGADOS DE LISTA --------------------------------------- */
+
+.t-subgrupo {
+    display: flex; align-items: center; gap: 9px;
+    padding: 6px 14px;
+    background: var(--t-surface);
+    border-bottom: 1px solid var(--t-line);
+    color: var(--t-ink-2);
+    font-size: .8125rem;
+}
+.t-subgrupo .t-dia-nombre { font-weight: 500; }
+.t-subgrupo .t-dia-nombre::first-letter { text-transform: uppercase; }
+
+.t-navdia {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; flex-wrap: wrap;
+}
+.t-navdia .form-control { max-width: 190px; text-align: center; }
+
+/* compatibilidad con clases de Bootstrap 4 que quedaron en algunas vistas */
+.float-right { float: right !important; }
+.float-left  { float: left  !important; }
+.table .thead-light th {
+    color: var(--t-ink-2);
+    background-color: var(--t-surface-2);
+    border-color: var(--t-line);
+}
+.table .thead-dark th {
+    color: var(--t-surface);
+    background-color: var(--t-ink);
+    border-color: var(--t-line-strong);
+}
+.profile-pic { display: inline; margin: 0 auto 0 -25%; height: 100%; width: auto; }
