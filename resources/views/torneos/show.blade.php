@@ -54,7 +54,7 @@
             <a href="{{route('torneos.finalizar',  array('torneoId' => $torneo->id))}}" class="btn btn-info m-1">Guardar Posiciones</a>
             <a href="{{route('incidencias.index',  array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Incidencias</a>
             @if(trim((string) $torneo->tm_competition_id) !== '')
-                <a href="{{ route('import_partidos.fixture', ['torneo_id' => $torneo->id, 'guardar' => 1]) }}"
+                <a href="{{ route('import_partidos.fixture', ['torneo_id' => $torneo->id]) }}"
                    class="btn btn-warning m-1"
                    title="Baja el fixture de este torneo desde Transfermarkt">Fixture (TM)</a>
             @else
