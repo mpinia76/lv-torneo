@@ -250,17 +250,57 @@ class ImportPartidosController extends Controller
             }
         }
 
+        // Si viene un torneo tuyo, la competencia sale de ahí.
+        $torneoElegido = null;
+        if ((int) $request->get('torneo_id')) {
+            $torneoElegido = \App\Torneo::find((int) $request->get('torneo_id'));
+            if ($torneoElegido && trim((string) $torneoElegido->tm_competition_id) !== '') {
+                $comp = trim((string) $torneoElegido->tm_competition_id);
+            }
+        }
+
+        $conTm = \App\Torneo::whereNotNull('tm_competition_id')->where('tm_competition_id', '!=', '')
+            ->orderBy('year', 'desc')->orderBy('nombre')->get();
+
+        $opts = '<option value="">— elegí un torneo tuyo —</option>';
+        foreach ($conTm as $t) {
+            $sel = ($torneoElegido && $torneoElegido->id === $t->id) ? ' selected' : '';
+            $opts .= '<option value="' . $t->id . '"' . $sel . '>'
+                . e($t->nombre . ' ' . $t->year . '  ·  ' . $t->tm_competition_id) . '</option>';
+        }
+
         $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Fixture por competencia</h1>'
             . '<p class="sub">Baja el fixture completo del torneo con <b>una</b> llamada y lo deja listo para '
             . 'aplicar fecha por fecha. Reemplaza la carga del Excel. El detalle de cada partido '
-            . '(alineaciones, goles, tarjetas) lo trae después la pantalla de siempre.<br>'
-            . 'El id de competencia sale de <code>primaryCompetitionId</code> de un club o de '
-            . '<code>import_partidos.competencia_external_id</code>. Ej: <code>ARGC</code>, <code>ARG1</code>.</p>'
-            . '<form method="get" style="margin:12px 0">'
-            . '<input name="comp" value="' . e($comp) . '" placeholder="competencia, ej ARGC" size="16"> '
-            . '<input type="hidden" name="guardar" value="1">'
-            . '<button>Bajar fixture</button> <span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>';
+            . '(alineaciones, goles, tarjetas) lo trae después la pantalla de siempre.</p>';
+
+        if ($conTm->isEmpty()) {
+            $html .= '<div class="err-box">Ningún torneo tuyo tiene cargado el id de competencia de Transfermarkt. '
+                . 'Averigualo con el buscador de abajo y guardalo en <b>Editar torneo → transfermarkt.com</b>. '
+                . 'Se hace una sola vez por torneo.</div>';
+        } else {
+            $html .= '<form method="get" style="margin:12px 0">'
+                . '<select name="torneo_id" class="s2" data-placeholder="elegí un torneo tuyo…">' . $opts . '</select> '
+                . '<input type="hidden" name="guardar" value="1">'
+                . '<button>Bajar fixture</button> '
+                . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>';
+        }
+
+        $html .= '<details' . ($comp === '' ? ' open' : '') . '><summary>No sé el id de competencia de un torneo</summary>'
+            . '<div class="diag" style="margin-top:8px">'
+            . '<p class="sub">El fixture de un club lista <b>todas</b> las competencias que juega, con sus ids. '
+            . 'Poné un club de Transfermarkt que participe del torneo que buscás y te las muestro. '
+            . 'Después copiá el id en <b>Editar torneo → transfermarkt.com</b>.</p>'
+            . '<form method="get">'
+            . '<input name="descubrir" value="' . e((string) $request->get('descubrir', '')) . '" placeholder="club TM, ej 1029 (Vélez)" size="22"> '
+            . '<button>Buscar competencias</button> <span class="sub">2 créditos</span></form>'
+            . $this->bloqueDescubrirCompetencias($request)
+            . '<p class="sub" style="margin-top:10px">También podés escribir el id a mano: '
+            . '<form method="get" style="display:inline">'
+            . '<input name="comp" value="' . e($comp) . '" placeholder="ej ARGC" size="12"> '
+            . '<input type="hidden" name="guardar" value="1"><button>Bajar</button></form></p>'
+            . '</div></details>';
 
         foreach ($avisos as $a) $html .= '<p class="ok-box">' . $a . '</p>';
 
@@ -375,6 +415,77 @@ class ImportPartidosController extends Controller
         $html .= '<h2>' . $titulo . '</h2>' . $this->tablaFixture($filas, $filtro, $gameday);
 
         return $this->pagina('Fixture por competencia', $html);
+    }
+
+    /**
+     * Buscador de ids de competencia.
+     *
+     * No hay forma de adivinar que "Clausura 2026" es `ARGC`. Pero el fixture de
+     * un club lista todas las competencias que juega, con su id y su temporada:
+     * con un club por país se descubren la liga, la copa nacional y las de
+     * Conmebol de una sola vez.
+     *
+     * Cuesta 2 llamadas: el fixture del club y los nombres de las competencias.
+     */
+    private function bloqueDescubrirCompetencias(Request $request)
+    {
+        $clubId = trim((string) $request->get('descubrir', ''));
+        if ($clubId === '') return '';
+
+        $resp = HttpHelper::getJson(self::TMAPI . '/club/' . rawurlencode($clubId) . '/fixtures');
+        if (!is_array($resp)) {
+            return '<p class="err-box">No pude traer el fixture del club ' . e($clubId) . '.</p>';
+        }
+        $data = isset($resp['data']) ? $resp['data'] : $resp;
+        $juegos = isset($data['games']) && is_array($data['games']) ? $data['games'] : [];
+        if (empty($juegos)) {
+            return '<p class="err-box">El club ' . e($clubId) . ' no devolvió partidos.</p>';
+        }
+
+        // Agrupar por competencia + temporada.
+        $comps = [];
+        foreach ($juegos as $g) {
+            $bd = isset($g['baseDetails']) && is_array($g['baseDetails']) ? $g['baseDetails'] : [];
+            $cid = isset($bd['competitionId']) ? (string) $bd['competitionId'] : '';
+            if ($cid === '') continue;
+            $temp = isset($bd['seasonId']) ? (string) $bd['seasonId'] : '';
+            $k = $cid . '|' . $temp;
+            if (!isset($comps[$k])) $comps[$k] = ['id' => $cid, 'temporada' => $temp, 'n' => 0, 'desde' => null, 'hasta' => null];
+            $comps[$k]['n']++;
+            $raw = isset($bd['date']['dateTimeUTC']) ? $bd['date']['dateTimeUTC'] : null;
+            if ($raw && ($ts = strtotime($raw))) {
+                $d = date('Y-m-d', $ts);
+                if (!$comps[$k]['desde'] || $d < $comps[$k]['desde']) $comps[$k]['desde'] = $d;
+                if (!$comps[$k]['hasta'] || $d > $comps[$k]['hasta']) $comps[$k]['hasta'] = $d;
+            }
+        }
+        if (empty($comps)) return '<p class="err-box">No reconocí ninguna competencia en ese club.</p>';
+
+        $ids = [];
+        foreach ($comps as $c) $ids[$c['id']] = true;
+        $nombres = $this->resolverNombres(self::TMAPI . '/competitions', array_keys($ids));
+
+        uasort($comps, function ($a, $b) { return strcmp((string) $b['desde'], (string) $a['desde']); });
+
+        $out = '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Competencia</th><th>Id</th>'
+            . '<th>Temporada TM</th><th>Partidos</th><th>Período</th><th></th></tr></thead><tbody>';
+        foreach ($comps as $c) {
+            $nom = isset($nombres[$c['id']]) ? $nombres[$c['id']] : $c['id'];
+            $out .= '<tr>'
+                . '<td>' . e($nom) . '</td>'
+                . '<td class="num"><b>' . e($c['id']) . '</b></td>'
+                . '<td class="num">' . e($c['temporada']) . '</td>'
+                . '<td class="num">' . $c['n'] . '</td>'
+                . '<td class="num">' . e((string) $c['desde']) . ' → ' . e((string) $c['hasta']) . '</td>'
+                . '<td><a href="' . e(route('import_partidos.fixture', ['comp' => $c['id'], 'guardar' => 1]))
+                . '">Bajar este fixture</a></td>'
+                . '</tr>';
+        }
+        $out .= '</tbody></table></div>'
+            . '<p class="sub">Copiá el <b>Id</b> y la <b>Temporada TM</b> en «Editar torneo → transfermarkt.com» '
+            . 'del torneo que corresponda. A partir de ahí aparece en el desplegable de arriba.</p>';
+
+        return $out;
     }
 
     /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */

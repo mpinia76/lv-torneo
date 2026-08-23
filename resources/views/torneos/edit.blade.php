@@ -107,6 +107,29 @@
 
         </div>
         </fieldset>
+        <fieldset>
+            <legend>transfermarkt.com</legend>
+            <div class="row">
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    {{Form::label('tm_competition_id', 'Id Competencia')}}
+                    {{Form::text('tm_competition_id', $torneo->tm_competition_id, ['class' => 'form-control', 'placeholder' => 'ej ARGC'])}}
+                </div>
+                <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                    {{Form::label('tm_season_id', 'Id Temporada')}}
+                    {{Form::text('tm_season_id', $torneo->tm_season_id, ['class' => 'form-control', 'placeholder' => 'ej 2025'])}}
+                </div>
+                <div class="form-group col-md-6">
+                    <label>&nbsp;</label>
+                    <p class="form-text text-muted" style="font-size:.85rem">
+                        Con esto cargado, el <a href="{{ route('import_partidos.fixture') }}" target="_blank">importador de fixture</a>
+                        baja los partidos de este torneo sin que tengas que tipear el id.
+                        Ojo: la temporada de TM no es el año del torneo (el Clausura 2026 es seasonId 2025).
+                        Si no sabés el id, en esa pantalla hay un buscador por club.
+                    </p>
+                </div>
+            </div>
+        </fieldset>
+
         <!--<fieldset>
             <legend>sofascore.com</legend>
             <div class="row">
