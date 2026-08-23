@@ -839,16 +839,37 @@ class TmDetallePartido
         // A los que no se les reconoció el rol se les da el primer lugar libre
         // (Principal, Linea 1, Linea 2, Cuarto, VAR), que es el orden en que
         // Transfermarkt los lista. Mejor eso que meter cuatro 'Principal'.
+        // Los roles son un enum de 5 y no se pueden repetir dentro del partido.
+        // Se reparten en dos pasadas: primero los reconocidos (y si dos caen en
+        // el mismo rol, el segundo se corre al siguiente libre), después los que
+        // no se reconocieron, por orden de aparición.
         $usados = [];
-        foreach ($pares as $par) if ($par[1] !== null) $usados[$par[1]] = true;
+        foreach ($pares as $i => $par) {
+            if ($par[1] === null) continue;
+            if (!isset($usados[$par[1]])) { $usados[$par[1]] = true; continue; }
+
+            $original = $par[1];
+            $pares[$i][1] = null;
+            foreach (self::$rolesArbitro as $rol) {
+                if (!isset($usados[$rol])) { $pares[$i][1] = $rol; $usados[$rol] = true; break; }
+            }
+            $this->aviso('Dos árbitros con el rol ' . $original . ' en este partido'
+                . ($par[2] !== '' ? ' (TM dice "' . $par[2] . '")' : '') . '. '
+                . ($pares[$i][1] !== null
+                    ? 'Al segundo lo puse como ' . $pares[$i][1] . '.'
+                    : 'No quedaba ningún rol libre, así que lo dejé afuera.'));
+        }
+
         foreach ($pares as $i => $par) {
             if ($par[1] !== null) continue;
             foreach (self::$rolesArbitro as $rol) {
                 if (!isset($usados[$rol])) { $pares[$i][1] = $rol; $usados[$rol] = true; break; }
             }
             if ($pares[$i][1] === null) {
-                $this->aviso('No pude ubicar a un árbitro: ya están tomados los cinco roles.'
-                    . ($par[2] !== '' ? ' Transfermarkt dice "' . $par[2] . '".' : ''));
+                $this->aviso('Árbitro TM ' . $par[0] . ' quedó afuera: tu tabla `partido_arbitros` sólo admite '
+                    . implode(', ', self::$rolesArbitro) . ' y ya están todos tomados. '
+                    . ($par[2] !== '' ? 'Transfermarkt lo llama "' . $par[2] . '". ' : '')
+                    . 'Si querés guardarlo hay que agregar ese rol al enum de la tabla.');
                 continue;
             }
             if ($par[2] !== '') {
