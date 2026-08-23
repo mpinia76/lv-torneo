@@ -119,7 +119,9 @@ class ImportPartidosController extends Controller
         $html = '<h1>Carga de partidos · DT por DT</h1>'
             . '<p class="sub">Todos los DTs de la base y en qué punto está cada uno. Sin el slug de Transfermarkt '
             . 'no se puede sondear: esos son los primeros a resolver.</p>'
-            . '<p class="acciones"><a class="boton-sec" href="' . e(route('import_detalles.index')) . '">'
+            . '<p class="acciones"><a class="boton-sec" href="' . e(route('import_partidos.fixture')) . '">'
+            . 'Fixture por competencia (torneos en curso)</a>'
+            . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">'
             . 'Detalle de los partidos (alineaciones, goles, tarjetas, cambios)</a></p>';
 
         $html .= '<div class="cards">'
@@ -207,6 +209,600 @@ class ImportPartidosController extends Controller
         }
 
         return $this->pagina('Carga de partidos', $html);
+    }
+
+    // ═══════════════════ FIXTURE POR COMPETENCIA ═══════════════════
+    //
+    // Para un torneo EN CURSO el motor DT por DT no sirve: junta la carrera de
+    // un técnico, no la fecha de un campeonato. Acá se baja el fixture entero de
+    // la competencia con UNA llamada a /competition/{id}/fixtures.
+    //
+    // Ventajas sobre el JSON del DT:
+    //   · `homeClub` / `awayClub` vienen explícitos → no hay que deducir localía.
+    //   · `isTimeDefined` dice si el partido ya tiene día y hora confirmados.
+    //   · `isFinished` dice si ya se jugó → mientras sea false la fecha se puede
+    //     seguir actualizando; una vez true, se congela.
+    //
+    // OJO con las fechas: `dateTimeUTC` viene en UTC y los partidos nocturnos
+    // argentinos caen al día siguiente. La conversión la hace `date()` porque
+    // config/app.php fija el timezone en America/Argentina/Buenos_Aires. No
+    // reemplazar por un parseo manual del string.
+
+    public function fixture(Request $request)
+    {
+        set_time_limit(0);
+
+        $comp    = trim((string) $request->get('comp', ''));
+        $guardar = (string) $request->get('guardar', '0') === '1';
+        $filtro  = trim((string) $request->get('estado', ''));
+        $gameday = trim((string) $request->get('gameday', ''));
+
+        $avisos = [];
+
+        if ($request->filled('mapear_tm') && $request->filled('mapear_equipo')) {
+            $tmId = trim((string) $request->get('mapear_tm'));
+            $eqId = (int) preg_replace('/\D.*$/', '', trim((string) $request->get('mapear_equipo')));
+            if ($tmId !== '' && $eqId > 0 && \App\Equipo::where('id', $eqId)->exists()) {
+                $this->guardarMapeo($tmId, $eqId, $request->get('mapear_nombre'), 'manual');
+                $avisos[] = 'Club de TM ' . e($tmId) . ' mapeado al equipo #' . $eqId . '.';
+            } else {
+                $avisos[] = '<span class="err">No pude mapear: revisá el id de equipo.</span>';
+            }
+        }
+
+        $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
+            . '<h1>Fixture por competencia</h1>'
+            . '<p class="sub">Baja el fixture completo del torneo con <b>una</b> llamada y lo deja listo para '
+            . 'aplicar fecha por fecha. Reemplaza la carga del Excel. El detalle de cada partido '
+            . '(alineaciones, goles, tarjetas) lo trae después la pantalla de siempre.<br>'
+            . 'El id de competencia sale de <code>primaryCompetitionId</code> de un club o de '
+            . '<code>import_partidos.competencia_external_id</code>. Ej: <code>ARGC</code>, <code>ARG1</code>.</p>'
+            . '<form method="get" style="margin:12px 0">'
+            . '<input name="comp" value="' . e($comp) . '" placeholder="competencia, ej ARGC" size="16"> '
+            . '<input type="hidden" name="guardar" value="1">'
+            . '<button>Bajar fixture</button> <span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>';
+
+        foreach ($avisos as $a) $html .= '<p class="ok-box">' . $a . '</p>';
+
+        if ($comp === '') return $this->pagina('Fixture', $html);
+
+        $usarCache = (string) $request->get('cache', '0') === '1';
+        $filas = [];
+
+        if ($usarCache) {
+            $filas = $this->fixtureDesdeStaging($comp);
+            if (empty($filas)) $usarCache = false;
+        }
+
+        $saltados = 0;
+        if (!$usarCache) {
+            $crudo = $this->traerFixture($comp);
+            if (is_string($crudo)) return $this->pagina('Fixture', $html . '<p class="err-box">' . $crudo . '</p>');
+
+            $compNombre = $this->nombreCompetencia($comp);
+            foreach ($crudo as $g) {
+                $f = $this->normalizarFixture($g, $comp, $compNombre);
+                if (!$f['hora_definida'] || !$f['dia']) { $saltados++; continue; }
+                $filas[] = $f;
+            }
+            $filas = $this->completarNombresClubes($filas);
+        }
+
+        if (empty($filas)) {
+            return $this->pagina('Fixture', $html
+                . '<p class="err-box">No vino ningún partido con día y hora confirmados para <code>'
+                . e($comp) . '</code>.</p>');
+        }
+
+        $filas = $this->clasificarFixture($filas);
+
+        $cont = ['total' => count($filas), 'nuevo' => 0, 'duplicado' => 0, 'conflicto' => 0,
+            'jugados' => 0, 'pendientes' => 0];
+        $porFecha = [];
+        foreach ($filas as $f) {
+            if (isset($cont[$f['estado']])) $cont[$f['estado']]++;
+            if ($f['terminado']) $cont['jugados']++; else $cont['pendientes']++;
+            $r = (string) $f['ronda'];
+            if (!isset($porFecha[$r])) {
+                $porFecha[$r] = ['n' => 0, 'nuevo' => 0, 'conflicto' => 0, 'duplicado' => 0,
+                    'desde' => $f['dia'], 'hasta' => $f['dia']];
+            }
+            $porFecha[$r]['n']++;
+            if (isset($porFecha[$r][$f['estado']])) $porFecha[$r][$f['estado']]++;
+            if ($f['dia'] < $porFecha[$r]['desde']) $porFecha[$r]['desde'] = $f['dia'];
+            if ($f['dia'] > $porFecha[$r]['hasta']) $porFecha[$r]['hasta'] = $f['dia'];
+        }
+        ksort($porFecha, SORT_NATURAL);
+
+        $guardadas = 0; $refrescadas = 0;
+        if ($guardar) {
+            foreach ($filas as $f) $guardadas += $this->persistirFixture($f) ? 1 : 0;
+            $refrescadas = $this->refrescarHorarios($filas);
+        }
+
+        $html .= '<div class="cards">'
+            . $this->card($cont['total'], 'partidos con fecha')
+            . $this->card($saltados, 'sin programar', $saltados ? 'gris' : '')
+            . $this->card($cont['jugados'], 'ya jugados')
+            . $this->card($cont['pendientes'], 'por jugarse')
+            . $this->card($cont['duplicado'], 'ya cargados', 'ok')
+            . $this->card($cont['nuevo'], 'nuevos a crear', $cont['nuevo'] ? 'warn' : 'ok')
+            . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
+            . '</div>';
+
+        if ($usarCache) $html .= '<p class="sub">Datos del staging: no se bajó nada de Transfermarkt.</p>';
+        if ($saltados) {
+            $html .= '<p class="sub">Se ignoraron <b>' . $saltados . '</b> partidos sin día y hora confirmados '
+                . '(<code>isTimeDefined: false</code>). Entran solos cuando TM los programe y vuelvas a bajar.</p>';
+        }
+        if ($guardar) {
+            $html .= '<p class="ok-box">Guardadas <b>' . $guardadas . '</b> filas en staging.'
+                . ($refrescadas ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos ya cargados que todavía no se jugaron.' : '')
+                . '</p>';
+        }
+
+        $base = route('import_partidos.fixture', ['comp' => $comp]);
+        $html .= '<p class="acciones">'
+            . '<a href="' . e($base . '&guardar=1') . '">Volver a bajar y guardar</a> · '
+            . '<a href="' . e($base . '&cache=1') . '">Refrescar sin bajar</a> · '
+            . '<a href="' . e($base . '&cache=1&estado=conflicto') . '">Ver solo conflictos</a> · '
+            . '<a href="' . e($base . '&cache=1&estado=nuevo') . '">Ver solo nuevos</a>'
+            . '</p>';
+
+        $html .= $this->bloqueClubesSinResolver($filas, $request);
+
+        $html .= '<h2>Fechas</h2><div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partidos</th>'
+            . '<th>Período</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th></th></tr></thead><tbody>';
+        foreach ($porFecha as $r => $d) {
+            $html .= '<tr>'
+                . '<td class="num"><b>' . e($r) . '</b></td>'
+                . '<td class="num">' . $d['n'] . '</td>'
+                . '<td class="num">' . e(substr($d['desde'], 0, 10))
+                . ($d['desde'] !== $d['hasta'] ? ' → ' . e(substr($d['hasta'], 0, 10)) : '') . '</td>'
+                . '<td class="num">' . $d['duplicado'] . '</td>'
+                . '<td class="num">' . ($d['nuevo'] ? '<b class="warn">' . $d['nuevo'] . '</b>' : '0') . '</td>'
+                . '<td class="num">' . ($d['conflicto'] ? '<b class="err">' . $d['conflicto'] . '</b>' : '0') . '</td>'
+                . '<td>' . ($d['nuevo']
+                    ? '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar',
+                        ['comp' => $comp, 'gameday' => $r])) . '">Aplicar ' . $d['nuevo'] . ' →</a>'
+                    : '<span class="sub">nada por crear</span>')
+                . '</td></tr>';
+        }
+        $html .= '</tbody></table></div>';
+
+        $titulo = $filtro !== '' ? ('Partidos con estado «' . e($filtro) . '»')
+            : ($gameday !== '' ? ('Fecha ' . e($gameday)) : 'Partidos');
+        $html .= '<h2>' . $titulo . '</h2>' . $this->tablaFixture($filas, $filtro, $gameday);
+
+        return $this->pagina('Fixture por competencia', $html);
+    }
+
+    /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */
+    private function traerFixture($compId)
+    {
+        $resp = HttpHelper::getJson(self::TMAPI . '/competition/' . rawurlencode($compId) . '/fixtures');
+        if (!is_array($resp)) {
+            $err = HttpHelper::getLastJsonError();
+            return 'No pude bajar el fixture de ' . e($compId) . '. '
+                . e(is_array($err) ? json_encode($err, JSON_UNESCAPED_UNICODE) : 'sin detalle');
+        }
+        $data = isset($resp['data']) ? $resp['data'] : $resp;
+        $bloques = isset($data['fixtures']) && is_array($data['fixtures']) ? $data['fixtures'] : [];
+        if (empty($bloques)) return 'El fixture de ' . e($compId) . ' vino vacío.';
+
+        $juegos = [];
+        foreach ($bloques as $b) {
+            if (!is_array($b) || empty($b['games']) || !is_array($b['games'])) continue;
+            foreach ($b['games'] as $g) if (is_array($g)) $juegos[] = $g;
+        }
+        return $juegos ?: 'El fixture de ' . e($compId) . ' no trajo partidos.';
+    }
+
+    /** Un partido del fixture -> la forma que usa el staging. */
+    private function normalizarFixture(array $g, $compId, $compNombre)
+    {
+        $bd = isset($g['baseDetails']) && is_array($g['baseDetails']) ? $g['baseDetails'] : [];
+        $fecha = isset($bd['date']) && is_array($bd['date']) ? $bd['date'] : [];
+
+        $dia = null;
+        $raw = isset($fecha['dateTimeUTC']) ? $fecha['dateTimeUTC'] : null;
+        if ($raw) {
+            $ts = strtotime($raw);
+            // date() convierte a America/Argentina/Buenos_Aires (config/app.php).
+            if ($ts) $dia = date('Y-m-d H:i:s', $ts);
+        }
+
+        $terminado = !empty($g['isFinished']);
+        $sc = isset($g['score']) && is_array($g['score']) ? $g['score'] : [];
+
+        return [
+            'external_id'             => isset($g['gameId']) ? (string) $g['gameId'] : null,
+            'competencia_external_id' => isset($bd['competitionId']) && $bd['competitionId'] !== '' ? $bd['competitionId'] : $compId,
+            'competencia_nombre'      => $compNombre,
+            'temporada'               => isset($bd['seasonId']) ? (string) $bd['seasonId'] : null,
+            'ronda'                   => isset($bd['gameDay']) ? (string) $bd['gameDay'] : null,
+            // En este flujo el "club" es SIEMPRE el local: local = 1 fijo.
+            'club_external_id'        => isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null,
+            'club_nombre'             => null,
+            'rival_external_id'       => isset($g['awayClub']['clubId']) ? (string) $g['awayClub']['clubId'] : null,
+            'rival_nombre'            => null,
+            'local'                   => 1,
+            'dia'                     => $dia,
+            'goles_favor'             => ($terminado && isset($sc['home'])) ? (int) $sc['home'] : null,
+            'goles_contra'            => ($terminado && isset($sc['away'])) ? (int) $sc['away'] : null,
+            'equipo_id' => null, 'rival_id' => null, 'partido_id' => null,
+            'estado' => 'nuevo', 'motivo' => null,
+            'payload' => json_encode($g, JSON_UNESCAPED_UNICODE),
+            'terminado'     => $terminado,
+            'hora_definida' => !empty($fecha['isTimeDefined']),
+            'reprogramado'  => !empty($g['extendedDetails']['isRescheduled']),
+        ];
+    }
+
+    /** El fixture trae solo clubIds: los nombres se piden aparte (1 llamada / 50). */
+    private function completarNombresClubes(array $filas)
+    {
+        $ids = [];
+        foreach ($filas as $f) {
+            if ($f['club_external_id'])  $ids[$f['club_external_id']] = true;
+            if ($f['rival_external_id']) $ids[$f['rival_external_id']] = true;
+        }
+        $nombres = $this->resolverNombres(self::TMAPI . '/clubs', array_keys($ids));
+        foreach ($filas as $i => $f) {
+            if ($f['club_external_id'] && isset($nombres[$f['club_external_id']])) {
+                $filas[$i]['club_nombre'] = $nombres[$f['club_external_id']];
+            }
+            if ($f['rival_external_id'] && isset($nombres[$f['rival_external_id']])) {
+                $filas[$i]['rival_nombre'] = $nombres[$f['rival_external_id']];
+            }
+        }
+        return $filas;
+    }
+
+    private function nombreCompetencia($compId)
+    {
+        $m = $this->resolverNombres(self::TMAPI . '/competitions', [$compId]);
+        return isset($m[(string) $compId]) ? $m[(string) $compId] : $compId;
+    }
+
+    /**
+     * Nuevo / duplicado / conflicto. Más simple que la del DT: acá la localía
+     * viene dada por homeClub/awayClub, así que no existe el caso
+     * "no se pudo determinar si fue local o visitante".
+     */
+    private function clasificarFixture(array $filas)
+    {
+        $mapaTm = $this->mapaTm();
+        $mapaNombres = $this->mapaNombres();
+
+        foreach ($filas as $i => $f) {
+            $localId = $this->resolverClub($f['club_external_id'], $f['club_nombre'], $mapaTm, $mapaNombres);
+            $visiId  = $this->resolverClub($f['rival_external_id'], $f['rival_nombre'], $mapaTm, $mapaNombres);
+            $filas[$i]['equipo_id'] = $localId;
+            $filas[$i]['rival_id']  = $visiId;
+
+            if (!$localId || !$visiId) {
+                $filas[$i]['estado'] = 'conflicto';
+                $faltan = [];
+                if (!$localId) $faltan[] = 'local «' . $f['club_nombre'] . '»';
+                if (!$visiId)  $faltan[] = 'visitante «' . $f['rival_nombre'] . '»';
+                $filas[$i]['motivo'] = 'sin mapear: ' . implode(' / ', $faltan);
+                continue;
+            }
+
+            $partido = $this->buscarPartido($localId, $visiId, $f['dia']);
+            if ($partido) {
+                $filas[$i]['partido_id'] = $partido->id;
+                $filas[$i]['estado'] = 'duplicado';
+                $filas[$i]['motivo'] = 'ya cargado';
+            } else {
+                $filas[$i]['estado'] = 'nuevo';
+            }
+        }
+        return $filas;
+    }
+
+    /** Guarda en staging. La clave es el gameId: reimportar no duplica. */
+    private function persistirFixture(array $f)
+    {
+        if (!$f['external_id']) return false;
+        $clave = ['fuente' => 'transfermarkt', 'external_id' => $f['external_id'], 'tecnico_id' => null];
+
+        $ya = DB::table('import_partidos')->where($clave)->first();
+        if ($ya && $ya->estado === 'aplicado') {
+            $sigue = $ya->partido_id && \App\Partido::where('id', $ya->partido_id)->exists();
+            if ($sigue) return false;   // aplicada y viva: no se pisa
+            DB::table('import_partidos')->where('id', $ya->id)
+                ->update(['estado' => 'nuevo', 'partido_id' => null, 'motivo' => null, 'updated_at' => now()]);
+        }
+
+        DB::table('import_partidos')->updateOrInsert($clave, [
+            'competencia_external_id' => $f['competencia_external_id'],
+            'competencia_nombre'      => $f['competencia_nombre'],
+            'temporada'               => $f['temporada'],
+            'ronda'                   => $f['ronda'],
+            'club_external_id'        => $f['club_external_id'],
+            'club_nombre'             => $f['club_nombre'],
+            'rival_external_id'       => $f['rival_external_id'],
+            'rival_nombre'            => $f['rival_nombre'],
+            'local'                   => 1,
+            'dia'                     => $f['dia'],
+            'goles_favor'             => $f['goles_favor'],
+            'goles_contra'            => $f['goles_contra'],
+            'equipo_id'               => $f['equipo_id'],
+            'rival_id'                => $f['rival_id'],
+            'partido_id'              => $f['partido_id'],
+            'estado'                  => $f['estado'],
+            'motivo'                  => $f['motivo'],
+            'payload'                 => $f['payload'],
+            'updated_at'              => now(),
+            'created_at'              => now(),
+        ]);
+        return true;
+    }
+
+    /**
+     * Corrige día y hora de los partidos YA cargados que todavía no se jugaron.
+     *
+     * Es lo contrario de la regla del motor DT (donde nunca se pisa la fecha,
+     * porque TM guarda la original de los postergados y la base tiene la real).
+     * Acá TM es la fuente de la programación: mientras `isFinished` sea false su
+     * horario manda. Con el partido jugado, la fecha queda congelada.
+     */
+    private function refrescarHorarios(array $filas)
+    {
+        $n = 0;
+        foreach ($filas as $f) {
+            if (!empty($f['terminado']) || empty($f['partido_id']) || empty($f['dia'])) continue;
+            $p = \App\Partido::find($f['partido_id']);
+            if (!$p) continue;
+            if (substr((string) $p->dia, 0, 16) === substr($f['dia'], 0, 16)) continue;
+            $p->forceFill(['dia' => $f['dia']])->save();
+            $n++;
+        }
+        return $n;
+    }
+
+    /** Relee el fixture desde el staging, sin tocar Transfermarkt. */
+    private function fixtureDesdeStaging($compId)
+    {
+        $filas = [];
+        $rows = DB::table('import_partidos')
+            ->whereNull('tecnico_id')->where('competencia_external_id', $compId)
+            ->orderBy('dia')->get();
+
+        foreach ($rows as $r) {
+            $g = $r->payload ? json_decode($r->payload, true) : null;
+            if (is_array($g) && !empty($g)) {
+                $f = $this->normalizarFixture($g, $compId, $r->competencia_nombre);
+                if ($r->club_nombre)  $f['club_nombre']  = $r->club_nombre;
+                if ($r->rival_nombre) $f['rival_nombre'] = $r->rival_nombre;
+            } else {
+                $f = [
+                    'external_id' => $r->external_id,
+                    'competencia_external_id' => $r->competencia_external_id,
+                    'competencia_nombre' => $r->competencia_nombre,
+                    'temporada' => $r->temporada, 'ronda' => $r->ronda,
+                    'club_external_id' => $r->club_external_id, 'club_nombre' => $r->club_nombre,
+                    'rival_external_id' => $r->rival_external_id, 'rival_nombre' => $r->rival_nombre,
+                    'local' => 1, 'dia' => $r->dia,
+                    'goles_favor' => $r->goles_favor, 'goles_contra' => $r->goles_contra,
+                    'payload' => $r->payload,
+                    'terminado' => $r->goles_favor !== null,
+                    'hora_definida' => true, 'reprogramado' => false,
+                ];
+            }
+            $f['equipo_id'] = null; $f['rival_id'] = null; $f['partido_id'] = null;
+            $f['estado'] = 'nuevo'; $f['motivo'] = null;
+            $filas[] = $f;
+        }
+        return $filas;
+    }
+
+    private function tablaFixture(array $filas, $filtro = '', $gameday = '')
+    {
+        $ids = [];
+        foreach ($filas as $f) if (!empty($f['partido_id'])) $ids[] = $f['partido_id'];
+        $fechas = $this->mapaFechas($ids);
+
+        $out = '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Día</th><th>Local</th><th>Res.</th>'
+            . '<th>Visitante</th><th>gameId</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>';
+        $n = 0;
+        foreach ($filas as $f) {
+            if ($filtro !== '' && $f['estado'] !== $filtro) continue;
+            if ($gameday !== '' && (string) $f['ronda'] !== (string) $gameday) continue;
+            if ($n++ >= 400) break;
+
+            $clase = $f['estado'] === 'nuevo' ? 'ok' : ($f['estado'] === 'conflicto' ? 'err' : '');
+            $res = ($f['goles_favor'] === null) ? '<span class="sub">—</span>'
+                : (e($f['goles_favor']) . ':' . e($f['goles_contra']));
+
+            $out .= '<tr class="' . $clase . '">'
+                . '<td class="num">' . e($f['ronda']) . '</td>'
+                . '<td class="num">' . e($f['dia'] ? substr($f['dia'], 0, 16) : '—')
+                . (!empty($f['reprogramado']) ? ' <span class="warn" title="reprogramado">↻</span>' : '') . '</td>'
+                . '<td>' . e($f['club_nombre']) . ($f['equipo_id'] ? ' <span class="id">#' . $f['equipo_id'] . '</span>' : '') . '</td>'
+                . '<td class="num">' . $res . '</td>'
+                . '<td>' . e($f['rival_nombre']) . ($f['rival_id'] ? ' <span class="id">#' . $f['rival_id'] . '</span>' : '') . '</td>'
+                . '<td class="num">' . e($f['external_id']) . '</td>'
+                . '<td>' . e($f['estado']) . '</td>'
+                . '<td>' . e($f['motivo'])
+                . ($f['partido_id']
+                    ? ' <span class="id">#' . $f['partido_id'] . '</span> '
+                      . $this->linkIncidencias(isset($fechas[(int) $f['partido_id']]) ? $fechas[(int) $f['partido_id']] : null)
+                    : '')
+                . '</td></tr>';
+        }
+        return $out . '</tbody></table></div>';
+    }
+
+    /**
+     * Crea los partidos de UNA fecha del fixture. De a una fecha a propósito:
+     * estos torneos NO son `parcial` —tienen tabla, promedios y acumulados—
+     * así que un error acá ensucia datos de verdad.
+     */
+    public function fixtureAplicar(Request $request)
+    {
+        set_time_limit(0);
+
+        $comp    = trim((string) $request->get('comp', ''));
+        $gameday = trim((string) $request->get('gameday', ''));
+        $torneoId = (int) $request->get('torneo_id');
+        $grupoId  = (int) $request->get('grupo_id');
+
+        $volver = '<p class="sub"><a href="' . e(route('import_partidos.fixture', ['comp' => $comp, 'cache' => 1]))
+            . '">← Volver al fixture</a></p>';
+
+        if ($comp === '' || $gameday === '') {
+            return $this->pagina('Aplicar fecha', $volver . '<p class="err">Faltan <code>comp</code> y <code>gameday</code>.</p>');
+        }
+
+        $filas = DB::table('import_partidos')
+            ->whereNull('tecnico_id')
+            ->where('competencia_external_id', $comp)
+            ->where('ronda', $gameday)
+            ->where('estado', 'nuevo')
+            ->orderBy('dia')->get();
+
+        if ($filas->isEmpty()) {
+            return $this->pagina('Aplicar fecha', $volver
+                . '<p class="ok-box">La fecha ' . e($gameday) . ' no tiene partidos nuevos por crear.</p>');
+        }
+
+        $html = $volver . '<h1>Fecha ' . e($gameday) . ' · ' . e($comp) . '</h1>';
+
+        // ── Elegir torneo y grupo ───────────────────────────────────────────
+        if (!$torneoId) {
+            $porGrupo = [];
+            foreach (\App\Torneo::orderBy('year', 'desc')->orderBy('nombre')->get() as $t) {
+                $etiqueta = $t->ambito === 'Internacional'
+                    ? (trim((string) $t->region) ?: 'Internacional')
+                    : (trim((string) $t->pais) ?: 'Argentina');
+                $porGrupo[$etiqueta][] = $t;
+            }
+            ksort($porGrupo);
+
+            $opts = '<option value="">— elegí el torneo —</option>';
+            foreach ($porGrupo as $etiqueta => $lista) {
+                $opts .= '<optgroup label="' . e($etiqueta) . '">';
+                foreach ($lista as $t) {
+                    $opts .= '<option value="' . $t->id . '">' . e($t->nombre . ' ' . $t->year) . '</option>';
+                }
+                $opts .= '</optgroup>';
+            }
+
+            return $this->pagina('Aplicar fecha', $html
+                . '<p class="sub">Son <b>' . $filas->count() . '</b> partidos. Elegí a qué torneo tuyo van. '
+                . 'Se crea (o se reusa) la fecha número <b>' . e($gameday) . '</b> dentro del grupo.</p>'
+                . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '">'
+                . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+                . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
+                . '<select name="torneo_id" class="s2" data-placeholder="elegí el torneo…">' . $opts . '</select> '
+                . '<button>Continuar</button></form>');
+        }
+
+        $torneo = \App\Torneo::find($torneoId);
+        if (!$torneo) return $this->pagina('Aplicar fecha', $volver . '<p class="err">No existe ese torneo.</p>');
+
+        $grupos = \App\Grupo::where('torneo_id', $torneo->id)->orderBy('id')->get();
+        if ($grupos->isEmpty()) {
+            $g = new \App\Grupo();
+            $g->forceFill(['nombre' => 'Único', 'torneo_id' => $torneo->id, 'equipos' => 0])->save();
+            $grupoId = $g->id;
+        } elseif (!$grupoId) {
+            if ($grupos->count() === 1) {
+                $grupoId = $grupos->first()->id;
+            } else {
+                $opts = '';
+                foreach ($grupos as $gr) $opts .= '<option value="' . $gr->id . '">' . e($gr->nombre) . '</option>';
+                return $this->pagina('Aplicar fecha', $html
+                    . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' tiene ' . $grupos->count() . ' grupos.</p>'
+                    . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '">'
+                    . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+                    . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
+                    . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
+                    . '<select name="grupo_id">' . $opts . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
+            }
+        }
+
+        // ── La fecha ────────────────────────────────────────────────────────
+        $fecha = \App\Fecha::where('grupo_id', $grupoId)->where('numero', $gameday)->first();
+        if (!$fecha) {
+            $fecha = new \App\Fecha();
+            $fecha->forceFill([
+                'numero'     => $gameday,
+                'grupo_id'   => $grupoId,
+                'orden'      => is_numeric($gameday) ? (int) $gameday : 999,
+                'url_nombre' => Str::slug('fecha-' . $gameday),
+            ])->save();
+        }
+
+        // ── Los partidos ────────────────────────────────────────────────────
+        $creados = 0; $errores = []; $detalle = '';
+        foreach ($filas as $r) {
+            try {
+                $localId = (int) $r->equipo_id;
+                $visiId  = (int) $r->rival_id;
+                if (!$localId || !$visiId) {
+                    $errores[] = 'Sin equipos resueltos: ' . $r->club_nombre . ' vs ' . $r->rival_nombre;
+                    continue;
+                }
+
+                $ya = \App\Partido::where('fecha_id', $fecha->id)
+                    ->where(function ($q) use ($localId, $visiId) {
+                        $q->where('equipol_id', $localId)->orWhere('equipov_id', $localId)
+                            ->orWhere('equipol_id', $visiId)->orWhere('equipov_id', $visiId);
+                    })->first();
+                if ($ya) {
+                    $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($localId)
+                        . ' en la fecha ' . $gameday . ' (#' . $ya->id . '). Ese quedó sin crear.';
+                    continue;
+                }
+
+                $partido = new \App\Partido();
+                $partido->forceFill([
+                    'fecha_id'   => $fecha->id,
+                    'dia'        => $r->dia,
+                    'equipol_id' => $localId,
+                    'equipov_id' => $visiId,
+                    'golesl'     => $r->goles_favor,
+                    'golesv'     => $r->goles_contra,
+                ])->save();
+
+                DB::table('import_partidos')->where('id', $r->id)
+                    ->update(['estado' => 'aplicado', 'partido_id' => $partido->id,
+                        'motivo' => null, 'updated_at' => now()]);
+
+                $detalle .= '<tr><td class="num">' . e(substr((string) $r->dia, 0, 16)) . '</td>'
+                    . '<td>' . e($this->nombreEquipo($localId)) . '</td>'
+                    . '<td class="num">' . ($r->goles_favor === null ? '—' : e($r->goles_favor) . ':' . e($r->goles_contra)) . '</td>'
+                    . '<td>' . e($this->nombreEquipo($visiId)) . '</td>'
+                    . '<td class="num">#' . $partido->id . '</td></tr>';
+                $creados++;
+            } catch (\Throwable $ex) {
+                $errores[] = 'Error en ' . $r->club_nombre . ' vs ' . $r->rival_nombre . ': ' . $ex->getMessage();
+                Log::error('fixtureAplicar: ' . $ex->getMessage());
+            }
+        }
+
+        $this->recontarEquipos($grupoId);
+
+        $html .= '<h1>Creados ' . $creados . ' partidos</h1>'
+            . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · grupo #' . (int) $grupoId
+            . ' · fecha ' . e($gameday) . '</p>';
+
+        if (!empty($errores)) {
+            $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>' . e(implode(' — ', $errores)) . '</p>';
+        }
+        if ($detalle) {
+            $html .= '<div class="scroll"><table><thead><tr><th>Día</th><th>Local</th><th>Res.</th>'
+                . '<th>Visitante</th><th>Partido</th></tr></thead><tbody>' . $detalle . '</tbody></table></div>';
+        }
+        $html .= '<p class="acciones">'
+            . '<a class="boton" href="' . e(route('import_partidos.fixture', ['comp' => $comp, 'cache' => 1])) . '">Seguir con otra fecha →</a>'
+            . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
+
+        return $this->pagina('Aplicar fecha', $html);
     }
 
     // ═══════════════════════════ CREAR EQUIPO DESDE TM ═══════════════════════════
