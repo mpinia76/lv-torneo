@@ -757,11 +757,68 @@ class ImportDetallesController extends Controller
             return redirect()->route('import_detalles.revisar');
         }
 
+        // "Está mal": el apareo de TM con un árbitro nuestro no es esa persona.
+        // Se corta el puente en `arbitro_tm` y nada más: el árbitro de la base
+        // casi siempre es alguien real y bien cargado —el error es haberlo
+        // atado a otro id de Transfermarkt—, así que borrarlo sería peor.
+        // Los partidos que ya se cargaron con el árbitro equivocado se
+        // arreglan con "Rehacer": ese borra los árbitros del partido y los
+        // vuelve a escribir, y esta vez el id de TM ya no está atado a nadie,
+        // con lo cual se crea el árbitro que corresponde.
+        if ($request->filled('mal_arb')) {
+            $fila = DB::table('arbitro_tm')->where('id', (int) $request->get('mal_arb'))->first();
+            if (!$fila) return redirect()->route('import_detalles.revisar');
+
+            $nombre = DB::table('arbitros')
+                ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                ->where('arbitros.id', $fila->arbitro_id)->value('personas.name');
+
+            $partidos = DB::table('partido_arbitros')
+                ->join('partidos', 'partidos.id', '=', 'partido_arbitros.partido_id')
+                ->where('partido_arbitros.arbitro_id', (int) $fila->arbitro_id)
+                ->select('partidos.id', 'partidos.dia', 'partido_arbitros.tipo')
+                ->orderBy('partidos.dia', 'desc')->limit(100)->get();
+
+            DB::table('arbitro_tm')->where('id', (int) $fila->id)->delete();
+
+            $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.revisar')) . '">← Jugadores y árbitros por revisar</a></p>'
+                . '<h1>Apareo deshecho</h1>'
+                . '<div class="ok-box">El árbitro de Transfermarkt <b>' . e($fila->tm_referee_id) . '</b>'
+                . (isset($fila->nombre_tm) && $fila->nombre_tm !== '' ? ' (' . e($fila->nombre_tm) . ')' : '')
+                . ' ya no está atado a <b>' . e($nombre ?: ('#' . $fila->arbitro_id)) . '</b>. '
+                . 'Al árbitro de la base no lo toqué.</div>'
+                . '<p class="sub">Ahora hay que rehacer los partidos donde se haya cargado mal. '
+                . '<b>Rehacer</b> borra los árbitros del partido y los vuelve a bajar: como el id de TM ya no apunta '
+                . 'a nadie, esta vez se va a crear el árbitro que corresponde. Ojo que gasta llamadas a la API.</p>';
+
+            if ($partidos->isEmpty()) {
+                $cuerpo .= '<div class="ok-box">Ese árbitro no figura en ningún partido: no hay nada que rehacer.</div>';
+            } else {
+                $cuerpo .= '<p class="sub">Estos son <b>todos</b> los partidos donde figura ' . e($nombre ?: 'ese árbitro')
+                    . ' — no todos vienen del importador. Rehacé sólo los que sepas que cargó él.</p>'
+                    . '<div class="scroll"><table><thead><tr><th>Partido</th><th>Día</th><th>Rol</th><th></th></tr></thead><tbody>';
+                foreach ($partidos as $p) {
+                    $cuerpo .= '<tr>'
+                        . '<td class="num">#' . (int) $p->id . '</td>'
+                        . '<td class="num">' . e(substr((string) $p->dia, 0, 10)) . '</td>'
+                        . '<td>' . e($p->tipo) . '</td>'
+                        . '<td><a class="err" href="' . e(route('import_detalles.bajar',
+                            ['partido_id' => (int) $p->id, 'forzar' => 1])) . '">Rehacer</a></td>'
+                        . '</tr>';
+                }
+                $cuerpo .= '</tbody></table></div>';
+            }
+
+            $cuerpo .= '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.revisar')) . '">Volver</a></p>';
+            return $this->pagina('Apareo deshecho', $cuerpo);
+        }
+
         $arbitros = DB::table('arbitro_tm')
             ->join('arbitros', 'arbitros.id', '=', 'arbitro_tm.arbitro_id')
             ->join('personas', 'personas.id', '=', 'arbitros.persona_id')
             ->where('arbitro_tm.revisar', 1)
             ->select('arbitro_tm.id', 'arbitro_tm.tm_referee_id', 'arbitro_tm.arbitro_id', 'arbitro_tm.created_at',
+                'arbitro_tm.nombre_tm',
                 'personas.name', 'personas.nombre', 'personas.apellido', 'personas.nacimiento', 'personas.nacionalidad')
             ->orderBy('arbitro_tm.created_at', 'desc')->limit(200)->get();
 
@@ -786,20 +843,27 @@ class ImportDetallesController extends Controller
         }
 
         if (!$arbitros->isEmpty()) {
-            $cuerpo .= '<h2>Árbitros</h2><div class="scroll"><table><thead><tr>'
-                . '<th>Alta</th><th>Nombre</th><th>Apellido, nombre</th><th>Nacimiento</th>'
+            $cuerpo .= '<h2>Árbitros</h2>'
+                . '<p class="sub">Compará las dos columnas de nombre: <b>en Transfermarkt</b> es lo que dice la fuente '
+                . 'y <b>en la base</b> es a quién quedó atado. Si no son la misma persona, <b>Está mal</b> corta el apareo.</p>'
+                . '<div class="scroll"><table><thead><tr>'
+                . '<th>Alta</th><th>En Transfermarkt</th><th>En la base</th><th>Apellido, nombre</th><th>Nacimiento</th>'
                 . '<th>Nacionalidad</th><th>TM</th><th></th></tr></thead><tbody>';
             foreach ($arbitros as $a) {
+                $distinto = $this->apellidoDistinto(isset($a->nombre_tm) ? $a->nombre_tm : '', $a->apellido);
                 $cuerpo .= '<tr>'
                     . '<td class="num">' . e(substr((string) $a->created_at, 0, 10)) . '</td>'
-                    . '<td>' . e($a->name) . '</td>'
+                    . '<td>' . e((isset($a->nombre_tm) && $a->nombre_tm !== '') ? $a->nombre_tm : '—') . '</td>'
+                    . '<td>' . e($a->name) . ($distinto ? ' <span class="err">¿otro apellido?</span>' : '') . '</td>'
                     . '<td>' . e($a->apellido . ', ' . $a->nombre) . '</td>'
                     . '<td class="num">' . e($a->nacimiento ?: '—') . '</td>'
                     . '<td>' . e($a->nacionalidad ?: '—') . '</td>'
                     . '<td><a target="_blank" href="https://www.transfermarkt.es/-/profil/schiedsrichter/' . e($a->tm_referee_id) . '">' . e($a->tm_referee_id) . '</a></td>'
                     . '<td><a href="' . e(route('arbitros.edit', $a->arbitro_id)) . '">Editar</a>'
                     . ' · <a href="' . e(route('import_detalles.arbitro', ['tm_id' => $a->tm_referee_id, 'tipo' => 'arbitro'])) . '">Diagnóstico</a>'
-                    . ' · <a href="' . e(route('import_detalles.revisar', ['ok_arb' => $a->id])) . '">Visto</a></td>'
+                    . ' · <a href="' . e(route('import_detalles.revisar', ['ok_arb' => $a->id])) . '">Visto</a>'
+                    . ' · <a class="err" href="' . e(route('import_detalles.revisar', ['mal_arb' => $a->id]))
+                    . '" title="No es esa persona: corta el apareo con Transfermarkt">Está mal</a></td>'
                     . '</tr>';
             }
             $cuerpo .= '</tbody></table></div><h2>Jugadores</h2>';
@@ -910,6 +974,32 @@ class ImportDetallesController extends Controller
             $out .= '</tr>';
         }
         return $out . '</tbody></table></div>';
+    }
+
+    /**
+     * ¿El apellido que tenemos en la base no aparece en el nombre que mandó
+     * Transfermarkt? Es la señal de un apareo equivocado: dos personas que
+     * comparten los nombres de pila (Juan Pablo Belatti y Juan Pablo González)
+     * y nada más. Sólo pinta la fila; no decide nada.
+     */
+    private function apellidoDistinto($nombreTm, $apellidoBase)
+    {
+        $limpiar = function ($t) {
+            $t = mb_strtolower(trim((string) $t), 'UTF-8');
+            $t = strtr($t, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n',
+                'à'=>'a','è'=>'e','ì'=>'i','ò'=>'o','ù'=>'u','ç'=>'c']);
+            return preg_replace('/[^a-z0-9 ]+/u', ' ', $t);
+        };
+
+        $tm  = $limpiar($nombreTm);
+        $ape = $limpiar($apellidoBase);
+        if (trim($tm) === '' || trim($ape) === '') return false;
+
+        foreach (preg_split('/\s+/', trim($ape)) as $t) {
+            if (mb_strlen($t) < 3) continue;
+            if (mb_strpos($tm, $t) !== false) return false;   // algo del apellido está: bien
+        }
+        return true;
     }
 
     private function card($n, $label, $tono = '')

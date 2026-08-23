@@ -1415,7 +1415,9 @@ class TmDetallePartido
                 if ($escribir) $this->guardarMapeoArbitro($tmId, $existente['id'], $datos['name'], 'auto', $existente['revisar']);
                 if ($existente['revisar']) {
                     $this->aviso('Aparejé al árbitro ' . $datos['apellido'] . ', ' . $datos['nombre']
-                        . ' con "' . $existente['base'] . '" (#' . $existente['id'] . '). Confirmalo.');
+                        . ' con "' . $existente['base'] . '" (#' . $existente['id'] . '). Confirmalo en '
+                        . '"Jugadores y árbitros por revisar" — si no es la misma persona, ahí está el botón '
+                        . '"Está mal", que corta el apareo para que Rehacer lo cargue bien.');
                 }
                 continue;
             }
@@ -1450,12 +1452,28 @@ class TmDetallePartido
      * tienen la fecha de nacimiento cargada. Sirve para las dos tablas porque el
      * criterio es el mismo: comparar las palabras del nombre completo.
      *
+     * OJO — acá NO alcanza con contar palabras en común (ago-2026):
+     * en jugadores, las "2 o más palabras" van SIEMPRE atadas a la misma fecha
+     * de nacimiento, y eso es lo que sostiene el apareo. Árbitros y DTs no
+     * tienen fecha, así que dos palabras sueltas son casi siempre dos nombres
+     * de pila: "Belatti, Juan Pablo" comparte juan+pablo con "González, Juan
+     * Pablo" y quedaban aparejados como la misma persona.
+     *
+     * Entonces exigimos además que se toquen los APELLIDOS, en las dos
+     * direcciones: alguna palabra del apellido de TM tiene que aparecer en el
+     * nombre completo de la base, y alguna del apellido de la base en el
+     * nombre completo de TM. Se compara contra el nombre COMPLETO —no campo
+     * contra campo— porque cada fuente parte los apellidos compuestos en un
+     * lugar distinto (TM "Venturino" / base "Biskupovic Venturino").
+     *
      * @param string $tabla 'arbitros' o 'tecnicos'
      */
     private function buscarPersonaRol($tabla, array $datos)
     {
         $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
         if (count($tokensTm) < 2) return null;
+
+        $apeTm = $this->tokensNombre($datos['apellido']);
 
         $cands = $this->candidatosPorNombre($tabla, $datos);
 
@@ -1465,7 +1483,13 @@ class TmDetallePartido
                 && substr((string) $c->nacimiento, 0, 10) !== $datos['nacimiento']) {
                 continue;   // fechas distintas: no es él
             }
-            $p = count(array_intersect($tokensTm, $this->tokensNombre($c->apellido . ' ' . $c->nombre)));
+
+            $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
+            $apeBase    = $this->tokensNombre($c->apellido);
+
+            if (!$this->apellidosSeTocan($apeTm, $tokensTm, $apeBase, $tokensBase)) continue;
+
+            $p = count(array_intersect($tokensTm, $tokensBase));
             if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
             elseif ($p === $puntaje && $p > 0) { $empatados++; }
         }
@@ -1474,6 +1498,25 @@ class TmDetallePartido
 
         return ['id' => (int) $mejor->id, 'base' => trim($mejor->apellido . ', ' . $mejor->nombre),
             'revisar' => ($empatados > 1 || $puntaje < count($tokensTm))];
+    }
+
+    /**
+     * ¿Los apellidos de las dos fichas se tocan? Ver buscarPersonaRol.
+     *
+     * Si de algún lado no sale apellido (TM a veces manda todo junto en el
+     * nombre), no inventamos: pedimos que el nombre completo sea exactamente
+     * el mismo conjunto de palabras.
+     */
+    private function apellidosSeTocan(array $apeTm, array $tokensTm, array $apeBase, array $tokensBase)
+    {
+        if (empty($apeTm) || empty($apeBase)) {
+            $a = $tokensTm;   sort($a);
+            $b = $tokensBase; sort($b);
+            return $a === $b;
+        }
+
+        return count(array_intersect($apeTm, $tokensBase)) > 0
+            && count(array_intersect($apeBase, $tokensTm)) > 0;
     }
 
     private function guardarMapeoArbitro($tmId, $arbitroId, $nombre, $origen, $revisar)
