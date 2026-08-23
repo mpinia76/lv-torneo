@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    @include('layouts.partials.meta')
+    @include('layouts.partials.metaPublic')
 </head>
 <body class="d-flex flex-column min-vh-100">
-<div class="wrapper d-flex flex-column flex-grow-1">
 
     @include('layouts.partials.headerPublic')
 
@@ -16,6 +15,5 @@
 
     @yield('scripts')
 
-</div>
 </body>
 </html>
