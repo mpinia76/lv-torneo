@@ -58,8 +58,8 @@
                    class="btn btn-warning m-1"
                    title="Baja el fixture de este torneo desde Transfermarkt">Fixture (TM)</a>
             @else
-                <a href="{{ route('import_partidos.fixture') }}" class="btn btn-outline-secondary m-1"
-                   title="Este torneo todavía no tiene cargado el id de competencia de Transfermarkt">Fixture (TM) — sin id</a>
+                <a href="{{ route('import_partidos.fixture') }}" class="btn btn-warning m-1"
+                   title="Este torneo todavía no tiene el id de competencia de Transfermarkt: buscalo y cargalo en Editar">Fixture (TM)</a>
             @endif
             <a href="{{route('torneos.dorsal',  array('torneoId' => $torneo->id))}}" class="btn btn-primary m-1">Modificar dorsales</a>
             <a href="{{ route('torneos.importargoles',  array('torneoId' => $torneo->id))}}"
