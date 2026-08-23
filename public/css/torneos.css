@@ -282,7 +282,7 @@ a:hover { color: var(--t-accent-hover); }
 .t-barra-torneo .t-barra-inner {
     display: flex; align-items: center; gap: 14px;
     min-height: 44px;
-    overflow-x: auto;
+    flex-wrap: wrap;
 }
 .t-barra-torneo .t-barra-titulo {
     display: flex; align-items: center; gap: 8px;
@@ -542,3 +542,87 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     border-color: var(--t-line-strong);
 }
 .profile-pic { display: inline; margin: 0 auto 0 -25%; height: 100%; width: auto; }
+
+
+/* ---------- 13. DETALLE DE PARTIDO --------------------------------------- */
+
+.t-marcador-grande {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+    text-align: center;
+    padding: 22px 16px 18px;
+    background: linear-gradient(180deg, var(--t-surface-2), var(--t-surface));
+    border-bottom: 1px solid var(--t-line);
+}
+.t-marcador-grande .t-lado {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.t-marcador-grande .t-lado b {
+    font-family: var(--t-fuente-titulo);
+    font-size: 1rem;
+    font-weight: 600;
+}
+.t-marcador-grande .t-lado a { color: var(--t-ink); }
+.t-marcador-cifra {
+    font-family: var(--t-fuente-titulo);
+    font-weight: 800;
+    font-size: 2.75rem;
+    line-height: 1;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+}
+.t-meta-partido {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--t-line);
+    font-size: 12.5px;
+    color: var(--t-muted);
+}
+.t-meta-partido b { color: var(--t-ink-2); font-weight: 500; }
+
+@media (max-width: 560px) {
+    .t-marcador-grande { gap: 8px; padding: 18px 10px 14px; }
+    .t-marcador-cifra { font-size: 2.125rem; }
+}
+
+/* la vista de detalle traía su propio <style>; esto lo reemplaza */
+.t-detalle .nav-tabs {
+    border-bottom: 1px solid var(--t-line);
+    gap: 2px;
+    justify-content: center;
+    margin-bottom: 0;
+}
+.t-detalle .nav-tabs .nav-link {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--t-muted);
+    font-size: .875rem;
+    padding: .6rem .8rem;
+    background: transparent;
+}
+.t-detalle .nav-tabs .nav-link:hover { color: var(--t-ink); }
+.t-detalle .nav-tabs .nav-link.active {
+    color: var(--t-ink);
+    border-bottom-color: var(--t-accent);
+    font-weight: 600;
+    background: transparent;
+}
+.t-detalle .tab-content {
+    background: var(--t-surface);
+    border: 1px solid var(--t-line);
+    border-top: 0;
+    border-radius: 0 0 var(--t-radius) var(--t-radius);
+    padding: 14px;
+}
+.t-detalle .tab-content .table { --bs-table-bg: transparent; margin-bottom: 0; }
+.t-detalle .imgCircle {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 6px;
+    border: 1px solid var(--t-line);
+}
+.t-detalle .table > :not(caption) > * > * { border-color: var(--t-line); }

@@ -3,137 +3,81 @@
 @section('pageTitle', 'Detalle Fecha')
 
 @section('content')
-    <style>
-        /* General */
-        h1.display-6 {
-            font-weight: 600;
-            margin-bottom: 25px;
-            color: #0d6efd;
-        }
+    @php
+        $torneoDet   = $partido->fecha->grupo->torneo;
+        $numeroFecha = is_numeric($partido->fecha->numero) ? 'Fecha ' . $partido->fecha->numero : $partido->fecha->numero;
+        $sinJugar    = is_null($partido->golesl) && is_null($partido->golesv);
+    @endphp
 
-        .card-custom {
-            border-radius: 15px;
-            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
-        }
+    <div class="container t-detalle">
 
-        /* Tab Navigation */
-        .nav-tabs .nav-link {
-            font-weight: 500;
-            border-radius: 10px 10px 0 0;
-            transition: all 0.3s;
-        }
+        <div class="t-cabecera">
+            <div>
+                <span class="t-eyebrow">
+                    <x-escudo :src="$torneoDet->escudo" :nombre="$torneoDet->nombre" tam="sm"/>
+                    {{ $torneoDet->nombre }} {{ $torneoDet->year }} @if($numeroFecha) · {{ $numeroFecha }} @endif
+                </span>
+                <h1>
+                    {{ $partido->equipol ? $partido->equipol->nombre : '' }}
+                    vs
+                    {{ $partido->equipov ? $partido->equipov->nombre : '' }}
+                </h1>
+            </div>
+        </div>
 
-        .nav-tabs .nav-link.active {
-            background: #0d6efd;
-            color: #fff !important;
-        }
+        <div class="t-panel mb-3">
+            <div class="t-marcador-grande">
+                <div class="t-lado">
+                    @if($partido->equipol)
+                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
+                            <x-escudo :src="$partido->equipol->escudo" :nombre="$partido->equipol->nombre" tam="xl"/>
+                        </a>
+                        <b>
+                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">{{ $partido->equipol->nombre }}</a>
+                            @if($partido->equipol->bandera_url)
+                                <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" title="{{ $partido->equipol->pais }}">
+                            @endif
+                        </b>
+                    @endif
+                </div>
 
-        .tab-content {
-            padding: 20px;
-            border: 1px solid #dee2e6;
-            border-top: 0;
-            background: #fff;
-            border-radius: 0 0 15px 15px;
-            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Tablas */
-        table.table {
-            background: #fff;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        table.table thead {
-            background: #f1f5f9;
-            font-weight: bold;
-        }
-
-        table.table td {
-            vertical-align: middle;
-        }
-
-        /* Jugadores */
-        .imgCircle {
-            border-radius: 50%;
-            height: 35px;
-            width: 35px;
-            object-fit: cover;
-            margin-right: 6px;
-            border: 2px solid #dee2e6;
-        }
-
-        .player-name {
-            font-weight: 600;
-        }
-
-        .event-icon {
-            margin-left: 6px;
-        }
-
-        /* Botón Volver */
-        .btn-success {
-            border-radius: 30px;
-            padding: 8px 25px;
-            font-weight: 500;
-        }
-
-
-    </style>
-
-    <div class="container">
-
-        <h1 class="display-6 text-center">
-            @if(is_numeric($partido->fecha->numero))
-                Fecha {{ $partido->fecha->numero }}
-            @else
-                {{ $partido->fecha->numero }}
-            @endif
-            de {{$partido->fecha->grupo->torneo->nombre}} {{$partido->fecha->grupo->torneo->year}}
-        </h1>
-
-        <div class="card card-custom p-3">
-            <table class="table table-sm text-center align-middle">
-                <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Local</th>
-                    <th>GL</th>
-                    <th>GV</th>
-                    <th>Visitante</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td>{{ ($partido->dia) ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                    <td>
-                        @if($partido->equipol)
-                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
-                                @if($partido->equipol->escudo)
-                                    <img src="{{ url('images/'.$partido->equipol->escudo) }}" height="25" class="me-2">
-                                @endif
-                                <span class="fw-bold">{{ $partido->equipol->nombre }}</span>
-                                <img src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" height="16" class="ms-1">
-                            </a>
+                <div>
+                    <div class="t-marcador-cifra">
+                        @if($sinJugar)
+                            – –
+                        @else
+                            {{ $partido->golesl }}&thinsp;–&thinsp;{{ $partido->golesv }}
                         @endif
-                    </td>
-                    <td>{{ $partido->golesl }} @if($partido->penalesl) ({{ $partido->penalesl }}) @endif</td>
-                    <td>{{ $partido->golesv }} @if($partido->penalesv) ({{ $partido->penalesv }}) @endif</td>
-                    <td>
-                        @if($partido->equipov)
-                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
-                                @if($partido->equipov->escudo)
-                                    <img src="{{ url('images/'.$partido->equipov->escudo) }}" height="25" class="me-2">
-                                @endif
-                                <span class="fw-bold">{{ $partido->equipov->nombre }}</span>
-                                <img src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" height="16" class="ms-1">
-                            </a>
-                        @endif
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+                    </div>
+                    @if($partido->penalesl || $partido->penalesv)
+                        <div class="t-eyebrow mt-2">Penales {{ $partido->penalesl }}–{{ $partido->penalesv }}</div>
+                    @endif
+                </div>
+
+                <div class="t-lado">
+                    @if($partido->equipov)
+                        <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
+                            <x-escudo :src="$partido->equipov->escudo" :nombre="$partido->equipov->nombre" tam="xl"/>
+                        </a>
+                        <b>
+                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">{{ $partido->equipov->nombre }}</a>
+                            @if($partido->equipov->bandera_url)
+                                <img class="bandera" src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" title="{{ $partido->equipov->pais }}">
+                            @endif
+                        </b>
+                    @endif
+                </div>
+            </div>
+
+            <div class="t-meta-partido">
+                @if($partido->dia)
+                    <span>Día <b>{{ date('d/m/Y', strtotime($partido->dia)) }}</b></span>
+                    <span>Hora <b>{{ date('H:i', strtotime($partido->dia)) }}</b></span>
+                @else
+                    <span>Sin fecha confirmada</span>
+                @endif
+                <span>{{ $torneoDet->nombre }} {{ $torneoDet->year }}</span>
+            </div>
         </div>
 
         <!-- Tabs -->
