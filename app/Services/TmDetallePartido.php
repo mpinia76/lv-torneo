@@ -102,6 +102,8 @@ class TmDetallePartido
     private $fotosBajadas = 0;
     /** Filas que la base rechazó (índices únicos, etc.). */
     private $fallidas = 0;
+    /** Crudo de los árbitros del último partido, para mostrarlo en la vista previa. */
+    private $crudoArbitros = null;
 
     // ═════════════════════════════════ API ═════════════════════════════════
 
@@ -135,6 +137,7 @@ class TmDetallePartido
             'creados'     => ['jugadores' => [], 'arbitros' => [], 'tecnicos' => []],
             'llamadas'    => 0,
             'crudo'       => null,
+            'crudo_arbitros' => null,
         ];
 
         $partido = Partido::find($partidoId);
@@ -457,6 +460,7 @@ class TmDetallePartido
         // Árbitros: sólo los que ya estén atados en arbitro_tm. Los que no,
         // se listan como aviso — no inventamos personas sin nombre.
         $plan['arbitros'] = $this->planArbitros($game, $partido, $escribir, $informe);
+        if ($informe !== null) $informe['crudo_arbitros'] = $this->crudoArbitros;
         $plan['tecnicos'] = $this->planTecnicos($game, $partido, $lados, $escribir, $informe);
 
         $informe['plan']   = $plan;
@@ -817,9 +821,30 @@ class TmDetallePartido
         $mapa = $this->mapaArbitros();
 
         // Forma A: lista estructurada con rol.
-        $lista = null;
+        $lista = null; $claveLista = null;
         foreach (['referees', 'refereeDetails'] as $k) {
-            if (isset($game[$k]) && is_array($game[$k])) { $lista = $game[$k]; break; }
+            if (isset($game[$k]) && is_array($game[$k])) { $lista = $game[$k]; $claveLista = $k; break; }
+        }
+
+        // Si algo no cierra —entradas sin id, sin rol, o de más— hay que ver el
+        // crudo: la estructura de TM puede no ser la lista plana que asumimos.
+        // Se guarda tal cual para poder mirarlo en la vista previa: el rol de
+        // los árbitros ya nos hizo equivocar tres veces por inferir en vez de leer.
+        $this->crudoArbitros = ['clave' => $claveLista, 'lista' => $lista,
+            'refereeIds' => isset($game['refereeIds']) ? $game['refereeIds'] : null,
+            'refereeId'  => isset($game['refereeId']) ? $game['refereeId'] : null];
+
+        $rarezas = 0;
+        if (is_array($lista)) {
+            foreach ($lista as $r) {
+                if (!is_array($r)) { $rarezas++; continue; }
+                if ($this->valor($r, ['id', 'refereeId', 'personId']) === null) $rarezas++;
+            }
+            if ($rarezas > 0 || count($lista) > count(self::$rolesArbitro)) {
+                $this->aviso('Estructura de árbitros rara en `' . $claveLista . '`: ' . count($lista)
+                    . ' entradas, ' . $rarezas . ' sin id reconocible. Crudo: '
+                    . $this->resumenCrudo($lista, 1500));
+            }
         }
 
         $pares = [];
@@ -830,7 +855,8 @@ class TmDetallePartido
                 $pares[] = [$this->valor($r, ['id', 'refereeId', 'personId']), $this->rolArbitro($crudo), $crudo];
             }
         } elseif (isset($game['refereeIds']) && is_array($game['refereeIds'])) {
-            // Forma B: sólo ids, sin rol. Se reparte por posición más abajo.
+            // Forma B: sólo ids, sin ningún dato de rol. Acá el orden es la
+            // única señal que hay, así que se usa —pero sólo acá, y avisando.
             foreach ($game['refereeIds'] as $id) {
                 $pares[] = [is_array($id) ? $this->valor($id, ['id', 'refereeId']) : $id, null, ''];
             }
@@ -860,23 +886,46 @@ class TmDetallePartido
                     : 'No quedaba ningún rol libre, así que lo dejé afuera.'));
         }
 
+        // Sin rol en el texto: se asigna por la POSICIÓN en la lista de TM,
+        // usando $ordenArbitroTm. Sólo cuentan las entradas con id: las que no
+        // lo tienen no son árbitros y correrían la numeración.
+        $pos = 0; $porOrden = [];
         foreach ($pares as $i => $par) {
+            if ($par[0] === null || $par[0] === '') continue;
+            $esteLugar = $pos++;
             if ($par[1] !== null) continue;
-            foreach (self::$rolesArbitro as $rol) {
-                if (!isset($usados[$rol])) { $pares[$i][1] = $rol; $usados[$rol] = true; break; }
+
+            $rol = isset(self::$ordenArbitroTm[$esteLugar]) ? self::$ordenArbitroTm[$esteLugar] : null;
+            if ($rol === null || isset($usados[$rol])) {
+                foreach (self::$rolesArbitro as $libre) {
+                    if (!isset($usados[$libre])) { $rol = $libre; break; }
+                }
             }
-            if ($pares[$i][1] === null) {
-                $this->aviso('Árbitro TM ' . $par[0] . ' quedó afuera: tu tabla `partido_arbitros` sólo admite '
-                    . implode(', ', self::$rolesArbitro) . ' y ya están todos tomados. '
-                    . ($par[2] !== '' ? 'Transfermarkt lo llama "' . $par[2] . '". ' : '')
-                    . 'Si querés guardarlo hay que agregar ese rol al enum de la tabla.');
-                continue;
-            }
-            if ($par[2] !== '') {
-                $this->aviso('Rol de árbitro sin reconocer: "' . $par[2] . '". Lo puse como '
-                    . $pares[$i][1] . ' por el orden en que viene. Pasame ese texto y lo agrego al mapeo.');
+            if ($rol === null || isset($usados[$rol])) continue;   // no quedan roles
+
+            $pares[$i][1] = $rol;
+            $pares[$i][3] = true;              // marcado: rol inferido, no informado
+            $usados[$rol] = true;
+            $porOrden[] = 'TM ' . $par[0] . ' → ' . $rol;
+        }
+
+        if (!empty($porOrden)) {
+            $this->aviso('Transfermarkt no informó el rol de ' . count($porOrden) . ' árbitro(s). '
+                . 'Los asigné por el orden en que vienen (' . implode(', ', self::$ordenArbitroTm) . '): '
+                . implode(' · ', $porOrden) . '. Es una inferencia por posición: verificalos.');
+        }
+
+        $sinLugar = [];
+        foreach ($pares as $par) {
+            if ($par[1] === null) {
+                $sinLugar[] = ($par[0] !== null && $par[0] !== '' ? 'TM ' . $par[0] : 'sin id');
             }
         }
+        if (!empty($sinLugar)) {
+            $this->aviso('Quedaron afuera ' . count($sinLugar) . ' árbitro(s), sin rol libre donde ponerlos: '
+                . implode(' · ', $sinLugar) . '.');
+        }
+
         $pares = array_values(array_filter($pares, function ($x) { return $x[1] !== null; }));
 
         // Los que todavía no conocemos: los buscamos por perfil, igual que a los
@@ -896,7 +945,8 @@ class TmDetallePartido
         }
 
         foreach ($pares as $par) {
-            list($tmId, $rol, $crudoRol) = $par;
+            $tmId = $par[0]; $rol = $par[1]; $crudoRol = $par[2];
+            $inferido = !empty($par[3]);
             if ($tmId === null || $tmId === '') continue;
             if (!isset($mapa[(string) $tmId])) {
                 $this->aviso('Árbitro TM ' . $tmId . ' (' . $rol . '): no lo tengo mapeado y no pude traer su perfil. '
@@ -909,8 +959,8 @@ class TmDetallePartido
                 'arbitro_id' => $arbitroId,
                 'tipo'       => $rol,
                 '_nombre'    => $this->nombreArbitro($arbitroId),
-                '_fuente'    => $crudoRol !== '' ? $crudoRol : '(TM no mandó rol)',
-                '_dudoso'    => $crudoRol === '',
+                '_fuente'    => $crudoRol !== '' ? $crudoRol : ($inferido ? '(por orden en la lista)' : '(TM no mandó rol)'),
+                '_dudoso'    => $inferido || $crudoRol === '',
             ];
         }
         return $out;
@@ -1446,8 +1496,20 @@ class TmDetallePartido
         return null;
     }
 
-    /** Los roles válidos, en el orden en que se reparten cuando no se reconocen. */
+    /** Los roles válidos de `partido_arbitros.tipo`. */
     private static $rolesArbitro = ['Principal', 'Linea 1', 'Linea 2', 'Cuarto', 'VAR'];
+
+    /**
+     * Orden en que Transfermarkt lista la terna cuando NO manda el rol.
+     * Observado en Aldosivi-Unión (fecha 6, Clausura 2026) y confirmado contra
+     * livefutbol: Amiconi principal, Viglietti asistente 2 — cae en la posición
+     * 4 con este orden, no con el del enum.
+     *
+     * Es una inferencia por posición, no un dato: si TM omite a alguien o
+     * cambia el orden, se corre todo. Por eso lo cargado así va marcado como
+     * dudoso y con aviso.
+     */
+    private static $ordenArbitroTm = ['Principal', 'VAR', 'Linea 1', 'Linea 2', 'Cuarto'];
 
     // ═══════════════════════ JUGADORES: RESOLVER Y CREAR ═══════════════════
 
@@ -2355,9 +2417,9 @@ class TmDetallePartido
         return trim(implode(' | ', $partes));
     }
 
-    private function resumenCrudo($a)
+    private function resumenCrudo($a, $largo = 200)
     {
-        return mb_substr(json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, 200);
+        return mb_substr(json_encode($a, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 0, $largo);
     }
 
     /** Saca las claves auxiliares (_nombre, _equipo…) antes de insertar. */

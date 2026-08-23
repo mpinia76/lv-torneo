@@ -313,6 +313,14 @@ class ImportDetallesController extends Controller
             '_nombre' => 'Jugador', '_equipo' => 'Equipo', '_fuente' => 'Cómo lo deduje']);
         $cuerpo .= $this->bloque('Árbitros', $p['arbitros'],
             ['tipo' => 'Rol', '_nombre' => 'Árbitro', '_fuente' => 'Texto de Transfermarkt']);
+
+        if (!empty($r['crudo_arbitros'])) {
+            $cuerpo .= '<h2>Árbitros · crudo de Transfermarkt</h2>'
+                . '<p class="sub">Tal como viene en el JSON. Es lo que hace falta para leer el rol de verdad '
+                . 'en vez de inferirlo por la posición.</p>'
+                . '<pre>' . e(json_encode($r['crudo_arbitros'],
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre>';
+        }
         $cuerpo .= $this->bloque('Técnicos', isset($p['tecnicos']) ? $p['tecnicos'] : [],
             ['_equipo' => 'Equipo', '_nombre' => 'DT', '_estado' => 'Estado']);
 
