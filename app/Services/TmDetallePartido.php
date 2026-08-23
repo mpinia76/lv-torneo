@@ -1855,6 +1855,25 @@ class TmDetallePartido
                     $plantillas[$clave] = $existente;
                 }
 
+                // El dorsal es único por plantilla (índice `plantilla_id_dorsal`).
+                // Si ya lo tiene OTRO jugador, gana el que dice Transfermarkt:
+                // al que estaba se le borra el número —sigue en la plantilla,
+                // solo pierde el dorsal— y se avisa para que lo revises.
+                if ($f['dorsal'] !== null && $f['dorsal'] !== '') {
+                    $ocupa = \App\PlantillaJugador::where('plantilla_id', $plantillas[$clave])
+                        ->where('dorsal', $f['dorsal'])
+                        ->where('jugador_id', '!=', $f['jugador_id'])->first();
+                    if ($ocupa) {
+                        $ocupa->update(['dorsal' => null]);
+                        // El token [[plantilla:N]] lo convierte en link la pantalla
+                        // que muestra los avisos, DESPUÉS de escapar el texto.
+                        $this->aviso('Dorsal ' . $f['dorsal'] . ' en ' . $f['_equipo'] . ': se lo saqué a "'
+                            . $this->nombreJugador($ocupa->jugador_id) . '" y se lo di a "' . $f['_nombre']
+                            . '", que es lo que dice Transfermarkt. El otro quedó sin dorsal: revisalo. '
+                            . '[[plantilla:' . (int) $plantillas[$clave] . ']]');
+                    }
+                }
+
                 $pj = \App\PlantillaJugador::where('plantilla_id', $plantillas[$clave])
                     ->where('jugador_id', $f['jugador_id'])->first();
 

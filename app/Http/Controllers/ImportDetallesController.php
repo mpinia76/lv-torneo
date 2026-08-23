@@ -278,7 +278,7 @@ class ImportDetallesController extends Controller
 
         if (!empty($r['avisos'])) {
             $cuerpo .= '<h2>Avisos</h2><div class="diag">';
-            foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . e($a) . '</div>';
+            foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . $this->avisoHtml($a) . '</div>';
             $cuerpo .= '</div>';
         }
 
@@ -401,7 +401,7 @@ class ImportDetallesController extends Controller
                 $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
             }
             foreach ($r['avisos'] as $a) {
-                $detalle .= '<div class="sub" style="margin-left:18px">• ' . e($a) . '</div>';
+                $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
             }
         }
 
@@ -531,7 +531,7 @@ class ImportDetallesController extends Controller
 
         if (!empty($r['avisos'])) {
             $cuerpo .= '<h2>Avisos</h2><div class="diag">';
-            foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . e($a) . '</div>';
+            foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . $this->avisoHtml($a) . '</div>';
             $cuerpo .= '</div>';
         }
 
@@ -666,7 +666,7 @@ class ImportDetallesController extends Controller
 
             if (!empty($r['avisos'])) {
                 $cuerpo .= '<h2>Avisos</h2><div class="diag">';
-                foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . e($a) . '</div>';
+                foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . $this->avisoHtml($a) . '</div>';
                 $cuerpo .= '</div>';
             }
             $cuerpo .= '<p class="acciones">'
@@ -829,6 +829,19 @@ class ImportDetallesController extends Controller
     }
 
     // ═══════════════════════════ AUXILIARES ═══════════════════════════
+
+    /**
+     * Los avisos se escapan siempre (traen datos crudos de Transfermarkt).
+     * Después de escapar, los tokens [[plantilla:N]] se convierten en un link
+     * a la edición de esa plantilla, para poder arreglar el dorsal de una.
+     */
+    private function avisoHtml($texto)
+    {
+        $html = e($texto);
+        return preg_replace_callback('/\[\[plantilla:(\d+)\]\]/', function ($m) {
+            return '<a href="' . e(route('plantillas.edit', (int) $m[1])) . '" target="_blank">abrir la plantilla ↗</a>';
+        }, $html);
+    }
 
     /**
      * partido_id => fecha_id, para linkear a "Datos complementarios"
