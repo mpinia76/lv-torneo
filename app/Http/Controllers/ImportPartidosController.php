@@ -427,6 +427,8 @@ class ImportPartidosController extends Controller
                     ? '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar',
                         ['comp' => $comp, 'gameday' => $r])) . '">Aplicar ' . $d['nuevo'] . ' →</a>'
                     : '<span class="sub">nada por crear</span>')
+                . ' <a class="boton-sec" href="' . e(route('import_detalles.index',
+                    ['comp' => $comp, 'ronda' => $r])) . '">Detalles →</a>'
                 . '</td></tr>';
         }
         $html .= '</tbody></table></div>';

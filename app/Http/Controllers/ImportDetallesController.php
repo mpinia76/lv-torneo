@@ -31,12 +31,19 @@ class ImportDetallesController extends Controller
     {
         $tecnicoId = (int) $request->get('tecnico_id', 0);
         $conDetalle = (string) $request->get('con_detalle', '0') === '1';
+        $comp  = trim((string) $request->get('comp', ''));
+        $ronda = trim((string) $request->get('ronda', ''));
 
+        // `aplicado` son los que creó el importador; `duplicado` los que ya
+        // tenías cargados y el fixture emparejó. A los dos se les puede bajar el
+        // detalle: lo único que hace falta es el partido_id y el gameId.
         $q = DB::table('import_partidos')
             ->whereNotNull('partido_id')
             ->whereNotNull('external_id')
-            ->where('estado', 'aplicado');
+            ->whereIn('estado', ['aplicado', 'duplicado']);
         if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        if ($comp !== '')  $q->where('competencia_external_id', $comp);
+        if ($ronda !== '') $q->where('ronda', $ronda);
 
         $filas = $q->orderBy('dia', 'desc')->limit(2000)->get();
 
@@ -113,8 +120,17 @@ class ImportDetallesController extends Controller
                 . e($t->nombre) . ' (' . (int) $t->n . ')</option>';
         }
         $cuerpo .= '</select> '
+            . '<input name="comp" value="' . e($comp) . '" placeholder="competencia, ej ARGC" size="14"> '
+            . '<input name="ronda" value="' . e($ronda) . '" placeholder="fecha nº" size="8"> '
             . '<label><input type="checkbox" name="con_detalle" value="1"' . ($conDetalle ? ' checked' : '') . '> mostrar también los que ya tienen detalle</label> '
-            . '<button>Filtrar</button></form>'
+            . '<button>Filtrar</button>'
+            . (($comp !== '' || $ronda !== '' || $tecnicoId)
+                ? ' <a href="' . e(route('import_detalles.index')) . '">limpiar filtros</a>' : '')
+            . '</form>'
+            . (($comp !== '' || $ronda !== '')
+                ? '<p class="sub">Filtrando por <b>' . e($comp !== '' ? $comp : 'todas') . '</b>'
+                  . ($ronda !== '' ? ' · fecha <b>' . e($ronda) . '</b>' : '') . '.</p>'
+                : '')
 
             . '<p class="acciones">'
             . '<a class="boton-sec" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm desde las URLs</a>'
@@ -127,7 +143,7 @@ class ImportDetallesController extends Controller
             $paraRehacer = min(10, $listos);
             $cuerpo .= '<p class="acciones"><a class="boton-sec" href="'
                 . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null,
-                    'n' => $paraRehacer, 'rehacer' => 1])))
+                    'n' => $paraRehacer, 'comp' => $comp ?: null, 'ronda' => $ronda ?: null, 'rehacer' => 1])))
                 . '">Rehacer el detalle de los ' . $paraRehacer . ' más nuevos</a>'
                 . ' <span class="sub">vuelve a bajarlos de Transfermarkt y pisa lo que ya tenían '
                 . '(' . $paraRehacer . ' llamadas)</span></p>';
@@ -140,7 +156,8 @@ class ImportDetallesController extends Controller
 
         $paraTanda = min(10, count($pendientes));
         $cuerpo .= '<p class="acciones">'
-            . '<a class="boton" href="' . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null, 'n' => $paraTanda])))
+            . '<a class="boton" href="' . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                'n' => $paraTanda, 'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
             . '">Bajar los primeros ' . $paraTanda . '</a>'
             . ' <span class="sub">≈ ' . $paraTanda . ' llamadas + las de jugadores nuevos</span></p>';
 
@@ -332,8 +349,14 @@ class ImportDetallesController extends Controller
         $rehacer = (string) $request->get('rehacer', '0') === '1';
         $desde   = (int) $request->get('offset', 0);
 
+        $comp  = trim((string) $request->get('comp', ''));
+        $ronda = trim((string) $request->get('ronda', ''));
+
         $q = DB::table('import_partidos')
-            ->whereNotNull('partido_id')->whereNotNull('external_id')->where('estado', 'aplicado');
+            ->whereNotNull('partido_id')->whereNotNull('external_id')
+            ->whereIn('estado', ['aplicado', 'duplicado']);
+        if ($comp !== '')  $q->where('competencia_external_id', $comp);
+        if ($ronda !== '') $q->where('ronda', $ronda);
         if ($rehacer) {
             $q->whereIn('partido_id', function ($sub) {
                 $sub->from('alineacions')->select('partido_id')->distinct();
@@ -382,7 +405,8 @@ class ImportDetallesController extends Controller
             }
         }
 
-        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null]))) . '">← Detalle de los partidos</a></p>'
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                'comp' => $comp ?: null, 'ronda' => $ronda ?: null]))) . '">← Detalle de los partidos</a></p>'
             . '<h1>' . ($rehacer ? 'Rehacer detalles' : 'Tanda de detalles') . '</h1>'
             . ($rehacer ? '<p class="sub">Se vuelve a bajar el detalle de partidos que <b>ya lo tenían</b>: '
                 . 'reemplaza alineación, goles, tarjetas, cambios y árbitros, y completa lo que el importador '
@@ -400,9 +424,11 @@ class ImportDetallesController extends Controller
         } else {
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null, 'n' => $n,
+                    'comp' => $comp ?: null, 'ronda' => $ronda ?: null,
                     'rehacer' => $rehacer ? 1 : null, 'offset' => $rehacer ? ($desde + $n) : null])))
                 . '">' . ($rehacer ? 'Rehacer los ' . $n . ' siguientes' : 'Otra tanda de ' . $n) . '</a>'
-                . '<a class="boton-sec" href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null]))) . '">Volver a la lista</a></p>'
+                . '<a class="boton-sec" href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                'comp' => $comp ?: null, 'ronda' => $ronda ?: null]))) . '">Volver a la lista</a></p>'
                 . '<div class="diag">' . $detalle . '</div>';
         }
 
@@ -609,7 +635,7 @@ class ImportDetallesController extends Controller
         $aplicar   = (string) $request->get('aplicar', '0') === '1';
 
         $q = DB::table('import_partidos')
-            ->whereNotNull('partido_id')->where('estado', 'aplicado');
+            ->whereNotNull('partido_id')->whereIn('estado', ['aplicado', 'duplicado']);
         if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
         $ids = $q->pluck('partido_id')->all();
 
