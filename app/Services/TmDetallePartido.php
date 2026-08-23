@@ -855,10 +855,37 @@ class TmDetallePartido
                 $pares[] = [$this->valor($r, ['id', 'refereeId', 'personId']), $this->rolArbitro($crudo), $crudo];
             }
         } elseif (isset($game['refereeIds']) && is_array($game['refereeIds'])) {
-            // Forma B: sólo ids, sin ningún dato de rol. Acá el orden es la
-            // única señal que hay, así que se usa —pero sólo acá, y avisando.
-            foreach ($game['refereeIds'] as $id) {
-                $pares[] = [is_array($id) ? $this->valor($id, ['id', 'refereeId']) : $id, null, ''];
+            // Forma B: objeto con una clave por rol. La clave ES el rol.
+            $fuera = [];
+            foreach (self::$clavesArbitroTm as $clave => $rol) {
+                if (!array_key_exists($clave, $game['refereeIds'])) continue;
+                $id = $game['refereeIds'][$clave];
+                if ($id === null || $id === '' || $id === 0 || $id === '0') continue;
+                if (is_array($id)) $id = $this->valor($id, ['id', 'refereeId']);
+                if ($id === null || $id === '') continue;
+
+                if (!in_array($rol, self::$rolesArbitro, true)) {
+                    // Los ignorados a propósito no generan aviso.
+                    if (!in_array($rol, self::$rolesArbitroIgnorados, true)) {
+                        $fuera[] = $rol . ' (TM ' . $id . ')';
+                    }
+                    continue;
+                }
+                $pares[] = [$id, $rol, $clave];
+            }
+
+            // Claves que TM mandó y no conocemos: hay que mirarlas, no ignorarlas.
+            foreach ($game['refereeIds'] as $clave => $id) {
+                if (isset(self::$clavesArbitroTm[$clave])) continue;
+                if ($id === null || $id === '' || $id === 0 || $id === '0') continue;
+                $this->aviso('Transfermarkt mandó un árbitro en una clave que no conozco: `' . $clave
+                    . '` = ' . (is_array($id) ? $this->resumenCrudo($id) : $id) . '. Pasámela y la mapeo.');
+            }
+
+            if (!empty($fuera)) {
+                $this->aviso('No cargué ' . count($fuera) . ' juez(ces) porque el rol no existe en tu tabla '
+                    . '`partido_arbitros` (que admite ' . implode(', ', self::$rolesArbitro) . '): '
+                    . implode(' · ', $fuera) . '. Si los querés, hay que agregar ese valor al enum.');
             }
         }
 
@@ -1498,6 +1525,40 @@ class TmDetallePartido
 
     /** Los roles válidos de `partido_arbitros.tipo`. */
     private static $rolesArbitro = ['Principal', 'Linea 1', 'Linea 2', 'Cuarto', 'VAR'];
+
+    /**
+     * `refereeIds` de tmapi NO es una lista: es un objeto donde CADA CLAVE dice
+     * el rol. Confirmado en Aldosivi-Unión (fecha 6, Clausura 2026):
+     *
+     *   refereeId 54272 (Amiconi) · secondRefereeAssistantId 69495 (Viglietti)
+     *   firstVideoAssistantId 21416 · secondVideoAssistantId 65524
+     *
+     * y coincide con livefutbol: Amiconi principal, Viglietti asistente 2.
+     * Los que TM no tiene vienen en null (acá faltaba el asistente 1, Castelli).
+     *
+     * OJO: iterar esto con foreach sobre los VALORES tira las claves, que son
+     * el dato. Fue exactamente el bug que puso a Viglietti como VAR.
+     *
+     * 'AVAR' y los jueces de gol no existen en el enum de `partido_arbitros`.
+     */
+    private static $clavesArbitroTm = [
+        'refereeId'                => 'Principal',
+        'firstRefereeAssistantId'  => 'Linea 1',
+        'secondRefereeAssistantId' => 'Linea 2',
+        'fourthOfficialId'         => 'Cuarto',
+        'firstVideoAssistantId'    => 'VAR',
+        'secondVideoAssistantId'   => 'AVAR',
+        'firstGoalJudgeId'         => 'Juez de gol 1',
+        'secondGoalJudgeId'        => 'Juez de gol 2',
+    ];
+
+    /**
+     * Roles que Transfermarkt manda, no entran en el enum, y encima se quieren
+     * silenciar. Vacío a propósito: el usuario prefiere que le avise siempre
+     * (ago-2026), aunque el AVAR no lo vaya a cargar — sirve para saber que el
+     * dato existía. Si algún aviso se vuelve puro ruido, sumar el rol acá.
+     */
+    private static $rolesArbitroIgnorados = [];
 
     /**
      * Orden en que Transfermarkt lista la terna cuando NO manda el rol.
