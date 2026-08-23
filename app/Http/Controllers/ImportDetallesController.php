@@ -311,7 +311,8 @@ class ImportDetallesController extends Controller
             '_equipo' => 'Equipo', 'tipo' => 'Tipo', '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Cambios', $p['cambios'], ['minuto' => 'Min', 'tipo' => 'Tipo',
             '_nombre' => 'Jugador', '_equipo' => 'Equipo', '_fuente' => 'Cómo lo deduje']);
-        $cuerpo .= $this->bloque('Árbitros', $p['arbitros'], ['tipo' => 'Rol', '_nombre' => 'Árbitro']);
+        $cuerpo .= $this->bloque('Árbitros', $p['arbitros'],
+            ['tipo' => 'Rol', '_nombre' => 'Árbitro', '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Técnicos', isset($p['tecnicos']) ? $p['tecnicos'] : [],
             ['_equipo' => 'Equipo', '_nombre' => 'DT', '_estado' => 'Estado']);
 

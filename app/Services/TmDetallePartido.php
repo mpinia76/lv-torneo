@@ -826,17 +826,37 @@ class TmDetallePartido
         if (is_array($lista)) {
             foreach ($lista as $r) {
                 if (!is_array($r)) continue;
-                $pares[] = [$this->valor($r, ['id', 'refereeId', 'personId']), $this->rolArbitro($this->juntarTexto($r, ['role', 'type', 'position', 'typeName']))];
+                $crudo = $this->juntarTexto($r, ['role', 'type', 'position', 'typeName', 'roleName', 'refereeType']);
+                $pares[] = [$this->valor($r, ['id', 'refereeId', 'personId']), $this->rolArbitro($crudo), $crudo];
             }
         } elseif (isset($game['refereeIds']) && is_array($game['refereeIds'])) {
-            // Forma B: sólo ids. El primero es el principal; el resto, líneas.
-            $i = 0;
+            // Forma B: sólo ids, sin rol. Se reparte por posición más abajo.
             foreach ($game['refereeIds'] as $id) {
-                $i++;
-                $rol = $i === 1 ? 'Principal' : ($i === 2 ? 'Línea 1' : ($i === 3 ? 'Línea 2' : 'Desconocido'));
-                $pares[] = [is_array($id) ? $this->valor($id, ['id', 'refereeId']) : $id, $rol];
+                $pares[] = [is_array($id) ? $this->valor($id, ['id', 'refereeId']) : $id, null, ''];
             }
         }
+
+        // A los que no se les reconoció el rol se les da el primer lugar libre
+        // (Principal, Linea 1, Linea 2, Cuarto, VAR), que es el orden en que
+        // Transfermarkt los lista. Mejor eso que meter cuatro 'Principal'.
+        $usados = [];
+        foreach ($pares as $par) if ($par[1] !== null) $usados[$par[1]] = true;
+        foreach ($pares as $i => $par) {
+            if ($par[1] !== null) continue;
+            foreach (self::$rolesArbitro as $rol) {
+                if (!isset($usados[$rol])) { $pares[$i][1] = $rol; $usados[$rol] = true; break; }
+            }
+            if ($pares[$i][1] === null) {
+                $this->aviso('No pude ubicar a un árbitro: ya están tomados los cinco roles.'
+                    . ($par[2] !== '' ? ' Transfermarkt dice "' . $par[2] . '".' : ''));
+                continue;
+            }
+            if ($par[2] !== '') {
+                $this->aviso('Rol de árbitro sin reconocer: "' . $par[2] . '". Lo puse como '
+                    . $pares[$i][1] . ' por el orden en que viene. Pasame ese texto y lo agrego al mapeo.');
+            }
+        }
+        $pares = array_values(array_filter($pares, function ($x) { return $x[1] !== null; }));
 
         // Los que todavía no conocemos: los buscamos por perfil, igual que a los
         // jugadores. Si la API no los devuelve, se saltean con un aviso.
@@ -855,7 +875,7 @@ class TmDetallePartido
         }
 
         foreach ($pares as $par) {
-            list($tmId, $rol) = $par;
+            list($tmId, $rol, $crudoRol) = $par;
             if ($tmId === null || $tmId === '') continue;
             if (!isset($mapa[(string) $tmId])) {
                 $this->aviso('Árbitro TM ' . $tmId . ' (' . $rol . '): no lo tengo mapeado y no pude traer su perfil. '
@@ -868,6 +888,8 @@ class TmDetallePartido
                 'arbitro_id' => $arbitroId,
                 'tipo'       => $rol,
                 '_nombre'    => $this->nombreArbitro($arbitroId),
+                '_fuente'    => $crudoRol !== '' ? $crudoRol : '(TM no mandó rol)',
+                '_dudoso'    => $crudoRol === '',
             ];
         }
         return $out;
@@ -1366,17 +1388,45 @@ class TmDetallePartido
         if ($this->mapaArbitros !== null) $this->mapaArbitros[(string) $tmId] = (int) $arbitroId;
     }
 
+    /**
+     * Rol del árbitro. Devuelve un valor del enum de `partido_arbitros`:
+     * 'Principal', 'Linea 1', 'Linea 2', 'Cuarto', 'VAR'  — SIN acento, y no
+     * existe 'Desconocido'. Cualquier otra cosa la rechaza la base.
+     *
+     * Devuelve null si no reconoce el texto: ahí `planArbitros` asigna por
+     * posición en vez de inventar un rol. Antes caía todo a 'Principal' y
+     * podías terminar con cuatro principales en el mismo partido.
+     */
     private function rolArbitro($txt)
     {
         $t = mb_strtolower(trim((string) $txt));
-        if ($t === '') return 'Principal';
-        if (mb_strpos($t, 'assistant') !== false || mb_strpos($t, 'linesman') !== false || mb_strpos($t, 'línea') !== false || mb_strpos($t, 'linea') !== false) {
-            return mb_strpos($t, '2') !== false ? 'Línea 2' : 'Línea 1';
+        if ($t === '') return null;
+
+        // VAR primero: "video assistant referee" contiene "assistant".
+        if (mb_strpos($t, 'var') !== false || mb_strpos($t, 'video') !== false) return 'VAR';
+
+        if (mb_strpos($t, 'fourth') !== false || mb_strpos($t, '4th') !== false
+            || mb_strpos($t, 'cuarto') !== false || mb_strpos($t, 'vierter') !== false) return 'Cuarto';
+
+        if (mb_strpos($t, 'assistant') !== false || mb_strpos($t, 'asistente') !== false
+            || mb_strpos($t, 'linesman') !== false || mb_strpos($t, 'línea') !== false
+            || mb_strpos($t, 'linea') !== false || mb_strpos($t, 'assistent') !== false) {
+            if (mb_strpos($t, '2') !== false || mb_strpos($t, 'second') !== false
+                || mb_strpos($t, 'segundo') !== false || mb_strpos($t, 'zweiter') !== false) return 'Linea 2';
+            return 'Linea 1';
         }
-        if (mb_strpos($t, 'fourth') !== false || mb_strpos($t, 'cuarto') !== false) return 'Desconocido';
-        if (mb_strpos($t, 'var') !== false) return 'Desconocido';
-        return 'Principal';
+
+        if (mb_strpos($t, 'referee') !== false || mb_strpos($t, 'árbitro') !== false
+            || mb_strpos($t, 'arbitro') !== false || mb_strpos($t, 'main') !== false
+            || mb_strpos($t, 'principal') !== false || mb_strpos($t, 'schiedsrichter') !== false) {
+            return 'Principal';
+        }
+
+        return null;
     }
+
+    /** Los roles válidos, en el orden en que se reparten cuando no se reconocen. */
+    private static $rolesArbitro = ['Principal', 'Linea 1', 'Linea 2', 'Cuarto', 'VAR'];
 
     // ═══════════════════════ JUGADORES: RESOLVER Y CREAR ═══════════════════
 
