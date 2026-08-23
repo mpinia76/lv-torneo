@@ -526,27 +526,32 @@ class ImportDetallesController extends Controller
         $compId = trim((string) $request->get('comp_id', ''));
         $season = trim((string) $request->get('season', ''));
         $ronda  = trim((string) $request->get('ronda', ''));
+        $clubId = trim((string) $request->get('club_id', ''));
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Diagnóstico de competencias</h1>'
-            . '<p class="sub">Prueba qué rutas de competencia responde tmapi. Si alguna devuelve el '
-            . '<b>fixture</b> (lista de partidos) o la <b>tabla</b>, un torneo en curso se podría cargar '
-            . 'por competencia en vez de a mano. <b>Cada ruta cuesta 1 crédito.</b><br>'
-            . 'El id de competencia sale del JSON de un club (<code>primaryCompetitionId</code>, ej '
-            . '<code>ARGC</code>) o de <code>import_partidos.competencia_external_id</code>.</p>'
+            . '<p class="sub">Busca una ruta que devuelva la <b>lista de partidos</b> con su <code>gameId</code>. '
+            . 'Es lo único que falta para cargar un torneo en curso: con el gameId, el importador de detalle '
+            . 'ya trae alineaciones e incidencias. <b>Cada ruta cuesta 1 crédito.</b><br>'
+            . 'Ya sabemos que <code>/games</code>, <code>/matches</code>, <code>matchday</code> y <code>round</code> '
+            . 'dan 404. Acá probamos el vocabulario propio de TM (<code>gameDay</code>) y el espejo de '
+            . '<code>/coach/{id}/performance-game</code> a nivel club.<br>'
+            . 'El id de competencia sale de <code>primaryCompetitionId</code> de un club (ej <code>ARGC</code>) '
+            . 'o de <code>import_partidos.competencia_external_id</code>. El de club, de <code>equipo_tm</code> '
+            . '(Vélez es <code>1029</code>).</p>'
             . '<form method="get" style="margin:12px 0">'
             . '<input name="comp_id" value="' . e($compId) . '" placeholder="comp id, ej ARGC" size="14"> '
             . '<input name="season" value="' . e($season) . '" placeholder="temporada, ej 2025" size="12"> '
             . '<input name="ronda" value="' . e($ronda) . '" placeholder="fecha nº" size="9"> '
-            . '<button>Probar</button>'
-            . ' <span class="sub">sin temporada prueba 5 rutas; con temporada y fecha, 10</span></form>';
+            . '<input name="club_id" value="' . e($clubId) . '" placeholder="club TM, ej 1029" size="12"> '
+            . '<button>Probar</button></form>';
 
-        if ($compId === '') {
+        if ($compId === '' && $clubId === '') {
             return $this->pagina('Diagnóstico de competencias', $cuerpo
-                . '<div class="diag">Pegá un id de competencia para arrancar.</div>');
+                . '<div class="diag">Pegá un id de competencia y/o uno de club para arrancar.</div>');
         }
 
-        $r = TmDetallePartido::diagnosticarCompetencia($compId, $season ?: null, $ronda ?: null);
+        $r = TmDetallePartido::diagnosticarCompetencia($compId ?: '', $season ?: null, $ronda ?: null, $clubId ?: null);
 
         $vivas = 0;
         foreach ($r['rutas'] as $info) if (!empty($info['ok'])) $vivas++;
@@ -557,17 +562,19 @@ class ImportDetallesController extends Controller
             . '</div>';
 
         $cuerpo .= '<div class="scroll"><table><thead><tr><th>Ruta</th><th>¿Responde?</th>'
-            . '<th>Items</th><th>Claves de primer nivel</th></tr></thead><tbody>';
+            . '<th>Items</th><th>Rama</th><th>Claves de primer nivel</th></tr></thead><tbody>';
         foreach ($r['rutas'] as $ruta => $info) {
-            $cuerpo .= '<tr>'
+            $cuerpo .= '<tr' . ((int) $info['items'] > 1 ? ' class="warn"' : '') . '>'
                 . '<td><code>' . e($ruta) . '</code></td>'
                 . '<td>' . (!empty($info['ok']) ? '<span class="ok">sí</span>' : '<span class="err">no</span>') . '</td>'
                 . '<td class="num">' . ((int) $info['items'] ?: '—') . '</td>'
+                . '<td>' . e($info['rama'] ?: '—') . '</td>'
                 . '<td>' . e(implode(', ', $info['claves']) ?: '—') . '</td>'
                 . '</tr>';
         }
         $cuerpo .= '</tbody></table></div>'
-            . '<p class="sub">Una ruta con muchos <b>items</b> es la candidata: ahí está la lista de partidos.</p>';
+            . '<p class="sub">La candidata es la fila resaltada con muchos <b>items</b>: ahí está la lista de partidos. '
+            . 'La columna <b>Rama</b> dice de qué clave cuelga.</p>';
 
         foreach ($r['rutas'] as $ruta => $info) {
             if (empty($info['ok'])) continue;

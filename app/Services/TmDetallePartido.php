@@ -1173,39 +1173,54 @@ class TmDetallePartido
     }
 
     /**
-     * Diagnóstico exploratorio de COMPETENCIAS en tmapi.
+     * Diagnóstico exploratorio: buscar una ruta que devuelva la LISTA DE
+     * PARTIDOS de una competencia. Es lo único que falta para cargar un torneo
+     * en curso: con el `gameId` de cada partido, `importar()` hace el resto.
      *
-     * El importador DT por DT no sirve para un torneo en curso: para cargar una
-     * fecha hace falta el fixture de la competencia, no la carrera de un técnico.
-     * Acá probamos qué rutas existen. Cada ruta es 1 crédito.
+     * No interesan tablas ni resultados: las tablas las arma el usuario con sus
+     * propios partidos, y los resultados vienen con las incidencias.
      *
-     * El id de competencia sale del JSON de un club
-     * (`baseDetails.primaryCompetitionId`, ej "ARGC") o del propio staging
-     * (`import_partidos.competencia_external_id`).
+     * Dos familias de candidatas:
+     *  a) TM llama `gameDay` a la fecha en su propio JSON (`gameDayCount`,
+     *     `closestGameDay`), así que probamos ESA palabra — no "round" ni
+     *     "matchday", que ya dieron 404.
+     *  b) El único endpoint que sabemos que devuelve partidos es
+     *     `/coach/{id}/performance-game`. Si el club tiene su equivalente,
+     *     el fixture se arma club por club.
      *
-     * @return array ['rutas' => [ruta => ['ok'=>bool,'claves'=>[],'items'=>int,'json'=>mixed]], 'llamadas' => int]
+     * Cada ruta es 1 crédito.
      */
-    public static function diagnosticarCompetencia($compId, $seasonId = null, $ronda = null)
+    public static function diagnosticarCompetencia($compId, $seasonId = null, $ronda = null, $clubId = null)
     {
         $c = rawurlencode($compId);
-        $s = $seasonId !== null && $seasonId !== '' ? rawurlencode($seasonId) : null;
-        $r = $ronda !== null && $ronda !== '' ? rawurlencode($ronda) : null;
+        $s = ($seasonId !== null && $seasonId !== '') ? rawurlencode($seasonId) : null;
+        $r = ($ronda !== null && $ronda !== '') ? rawurlencode($ronda) : null;
+        $k = ($clubId !== null && $clubId !== '') ? rawurlencode($clubId) : null;
 
-        $rutas = [
-            '/competitions?ids[]=' . $c,
-            '/competition/' . $c,
-            '/competition/' . $c . '/games',
-            '/competition/' . $c . '/matches',
-            '/competition/' . $c . '/table',
-        ];
-        if ($s !== null) {
-            $rutas[] = '/competition/' . $c . '/season/' . $s . '/games';
-            $rutas[] = '/competition/' . $c . '/games?seasonId=' . $s;
-            $rutas[] = '/competition/' . $c . '/season/' . $s . '/table';
+        $rutas = [];
+
+        // (a) Competencia, con el vocabulario propio de TM.
+        if ($c !== '') {
+            $rutas[] = '/competition/' . $c . '/gamedays';
+            $rutas[] = '/competition/' . $c . '/fixtures';
+            $rutas[] = '/competition/' . $c . '/schedule';
+            $rutas[] = '/competition/' . $c . '/clubs';
             if ($r !== null) {
-                $rutas[] = '/competition/' . $c . '/games?seasonId=' . $s . '&matchday=' . $r;
-                $rutas[] = '/competition/' . $c . '/season/' . $s . '/round/' . $r;
+                $rutas[] = '/competition/' . $c . '/gameday/' . $r;
+                $rutas[] = '/competition/' . $c . '/games?gameDay=' . $r;
             }
+            if ($s !== null && $r !== null) {
+                $rutas[] = '/competition/' . $c . '/season/' . $s . '/gameday/' . $r;
+                $rutas[] = '/competition/' . $c . '/games?seasonId=' . $s . '&gameDay=' . $r;
+            }
+        }
+
+        // (b) Club: espejo de /coach/{id}/performance-game.
+        if ($k !== null) {
+            $rutas[] = '/club/' . $k . '/performance-game';
+            $rutas[] = '/club/' . $k . '/games';
+            $rutas[] = '/club/' . $k . '/fixtures';
+            if ($s !== null) $rutas[] = '/club/' . $k . '/season/' . $s . '/games';
         }
 
         $out = ['rutas' => [], 'llamadas' => 0];
@@ -1214,19 +1229,25 @@ class TmDetallePartido
             $json = HttpHelper::getJson(self::TMAPI . $ruta);
             $out['llamadas']++;
 
-            $info = ['ok' => false, 'claves' => [], 'items' => 0, 'json' => $json];
+            $info = ['ok' => false, 'claves' => [], 'items' => 0, 'rama' => null, 'json' => $json];
             if (is_array($json) && !empty($json)) {
                 $exito = !array_key_exists('success', $json) || !empty($json['success']);
                 $data  = array_key_exists('data', $json) ? $json['data'] : $json;
                 $info['ok'] = $exito && !empty($data);
+
                 if (is_array($data)) {
                     $info['claves'] = array_slice(array_keys($data), 0, 30);
-                    // ¿Es una lista? Entonces puede ser el fixture.
                     if (isset($data[0])) {
                         $info['items'] = count($data);
+                        $info['rama'] = '(raíz)';
                     } else {
-                        foreach ($data as $k => $v) {
-                            if (is_array($v) && isset($v[0])) { $info['items'] = count($v); break; }
+                        // La lista puede colgar de una rama: performance, games, etc.
+                        foreach ($data as $clave => $valor) {
+                            if (is_array($valor) && isset($valor[0])) {
+                                $info['items'] = count($valor);
+                                $info['rama'] = $clave;
+                                break;
+                            }
                         }
                     }
                 }
