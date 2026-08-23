@@ -471,7 +471,7 @@ class TmDetallePartido
         // ── 6) Guardar ─────────────────────────────────────────────────────
         if ($escribir) {
             try {
-                DB::transaction(function () use ($plan, $partido, $forzar) {
+                DB::transaction(function () use ($plan, $partido, $forzar, $game, $lados) {
                     if ($forzar) {
                         Alineacion::where('partido_id', $partido->id)->delete();
                         Gol::where('partido_id', $partido->id)->delete();
@@ -488,6 +488,9 @@ class TmDetallePartido
                     $this->grabarFilas(Tarjeta::class,      $plan['tarjetas'],    'una tarjeta');
                     $this->grabarFilas(Cambio::class,       $plan['cambios'],     'un cambio');
                     $this->grabarFilas(PartidoArbitro::class, $plan['arbitros'],  'un árbitro');
+
+                    // Si el partido no tenía marcador, se lo ponemos.
+                    $this->completarMarcador($game, $partido, $lados);
 
                     // El DT del club dirigido ya lo pudo haber cargado el
                     // importador de partidos: nunca pisamos ni duplicamos, sólo
@@ -520,6 +523,46 @@ class TmDetallePartido
      * cada equipo nuestro. Si no coinciden, aborta: mejor no cargar nada que
      * cargar la alineación del rival.
      */
+    /**
+     * Carga el marcador si el partido está SIN resultado.
+     *
+     * El detalle traía goles, tarjetas y cambios pero nunca tocaba
+     * `partidos.golesl/golesv`: eso sólo lo hacía el fixture al crear el
+     * partido. Si el partido lo cargaste vos (Excel) y bajás las incidencias,
+     * el resultado tiene que venir con ellas.
+     *
+     * NUNCA pisa un resultado ya cargado. Y respeta la orientación: `$lados[0]`
+     * es el local SEGÚN TM, que no siempre es el local de tu partido (finales
+     * en cancha neutral, ver `orientar()`).
+     */
+    private function completarMarcador(array $game, Partido $partido, array $lados)
+    {
+        if ($partido->golesl !== null && $partido->golesv !== null) return false;
+
+        $sc = isset($game['score']) && is_array($game['score']) ? $game['score'] : [];
+        if (!isset($sc['home']) || !isset($sc['away'])) return false;
+        if (empty($game['isFinished'])) return false;   // sin jugar: no hay marcador
+
+        $golesTmLocal = (int) $sc['home'];
+        $golesTmVisit = (int) $sc['away'];
+
+        // $lados[0] es el equipo que TM pone de local.
+        $equipoTmLocal = (int) $lados[0]['equipo_id'];
+
+        if ($equipoTmLocal === (int) $partido->equipol_id) {
+            $gl = $golesTmLocal; $gv = $golesTmVisit;
+        } elseif ($equipoTmLocal === (int) $partido->equipov_id) {
+            $gl = $golesTmVisit; $gv = $golesTmLocal;
+        } else {
+            return false;
+        }
+
+        $partido->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
+        $this->aviso('El partido estaba sin resultado: le cargué ' . $gl . ':' . $gv
+            . ' según Transfermarkt.');
+        return true;
+    }
+
     private function orientar(array $game, Partido $partido, $escribir = false)
     {
         $mapaEq = $this->mapaEquipos();
