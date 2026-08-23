@@ -361,7 +361,14 @@ class ImportPartidosController extends Controller
         if ($guardar || $refrescar) {
             foreach ($filas as $f) $guardadas += $this->persistirFixture($f) ? 1 : 0;
         }
-        if ($refrescar) $refrescadas = $this->refrescarHorarios($filas);
+        $resultados = ['cargados' => 0, 'detalle' => ''];
+        if ($refrescar) {
+            $refrescadas = $this->refrescarHorarios($filas);
+            $resultados  = $this->completarResultados($filas);
+        }
+
+        // La auditoría no escribe nada: se muestra siempre.
+        $problemas = $this->auditarResultados($filas);
 
         $html .= '<div class="cards">'
             . $this->card($cont['total'], 'partidos con fecha')
@@ -382,10 +389,18 @@ class ImportPartidosController extends Controller
             $html .= '<p class="ok-box">Guardadas <b>' . $guardadas . '</b> filas en staging.'
                 . ($refrescar
                     ? ($refrescadas
-                        ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos ya cargados que todavía no se jugaron.'
+                        ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos que todavía no se jugaron.'
                         : ' Ningún horario necesitaba corrección.')
+                      . ($resultados['cargados']
+                        ? ' Cargué el resultado de <b>' . $resultados['cargados'] . '</b> partidos que estaban sin marcador.'
+                        : ' Ningún partido estaba sin resultado.')
                     : '')
                 . '</p>';
+            if ($resultados['detalle']) {
+                $html .= '<h2>Resultados cargados</h2><div class="scroll"><table><thead><tr><th>Día</th>'
+                    . '<th>Local</th><th>Res.</th><th>Visitante</th><th>Partido</th></tr></thead><tbody>'
+                    . $resultados['detalle'] . '</tbody></table></div>';
+            }
         } else {
             $html .= '<p class="ok-box"><b>No se escribió nada.</b> Esto es solo una vista: '
                 . 'no se creó, borró ni modificó ningún partido tuyo. '
@@ -399,9 +414,10 @@ class ImportPartidosController extends Controller
             . ' <span class="sub">no toca tus partidos; solo habilita el botón «Aplicar» de cada fecha</span>'
             . '</p>'
             . '<p class="acciones">'
-            . '<a class="boton-sec" href="' . e($base . '&cache=1&refrescar=1') . '">Guardar y corregir horarios</a>'
-            . ' <span class="sub"><b>esto sí escribe en tus partidos</b>: le pisa día y hora a los que ya tenés cargados '
-            . 'y todavía no se jugaron. Usalo recién cuando hayas comprobado que el emparejado es correcto.</span>'
+            . '<a class="boton-sec" href="' . e($base . '&cache=1&refrescar=1') . '">Guardar, corregir horarios y cargar resultados</a>'
+            . ' <span class="sub"><b>esto sí escribe en tus partidos</b>: pisa día y hora de los que todavía no se '
+            . 'jugaron, y carga el marcador en los que estén <b>sin resultado</b>. Nunca pisa un resultado que ya '
+            . 'tengas cargado. Usalo cuando hayas comprobado que el emparejado es correcto.</span>'
             . '</p>'
             . '<p class="acciones">'
             . '<a href="' . e($base) . '">Volver a bajar de TM</a> · '
@@ -411,6 +427,36 @@ class ImportPartidosController extends Controller
             . '</p>';
 
         $html .= $this->bloqueClubesSinResolver($filas, $request);
+
+        if (!empty($problemas)) {
+            $html .= '<h2>Revisar <span class="sub">(' . count($problemas) . ')</span></h2>'
+                . '<p class="sub">Diferencias entre lo que tenés cargado y lo que dice Transfermarkt, más chequeos '
+                . 'internos de tu base. <b>No se corrige nada de esto solo</b>: puede estar mal TM o podés tenerlo '
+                . 'bien vos.</p>'
+                . '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido</th><th>Qué pasa</th>'
+                . '<th>Tenés</th><th>TM / contado</th><th></th></tr></thead><tbody>';
+            $mapaF = $this->mapaFechas(array_map(function ($x) { return $x['partido_id']; }, $problemas));
+            $n = 0;
+            foreach ($problemas as $pr) {
+                if ($n++ >= 200) break;
+                $html .= '<tr class="warn">'
+                    . '<td class="num">' . e(substr((string) $pr['dia'], 0, 10)) . '</td>'
+                    . '<td>' . e($pr['local'] . ' vs ' . $pr['visitante']) . '</td>'
+                    . '<td>' . e($pr['problema']) . '</td>'
+                    . '<td class="num">' . e((string) $pr['tuyo']) . '</td>'
+                    . '<td class="num">' . e((string) $pr['tm']) . '</td>'
+                    . '<td><span class="id">#' . (int) $pr['partido_id'] . '</span> '
+                    . $this->linkIncidencias(isset($mapaF[$pr['partido_id']]) ? $mapaF[$pr['partido_id']] : null)
+                    . '</td></tr>';
+            }
+            $html .= '</tbody></table></div>';
+            if (count($problemas) > 200) {
+                $html .= '<p class="sub">Se muestran 200 de ' . count($problemas) . '.</p>';
+            }
+        } else {
+            $html .= '<p class="ok-box">Nada para revisar: los resultados que tenés coinciden con TM, la localía '
+                . 'también, y los goles cargados dan el marcador.</p>';
+        }
 
         $html .= '<h2>Fechas</h2><div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partidos</th>'
             . '<th>Período</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th></th></tr></thead><tbody>';
@@ -710,6 +756,152 @@ class ImportPartidosController extends Controller
             $n++;
         }
         return $n;
+    }
+
+    /**
+     * Carga el resultado en los partidos que YA tenés pero que están sin
+     * marcador. Nunca pisa un resultado cargado: si el tuyo difiere del de TM,
+     * se avisa y se deja como está — puede ser un error de TM o tuyo, pero lo
+     * decidís vos.
+     *
+     * OJO CON LA LOCALÍA: `buscarPartido()` empareja en los dos órdenes, así que
+     * tu partido puede tener local y visitante al revés de como los tiene TM.
+     * Antes de copiar los goles hay que mirar la orientación, o se carga el
+     * resultado dado vuelta.
+     */
+    private function completarResultados(array $filas)
+    {
+        $out = ['cargados' => 0, 'detalle' => ''];
+
+        foreach ($filas as $f) {
+            if (empty($f['terminado']) || empty($f['partido_id'])) continue;
+            if ($f['goles_favor'] === null || $f['goles_contra'] === null) continue;
+
+            $p = \App\Partido::find($f['partido_id']);
+            if (!$p) continue;
+            if ($p->golesl !== null && $p->golesv !== null) continue;   // ya tiene resultado
+
+            // ¿Está en el mismo orden que TM?
+            if ((int) $p->equipol_id === (int) $f['equipo_id']) {
+                $gl = (int) $f['goles_favor']; $gv = (int) $f['goles_contra'];
+            } elseif ((int) $p->equipol_id === (int) $f['rival_id']) {
+                $gl = (int) $f['goles_contra']; $gv = (int) $f['goles_favor'];
+            } else {
+                continue;   // no reconozco la orientación: no toco nada
+            }
+
+            $p->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
+            $out['detalle'] .= '<tr><td class="num">' . e(substr((string) $f['dia'], 0, 10)) . '</td>'
+                . '<td>' . e($this->nombreEquipo($p->equipol_id)) . '</td>'
+                . '<td class="num"><b>' . $gl . ':' . $gv . '</b></td>'
+                . '<td>' . e($this->nombreEquipo($p->equipov_id)) . '</td>'
+                . '<td class="num">#' . (int) $p->id . '</td></tr>';
+            $out['cargados']++;
+        }
+        return $out;
+    }
+
+    /**
+     * Audita sin escribir nada. Tres cosas:
+     *   · tu resultado vs el de Transfermarkt
+     *   · la localía: si tu partido tiene local y visitante al revés que TM
+     *   · el marcador vs los goles cargados en `gols`
+     *
+     * `gols` no guarda el equipo: sale de la alineación del jugador. Y un gol
+     * "En Contra" suma para el RIVAL del que lo hizo.
+     */
+    private function auditarResultados(array $filas)
+    {
+        $ids = [];
+        foreach ($filas as $f) if (!empty($f['partido_id'])) $ids[] = (int) $f['partido_id'];
+        $ids = array_values(array_unique($ids));
+        if (empty($ids)) return [];
+
+        $partidos = [];
+        foreach (array_chunk($ids, 500) as $t) {
+            foreach (\App\Partido::whereIn('id', $t)->get() as $p) $partidos[(int) $p->id] = $p;
+        }
+
+        // Goles cargados, atribuidos al equipo que corresponde.
+        $anotados = []; $sinAtribuir = [];
+        foreach (array_chunk($ids, 500) as $t) {
+            $rows = DB::table('gols')
+                ->leftJoin('alineacions', function ($j) {
+                    $j->on('alineacions.partido_id', '=', 'gols.partido_id')
+                      ->on('alineacions.jugador_id', '=', 'gols.jugador_id');
+                })
+                ->whereIn('gols.partido_id', $t)
+                ->select('gols.partido_id', 'gols.tipo', 'alineacions.equipo_id',
+                    DB::raw('COUNT(*) AS n'))
+                ->groupBy('gols.partido_id', 'gols.tipo', 'alineacions.equipo_id')
+                ->get();
+
+            foreach ($rows as $r) {
+                $pid = (int) $r->partido_id;
+                if (!isset($partidos[$pid])) continue;
+                if ($r->equipo_id === null) { $sinAtribuir[$pid] = (isset($sinAtribuir[$pid]) ? $sinAtribuir[$pid] : 0) + (int) $r->n; continue; }
+
+                $p = $partidos[$pid];
+                $deQuien = (int) $r->equipo_id;
+                // En contra: el gol es del rival del que lo hizo.
+                if ($r->tipo === 'En Contra') {
+                    $deQuien = ((int) $p->equipol_id === $deQuien) ? (int) $p->equipov_id : (int) $p->equipol_id;
+                }
+                if (!isset($anotados[$pid])) $anotados[$pid] = ['l' => 0, 'v' => 0];
+                if ($deQuien === (int) $p->equipol_id) $anotados[$pid]['l'] += (int) $r->n;
+                else                                    $anotados[$pid]['v'] += (int) $r->n;
+            }
+        }
+
+        $problemas = [];
+        foreach ($filas as $f) {
+            $pid = (int) (isset($f['partido_id']) ? $f['partido_id'] : 0);
+            if (!$pid || !isset($partidos[$pid])) continue;
+            $p = $partidos[$pid];
+
+            $invertido = ((int) $p->equipol_id === (int) $f['rival_id']);
+            $problema = null; $tuyo = null; $deTm = null;
+
+            if (!empty($f['terminado']) && $f['goles_favor'] !== null
+                && $p->golesl !== null && $p->golesv !== null) {
+                $tmL = $invertido ? (int) $f['goles_contra'] : (int) $f['goles_favor'];
+                $tmV = $invertido ? (int) $f['goles_favor']  : (int) $f['goles_contra'];
+                if ((int) $p->golesl !== $tmL || (int) $p->golesv !== $tmV) {
+                    $problema = 'resultado distinto al de TM';
+                    $tuyo = $p->golesl . ':' . $p->golesv;
+                    $deTm = $tmL . ':' . $tmV;
+                }
+            }
+
+            // Los goles cargados tienen que dar el marcador.
+            if ($problema === null && isset($anotados[$pid])
+                && $p->golesl !== null && $p->golesv !== null) {
+                $a = $anotados[$pid];
+                if ($a['l'] !== (int) $p->golesl || $a['v'] !== (int) $p->golesv) {
+                    $problema = 'los goles cargados no dan el marcador';
+                    $tuyo = $p->golesl . ':' . $p->golesv;
+                    $deTm = $a['l'] . ':' . $a['v'] . ' (contados en gols)';
+                }
+            }
+
+            if ($problema === null && !empty($sinAtribuir[$pid])) {
+                $problema = $sinAtribuir[$pid] . ' gol(es) de jugadores que no están en la alineación';
+            }
+
+            if ($problema === null && $invertido) {
+                $problema = 'localía invertida respecto de TM';
+                $tuyo = $this->nombreEquipo($p->equipol_id) . ' de local';
+                $deTm = $this->nombreEquipo($f['equipo_id']) . ' de local';
+            }
+
+            if ($problema !== null) {
+                $problemas[] = ['partido_id' => $pid, 'dia' => $f['dia'],
+                    'local' => $this->nombreEquipo($p->equipol_id),
+                    'visitante' => $this->nombreEquipo($p->equipov_id),
+                    'problema' => $problema, 'tuyo' => $tuyo, 'tm' => $deTm];
+            }
+        }
+        return $problemas;
     }
 
     /** Relee el fixture desde el staging, sin tocar Transfermarkt. */
