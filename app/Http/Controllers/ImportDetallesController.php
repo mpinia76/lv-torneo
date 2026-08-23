@@ -512,6 +512,77 @@ class ImportDetallesController extends Controller
         return $this->pagina('Diagnóstico de perfiles', $cuerpo);
     }
 
+    /**
+     * Explora qué rutas de competencia existen en tmapi. Es el paso previo a
+     * decidir si un torneo EN CURSO (Liga Profesional, Conmebol) se puede
+     * cargar por fixture en vez de fecha por fecha a mano desde livefutbol.
+     *
+     *   /admin/import-detalles/competencia?comp_id=ARGC&season=2025&ronda=1
+     */
+    public function competencia(Request $request)
+    {
+        set_time_limit(0);
+
+        $compId = trim((string) $request->get('comp_id', ''));
+        $season = trim((string) $request->get('season', ''));
+        $ronda  = trim((string) $request->get('ronda', ''));
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
+            . '<h1>Diagnóstico de competencias</h1>'
+            . '<p class="sub">Prueba qué rutas de competencia responde tmapi. Si alguna devuelve el '
+            . '<b>fixture</b> (lista de partidos) o la <b>tabla</b>, un torneo en curso se podría cargar '
+            . 'por competencia en vez de a mano. <b>Cada ruta cuesta 1 crédito.</b><br>'
+            . 'El id de competencia sale del JSON de un club (<code>primaryCompetitionId</code>, ej '
+            . '<code>ARGC</code>) o de <code>import_partidos.competencia_external_id</code>.</p>'
+            . '<form method="get" style="margin:12px 0">'
+            . '<input name="comp_id" value="' . e($compId) . '" placeholder="comp id, ej ARGC" size="14"> '
+            . '<input name="season" value="' . e($season) . '" placeholder="temporada, ej 2025" size="12"> '
+            . '<input name="ronda" value="' . e($ronda) . '" placeholder="fecha nº" size="9"> '
+            . '<button>Probar</button>'
+            . ' <span class="sub">sin temporada prueba 5 rutas; con temporada y fecha, 10</span></form>';
+
+        if ($compId === '') {
+            return $this->pagina('Diagnóstico de competencias', $cuerpo
+                . '<div class="diag">Pegá un id de competencia para arrancar.</div>');
+        }
+
+        $r = TmDetallePartido::diagnosticarCompetencia($compId, $season ?: null, $ronda ?: null);
+
+        $vivas = 0;
+        foreach ($r['rutas'] as $info) if (!empty($info['ok'])) $vivas++;
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($r['llamadas'], 'rutas probadas')
+            . $this->card($vivas, 'con datos', $vivas ? 'ok' : 'err')
+            . '</div>';
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th>Ruta</th><th>¿Responde?</th>'
+            . '<th>Items</th><th>Claves de primer nivel</th></tr></thead><tbody>';
+        foreach ($r['rutas'] as $ruta => $info) {
+            $cuerpo .= '<tr>'
+                . '<td><code>' . e($ruta) . '</code></td>'
+                . '<td>' . (!empty($info['ok']) ? '<span class="ok">sí</span>' : '<span class="err">no</span>') . '</td>'
+                . '<td class="num">' . ((int) $info['items'] ?: '—') . '</td>'
+                . '<td>' . e(implode(', ', $info['claves']) ?: '—') . '</td>'
+                . '</tr>';
+        }
+        $cuerpo .= '</tbody></table></div>'
+            . '<p class="sub">Una ruta con muchos <b>items</b> es la candidata: ahí está la lista de partidos.</p>';
+
+        foreach ($r['rutas'] as $ruta => $info) {
+            if (empty($info['ok'])) continue;
+            $txt = json_encode($info['json'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $corte = '';
+            if (strlen($txt) > 12000) {
+                $txt = substr($txt, 0, 12000);
+                $corte = '<p class="sub">(recortado: se muestran los primeros 12 KB)</p>';
+            }
+            $cuerpo .= '<h2>' . e($ruta) . '</h2><pre>' . e($txt) . '</pre>' . $corte;
+        }
+
+        return $this->pagina('Diagnóstico de competencias', $cuerpo);
+    }
+
     // ═══════════════════════════ PLANTILLAS ═══════════════════════════
 
     /**

@@ -1172,6 +1172,71 @@ class TmDetallePartido
         return $out;
     }
 
+    /**
+     * Diagnóstico exploratorio de COMPETENCIAS en tmapi.
+     *
+     * El importador DT por DT no sirve para un torneo en curso: para cargar una
+     * fecha hace falta el fixture de la competencia, no la carrera de un técnico.
+     * Acá probamos qué rutas existen. Cada ruta es 1 crédito.
+     *
+     * El id de competencia sale del JSON de un club
+     * (`baseDetails.primaryCompetitionId`, ej "ARGC") o del propio staging
+     * (`import_partidos.competencia_external_id`).
+     *
+     * @return array ['rutas' => [ruta => ['ok'=>bool,'claves'=>[],'items'=>int,'json'=>mixed]], 'llamadas' => int]
+     */
+    public static function diagnosticarCompetencia($compId, $seasonId = null, $ronda = null)
+    {
+        $c = rawurlencode($compId);
+        $s = $seasonId !== null && $seasonId !== '' ? rawurlencode($seasonId) : null;
+        $r = $ronda !== null && $ronda !== '' ? rawurlencode($ronda) : null;
+
+        $rutas = [
+            '/competitions?ids[]=' . $c,
+            '/competition/' . $c,
+            '/competition/' . $c . '/games',
+            '/competition/' . $c . '/matches',
+            '/competition/' . $c . '/table',
+        ];
+        if ($s !== null) {
+            $rutas[] = '/competition/' . $c . '/season/' . $s . '/games';
+            $rutas[] = '/competition/' . $c . '/games?seasonId=' . $s;
+            $rutas[] = '/competition/' . $c . '/season/' . $s . '/table';
+            if ($r !== null) {
+                $rutas[] = '/competition/' . $c . '/games?seasonId=' . $s . '&matchday=' . $r;
+                $rutas[] = '/competition/' . $c . '/season/' . $s . '/round/' . $r;
+            }
+        }
+
+        $out = ['rutas' => [], 'llamadas' => 0];
+
+        foreach ($rutas as $ruta) {
+            $json = HttpHelper::getJson(self::TMAPI . $ruta);
+            $out['llamadas']++;
+
+            $info = ['ok' => false, 'claves' => [], 'items' => 0, 'json' => $json];
+            if (is_array($json) && !empty($json)) {
+                $exito = !array_key_exists('success', $json) || !empty($json['success']);
+                $data  = array_key_exists('data', $json) ? $json['data'] : $json;
+                $info['ok'] = $exito && !empty($data);
+                if (is_array($data)) {
+                    $info['claves'] = array_slice(array_keys($data), 0, 30);
+                    // ¿Es una lista? Entonces puede ser el fixture.
+                    if (isset($data[0])) {
+                        $info['items'] = count($data);
+                    } else {
+                        foreach ($data as $k => $v) {
+                            if (is_array($v) && isset($v[0])) { $info['items'] = count($v); break; }
+                        }
+                    }
+                }
+            }
+            $out['rutas'][$ruta] = $info;
+        }
+
+        return $out;
+    }
+
     private function resolverArbitros(array $ids, $escribir, array &$informe = null)
     {
         $out = [];
