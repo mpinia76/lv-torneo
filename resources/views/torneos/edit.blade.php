@@ -123,7 +123,9 @@
                     <p class="form-text text-muted" style="font-size:.85rem">
                         Con esto cargado, el <a href="{{ route('import_partidos.fixture') }}" target="_blank">importador de fixture</a>
                         baja los partidos de este torneo sin que tengas que tipear el id.
-                        Ojo: la temporada de TM no es el año del torneo (el Clausura 2026 es seasonId 2025).
+                        <b>Ojo con la temporada:</b> el <code>seasonId</code> de TM es el año de arranque y para
+                        Argentina va <b>uno atrás</b> del año real — el Clausura 2026 es seasonId <b>2025</b>.
+                        Acá va el seasonId (el número que entiende la API), no tu año.
                         Si no sabés el id, en esa pantalla hay un buscador por club.
                     </p>
                 </div>

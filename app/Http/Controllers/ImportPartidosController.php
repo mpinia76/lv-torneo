@@ -449,8 +449,14 @@ class ImportPartidosController extends Controller
             $cid = isset($bd['competitionId']) ? (string) $bd['competitionId'] : '';
             if ($cid === '') continue;
             $temp = isset($bd['seasonId']) ? (string) $bd['seasonId'] : '';
+            // OJO: `seasonId` es el año de ARRANQUE de la temporada; para
+            // Argentina va uno atrás del año real. El año que usa el usuario es
+            // `cyclicalName` (= seasonId + 1). Nunca mostrar el seasonId solo.
+            $anio = isset($bd['season']['cyclicalName']) ? (string) $bd['season']['cyclicalName'] : '';
             $k = $cid . '|' . $temp;
-            if (!isset($comps[$k])) $comps[$k] = ['id' => $cid, 'temporada' => $temp, 'n' => 0, 'desde' => null, 'hasta' => null];
+            if (!isset($comps[$k])) $comps[$k] = ['id' => $cid, 'temporada' => $temp, 'anio' => $anio,
+                'n' => 0, 'desde' => null, 'hasta' => null];
+            if ($anio !== '' && $comps[$k]['anio'] === '') $comps[$k]['anio'] = $anio;
             $comps[$k]['n']++;
             $raw = isset($bd['date']['dateTimeUTC']) ? $bd['date']['dateTimeUTC'] : null;
             if ($raw && ($ts = strtotime($raw))) {
@@ -468,13 +474,15 @@ class ImportPartidosController extends Controller
         uasort($comps, function ($a, $b) { return strcmp((string) $b['desde'], (string) $a['desde']); });
 
         $out = '<div class="scroll" style="margin-top:8px"><table><thead><tr><th>Competencia</th><th>Id</th>'
-            . '<th>Temporada TM</th><th>Partidos</th><th>Período</th><th></th></tr></thead><tbody>';
+            . '<th>Es tu año…</th><th>seasonId TM</th><th>Partidos</th><th>Período</th><th></th></tr></thead><tbody>';
         foreach ($comps as $c) {
             $nom = isset($nombres[$c['id']]) ? $nombres[$c['id']] : $c['id'];
+            $anio = $c['anio'] !== '' ? $c['anio'] : substr((string) $c['desde'], 0, 4);
             $out .= '<tr>'
                 . '<td>' . e($nom) . '</td>'
                 . '<td class="num"><b>' . e($c['id']) . '</b></td>'
-                . '<td class="num">' . e($c['temporada']) . '</td>'
+                . '<td class="num"><b class="ok">' . e($anio) . '</b></td>'
+                . '<td class="num gris">' . e($c['temporada']) . '</td>'
                 . '<td class="num">' . $c['n'] . '</td>'
                 . '<td class="num">' . e((string) $c['desde']) . ' → ' . e((string) $c['hasta']) . '</td>'
                 . '<td><a href="' . e(route('import_partidos.fixture', ['comp' => $c['id'], 'guardar' => 1]))
@@ -482,8 +490,12 @@ class ImportPartidosController extends Controller
                 . '</tr>';
         }
         $out .= '</tbody></table></div>'
-            . '<p class="sub">Copiá el <b>Id</b> y la <b>Temporada TM</b> en «Editar torneo → transfermarkt.com» '
-            . 'del torneo que corresponda. A partir de ahí aparece en el desplegable de arriba.</p>';
+            . '<p class="sub"><b>Ojo con las dos columnas de año.</b> «Es tu año» es el que usás vos '
+            . '(el <code>cyclicalName</code> de TM, que coincide con las fechas de los partidos). '
+            . '«seasonId TM» va <b>uno atrás</b> y es el que hay que guardar en el torneo, porque es el que '
+            . 'entiende la API. El Clausura 2026 es seasonId 2025.<br>'
+            . 'Copiá el <b>Id</b> y el <b>seasonId</b> en «Editar torneo → transfermarkt.com» del torneo '
+            . 'cuyo año coincida con la columna «Es tu año». A partir de ahí aparece en el desplegable de arriba.</p>';
 
         return $out;
     }
@@ -530,7 +542,10 @@ class ImportPartidosController extends Controller
             'external_id'             => isset($g['gameId']) ? (string) $g['gameId'] : null,
             'competencia_external_id' => isset($bd['competitionId']) && $bd['competitionId'] !== '' ? $bd['competitionId'] : $compId,
             'competencia_nombre'      => $compNombre,
+            // `seasonId` es el año de arranque: para Argentina va uno atrás del
+            // año real. El año que se le muestra al usuario es `cyclicalName`.
             'temporada'               => isset($bd['seasonId']) ? (string) $bd['seasonId'] : null,
+            'anio'                    => isset($bd['season']['cyclicalName']) ? (string) $bd['season']['cyclicalName'] : null,
             'ronda'                   => isset($bd['gameDay']) ? (string) $bd['gameDay'] : null,
             // En este flujo el "club" es SIEMPRE el local: local = 1 fijo.
             'club_external_id'        => isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null,

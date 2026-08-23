@@ -52,6 +52,21 @@
                             </a>
                         </li>
 
+                        <li role="separator" class="divider"></li>
+
+                        <li><a class="dropdown-item" href="{{ route('import_partidos.fixture') }}">
+                                {{ __('Fixture por competencia (TM)') }}
+                            </a>
+                        </li>
+                        <li><a class="dropdown-item" href="{{ route('import_partidos.index') }}">
+                                {{ __('Carga de partidos por DT (TM)') }}
+                            </a>
+                        </li>
+                        <li><a class="dropdown-item" href="{{ route('import_detalles.index') }}">
+                                {{ __('Detalle de partidos (TM)') }}
+                            </a>
+                        </li>
+
 
 
 
