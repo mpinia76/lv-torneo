@@ -9459,12 +9459,89 @@ private function normalizarMinuto(string $texto): int
             ],
         ];
 
+        // El gameId con el que se bajó esto queda anotado en el staging del
+        // importador. Con eso el partido pasa a tener su link a la ficha de TM
+        // en los controles, y la próxima vez que haya que rehacerle el detalle
+        // no hace falta volver a pegar la URL.
+        $this->recordarGameIdTM($partido, (string) $gameId);
+
         // 7-11. Validar + guardar (lógica compartida con resultados-futbol)
         return $this->guardarIncidenciasImportadas(
             $partido, $fecha, $grupo, $strLocal, $strVisitante,
             $jueces, $localTitulares, $visitanteTitulares, $equipos,
             $success, 1, '', 3, $tecnicos
         );
+    }
+
+    /**
+     * Anota en `import_partidos` el gameId de Transfermarkt de un partido que
+     * se importó pegando la URL a mano.
+     *
+     * Ese staging es de donde salen dos cosas en los controles: el botón que
+     * abre la ficha del partido en TM y el "Rehacer" que va derecho a la vista
+     * previa del importador. Los partidos que nunca pasaron por el importador
+     * de DTs no tenían fila, así que no tenían ninguna de las dos aunque el
+     * detalle se hubiera bajado de TM.
+     *
+     * La clave es la misma que usa `ImportPartidosController::persistirFixture()`
+     * —fuente + external_id + tecnico_id null—, así que si la fila ya existe no
+     * se duplica ni se le pisa lo que trajo el importador: solo se le completa
+     * el `partido_id`.
+     *
+     * Es un extra: si algo falla acá, el import del detalle sigue igual.
+     */
+    private function recordarGameIdTM($partido, string $gameId)
+    {
+        $gameId = trim($gameId);
+
+        if ($gameId === '' || !preg_match('/^\d{1,20}$/', $gameId)) {
+            return;
+        }
+
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('import_partidos')) {
+                return;
+            }
+
+            $clave = ['fuente' => 'transfermarkt', 'external_id' => $gameId, 'tecnico_id' => null];
+            $ya    = DB::table('import_partidos')->where($clave)->first();
+
+            if ($ya) {
+                // Ya la tenía el importador: solo la atamos a este partido si
+                // le faltaba. Su estado y su motivo son de él, no se tocan.
+                if (!$ya->partido_id) {
+                    DB::table('import_partidos')->where('id', $ya->id)->update([
+                        'partido_id' => $partido->id,
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                return;
+            }
+
+            DB::table('import_partidos')->insert($clave + [
+                'club_external_id'  => null,
+                'club_nombre'       => $partido->equipol->nombre,
+                'rival_external_id' => null,
+                'rival_nombre'      => $partido->equipov->nombre,
+                'local'             => 1,
+                'dia'               => $partido->dia,
+                'goles_favor'       => $partido->golesl,
+                'goles_contra'      => $partido->golesv,
+                'equipo_id'         => $partido->equipol_id,
+                'rival_id'          => $partido->equipov_id,
+                'partido_id'        => $partido->id,
+                // Ya está cargado: la fila existe para guardar el gameId, no
+                // para que el importador lo cree de nuevo.
+                'estado'            => 'duplicado',
+                'motivo'            => 'detalle importado pegando la URL de Transfermarkt',
+                'created_at'        => now(),
+                'updated_at'        => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('No pude anotar el gameId de TM del partido '
+                . $partido->id . ': ' . $e->getMessage());
+        }
     }
 
     /**

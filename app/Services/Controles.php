@@ -45,16 +45,6 @@ class Controles
     /** La ficha del partido en Transfermarkt, para pegarle el gameId atrás. */
     public const TM_PARTIDO = 'https://www.transfermarkt.com/spielbericht/index/spielbericht/';
 
-    /**
-     * El calendario de un club en una temporada. Se le pega
-     * `{tm_club_id}/saison_id/{year}`. El primer tramo de la URL es el slug del
-     * club y TM lo ignora, así que va una `x` fija.
-     */
-    public const TM_CLUB = 'https://www.transfermarkt.com/x/spielplandatum/verein/';
-
-    /** La búsqueda rápida, último recurso cuando no hay nada mapeado. */
-    public const TM_BUSQUEDA = 'https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=';
-
     /** Los tres roles que tiene que tener sí o sí una terna arbitral. */
     public const ROLES_TERNA = [
         'Principal' => 'Principal',
@@ -343,24 +333,13 @@ class Controles
     }
 
     /**
-     * Le pega a cada fila el gameId de Transfermarkt y un link a TM.
+     * Le pega a cada fila el gameId de Transfermarkt del partido.
      *
-     * Con el gameId la tabla puede ofrecer dos cosas que antes había que ir a
-     * buscar a mano: la ficha del partido en TM y rehacerle el detalle
+     * Con eso la tabla puede ofrecer dos cosas que antes había que ir a buscar
+     * a mano: el link a la ficha del partido en TM, y rehacerle el detalle
      * (alineación, goles, tarjetas, cambios, árbitros) desde el importador.
      *
-     * Pero la mayoría de los partidos viejos nunca pasaron por el importador,
-     * así que no tienen gameId. Antes esas filas se quedaban sin ningún link y
-     * había que ir a buscar el partido a mano. Ahora el botón TM está SIEMPRE,
-     * con tres calidades distintas (`tm_nivel`):
-     *
-     *   partido - gameId conocido: la ficha exacta del partido.
-     *   club    - sin gameId pero el equipo está en `equipo_tm`: el calendario
-     *             de ese club en esa temporada, el partido está a un clic.
-     *   busqueda- ni una cosa ni la otra: la búsqueda rápida por el nombre del
-     *             equipo local.
-     *
-     * Van dos consultas por página, no una por fila: `import_partidos` no
+     * Va una sola consulta por página, no una por fila: `import_partidos` no
      * tiene índice por `partido_id`, así que una subconsulta correlacionada en
      * el SELECT saldría carísima.
      */
@@ -370,105 +349,25 @@ class Controles
 
         foreach ($filas as $fila) {
             $fila->tm_game_id = null;
-            $fila->tm_url     = null;
-            $fila->tm_nivel   = 'busqueda';
-            $fila->tm_titulo  = '';
         }
 
-        if ($filas->isEmpty()) {
+        if ($filas->isEmpty() || !$this->hayStagingDeImport()) {
             return $filas;
         }
 
-        $mapa = [];
-
-        if ($this->hayStagingDeImport()) {
-            $mapa = DB::table('import_partidos')
-                ->whereIn('partido_id', $filas->pluck('id')->unique()->values()->all())
-                ->whereNotNull('external_id')
-                ->where('external_id', '!=', '')
-                ->orderBy('id') // si hay varias filas del mismo partido, gana la última
-                ->pluck('external_id', 'partido_id')
-                ->all();
-        }
-
-        $clubes = $this->clubesTm($filas);
+        $mapa = DB::table('import_partidos')
+            ->whereIn('partido_id', $filas->pluck('id')->unique()->values()->all())
+            ->whereNotNull('external_id')
+            ->where('external_id', '!=', '')
+            ->orderBy('id') // si hay varias filas del mismo partido, gana la última
+            ->pluck('external_id', 'partido_id')
+            ->all();
 
         foreach ($filas as $fila) {
             $fila->tm_game_id = $mapa[$fila->id] ?? null;
-
-            if ($fila->tm_game_id) {
-                $fila->tm_url    = self::TM_PARTIDO.$fila->tm_game_id;
-                $fila->tm_nivel  = 'partido';
-                $fila->tm_titulo = 'La ficha de este partido en Transfermarkt (gameId '.$fila->tm_game_id.').';
-                continue;
-            }
-
-            $club = $clubes[(int) ($fila->equipol_id ?? 0)]
-                ?? $clubes[(int) ($fila->equipov_id ?? 0)]
-                ?? null;
-            $year = (int) ($fila->year ?? 0);
-
-            if ($club && $year) {
-                $fila->tm_url    = self::TM_CLUB.$club.'/saison_id/'.$year;
-                $fila->tm_nivel  = 'club';
-                $fila->tm_titulo = 'Este partido no pasó por el importador, así que no tenemos su gameId: '
-                    .'esto abre el calendario '.$year.' del club en Transfermarkt.';
-                continue;
-            }
-
-            $nombre = trim((string) ($fila->equipo_local_nombre ?? ''));
-
-            $fila->tm_url    = self::TM_BUSQUEDA.rawurlencode($nombre);
-            $fila->tm_nivel  = 'busqueda';
-            $fila->tm_titulo = 'Sin gameId y sin club mapeado en equipo_tm: '
-                .'esto busca "'.$nombre.'" en Transfermarkt.';
         }
 
         return $filas;
-    }
-
-    /**
-     * Los clubes de Transfermarkt de los equipos que aparecen en estas filas.
-     *
-     * Devuelve [equipo_id => tm_club_id]. Si la tabla de mapeo todavía no
-     * existe (base sin la migración del importador), no rompe: simplemente no
-     * hay fallback de club y el link va a la búsqueda.
-     */
-    private function clubesTm($filas): array
-    {
-        if (!$this->hayMapeoDeClubes()) {
-            return [];
-        }
-
-        $ids = $filas->pluck('equipol_id')
-            ->merge($filas->pluck('equipov_id'))
-            ->filter()
-            ->map(function ($id) { return (int) $id; })
-            ->unique()
-            ->values()
-            ->all();
-
-        if (!$ids) {
-            return [];
-        }
-
-        return DB::table('equipo_tm')
-            ->whereIn('equipo_id', $ids)
-            ->whereNotNull('tm_club_id')
-            ->pluck('tm_club_id', 'equipo_id')
-            ->all();
-    }
-
-    /** ¿Está la tabla de mapeo de clubes? Mismo criterio que el staging. */
-    private function hayMapeoDeClubes(): bool
-    {
-        static $existe = null;
-
-        if ($existe === null) {
-            $existe = Schema::hasTable('equipo_tm');
-        }
-
-        return $existe;
     }
 
     /**
