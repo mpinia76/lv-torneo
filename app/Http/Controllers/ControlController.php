@@ -127,8 +127,11 @@ class ControlController extends Controller
             $todas  = $penales->malCargados($filtros);
             $pagina = max(1, (int) $request->query('page', 1));
 
+            $deLaPagina = $todas->forPage($pagina, Controles::POR_PAGINA)->values();
+            $this->controles->agregarTransfermarkt($deLaPagina);
+
             return new LengthAwarePaginator(
-                $todas->forPage($pagina, Controles::POR_PAGINA)->values(),
+                $deLaPagina,
                 $todas->count(),
                 Controles::POR_PAGINA,
                 $pagina,
@@ -150,6 +153,10 @@ class ControlController extends Controller
         if ($clave === 'penales.faltantes') {
             $penales->resolver($paginador->getCollection());
         }
+
+        // El link a Transfermarkt y el botón de rehacer valen para cualquier
+        // chequeo: la fila siempre es un partido.
+        $this->controles->agregarTransfermarkt($paginador->getCollection());
 
         return $paginador;
     }

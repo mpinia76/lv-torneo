@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Controles de carga de partidos.
@@ -40,6 +41,9 @@ class Controles
      * clave: el driver de cache es `file` y no soporta tags.
      */
     private const CLAVE_VERSION = 'controles.version';
+
+    /** La ficha del partido en Transfermarkt, para pegarle el gameId atrás. */
+    public const TM_PARTIDO = 'https://www.transfermarkt.com/spielbericht/index/spielbericht/';
 
     /** Los tres roles que tiene que tener sí o sí una terna arbitral. */
     public const ROLES_TERNA = [
@@ -326,6 +330,59 @@ class Controles
                 ? $request->input('rol')
                 : null,
         ];
+    }
+
+    /**
+     * Le pega a cada fila el gameId de Transfermarkt del partido.
+     *
+     * Con eso la tabla puede ofrecer dos cosas que antes había que ir a buscar
+     * a mano: el link a la ficha del partido en TM, y rehacerle el detalle
+     * (alineación, goles, tarjetas, cambios, árbitros) desde el importador.
+     *
+     * Va una sola consulta por página, no una por fila: `import_partidos` no
+     * tiene índice por `partido_id`, así que una subconsulta correlacionada en
+     * el SELECT saldría carísima.
+     */
+    public function agregarTransfermarkt($filas)
+    {
+        $filas = collect($filas);
+
+        foreach ($filas as $fila) {
+            $fila->tm_game_id = null;
+        }
+
+        if ($filas->isEmpty() || !$this->hayStagingDeImport()) {
+            return $filas;
+        }
+
+        $mapa = DB::table('import_partidos')
+            ->whereIn('partido_id', $filas->pluck('id')->unique()->values()->all())
+            ->whereNotNull('external_id')
+            ->where('external_id', '!=', '')
+            ->orderBy('id') // si hay varias filas del mismo partido, gana la última
+            ->pluck('external_id', 'partido_id')
+            ->all();
+
+        foreach ($filas as $fila) {
+            $fila->tm_game_id = $mapa[$fila->id] ?? null;
+        }
+
+        return $filas;
+    }
+
+    /**
+     * ¿Existe el staging del importador? En una base que todavía no corrió esa
+     * migración, los controles tienen que seguir andando igual.
+     */
+    private function hayStagingDeImport(): bool
+    {
+        static $existe = null;
+
+        if ($existe === null) {
+            $existe = Schema::hasTable('import_partidos');
+        }
+
+        return $existe;
     }
 
     /** Cuántos árbitros hay cargados de cada rol; sirve para leer la terna. */
