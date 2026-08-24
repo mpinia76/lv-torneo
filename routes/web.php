@@ -282,6 +282,7 @@ Route::get('goleadores', 'GrupoController@goleadoresPublic')->name('grupos.golea
 Route::get('tarjetero', 'GrupoController@tarjetasPublic')->name('grupos.tarjetasPublic');
 Route::get('verFechas', 'FechaController@ver')->name('fechas.ver');
 Route::get('fixture', 'FechaController@fixture')->name('fechas.fixture');
+Route::get('buscar', 'BuscadorController@index')->name('buscar');
 Route::get('verFecha', 'FechaController@showPublic')->name('fechas.showPublic');
 Route::get('detalleFecha', 'FechaController@detalle')->name('fechas.detalle');
 Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');

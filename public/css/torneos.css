@@ -206,7 +206,11 @@ a:hover { color: var(--t-accent-hover); }
 .t-navbar {
     background: color-mix(in srgb, var(--t-surface) 88%, transparent);
     border-bottom: 1px solid var(--t-line);
-    backdrop-filter: saturate(1.4) blur(10px);
+}
+/* El desenfoque va sólo en escritorio: backdrop-filter convierte a la barra en
+   bloque contenedor de los position:fixed y le come la altura al panel lateral. */
+@media (min-width: 992px) {
+    .t-navbar { backdrop-filter: saturate(1.4) blur(10px); }
 }
 @supports not (background: color-mix(in srgb, red 50%, blue)) {
     .t-navbar { background: var(--t-surface); }
@@ -964,3 +968,104 @@ table.t-tabla tr.t-desciende:hover { background: rgba(176, 57, 44, .15); }
 
 /* Los subtítulos de colores de las estadísticas también gritaban */
 h5.text-warning, h5.text-success, h5.text-info, h5.text-danger { color: var(--t-ink) !important; }
+
+/* ==========================================================================
+   17. MENÚS: buscador general, panel lateral y torneos por año
+   ========================================================================== */
+
+.t-buscador { position: relative; display: flex; align-items: center; }
+.t-buscador .bi-search {
+    position: absolute; left: 9px;
+    color: var(--t-muted);
+    font-size: 13px;
+    pointer-events: none;
+}
+.t-buscador .form-control {
+    padding-left: 28px;
+    width: 230px;
+    background: var(--t-surface-2);
+    border-color: var(--t-line);
+    font-size: .8125rem;
+}
+.t-buscador .form-control:focus {
+    background: var(--t-surface);
+    border-color: var(--t-accent);
+    box-shadow: none;
+}
+.t-buscador.d-lg-none .form-control { width: 100%; }
+
+/* panel lateral en celular; en escritorio Bootstrap lo vuelve barra normal */
+.t-offcanvas { --bs-offcanvas-width: 310px; }
+.offcanvas.t-offcanvas {
+    background: var(--t-surface);
+    color: var(--t-ink);
+    border-left: 1px solid var(--t-line);
+}
+.t-offcanvas .offcanvas-header { border-bottom: 1px solid var(--t-line); }
+@media (max-width: 991.98px) {
+    .t-offcanvas .navbar-nav { gap: 2px; }
+    .t-offcanvas .nav-link { padding: .5rem .6rem; }
+    .t-offcanvas .dropdown-menu {
+        width: 100% !important;
+        border: 0;
+        box-shadow: none;
+        background: var(--t-surface-2);
+        margin: 2px 0 6px;
+        max-height: 46vh;
+    }
+}
+
+/* torneos agrupados por año */
+.t-menu-torneos { max-height: 72vh; }
+.t-menu-grupo { padding-bottom: 4px; }
+.t-menu-anio {
+    position: sticky;
+    top: 44px;
+    z-index: 1;
+    background: var(--t-surface);
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    color: var(--t-muted);
+    padding: 6px 6px 3px;
+    border-bottom: 1px solid var(--t-line);
+    margin-bottom: 2px;
+}
+@media (max-width: 991.98px) {
+    .t-menu-anio { background: var(--t-surface-2); top: 40px; }
+}
+
+/* ---------- resultados del buscador ---------- */
+
+.t-resultados { display: block; }
+.t-resultado {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--t-line);
+    color: var(--t-ink);
+}
+.t-resultado:last-child { border-bottom: 0; }
+.t-resultado:hover { background: var(--t-surface-2); color: var(--t-ink); }
+.t-resultado-nombre { font-weight: 500; }
+.t-resultado-dato {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--t-muted);
+}
+.t-resultado .t-chevron { color: var(--t-line-strong); }
+.t-resultado .t-resultado-dato + .t-chevron { margin-left: 8px; }
+.t-resultado .imgCircle {
+    width: 30px; height: 30px; border-radius: 50%;
+    object-fit: cover; border: 1px solid var(--t-line);
+}
+.t-grupo .t-eyebrow { margin-left: auto; }
+
+/* En escritorio la barra tiene que entrar en una sola línea: el contenedor de
+   Bootstrap tope en 1320 px, así que los enlaces van justos y el buscador corto. */
+@media (min-width: 992px) {
+    .t-buscador .form-control { width: 172px; }
+    .t-navbar .nav-link { padding: .4rem .5rem; font-size: .84rem; }
+}
+@media (min-width: 1500px) {
+    .t-buscador .form-control { width: 210px; }
+}
