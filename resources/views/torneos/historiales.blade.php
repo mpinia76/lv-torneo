@@ -69,50 +69,11 @@
         </div>
         <!-- Tabla de partidos -->
         <div class="table-responsive mb-4">
-            <table class="table table-bordered table-hover">
-                <thead class="thead-light text-center">
-                <tr>
-                    <th>Torneo</th>
-                    <th>Fecha</th>
-                    <th>Día</th>
-                    <th>Local</th>
-                    <th>GL</th>
-                    <th>GV</th>
-                    <th>Visitante</th>
-                    <th>Cancha Neutral</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($partidos as $partido)
-                    <tr style="cursor:pointer;" onclick="window.location='{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}'">
-                        <td>{{$partido->nombreTorneo}} {{$partido->year}}</td>
-                        <td>{{ is_numeric($partido->numero) ? "Fecha $partido->numero" : $partido->numero }}</td>
-                        <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                        <td class="text-left">
-                            <a href="{{route('equipos.ver', ['equipoId' => $partido->equipol_id])}}">
-                                @if($partido->fotoLocal)
-                                    <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="mr-1">
-                                @endif
-                                {{$partido->local}}
-                                <img src="{{ url('images/'.removeAccents($partido->paisLocal).'.gif') }}" alt="{{ $partido->paisLocal }}">
-                            </a>
-                        </td>
-                        <td>{{$partido->golesl}} @if(isset($partido->penalesl)) ({{$partido->penalesl}}) @endif</td>
-                        <td>{{$partido->golesv}} @if(isset($partido->penalesv)) ({{$partido->penalesv}}) @endif</td>
-                        <td class="text-left">
-                            <a href="{{route('equipos.ver', ['equipoId' => $partido->equipov_id])}}">
-                                @if($partido->fotoVisitante)
-                                    <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="mr-1">
-                                @endif
-                                {{$partido->visitante}}
-                                <img src="{{ url('images/'.removeAccents($partido->paisVisitante).'.gif') }}" alt="{{ $partido->paisVisitante }}">
-                            </a>
-                        </td>
-                        <td>{{$partido->neutral}}</td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+            <div class="t-panel t-lista-partidos">
+                        @foreach($partidos as $partido)
+                            <x-partido :p="$partido" :neutral="true"/>
+                        @endforeach
+                    </div>
         </div>
 
 

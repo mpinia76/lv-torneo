@@ -691,61 +691,74 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .table > thead.table-dark a:hover,
 .table > thead.table-dark a.text-white:hover { color: var(--t-ink) !important; }
 
-/* Filas con color de Bootstrap: en vez de pintar toda la fila, franja al costado.
-   Hay que pisar también las variantes striped y hover, o el rayado de Bootstrap
-   vuelve a meter su verde claro y en oscuro queda texto claro sobre fondo claro. */
+/* Filas con color de Bootstrap. En estas tablas el color de fila SIGNIFICA algo
+   (Libertadores, Sudamericana, descenso), así que se ve: tinte claro pero
+   presente, más una franja del color al costado. Hay que pisar también las
+   variantes striped y hover, o el rayado de Bootstrap vuelve a poner su color
+   y en oscuro queda texto claro sobre fondo claro. */
 .table > tbody > tr.table-success,
 .table > tbody > tr.table-danger,
 .table > tbody > tr.table-warning,
-.table > tbody > tr.table-info {
+.table > tbody > tr.table-info,
+.table > tbody > tr.table-primary,
+.table > tbody > tr.table-secondary,
+.table > tbody > tr.table-light {
     --bs-table-color: var(--t-ink);
     --bs-table-striped-color: var(--t-ink);
     --bs-table-hover-color: var(--t-ink);
     color: var(--t-ink);
 }
 .table > tbody > tr.table-success {
-    --bs-table-bg: rgba(30, 127, 78, .06);
-    --bs-table-striped-bg: rgba(30, 127, 78, .06);
-    --bs-table-hover-bg: rgba(30, 127, 78, .12);
+    --bs-table-bg: rgba(30, 127, 78, .15);
+    --bs-table-striped-bg: rgba(30, 127, 78, .15);
+    --bs-table-hover-bg: rgba(30, 127, 78, .24);
 }
 .table > tbody > tr.table-danger {
-    --bs-table-bg: rgba(176, 57, 44, .06);
-    --bs-table-striped-bg: rgba(176, 57, 44, .06);
-    --bs-table-hover-bg: rgba(176, 57, 44, .12);
+    --bs-table-bg: rgba(176, 57, 44, .15);
+    --bs-table-striped-bg: rgba(176, 57, 44, .15);
+    --bs-table-hover-bg: rgba(176, 57, 44, .24);
 }
 .table > tbody > tr.table-warning {
-    --bs-table-bg: rgba(234, 179, 8, .08);
-    --bs-table-striped-bg: rgba(234, 179, 8, .08);
-    --bs-table-hover-bg: rgba(234, 179, 8, .15);
+    --bs-table-bg: rgba(234, 179, 8, .20);
+    --bs-table-striped-bg: rgba(234, 179, 8, .20);
+    --bs-table-hover-bg: rgba(234, 179, 8, .30);
 }
-.table > tbody > tr.table-info {
-    --bs-table-bg: rgba(23, 70, 162, .06);
-    --bs-table-striped-bg: rgba(23, 70, 162, .06);
-    --bs-table-hover-bg: rgba(23, 70, 162, .12);
+.table > tbody > tr.table-info,
+.table > tbody > tr.table-primary {
+    --bs-table-bg: rgba(23, 70, 162, .13);
+    --bs-table-striped-bg: rgba(23, 70, 162, .13);
+    --bs-table-hover-bg: rgba(23, 70, 162, .22);
 }
-[data-bs-theme="dark"] .table > tbody > tr.table-success { --bs-table-bg: rgba(76, 179, 128, .10); --bs-table-striped-bg: rgba(76, 179, 128, .10); }
-[data-bs-theme="dark"] .table > tbody > tr.table-danger  { --bs-table-bg: rgba(224, 112, 95, .10); --bs-table-striped-bg: rgba(224, 112, 95, .10); }
-[data-bs-theme="dark"] .table > tbody > tr.table-warning { --bs-table-bg: rgba(245, 206, 62, .10); --bs-table-striped-bg: rgba(245, 206, 62, .10); }
-[data-bs-theme="dark"] .table > tbody > tr.table-info    { --bs-table-bg: rgba(123, 165, 255, .10); --bs-table-striped-bg: rgba(123, 165, 255, .10); }
-.table > tbody > tr.table-success > td:first-child { box-shadow: inset 3px 0 0 var(--t-win); }
-.table > tbody > tr.table-danger  > td:first-child { box-shadow: inset 3px 0 0 var(--t-loss); }
-.table > tbody > tr.table-warning > td:first-child { box-shadow: inset 3px 0 0 var(--t-amarilla); }
-.table > tbody > tr.table-info    > td:first-child { box-shadow: inset 3px 0 0 var(--t-accent); }
-
-/* Filas de agrupación (torneo / fecha / día) en las tablas viejas */
-.table > tbody > tr.table-primary,
 .table > tbody > tr.table-secondary,
 .table > tbody > tr.table-light {
-    --bs-table-bg: var(--t-surface-2);
-    --bs-table-striped-bg: var(--t-surface-2);
-    --bs-table-hover-bg: var(--t-surface-2);
-    --bs-table-color: var(--t-ink);
-    --bs-table-striped-color: var(--t-ink);
-    --bs-table-hover-color: var(--t-ink);
-    color: var(--t-ink);
-    font-family: var(--t-fuente-titulo);
-    font-weight: 600;
+    --bs-table-bg: rgba(107, 118, 121, .16);
+    --bs-table-striped-bg: rgba(107, 118, 121, .16);
+    --bs-table-hover-bg: rgba(107, 118, 121, .26);
 }
+[data-bs-theme="dark"] .table > tbody > tr.table-success  { --bs-table-bg: rgba(76, 179, 128, .17);  --bs-table-striped-bg: rgba(76, 179, 128, .17); }
+[data-bs-theme="dark"] .table > tbody > tr.table-danger   { --bs-table-bg: rgba(224, 112, 95, .17);  --bs-table-striped-bg: rgba(224, 112, 95, .17); }
+[data-bs-theme="dark"] .table > tbody > tr.table-warning  { --bs-table-bg: rgba(245, 206, 62, .17);  --bs-table-striped-bg: rgba(245, 206, 62, .17); }
+[data-bs-theme="dark"] .table > tbody > tr.table-info,
+[data-bs-theme="dark"] .table > tbody > tr.table-primary  { --bs-table-bg: rgba(123, 165, 255, .17); --bs-table-striped-bg: rgba(123, 165, 255, .17); }
+[data-bs-theme="dark"] .table > tbody > tr.table-secondary,
+[data-bs-theme="dark"] .table > tbody > tr.table-light    { --bs-table-bg: rgba(138, 148, 143, .20); --bs-table-striped-bg: rgba(138, 148, 143, .20); }
+
+.table > tbody > tr.table-success   > td:first-child { box-shadow: inset 4px 0 0 var(--t-win); }
+.table > tbody > tr.table-danger    > td:first-child { box-shadow: inset 4px 0 0 var(--t-loss); }
+.table > tbody > tr.table-warning   > td:first-child { box-shadow: inset 4px 0 0 var(--t-amarilla); }
+.table > tbody > tr.table-info      > td:first-child,
+.table > tbody > tr.table-primary   > td:first-child { box-shadow: inset 4px 0 0 var(--t-accent); }
+.table > tbody > tr.table-secondary > td:first-child,
+.table > tbody > tr.table-light     > td:first-child { box-shadow: inset 4px 0 0 var(--t-muted); }
+
+/* Las referencias de abajo de la tabla, con los mismos colores que las filas */
+.badge { font-weight: 600; font-size: 11px; border-radius: 99px; padding: .35em .75em; }
+.badge.bg-success   { background-color: var(--t-win) !important; color: #fff; }
+.badge.bg-danger    { background-color: var(--t-loss) !important; color: #fff; }
+.badge.bg-warning   { background-color: var(--t-amarilla) !important; color: #2A2100; }
+.badge.bg-info,
+.badge.bg-primary   { background-color: var(--t-accent) !important; color: var(--t-accent-ink); }
+.badge.bg-secondary { background-color: var(--t-muted) !important; color: #fff; }
 
 /* Los datos son enlaces en casi todas las tablas: que no griten en azul */
 .table a { color: var(--t-ink-2); }
@@ -868,3 +881,86 @@ table.t-tabla td.t-centro, table.t-tabla th.t-centro { text-align: center; }
 /* Los títulos en azul de Bootstrap quedaban gritando; el color se usa para otra cosa */
 h1.text-primary, h2.text-primary, h3.text-primary,
 h4.text-primary, h5.text-primary, h6.text-primary { color: var(--t-ink) !important; }
+
+tr.t-desciende .t-pos::before { background: var(--t-loss); }
+
+/* Tinte de zona en las tablas nuevas (además de la franja) */
+table.t-tabla tr.t-clasifica  { background: rgba(30, 127, 78, .07); }
+table.t-tabla tr.t-repechaje  { background: rgba(23, 70, 162, .06); }
+table.t-tabla tr.t-desciende  { background: rgba(176, 57, 44, .08); }
+table.t-tabla tr.t-clasifica:hover { background: rgba(30, 127, 78, .14); }
+table.t-tabla tr.t-repechaje:hover { background: rgba(23, 70, 162, .13); }
+table.t-tabla tr.t-desciende:hover { background: rgba(176, 57, 44, .15); }
+[data-bs-theme="dark"] table.t-tabla tr.t-clasifica { background: rgba(76, 179, 128, .12); }
+[data-bs-theme="dark"] table.t-tabla tr.t-repechaje { background: rgba(123, 165, 255, .12); }
+[data-bs-theme="dark"] table.t-tabla tr.t-desciende { background: rgba(224, 112, 95, .13); }
+
+/* ==========================================================================
+   16. FILA DE PARTIDO ANCHA (listados que mezclan torneos y años)
+   Misma fila que el fixture, con dos columnas más: competencia y día.
+   ========================================================================== */
+
+.t-lista-partidos { display: block; }
+
+.t-partido-ancho {
+    grid-template-columns: minmax(140px, 210px) 88px 1fr auto 1fr 30px;
+}
+.t-partido-ancho.sin-torneo {
+    grid-template-columns: 88px 1fr auto 1fr 30px;
+}
+
+.t-competencia {
+    display: flex; align-items: center; gap: 8px;
+    min-width: 0;
+}
+.t-competencia-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.t-competencia-nombre {
+    font-size: .8125rem;
+    font-weight: 500;
+    color: var(--t-ink-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.t-competencia-fecha {
+    font-family: var(--t-fuente-dato);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--t-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.t-cuando {
+    display: flex; flex-direction: column;
+    font-family: var(--t-fuente-dato);
+    font-size: 11.5px;
+    color: var(--t-muted);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+}
+.t-cuando-hora { color: var(--t-line-strong); }
+
+.t-partido .t-equipo.propio a { font-weight: 700; color: var(--t-ink); }
+
+@media (max-width: 820px) {
+    .t-partido-ancho,
+    .t-partido-ancho.sin-torneo {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "comp comp"
+            "cuando cuando"
+            "local marcador"
+            "visita marcador";
+        gap: 3px 10px;
+        padding: 10px 12px;
+    }
+    .t-partido-ancho .t-competencia { grid-area: comp; }
+    .t-partido-ancho .t-competencia-txt { flex-direction: row; gap: 8px; align-items: baseline; }
+    .t-partido-ancho .t-cuando { grid-area: cuando; flex-direction: row; gap: 8px; }
+    .t-partido-ancho .t-equipo.local { grid-area: local; justify-content: flex-start; text-align: left; }
+    .t-partido-ancho .t-equipo.visita { grid-area: visita; }
+    .t-partido-ancho .t-marcador { grid-area: marcador; align-self: center; }
+    .t-partido-ancho .t-estado { display: none; }
+}
+
+/* Los subtítulos de colores de las estadísticas también gritaban */
+h5.text-warning, h5.text-success, h5.text-info, h5.text-danger { color: var(--t-ink) !important; }

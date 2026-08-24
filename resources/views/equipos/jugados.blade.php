@@ -65,50 +65,11 @@
         <div class="row">
             <div class="col-12">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover align-middle text-center">
-                        <thead class="table-dark">
-                        <tr>
-                            <th>Torneo</th>
-                            <th>Fecha</th>
-                            <th>Día</th>
-                            <th>Local</th>
-                            <th>GL</th>
-                            <th>GV</th>
-                            <th>Visitante</th>
-                        </tr>
-                        </thead>
-                        <tbody>
+                    <div class="t-panel t-lista-partidos">
                         @foreach($partidos as $partido)
-                            <tr class="clickable-row"
-                                data-href="{{ route('fechas.detalle', ['partidoId'=>$partido->partido_id]) }}"
-                                style="cursor:pointer;">
-                                <td>{{ $partido->nombreTorneo }} {{ $partido->year }}</td>
-                                <td>{{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}</td>
-                                <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                                <td class="text-end">
-                                    @if($partido->local)
-                                        @if($partido->fotoLocal)
-                                            <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
-                                        @endif
-                                        {{ $partido->local }}
-                                        <img src="{{ url('images/'.removeAccents($partido->paisLocal).'.gif') }}" alt="{{ $partido->paisLocal }}" height="15">
-                                    @endif
-                                </td>
-                                <td class="fw-bold">{{ $partido->golesl }}@if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
-                                <td class="fw-bold">{{ $partido->golesv }}@if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
-                                <td class="text-start">
-                                    @if($partido->visitante)
-                                        @if($partido->fotoVisitante)
-                                            <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
-                                        @endif
-                                        {{ $partido->visitante }}
-                                        <img src="{{ url('images/'.removeAccents($partido->paisVisitante).'.gif') }}" alt="{{ $partido->paisVisitante }}" height="15">
-                                    @endif
-                                </td>
-                            </tr>
+                            <x-partido :p="$partido" :destacar="$equipo->id"/>
                         @endforeach
-                        </tbody>
-                    </table>
+                    </div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mt-3">

@@ -91,10 +91,15 @@
 
             {{-- --------------------------------------------------- menú --- --}}
             <div class="col-md-3">
+                {{-- OJO con los nombres de las variables de este @foreach: al final
+                     de la vista, @extends le pasa al layout TODO lo que quedó
+                     definido acá (get_defined_vars()), y el footer hace
+                     `@if(isset($grupo) && $grupo->penales)` esperando un modelo
+                     Grupo. Una variable llamada $grupo rompe el footer entero. --}}
                 <div class="ctrl-menu">
-                    @foreach($grupos as $grupo => $chequeos)
-                        <div class="ctrl-menu-grupo">{{ $grupo }}</div>
-                        @foreach($chequeos as $c => $d)
+                    @foreach($grupos as $nombreGrupo => $chequeosGrupo)
+                        <div class="ctrl-menu-grupo">{{ $nombreGrupo }}</div>
+                        @foreach($chequeosGrupo as $c => $d)
                             <a href="{{ route('controles.index', array_filter(['check' => $c] + $filtros)) }}"
                                class="{{ $c === $clave ? 'activo' : '' }}"
                                title="{{ $d['ayuda'] }}">

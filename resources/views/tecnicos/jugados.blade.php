@@ -106,51 +106,11 @@
                 <div class="row mt-4">
                     <div class="col-md-12">
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-dark">
-                                <tr>
-                                    <th>Torneo</th>
-                                    <th>Fecha</th>
-                                    <th>Día</th>
-                                    <th>Local</th>
-                                    <th>GL</th>
-                                    <th>GV</th>
-                                    <th>Visitante</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($partidos as $partido)
-                                    <tr style="cursor:pointer;" onclick="window.location='{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}'">
-                                        <td>
-                                            @if($partido->escudoTorneo)
-                                                <img src="{{ url('images/'.$partido->escudoTorneo) }}" alt="Escudo {{ $partido->nombreTorneo }}" height="20" class="me-1">
-                                            @endif
-                                            {{ $partido->nombreTorneo }} {{ $partido->year }}
-                                        </td>
-                                        <td>{{ is_numeric($partido->numero) ? 'Fecha '.$partido->numero : $partido->numero }}</td>
-                                        <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                                        <td>
-                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol_id]) }}">
-                                                @if($partido->fotoLocal)
-                                                    <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
-                                                @endif
-                                                {{ $partido->local }}
-                                            </a>
-                                        </td>
-                                        <td>{{ $partido->golesl }} @if(isset($partido->penalesl)) ({{ $partido->penalesl }}) @endif</td>
-                                        <td>{{ $partido->golesv }} @if(isset($partido->penalesv)) ({{ $partido->penalesv }}) @endif</td>
-                                        <td>
-                                            <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov_id]) }}">
-                                                @if($partido->fotoVisitante)
-                                                    <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
-                                                @endif
-                                                {{ $partido->visitante }}
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
+                            <div class="t-panel t-lista-partidos">
+                        @foreach($partidos as $partido)
+                            <x-partido :p="$partido"/>
+                        @endforeach
+                    </div>
                         </div>
 
                         {{-- Paginación y total --}}

@@ -6,7 +6,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-        <h1 class="h3 mb-4 text-center text-warning">🏆 Estadísticas por Torneo</h1>
+        <h1 class="t-titulo">Estadísticas por Torneo</h1>
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             @php
                 $tabs = [
@@ -117,7 +117,7 @@
             </div>
             {{-- Gráficos --}}
             <div class="tab-pane fade" id="graficos" role="tabpanel" aria-labelledby="graficos-tab">
-                <h1 class="h3 mb-4 text-center text-success">📊 Estadísticas en Gráficos</h1>
+                <h1 class="t-titulo">Estadísticas en Gráficos</h1>
 
                 <div class="row">
                     {{-- 1. Goles por Equipo --}}

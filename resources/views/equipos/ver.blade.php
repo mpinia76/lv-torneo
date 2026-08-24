@@ -372,57 +372,11 @@
             <!-- Agrega el contenido de la pestaña -->
             <div class="tab-pane fade {{ request()->get('pestActiva') == 'partidos' ? 'show active' : '' }}" id="partidos" role="tabpanel">
                 <div class="table-responsive mt-3">
-                    <table class="table table-striped table-hover align-middle">
-                        <thead class="table-dark">
-                        <tr>
-                            <th>Torneo</th>
-                            <th>Fecha</th>
-                            <th>Día</th>
-                            <th>Local</th>
-                            <th>GL</th>
-                            <th>GV</th>
-                            <th>Visitante</th>
-                        </tr>
-                        </thead>
-                        <tbody>
+                    <div class="t-panel t-lista-partidos">
                         @foreach($partidos as $partido)
-                            <tr onclick="window.location='{{ route('fechas.detalle', ['partidoId' => $partido->partido_id]) }}'" style="cursor:pointer;">
-                                <td>
-                                    @if($partido->escudoTorneo)
-                                        <img src="{{ url('images/'.$partido->escudoTorneo) }}" alt="Escudo {{ $partido->nombreTorneo }}" height="20" class="me-1">
-                                    @endif
-                                    {{ $partido->nombreTorneo }} {{ $partido->year }}
-                                </td>
-                                <td>
-                                    @if(is_numeric($partido->numero))
-                                        Fecha {{ $partido->numero }}
-                                    @else
-                                        {{ $partido->numero }}
-                                    @endif
-                                </td>
-                                <td>{{ $partido->dia ? date('d/m/Y H:i', strtotime($partido->dia)) : '' }}</td>
-                                <td>
-                                    <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol_id]) }}" onclick="event.stopPropagation()">
-                                        @if($partido->fotoLocal)
-                                            <img src="{{ url('images/'.$partido->fotoLocal) }}" height="20" class="me-1">
-                                        @endif
-                                        {{ $partido->local }}
-                                    </a>
-                                </td>
-                                <td>{{ $partido->golesl }} @isset($partido->penalesl) ({{ $partido->penalesl }}) @endisset</td>
-                                <td>{{ $partido->golesv }} @isset($partido->penalesv) ({{ $partido->penalesv }}) @endisset</td>
-                                <td>
-                                    <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov_id]) }}" onclick="event.stopPropagation()">
-                                        @if($partido->fotoVisitante)
-                                            <img src="{{ url('images/'.$partido->fotoVisitante) }}" height="20" class="me-1">
-                                        @endif
-                                        {{ $partido->visitante }}
-                                    </a>
-                                </td>
-                            </tr>
+                            <x-partido :p="$partido" :destacar="$equipo->id"/>
                         @endforeach
-                        </tbody>
-                    </table>
+                    </div>
 
                     {{-- Paginación --}}
                     <div class="d-flex justify-content-between align-items-center mt-3">
