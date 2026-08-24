@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\TmBuscarGameId;
 use App\Services\TmDetallePartido;
 
 /**
@@ -222,8 +223,26 @@ class ImportDetallesController extends Controller
                 ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
             if ($fila && $gameId === '') $gameId = (string) $fila->external_id;
         }
+
+        // Sin gameId en el staging lo buscamos en Transfermarkt: con los dos
+        // clubes y la fecha alcanza. Así "Rehacer" anda en cualquier partido y
+        // no sólo en los que pasaron por el importador de DTs.
+        $buscado = null;
+        if ($partidoId && $gameId === '') {
+            $buscador = new TmBuscarGameId;
+            $buscado  = $buscador->buscar($partidoId);
+
+            if (!empty($buscado['game_id'])) {
+                $gameId = (string) $buscado['game_id'];
+                $buscador->anotar($partidoId, $gameId, 'encontrado solo por ' . $buscado['como']);
+
+                $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
+                    ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+            }
+        }
+
         if (!$partidoId || $gameId === '') {
-            return $this->pagina('Detalle', '<p class="err">Falta <code>?partido_id=</code> (y su gameId en el staging).</p>');
+            return $this->pagina('Detalle', $this->sinGameId($partidoId, $buscado));
         }
 
         // &fotos=0 para no gastar una llamada por cada persona nueva.
@@ -342,6 +361,45 @@ class ImportDetallesController extends Controller
         }
 
         return $this->pagina('Detalle del partido', $cuerpo);
+    }
+
+    /**
+     * Qué mostrar cuando no hay gameId ni después de buscarlo en Transfermarkt.
+     *
+     * Es el único caso en que todavía hay que pegar la URL a mano, así que la
+     * página explica por qué falló la búsqueda automática (casi siempre: el
+     * equipo no está atado a un club de TM en `equipo_tm`) y deja el link para
+     * hacerlo a mano de una vez.
+     */
+    private function sinGameId($partidoId, $buscado)
+    {
+        if (!$partidoId) {
+            return '<p class="err">Falta <code>?partido_id=</code>.</p>';
+        }
+
+        $html = '<h1>No encontré este partido en Transfermarkt</h1>'
+            . '<p class="sub">Para bajarle el detalle hace falta el <b>gameId</b> de Transfermarkt. '
+            . 'Lo busqué solo por el fixture de los dos clubes y por los partidos de los DTs, '
+            . 'y no lo pude identificar sin lugar a dudas.</p>';
+
+        if (!empty($buscado['avisos'])) {
+            $html .= '<div class="diag">';
+            foreach ($buscado['avisos'] as $a) {
+                $html .= '<div class="warn">• ' . e($a) . '</div>';
+            }
+            $html .= '</div>';
+        }
+
+        $html .= '<p class="sub"><b>Para que se rehaga solo la próxima vez</b>, lo que falta es una de estas dos: '
+            . 'que los dos equipos estén atados a su club de Transfermarkt en <code>equipo_tm</code> '
+            . '(el sondeo del DT aprende esos mapeos solo), o que los DTs del partido tengan cargada su '
+            . 'URL de Transfermarkt. Con cualquiera de las dos, este mismo botón lo encuentra sin ayuda.</p>'
+            . '<p class="sub">Última salida, sólo para este partido: '
+            . '<a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $partidoId])) . '">'
+            . 'pegar la URL de Transfermarkt a mano</a>. Pegándola una vez queda anotado el gameId y de ahí en más '
+            . 'este partido se rehace solo.</p>';
+
+        return $html;
     }
 
     // ═══════════════════════════════ TANDA ═══════════════════════════════

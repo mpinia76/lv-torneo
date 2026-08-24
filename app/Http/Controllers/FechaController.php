@@ -9492,56 +9492,11 @@ private function normalizarMinuto(string $texto): int
      */
     private function recordarGameIdTM($partido, string $gameId)
     {
-        $gameId = trim($gameId);
-
-        if ($gameId === '' || !preg_match('/^\d{1,20}$/', $gameId)) {
-            return;
-        }
-
-        try {
-            if (!\Illuminate\Support\Facades\Schema::hasTable('import_partidos')) {
-                return;
-            }
-
-            $clave = ['fuente' => 'transfermarkt', 'external_id' => $gameId, 'tecnico_id' => null];
-            $ya    = DB::table('import_partidos')->where($clave)->first();
-
-            if ($ya) {
-                // Ya la tenía el importador: solo la atamos a este partido si
-                // le faltaba. Su estado y su motivo son de él, no se tocan.
-                if (!$ya->partido_id) {
-                    DB::table('import_partidos')->where('id', $ya->id)->update([
-                        'partido_id' => $partido->id,
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                return;
-            }
-
-            DB::table('import_partidos')->insert($clave + [
-                'club_external_id'  => null,
-                'club_nombre'       => $partido->equipol->nombre,
-                'rival_external_id' => null,
-                'rival_nombre'      => $partido->equipov->nombre,
-                'local'             => 1,
-                'dia'               => $partido->dia,
-                'goles_favor'       => $partido->golesl,
-                'goles_contra'      => $partido->golesv,
-                'equipo_id'         => $partido->equipol_id,
-                'rival_id'          => $partido->equipov_id,
-                'partido_id'        => $partido->id,
-                // Ya está cargado: la fila existe para guardar el gameId, no
-                // para que el importador lo cree de nuevo.
-                'estado'            => 'duplicado',
-                'motivo'            => 'detalle importado pegando la URL de Transfermarkt',
-                'created_at'        => now(),
-                'updated_at'        => now(),
-            ]);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('No pude anotar el gameId de TM del partido '
-                . $partido->id . ': ' . $e->getMessage());
-        }
+        // El que escribe la fila es el servicio, así que hay una sola versión
+        // de esto: la misma que usa la búsqueda automática de gameId.
+        (new \App\Services\TmBuscarGameId)->anotar(
+            $partido->id, $gameId, 'detalle importado pegando la URL de Transfermarkt'
+        );
     }
 
     /**
