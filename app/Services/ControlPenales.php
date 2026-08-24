@@ -22,9 +22,15 @@ use Illuminate\Support\Facades\DB;
  * 2. NO MÁS N+1. Antes, por cada gol de penal se hacían entre cuatro y seis
  *    consultas sueltas (alineación del goleador, equipo rival, arquero
  *    titular, cambios de arquero, rojas). Ahora se resuelve de a página: se
- *    traen las alineaciones, los cambios de arqueros y las rojas de todos los
+ *    traen las alineaciones, los cambios y las expulsiones de todos los
  *    partidos de la página en tres consultas, y el arquero se calcula en
  *    memoria con `arqueroEnCancha()`.
+ *
+ * 3. NO SE PUDO DETERMINAR EL ARQUERO ≠ ESTÁ MAL CARGADO. Cuando echan al
+ *    arquero y no quedan cambios, ataja un jugador de campo: el penal está
+ *    bien cargado aunque el que figura no sea arquero. Esos casos se dan por
+ *    buenos si el jugador cargado estaba en cancha en ese minuto
+ *    (`estabaEnCancha()`), y solo se muestran los que ni siquiera estaban.
  */
 class ControlPenales
 {
@@ -131,8 +137,21 @@ class ControlPenales
 
             foreach ($resueltas as $fila) {
                 // El arquero cargado tiene que ser el que estaba en cancha.
-                // Si no se pudo determinar ninguno, también es para revisar.
-                if ($fila->arquero_id !== null && (int) $fila->arquero_id === (int) $fila->arquero_cargado_id) {
+                if ($fila->arquero_id !== null) {
+                    if ((int) $fila->arquero_id === (int) $fila->arquero_cargado_id) {
+                        continue;
+                    }
+
+                    $malas->push($fila);
+                    continue;
+                }
+
+                // No se pudo determinar el arquero (lo echaron, no quedaban
+                // cambios, la alineación no tiene arquero titular). Eso NO es
+                // un error de carga: alguien tuvo que atajar igual, y muchas
+                // veces es un jugador de campo. Si el que está cargado estaba
+                // en cancha en ese minuto, damos el penal por bien cargado.
+                if (!empty($fila->cargado_en_cancha)) {
                     continue;
                 }
 
@@ -158,6 +177,12 @@ class ControlPenales
      *   arquero_cargado_nombre      - solo en los penales ya cargados
      *   ejecutor_nombre             - solo en los goles de penal
      *   motivo                      - por qué no se pudo determinar el arquero
+     *   cargado_en_cancha           - solo en los penales ya cargados y solo
+     *                                 cuando no se pudo determinar el arquero:
+     *                                 si el jugador cargado estaba en cancha en
+     *                                 ese minuto. Es lo que separa "atajó un
+     *                                 jugador de campo" (está bien) de "está
+     *                                 cargado cualquiera" (hay que corregirlo).
      */
     public function resolver($filas)
     {
@@ -171,8 +196,9 @@ class ControlPenales
         $ctx      = $this->contexto($partidos);
 
         foreach ($filas as $fila) {
-            $fila->arquero_id = null;
-            $fila->motivo     = null;
+            $fila->arquero_id        = null;
+            $fila->motivo            = null;
+            $fila->cargado_en_cancha = false;
 
             $minuto = $fila->minuto;
 
@@ -203,7 +229,31 @@ class ControlPenales
             $fila->equipo_arquero_id = $equipo;
             $fila->arquero_id = $this->arqueroEnCancha($fila->id, $equipo, (int) $minuto, $ctx);
 
-            if ($fila->arquero_id === null && $fila->motivo === null) {
+            if ($fila->arquero_id !== null) {
+                continue;
+            }
+
+            // Sin arquero determinable. En un penal ya cargado, todavía se
+            // puede decir algo útil: si el jugador cargado estaba en cancha en
+            // ese minuto, es el caso de siempre —echaron al arquero, no
+            // quedaban cambios y se puso los guantes un jugador de campo— y no
+            // hay nada que corregir.
+            if (!isset($fila->ejecutor_id) && isset($fila->arquero_cargado_id)) {
+                $fila->cargado_en_cancha = $this->estabaEnCancha(
+                    $fila->id, $fila->arquero_cargado_id, $equipo, (int) $minuto, $ctx
+                );
+
+                if ($fila->cargado_en_cancha) {
+                    $fila->motivo = 'No hay arquero determinable en ese minuto (expulsado o sin cambios), '
+                        .'pero el jugador cargado estaba en cancha: atajó él.';
+                    continue;
+                }
+
+                $fila->motivo = 'El jugador cargado no estaba en cancha en ese minuto.';
+                continue;
+            }
+
+            if ($fila->motivo === null) {
                 $fila->motivo = 'No se pudo determinar el arquero (sin arquero titular, expulsado o cambios incompletos).';
             }
         }
@@ -267,12 +317,83 @@ class ControlPenales
     }
 
     /**
+     * ¿Este jugador estaba en cancha en ese minuto, en ese equipo?
+     *
+     * Es la versión suave de `arqueroEnCancha()`: no pregunta si es el arquero,
+     * solo si estaba adentro. Sirve para el caso en que no hay arquero
+     * determinable y atajó un jugador de campo.
+     *
+     * Titular hasta que lo cambien, suplente desde que entra, y afuera si vio
+     * la roja (o la doble amarilla) antes del minuto.
+     */
+    public function estabaEnCancha($partidoId, $jugadorId, $equipoId, int $minuto, array $ctx): bool
+    {
+        $jugadorId = (int) $jugadorId;
+        $adentro   = null;
+
+        foreach ($ctx['alineaciones'][$partidoId] ?? [] as $a) {
+            if ((int) $a->jugador_id !== $jugadorId || (int) $a->equipo_id !== (int) $equipoId) {
+                continue;
+            }
+
+            $adentro = ($a->tipo === 'Titular');
+            break;
+        }
+
+        // Ni siquiera figura en la alineación de ese equipo.
+        if ($adentro === null) {
+            return false;
+        }
+
+        // Acá van TODOS los cambios, no solo los de arqueros: el que nos
+        // interesa puede ser un jugador de campo.
+        foreach ($ctx['cambiosTodos'][$partidoId] ?? [] as $c) {
+            if ((int) $c->jugador_id !== $jugadorId) {
+                continue;
+            }
+
+            if ($c->minuto === null || (int) $c->minuto > $minuto) {
+                continue;
+            }
+
+            if ($c->tipo === 'Entra') {
+                $adentro = true;
+            } elseif ($c->tipo === 'Sale') {
+                $adentro = false;
+            }
+        }
+
+        if (!$adentro) {
+            return false;
+        }
+
+        foreach ($ctx['rojas'][$partidoId] ?? [] as $r) {
+            if ((int) $r->jugador_id === $jugadorId && $r->minuto !== null && (int) $r->minuto <= $minuto) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Las tres consultas que alimentan `arqueroEnCancha()` para un conjunto
-     * de partidos: alineaciones, cambios de arqueros y rojas.
+     * de partidos: alineaciones, cambios y expulsiones.
+     *
+     * Los cambios quedan en dos listas: `cambios` son solo los de arqueros (es
+     * lo que mira `arqueroEnCancha()`, donde "entra" significa "este es el
+     * arquero nuevo") y `cambiosTodos` son todos, para `estabaEnCancha()`. Una
+     * sola consulta alimenta las dos.
      */
     public function contexto(array $partidoIds): array
     {
-        $ctx = ['alineaciones' => [], 'equipoDe' => [], 'cambios' => [], 'rojas' => []];
+        $ctx = [
+            'alineaciones' => [],
+            'equipoDe'     => [],
+            'cambios'      => [], // solo arqueros
+            'cambiosTodos' => [],
+            'rojas'        => [],
+        ];
 
         if (empty($partidoIds)) {
             return $ctx;
@@ -298,18 +419,29 @@ class ControlPenales
         $cambios = DB::table('cambios')
             ->join('jugadors', 'cambios.jugador_id', '=', 'jugadors.id')
             ->whereIn('cambios.partido_id', $partidoIds)
-            ->where('jugadors.tipoJugador', 'Arquero')
             ->orderBy('cambios.minuto')
             ->orderBy('cambios.id')
-            ->get(['cambios.partido_id', 'cambios.jugador_id', 'cambios.tipo', 'cambios.minuto']);
+            ->get([
+                'cambios.partido_id',
+                'cambios.jugador_id',
+                'cambios.tipo',
+                'cambios.minuto',
+                'jugadors.tipoJugador',
+            ]);
 
         foreach ($cambios as $c) {
-            $ctx['cambios'][$c->partido_id][] = $c;
+            $ctx['cambiosTodos'][$c->partido_id][] = $c;
+
+            if ($c->tipoJugador === 'Arquero') {
+                $ctx['cambios'][$c->partido_id][] = $c;
+            }
         }
 
+        // La doble amarilla también deja al equipo con uno menos: si no se
+        // cuenta, el arquero expulsado por dos amarillas sigue "atajando".
         $rojas = DB::table('tarjetas')
             ->whereIn('partido_id', $partidoIds)
-            ->where('tipo', 'Roja')
+            ->whereIn('tipo', ['Roja', 'Doble Amarilla'])
             ->get(['partido_id', 'jugador_id', 'minuto']);
 
         foreach ($rojas as $r) {

@@ -5,8 +5,14 @@
     llevan a la pantalla donde se corrige a mano. Los dos últimos valen para
     cualquier chequeo, porque la fila siempre es un partido:
 
-      TM       - la ficha del partido en Transfermarkt (solo si el partido pasó
-                 por el importador y tenemos su gameId).
+      TM       - Transfermarkt. Está SIEMPRE, en todos los controles y en todas
+                 las filas. Adónde lleva depende de lo que sepamos del partido
+                 (lo resuelve `Controles::agregarTransfermarkt()`):
+                   partido  -> la ficha exacta, cuando hay gameId;
+                   club     -> el calendario del club en esa temporada;
+                   busqueda -> la búsqueda por el nombre del equipo local.
+                 Los dos últimos van más apagados y con un `?` atrás, para que
+                 se vea de una que no es la ficha del partido.
       Rehacer  - vuelve a bajar el detalle completo. Con gameId va a la vista
                  previa del importador (que muestra qué va a escribir antes de
                  tocar nada); sin gameId, a la pantalla de pegar la URL.
@@ -28,6 +34,12 @@
     ];
 
     $gameId = $fila->tm_game_id ?? null;
+
+    // El link a TM lo arma el servicio. Si la fila viniera de otro lado y no lo
+    // trajera, se arma acá el de último recurso antes que quedarse sin botón.
+    $tmUrl    = $fila->tm_url ?? (\App\Services\Controles::TM_BUSQUEDA.rawurlencode((string) ($fila->equipo_local_nombre ?? '')));
+    $tmNivel  = $fila->tm_nivel ?? 'busqueda';
+    $tmTitulo = $fila->tm_titulo ?? 'Buscar en Transfermarkt.';
 @endphp
 
 @foreach($def['acciones'] as $accion)
@@ -36,9 +48,11 @@
     @endif
 @endforeach
 
+<a href="{{ $tmUrl }}" target="_blank" rel="noopener"
+   class="ctrl-b-tm {{ $tmNivel === 'partido' ? '' : 'ctrl-b-tm-aprox' }}"
+   title="{{ $tmTitulo }}">TM{{ $tmNivel === 'partido' ? '' : '?' }}</a>
+
 @if($gameId)
-    <a href="{{ \App\Services\Controles::TM_PARTIDO . $gameId }}" target="_blank" rel="noopener"
-       class="ctrl-b-tm" title="Ver el partido en Transfermarkt (gameId {{ $gameId }})">TM</a>
     <a href="{{ route('import_detalles.ver', ['partido_id' => $partido]) }}" target="_blank" rel="noopener"
        class="ctrl-b-rehacer"
        title="Vuelve a bajar alineación, goles, tarjetas, cambios y árbitros desde Transfermarkt. Primero muestra qué va a escribir.">Rehacer</a>

@@ -184,12 +184,16 @@
 
 .ctrl-motivo { color: #842029; font-size: .85em; }
 
-/* Botones de la fila. */
-.ctrl-botones { white-space: nowrap; text-align: right; }
+/* Botones de la fila.
+   Sin `nowrap`: con el botón de TM en todas las filas la columna se hacía más
+   ancha que la pantalla y los últimos botones quedaban fuera de vista, del
+   otro lado del scroll horizontal. Ahora bajan de renglón. */
+.ctrl-botones { text-align: right; }
 .ctrl-botones a {
     display: inline-block;
     padding: .3em .8em;
     margin-left: .3em;
+    margin-top: .15em;
     border-radius: .25em;
     font-size: .9em;
     color: #fff;
@@ -202,6 +206,9 @@
 .ctrl-b-gris  { background: #6c757d; }
 /* Los dos que salen del sistema: Transfermarkt y rehacer el detalle. */
 .ctrl-b-tm      { background: #1a3c5a; }
+/* El TM que no es la ficha del partido (calendario del club o búsqueda): mismo
+   botón, más apagado, para no prometer lo que no es. */
+.ctrl-b-tm-aprox { background: #6b8ba4; }
 .ctrl-b-rehacer { background: #fff; color: #495057; border: 1px solid #ced4da; padding: .25em .75em; }
 .ctrl-botones a.ctrl-b-rehacer:hover { background: #f1f3f5; color: #24292f; opacity: 1; }
 
