@@ -16,7 +16,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
 <script src="{{ asset('ini.js') }}"></script>
 <script src="{{ asset('js/dropdownFilter.js') }}"></script>
-<script src="{{ asset('js/torneos.js') }}?v=1"></script>
+<script src="{{ asset('js/torneos.js') }}?v=2"></script>
 
 @yield('bottom')
 

@@ -7,7 +7,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="h3 mb-4 text-center text-primary">⚽ Jugados</h1>
+                <h1 class="t-titulo">Jugados</h1>
 
                 <div class="row">
                     <div class="col-xs-12 col-sm-6 col-md-3">

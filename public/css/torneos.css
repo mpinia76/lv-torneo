@@ -626,3 +626,245 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     border: 1px solid var(--t-line);
 }
 .t-detalle .table > :not(caption) > * > * { border-color: var(--t-line); }
+
+/* ==========================================================================
+   14. TABLAS Y TARJETAS DE TODO EL SITIO
+   Las ~35 vistas usan el mismo molde: .card > .card-body > table.table con
+   thead.table-dark. Se redefine acá para que todas mejoren sin tocarlas.
+   ========================================================================== */
+
+.card {
+    background: var(--t-surface);
+    border: 1px solid var(--t-line) !important;
+    border-radius: var(--t-radius);
+    box-shadow: var(--t-shadow);
+}
+.card-body { padding: 16px; }
+
+.t-titulo {
+    font-family: var(--t-fuente-titulo);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -.015em;
+    margin: 0 0 16px;
+}
+
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--t-ink);
+    --bs-table-border-color: var(--t-line);
+    --bs-table-striped-bg: rgba(17, 23, 26, .028);
+    --bs-table-striped-color: var(--t-ink);
+    --bs-table-hover-bg: var(--t-surface-2);
+    --bs-table-hover-color: var(--t-ink);
+    font-size: .875rem;
+    font-variant-numeric: tabular-nums;
+    border-color: var(--t-line);
+    margin-bottom: 0;
+}
+[data-bs-theme="dark"] .table { --bs-table-striped-bg: rgba(255, 255, 255, .03); }
+.table > :not(caption) > * > * { padding: .5rem .6rem; }
+.table > tbody > tr:last-child > * { border-bottom-width: 0; }
+
+/* Cabeceras: casi todas las vistas usan thead.table-dark (barra negra) */
+.table > thead.table-dark,
+.table > thead.thead-light { --bs-table-bg: transparent; --bs-table-color: var(--t-muted); }
+.table > thead.table-dark > tr > th,
+.table > thead.table-dark > th,
+.table > thead.thead-light > tr > th,
+.table > thead.thead-light > th {
+    background: var(--t-surface-2);
+    color: var(--t-muted);
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 500;
+    border-bottom: 1px solid var(--t-line-strong);
+    border-top: 1px solid var(--t-line);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.table > thead.table-dark a,
+.table > thead.table-dark a.text-white,
+.table > thead.thead-light a { color: var(--t-muted) !important; }
+.table > thead.table-dark a:hover,
+.table > thead.table-dark a.text-white:hover { color: var(--t-ink) !important; }
+
+/* Filas con color de Bootstrap: en vez de pintar toda la fila, franja al costado.
+   Hay que pisar también las variantes striped y hover, o el rayado de Bootstrap
+   vuelve a meter su verde claro y en oscuro queda texto claro sobre fondo claro. */
+.table > tbody > tr.table-success,
+.table > tbody > tr.table-danger,
+.table > tbody > tr.table-warning,
+.table > tbody > tr.table-info {
+    --bs-table-color: var(--t-ink);
+    --bs-table-striped-color: var(--t-ink);
+    --bs-table-hover-color: var(--t-ink);
+    color: var(--t-ink);
+}
+.table > tbody > tr.table-success {
+    --bs-table-bg: rgba(30, 127, 78, .06);
+    --bs-table-striped-bg: rgba(30, 127, 78, .06);
+    --bs-table-hover-bg: rgba(30, 127, 78, .12);
+}
+.table > tbody > tr.table-danger {
+    --bs-table-bg: rgba(176, 57, 44, .06);
+    --bs-table-striped-bg: rgba(176, 57, 44, .06);
+    --bs-table-hover-bg: rgba(176, 57, 44, .12);
+}
+.table > tbody > tr.table-warning {
+    --bs-table-bg: rgba(234, 179, 8, .08);
+    --bs-table-striped-bg: rgba(234, 179, 8, .08);
+    --bs-table-hover-bg: rgba(234, 179, 8, .15);
+}
+.table > tbody > tr.table-info {
+    --bs-table-bg: rgba(23, 70, 162, .06);
+    --bs-table-striped-bg: rgba(23, 70, 162, .06);
+    --bs-table-hover-bg: rgba(23, 70, 162, .12);
+}
+[data-bs-theme="dark"] .table > tbody > tr.table-success { --bs-table-bg: rgba(76, 179, 128, .10); --bs-table-striped-bg: rgba(76, 179, 128, .10); }
+[data-bs-theme="dark"] .table > tbody > tr.table-danger  { --bs-table-bg: rgba(224, 112, 95, .10); --bs-table-striped-bg: rgba(224, 112, 95, .10); }
+[data-bs-theme="dark"] .table > tbody > tr.table-warning { --bs-table-bg: rgba(245, 206, 62, .10); --bs-table-striped-bg: rgba(245, 206, 62, .10); }
+[data-bs-theme="dark"] .table > tbody > tr.table-info    { --bs-table-bg: rgba(123, 165, 255, .10); --bs-table-striped-bg: rgba(123, 165, 255, .10); }
+.table > tbody > tr.table-success > td:first-child { box-shadow: inset 3px 0 0 var(--t-win); }
+.table > tbody > tr.table-danger  > td:first-child { box-shadow: inset 3px 0 0 var(--t-loss); }
+.table > tbody > tr.table-warning > td:first-child { box-shadow: inset 3px 0 0 var(--t-amarilla); }
+.table > tbody > tr.table-info    > td:first-child { box-shadow: inset 3px 0 0 var(--t-accent); }
+
+/* Filas de agrupación (torneo / fecha / día) en las tablas viejas */
+.table > tbody > tr.table-primary,
+.table > tbody > tr.table-secondary,
+.table > tbody > tr.table-light {
+    --bs-table-bg: var(--t-surface-2);
+    --bs-table-striped-bg: var(--t-surface-2);
+    --bs-table-hover-bg: var(--t-surface-2);
+    --bs-table-color: var(--t-ink);
+    --bs-table-striped-color: var(--t-ink);
+    --bs-table-hover-color: var(--t-ink);
+    color: var(--t-ink);
+    font-family: var(--t-fuente-titulo);
+    font-weight: 600;
+}
+
+/* Los datos son enlaces en casi todas las tablas: que no griten en azul */
+.table a { color: var(--t-ink-2); }
+.table a:hover { color: var(--t-accent); text-decoration: underline; }
+
+/* Imágenes dentro de tablas: escudos, fotos y banderas parejas */
+.table td img { vertical-align: middle; }
+.table td img[height="25"],
+.table td img[height="20"],
+.table td img[height="30"] {
+    width: 24px; height: 24px !important;
+    object-fit: contain;
+}
+[data-bs-theme="dark"] .table td img[height="25"],
+[data-bs-theme="dark"] .table td img[height="20"],
+[data-bs-theme="dark"] .table td img[height="30"] {
+    background: rgba(255, 255, 255, .90);
+    border-radius: 4px;
+    padding: 1px;
+}
+.table td img[src$=".gif"] {
+    width: 15px; height: 11px;
+    border-radius: 2px;
+    object-fit: cover;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+    background: none;
+    padding: 0;
+}
+.table td img.imgCircle,
+.table td .imgCircle {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--t-line);
+    margin-right: 4px;
+}
+
+/* Botones: el verde estaba reservado para "ganó", así que "Volver" queda neutro */
+.btn-success {
+    --bs-btn-bg: var(--t-surface);
+    --bs-btn-border-color: var(--t-line);
+    --bs-btn-color: var(--t-ink-2);
+    --bs-btn-hover-bg: var(--t-surface-2);
+    --bs-btn-hover-border-color: var(--t-line-strong);
+    --bs-btn-hover-color: var(--t-ink);
+    --bs-btn-active-bg: var(--t-surface-2);
+    --bs-btn-active-border-color: var(--t-line-strong);
+    --bs-btn-active-color: var(--t-ink);
+}
+.btn-primary {
+    --bs-btn-bg: var(--t-accent);
+    --bs-btn-border-color: var(--t-accent);
+    --bs-btn-color: var(--t-accent-ink);
+    --bs-btn-hover-bg: var(--t-accent-hover);
+    --bs-btn-hover-border-color: var(--t-accent-hover);
+    --bs-btn-hover-color: var(--t-accent-ink);
+}
+.pagination { --bs-pagination-color: var(--t-ink-2); --bs-pagination-bg: var(--t-surface);
+    --bs-pagination-border-color: var(--t-line); --bs-pagination-hover-bg: var(--t-surface-2);
+    --bs-pagination-hover-color: var(--t-ink); --bs-pagination-active-bg: var(--t-accent);
+    --bs-pagination-active-border-color: var(--t-accent); --bs-pagination-font-size: .84rem; }
+
+/* utilidad para las tablas nuevas */
+table.t-tabla td.t-izq, table.t-tabla th.t-izq { text-align: left; }
+table.t-tabla td.t-centro, table.t-tabla th.t-centro { text-align: center; }
+
+/* ==========================================================================
+   15. MENÚ PRINCIPAL
+   ========================================================================== */
+
+.t-navbar .dropdown-menu {
+    width: 330px;
+    padding: 0 6px 6px;
+}
+.t-menu-buscador {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--t-surface);
+    padding: 8px 2px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--t-line);
+}
+.t-menu-buscador .form-control { font-size: .8125rem; }
+.t-navbar .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: .38rem .5rem;
+    border-radius: var(--t-radius-sm);
+    white-space: normal;
+}
+.t-navbar .dropdown-item .t-anio {
+    margin-left: auto;
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    color: var(--t-muted);
+    padding-left: 8px;
+}
+.t-navbar .dropdown-item.activo {
+    background: var(--t-accent-soft);
+    color: var(--t-accent);
+    font-weight: 600;
+}
+.t-navbar .dropdown-item.activo .t-anio { color: var(--t-accent); }
+.t-navbar .dropdown-menu .t-menu-vacio {
+    padding: 10px 6px;
+    color: var(--t-muted);
+    font-size: .8125rem;
+}
+
+.t-navbar .dropdown-menu.t-menu-corto { width: auto; min-width: 210px; padding: 6px; }
+.t-barra-torneo .dropdown-menu { min-width: 200px; padding: 6px; }
+.t-barra-torneo .dropdown-item { border-radius: var(--t-radius-sm); padding: .35rem .5rem; font-size: .84rem; }
+
+.t-panel-pie { align-items: center; }
+.t-paginacion .pagination { margin: 0; }
+.t-paginacion nav { display: flex; }
+
+/* Los títulos en azul de Bootstrap quedaban gritando; el color se usa para otra cosa */
+h1.text-primary, h2.text-primary, h3.text-primary,
+h4.text-primary, h5.text-primary, h6.text-primary { color: var(--t-ink) !important; }

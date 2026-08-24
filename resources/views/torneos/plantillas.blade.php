@@ -6,7 +6,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="h3 mb-4 text-center text-primary">👕 Plantillas</h1>
+                <h1 class="t-titulo">Plantillas</h1>
         {{-- Selección de equipo --}}
         <form method="GET" class="mb-3 d-flex align-items-center">
             <div class="d-flex justify-content-center align-items-center flex-wrap gap-2">

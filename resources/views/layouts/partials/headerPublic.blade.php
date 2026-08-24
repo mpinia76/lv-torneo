@@ -39,18 +39,19 @@
                         <a class="nav-link dropdown-toggle" href="#" id="ligaDropdown" role="button"
                            data-bs-toggle="dropdown" aria-expanded="false">Ligas</a>
                         <ul class="dropdown-menu" aria-labelledby="ligaDropdown">
-                            <li>
-                                <input type="text" class="form-control form-control-sm m-2" style="width: calc(100% - 1rem)"
+                            <li class="t-menu-buscador">
+                                <input type="text" class="form-control form-control-sm"
                                        placeholder="Buscar liga..." onkeyup="filterDropdown(this, 'ligaDropdownMenu')">
                             </li>
                             <div id="ligaDropdownMenu">
                                 @foreach($torneosMenu ?? $torneos as $torneo)
                                     @if($torneo->tipo=='Liga' && $torneo->ambito=='Nacional')
                                         <li>
-                                            <a class="dropdown-item d-flex align-items-center gap-2"
+                                            <a class="dropdown-item {{ Session::get('codigoTorneo') == $torneo->id ? 'activo' : '' }}"
                                                href="{{route('fechas.ver', ['torneoId' => $torneo->id])}}">
                                                 <x-escudo :src="$torneo->escudo" :nombre="$torneo->nombre" tam="sm"/>
-                                                {{$torneo->nombre}} - {{$torneo->year}}
+                                                <span>{{$torneo->nombre}}</span>
+                                                <span class="t-anio">{{$torneo->year}}</span>
                                             </a>
                                         </li>
                                     @endif
@@ -64,18 +65,19 @@
                         <a class="nav-link dropdown-toggle" href="#" id="copaDropdown" role="button"
                            data-bs-toggle="dropdown" aria-expanded="false">Copas</a>
                         <ul class="dropdown-menu" aria-labelledby="copaDropdown">
-                            <li>
-                                <input type="text" class="form-control form-control-sm m-2" style="width: calc(100% - 1rem)"
+                            <li class="t-menu-buscador">
+                                <input type="text" class="form-control form-control-sm"
                                        placeholder="Buscar copa..." onkeyup="filterDropdown(this, 'copaDropdownMenu')">
                             </li>
                             <div id="copaDropdownMenu">
                                 @foreach($torneosMenu ?? $torneos as $torneo)
                                     @if($torneo->tipo=='Copa' && $torneo->ambito=='Nacional')
                                         <li>
-                                            <a class="dropdown-item d-flex align-items-center gap-2"
+                                            <a class="dropdown-item {{ Session::get('codigoTorneo') == $torneo->id ? 'activo' : '' }}"
                                                href="{{route('fechas.ver', ['torneoId' => $torneo->id])}}">
                                                 <x-escudo :src="$torneo->escudo" :nombre="$torneo->nombre" tam="sm"/>
-                                                {{$torneo->nombre}} - {{$torneo->year}}
+                                                <span>{{$torneo->nombre}}</span>
+                                                <span class="t-anio">{{$torneo->year}}</span>
                                             </a>
                                         </li>
                                     @endif
@@ -89,18 +91,19 @@
                         <a class="nav-link dropdown-toggle" href="#" id="interDropdown" role="button"
                            data-bs-toggle="dropdown" aria-expanded="false">Internacional</a>
                         <ul class="dropdown-menu" aria-labelledby="interDropdown">
-                            <li>
-                                <input type="text" class="form-control form-control-sm m-2" style="width: calc(100% - 1rem)"
+                            <li class="t-menu-buscador">
+                                <input type="text" class="form-control form-control-sm"
                                        placeholder="Buscar torneo..." onkeyup="filterDropdown(this, 'interDropdownMenu')">
                             </li>
                             <div id="interDropdownMenu">
                                 @foreach($torneosMenu ?? $torneos as $torneo)
                                     @if($torneo->ambito=='Internacional')
                                         <li>
-                                            <a class="dropdown-item d-flex align-items-center gap-2"
+                                            <a class="dropdown-item {{ Session::get('codigoTorneo') == $torneo->id ? 'activo' : '' }}"
                                                href="{{route('fechas.ver', ['torneoId' => $torneo->id])}}">
                                                 <x-escudo :src="$torneo->escudo" :nombre="$torneo->nombre" tam="sm"/>
-                                                {{$torneo->nombre}} - {{$torneo->year}}
+                                                <span>{{$torneo->nombre}}</span>
+                                                <span class="t-anio">{{$torneo->year}}</span>
                                             </a>
                                         </li>
                                     @endif
@@ -113,7 +116,7 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="protagonistasDropdown" role="button"
                            data-bs-toggle="dropdown" aria-expanded="false">Protagonistas</a>
-                        <ul class="dropdown-menu" aria-labelledby="protagonistasDropdown">
+                        <ul class="dropdown-menu t-menu-corto" aria-labelledby="protagonistasDropdown">
                             <li><a class="dropdown-item" href="{{route('torneos.arqueros')}}">Arqueros</a></li>
                             <li><a class="dropdown-item" href="{{route('torneos.goleadores')}}">Goleadores</a></li>
                             <li><a class="dropdown-item" href="{{route('torneos.jugadores')}}">Jugadores</a></li>
@@ -126,7 +129,7 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="equiposDropdown" role="button"
                            data-bs-toggle="dropdown" aria-expanded="false">Equipos</a>
-                        <ul class="dropdown-menu" aria-labelledby="equiposDropdown">
+                        <ul class="dropdown-menu t-menu-corto" aria-labelledby="equiposDropdown">
                             <li><a class="dropdown-item" href="{{route('torneos.historiales')}}">Historiales</a></li>
                             <li><a class="dropdown-item" href="{{route('torneos.posiciones')}}">Tabla Histórica</a></li>
                             <li><a class="dropdown-item" href="{{route('torneos.titulos')}}">Títulos</a></li>

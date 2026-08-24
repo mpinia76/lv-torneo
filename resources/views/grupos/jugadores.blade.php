@@ -6,7 +6,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-        <h1 class="h3 mb-4 text-center text-primary">⚽ Jugadores</h1>
+        <h1 class="t-titulo">Jugadores</h1>
 
                 <form class="d-flex justify-content-center mb-4">
                     <input type="hidden" name="torneoId" value="{{ $torneo->id }}">

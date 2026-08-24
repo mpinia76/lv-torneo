@@ -6,7 +6,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-        <h1 class="h3 mb-4 text-center text-primary">🧤 Arqueros</h1>
+        <h1 class="t-titulo">Arqueros</h1>
 
                 <form class="form-inline mb-3 d-flex justify-content-between align-items-center" id="formulario">
 

@@ -63,6 +63,14 @@
             }
         });
 
+        /* al abrir un menú con buscador, el cursor va directo al campo */
+        document.addEventListener('shown.bs.dropdown', function (ev) {
+            var menu = ev.target.querySelector('.dropdown-menu');
+            if (!menu) return;
+            var campo = menu.querySelector('.t-menu-buscador input');
+            if (campo) campo.focus();
+        });
+
         /* filas de partido: toda la fila lleva al detalle, menos los enlaces internos */
         document.addEventListener('click', function (ev) {
             var fila = ev.target.closest('[data-href]');

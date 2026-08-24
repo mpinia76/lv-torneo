@@ -23,13 +23,9 @@
         @endif
         <a class="btn btn-success m-1" href="{{route('torneos.create')}}">Nuevo</a>
         <a class="btn btn-warning m-1" href="{{ route('titulos.index') }}">Títulos</a>
-        <a class="btn btn-info m-1" href="{{route('partidos.controlarAlineaciones')}}">Controlar alineaciones</a>
-        <a class="btn btn-info m-1" href="{{route('partidos.controlarGoles')}}">Controlar goles</a>
-        <a class="btn btn-info m-1" href="{{route('partidos.controlarTarjetas')}}">Controlar tarjetas</a>
-        <a class="btn btn-info m-1" href="{{route('partidos.controlarCambios')}}">Controlar cambios</a>
-        <a class="btn btn-info m-1" href="{{route('partidos.controlarArbitros')}}">Controlar arbitros</a>
-        <a class="btn btn-info m-1" href="{{route('partidos.controlarTecnicos')}}">Controlar técnicos</a>
-        <a class="btn btn-info m-1" href="{{route('torneos.controlarPenales')}}">Controlar penales</a>
+        {{-- Los siete botones "Controlar ..." son ahora un solo panel: cada
+             control es un link adentro, asi se ejecuta una consulta por vez. --}}
+        <a class="btn btn-info m-1" href="{{route('controles.index')}}">Controles de carga</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

@@ -151,8 +151,15 @@ class TmDetallePartido
         $yaCargado = Alineacion::where('partido_id', $partido->id)->count();
         if ($yaCargado && !$forzar) {
             if ($escribir) {
+                // Aunque no se rehaga el detalle, si el partido está sin
+                // marcador se lo completamos: el resultado está en el payload
+                // que ya guardó el fixture, así que no cuesta ninguna llamada.
+                $puesto = $this->marcadorDesdeStaging($partido);
+
                 $informe['error'] = 'El partido #' . $partido->id . ' ya tiene alineación cargada ('
-                    . $yaCargado . ' jugadores). Para reemplazarla usá "Rehacer".';
+                    . $yaCargado . ' jugadores). Para reemplazarla usá "Rehacer".'
+                    . ($puesto ? ' (Igual le cargué el resultado, que estaba vacío.)' : '');
+                $informe['avisos'] = $this->avisos;
                 return $informe;
             }
             $this->aviso('Este partido ya tiene detalle cargado (' . $yaCargado . ' en la alineación). '
@@ -523,6 +530,47 @@ class TmDetallePartido
      * cada equipo nuestro. Si no coinciden, aborta: mejor no cargar nada que
      * cargar la alineación del rival.
      */
+    /**
+     * Completa el marcador usando el payload que ya está en `import_partidos`,
+     * sin llamar a la API. Sirve cuando el partido ya tiene el detalle cargado
+     * y por eso `importar()` corta antes de bajar nada.
+     */
+    private function marcadorDesdeStaging(Partido $partido)
+    {
+        if ($partido->golesl !== null && $partido->golesv !== null) return false;
+
+        $fila = DB::table('import_partidos')
+            ->where('partido_id', $partido->id)->whereNotNull('payload')
+            ->orderBy('id', 'desc')->first();
+        if (!$fila) return false;
+
+        $g = json_decode($fila->payload, true);
+        if (!is_array($g) || empty($g['isFinished'])) return false;
+        if (!isset($g['score']['home']) || !isset($g['score']['away'])) return false;
+
+        $tmLocal = isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null;
+        if ($tmLocal === null) return false;
+
+        $mapaEq = $this->mapaEquipos();
+        $equipoTmLocal = isset($mapaEq[$tmLocal]) ? (int) $mapaEq[$tmLocal] : null;
+        if (!$equipoTmLocal && $fila->equipo_id) $equipoTmLocal = (int) $fila->equipo_id;
+        if (!$equipoTmLocal) return false;
+
+        $home = (int) $g['score']['home']; $away = (int) $g['score']['away'];
+        if ($equipoTmLocal === (int) $partido->equipol_id) {
+            $gl = $home; $gv = $away;
+        } elseif ($equipoTmLocal === (int) $partido->equipov_id) {
+            $gl = $away; $gv = $home;
+        } else {
+            return false;
+        }
+
+        $partido->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
+        $this->aviso('El partido estaba sin resultado: le cargué ' . $gl . ':' . $gv
+            . ' desde el fixture que ya estaba guardado (sin gastar llamadas).');
+        return true;
+    }
+
     /**
      * Carga el marcador si el partido está SIN resultado.
      *

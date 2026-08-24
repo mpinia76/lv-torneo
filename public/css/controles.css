@@ -1,0 +1,232 @@
+/*
+ * Panel de controles de carga.
+ *
+ * El admin carga Bootstrap 3 por CSS y Bootstrap 4 por JS, así que las clases
+ * de utilidad de una versión y otra no se pueden dar por hechas. Todo lo de
+ * esta pantalla está namespaceado bajo `.ctrl` y no depende de ninguna de las
+ * dos: lo único que se usa de Bootstrap es la grilla (col-md-*) y los botones.
+ */
+
+.ctrl { color: #24292f; }
+
+.ctrl h1.display-6 { margin-bottom: .25rem; }
+
+.ctrl-intro {
+    color: #6c757d;
+    font-size: .88rem;
+    margin-bottom: 1rem;
+}
+
+/* --------------------------------------------------- barra de filtros --- */
+
+.ctrl-filtros {
+    background: #f6f8fa;
+    border: 1px solid #e3e6ea;
+    border-radius: .35rem;
+    padding: .75rem;
+    margin-bottom: 1rem;
+}
+
+.ctrl-filtros label {
+    display: block;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #6c757d;
+    margin-bottom: .15rem;
+    font-weight: 700;
+}
+
+.ctrl-filtros .ctrl-campo { display: inline-block; vertical-align: bottom; margin-right: .5rem; }
+.ctrl-filtros select,
+.ctrl-filtros input[type="text"] {
+    height: 32px;
+    padding: 2px 6px;
+    border: 1px solid #ced4da;
+    border-radius: .25rem;
+    background: #fff;
+    font-size: .85rem;
+}
+.ctrl-filtros .ctrl-acciones { float: right; }
+
+/* ---------------------------------------------------------- el menú ---- */
+
+.ctrl-menu { border: 1px solid #e3e6ea; border-radius: .35rem; overflow: hidden; }
+
+.ctrl-menu-grupo {
+    background: #f6f8fa;
+    border-bottom: 1px solid #e3e6ea;
+    border-top: 1px solid #e3e6ea;
+    padding: .35rem .6rem;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #6c757d;
+}
+.ctrl-menu-grupo:first-child { border-top: 0; }
+
+.ctrl-menu a {
+    display: block;
+    padding: .45rem .6rem .45rem .85rem;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid #f1f3f5;
+    color: #24292f;
+    text-decoration: none;
+    font-size: .88rem;
+    line-height: 1.25;
+}
+.ctrl-menu a:hover { background: #f6f8fa; text-decoration: none; color: #0b5ed7; }
+.ctrl-menu a.activo {
+    background: #eaf2ff;
+    border-left-color: #0d6efd;
+    font-weight: 700;
+    color: #0b5ed7;
+}
+
+/* El total va a la derecha del nombre y llega por AJAX. */
+.ctrl-total {
+    float: right;
+    min-width: 34px;
+    text-align: center;
+    background: #e9ecef;
+    color: #495057;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: .75rem;
+    font-weight: 700;
+}
+.ctrl-total.cargando { color: #adb5bd; background: #f1f3f5; }
+.ctrl-total.hay      { background: #f8d7da; color: #842029; }
+.ctrl-total.limpio   { background: #d1e7dd; color: #0f5132; }
+
+/* -------------------------------------------------- encabezado y tabla -- */
+
+.ctrl-cabecera {
+    border-bottom: 2px solid #e3e6ea;
+    padding-bottom: .5rem;
+    margin-bottom: .75rem;
+}
+.ctrl-cabecera h2 { font-size: 1.35rem; margin: 0 0 .15rem; font-weight: 700; }
+.ctrl-ayuda { color: #6c757d; font-size: .85rem; margin: 0; }
+
+.ctrl-tabla { width: 100%; font-size: .85rem; border-collapse: collapse; }
+.ctrl-tabla thead th {
+    text-align: left;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #6c757d;
+    border-bottom: 2px solid #e3e6ea;
+    padding: .35rem .5rem;
+    white-space: nowrap;
+}
+.ctrl-tabla td {
+    padding: .4rem .5rem;
+    border-bottom: 1px solid #f1f3f5;
+    vertical-align: middle;
+}
+.ctrl-tabla tbody tr:hover { background: #f8f9fa; }
+
+.ctrl-torneo { font-weight: 600; display: block; }
+.ctrl-torneo a { color: #24292f; }
+.ctrl-sub { color: #6c757d; font-size: .78rem; }
+
+/* El partido: local a la derecha, visitante a la izquierda, marcador al medio. */
+.ctrl-partido { white-space: nowrap; }
+.ctrl-equipo { display: inline-block; min-width: 165px; }
+.ctrl-equipo img { height: 18px; width: 18px; object-fit: contain; }
+.ctrl-equipo.local { text-align: right; }
+.ctrl-equipo.visita { text-align: left; }
+.ctrl-marcador {
+    display: inline-block;
+    background: #24292f;
+    color: #fff;
+    border-radius: .25rem;
+    padding: 1px 8px;
+    margin: 0 .4rem;
+    font-weight: 700;
+    font-size: .82rem;
+}
+.ctrl-penales { color: #adb5bd; font-weight: 400; }
+
+.ctrl-jugador img {
+    height: 26px; width: 26px;
+    object-fit: cover; border-radius: 50%;
+    margin-right: .35rem;
+    background: #f1f3f5;
+}
+
+/* Marquitas de detalle (falta línea 1, x2, 10 titulares, etc.). */
+.ctrl-chip {
+    display: inline-block;
+    border-radius: .25rem;
+    padding: 1px 6px;
+    font-size: .75rem;
+    font-weight: 700;
+    margin-right: .25rem;
+    white-space: nowrap;
+}
+.ctrl-chip.mal   { background: #f8d7da; color: #842029; }
+.ctrl-chip.ok    { background: #d1e7dd; color: #0f5132; }
+.ctrl-chip.aviso { background: #fff3cd; color: #664d03; }
+.ctrl-chip.neutro{ background: #e9ecef; color: #495057; }
+
+.ctrl-motivo { color: #842029; font-size: .78rem; }
+
+/* Botones de la fila: chicos, sin el margen de .m-1 que los desalinea. */
+.ctrl-botones { white-space: nowrap; text-align: right; }
+.ctrl-botones a {
+    display: inline-block;
+    padding: 2px 8px;
+    margin-left: .25rem;
+    border-radius: .25rem;
+    font-size: .78rem;
+    color: #fff;
+    text-decoration: none;
+    border: 0;
+}
+.ctrl-botones a:hover { opacity: .88; color: #fff; text-decoration: none; }
+.ctrl-b-verde { background: #198754; }
+.ctrl-b-azul  { background: #0d6efd; }
+.ctrl-b-gris  { background: #6c757d; }
+
+.ctrl-vacio {
+    text-align: center;
+    color: #0f5132;
+    background: #d1e7dd;
+    border-radius: .35rem;
+    padding: 1.25rem;
+    font-weight: 600;
+}
+
+.ctrl-pie { margin-top: .75rem; }
+.ctrl-pie .pagination { margin: 0; }
+.ctrl-resumen { color: #6c757d; font-size: .85rem; padding-top: .4rem; }
+
+/* Aviso arriba de la tabla (aplicar penales, roles cargados, etc.). */
+.ctrl-aviso {
+    background: #fff8e5;
+    border: 1px solid #ffe08a;
+    border-radius: .35rem;
+    padding: .6rem .75rem;
+    margin-bottom: .75rem;
+    font-size: .85rem;
+}
+
+.ctrl-filtro-rol { margin-bottom: .75rem; font-size: .85rem; }
+.ctrl-filtro-rol a {
+    display: inline-block;
+    padding: 2px 9px;
+    margin-right: .3rem;
+    border: 1px solid #ced4da;
+    border-radius: 12px;
+    color: #495057;
+    text-decoration: none;
+}
+.ctrl-filtro-rol a.activo { background: #0d6efd; border-color: #0d6efd; color: #fff; }
+
+@media (max-width: 991px) {
+    .ctrl-equipo { min-width: 110px; }
+    .ctrl-menu { margin-bottom: 1rem; }
+}

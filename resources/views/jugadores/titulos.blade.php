@@ -6,7 +6,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="h3 mb-4 text-center text-primary">🏆 Títulos</h1>
+                <h1 class="t-titulo">Títulos</h1>
         {{-- Info del jugador --}}
         <div class="row mb-4">
             <div class="col-md-3 text-center">

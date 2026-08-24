@@ -113,12 +113,22 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/reasignar/{id}', 'JugadorController@reasignar')->name('jugadores.reasignar');
     Route::put('guardarReasignar', 'JugadorController@guardarReasignar');
 
-    Route::get('controlarAlineaciones', 'PartidoController@controlarAlineaciones')->name('partidos.controlarAlineaciones');
-    Route::get('controlarTarjetas', 'PartidoController@controlarTarjetas')->name('partidos.controlarTarjetas');
-    Route::get('controlarGoles', 'PartidoController@controlarGoles')->name('partidos.controlarGoles');
-    Route::get('controlarCambios', 'PartidoController@controlarCambios')->name('partidos.controlarCambios');
-    Route::get('controlarArbitros', 'PartidoController@controlarArbitros')->name('partidos.controlarArbitros');
-    Route::get('controlarTecnicos', 'PartidoController@controlarTecnicos')->name('partidos.controlarTecnicos');
+    // Panel unificado de controles de carga. Reemplaza a las siete pantallas
+    // "Controlar ..." que habia antes: son chequeos dentro de la misma vista y
+    // se ejecuta solo la consulta del que se esta mirando.
+    Route::get('controles', 'ControlController@index')->name('controles.index');
+    Route::get('controles/conteo', 'ControlController@conteo')->name('controles.conteo');
+    Route::post('controles/recalcular', 'ControlController@recalcular')->name('controles.recalcular');
+    Route::post('controles/penales/aplicar', 'ControlController@aplicarPenales')->name('controles.penales.aplicar');
+
+    // Las URLs viejas siguen andando (links guardados, favoritos) pero caen en
+    // el chequeo equivalente del panel nuevo.
+    Route::redirect('controlarAlineaciones', '/admin/controles?check=alineaciones.faltan')->name('partidos.controlarAlineaciones');
+    Route::redirect('controlarTarjetas', '/admin/controles?check=tarjetas.sin_jugar')->name('partidos.controlarTarjetas');
+    Route::redirect('controlarGoles', '/admin/controles?check=goles.sin_jugar')->name('partidos.controlarGoles');
+    Route::redirect('controlarCambios', '/admin/controles?check=cambios.sin_jugar')->name('partidos.controlarCambios');
+    Route::redirect('controlarArbitros', '/admin/controles?check=arbitros.terna')->name('partidos.controlarArbitros');
+    Route::redirect('controlarTecnicos', '/admin/controles?check=tecnicos.faltan')->name('partidos.controlarTecnicos');
 
 
     Route::get('/reassign/{id}', 'TecnicoController@reasignar')->name('tecnicos.reasignar');
@@ -135,7 +145,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('importpenalesfecha', 'FechaController@importpenalesfecha')->name('fechas.importpenalesfecha');
     Route::get('controlarbitrosfecha', 'FechaController@controlarbitrosfecha')->name('fechas.controlarbitrosfecha');
 
-    Route::get('controlarPenales', 'TorneoController@controlarPenales')->name('torneos.controlarPenales');
+    Route::redirect('controlarPenales', '/admin/controles?check=penales.faltantes')->name('torneos.controlarPenales');
 
     Route::get('finalizar', 'TorneoController@finalizar')->name('torneos.finalizar');
     Route::put('guardarFinalizar', 'TorneoController@guardarFinalizar');
