@@ -1,92 +1,205 @@
-<div class="row mb-3">
-    <div class="col-md-3"><strong>Títulos</strong><br>{{ $titulosJugadorLiga+$titulosJugadorCopa+$titulosJugadorInternacional }}</div>
-    <div class="col-md-3"><strong>Ligas nacionales</strong><br>{{ $titulosJugadorLiga }}</div>
-    <div class="col-md-3"><strong>Copas nacionales</strong><br>{{ $titulosJugadorCopa }}</div>
-    <div class="col-md-3"><strong>Internacionales</strong><br>{{ $titulosJugadorInternacional }}</div>
-</div>
-<table class="table table-striped table-hover align-middle" style="font-size: 14px;">
-    <thead class="table-dark">
-    <th>#</th>
-    <th>Torneo</th>
-    <th>Equipos</th>
-    <th>Jugados</th>
-    <th>Goles</th>
-    <th>Amarillas</th>
-    <th>Rojas</th>
-    <th>P. Errados</th>
-    <th>P. Atajados</th>
-    <th>Arq. Recibidos</th>
-    <th>Arq. V. Invictas</th>
-    </thead>
-    <tbody>
-    @php
-        $i=1; $totalJugados=$totalGoles=$totalAmarillas=$totalRojas=$totalAtajados=$totalErrados=$totalRecibidos=$totalInvictas=0;
-    @endphp
-    @foreach($torneosJugador as $torneo)
-        @php
-            $totalJugados+=$torneo->jugados;
-            $totalGoles+=$torneo->goles;
-            $totalAmarillas+=$torneo->amarillas;
-            $totalRojas+=$torneo->rojas;
-            $totalErrados+=$torneo->errados;
-            $totalAtajados+=$torneo->atajados;
-            $totalRecibidos+=$torneo->recibidos;
-            $totalInvictas+=$torneo->invictas;
-            $jugo = $torneo->jugados>0?1:0;
-        @endphp
-        <tr>
-            <td>{{$i++}}</td>
-            <td>@if($torneo->escudoTorneo)<img src="{{ url('images/'.$torneo->escudoTorneo) }}" height="25">@endif {{$torneo->nombreTorneo}}</td>
-            <td>
-                @if($torneo->escudo)
-                    @foreach(explode(',',$torneo->escudo) as $escudo)
-                        @if($escudo!='')
-                            @php $escudoArr = explode('_',$escudo); @endphp
-                            <a href="{{route('equipos.ver', ['equipoId'=>$escudoArr[1]])}}">
-                                <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" alt="{{$escudoArr[3]}}" title="{{$escudoArr[3]}}">
-                                @if(isset($escudoArr[2]) && $escudoArr[2]!='') Pos: {!!$escudoArr[2]!!} @endif
-                            </a>
-                        @endif
-                    @endforeach
-                @endif
-            </td>
-            <td>{{$torneo->jugados}}</td>
-            <td>{{$torneo->goles}} ({{$jugo?round($torneo->goles/$torneo->jugados,2):0}})</td>
-            <td>{{$torneo->amarillas}} ({{$jugo?round($torneo->amarillas/$torneo->jugados,2):0}})</td>
-            <td>{{$torneo->rojas}} ({{$jugo?round($torneo->rojas/$torneo->jugados,2):0}})</td>
-            <td>{{$torneo->errados}} </td>
-            <td>{{$torneo->atajados}} </td>
-            <td>{{$torneo->recibidos}} ({{$jugo?round($torneo->recibidos/$torneo->jugados,2):0}})</td>
-            <td>{{$torneo->invictas}} ({{$jugo?round($torneo->invictas/$torneo->jugados,2):0}})</td>
-        </tr>
-    @endforeach
-    <!-- Totales -->
-    <tr>
-        <td></td><td></td><td><strong>Totales</strong></td>
-        <td>{{ $totalJugados }}</td>
-        <td>
-            {{ $totalGoles }}
-            ({{ $totalJugados > 0 ? round($totalGoles / $totalJugados, 2) : 0 }})
-        </td>
-        <td>
-            {{ $totalAmarillas }}
-            ({{ $totalJugados > 0 ? round($totalAmarillas / $totalJugados, 2) : 0 }})
-        </td>
-        <td>
-            {{ $totalRojas }}
-            ({{ $totalJugados > 0 ? round($totalRojas / $totalJugados, 2) : 0 }})
-        </td>
-        <td>{{ $totalErrados }}</td>
-        <td>{{ $totalAtajados }}</td>
-        <td>
-            {{ $totalRecibidos }}
-            ({{ $totalJugados > 0 ? round($totalRecibidos / $totalJugados, 2) : 0 }})
-        </td>
-        <td>
-            {{ $totalInvictas }}
-            ({{ $totalJugados > 0 ? round($totalInvictas / $totalJugados, 2) : 0 }})
-        </td>
-    </tr>
+{{--
+    Carrera como jugador: tira de números + una fila por torneo.
+    La incluyen jugadores/ver y tecnicos/ver, así que NO puede depender de
+    $jugador (en la ficha del técnico esa variable no existe): los enlaces a
+    los listados van dentro de @isset.
 
-    </tbody>
-</table>
+    Variables con prefijo fj para no pisar las globales del layout
+    ($torneos, $grupo, $i ya están tomadas).
+--}}
+@php
+    $fjJugados = $fjGoles = $fjAmarillas = $fjRojas = 0;
+    $fjErrados = $fjAtajados = $fjRecibidos = $fjInvictas = 0;
+    $fjEquipos = [];
+    $fjFilas   = [];
+
+    foreach ($torneosJugador as $fjT) {
+        $fjJugados   += $fjT->jugados;
+        $fjGoles     += $fjT->goles;
+        $fjAmarillas += $fjT->amarillas;
+        $fjRojas     += $fjT->rojas;
+        $fjErrados   += $fjT->errados;
+        $fjAtajados  += $fjT->atajados;
+        $fjRecibidos += $fjT->recibidos;
+        $fjInvictas  += $fjT->invictas;
+
+        $fjEquiposFila = [];
+        foreach (explode(',', (string) $fjT->escudo) as $fjCadena) {
+            if (trim($fjCadena) === '') { continue; }
+            $fjPartes = explode('_', $fjCadena);
+            $fjEquiposFila[] = [
+                'escudo' => $fjPartes[0] ?? '',
+                'id'     => $fjPartes[1] ?? '',
+                'pos'    => $fjPartes[2] ?? '',
+                'nombre' => $fjPartes[3] ?? '',
+            ];
+            if (!empty($fjPartes[1])) { $fjEquipos[$fjPartes[1]] = true; }
+        }
+
+        $fjFilas[] = ['t' => $fjT, 'equipos' => $fjEquiposFila];
+    }
+
+    $fjTitulos = $titulosJugadorLiga + $titulosJugadorCopa + $titulosJugadorInternacional;
+    $fjProm    = $fjJugados > 0 ? number_format($fjGoles / $fjJugados, 2) : '0.00';
+
+    // Columnas de arquero y de penales: sólo si hay algo que mostrar.
+    $fjArco    = ($fjAtajados + $fjRecibidos + $fjInvictas) > 0;
+    $fjPenales = ($fjErrados + $fjAtajados) > 0;
+
+    $fjCero = function ($v) {
+        return $v > 0 ? e($v) : '<span class="t-cero">0</span>';
+    };
+    $fjRatio = function ($v, $sobre) {
+        return $sobre > 0 && $v > 0 ? '<span class="t-prom">('.number_format($v / $sobre, 2).')</span>' : '';
+    };
+@endphp
+
+@if(count($torneosJugador) === 0)
+    <div class="t-panel"><div class="t-vacio"><i class="bi bi-clipboard-x"></i>Todavía no hay torneos cargados como jugador.</div></div>
+@else
+
+    <div class="t-kpis">
+        <div class="t-kpi">
+            <div class="t-kpi-num">{{ $fjJugados }}</div>
+            <div class="t-kpi-rot">Partidos</div>
+        </div>
+        <div class="t-kpi t-kpi-acento">
+            <div class="t-kpi-num">{{ $fjGoles }}</div>
+            <div class="t-kpi-rot">Goles</div>
+        </div>
+        <div class="t-kpi">
+            <div class="t-kpi-num">{{ $fjProm }}</div>
+            <div class="t-kpi-rot">Gol/partido</div>
+        </div>
+        <div class="t-kpi">
+            <div class="t-kpi-num">{{ count($torneosJugador) }}</div>
+            <div class="t-kpi-rot">Torneos</div>
+        </div>
+        <div class="t-kpi">
+            <div class="t-kpi-num">{{ count($fjEquipos) }}</div>
+            <div class="t-kpi-rot">Equipos</div>
+        </div>
+        <div class="t-kpi {{ $fjTitulos > 0 ? 't-kpi-win' : 't-kpi-apagado' }}">
+            <div class="t-kpi-num">{{ $fjTitulos }}</div>
+            <div class="t-kpi-rot">Títulos</div>
+        </div>
+        @if($fjArco)
+            <div class="t-kpi">
+                <div class="t-kpi-num">{{ $fjInvictas }}</div>
+                <div class="t-kpi-rot">Vallas invictas</div>
+            </div>
+        @endif
+    </div>
+
+    @if($fjTitulos > 0)
+        <div class="t-kpis-pie">
+            <span>Ligas nacionales <b>{{ $titulosJugadorLiga }}</b></span>
+            <span>Copas nacionales <b>{{ $titulosJugadorCopa }}</b></span>
+            <span>Internacionales <b>{{ $titulosJugadorInternacional }}</b></span>
+        </div>
+    @endif
+
+    <div class="t-panel">
+        <div class="t-tabla-wrap">
+            <table class="t-tabla">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Torneo</th>
+                    <th class="t-izq">Equipos</th>
+                    <th title="Partidos jugados">J</th>
+                    <th title="Goles">Goles</th>
+                    <th title="Tarjetas amarillas">TA</th>
+                    <th title="Tarjetas rojas">TR</th>
+                    @if($fjPenales)
+                        <th title="Penales errados">P. Err.</th>
+                    @endif
+                    @if($fjArco)
+                        <th title="Penales atajados">P. Ataj.</th>
+                        <th title="Goles recibidos">GC</th>
+                        <th title="Vallas invictas">VI</th>
+                    @endif
+                </tr>
+                </thead>
+                <tbody>
+                @foreach($fjFilas as $fjIndice => $fjFila)
+                    @php $fjT = $fjFila['t']; @endphp
+                    <tr>
+                        <td class="t-pos">{{ $fjIndice + 1 }}</td>
+                        <td>
+                            <a class="t-torneo" href="{{ route('torneos.ver', ['torneoId' => $fjT->idTorneo]) }}">
+                                <x-escudo :src="$fjT->escudoTorneo" :nombre="$fjT->nombreTorneo" tam="sm"/>
+                                {{ $fjT->nombreTorneo }}
+                            </a>
+                        </td>
+                        <td class="t-izq">
+                            <span class="t-equipos-celda">
+                                @foreach($fjFila['equipos'] as $fjEq)
+                                    @php
+                                        $fjEsSub  = strpos($fjEq['pos'], 'subcampeon.png') !== false;
+                                        $fjEsCamp = !$fjEsSub && strpos($fjEq['pos'], 'campeon.png') !== false;
+                                    @endphp
+                                    <a class="t-equipo-chip"
+                                       href="{{ route('equipos.ver', ['equipoId' => $fjEq['id']]) }}"
+                                       title="{{ $fjEq['nombre'] }}">
+                                        <x-escudo :src="$fjEq['escudo']" :nombre="$fjEq['nombre']" tam="sm"/>
+                                        @if(trim($fjEq['pos']) !== '')
+                                            <span class="t-ficha-pos {{ $fjEsCamp ? 't-campeon' : '' }}">
+                                                {!! $fjEq['pos'] !!}{{ is_numeric(trim(strip_tags($fjEq['pos']))) ? '°' : '' }}
+                                            </span>
+                                        @endif
+                                    </a>
+                                @endforeach
+                            </span>
+                        </td>
+                        <td class="t-pts">
+                            @isset($jugador)
+                                <a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id, 'torneoId' => $fjT->idTorneo]) }}">{{ $fjT->jugados }}</a>
+                            @else
+                                {{ $fjT->jugados }}
+                            @endisset
+                        </td>
+                        <td>
+                            @isset($jugador)
+                                <a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'torneoId' => $fjT->idTorneo]) }}">{!! $fjCero($fjT->goles) !!}</a>
+                            @else
+                                {!! $fjCero($fjT->goles) !!}
+                            @endisset
+                            {!! $fjRatio($fjT->goles, $fjT->jugados) !!}
+                        </td>
+                        <td>{!! $fjCero($fjT->amarillas) !!}</td>
+                        <td>{!! $fjCero($fjT->rojas) !!}</td>
+                        @if($fjPenales)
+                            <td>{!! $fjCero($fjT->errados) !!}</td>
+                        @endif
+                        @if($fjArco)
+                            <td>{!! $fjCero($fjT->atajados) !!}</td>
+                            <td>{!! $fjCero($fjT->recibidos) !!} {!! $fjRatio($fjT->recibidos, $fjT->jugados) !!}</td>
+                            <td>{!! $fjCero($fjT->invictas) !!}</td>
+                        @endif
+                    </tr>
+                @endforeach
+                </tbody>
+                <tfoot>
+                <tr class="t-totales">
+                    <td></td>
+                    <td>Totales</td>
+                    <td class="t-izq">{{ count($fjEquipos) }} {{ count($fjEquipos) === 1 ? 'equipo' : 'equipos' }}</td>
+                    <td class="t-pts">{{ $fjJugados }}</td>
+                    <td>{{ $fjGoles }} {!! $fjRatio($fjGoles, $fjJugados) !!}</td>
+                    <td>{{ $fjAmarillas }}</td>
+                    <td>{{ $fjRojas }}</td>
+                    @if($fjPenales)
+                        <td>{{ $fjErrados }}</td>
+                    @endif
+                    @if($fjArco)
+                        <td>{{ $fjAtajados }}</td>
+                        <td>{{ $fjRecibidos }} {!! $fjRatio($fjRecibidos, $fjJugados) !!}</td>
+                        <td>{{ $fjInvictas }}</td>
+                    @endif
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+@endif

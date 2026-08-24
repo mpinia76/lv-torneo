@@ -592,13 +592,15 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 }
 
 /* la vista de detalle traía su propio <style>; esto lo reemplaza */
-.t-detalle .nav-tabs {
+.t-detalle .nav-tabs,
+.t-ficha-pagina .nav-tabs {
     border-bottom: 1px solid var(--t-line);
     gap: 2px;
     justify-content: center;
     margin-bottom: 0;
 }
-.t-detalle .nav-tabs .nav-link {
+.t-detalle .nav-tabs .nav-link,
+.t-ficha-pagina .nav-tabs .nav-link {
     border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
@@ -607,29 +609,35 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     padding: .6rem .8rem;
     background: transparent;
 }
-.t-detalle .nav-tabs .nav-link:hover { color: var(--t-ink); }
-.t-detalle .nav-tabs .nav-link.active {
+.t-detalle .nav-tabs .nav-link:hover,
+.t-ficha-pagina .nav-tabs .nav-link:hover { color: var(--t-ink); }
+.t-detalle .nav-tabs .nav-link.active,
+.t-ficha-pagina .nav-tabs .nav-link.active {
     color: var(--t-ink);
     border-bottom-color: var(--t-accent);
     font-weight: 600;
     background: transparent;
 }
-.t-detalle .tab-content {
+.t-detalle .tab-content,
+.t-ficha-pagina .tab-content {
     background: var(--t-surface);
     border: 1px solid var(--t-line);
     border-top: 0;
     border-radius: 0 0 var(--t-radius) var(--t-radius);
     padding: 14px;
 }
-.t-detalle .tab-content .table { --bs-table-bg: transparent; margin-bottom: 0; }
-.t-detalle .imgCircle {
+.t-detalle .tab-content .table,
+.t-ficha-pagina .tab-content .table { --bs-table-bg: transparent; margin-bottom: 0; }
+.t-detalle .imgCircle,
+.t-ficha-pagina .imgCircle {
     width: 34px; height: 34px;
     border-radius: 50%;
     object-fit: cover;
     margin-right: 6px;
     border: 1px solid var(--t-line);
 }
-.t-detalle .table > :not(caption) > * > * { border-color: var(--t-line); }
+.t-detalle .table > :not(caption) > * > *,
+.t-ficha-pagina .table > :not(caption) > * > * { border-color: var(--t-line); }
 
 /* ==========================================================================
    14. TABLAS Y TARJETAS DE TODO EL SITIO
@@ -1069,3 +1077,316 @@ h5.text-warning, h5.text-success, h5.text-info, h5.text-danger { color: var(--t-
 @media (min-width: 1500px) {
     .t-buscador .form-control { width: 210px; }
 }
+
+
+/* ==========================================================================
+   15. FICHAS DE PROTAGONISTAS  (jugador · técnico · árbitro)
+   Una sola cabecera para las tres, más la tira de números de carrera y la
+   tabla temporada por temporada. Todo con los tokens del sistema, así que
+   funciona igual en claro y en oscuro.
+   ========================================================================== */
+
+.t-ficha-pagina .nav-tabs { justify-content: flex-start; }
+
+/* ---------- cabecera ---------- */
+
+.t-ficha {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    padding: 18px;
+    margin-bottom: 14px;
+    background: linear-gradient(180deg, var(--t-surface-2), var(--t-surface));
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius);
+    box-shadow: var(--t-shadow);
+}
+
+.t-ficha-foto {
+    width: 116px;
+    height: 116px;
+    border-radius: 14px;
+    object-fit: cover;
+    object-position: top center;
+    background: var(--t-surface);
+    border: 1px solid var(--t-line);
+    display: block;
+}
+
+.t-ficha-nombre {
+    font-family: var(--t-fuente-titulo);
+    font-size: 1.75rem;
+    font-weight: 800;
+    letter-spacing: -.015em;
+    line-height: 1.12;
+    margin: 6px 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.t-ficha-nombre .bandera { width: 22px; height: 16px; }
+.t-ficha-obito { opacity: .75; }
+
+.t-ficha-sub {
+    color: var(--t-muted);
+    font-size: .875rem;
+}
+
+.t-ficha-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.t-dato {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 4px 10px;
+    border: 1px solid var(--t-line);
+    border-radius: 999px;
+    background: var(--t-surface);
+    font-size: .8125rem;
+    color: var(--t-ink);
+    max-width: 100%;
+}
+.t-dato > span {
+    font-family: var(--t-fuente-dato);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--t-muted);
+    flex: none;
+}
+.t-dato > b { font-weight: 600; }
+
+.t-ficha-obs {
+    margin: 12px 0 0;
+    padding-top: 11px;
+    border-top: 1px solid var(--t-line);
+    color: var(--t-ink-2);
+    font-size: .875rem;
+    line-height: 1.5;
+    max-width: 72ch;
+}
+
+@media (max-width: 575.98px) {
+    .t-ficha {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+        gap: 14px;
+    }
+    .t-ficha-nombre { justify-content: center; font-size: 1.5rem; }
+    .t-ficha-chips  { justify-content: center; }
+    .t-ficha-obs    { text-align: left; }
+}
+
+/* ---------- tira de números de carrera ---------- */
+
+.t-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+    gap: 1px;
+    background: var(--t-surface);
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius);
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+/* La separación la pinta cada celda (outline sobre el gap de 1px) y no el
+   fondo del grid: si la última fila queda incompleta, el hueco no se ve. */
+.t-kpi {
+    background: var(--t-surface);
+    padding: 12px 14px;
+    min-width: 0;
+    outline: 1px solid var(--t-line);
+}
+.t-kpi-num {
+    font-family: var(--t-fuente-titulo);
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+}
+.t-kpi-num small {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--t-muted);
+    margin-left: 3px;
+}
+.t-kpi-rot {
+    font-family: var(--t-fuente-dato);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--t-muted);
+    margin-top: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.t-kpi-acento .t-kpi-num { color: var(--t-accent); }
+.t-kpi-win    .t-kpi-num { color: var(--t-win); }
+.t-kpi-loss   .t-kpi-num { color: var(--t-loss); }
+.t-kpi-apagado .t-kpi-num { color: var(--t-muted); }
+
+/* renglón de detalle debajo de la tira (desglose de títulos, etc.) */
+.t-kpis-pie {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: -8px 0 14px;
+    padding: 0 2px;
+    font-size: 12.5px;
+    color: var(--t-muted);
+}
+.t-kpis-pie b { color: var(--t-ink-2); font-weight: 600; }
+
+/* ---------- barra G / E / P ---------- */
+
+.t-ge {
+    display: inline-flex;
+    width: 62px;
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--t-line);
+    vertical-align: middle;
+}
+.t-ge i { display: block; height: 100%; }
+.t-ge .g { background: var(--t-win); }
+.t-ge .e { background: var(--t-draw); }
+.t-ge .p { background: var(--t-loss); }
+
+/* ---------- tabla temporada por temporada ---------- */
+
+.t-tabla .t-torneo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: var(--t-ink);
+    white-space: nowrap;
+}
+.t-tabla .t-torneo:hover { color: var(--t-accent); }
+
+.t-equipos-celda {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.t-equipo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--t-ink-2);
+}
+.t-equipo-chip:hover { color: var(--t-accent); }
+
+.t-ficha-pos {
+    font-family: var(--t-fuente-dato);
+    font-size: 10px;
+    letter-spacing: .04em;
+    color: var(--t-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+.t-ficha-pos img { height: 13px; width: auto; }
+.t-ficha-pos.t-campeon { color: var(--t-accent); font-weight: 600; }
+
+.t-tabla tfoot td,
+.t-tabla tr.t-totales td { white-space: nowrap;
+    border-top: 1px solid var(--t-line-strong);
+    border-bottom: 0;
+    font-weight: 700;
+    background: var(--t-surface-2);
+}
+.t-tabla tr.t-totales:hover td { background: var(--t-surface-2); }
+
+.t-prom {
+    color: var(--t-muted);
+    font-size: 11.5px;
+    margin-left: 3px;
+    font-variant-numeric: tabular-nums;
+}
+
+.t-cero { color: var(--t-line-strong); }
+
+/* ---------- vacíos ---------- */
+
+.t-vacio {
+    padding: 26px 16px;
+    text-align: center;
+    color: var(--t-muted);
+    font-size: .875rem;
+}
+.t-vacio .bi { font-size: 1.5rem; display: block; margin-bottom: 6px; opacity: .5; }
+
+
+/* ---------- 15.b FICHA DE CLUB ------------------------------------------- */
+
+/* El escudo NO se recorta como una foto: entra entero en la misma caja. */
+.t-ficha-foto.t-ficha-escudo {
+    object-fit: contain;
+    object-position: center;
+    padding: 8px;
+    background: var(--t-surface);
+}
+
+/* Texto largo (historia del club): ancho de lectura y aire entre renglones. */
+.t-prosa {
+    max-width: 74ch;
+    line-height: 1.7;
+    color: var(--t-ink-2);
+    margin: 0;
+}
+.t-prosa strong, .t-prosa b { color: var(--t-ink); }
+
+/* Encabezados que ordenan la tabla */
+table.t-tabla th a {
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+table.t-tabla th a:hover { color: var(--t-ink); }
+table.t-tabla th.t-orden-activo a { color: var(--t-accent); }
+table.t-tabla th .bi { font-size: 10px; }
+
+/* Nombre de jugador dentro de una tabla */
+.t-persona-celda {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap;
+}
+.t-persona-celda img {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--t-line);
+    flex: none;
+}
+.t-persona-celda a { color: var(--t-ink); font-weight: 500; }
+.t-persona-celda a:hover { color: var(--t-accent); }
+
+/* Pie de las listas paginadas */
+.t-pie-lista {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: var(--t-muted);
+}
+.t-pie-lista .pagination { margin: 0; }
