@@ -13,7 +13,7 @@
 
 .ctrl {
     color: #24292f;
-    font-size: 19px;
+    font-size: 16px;
 }
 
 .ctrl h1.display-6 { margin-bottom: .25rem; }
@@ -238,7 +238,7 @@
 .ctrl-filtro-rol a.activo { background: #0d6efd; border-color: #0d6efd; color: #fff; }
 
 @media (max-width: 1199px) {
-    .ctrl { font-size: 12px; }
+    .ctrl { font-size: 17px; }
 }
 @media (max-width: 991px) {
     .ctrl-equipo { min-width: 7em; }
