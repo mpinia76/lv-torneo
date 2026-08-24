@@ -9,8 +9,11 @@
 
 @if($filas->total() === 0)
     <div class="ctrl-vacio">
-        No hay nada para corregir en este control
-        @if($filtros['year'] || $filtros['torneo'] || $filtros['q']) con los filtros puestos @endif.
+        @if($filtros['year'] || $filtros['torneo'] || $filtros['q'])
+            No hay nada para corregir en este control con los filtros puestos.
+        @else
+            No hay nada para corregir en este control.
+        @endif
     </div>
 @else
     <div style="overflow-x:auto">

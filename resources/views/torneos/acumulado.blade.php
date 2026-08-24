@@ -25,8 +25,10 @@
                 }
             }
 
-            // Solo agregar color y badge de Descenso si $descenso > 0
-            if ($torneo->descenso > 0) {
+            // El descenso puede venir por posición ($torneo->descenso) o por promedio
+            // ($torneo->descenso_promedio). El controlador marca zona = 'Descenso' en los
+            // dos casos, así que el color tiene que existir en los dos casos.
+            if (($torneo->descenso ?? 0) > 0 || ($torneo->descenso_promedio ?? 0) > 0) {
                 $colores['Descenso'] = 'table-danger';
             }
         @endphp

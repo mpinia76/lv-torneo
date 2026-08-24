@@ -46,7 +46,11 @@ class ControlController extends Controller
             'filtros'      => $filtros,
             'filas'        => $filas,
             'anios'        => $this->controles->anios(),
-            'torneos'      => $this->controles->torneos($filtros['year']),
+            // Ojo: NO se puede llamar 'torneos'. ComposerServiceProvider hace
+            // View::composer('*') y mete su propio $torneos (coleccion de
+            // modelos Torneo) en todas las vistas, pisando lo que mande el
+            // controlador.
+            'torneosFiltro' => $this->controles->torneos($filtros['year']),
             'rolesTerna'   => Controles::ROLES_TERNA,
             'resumenRoles' => $def['grupo'] === 'Árbitros' ? $this->controles->resumenRoles() : [],
         ]);

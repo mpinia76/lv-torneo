@@ -67,8 +67,10 @@
                     <label>Torneo</label>
                     <select name="torneo">
                         <option value="">Todos</option>
-                        @foreach($torneos as $id => $nombre)
-                            <option value="{{ $id }}" @if($filtros['torneo'] == $id) selected @endif>{{ $nombre }}</option>
+                        {{-- $torneosFiltro y no $torneos: el composer global de
+                             ComposerServiceProvider pisa $torneos en todas las vistas. --}}
+                        @foreach($torneosFiltro as $torneoId => $torneoNombre)
+                            <option value="{{ $torneoId }}" @if($filtros['torneo'] == $torneoId) selected @endif>{{ $torneoNombre }}</option>
                         @endforeach
                     </select>
                 </div>
