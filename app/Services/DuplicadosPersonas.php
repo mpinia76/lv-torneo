@@ -511,9 +511,14 @@ class DuplicadosPersonas
         $base   = 0;
         $motivo = '';
 
+        // ¿La señal del nombre es fuerte? (nombre idéntico, o uno contenido en
+        // el otro). Lo necesita el castigo por fecha, más abajo.
+        $nombreFuerte = false;
+
         if ($p1['orden'] !== '' && $p1['orden'] === $p2['orden']) {
             $base   = 100;
             $motivo = 'nombre idéntico';
+            $nombreFuerte = true;
         } else {
             $inter = array_values(array_intersect($tokA, $tokB));
             $ni    = count($inter);
@@ -535,6 +540,7 @@ class DuplicadosPersonas
                 // "Juan Pérez" contra "Juan Carlos Pérez".
                 $base   = 88;
                 $motivo = 'un nombre está contenido en el otro';
+                $nombreFuerte = true;
             } else {
                 $nInter = array_intersect($p1['n'], $p2['n']);
                 if ($nInter) {
@@ -559,13 +565,29 @@ class DuplicadosPersonas
 
         $extras = [];
 
-        // Fecha de nacimiento: es el desempate más confiable que hay.
+        // Fecha de nacimiento: es el desempate más confiable que hay… salvo
+        // cuando el nombre es la evidencia fuerte y la fecha es justamente el
+        // dato dudoso.
+        //
+        // El castigo entero (−45) esconde los repetidos más obvios que hay:
+        //
+        //   Falcón Pérez, Yael / Pérez, Yael Falcón   100 − 45 =  55
+        //   Gariano, Carlos Andrés / Gariano, Andrés   88 − 45 =  43
+        //
+        // Los dos quedaban abajo del umbral 70 y no aparecían nunca, y en los
+        // dos la fecha era el dato malo (Transfermarkt las manda mal seguido).
+        // Por eso, si el nombre es fuerte —idéntico o uno contenido en el
+        // otro—, la resta se topea: el par sigue siendo visible y el motivo
+        // avisa en mayúsculas que las fechas no coinciden, que es lo que hay
+        // que mirar. Con nombres flojos ("mismo apellido, distinto nombre",
+        // 45 de base) el castigo va entero y el par sigue afuera, que es lo
+        // que evita que la pantalla se llene de homónimos.
         if ($p1['nacimiento'] && $p2['nacimiento']) {
             if ($p1['nacimiento'] === $p2['nacimiento']) {
                 $base += 12;
                 $extras[] = 'misma fecha de nacimiento';
             } else {
-                $base -= 45;
+                $base -= $nombreFuerte ? 18 : 45;
                 $extras[] = 'FECHAS DE NACIMIENTO DISTINTAS';
             }
         }
