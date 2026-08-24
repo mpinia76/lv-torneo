@@ -4,8 +4,16 @@
 
 @section('content')
     {{-- Va acá adentro a propósito: el layout carga Bootstrap 3 después de
-         app.css, así que una hoja propia en el <head> perdería contra él. --}}
-    <link href="{{ asset('css/controles.css') }}" rel="stylesheet">
+         app.css, así que una hoja propia en el <head> perdería contra él.
+
+         El `?v=` es la fecha del archivo: sin eso el navegador se queda con la
+         hoja vieja y los botones nuevos salen sin estilo (un botón blanco con
+         letra blanca no se ve). Cada vez que se toca el CSS, cambia la URL. --}}
+    @php
+        $cssControles = public_path('css/controles.css');
+        $cssVersion   = is_file($cssControles) ? filemtime($cssControles) : null;
+    @endphp
+    <link href="{{ asset('css/controles.css').($cssVersion ? '?v='.$cssVersion : '') }}" rel="stylesheet">
 
     <div class="container-fluid ctrl">
 

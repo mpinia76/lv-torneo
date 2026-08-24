@@ -204,10 +204,20 @@
 .ctrl-b-verde { background: #198754; }
 .ctrl-b-azul  { background: #0d6efd; }
 .ctrl-b-gris  { background: #6c757d; }
-/* Los dos que salen del sistema: Transfermarkt y rehacer el detalle. */
+/* Los dos que salen del sistema: Transfermarkt y rehacer el detalle.
+
+   OJO CON LA ESPECIFICIDAD. "Rehacer" era `background:#fff; color:#495057;
+   border:1px solid #ced4da`, pero `.ctrl-botones a` (clase + elemento) le gana
+   a `.ctrl-b-rehacer` (clase sola): ganaban el `color:#fff` y el `border:0` de
+   arriba y quedaba letra blanca, sin borde, sobre fondo blanco. El botón
+   estaba en el HTML y era literalmente invisible. A los otros no les pasa
+   porque solo declaran `background`, que arriba no está.
+
+   Por eso ahora es un botón lleno como los demás: la letra blanca de arriba es
+   la que corresponde. Si algún día hay que darle otro color de texto, el
+   selector tiene que ser `.ctrl-botones a.ctrl-b-rehacer`. */
 .ctrl-b-tm      { background: #1a3c5a; }
-.ctrl-b-rehacer { background: #fff; color: #495057; border: 1px solid #ced4da; padding: .25em .75em; }
-.ctrl-botones a.ctrl-b-rehacer:hover { background: #f1f3f5; color: #24292f; opacity: 1; }
+.ctrl-b-rehacer { background: #b45309; }
 
 .ctrl-vacio {
     text-align: center;
