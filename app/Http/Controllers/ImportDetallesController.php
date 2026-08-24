@@ -217,6 +217,10 @@ class ImportDetallesController extends Controller
         $gameId    = trim((string) $request->get('game_id', ''));
         $forzar    = (string) $request->get('forzar', '0') === '1';
 
+        // Si el gameId viene en la URL es porque lo eligió el usuario entre los
+        // candidatos: si el partido baja bien, se anota para no volver a preguntar.
+        $elegido = $gameId !== '';
+
         $fila = null;
         if ($partidoId) {
             $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
@@ -250,6 +254,17 @@ class ImportDetallesController extends Controller
 
         $r = (new TmDetallePartido)->importar($partidoId, $gameId,
             ['escribir' => $escribir, 'forzar' => $forzar, 'fotos' => $fotos]);
+
+        // El importador aborta si los clubes no aparean, así que llegar hasta acá
+        // sin error es la confirmación de que el gameId elegido era el correcto.
+        if ($elegido && empty($r['error'])) {
+            (new TmBuscarGameId)->anotar($partidoId, $gameId, 'elegido entre los candidatos de Transfermarkt');
+
+            if (!$fila) {
+                $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
+                    ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+            }
+        }
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
             . '<h1>' . ($escribir ? 'Detalle cargado' : 'Vista previa') . ' · partido #' . $partidoId . '</h1>';
@@ -364,12 +379,13 @@ class ImportDetallesController extends Controller
     }
 
     /**
-     * Qué mostrar cuando no hay gameId ni después de buscarlo en Transfermarkt.
+     * Qué mostrar cuando la búsqueda automática no pudo decidir sola.
      *
-     * Es el único caso en que todavía hay que pegar la URL a mano, así que la
-     * página explica por qué falló la búsqueda automática (casi siempre: el
-     * equipo no está atado a un club de TM en `equipo_tm`) y deja el link para
-     * hacerlo a mano de una vez.
+     * Casi nunca es que TM no tenga el partido: es que hay dos o tres que
+     * podrían serlo y no hay con qué desempatar (los clubes no están atados en
+     * `equipo_tm`). Entonces no se manda al usuario a buscar la URL: se le
+     * muestran los candidatos con fecha y nombres, y elige de un clic. Lo que
+     * elige queda anotado, así que el partido no vuelve a preguntar.
      */
     private function sinGameId($partidoId, $buscado)
     {
@@ -377,10 +393,38 @@ class ImportDetallesController extends Controller
             return '<p class="err">Falta <code>?partido_id=</code>.</p>';
         }
 
-        $html = '<h1>No encontré este partido en Transfermarkt</h1>'
-            . '<p class="sub">Para bajarle el detalle hace falta el <b>gameId</b> de Transfermarkt. '
-            . 'Lo busqué solo por el fixture de los dos clubes y por los partidos de los DTs, '
-            . 'y no lo pude identificar sin lugar a dudas.</p>';
+        $candidatos = isset($buscado['candidatos']) ? $buscado['candidatos'] : [];
+
+        $html = '<h1>' . ($candidatos ? '¿Cuál de estos es?' : 'No encontré este partido en Transfermarkt') . '</h1>'
+            . '<p class="sub">' . $this->resumenPartido($partidoId) . '</p>';
+
+        if ($candidatos) {
+            $html .= '<p class="sub">Estos son los partidos de Transfermarkt que podrían ser éste. '
+                . 'No elijo yo porque los equipos no están atados a sus clubes de Transfermarkt y un gameId '
+                . 'equivocado escribe la alineación de otro partido. Elegí vos y queda anotado para siempre.</p>'
+                . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Partido en Transfermarkt</th>'
+                . '<th>gameId</th><th></th><th></th></tr></thead><tbody>';
+
+            foreach ($candidatos as $c) {
+                $html .= '<tr>'
+                    . '<td class="num">' . e((string) $c['dia']) . '</td>'
+                    . '<td>' . e($c['local']) . ' vs ' . e($c['visita']) . '</td>'
+                    . '<td class="num gris">' . e($c['game_id']) . '</td>'
+                    . '<td><a href="' . e(\App\Services\Controles::TM_PARTIDO . $c['game_id'])
+                    . '" target="_blank" rel="noopener">ver en TM</a></td>'
+                    . '<td><a class="boton" href="'
+                    . e(route('import_detalles.ver', ['partido_id' => (int) $partidoId, 'game_id' => $c['game_id']]))
+                    . '">Es éste →</a></td>'
+                    . '</tr>';
+            }
+
+            $html .= '</tbody></table></div>'
+                . '<p class="sub">«Es éste» abre la vista previa: muestra qué va a escribir <b>antes</b> de tocar '
+                . 'nada, y si los equipos no aparean con los de la base te avisa ahí mismo.</p>';
+        } else {
+            $html .= '<p class="sub">Para bajarle el detalle hace falta el <b>gameId</b> de Transfermarkt. '
+                . 'Lo busqué por el fixture de los dos clubes y por los partidos de los DTs, y no apareció.</p>';
+        }
 
         if (!empty($buscado['avisos'])) {
             $html .= '<div class="diag">';
@@ -400,6 +444,24 @@ class ImportDetallesController extends Controller
             . 'este partido se rehace solo.</p>';
 
         return $html;
+    }
+
+    /** "Equipo A vs Equipo B · 2026-08-19", para saber de qué partido hablamos. */
+    private function resumenPartido($partidoId)
+    {
+        $p = DB::table('partidos')
+            ->join('equipos as el', 'partidos.equipol_id', '=', 'el.id')
+            ->join('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
+            ->where('partidos.id', (int) $partidoId)
+            ->first(['partidos.dia', 'el.nombre as local', 'ev.nombre as visita']);
+
+        if (!$p) {
+            return 'Partido #' . (int) $partidoId;
+        }
+
+        return e($p->local) . ' vs ' . e($p->visita)
+            . ($p->dia ? ' · ' . e(substr((string) $p->dia, 0, 10)) : '')
+            . ' · partido #' . (int) $partidoId;
     }
 
     // ═══════════════════════════════ TANDA ═══════════════════════════════

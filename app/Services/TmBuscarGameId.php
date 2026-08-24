@@ -49,6 +49,17 @@ class TmBuscarGameId
     /** @var array */
     private $avisos = [];
 
+    /**
+     * Los partidos de TM que podrían ser éste pero no se pudo decidir.
+     *
+     * Cuando la búsqueda no puede elegir sola, esto es lo que se le muestra al
+     * usuario para que elija él de un clic: mejor tres opciones concretas que
+     * mandarlo a buscar la URL a Transfermarkt.
+     *
+     * @var array gameId => ['dia' => 'Y-m-d', 'home' => id, 'away' => id]
+     */
+    private $candidatos = [];
+
     /** @var int */
     private $llamadas = 0;
 
@@ -56,12 +67,13 @@ class TmBuscarGameId
      * Busca el gameId de un partido.
      *
      * Devuelve ['game_id' => string|null, 'como' => string|null,
-     *           'avisos' => string[], 'llamadas' => int].
+     *           'candidatos' => array, 'avisos' => string[], 'llamadas' => int].
      */
     public function buscar($partidoId): array
     {
-        $this->avisos   = [];
-        $this->llamadas = 0;
+        $this->avisos     = [];
+        $this->candidatos = [];
+        $this->llamadas   = 0;
 
         $partido = DB::table('partidos')->where('id', (int) $partidoId)->first();
 
@@ -207,6 +219,7 @@ class TmBuscarGameId
     {
         $fecha      = strtotime(substr((string) $dia, 0, 10));
         $candidatos = [];
+        $datos      = [];
 
         // Si no conocemos ninguno de los dos clubes, lo único que queda para
         // reconocer el partido es la fecha, así que se exige exacta. Esto sólo
@@ -234,6 +247,12 @@ class TmBuscarGameId
             if (!isset($candidatos[$clave]) || $diff < $candidatos[$clave]) {
                 $candidatos[$clave] = $diff;
             }
+
+            $datos[$clave] = [
+                'dia'  => $j['dia'],
+                'home' => isset($j['home']) ? $j['home'] : null,
+                'away' => isset($j['away']) ? $j['away'] : null,
+            ];
         }
 
         if (empty($candidatos)) {
@@ -248,9 +267,9 @@ class TmBuscarGameId
         // ventana pueden ser contra rivales distintos: no hay con qué
         // desempatar.
         if (!($tmLocal && $tmVisit)) {
+            $this->anotarCandidatos($candidatos, $datos);
             $this->avisos[] = 'Hay ' . count($candidatos) . ' partidos posibles alrededor de esa fecha y no tengo '
-                . 'los dos equipos atados a clubes de Transfermarkt, así que no puedo saber cuál es '
-                . '(gameId ' . implode(', ', array_keys($candidatos)) . ').';
+                . 'los dos equipos atados a clubes de Transfermarkt, así que no elijo yo.';
             return null;
         }
 
@@ -260,12 +279,105 @@ class TmBuscarGameId
         $empatados = array_keys(array_filter($candidatos, function ($d) use ($mejor) { return $d === $mejor; }));
 
         if (count($empatados) > 1) {
+            $this->anotarCandidatos(array_flip($empatados), $datos);
             $this->avisos[] = 'Encontré ' . count($empatados) . ' partidos de Transfermarkt el mismo día entre estos '
-                . 'dos equipos (gameId ' . implode(', ', $empatados) . '). No elijo ninguno: cargá la URL a mano.';
+                . 'dos equipos. No elijo ninguno.';
             return null;
         }
 
         return (string) $empatados[0];
+    }
+
+    /** Guarda los que quedaron en duda para poder ofrecerlos a mano. */
+    private function anotarCandidatos(array $candidatos, array $datos)
+    {
+        foreach (array_keys($candidatos) as $gameId) {
+            $gameId = (string) $gameId;
+
+            if (!isset($this->candidatos[$gameId]) && isset($datos[$gameId])) {
+                $this->candidatos[$gameId] = $datos[$gameId];
+            }
+        }
+    }
+
+    /**
+     * Los candidatos con el nombre de los dos clubes puestos.
+     *
+     * Una llamada para todos: sin los nombres la lista es una fila de números y
+     * no hay forma de elegir.
+     */
+    private function candidatosConNombres(): array
+    {
+        if (empty($this->candidatos)) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($this->candidatos as $c) {
+            foreach (['home', 'away'] as $k) {
+                if (!empty($c[$k])) {
+                    $ids[(string) $c[$k]] = true;
+                }
+            }
+        }
+
+        $nombres = $this->nombresDeClubes(array_keys($ids));
+        $out     = [];
+
+        foreach ($this->candidatos as $gameId => $c) {
+            $out[] = [
+                'game_id' => (string) $gameId,
+                'dia'     => isset($c['dia']) ? $c['dia'] : null,
+                'local'   => isset($nombres[(string) $c['home']]) ? $nombres[(string) $c['home']] : ('club ' . $c['home']),
+                'visita'  => isset($nombres[(string) $c['away']]) ? $nombres[(string) $c['away']] : ('club ' . $c['away']),
+            ];
+        }
+
+        usort($out, function ($a, $b) { return strcmp((string) $a['dia'], (string) $b['dia']); });
+
+        return $out;
+    }
+
+    /** [clubId => nombre] de una sola llamada. */
+    private function nombresDeClubes(array $ids): array
+    {
+        $ids = array_values(array_filter($ids));
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        $qs = implode('&', array_map(function ($id) { return 'ids[]=' . urlencode($id); }, array_slice($ids, 0, 50)));
+
+        $this->llamadas++;
+        $json = HttpHelper::getJson(self::TMAPI . '/clubs?' . $qs);
+
+        if (!is_array($json)) {
+            return [];
+        }
+
+        $items = isset($json['data']) ? $json['data'] : $json;
+        $map   = [];
+
+        if (!is_array($items)) {
+            return [];
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item) || !isset($item['id'])) {
+                continue;
+            }
+
+            foreach (['name', 'fullName', 'officialName', 'shortName'] as $k) {
+                if (!empty($item[$k]) && !is_array($item[$k])) {
+                    $map[(string) $item['id']] = trim((string) $item[$k]);
+                    break;
+                }
+            }
+        }
+
+        return $map;
     }
 
     /**
@@ -483,10 +595,12 @@ class TmBuscarGameId
         }
 
         return [
-            'game_id'  => $gameId,
-            'como'     => $como,
-            'avisos'   => $this->avisos,
-            'llamadas' => $this->llamadas,
+            'game_id'    => $gameId,
+            'como'       => $como,
+            // Los nombres sólo se piden si de verdad hay que mostrar la lista.
+            'candidatos' => $gameId ? [] : $this->candidatosConNombres(),
+            'avisos'     => $this->avisos,
+            'llamadas'   => $this->llamadas,
         ];
     }
 }
