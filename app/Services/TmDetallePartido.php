@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use App\Persona;
 use App\Jugador;
@@ -2325,12 +2326,7 @@ class TmDetallePartido
      */
     private function rescatarPrimerApellido(array $n, $nacionalidad)
     {
-        static $dosApellidos = ['Argentina', 'Bolivia', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
-            'Ecuador', 'El Salvador', 'España', 'Guatemala', 'Guinea Ecuatorial', 'Honduras',
-            'México', 'Nicaragua', 'Panamá', 'Paraguay', 'Perú', 'Puerto Rico',
-            'República Dominicana', 'Uruguay', 'Venezuela'];
-
-        if ($nacionalidad === null || !in_array($nacionalidad, $dosApellidos, true)) return $n;
+        if (!$this->esHispana($nacionalidad)) return $n;
 
         $nombres   = preg_split('/\s+/', trim($n['nombre']));
         $apellidos = preg_split('/\s+/', trim($n['apellido']));
@@ -2350,6 +2346,123 @@ class TmDetallePartido
         $n['nombre']   = implode(' ', $nombres);
         $n['apellido'] = implode(' ', $mover) . ' ' . $n['apellido'];
         return $n;
+    }
+
+    /**
+     * Nacionalidades donde la costumbre son DOS apellidos. La usan las dos
+     * reglas de reparto de nombre de acá abajo.
+     */
+    private function esHispana($nacionalidad)
+    {
+        static $dosApellidos = ['Argentina', 'Bolivia', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
+            'Ecuador', 'El Salvador', 'España', 'Guatemala', 'Guinea Ecuatorial', 'Honduras',
+            'México', 'Nicaragua', 'Panamá', 'Paraguay', 'Perú', 'Puerto Rico',
+            'República Dominicana', 'Uruguay', 'Venezuela'];
+
+        return $nacionalidad !== null && in_array($nacionalidad, $dosApellidos, true);
+    }
+
+    /**
+     * Segundo apellido cuando Transfermarkt no manda NINGÚN ancla.
+     *
+     * El JSON de árbitros (`/referees`) viene pelado: sólo `name`, sin
+     * shortName, sin passportName y sin displayName (confirmado con el
+     * diagnóstico del árbitro 28495, ago-2026). Sin ancla,
+     * `NombreHelper::separarTM` cae al fallback "la última palabra es el
+     * apellido", y TODO árbitro con apellido doble entra partido mal:
+     *
+     *   "Yael Falcón Pérez"  ->  nombre "Yael Falcón" / apellido "Pérez"   (mal)
+     *                        ->  nombre "Yael"        / apellido "Falcón Pérez"
+     *
+     * Por la FORMA no se puede decidir: "Yael | Falcón Pérez" y "Jorge Daniel |
+     * Baliño" son las dos "tres palabras, argentino". Cualquier regla del tipo
+     * "las dos últimas son apellidos" arregla al primero y rompe al segundo.
+     *
+     * Entonces no inventamos la regla: le preguntamos a la base, que ya tiene
+     * miles de personas cargadas a mano. Ver `tokenEsApellido()`.
+     *
+     * Sólo corre cuando el perfil NO trajo shortName. Si TM mandó ancla, esa
+     * manda: no le discutimos a un dato por una estadística.
+     */
+    private function apellidoDobleSinAncla(array $n, $nacionalidad, array $perfil)
+    {
+        if (!empty($perfil['shortName'])) return $n;
+        if (!$this->esHispana($nacionalidad)) return $n;
+
+        $nombres   = array_values(array_filter(preg_split('/\s+/', trim($n['nombre'])), 'strlen'));
+        $apellidos = array_values(array_filter(preg_split('/\s+/', trim($n['apellido'])), 'strlen'));
+
+        // Con tres o más nombres ya trabajó rescatarPrimerApellido. El caso que
+        // queda es el de tres palabras: dos "nombres" y un apellido.
+        if (count($nombres) !== 2 || count($apellidos) !== 1) return $n;
+
+        $palabra   = end($nombres);
+        $veredicto = $this->tokenEsApellido($palabra);
+
+        if ($veredicto === true) {
+            array_pop($nombres);
+            $n['nombre']   = implode(' ', $nombres);
+            $n['apellido'] = $palabra . ' ' . $n['apellido'];
+            return $n;
+        }
+
+        if ($veredicto === null) {
+            $this->aviso('No sé cómo se parte "' . trim($n['name']) . '": Transfermarkt no manda el apellido '
+                . 'aparte y "' . $palabra . '" no aparece claro en la base ni como nombre ni como apellido. '
+                . 'Quedó como "' . trim($n['apellido']) . ', ' . trim($n['nombre']) . '" — si está mal, '
+                . 'corregilo en la ficha.');
+        }
+
+        return $n;
+    }
+
+    /**
+     * ¿"falcón" es apellido o nombre de pila? Lo decide el índice invertido
+     * `persona_tokens` (el que arma `DuplicadosPersonas`), contando cuántas
+     * personas distintas lo tienen en cada campo: 'a' apellido, 'n' nombre.
+     *
+     *   true  = es apellido
+     *   false = es nombre de pila
+     *   null  = no sé (o la tabla no está)
+     *
+     * Se exige una diferencia clara —el doble y al menos 3 fichas— porque hay
+     * palabras que son las dos cosas ("Martín", "Nicolás"). Ante la duda
+     * devuelve null y el nombre queda como vino: un apellido mal partido se
+     * corrige en dos clics, uno mal "corregido" no se nota nunca.
+     *
+     * OJO: `tokensDe()` indexa los nombres TAMBIÉN como apellido cuando la
+     * ficha tiene el apellido vacío, así que hay algo de ruido en el campo 'a'.
+     * Por eso el umbral pide el doble y no un simple "más que".
+     */
+    private function tokenEsApellido($palabra)
+    {
+        static $cache = [];
+
+        $tokens = DuplicadosPersonas::tokenizar($palabra);
+        $tok    = $tokens ? $tokens[0] : '';
+        if ($tok === '') return null;
+        if (array_key_exists($tok, $cache)) return $cache[$tok];
+
+        try {
+            if (!Schema::hasTable('persona_tokens')) return $cache[$tok] = null;
+
+            $conteo = DB::table('persona_tokens')
+                ->select('campo', DB::raw('COUNT(DISTINCT persona_id) as n'))
+                ->where('token', $tok)
+                ->groupBy('campo')
+                ->pluck('n', 'campo')
+                ->all();
+        } catch (\Exception $e) {
+            return $cache[$tok] = null;
+        }
+
+        $comoApellido = isset($conteo['a']) ? (int) $conteo['a'] : 0;
+        $comoNombre   = isset($conteo['n']) ? (int) $conteo['n'] : 0;
+
+        if ($comoApellido >= 3 && $comoApellido >= 2 * $comoNombre) return $cache[$tok] = true;
+        if ($comoNombre   >= 3 && $comoNombre   >= 2 * $comoApellido) return $cache[$tok] = false;
+
+        return $cache[$tok] = null;
     }
 
     /** Traduce el perfil de la API a nuestros campos (mismo criterio que el import de jugadores). */
@@ -2426,6 +2539,7 @@ class TmDetallePartido
         elseif ($pieRaw === 'Ambidiestro') $pie = 'Ambas';
 
         $n = $this->rescatarPrimerApellido($n, $nacionalidad);
+        $n = $this->apellidoDobleSinAncla($n, $nacionalidad, $p);
 
         $persona = ['name' => trim($n['name']), 'nombre' => trim($n['nombre']), 'apellido' => trim($n['apellido'])];
         if ($ciudad)        $persona['ciudad'] = $ciudad;
