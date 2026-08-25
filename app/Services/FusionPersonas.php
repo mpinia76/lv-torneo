@@ -70,6 +70,34 @@ class FusionPersonas
         ];
     }
 
+    /**
+     * El mapa de roles y tablas hijas, expuesto para que el resto de la app mire
+     * exactamente las mismas tablas que la fusión (contar registros, borrar una
+     * persona huérfana). Si acá se agrega una tabla, se agrega en todos lados.
+     */
+    public static function mapaRoles(): array
+    {
+        return self::relaciones();
+    }
+
+    /**
+     * Tablas que hay que mover en una fusión pero que NO son un "registro
+     * deportivo": son bitácoras de importación, no partidos jugados. No se
+     * cuentan en el badge de la pantalla para no inflar fichas vacías.
+     */
+    private static $hijosQueNoSonRegistro = ['import_partidos'];
+
+    /**
+     * Misma lista, expuesta: el criterio de "esta ficha está vacía" tiene que ser
+     * EL MISMO en el badge de la pantalla, en la pestaña "sin registros" y en el
+     * borrado. Si cada uno mira tablas distintas, aparece un botón de borrar que
+     * el servidor después rechaza siempre.
+     */
+    public static function hijosQueNoSonRegistro(): array
+    {
+        return self::$hijosQueNoSonRegistro;
+    }
+
     /** Campos de `personas` que se completan en el ganador si los tiene vacíos. */
     private static $camposPersona = [
         'name', 'nombre', 'apellido', 'email', 'telefono', 'ciudad', 'observaciones',
@@ -435,20 +463,21 @@ class FusionPersonas
             $peso[$id] = ['registros' => 0, 'campos' => 0, 'roles' => []];
         }
 
-        $conteos = [
-            'jugador' => [
-                'tabla' => 'jugadors',
-                'hijos' => ['alineacions' => 'jugador_id', 'gols' => 'jugador_id', 'plantilla_jugadors' => 'jugador_id'],
-            ],
-            'tecnico' => [
-                'tabla' => 'tecnicos',
-                'hijos' => ['partido_tecnicos' => 'tecnico_id', 'plantilla_tecnicos' => 'tecnico_id'],
-            ],
-            'arbitro' => [
-                'tabla' => 'arbitros',
-                'hijos' => ['partido_arbitros' => 'arbitro_id'],
-            ],
-        ];
+        // Se cuentan TODAS las tablas hijas del mapa de roles, no un subconjunto.
+        // Antes solo miraba alineaciones, goles y planteles: una ficha con
+        // tarjetas o cambios y nada más mostraba "0 reg.", y ese cero ahora
+        // habilita el botón de borrar. El número tiene que ser el completo.
+        $conteos = [];
+        foreach (self::relaciones() as $rol => $cfg) {
+            $hijos = [];
+            foreach (array_keys($cfg['hijos']) as $hijo) {
+                if (in_array($hijo, self::$hijosQueNoSonRegistro, true)) {
+                    continue;
+                }
+                $hijos[$hijo] = $cfg['fk'];
+            }
+            $conteos[$rol] = ['tabla' => $cfg['tabla'], 'hijos' => $hijos];
+        }
 
         foreach ($conteos as $rol => $cfg) {
             if (!self::hayTabla($cfg['tabla']) || !self::hayColumna($cfg['tabla'], 'persona_id')) {

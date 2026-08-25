@@ -6,7 +6,9 @@ use App\Persona;
 use App\PersonaDuplicado;
 use App\Services\DuplicadosPersonas;
 use App\Services\FusionPersonas;
+use App\Services\RegistrosPersonas;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -26,6 +28,9 @@ class PersonaDuplicadoController extends Controller
     /** Cuántos pares por página. */
     private const POR_PAGINA = 50;
 
+    /** Clave de caché de la lista de personas sin registros. */
+    private const CACHE_SIN_REGISTROS = 'personas.sin_registros_ids';
+
     /**
      * El grupo `admin` de routes/web.php no tiene middleware: la autenticación
      * la pone cada controller en su constructor (igual que JugadorController).
@@ -44,28 +49,33 @@ class PersonaDuplicadoController extends Controller
         $buscar = trim((string) $request->query('q', ''));
 
         $datos = [
-            'tab'        => $tab,
-            'estado'     => $estado,
-            'umbral'     => $umbral,
-            'buscar'     => $buscar,
-            'conteos'    => $this->conteos($umbral),
-            'pares'      => null,
-            'personas'   => collect(),
-            'peso'       => [],
-            'sinNombre'  => null,
-            'sinBandera' => null,
-            'indexado'   => DB::table('personas')->whereNull('clave_orden')->count() === 0,
+            'tab'          => $tab,
+            'estado'       => $estado,
+            'umbral'       => $umbral,
+            'buscar'       => $buscar,
+            'conteos'      => $this->conteos($umbral),
+            'pares'        => null,
+            'personas'     => collect(),
+            'peso'         => [],
+            'clubes'       => [],
+            'sinNombre'    => null,
+            'sinBandera'   => null,
+            'sinRegistros' => null,
+            'indexado'     => DB::table('personas')->whereNull('clave_orden')->count() === 0,
         ];
 
         if ($tab === 'sin-nombre') {
             $datos['sinNombre'] = $this->sinNombreApellido($request);
         } elseif ($tab === 'nacionalidad') {
             $datos['sinBandera'] = $this->sinBandera($request);
+        } elseif ($tab === 'sin-registros') {
+            $datos['sinRegistros'] = $this->sinRegistros($request);
         } else {
-            list($pares, $personas, $peso) = $this->repetidos($request, $estado, $umbral, $buscar);
+            list($pares, $personas, $peso, $clubes) = $this->repetidos($request, $estado, $umbral, $buscar);
             $datos['pares']    = $pares;
             $datos['personas'] = $personas;
             $datos['peso']     = $peso;
+            $datos['clubes']   = $clubes;
         }
 
         return view('jugadores.verificarPersona', $datos);
@@ -117,7 +127,12 @@ class PersonaDuplicadoController extends Controller
 
         $peso = $ids ? FusionPersonas::peso($ids) : [];
 
-        return [$pares, $personas, $peso];
+        // Los clubes de las dos fichas son lo que realmente resuelve el par: si
+        // comparten club y temporada es la misma persona, si no, son homónimos.
+        // Sale en unas pocas consultas para toda la página, igual que el peso.
+        $clubes = $ids ? RegistrosPersonas::clubes($ids) : [];
+
+        return [$pares, $personas, $peso, $clubes];
     }
 
     private function conteos(int $umbral): array
@@ -130,15 +145,74 @@ class PersonaDuplicadoController extends Controller
             ->all();
 
         return [
-            'pendiente'  => (int) ($porEstado[PersonaDuplicado::PENDIENTE] ?? 0),
-            'descartado' => (int) ($porEstado[PersonaDuplicado::DESCARTADO] ?? 0),
-            'sinNombre'  => (int) Persona::where(function ($q) {
+            'pendiente'    => (int) ($porEstado[PersonaDuplicado::PENDIENTE] ?? 0),
+            'descartado'   => (int) ($porEstado[PersonaDuplicado::DESCARTADO] ?? 0),
+            'sinNombre'    => (int) Persona::where(function ($q) {
                 $q->whereNull('nombre')->orWhere('nombre', '')
                   ->orWhereNull('apellido')->orWhere('apellido', '');
             })->count(),
-            'sinBandera' => (int) $this->contarSinBandera(),
-            'fusiones'   => (int) DB::table('persona_fusiones')->count(),
+            'sinBandera'   => (int) $this->contarSinBandera(),
+            'sinRegistros' => (int) $this->contarSinRegistros(),
+            'fusiones'     => (int) DB::table('persona_fusiones')->count(),
         ];
+    }
+
+    // ------------------------------------------------------------------
+    // Pestaña 4: personas sin ningún registro
+    // ------------------------------------------------------------------
+
+    /**
+     * Los ids de las personas sin registros, cacheados.
+     *
+     * La consulta recorre toda la tabla `personas` con un NOT EXISTS por tabla
+     * hija. Para una persona CON registros MySQL corta en el primer NOT EXISTS,
+     * pero para las huérfanas —que son justo las que se listan— tiene que
+     * evaluarlos todos. Por eso se resuelve una sola vez: el conteo de la
+     * pestaña y cada página salen de la misma lista cacheada, y no de repetir
+     * la consulta cara en cada carga.
+     */
+    private function idsSinRegistros(): array
+    {
+        return Cache::remember(self::CACHE_SIN_REGISTROS, 600, function () {
+            return RegistrosPersonas::queryHuerfanas()
+                ->orderBy('apellido')
+                ->orderBy('nombre')
+                ->pluck('id')
+                ->all();
+        });
+    }
+
+    private function contarSinRegistros(): int
+    {
+        return count($this->idsSinRegistros());
+    }
+
+    /** Se pagina sobre la lista cacheada y se traen solo las 50 filas visibles. */
+    private function sinRegistros(Request $request)
+    {
+        $ids    = $this->idsSinRegistros();
+        $pagina = max(1, (int) $request->query('page', 1));
+        $tramo  = array_slice($ids, ($pagina - 1) * self::POR_PAGINA, self::POR_PAGINA);
+
+        $personas = collect();
+        if ($tramo) {
+            $orden = array_flip($tramo);
+            $personas = Persona::with(['jugador', 'tecnico', 'arbitro'])
+                ->whereIn('id', $tramo)
+                ->get()
+                ->sortBy(function ($p) use ($orden) {
+                    return $orden[$p->id] ?? PHP_INT_MAX;
+                })
+                ->values();
+        }
+
+        return new LengthAwarePaginator(
+            $personas,
+            count($ids),
+            self::POR_PAGINA,
+            $pagina,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
     }
 
     // ------------------------------------------------------------------
@@ -331,7 +405,55 @@ class PersonaDuplicadoController extends Controller
             return redirect()->back()->withErrors(['error' => $r['mensaje']]);
         }
 
+        Cache::forget(self::CACHE_SIN_REGISTROS);
+
         return redirect()->back()->with('success', $r['mensaje'] . ' ' . implode('; ', $r['detalle']));
+    }
+
+    /**
+     * Borra personas que no tienen ningún registro asociado.
+     *
+     * No son candidatas a fusión: no le aportan nada a la ficha que queda, y
+     * fusionarlas solo mete ruido en la carrera de la otra. Lo que corresponde
+     * es sacarlas del medio.
+     *
+     * El servicio vuelve a contar con la fila bloqueada antes de borrar: si en
+     * el medio alguien le colgó partidos a esa ficha, se aborta esa persona y
+     * las demás siguen.
+     */
+    public function eliminar(Request $request)
+    {
+        $ids = array_filter(array_map('intval', (array) $request->input('personas', [])));
+
+        if (!$ids) {
+            return redirect()->back()->withErrors(['error' => 'No indicaste ninguna persona para borrar.']);
+        }
+
+        set_time_limit(0);
+
+        $ok      = 0;
+        $errores = [];
+
+        foreach ($ids as $id) {
+            $r = RegistrosPersonas::eliminar($id);
+            if ($r['ok']) {
+                $ok++;
+            } else {
+                $errores[] = $r['mensaje'];
+            }
+        }
+
+        Cache::forget(self::CACHE_SIN_REGISTROS);
+
+        $mensaje = $ok === 1 ? 'Se borró 1 persona sin registros.' : "Se borraron {$ok} personas sin registros.";
+
+        if ($errores) {
+            return redirect()->back()
+                ->with('success', $mensaje)
+                ->withErrors(['error' => implode(' / ', array_slice($errores, 0, 5))]);
+        }
+
+        return redirect()->back()->with('success', $mensaje);
     }
 
     /** Acciones sobre varios pares tildados a la vez. */
@@ -393,6 +515,8 @@ class PersonaDuplicadoController extends Controller
                     $errores[] = $r['mensaje'];
                 }
             }
+
+            Cache::forget(self::CACHE_SIN_REGISTROS);
 
             $mensaje = "{$ok} pares fusionados.";
             if ($salteados) {

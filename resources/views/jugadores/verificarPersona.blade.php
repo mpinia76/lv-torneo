@@ -12,6 +12,14 @@
         .imgCircle { width:38px; height:38px; object-fit:cover; border-radius:50%; }
         .dup-barra { background:#f8f9fa; border:1px solid #e3e6ea; border-radius:.35rem; padding:.75rem; margin-bottom:1rem; }
         .nav-tabs .nav-link.active { background-color:#007bff; color:#fff; border-color:#007bff; }
+        .dup-ficha-vacia { border-color:#dc3545; background:#fff5f5; }
+        .dup-clubes { line-height:1.7; }
+        .dup-club { display:inline-block; border:1px solid #e3e6ea; border-radius:.25rem;
+                    padding:0 .3rem; margin:0 .15rem .15rem 0; background:#fff; white-space:nowrap; }
+        /* mismo club en las dos fichas, pero en años que no se pisan */
+        .dup-club-comun { border-color:#ffc107; background:#fff9e6; }
+        /* mismo club Y años solapados: la señal fuerte de que es la misma persona */
+        .dup-club-igual { border-color:#28a745; background:#e9f7ee; font-weight:600; }
     </style>
 
     <div class="container-fluid">
@@ -92,11 +100,20 @@
         @php
             $qs = ['estado' => $estado, 'umbral' => $umbral, 'q' => $buscar];
         @endphp
+        @php
+            $tabsAparte = ['sin-nombre', 'nacionalidad', 'sin-registros'];
+        @endphp
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
-                <a class="nav-link @if($tab!='sin-nombre' && $tab!='nacionalidad') active @endif"
+                <a class="nav-link @if(!in_array($tab, $tabsAparte)) active @endif"
                    href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'repetidos']) }}">
                     Posibles repetidos <span class="badge badge-light">{{ $conteos['pendiente'] }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @if($tab=='sin-registros') active @endif"
+                   href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-registros']) }}">
+                    Sin registros <span class="badge badge-light">{{ $conteos['sinRegistros'] }}</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -116,7 +133,7 @@
         {{-- ================================================================
              Pestaña 1: pares repetidos
         ================================================================= --}}
-        @if($tab != 'sin-nombre' && $tab != 'nacionalidad')
+        @if(!in_array($tab, $tabsAparte))
 
             @if($pares->total() == 0)
                 <div class="alert alert-info">
@@ -173,6 +190,13 @@
                                 $par->persona_id, $par->simil_id, $peso
                             );
                             $colorPuntaje = $par->puntaje >= 95 ? 'danger' : ($par->puntaje >= 80 ? 'warning' : 'secondary');
+
+                            $clubesA = $clubes[$par->persona_id] ?? [];
+                            $clubesB = $clubes[$par->simil_id]   ?? [];
+                            // Clubes compartidos, calculado una vez por par.
+                            $comunesA = \App\Services\RegistrosPersonas::enComun($clubesA, $clubesB);
+                            $comunesB = \App\Services\RegistrosPersonas::enComun($clubesB, $clubesA);
+                            $hayClubeSolapado = in_array(true, $comunesA, true);
                         @endphp
                         <tr>
                             <td>
@@ -184,17 +208,24 @@
                                     <span class="badge badge-light">descartado</span>
                                 @endif
                                 <span class="dup-motivo">{{ $par->motivo }}</span>
+                                @if($hayClubeSolapado)
+                                    <span class="badge badge-success" title="Las dos fichas comparten club en las mismas temporadas">
+                                        mismo club y año
+                                    </span>
+                                @endif
                             </td>
                             <td style="width:30%;">
                                 @include('jugadores._personaCelda', [
                                     'p' => $a, 'otro' => $b, 'info' => $pesoA,
                                     'sugerido' => $ganadorSugerido == $par->persona_id,
+                                    'clubes' => $clubesA, 'comunes' => $comunesA,
                                 ])
                             </td>
                             <td style="width:30%;">
                                 @include('jugadores._personaCelda', [
                                     'p' => $b, 'otro' => $a, 'info' => $pesoB,
                                     'sugerido' => $ganadorSugerido == $par->simil_id,
+                                    'clubes' => $clubesB, 'comunes' => $comunesB,
                                 ])
                             </td>
                             <td>
@@ -296,6 +327,88 @@
                 <div class="col-md-3 text-right"><strong>Total: {{ $sinBandera->total() }}</strong></div>
             </div>
         @endif
+
+        {{-- ================================================================
+             Pestaña 4: personas sin ningún registro
+        ================================================================= --}}
+        @if($tab == 'sin-registros')
+            <p class="text-muted small">
+                Personas que no figuran en ningún partido, gol, plantel ni planilla: son fichas que quedaron
+                de una importación y no las usa nada. <strong>No son candidatas a fusión</strong> —no le aportan
+                nada a la ficha que quedaría— así que lo que corresponde es borrarlas.
+                Antes de borrar, el sistema vuelve a contar los registros de cada una: si alguna dejó de estar
+                vacía, se saltea y avisa.
+            </p>
+
+            @if($sinRegistros->total() == 0)
+                <div class="alert alert-info">No hay personas sin registros. Todo limpio.</div>
+            @else
+                <form id="formBorrar" method="POST" action="{{ route('personas.eliminar') }}"
+                      onsubmit="return confirmarBorrado()"></form>
+                <input type="hidden" name="_token" value="{{ csrf_token() }}" form="formBorrar">
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="small mb-0"><input type="checkbox" id="tildarTodos"> tildar todo lo visible</label>
+                    <button form="formBorrar" class="btn btn-sm btn-danger">Eliminar las tildadas</button>
+                </div>
+
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th style="width:28px;"></th>
+                            <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
+                            <th>Nacionalidad</th><th>Nacimiento</th><th>Roles</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($sinRegistros as $huerfana)
+                        <tr>
+                            <td>
+                                <input type="checkbox" name="personas[]" value="{{ $huerfana->id }}"
+                                       form="formBorrar" class="tildable">
+                            </td>
+                            <td>
+                                @if($huerfana->foto)
+                                    <img class="imgCircle" src="{{ url('images/'.$huerfana->foto) }}" alt="">
+                                @else
+                                    <img class="imgCircle" src="{{ url('images/sin_foto.png') }}" alt="">
+                                @endif
+                                <img src="{{ $huerfana->bandera_url }}" alt="{{ $huerfana->nacionalidad }}">
+                            </td>
+                            <td>{{ $huerfana->id }}</td>
+                            <td>{{ $huerfana->name }}</td>
+                            <td>{{ $huerfana->apellido }}</td>
+                            <td>{{ $huerfana->nombre }}</td>
+                            <td>{{ $huerfana->nacionalidad }}</td>
+                            <td>{{ $huerfana->nacimiento ? \Carbon\Carbon::parse($huerfana->nacimiento)->format('d/m/Y') : '' }}</td>
+                            <td>
+                                @if($huerfana->jugador)<span class="badge badge-primary">Jugador {{ $huerfana->jugador->id }}</span>@endif
+                                @if($huerfana->tecnico)<span class="badge badge-success">DT {{ $huerfana->tecnico->id }}</span>@endif
+                                @if($huerfana->arbitro)<span class="badge badge-warning">Árbitro {{ $huerfana->arbitro->id }}</span>@endif
+                                @if(!$huerfana->jugador && !$huerfana->tecnico && !$huerfana->arbitro)
+                                    <span class="badge badge-danger">sin rol</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($huerfana->jugador)
+                                    <a href="{{ route('jugadores.edit', $huerfana->jugador->id) }}" target="_blank" class="small">editar</a>
+                                @elseif($huerfana->tecnico)
+                                    <a href="{{ route('tecnicos.edit', $huerfana->tecnico->id) }}" target="_blank" class="small">editar</a>
+                                @elseif($huerfana->arbitro)
+                                    <a href="{{ route('arbitros.edit', $huerfana->arbitro->id) }}" target="_blank" class="small">editar</a>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+
+                <div class="row">
+                    <div class="col-md-9">{{ $sinRegistros->links() }}</div>
+                    <div class="col-md-3 text-right"><strong>Total: {{ $sinRegistros->total() }}</strong></div>
+                </div>
+            @endif
+        @endif
     </div>
 
     <script>
@@ -307,6 +420,15 @@
                 });
             }
         });
+
+        function confirmarBorrado() {
+            var n = document.querySelectorAll('.tildable:checked').length;
+            if (n === 0) {
+                alert('No tildaste ninguna persona.');
+                return false;
+            }
+            return confirm('Se van a BORRAR ' + n + ' personas sin registros. No se puede deshacer. ¿Confirmás?');
+        }
 
         function confirmarLote(form, evento) {
             var n = document.querySelectorAll('.tildable:checked').length;

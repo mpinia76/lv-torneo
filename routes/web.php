@@ -88,6 +88,11 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('personas/duplicados/fusionar', 'PersonaDuplicadoController@fusionar')->name('personas.duplicados.fusionar');
     Route::post('personas/duplicados/lote', 'PersonaDuplicadoController@lote')->name('personas.duplicados.lote');
 
+    // Borra personas que no tienen ningun registro asociado. El controller vuelve
+    // a contar con la fila bloqueada antes de borrar: nunca confia en el "0 reg."
+    // que vio el navegador.
+    Route::post('personas/eliminar', 'PersonaDuplicadoController@eliminar')->name('personas.eliminar');
+
     // Se mantiene el nombre de ruta por compatibilidad, pero apunta al controller
     // nuevo: JugadorController@verificarSimilitud escribia SOLO en
     // `personas_verificadas`, asi que un par descartado por ahi reaparecia como
