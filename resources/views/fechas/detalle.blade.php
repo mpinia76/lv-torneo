@@ -17,11 +17,6 @@
                     <x-escudo :src="$torneoDet->escudo" :nombre="$torneoDet->nombre" tam="sm"/>
                     {{ $torneoDet->nombre }} {{ $torneoDet->year }} @if($numeroFecha) · {{ $numeroFecha }} @endif
                 </span>
-                <h1>
-                    {{ $partido->equipol ? $partido->equipol->nombre : '' }}
-                    vs
-                    {{ $partido->equipov ? $partido->equipov->nombre : '' }}
-                </h1>
             </div>
         </div>
 
