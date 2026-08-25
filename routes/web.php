@@ -93,6 +93,12 @@ Route::group(['prefix' => 'admin'], function()
     // que vio el navegador.
     Route::post('personas/eliminar', 'PersonaDuplicadoController@eliminar')->name('personas.eliminar');
 
+    // Completa las fichas sin fecha de nacimiento con el perfil de Transfermarkt
+    // (una llamada cada 50 personas). Escribe SOLO los campos vacios: la fecha es
+    // el desempate de la pantalla de repetidos, y las que TM manda mal ya estan
+    // corregidas a mano.
+    Route::post('personas/fechas/completar', 'PersonaDuplicadoController@completarFechas')->name('personas.fechas.completar');
+
     // Se mantiene el nombre de ruta por compatibilidad, pero apunta al controller
     // nuevo: JugadorController@verificarSimilitud escribia SOLO en
     // `personas_verificadas`, asi que un par descartado por ahi reaparecia como

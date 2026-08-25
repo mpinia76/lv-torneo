@@ -101,7 +101,7 @@
             $qs = ['estado' => $estado, 'umbral' => $umbral, 'q' => $buscar];
         @endphp
         @php
-            $tabsAparte = ['sin-nombre', 'nacionalidad', 'sin-registros'];
+            $tabsAparte = ['sin-nombre', 'nacionalidad', 'sin-registros', 'sin-fecha'];
         @endphp
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
@@ -114,6 +114,12 @@
                 <a class="nav-link @if($tab=='sin-registros') active @endif"
                    href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-registros']) }}">
                     Sin registros <span class="badge badge-light">{{ $conteos['sinRegistros'] }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @if($tab=='sin-fecha') active @endif"
+                   href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-fecha']) }}">
+                    Sin fecha de nacimiento <span class="badge badge-light">{{ $conteos['sinFecha'] }}</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -406,6 +412,112 @@
                 <div class="row">
                     <div class="col-md-9">{{ $sinRegistros->links() }}</div>
                     <div class="col-md-3 text-right"><strong>Total: {{ $sinRegistros->total() }}</strong></div>
+                </div>
+            @endif
+        @endif
+
+        {{-- ================================================================
+             Pestaña 5: personas sin fecha de nacimiento
+        ================================================================= --}}
+        @if($tab == 'sin-fecha')
+            <p class="text-muted small">
+                La fecha de nacimiento es el desempate de la pantalla de repetidos: sin ella, un par no suma
+                el +12 de "misma fecha" ni se lleva la resta de "fechas distintas", y queda flotando.
+                <strong>Cada fecha que se completa es un par menos para mirar a mano.</strong>
+                El botón baja los perfiles de Transfermarkt (una llamada cada 50 personas) y escribe
+                <strong>solo los campos vacíos</strong>: nunca pisa lo que ya está cargado, porque TM manda
+                fechas mal seguido y lo revisado a mano vale más.
+            </p>
+
+            @if($conteos['sinFecha'] == 0)
+                <div class="alert alert-info">No hay personas sin fecha de nacimiento.</div>
+            @else
+                <div class="card mb-3">
+                    <div class="card-body py-2">
+                        <form method="POST" action="{{ route('personas.fechas.completar') }}" class="form-inline">
+                            @csrf
+                            <span class="mr-3">
+                                <strong>{{ $conteos['sinFechaTm'] }}</strong> tienen ficha de Transfermarkt y se
+                                pueden resolver solas.
+                                <span class="text-muted">
+                                    Las otras {{ $conteos['sinFecha'] - $conteos['sinFechaTm'] }} no están en TM:
+                                    ahí no hay nada que traer.
+                                </span>
+                            </span>
+                            <label class="mr-2 mb-0">Traer de a</label>
+                            <select name="limite" class="form-control form-control-sm mr-2">
+                                <option value="50">50</option>
+                                <option value="200">200</option>
+                                <option value="500" selected>500</option>
+                                <option value="1000">1000</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary">Completar desde Transfermarkt</button>
+                        </form>
+                        <small class="text-muted d-block mt-1">
+                            Cada 50 personas es una llamada a la API. Si son muchas, apretá varias veces:
+                            el resumen te dice cuántas quedan.
+                        </small>
+                    </div>
+                </div>
+
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
+                            <th>Nacionalidad</th><th>Roles</th><th>Transfermarkt</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($sinFecha as $p)
+                        @php $tm = $tmDe[$p->id] ?? null; @endphp
+                        <tr>
+                            <td>
+                                @if($p->foto)
+                                    <img class="imgCircle" src="{{ url('images/'.$p->foto) }}" alt="">
+                                @else
+                                    <img class="imgCircle" src="{{ url('images/sin_foto.png') }}" alt="">
+                                @endif
+                                <img src="{{ $p->bandera_url }}" alt="{{ $p->nacionalidad }}">
+                            </td>
+                            <td>{{ $p->id }}</td>
+                            <td>{{ $p->name }}</td>
+                            <td>{{ $p->apellido }}</td>
+                            <td>{{ $p->nombre }}</td>
+                            <td>{{ $p->nacionalidad }}</td>
+                            <td>
+                                @if($p->jugador)<span class="badge badge-primary">Jugador {{ $p->jugador->id }}</span>@endif
+                                @if($p->tecnico)<span class="badge badge-success">DT {{ $p->tecnico->id }}</span>@endif
+                                @if($p->arbitro)<span class="badge badge-warning">Árbitro {{ $p->arbitro->id }}</span>@endif
+                            </td>
+                            <td>
+                                @if($tm && !empty($tm['tm']))
+                                    @php
+                                        $tramo = $tm['tipo'] === 'tecnico' ? 'trainer'
+                                               : ($tm['tipo'] === 'arbitro' ? 'schiedsrichter' : 'spieler');
+                                    @endphp
+                                    <a href="https://www.transfermarkt.es/-/profil/{{ $tramo }}/{{ $tm['tm'] }}"
+                                       target="_blank" class="small">TM {{ $tm['tm'] }}</a>
+                                @else
+                                    <span class="badge badge-secondary">sin TM</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($p->jugador)
+                                    <a href="{{ route('jugadores.edit', $p->jugador->id) }}" target="_blank" class="small">editar</a>
+                                @elseif($p->tecnico)
+                                    <a href="{{ route('tecnicos.edit', $p->tecnico->id) }}" target="_blank" class="small">editar</a>
+                                @elseif($p->arbitro)
+                                    <a href="{{ route('arbitros.edit', $p->arbitro->id) }}" target="_blank" class="small">editar</a>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+
+                <div class="row">
+                    <div class="col-md-9">{{ $sinFecha->links() }}</div>
+                    <div class="col-md-3 text-right"><strong>Total: {{ $sinFecha->total() }}</strong></div>
                 </div>
             @endif
         @endif

@@ -7,6 +7,7 @@ use App\PersonaDuplicado;
 use App\Services\DuplicadosPersonas;
 use App\Services\FusionPersonas;
 use App\Services\RegistrosPersonas;
+use App\Services\TmFechas;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
@@ -30,6 +31,9 @@ class PersonaDuplicadoController extends Controller
 
     /** Clave de caché de la lista de personas sin registros. */
     private const CACHE_SIN_REGISTROS = 'personas.sin_registros_ids';
+
+    /** Clave de caché de las personas sin fecha de nacimiento (con su id de TM). */
+    private const CACHE_SIN_FECHA = 'personas.sin_fecha';
 
     /**
      * El grupo `admin` de routes/web.php no tiene middleware: la autenticación
@@ -61,6 +65,8 @@ class PersonaDuplicadoController extends Controller
             'sinNombre'    => null,
             'sinBandera'   => null,
             'sinRegistros' => null,
+            'sinFecha'     => null,
+            'tmDe'         => [],
             'indexado'     => DB::table('personas')->whereNull('clave_orden')->count() === 0,
         ];
 
@@ -70,6 +76,8 @@ class PersonaDuplicadoController extends Controller
             $datos['sinBandera'] = $this->sinBandera($request);
         } elseif ($tab === 'sin-registros') {
             $datos['sinRegistros'] = $this->sinRegistros($request);
+        } elseif ($tab === 'sin-fecha') {
+            list($datos['sinFecha'], $datos['tmDe']) = $this->sinFecha($request);
         } else {
             list($pares, $personas, $peso, $clubes) = $this->repetidos($request, $estado, $umbral, $buscar);
             $datos['pares']    = $pares;
@@ -153,8 +161,74 @@ class PersonaDuplicadoController extends Controller
             })->count(),
             'sinBandera'   => (int) $this->contarSinBandera(),
             'sinRegistros' => (int) $this->contarSinRegistros(),
+            'sinFecha'     => count($this->pendientesSinFecha()),
+            'sinFechaTm'   => $this->contarSinFechaConTm(),
             'fusiones'     => (int) DB::table('persona_fusiones')->count(),
         ];
+    }
+
+    // ------------------------------------------------------------------
+    // Pestaña 5: personas sin fecha de nacimiento
+    // ------------------------------------------------------------------
+
+    /**
+     * Las personas sin fecha, con el id de Transfermarkt de cada una.
+     *
+     * Se cachea igual que la lista de huérfanas: el conteo lo pide TODA carga
+     * de la pantalla (esté en la pestaña que esté), y son tres joins sobre
+     * `personas` enteras.
+     */
+    private function pendientesSinFecha(): array
+    {
+        return Cache::remember(self::CACHE_SIN_FECHA, 600, function () {
+            return TmFechas::pendientes();
+        });
+    }
+
+    /** Cuántas de esas se pueden resolver solas (tienen id de TM). */
+    private function contarSinFechaConTm(): int
+    {
+        $n = 0;
+        foreach ($this->pendientesSinFecha() as $d) {
+            if (!empty($d['tm'])) $n++;
+        }
+        return $n;
+    }
+
+    /** Se pagina sobre la lista cacheada, igual que "sin registros". */
+    private function sinFecha(Request $request): array
+    {
+        $pendientes = $this->pendientesSinFecha();
+        $ids        = array_keys($pendientes);
+        $pagina     = max(1, (int) $request->query('page', 1));
+        $tramo      = array_slice($ids, ($pagina - 1) * self::POR_PAGINA, self::POR_PAGINA);
+
+        $personas = collect();
+        if ($tramo) {
+            $orden = array_flip($tramo);
+            $personas = Persona::with(['jugador', 'tecnico', 'arbitro'])
+                ->whereIn('id', $tramo)
+                ->get()
+                ->sortBy(function ($p) use ($orden) {
+                    return $orden[$p->id] ?? PHP_INT_MAX;
+                })
+                ->values();
+        }
+
+        $tmDe = [];
+        foreach ($tramo as $id) {
+            $tmDe[$id] = $pendientes[$id];
+        }
+
+        $paginador = new LengthAwarePaginator(
+            $personas,
+            count($ids),
+            self::POR_PAGINA,
+            $pagina,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return [$paginador, $tmDe];
     }
 
     // ------------------------------------------------------------------
@@ -406,6 +480,7 @@ class PersonaDuplicadoController extends Controller
         }
 
         Cache::forget(self::CACHE_SIN_REGISTROS);
+        Cache::forget(self::CACHE_SIN_FECHA);
 
         return redirect()->back()->with('success', $r['mensaje'] . ' ' . implode('; ', $r['detalle']));
     }
@@ -444,6 +519,7 @@ class PersonaDuplicadoController extends Controller
         }
 
         Cache::forget(self::CACHE_SIN_REGISTROS);
+        Cache::forget(self::CACHE_SIN_FECHA);
 
         $mensaje = $ok === 1 ? 'Se borró 1 persona sin registros.' : "Se borraron {$ok} personas sin registros.";
 
@@ -451,6 +527,58 @@ class PersonaDuplicadoController extends Controller
             return redirect()->back()
                 ->with('success', $mensaje)
                 ->withErrors(['error' => implode(' / ', array_slice($errores, 0, 5))]);
+        }
+
+        return redirect()->back()->with('success', $mensaje);
+    }
+
+    /**
+     * Completa las fichas sin fecha de nacimiento con el perfil de Transfermarkt.
+     *
+     * Escribe solo donde el campo está vacío: TM manda fechas mal seguido y lo
+     * que ya está cargado a mano vale más. Va de a tandas porque cada 50
+     * personas es una llamada a la API y el navegador tiene su tiempo máximo.
+     */
+    public function completarFechas(Request $request)
+    {
+        set_time_limit(0);
+
+        $limite = (int) $request->input('limite', 500);
+        $limite = $limite < 0 ? 0 : min($limite, 5000);
+
+        try {
+            $r = TmFechas::completar($limite, $this->pendientesSinFecha());
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors(['error' => 'No se pudo completar: ' . $e->getMessage()]);
+        }
+
+        Cache::forget(self::CACHE_SIN_FECHA);
+
+        $partes = [];
+        foreach ($r['campos'] as $campo => $n) {
+            $partes[] = $n . ' ' . $campo;
+        }
+
+        $mensaje = "Se consultaron {$r['personas']} personas en {$r['llamadas']} llamadas a Transfermarkt.";
+        $mensaje .= $partes ? ' Se completó: ' . implode(', ', $partes) . '.' : ' No se completó ningún campo.';
+
+        if ($r['sin_fecha']) {
+            $mensaje .= " {$r['sin_fecha']} tienen ficha en TM pero sin fecha de nacimiento (es lo normal en árbitros).";
+        }
+        if ($r['sin_perfil']) {
+            $mensaje .= " {$r['sin_perfil']} no volvieron de la API.";
+        }
+        if ($r['sin_tm']) {
+            $mensaje .= " Quedan {$r['sin_tm']} sin id de Transfermarkt: esas no se pueden resolver así.";
+        }
+        if ($r['quedan']) {
+            $mensaje .= " Faltan {$r['quedan']} con id de TM: volvé a apretar el botón para seguir.";
+        }
+
+        if ($r['errores']) {
+            return redirect()->back()
+                ->with('success', $mensaje)
+                ->withErrors(['error' => implode(' / ', array_slice($r['errores'], 0, 5))]);
         }
 
         return redirect()->back()->with('success', $mensaje);
@@ -517,6 +645,7 @@ class PersonaDuplicadoController extends Controller
             }
 
             Cache::forget(self::CACHE_SIN_REGISTROS);
+        Cache::forget(self::CACHE_SIN_FECHA);
 
             $mensaje = "{$ok} pares fusionados.";
             if ($salteados) {
