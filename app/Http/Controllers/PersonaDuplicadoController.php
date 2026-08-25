@@ -163,6 +163,7 @@ class PersonaDuplicadoController extends Controller
             'sinRegistros' => (int) $this->contarSinRegistros(),
             'sinFecha'     => count($this->pendientesSinFecha()),
             'sinFechaTm'   => $this->contarSinFechaConTm(),
+            'sinFechaDet'  => TmFechas::detalle($this->pendientesSinFecha()),
             'fusiones'     => (int) DB::table('persona_fusiones')->count(),
         ];
     }
@@ -546,8 +547,17 @@ class PersonaDuplicadoController extends Controller
         $limite = (int) $request->input('limite', 500);
         $limite = $limite < 0 ? 0 : min($limite, 5000);
 
+        // La ficha web se pide aparte porque gasta un crédito de ScraperAPI por
+        // página: es la única forma de sacarle la fecha a los árbitros, pero no
+        // es gratis como la API.
+        $opciones = [
+            'html'        => $request->boolean('html'),
+            'limite_html' => max(0, min((int) $request->input('limite_html', 25), 500)),
+            'reintentar'  => $request->boolean('reintentar'),
+        ];
+
         try {
-            $r = TmFechas::completar($limite, $this->pendientesSinFecha());
+            $r = TmFechas::completar($limite, $this->pendientesSinFecha(), $opciones);
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['error' => 'No se pudo completar: ' . $e->getMessage()]);
         }
@@ -559,11 +569,20 @@ class PersonaDuplicadoController extends Controller
             $partes[] = $n . ' ' . $campo;
         }
 
-        $mensaje = "Se consultaron {$r['personas']} personas en {$r['llamadas']} llamadas a Transfermarkt.";
+        $mensaje = 'Se ' . ($r['personas'] == 1 ? 'consultó 1 persona' : "consultaron {$r['personas']} personas")
+            . ' en ' . ($r['llamadas'] == 1 ? '1 llamada' : "{$r['llamadas']} llamadas") . ' a Transfermarkt.';
         $mensaje .= $partes ? ' Se completó: ' . implode(', ', $partes) . '.' : ' No se completó ningún campo.';
 
+        if ($r['html_paginas']) {
+            $mensaje .= " Se bajaron {$r['html_paginas']} fichas web (1 crédito cada una) y de ahí salieron {$r['html_fechas']} fechas.";
+        }
         if ($r['sin_fecha']) {
-            $mensaje .= " {$r['sin_fecha']} tienen ficha en TM pero sin fecha de nacimiento (es lo normal en árbitros).";
+            $mensaje .= " {$r['sin_fecha']} tienen ficha en TM pero la API no trae fecha (es lo normal en árbitros)"
+                . ($r['html_paginas'] ? '.' : ': probá con el tilde de la ficha web.');
+        }
+        if ($r['agotadas']) {
+            $mensaje .= " {$r['agotadas']} ya se habían consultado antes sin suerte y no se volvieron a pedir"
+                . ' (tildá "reintentar" si querés insistir).';
         }
         if ($r['sin_perfil']) {
             $mensaje .= " {$r['sin_perfil']} no volvieron de la API.";

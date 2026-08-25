@@ -432,30 +432,72 @@
             @if($conteos['sinFecha'] == 0)
                 <div class="alert alert-info">No hay personas sin fecha de nacimiento.</div>
             @else
+                @php $det = $conteos['sinFechaDet']; @endphp
+                <table class="table table-sm table-bordered w-auto mb-3">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Rol</th><th class="text-right">Sin fecha</th>
+                            <th class="text-right">Con id de TM</th>
+                            <th class="text-right">Sin id de TM</th>
+                            <th class="text-right">Ya consultadas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach(['jugador' => 'Jugadores', 'tecnico' => 'DTs', 'arbitro' => 'Árbitros'] as $k => $etiqueta)
+                        <tr>
+                            <td>{{ $etiqueta }}</td>
+                            <td class="text-right">{{ $det[$k]['total'] }}</td>
+                            <td class="text-right">{{ $det[$k]['con_tm'] }}</td>
+                            <td class="text-right">{{ $det[$k]['sin_tm'] }}</td>
+                            <td class="text-right text-muted">{{ $det[$k]['agotadas'] }}</td>
+                        </tr>
+                    @endforeach
+                        <tr class="font-weight-bold">
+                            <td>Total</td>
+                            <td class="text-right">{{ $det['total']['total'] }}</td>
+                            <td class="text-right">{{ $det['total']['con_tm'] }}</td>
+                            <td class="text-right">{{ $det['total']['sin_tm'] }}</td>
+                            <td class="text-right">{{ $det['total']['agotadas'] }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
                 <div class="card mb-3">
                     <div class="card-body py-2">
-                        <form method="POST" action="{{ route('personas.fechas.completar') }}" class="form-inline">
+                        <form method="POST" action="{{ route('personas.fechas.completar') }}">
                             @csrf
-                            <span class="mr-3">
-                                <strong>{{ $conteos['sinFechaTm'] }}</strong> tienen ficha de Transfermarkt y se
-                                pueden resolver solas.
-                                <span class="text-muted">
-                                    Las otras {{ $conteos['sinFecha'] - $conteos['sinFechaTm'] }} no están en TM:
-                                    ahí no hay nada que traer.
-                                </span>
-                            </span>
-                            <label class="mr-2 mb-0">Traer de a</label>
-                            <select name="limite" class="form-control form-control-sm mr-2">
-                                <option value="50">50</option>
-                                <option value="200">200</option>
-                                <option value="500" selected>500</option>
-                                <option value="1000">1000</option>
-                            </select>
-                            <button class="btn btn-sm btn-primary">Completar desde Transfermarkt</button>
+                            <div class="form-inline">
+                                <label class="mr-2 mb-0">Consultar la API de a</label>
+                                <select name="limite" class="form-control form-control-sm mr-3">
+                                    <option value="50">50</option>
+                                    <option value="200">200</option>
+                                    <option value="500" selected>500</option>
+                                    <option value="1000">1000</option>
+                                </select>
+
+                                <label class="mr-2 mb-0">
+                                    <input type="checkbox" name="html" value="1"> también la ficha web, de a
+                                </label>
+                                <select name="limite_html" class="form-control form-control-sm mr-3">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+
+                                <label class="mr-3 mb-0">
+                                    <input type="checkbox" name="reintentar" value="1"> reintentar las ya consultadas
+                                </label>
+
+                                <button class="btn btn-sm btn-primary">Completar desde Transfermarkt</button>
+                            </div>
                         </form>
-                        <small class="text-muted d-block mt-1">
-                            Cada 50 personas es una llamada a la API. Si son muchas, apretá varias veces:
-                            el resumen te dice cuántas quedan.
+                        <small class="text-muted d-block mt-2">
+                            <strong>La API</strong> es gratis y va de a 50 por llamada, pero para los árbitros casi
+                            nunca trae la fecha. <strong>La ficha web</strong> sí la muestra, pero Transfermarkt nos
+                            bloquea el HTML directo y sale <strong>1 crédito de ScraperAPI por ficha</strong>, así que
+                            va con su propio tope. Lo que se consulta y no da fecha queda anotado y no se vuelve a
+                            pedir, salvo que tildes "reintentar".
                         </small>
                     </div>
                 </div>

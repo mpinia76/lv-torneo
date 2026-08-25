@@ -43,6 +43,9 @@ class TmFechas
     /** Cuántos ids entran en una llamada. Mismo tope que usa el importador. */
     const POR_LLAMADA = 50;
 
+    /** Dónde queda anotado qué ya se consultó (ver la migración homónima). */
+    const TABLA_INTENTOS = 'persona_fecha_tm';
+
     /**
      * Todas las personas sin fecha de nacimiento, ordenadas por apellido.
      *
@@ -114,21 +117,62 @@ class TmFechas
     }
 
     /**
-     * Baja los perfiles y completa lo que esté vacío.
+     * Cómo está repartido el problema: por rol y por si se puede resolver.
      *
-     * $limite acota cuántas personas se procesan en esta pasada (0 = todas).
-     * Con 500 son 10 llamadas, que es lo que entra cómodo en un request.
+     * Es lo que hace falta para saber dónde meter el esfuerzo. Sale de la misma
+     * lista que ya tiene el controller cacheada, así que no cuesta nada.
      */
-    public static function completar(int $limite = 500, array $pendientes = null): array
+    public static function detalle(array $pendientes = null): array
     {
         $pendientes = $pendientes !== null ? $pendientes : self::pendientes();
+        $intentos   = self::intentos();
+
+        $vacio = ['total' => 0, 'con_tm' => 0, 'sin_tm' => 0, 'agotadas' => 0];
+        $out = ['jugador' => $vacio, 'tecnico' => $vacio, 'arbitro' => $vacio, 'total' => $vacio];
+
+        foreach ($pendientes as $personaId => $d) {
+            $tipo = isset($out[$d['tipo']]) ? $d['tipo'] : 'jugador';
+            foreach ([$tipo, 'total'] as $k) {
+                $out[$k]['total']++;
+                if (!empty($d['tm'])) $out[$k]['con_tm']++; else $out[$k]['sin_tm']++;
+                if (isset($intentos[(int) $personaId])) $out[$k]['agotadas']++;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Baja los perfiles y completa lo que esté vacío.
+     *
+     * $limite acota cuántas personas se consultan por API en esta pasada
+     * (0 = todas). Con 500 son 10 llamadas, que entra cómodo en un request.
+     *
+     * $opciones:
+     *   html        => bool  buscar en la ficha web las que la API deja sin
+     *                        fecha. Sale 1 crédito de ScraperAPI por ficha,
+     *                        porque Transfermarkt nos bloquea el HTML directo.
+     *   limite_html => int   tope de fichas web por pasada (default 25)
+     *   reintentar  => bool  volver a preguntar por las ya marcadas como
+     *                        agotadas (TM completa fichas con el tiempo)
+     */
+    public static function completar(int $limite = 500, array $pendientes = null, array $opciones = []): array
+    {
+        $pendientes  = $pendientes !== null ? $pendientes : self::pendientes();
+        $conHtml     = !empty($opciones['html']);
+        $limiteHtml  = isset($opciones['limite_html']) ? (int) $opciones['limite_html'] : 25;
+        $reintentar  = !empty($opciones['reintentar']);
+        $intentos    = $reintentar ? [] : self::intentos();
 
         $r = [
-            'personas'   => 0,   // cuántas se consultaron
+            'personas'   => 0,   // cuántas se consultaron por API
             'llamadas'   => 0,
             'sin_tm'     => 0,   // no hay id de TM: no se puede ni intentar
             'sin_perfil' => 0,   // la API no devolvió esa ficha
             'sin_fecha'  => 0,   // vino el perfil pero sin fecha de nacimiento
+            'agotadas'   => 0,   // ya se habían consultado y no había nada
+            'html_paginas' => 0, // fichas web bajadas (= créditos gastados)
+            'html_fechas'  => 0, // fechas que salieron de la ficha web
             'campos'     => [],  // campo => cuántas veces se completó
             'quedan'     => 0,
             'errores'    => [],
@@ -137,6 +181,7 @@ class TmFechas
         $porTipo = [];
         foreach ($pendientes as $personaId => $d) {
             if (empty($d['tm'])) { $r['sin_tm']++; continue; }
+            if (isset($intentos[(int) $personaId])) { $r['agotadas']++; continue; }
             $porTipo[$d['tipo']][] = [
                 'persona' => (int) $personaId,
                 'rol_id'  => (int) $d['rol_id'],
@@ -146,6 +191,7 @@ class TmFechas
 
         $paises = JugadorController::paisesTM();
         $cortado = false;
+        $paraHtml = [];
 
         foreach (['jugador', 'tecnico', 'arbitro'] as $tipo) {
             if (empty($porTipo[$tipo])) continue;
@@ -160,17 +206,53 @@ class TmFechas
 
                 foreach ($tanda as $fila) {
                     $r['personas']++;
-                    if (!isset($perfiles[$fila['tm']])) { $r['sin_perfil']++; continue; }
+
+                    if (!isset($perfiles[$fila['tm']])) {
+                        $r['sin_perfil']++;
+                        $paraHtml[] = ['tipo' => $tipo, 'fila' => $fila, 'estado' => 'sin_perfil'];
+                        continue;
+                    }
 
                     $datos = self::datosDePerfil($perfiles[$fila['tm']], $paises);
-                    if (empty($datos['nacimiento'])) $r['sin_fecha']++;
 
                     try {
                         self::aplicar($tipo, $fila, $datos, $r);
                     } catch (\Exception $e) {
                         $r['errores'][] = 'Persona #' . $fila['persona'] . ': ' . $e->getMessage();
                     }
+
+                    if (empty($datos['nacimiento'])) {
+                        $r['sin_fecha']++;
+                        $paraHtml[] = ['tipo' => $tipo, 'fila' => $fila, 'estado' => 'sin_fecha'];
+                    } else {
+                        self::registrar($fila['persona'], $fila['tm'], 'api', 'completada');
+                    }
                 }
+            }
+        }
+
+        // ── Segunda vuelta: la ficha web ───────────────────────────────────
+        // La API de TM viene sin fecha para casi todos los árbitros, pero la
+        // página del perfil sí la muestra. Es la única forma de exprimir esos.
+        foreach ($paraHtml as $i => $caso) {
+            if (!$conHtml) {
+                self::registrar($caso['fila']['persona'], $caso['fila']['tm'], 'api', $caso['estado']);
+                continue;
+            }
+            if ($limiteHtml > 0 && $r['html_paginas'] >= $limiteHtml) {
+                // No la marcamos: queda para la próxima pasada.
+                continue;
+            }
+
+            $r['html_paginas']++;
+            $fecha = self::fechaDelHtml($caso['tipo'], $caso['fila']['tm']);
+
+            if ($fecha) {
+                $r['html_fechas']++;
+                self::aplicarFecha($caso['fila']['persona'], $fecha, $r);
+                self::registrar($caso['fila']['persona'], $caso['fila']['tm'], 'html', 'completada');
+            } else {
+                self::registrar($caso['fila']['persona'], $caso['fila']['tm'], 'html', $caso['estado']);
             }
         }
 
@@ -181,6 +263,109 @@ class TmFechas
         }
 
         return $r;
+    }
+
+    /**
+     * La fecha de nacimiento leída de la página del perfil.
+     *
+     * Se prueban cuatro formas porque el HTML de TM cambia de layout y no todas
+     * las fichas traen las mismas etiquetas:
+     *   1) el link "qué pasó un día como hoy" (.../datum/AAAA-MM-DD) — el más
+     *      confiable, viene en formato ISO;
+     *   2) itemprop="birthDate" (layout viejo);
+     *   3) el JSON-LD embebido ("dateOfBirth": "...");
+     *   4) la etiqueta "Fecha de nacimiento" y lo que venga atrás.
+     */
+    public static function fechaDelHtml(string $tipo, string $tmId): ?string
+    {
+        $tramo = $tipo === 'tecnico' ? 'trainer' : ($tipo === 'arbitro' ? 'schiedsrichter' : 'spieler');
+        $url   = 'https://www.transfermarkt.es/-/profil/' . $tramo . '/' . rawurlencode($tmId);
+
+        $html = HttpHelper::getHtmlContent($url);
+        if (!is_string($html) || $html === '') return null;
+
+        if (preg_match('#/datum/(\d{4}-\d{2}-\d{2})#', $html, $m)) {
+            return $m[1];
+        }
+        if (preg_match('#itemprop="birthDate"[^>]*>\s*([^<]{4,40})#i', $html, $m)) {
+            $f = self::aFechaSuelta($m[1]);
+            if ($f) return $f;
+        }
+        if (preg_match('#"dateOfBirth"\s*:\s*"([^"]{4,40})"#i', $html, $m)) {
+            $f = self::aFechaSuelta($m[1]);
+            if ($f) return $f;
+        }
+        if (preg_match('#Fecha de nacimiento.{0,300}?(\d{1,2}[\./ ]+(?:de[\. ]+)?[a-zA-Záéíóú]{3,12}[\./ ]+(?:de[\. ]+)?\d{4}|\d{1,2}[\./]\d{1,2}[\./]\d{4})#su', $html, $m)) {
+            $f = self::aFechaSuelta($m[1]);
+            if ($f) return $f;
+        }
+
+        return null;
+    }
+
+    /** Fecha suelta de TM (ISO, dd/mm/aaaa o "22 jul 1985") -> Y-m-d. */
+    private static function aFechaSuelta($raw): ?string
+    {
+        $t = trim(preg_replace('/\s+/u', ' ', (string) $raw));
+        if ($t === '') return null;
+
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $t, $m)) {
+            return $m[1] . '-' . $m[2] . '-' . $m[3];
+        }
+
+        if (preg_match('#^(\d{1,2})[\./](\d{1,2})[\./](\d{4})#', $t, $m)) {
+            return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        }
+
+        $meses = [
+            'ene' => 1, 'feb' => 2, 'mar' => 3, 'abr' => 4, 'may' => 5, 'jun' => 6,
+            'jul' => 7, 'ago' => 8, 'sep' => 9, 'set' => 9, 'oct' => 10, 'nov' => 11, 'dic' => 12,
+        ];
+        if (preg_match('#^(\d{1,2})[\. ]+(?:de[\. ]+)?([a-záéíóú]{3,12})[\. ]+(?:de[\. ]+)?(\d{4})#ui', $t, $m)) {
+            $clave = mb_strtolower(mb_substr($m[2], 0, 3));
+            $clave = strtr($clave, ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+            if (isset($meses[$clave])) {
+                return sprintf('%04d-%02d-%02d', $m[3], $meses[$clave], $m[1]);
+            }
+        }
+
+        try {
+            return Carbon::parse($t)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /** Las personas que ya se consultaron y no dieron fecha. */
+    private static function intentos(): array
+    {
+        if (!Schema::hasTable(self::TABLA_INTENTOS)) return [];
+
+        return DB::table(self::TABLA_INTENTOS)
+            ->whereIn('estado', ['sin_fecha', 'sin_perfil'])
+            ->pluck('estado', 'persona_id')
+            ->all();
+    }
+
+    /** Deja anotado en qué terminó el intento, para no repetirlo al pedo. */
+    private static function registrar($personaId, $tmId, string $fuente, string $estado): void
+    {
+        if (!Schema::hasTable(self::TABLA_INTENTOS)) return;
+
+        $previo = DB::table(self::TABLA_INTENTOS)->where('persona_id', $personaId)->first();
+
+        DB::table(self::TABLA_INTENTOS)->updateOrInsert(
+            ['persona_id' => (int) $personaId],
+            [
+                'tm_id'         => $tmId !== null ? (string) $tmId : null,
+                'fuente'        => $fuente,
+                'estado'        => $estado,
+                'intentos'      => $previo ? ((int) $previo->intentos + 1) : 1,
+                'consultado_at' => now(),
+                'updated_at'    => now(),
+                'created_at'    => $previo && isset($previo->created_at) ? $previo->created_at : now(),
+            ]
+        );
     }
 
     // ------------------------------------------------------------------
@@ -397,6 +582,20 @@ class TmFechas
                 $r['campos'][$campo] = (isset($r['campos'][$campo]) ? $r['campos'][$campo] : 0) + 1;
             }
         }
+    }
+
+    /** Escribe solo la fecha (es lo único que sacamos de la ficha web). */
+    private static function aplicarFecha($personaId, string $fecha, array &$r): void
+    {
+        $persona = DB::table('personas')->where('id', $personaId)->first();
+        if (!$persona) return;
+        if (!self::vacio(isset($persona->nacimiento) ? $persona->nacimiento : null)) return;
+
+        $set = ['nacimiento' => $fecha];
+        if (self::tieneCol('personas', 'updated_at')) $set['updated_at'] = now();
+
+        DB::table('personas')->where('id', $personaId)->update($set);
+        $r['campos']['nacimiento'] = (isset($r['campos']['nacimiento']) ? $r['campos']['nacimiento'] : 0) + 1;
     }
 
     /**
