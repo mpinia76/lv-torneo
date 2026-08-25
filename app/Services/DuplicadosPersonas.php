@@ -610,11 +610,27 @@ class DuplicadosPersonas
 
         // Mismo nombre en roles distintos (jugador que después fue DT, por ejemplo):
         // en la base tendrían que ser UNA sola persona con dos roles.
+        //
+        // Con los árbitros es al revés: un árbitro no juega ni dirige, así que
+        // si un lado es árbitro y el otro no, son dos personas. Y como los
+        // árbitros casi nunca tienen fecha de nacimiento cargada, el castigo
+        // por "fechas distintas" no los frena: sin esta resta, cualquier
+        // homónimo flojo (mismo apellido y misma inicial, 70) subía a 76 con el
+        // +6 y llenaba la pantalla — Navarro Buritica (jugador) contra Navarro
+        // Contreras (árbitro), Nascimento Santana contra do Nascimento, etc.
+        //
+        // La resta deja pasar solo el nombre completo idéntico (100 − 25 = 75),
+        // que es el único que vale la pena mirar una vez y descartar.
         $roles1 = array_keys($p1['roles']);
         $roles2 = array_keys($p2['roles']);
         if ($roles1 && $roles2 && !array_intersect($roles1, $roles2)) {
-            $base += 6;
-            $extras[] = 'roles distintos (' . implode('/', $roles1) . ' y ' . implode('/', $roles2) . ')';
+            if (in_array('arbitro', $roles1, true) !== in_array('arbitro', $roles2, true)) {
+                $base -= 25;
+                $extras[] = 'uno es árbitro y el otro no';
+            } else {
+                $base += 6;
+                $extras[] = 'roles distintos (' . implode('/', $roles1) . ' y ' . implode('/', $roles2) . ')';
+            }
         }
 
         $puntaje = max(0, min(100, (int) round($base)));
