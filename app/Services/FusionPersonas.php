@@ -29,6 +29,15 @@ class FusionPersonas
     /**
      * Cada rol: su tabla, la clave foránea y las tablas hijas con las columnas
      * que definen un choque (vacío = esa tabla no puede chocar).
+     *
+     * `mapeos` es aparte de `hijos` a propósito: son los puentes con
+     * Transfermarkt (`jugador_tm`, `arbitro_tm`). No son registros deportivos
+     * —no cuentan para el badge ni bloquean un borrado— pero tampoco tienen
+     * foreign key, así que si quedan apuntando a la ficha que se va, el
+     * importador después cree que ese id todavía existe y lo usa. Eso fue
+     * exactamente el jugador #75166 de Atenas de San Carlos: el INSERT reventó
+     * con un 1452, pero recién después de haberle sacado el dorsal 16 al
+     * jugador de verdad.
      */
     private static function relaciones(): array
     {
@@ -46,6 +55,7 @@ class FusionPersonas
                     'penals'                      => [],
                     'jugador_estadistica_manuals' => [],
                 ],
+                'mapeos' => ['jugador_tm'],
             ],
             'tecnico' => [
                 'tabla' => 'tecnicos',
@@ -59,6 +69,9 @@ class FusionPersonas
                     'import_partidos'             => [],
                     'tecnico_ciclos'              => [],
                 ],
+                // Los DTs todavía no tienen tabla de mapeo: se atan por
+                // `tecnicos.transfermarkt_url`, que viaja con la ficha.
+                'mapeos' => [],
             ],
             'arbitro' => [
                 'tabla' => 'arbitros',
@@ -66,6 +79,7 @@ class FusionPersonas
                 'hijos' => [
                     'partido_arbitros' => ['partido_id', 'tipo'],
                 ],
+                'mapeos' => ['arbitro_tm'],
             ],
         ];
     }
@@ -419,6 +433,19 @@ class FusionPersonas
             if ($movidas || $fusionadas) {
                 $detalle[] = "{$hijo}: {$movidas} movidas"
                     . ($fusionadas ? ", {$fusionadas} repetidas unificadas" : '');
+            }
+        }
+
+        // Los puentes con Transfermarkt no son registros, pero no tienen
+        // foreign key: si se los deja apuntando a la ficha que se borra, el
+        // importador los sigue creyendo buenos y vuelve a escribir ese id.
+        foreach ((isset($cfg['mapeos']) ? $cfg['mapeos'] : []) as $mapeo) {
+            if (!self::hayTabla($mapeo) || !self::hayColumna($mapeo, $fk)) {
+                continue;
+            }
+            $repuntadas = DB::table($mapeo)->where($fk, $filaPerdedor->id)->update([$fk => $filaGanador->id]);
+            if ($repuntadas) {
+                $detalle[] = "{$mapeo}: {$repuntadas} repuntadas a #{$filaGanador->id}";
             }
         }
 

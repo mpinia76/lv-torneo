@@ -1390,3 +1390,161 @@ table.t-tabla th .bi { font-size: 10px; }
     color: var(--t-muted);
 }
 .t-pie-lista .pagination { margin: 0; }
+
+/* ---------- 16. LISTADO DE TÉCNICOS -------------------------------------- */
+/* La columna "Equipos" traía todos los clubes con puntos y % en texto y hacía
+   filas de 400 px. Ahora la fila muestra sólo escudos y el detalle vive en una
+   fila que se abre con el botón "+N". */
+
+.t-tec-busqueda { display: flex; gap: 8px; }
+.t-tec-busqueda input[type="search"] { width: 220px; }
+
+/* mosaico de la tira que además filtra */
+a.t-kpi-enlace { color: inherit; display: block; }
+a.t-kpi-enlace:hover { background: var(--t-surface-2); color: inherit; }
+a.t-kpi-enlace .t-kpi-rot::after {
+    content: " \203A"; /* › : evita depender del font de iconos */
+    font-size: 12px;
+    opacity: .55;
+}
+
+.t-tec-filtros {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: -4px 0 12px;
+}
+.t-tec-filtros .t-chip .bi { font-size: 10px; }
+.t-tec-ayuda {
+    font-size: 11.5px;
+    color: var(--t-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ---------- celda del técnico ---------- */
+
+.t-tec-tabla .t-persona-celda { align-items: center; }
+.t-tec-txt {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.t-tec-nombre { display: inline-flex; align-items: center; gap: 6px; }
+.t-tec-sub {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--t-fuente-dato);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--t-muted);
+}
+.t-tec-punto {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--t-win);
+    display: inline-block;
+    flex: none;
+}
+
+/* ---------- efectividad y diferencia ---------- */
+
+.t-tec-ef {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+}
+.t-tec-ef b { font-weight: 600; }
+.t-tec-ef-pista {
+    display: block;
+    width: 46px; height: 3px;
+    border-radius: 2px;
+    background: var(--t-line);
+    overflow: hidden;
+}
+.t-tec-ef-pista i { display: block; height: 100%; background: var(--t-accent); }
+
+td.t-dif-pos { color: var(--t-win); }
+td.t-dif-neg { color: var(--t-loss); }
+
+/* ---------- columna de equipos ---------- */
+
+.t-tec-escudos {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
+}
+.t-tec-mas {
+    border: 1px solid var(--t-line);
+    background: var(--t-surface-2);
+    color: var(--t-muted);
+    border-radius: 99px;
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 5px 8px;
+    min-width: 26px;
+    cursor: pointer;
+    flex: none;
+}
+.t-tec-mas:hover { color: var(--t-accent); border-color: var(--t-accent-soft); }
+.t-tec-mas.activo {
+    background: var(--t-accent-soft);
+    border-color: var(--t-accent-soft);
+    color: var(--t-accent);
+}
+.t-tec-mas.activo .bi { transform: rotate(180deg); }
+.t-tec-mas .bi { display: inline-block; font-size: 10px; transition: transform .15s ease; }
+
+/* ---------- fila desplegable con el detalle por club ---------- */
+
+.t-tec-detalle > td {
+    background: var(--t-surface-2);
+    box-shadow: inset 3px 0 0 var(--t-accent-soft);
+    padding: 10px 12px 12px 24px !important;
+    text-align: left !important;
+}
+.t-tec-clubes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 4px 16px;
+}
+.t-tec-club {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 7px;
+    color: var(--t-ink-2);
+    font-size: 12.5px;
+    min-width: 0;
+}
+.t-tec-club:hover { background: var(--t-surface); color: var(--t-accent); }
+.t-tec-club-nom {
+    font-weight: 500;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.t-tec-club-dato {
+    margin-left: auto;
+    font-family: var(--t-fuente-dato);
+    font-size: 11px;
+    color: var(--t-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+    .t-tec-busqueda { width: 100%; }
+    .t-tec-busqueda input[type="search"] { width: auto; flex: 1; }
+    .t-tec-clubes { grid-template-columns: 1fr; }
+}

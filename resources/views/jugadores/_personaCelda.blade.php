@@ -122,7 +122,10 @@
                                        'rol'      => $club['rol'],
                                        'equipos'  => implode(',', $club['equipo_ids']),
                                        'etiqueta' => $club['equipo'].' '.$periodo,
-                                       'volver'   => request()->getRequestUri(),
+                                       // Solo la query string: la ruta la arma el
+                                       // controller con route(). Con el path entero,
+                                       // redirect()->to() duplica el prefijo del hosting.
+                                       'volver'   => request()->getQueryString(),
                                    ]) }}"
                                    title="Mover este tramo a la ficha #{{ $otro->id }} (no fusiona: las dos personas siguen existiendo)">&rarr;</a>
                             @endif

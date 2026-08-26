@@ -3217,17 +3217,58 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             }
         }
 
-        $goleadores->setPath(route('torneos.tecnicos', [
-            'order' => $order,
-            'tipoOrder' => $tipoOrder,
-            'actuales' => $actuales,
-            'campeones' => $campeones,
-            'torneoId' => $torneoId,
-        ]));
+        // La vista arrastra los parametros con appends(); el path va limpio para
+        // no duplicar el query string en los enlaces de la paginacion.
+        $goleadores->setPath(route('torneos.tecnicos'));
+
+        /**
+         * Numeros de la tira superior. Respetan el filtro por nombre (para que
+         * no queden contradictorios con el listado) pero no las dos casillas:
+         * los mosaicos "Dirigiendo" y "Campeones" son los que las activan.
+         */
+        $paramsNombre = $nombre ? [$like, $like] : [];
+
+        $totalDirigiendo = DB::selectOne("
+            SELECT COUNT(DISTINCT tecnicos.id) AS c
+            FROM partido_tecnicos
+            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+            INNER JOIN personas ON personas.id = tecnicos.persona_id
+            INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            INNER JOIN torneos ON torneos.id = grupos.torneo_id
+            WHERE torneos.year LIKE ?
+            $nombreFiltro
+        ", array_merge(["%$year%"], $paramsNombre))->c;
+
+        $totalCampeones = DB::selectOne("
+            SELECT COUNT(DISTINCT tecnicos.id) AS c
+            FROM partido_tecnicos
+            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+            INNER JOIN personas ON personas.id = tecnicos.persona_id
+            INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            INNER JOIN posicion_torneos
+                ON posicion_torneos.torneo_id = grupos.torneo_id
+                AND posicion_torneos.equipo_id = partido_tecnicos.equipo_id
+                AND posicion_torneos.posicion = 1
+            WHERE 1 = 1
+            $nombreFiltro
+        ", $paramsNombre)->c;
+
+        $totalTecnicos = count($tecnicosFull);
+        $totalPartidos = 0;
+        foreach ($tecnicosFull as $fila) {
+            $totalPartidos += (int) $fila->jugados;
+        }
 
         $i = $offSet + 1;
 
-        return view('torneos.tecnicos', compact('goleadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId', 'campeones'));
+        return view('torneos.tecnicos', compact(
+            'goleadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId', 'campeones',
+            'totalTecnicos', 'totalPartidos', 'totalDirigiendo', 'totalCampeones', 'year'
+        ));
     }
 
     public function tecnicos_old(Request $request)

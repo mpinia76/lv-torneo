@@ -277,6 +277,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-detalles/tanda', 'ImportDetallesController@tanda')->name('import_detalles.tanda');
     Route::get('/import-detalles/sembrar', 'ImportDetallesController@sembrar')->name('import_detalles.sembrar');
     Route::get('/import-detalles/revisar', 'ImportDetallesController@revisar')->name('import_detalles.revisar');
+    Route::get('/import-detalles/mapeos', 'ImportDetallesController@mapeos')->name('import_detalles.mapeos');
     Route::get('/import-detalles/plantillas', 'ImportDetallesController@plantillas')->name('import_detalles.plantillas');
     Route::get('/import-detalles/resultados', 'ImportDetallesController@resultados')->name('import_detalles.resultados');
     Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');

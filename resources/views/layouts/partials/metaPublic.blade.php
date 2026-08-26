@@ -30,6 +30,6 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
-<link href="{{ asset('css/torneos.css') }}?v=7" rel="stylesheet">
+<link href="{{ asset('css/torneos.css') }}?v=8" rel="stylesheet">
 
 <link rel="shortcut icon" type="image/png" href="{{ url('images/icon_ball.png') }}">

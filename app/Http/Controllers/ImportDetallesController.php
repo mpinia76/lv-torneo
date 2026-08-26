@@ -20,6 +20,7 @@ use App\Services\TmDetallePartido;
  *   tanda()   -> baja y guarda los N primeros de la lista
  *   sembrar() -> llena jugador_tm con los jugadores que ya tienen transfermarkt_url
  *   revisar() -> jugadores creados automáticamente que falta repasar
+ *   mapeos()  -> puentes con TM que apuntan a fichas borradas (no gasta API)
  *
  * Cada partido cuesta 1 llamada a la API, más 1 cada 50 jugadores nuevos.
  * Los jugadores se resuelven una sola vez en la vida.
@@ -101,10 +102,24 @@ class ImportDetallesController extends Controller
         $sembrados = DB::table('jugador_tm')->where('origen', 'url')->count();
         $porSembrar = max(0, $conUrl - $sembrados);
 
+        // Mapeos que apuntan a una ficha que ya no existe. Mientras estén, cada
+        // partido donde aparezca ese jugador escribe un id fantasma: la fila se
+        // rechaza por foreign key, pero antes le saca el dorsal al que sí está.
+        $nRotos = TmDetallePartido::contarMapeosRotos();
+
         $cuerpo = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Detalle de los partidos</h1>'
             . '<p class="sub">Alineaciones, goles, tarjetas, cambios y árbitros. Cada partido es <b>una</b> llamada a la API, '
             . 'más una cada 50 jugadores que aparezcan por primera vez.</p>'
+
+            . ($nRotos
+                ? '<div class="err-box"><b>Hay ' . $nRotos . ' mapeo(s) roto(s).</b><br>'
+                . 'Apuntan a fichas que ya no existen: se las llevó una fusión de personas o el borrado de '
+                . 'huérfanas, y <code>jugador_tm</code> no tiene foreign key que lo impida. El importador ya no '
+                . 'los usa, pero conviene limpiarlos.<br>'
+                . '<a class="boton" style="margin-top:8px" href="' . e(route('import_detalles.mapeos')) . '">Ver los mapeos rotos</a>'
+                . '</div>'
+                : '')
 
             . ($porSembrar
                 ? '<div class="err-box"><b>Antes de bajar nada, sembrá el mapeo.</b><br>'
@@ -130,6 +145,7 @@ class ImportDetallesController extends Controller
             . $this->card(count($filas) - $listos, 'Sin detalle', (count($filas) - $listos) ? 'warn' : '')
             . $this->card($mapeados, 'Jugadores mapeados')
             . $this->card($porRevisar, 'Por revisar', $porRevisar ? 'warn' : '')
+            . $this->card($nRotos, 'Mapeos rotos', $nRotos ? 'warn' : '')
             . $this->card($sinResultado, 'Sin resultado', $sinResultado ? 'warn' : '')
             . '</div>'
 
@@ -155,6 +171,9 @@ class ImportDetallesController extends Controller
             . '<p class="acciones">'
             . '<a class="boton-sec" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm desde las URLs</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar (' . $porRevisar . ')</a>'
+            . ($nRotos
+                ? '<a class="boton-sec" href="' . e(route('import_detalles.mapeos')) . '">Mapeos rotos (' . $nRotos . ')</a>'
+                : '')
             . '<a class="boton-sec" href="' . e(route('import_detalles.plantillas', array_filter(['tecnico_id' => $tecnicoId ?: null])))
             . '">Completar plantillas de lo ya cargado</a>'
             . ($sinResultado
@@ -1264,6 +1283,76 @@ class ImportDetallesController extends Controller
             if (mb_strpos($tm, $t) !== false) return false;   // algo del apellido está: bien
         }
         return true;
+    }
+
+    /**
+     * Mapeos con Transfermarkt que apuntan a una ficha que ya no existe.
+     *
+     * `jugador_tm` y `arbitro_tm` no tienen foreign key contra `jugadors` /
+     * `arbitros`. Hasta ago-2026 ni la fusión de personas ni el borrado de
+     * huérfanas las repuntaban, así que unificar dos fichas dejaba el mapeo
+     * apuntando a la que se borró. Después, en el próximo partido de ese
+     * jugador, el importador escribía ese id fantasma: MySQL lo rechazaba con
+     * un 1452 —pero recién después de haberle sacado el dorsal al jugador de
+     * verdad, que es lo que pasó con el 16 de Atenas de San Carlos—.
+     *
+     * Las dos puntas ya están tapadas (el importador ignora los mapeos muertos,
+     * y la fusión y el borrado los repuntan o los borran). Esto es para los que
+     * quedaron de antes: **un arreglo nuevo no repara lo viejo**.
+     *
+     * Borrarlos no pierde nada y NO gasta llamadas a la API: la próxima vez que
+     * ese jugador aparezca en un partido, el importador lo aparea de nuevo por
+     * apellido + fecha de nacimiento y vuelve a atar la fila, esta vez a la
+     * ficha que sobrevivió.
+     */
+    public function mapeos(Request $request)
+    {
+        if ((string) $request->get('limpiar', '0') === '1') {
+            $borradas = TmDetallePartido::limpiarMapeosRotos();
+            return redirect()->route('import_detalles.mapeos')
+                ->with('ok_mapeos', $borradas['jugador'] + $borradas['arbitro']);
+        }
+
+        $rotos = TmDetallePartido::mapeosRotos();
+        $total = count($rotos['jugador']) + count($rotos['arbitro']);
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Mapeos rotos</h1>'
+            . '<p class="sub">Filas de <code>jugador_tm</code> y <code>arbitro_tm</code> que apuntan a una ficha '
+            . 'que ya no existe: se la llevó una fusión de personas o el borrado de huérfanas. '
+            . 'Borrarlas no pierde nada y no gasta ni una llamada a la API — la próxima vez que ese jugador '
+            . 'aparezca en un partido se vuelve a aparear solo, contra la ficha que quedó.</p>';
+
+        if (session('ok_mapeos') !== null) {
+            $cuerpo .= '<div class="ok-box">Limpié ' . (int) session('ok_mapeos') . ' fila(s).</div>';
+        }
+
+        if (!$total) {
+            $cuerpo .= '<div class="ok-box">No hay ninguno: todos los mapeos apuntan a una ficha que existe.</div>';
+            return $this->pagina('Mapeos rotos', $cuerpo);
+        }
+
+        $cuerpo .= '<p class="acciones"><a class="boton" href="'
+            . e(route('import_detalles.mapeos', ['limpiar' => 1])) . '">Limpiar los ' . $total . '</a></p>';
+
+        foreach (['jugador' => ['Jugadores', 'jugador'], 'arbitro' => ['Árbitros', 'árbitro']] as $rol => $textos) {
+            if (empty($rotos[$rol])) continue;
+            $cuerpo .= '<h2>' . e($textos[0]) . ' (' . count($rotos[$rol]) . ')</h2>'
+                . '<table><thead><tr><th>id TM</th><th>nombre que trajo TM</th>'
+                . '<th>' . e($textos[1]) . ' que ya no existe</th><th>origen</th><th>atado el</th></tr></thead><tbody>';
+            foreach ($rotos[$rol] as $r) {
+                $cuerpo .= '<tr>'
+                    . '<td>' . e((string) $r->tm_id) . '</td>'
+                    . '<td>' . e($r->nombre_tm !== null && $r->nombre_tm !== '' ? $r->nombre_tm : '—') . '</td>'
+                    . '<td>#' . (int) $r->ficha_id . '</td>'
+                    . '<td>' . e($r->origen !== null ? $r->origen : '—') . '</td>'
+                    . '<td>' . e($r->created_at !== null ? substr((string) $r->created_at, 0, 10) : '—') . '</td>'
+                    . '</tr>';
+            }
+            $cuerpo .= '</tbody></table>';
+        }
+
+        return $this->pagina('Mapeos rotos', $cuerpo);
     }
 
     private function card($n, $label, $tono = '')

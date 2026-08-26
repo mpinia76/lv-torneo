@@ -564,7 +564,7 @@ class PersonaDuplicadoController extends Controller
             'equipos'  => $equipos,
             'etiqueta' => $etiqueta,
             'peso'     => FusionPersonas::peso([$origen, $destino]),
-            'volver'   => self::rutaInterna($request->query('volver')),
+            'volver'   => self::consultaDeVuelta($request->query('volver')),
         ]);
     }
 
@@ -627,26 +627,44 @@ class PersonaDuplicadoController extends Controller
         // de huérfanas está cacheada y hay que invalidarla, igual que al fusionar.
         Cache::forget(self::CACHE_SIN_REGISTROS);
 
-        $volver = self::rutaInterna($request->input('volver'));
-
-        return redirect()->to($volver ?: route('jugadores.verificarPersonas'))
+        return redirect()->to(self::urlDeVuelta($request->input('volver')))
             ->with('success', $r['mensaje'] . ' ' . implode('; ', $r['detalle']));
     }
 
     /**
-     * Solo se acepta volver a una ruta de este sitio. Redirigir a lo que venga
-     * en un parámetro es un open redirect, aunque la pantalla sea de admin.
+     * De "volver" se guarda SOLO la query string, nunca una ruta.
+     *
+     * Guardar la ruta entera fue un 404 en producción: `redirect()->to()` y
+     * `url()` le anteponen la raíz de la app a todo lo que no sea una URL
+     * absoluta, así que un path que ya venía con el prefijo del hosting
+     * (/~torneospinia/public/admin/...) volvía duplicado. Y aceptar una URL
+     * absoluta desde un parámetro es un open redirect. Con la query string sola
+     * las dos cosas se resuelven: el destino siempre lo pone route().
      */
-    private static function rutaInterna($url)
+    private static function consultaDeVuelta($valor)
     {
-        $url = is_string($url) ? trim($url) : '';
-
-        // "//otrositio.com" también es absoluta para el navegador.
-        if ($url === '' || substr($url, 0, 1) !== '/' || substr($url, 0, 2) === '//') {
+        $qs = is_string($valor) ? trim($valor) : '';
+        if ($qs === '') {
             return null;
         }
 
-        return $url;
+        // Por si llega con el signo de pregunta o con un fragmento pegado.
+        $qs = ltrim($qs, '?');
+        $corte = strpos($qs, '#');
+        if ($corte !== false) {
+            $qs = substr($qs, 0, $corte);
+        }
+
+        return $qs === '' ? null : $qs;
+    }
+
+    /** La pantalla de repetidos con los filtros que traía el que vino de ahí. */
+    private static function urlDeVuelta($valor)
+    {
+        $url = route('jugadores.verificarPersonas');
+        $qs  = self::consultaDeVuelta($valor);
+
+        return $qs ? $url . '?' . $qs : $url;
     }
 
     /**

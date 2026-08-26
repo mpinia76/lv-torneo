@@ -22,6 +22,9 @@
         $orig       = $previo['origen'];
         $dest       = $previo['destino'];
         $nombreClub = $etiqueta !== '' ? $etiqueta : implode(', ', $previo['equipos']);
+        // $volver es SOLO la query string: la ruta la pone route(), si no
+        // redirect()->to() le antepone la raíz y el prefijo queda duplicado.
+        $volverUrl  = route('jugadores.verificarPersonas') . ($volver ? '?' . $volver : '');
         $totalFilas = 0;
         $dudosos    = 0;
         foreach ($previo['partidos'] as $unPartido) {
@@ -297,7 +300,7 @@
             <button class="btn btn-primary" @if(!$previo['plantillas'] && !$previo['partidos']) disabled @endif>
                 Mover a la ficha #{{ $dest->id }}
             </button>
-            <a href="{{ $volver ?: route('jugadores.verificarPersonas') }}" class="btn btn-link">Cancelar</a>
+            <a href="{{ $volverUrl }}" class="btn btn-link">Cancelar</a>
         </form>
     </div>
 

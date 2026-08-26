@@ -306,7 +306,8 @@ class RegistrosPersonas
                     $hijos[] = $hijo;
                 }
             }
-            $mapa[$rol] = ['tabla' => $cfg['tabla'], 'fk' => $cfg['fk'], 'hijos' => $hijos, 'logs' => $logs];
+            $mapa[$rol] = ['tabla' => $cfg['tabla'], 'fk' => $cfg['fk'], 'hijos' => $hijos, 'logs' => $logs,
+                'mapeos' => isset($cfg['mapeos']) ? $cfg['mapeos'] : []];
         }
 
         return $mapa;
@@ -412,6 +413,18 @@ class RegistrosPersonas
                         continue;
                     }
                     DB::table($log)->whereIn($cfg['fk'], $rolIds)->update([$cfg['fk'] => null]);
+                }
+
+                // Los puentes con Transfermarkt (jugador_tm, arbitro_tm) se van
+                // con la ficha. No se les puede soltar la referencia como a las
+                // bitácoras: un mapeo sin ficha no es un mapeo, y el importador
+                // lo tomaría como un id válido. La próxima bajada lo vuelve a
+                // crear apuntando a quien corresponda.
+                foreach ($cfg['mapeos'] as $mapeo) {
+                    if (!self::hayTabla($mapeo) || !self::hayColumna($mapeo, $cfg['fk'])) {
+                        continue;
+                    }
+                    DB::table($mapeo)->whereIn($cfg['fk'], $rolIds)->delete();
                 }
 
                 DB::table($cfg['tabla'])->where('persona_id', $personaId)->delete();

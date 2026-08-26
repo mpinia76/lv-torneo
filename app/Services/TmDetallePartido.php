@@ -91,6 +91,12 @@ class TmDetallePartido
     private $mapaArbitros  = null;
     private $mapaEquipos   = null;
     private $mapaTecnicos  = null;
+    /**
+     * tm_id => id fantasma, de los mapeos que apuntan a una ficha que ya no
+     * existe. Se llenan al leer el mapa y se avisan cuando el partido los usa.
+     */
+    private $mapeosRotosJugador = [];
+    private $mapeosRotosArbitro = [];
     /** En la vista previa los jugadores que se crearían llevan un id negativo. */
     private $nombresPreview = [];
     private $tiposPreview   = [];
@@ -212,6 +218,16 @@ class TmDetallePartido
         $faltan = [];
         foreach ($idsTm as $id) {
             if (!isset($mapa[$id])) $faltan[] = $id;
+        }
+
+        // Los que faltan porque su mapeo apuntaba a una ficha borrada no son
+        // jugadores nuevos: ya habían estado atados. Se avisa para que no
+        // parezca que Transfermarkt trajo gente desconocida.
+        foreach (array_intersect_key($this->mapeosRotosJugador, array_flip($faltan)) as $tmId => $fantasma) {
+            $this->aviso('El mapeo del jugador TM ' . $tmId . ' apuntaba al jugador #' . $fantasma
+                . ', que ya no existe: se lo llevó una fusión de personas o el borrado de huérfanas. '
+                . 'Lo apareo de nuevo desde el perfil y dejo la fila apuntando a la ficha que quedó. '
+                . 'Los mapeos rotos se limpian todos juntos en "Mapeos rotos".');
         }
 
         $nuevos = [];
@@ -1225,6 +1241,10 @@ class TmDetallePartido
         foreach ($pares as $par) {
             if ($par[0] === null || $par[0] === '') continue;
             if (!isset($mapa[(string) $par[0]])) $faltan[] = (string) $par[0];
+        }
+        foreach (array_intersect_key($this->mapeosRotosArbitro, array_flip($faltan)) as $tmId => $fantasma) {
+            $this->aviso('El mapeo del árbitro TM ' . $tmId . ' apuntaba al árbitro #' . $fantasma
+                . ', que ya no existe: se lo llevó una fusión o un borrado. Lo apareo de nuevo desde el perfil.');
         }
         if (!empty($faltan)) {
             // OJO: nada de array_merge acá. Las claves son ids numéricos y
@@ -2330,8 +2350,29 @@ class TmDetallePartido
     {
         if (empty($filas)) return;
 
+        // Última red: un jugador_id que ya no existe no puede quedarse con el
+        // dorsal de nadie. El INSERT iba a fallar igual por foreign key, pero
+        // para entonces al jugador de verdad ya le habíamos borrado el número,
+        // y ese dato no vuelve solo. Se verifica antes de tocar nada.
+        $pedidos = [];
+        foreach ($filas as $f) {
+            if (!empty($f['jugador_id']) && (int) $f['jugador_id'] > 0) $pedidos[(int) $f['jugador_id']] = true;
+        }
+        $vivos = [];
+        if ($pedidos) {
+            foreach (DB::table('jugadors')->whereIn('id', array_keys($pedidos))->pluck('id') as $id) {
+                $vivos[(int) $id] = true;
+            }
+        }
+
         $plantillas = [];   // "torneo-equipo" => plantilla_id
         foreach ($filas as $f) {
+            if (!isset($vivos[(int) $f['jugador_id']])) {
+                $this->fallidas++;
+                $this->aviso('No sumé a la plantilla a "' . $f['_nombre'] . '": el jugador #' . (int) $f['jugador_id']
+                    . ' no existe en la base (mapeo viejo de jugador_tm). No le toqué el dorsal a nadie.');
+                continue;
+            }
             $clave = $f['torneo_id'] . '-' . $f['equipo_id'];
             try {
                 if (!isset($plantillas[$clave])) {
@@ -2762,23 +2803,129 @@ class TmDetallePartido
 
     // ═══════════════════════════ MAPEOS ═══════════════════════════
 
+    /**
+     * tm_player_id -> jugador_id, SÓLO con las fichas que todavía existen.
+     *
+     * `jugador_tm` no tiene foreign key contra `jugadors`, y hasta ago-2026 ni
+     * la fusión de personas ni el borrado de huérfanas la repuntaban: al
+     * unificar dos fichas, el mapeo seguía apuntando a la que se borró. Ese id
+     * fantasma después viajaba entero hasta el INSERT y reventaba con el 1452
+     * de MySQL —pero recién DESPUÉS de haberle sacado el dorsal al jugador de
+     * verdad, que es como se perdió el 16 de Atenas de San Carlos—.
+     *
+     * Un mapeo que apunta a la nada no es un dato, es basura: se saltea y el
+     * tm_id vuelve a la bolsa de "sin mapear", para que resolverJugador() lo
+     * aparee de nuevo y de paso deje la fila apuntando bien.
+     */
     private function mapaJugadores()
     {
         if ($this->mapaJugadores !== null) return $this->mapaJugadores;
         $mapa = [];
-        foreach (DB::table('jugador_tm')->select('tm_player_id', 'jugador_id')->get() as $r) {
+        $rotos = [];
+        $filas = DB::table('jugador_tm')
+            ->leftJoin('jugadors', 'jugadors.id', '=', 'jugador_tm.jugador_id')
+            ->select('jugador_tm.tm_player_id', 'jugador_tm.jugador_id', 'jugadors.id as vive')
+            ->get();
+        foreach ($filas as $r) {
+            if ($r->vive === null) {
+                $rotos[(string) $r->tm_player_id] = (int) $r->jugador_id;
+                continue;
+            }
             $mapa[(string) $r->tm_player_id] = (int) $r->jugador_id;
         }
+        $this->mapeosRotosJugador = $rotos;
         return $this->mapaJugadores = $mapa;
     }
 
+    /**
+     * Los mapeos rotos que hay hoy en la base, sin filtrar por partido. Lo usa
+     * la pantalla de reparación (`import_detalles.mapeos`), que los borra: la
+     * próxima bajada los vuelve a crear apuntando a la ficha correcta.
+     *
+     * @return array ['jugador' => [...], 'arbitro' => [...]]
+     */
+    public static function mapeosRotos()
+    {
+        $out = ['jugador' => [], 'arbitro' => []];
+
+        if (Schema::hasTable('jugador_tm')) {
+            $out['jugador'] = DB::table('jugador_tm')
+                ->leftJoin('jugadors', 'jugadors.id', '=', 'jugador_tm.jugador_id')
+                ->whereNull('jugadors.id')
+                ->select('jugador_tm.id', 'jugador_tm.tm_player_id as tm_id', 'jugador_tm.jugador_id as ficha_id',
+                    'jugador_tm.nombre_tm', 'jugador_tm.origen', 'jugador_tm.created_at')
+                ->orderBy('jugador_tm.id')->get()->all();
+        }
+
+        if (Schema::hasTable('arbitro_tm')) {
+            $out['arbitro'] = DB::table('arbitro_tm')
+                ->leftJoin('arbitros', 'arbitros.id', '=', 'arbitro_tm.arbitro_id')
+                ->whereNull('arbitros.id')
+                ->select('arbitro_tm.id', 'arbitro_tm.tm_referee_id as tm_id', 'arbitro_tm.arbitro_id as ficha_id',
+                    'arbitro_tm.nombre_tm', 'arbitro_tm.origen', 'arbitro_tm.created_at')
+                ->orderBy('arbitro_tm.id')->get()->all();
+        }
+
+        return $out;
+    }
+
+    /**
+     * Cuántos mapeos rotos hay, sin traerlos. El index del importador lo pinta
+     * en cada carga y `jugador_tm` va camino a las decenas de miles de filas:
+     * un COUNT por tabla, no la lista entera.
+     */
+    public static function contarMapeosRotos()
+    {
+        $n = 0;
+
+        if (Schema::hasTable('jugador_tm')) {
+            $n += DB::table('jugador_tm')
+                ->leftJoin('jugadors', 'jugadors.id', '=', 'jugador_tm.jugador_id')
+                ->whereNull('jugadors.id')->count();
+        }
+
+        if (Schema::hasTable('arbitro_tm')) {
+            $n += DB::table('arbitro_tm')
+                ->leftJoin('arbitros', 'arbitros.id', '=', 'arbitro_tm.arbitro_id')
+                ->whereNull('arbitros.id')->count();
+        }
+
+        return $n;
+    }
+
+    /** Borra las filas de mapeo que apuntan a fichas inexistentes. */
+    public static function limpiarMapeosRotos()
+    {
+        $rotos = self::mapeosRotos();
+        $out = ['jugador' => 0, 'arbitro' => 0];
+
+        foreach (['jugador' => 'jugador_tm', 'arbitro' => 'arbitro_tm'] as $rol => $tabla) {
+            $ids = [];
+            foreach ($rotos[$rol] as $r) $ids[] = (int) $r->id;
+            if ($ids) $out[$rol] = DB::table($tabla)->whereIn('id', $ids)->delete();
+        }
+
+        return $out;
+    }
+
+    /** Igual que mapaJugadores(): un arbitro_id que ya no existe no es un mapeo. Ver allá el porqué. */
     private function mapaArbitros()
     {
         if ($this->mapaArbitros !== null) return $this->mapaArbitros;
         $mapa = [];
-        foreach (DB::table('arbitro_tm')->select('tm_referee_id', 'arbitro_id')->get() as $r) {
+        $rotos = [];
+        $filas = DB::table('arbitro_tm')
+            ->leftJoin('arbitros', 'arbitros.id', '=', 'arbitro_tm.arbitro_id')
+            ->select('arbitro_tm.tm_referee_id', 'arbitro_tm.arbitro_id', 'arbitros.id as vive')
+            ->get();
+        foreach ($filas as $r) {
+            if ($r->vive === null) {
+                $rotos[(string) $r->tm_referee_id] = (int) $r->arbitro_id;
+                continue;
+            }
             $mapa[(string) $r->tm_referee_id] = (int) $r->arbitro_id;
         }
+        $this->mapeosRotosArbitro = $rotos;
         return $this->mapaArbitros = $mapa;
     }
 
