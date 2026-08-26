@@ -6,6 +6,7 @@ use App\Persona;
 use App\PersonaDuplicado;
 use App\Services\DuplicadosPersonas;
 use App\Services\FusionPersonas;
+use App\Services\MoverRegistros;
 use App\Services\RegistrosPersonas;
 use App\Services\TmFechas;
 use Illuminate\Http\Request;
@@ -525,6 +526,127 @@ class PersonaDuplicadoController extends Controller
         Cache::forget(self::CACHE_SIN_FECHA);
 
         return redirect()->back()->with('success', $r['mensaje'] . ' ' . implode('; ', $r['detalle']));
+    }
+
+    /**
+     * Previsualización del traspaso PARCIAL de carrera.
+     *
+     * Es el caso que ni la fusión ni "Reasignar" cubren: dos personas que SON
+     * distintas, pero con un tramo colgado de la ficha equivocada (Iván Gómez
+     * #3160 con el Platense 2021-2022 que es de #291). Acá no se borra a nadie:
+     * se mueve un club con sus planteles y sus partidos.
+     *
+     * El GET no escribe nada. Muestra exactamente qué filas se van a mover para
+     * que la confirmación no sea sobre una lista de ids.
+     */
+    public function moverForm(Request $request)
+    {
+        $origen   = (int) $request->query('origen');
+        $destino  = (int) $request->query('destino');
+        $rol      = (string) $request->query('rol', 'jugador');
+        $etiqueta = trim((string) $request->query('etiqueta', ''));
+        $equipos  = array_values(array_filter(array_map(
+            'intval',
+            explode(',', (string) $request->query('equipos', ''))
+        )));
+
+        $previo = MoverRegistros::previsualizar($origen, $destino, $rol, $equipos);
+
+        if (!$previo['ok']) {
+            return redirect()->route('jugadores.verificarPersonas')->withErrors(['error' => $previo['mensaje']]);
+        }
+
+        return view('jugadores.moverRegistros', [
+            'previo'   => $previo,
+            'origen'   => $origen,
+            'destino'  => $destino,
+            'rol'      => $rol,
+            'equipos'  => $equipos,
+            'etiqueta' => $etiqueta,
+            'peso'     => FusionPersonas::peso([$origen, $destino]),
+            'volver'   => self::rutaInterna($request->query('volver')),
+        ]);
+    }
+
+    /**
+     * Ejecuta el traspaso parcial.
+     *
+     * Lo que llega del formulario se vuelve a validar contra la previsualización
+     * dentro del servicio: de los ids que manda el navegador solo sobreviven los
+     * que realmente pertenecen a ese club y a esa ficha.
+     */
+    public function mover(Request $request)
+    {
+        $request->validate([
+            'origen'  => 'required|integer|exists:personas,id',
+            'destino' => 'required|integer|different:origen|exists:personas,id',
+            'rol'     => 'required|string',
+            'equipos' => 'required|string',
+        ]);
+
+        set_time_limit(0);
+
+        $origen  = (int) $request->input('origen');
+        $destino = (int) $request->input('destino');
+        $rol     = (string) $request->input('rol');
+        $equipos = array_values(array_filter(array_map(
+            'intval',
+            explode(',', (string) $request->input('equipos'))
+        )));
+
+        $r = MoverRegistros::mover(
+            $origen,
+            $destino,
+            $rol,
+            $equipos,
+            (array) $request->input('plantillas', []),
+            (array) $request->input('partidos', []),
+            (string) $request->input('etiqueta', '')
+        );
+
+        if (!$r['ok']) {
+            return redirect()->back()->withErrors(['error' => $r['mensaje']])->withInput();
+        }
+
+        // Mover un tramo es, en sí mismo, la prueba de que son dos personas
+        // distintas. Y además le saca al par la única señal que lo hacía
+        // sospechoso (el club compartido), así que si quedara pendiente
+        // volvería a la lista con menos información que antes.
+        if ($request->boolean('descartar')) {
+            list($a, $b) = PersonaDuplicado::ordenado($origen, $destino);
+
+            PersonaDuplicado::updateOrCreate(
+                ['persona_id' => $a, 'simil_id' => $b],
+                ['estado' => PersonaDuplicado::DESCARTADO]
+            );
+
+            $this->espejarVerificadas($a, $b);
+        }
+
+        // La ficha de origen puede haber quedado sin un solo registro: la lista
+        // de huérfanas está cacheada y hay que invalidarla, igual que al fusionar.
+        Cache::forget(self::CACHE_SIN_REGISTROS);
+
+        $volver = self::rutaInterna($request->input('volver'));
+
+        return redirect()->to($volver ?: route('jugadores.verificarPersonas'))
+            ->with('success', $r['mensaje'] . ' ' . implode('; ', $r['detalle']));
+    }
+
+    /**
+     * Solo se acepta volver a una ruta de este sitio. Redirigir a lo que venga
+     * en un parámetro es un open redirect, aunque la pantalla sea de admin.
+     */
+    private static function rutaInterna($url)
+    {
+        $url = is_string($url) ? trim($url) : '';
+
+        // "//otrositio.com" también es absoluta para el navegador.
+        if ($url === '' || substr($url, 0, 1) !== '/' || substr($url, 0, 2) === '//') {
+            return null;
+        }
+
+        return $url;
     }
 
     /**

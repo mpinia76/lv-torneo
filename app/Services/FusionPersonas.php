@@ -440,9 +440,13 @@ class FusionPersonas
      * Devuelve los campos que están vacíos en $ganador y con dato en $perdedor.
      * Vacío = NULL o cadena vacía. Un 0 es un dato y no se pisa.
      *
+     * Público porque MoverRegistros (el traspaso parcial de carrera) resuelve
+     * los choques con EXACTAMENTE este criterio. Duplicarlo allá era garantizar
+     * que las dos copias se separen con el primer arreglo.
+     *
      * @param array $pares grupos de campos que viajan juntos (documento + tipoDocumento)
      */
-    private static function completar($ganador, $perdedor, array $campos, array $pares = []): array
+    public static function completar($ganador, $perdedor, array $campos, array $pares = []): array
     {
         $vacio = function ($v) {
             return $v === null || (is_string($v) && trim($v) === '');
@@ -502,7 +506,8 @@ class FusionPersonas
         return self::$esquema["t:{$tabla}"];
     }
 
-    private static function columnas(string $tabla): array
+    /** Público por el mismo motivo que completar(): lo usa MoverRegistros. */
+    public static function columnas(string $tabla): array
     {
         if (!array_key_exists("c:{$tabla}", self::$esquema)) {
             self::$esquema["c:{$tabla}"] = self::hayTabla($tabla) ? Schema::getColumnListing($tabla) : [];

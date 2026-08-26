@@ -102,10 +102,30 @@
                             $titulo    = $mismoAnio
                                 ? 'La otra ficha también está en este club en las mismas temporadas: casi seguro es la misma persona'
                                 : ($esComun ? 'La otra ficha también pasó por este club, pero en otros años' : '');
+
+                            // Traspaso parcial: este tramo va a la OTRA ficha, sin fusionar.
+                            // Hace falta el id real del equipo —el nombre no alcanza, puede
+                            // haber dos clubes homónimos en `equipos`— y un rol con equipo:
+                            // los árbitros no tienen club, lo que se les muestra son torneos.
+                            $puedeMover = $otro
+                                && !empty($club['equipo_ids'])
+                                && in_array($club['rol'], \App\Services\MoverRegistros::ROLES, true);
                         @endphp
                         <span class="dup-club @if($mismoAnio) dup-club-igual @elseif($esComun) dup-club-comun @endif"
                               @if($titulo) title="{{ $titulo }}" @endif>
                             {{ $club['equipo'] }} <span class="text-muted">{{ $periodo }}</span>
+                            @if($puedeMover)
+                                <a class="dup-mover"
+                                   href="{{ route('personas.mover.form', [
+                                       'origen'   => $p->id,
+                                       'destino'  => $otro->id,
+                                       'rol'      => $club['rol'],
+                                       'equipos'  => implode(',', $club['equipo_ids']),
+                                       'etiqueta' => $club['equipo'].' '.$periodo,
+                                       'volver'   => request()->getRequestUri(),
+                                   ]) }}"
+                                   title="Mover este tramo a la ficha #{{ $otro->id }} (no fusiona: las dos personas siguen existiendo)">&rarr;</a>
+                            @endif
                         </span>
                     @endforeach
                     @if(count($clubes) > $tope)

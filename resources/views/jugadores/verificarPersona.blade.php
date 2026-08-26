@@ -20,6 +20,9 @@
         .dup-club-comun { border-color:#ffc107; background:#fff9e6; }
         /* mismo club Y años solapados: la señal fuerte de que es la misma persona */
         .dup-club-igual { border-color:#28a745; background:#e9f7ee; font-weight:600; }
+        /* flecha "mover este tramo a la otra ficha" */
+        .dup-mover { color:#adb5bd; text-decoration:none; font-weight:700; padding-left:.15rem; }
+        .dup-mover:hover { color:#007bff; text-decoration:none; }
     </style>
 
     <div class="container-fluid">

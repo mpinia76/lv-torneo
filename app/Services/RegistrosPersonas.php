@@ -42,7 +42,12 @@ class RegistrosPersonas
      * después dirigió): son dos entradas distintas, con su propio período.
      *
      * @param  int[] $ids
-     * @return array [persona_id => [['equipo'=>string,'desde'=>int,'hasta'=>int,'rol'=>string], ...]]
+     * `equipo_ids` lleva los ids REALES de `equipos` detras del nombre. La entrada
+     * se sigue agrupando por nombre (dos filas distintas de "Platense" en `equipos`
+     * se ven como un solo club, igual que siempre), pero cualquier accion que mueva
+     * registros tiene que trabajar con estos ids y no con el texto.
+     *
+     * @return array [persona_id => [['equipo'=>string,'equipo_ids'=>int[],'desde'=>int,'hasta'=>int,'rol'=>string], ...]]
      */
     public static function clubes(array $ids): array
     {
@@ -66,11 +71,15 @@ class RegistrosPersonas
                 $clave = $fuente['rol'] . '|' . $equipo;
 
                 if (!isset($crudo[$pid][$clave])) {
-                    $crudo[$pid][$clave] = ['equipo' => $equipo, 'rol' => $fuente['rol'], 'years' => []];
+                    $crudo[$pid][$clave] = ['equipo' => $equipo, 'rol' => $fuente['rol'], 'years' => [], 'equipos' => []];
                 }
                 $year = (int) $f->year;
                 if ($year > 0) {
                     $crudo[$pid][$clave]['years'][$year] = true;
+                }
+                $equipoId = (int) ($f->equipo_id ?? 0);
+                if ($equipoId > 0) {
+                    $crudo[$pid][$clave]['equipos'][$equipoId] = true;
                 }
             }
         }
@@ -81,10 +90,11 @@ class RegistrosPersonas
             foreach ($crudo[$id] ?? [] as $entrada) {
                 $years = array_keys($entrada['years']);
                 $lista[] = [
-                    'equipo' => $entrada['equipo'],
-                    'rol'    => $entrada['rol'],
-                    'desde'  => $years ? min($years) : 0,
-                    'hasta'  => $years ? max($years) : 0,
+                    'equipo'     => $entrada['equipo'],
+                    'equipo_ids' => array_keys($entrada['equipos']),
+                    'rol'        => $entrada['rol'],
+                    'desde'      => $years ? min($years) : 0,
+                    'hasta'      => $years ? max($years) : 0,
                 ];
             }
 
@@ -182,7 +192,7 @@ class RegistrosPersonas
               ->join('equipos as e', 'e.id', '=', 'pl.equipo_id')
               ->join('grupos as g', 'g.id', '=', 'pl.grupo_id')
               ->join('torneos as t', 't.id', '=', 'g.torneo_id')
-              ->select('rol.persona_id', 'e.nombre as equipo', 't.year');
+              ->select('rol.persona_id', 'e.id as equipo_id', 'e.nombre as equipo', 't.year');
 
         } elseif ($f['via'] === 'partido') {
             // El equipo sale del propio registro (alineacions / partido_tecnicos
@@ -196,7 +206,7 @@ class RegistrosPersonas
               ->join('fechas as fe', 'fe.id', '=', 'pa.fecha_id')
               ->join('grupos as g', 'g.id', '=', 'fe.grupo_id')
               ->join('torneos as t', 't.id', '=', 'g.torneo_id')
-              ->select('rol.persona_id', 'e.nombre as equipo', 't.year');
+              ->select('rol.persona_id', 'e.id as equipo_id', 'e.nombre as equipo', 't.year');
 
         } else { // torneo
             if (!self::hayTabla('partidos') || !self::hayTabla('fechas')) {
@@ -206,7 +216,7 @@ class RegistrosPersonas
               ->join('fechas as fe', 'fe.id', '=', 'pa.fecha_id')
               ->join('grupos as g', 'g.id', '=', 'fe.grupo_id')
               ->join('torneos as t', 't.id', '=', 'g.torneo_id')
-              ->select('rol.persona_id', 't.nombre as equipo', 't.year');
+              ->select('rol.persona_id', DB::raw('0 as equipo_id'), 't.nombre as equipo', 't.year');
         }
 
         return $q->distinct()->get();

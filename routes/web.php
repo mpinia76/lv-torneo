@@ -88,6 +88,13 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('personas/duplicados/fusionar', 'PersonaDuplicadoController@fusionar')->name('personas.duplicados.fusionar');
     Route::post('personas/duplicados/lote', 'PersonaDuplicadoController@lote')->name('personas.duplicados.lote');
 
+    // Traspaso PARCIAL de carrera entre dos personas DISTINTAS: mover un tramo
+    // (un club y sus temporadas) de una ficha a la otra sin fusionar nada. El GET
+    // solo previsualiza; el POST vuelve a calcular la lista y se queda con la
+    // interseccion, asi un id escrito a mano no puede mover otro club.
+    Route::get('personas/mover', 'PersonaDuplicadoController@moverForm')->name('personas.mover.form');
+    Route::post('personas/mover', 'PersonaDuplicadoController@mover')->name('personas.mover');
+
     // Borra personas que no tienen ningun registro asociado. El controller vuelve
     // a contar con la fila bloqueada antes de borrar: nunca confia en el "0 reg."
     // que vio el navegador.

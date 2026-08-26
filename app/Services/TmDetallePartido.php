@@ -868,10 +868,14 @@ class TmDetallePartido
             foreach ($lineup[$rama] as $p) {
                 if (!is_array($p)) continue;
                 $orden++;
+                // OJO: Transfermarkt manda `0` cuando NO sabe el dorsal (pasa
+                // seguido en el ascenso brasileño). Un 0 no es un dorsal: si se
+                // lo toma como bueno, el primero de la lista se queda con el 0 y
+                // todos los demás chocan contra él y caen en "repetido".
                 $dorsal = $this->valor($p, self::$kDorsal);
                 $out[] = [
                     'tm_id'  => $this->valor($p, self::$kJugador),
-                    'dorsal' => ($dorsal === null || $dorsal === '') ? null : (int) $dorsal,
+                    'dorsal' => ($dorsal === null || $dorsal === '' || (int) $dorsal === 0) ? null : (int) $dorsal,
                     'tipo'   => $tipo,
                     'orden'  => $orden,
                     'crudo'  => $p,
@@ -2165,6 +2169,7 @@ class TmDetallePartido
             ->where('grupos.torneo_id', $torneoId)
             ->whereIn('plantillas.equipo_id', $equipos)
             ->whereNotNull('plantilla_jugadors.dorsal')
+            ->where('plantilla_jugadors.dorsal', '!=', 0)
             ->select('plantillas.equipo_id', 'plantilla_jugadors.jugador_id', 'plantilla_jugadors.dorsal')
             ->get();
 
@@ -2356,7 +2361,7 @@ class TmDetallePartido
                 // Si ya lo tiene OTRO jugador, gana el que dice Transfermarkt:
                 // al que estaba se le borra el número —sigue en la plantilla,
                 // solo pierde el dorsal— y se avisa para que lo revises.
-                if ($f['dorsal'] !== null && $f['dorsal'] !== '') {
+                if ($f['dorsal'] !== null && $f['dorsal'] !== '' && (int) $f['dorsal'] !== 0) {
                     $ocupa = \App\PlantillaJugador::where('plantilla_id', $plantillas[$clave])
                         ->where('dorsal', $f['dorsal'])
                         ->where('jugador_id', '!=', $f['jugador_id'])->first();
@@ -2380,7 +2385,8 @@ class TmDetallePartido
                         'jugador_id'   => $f['jugador_id'],
                         'dorsal'       => $f['dorsal'],
                     ]);
-                } elseif (($pj->dorsal === null || $pj->dorsal === '') && $f['dorsal'] !== null) {
+                } elseif (($pj->dorsal === null || $pj->dorsal === '')
+                    && $f['dorsal'] !== null && (int) $f['dorsal'] !== 0) {
                     $pj->update(['dorsal' => $f['dorsal']]);
                 }
             } catch (\Exception $e) {
