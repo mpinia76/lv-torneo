@@ -60,6 +60,24 @@ class ImportDetallesController extends Controller
             }
         }
 
+        // El resultado sale de `partidos`, NO del staging: cuando se baja el
+        // detalle el marcador se escribe en `partidos.golesl/golesv`, mientras
+        // que la fila de `import_partidos` conserva lo que traía Transfermarkt
+        // el día del fixture — vacío si el partido todavía no se había jugado.
+        $marcadores = [];
+        if (!empty($ids)) {
+            foreach (DB::table('partidos')->whereIn('id', $ids)
+                         ->select('id', 'golesl', 'golesv')->get() as $r) {
+                $marcadores[(int) $r->id] = $r;
+            }
+        }
+
+        $sinResultado = 0;
+        foreach (array_unique($ids) as $pid) {
+            if (!isset($marcadores[$pid])) continue;
+            if ($marcadores[$pid]->golesl === null || $marcadores[$pid]->golesv === null) $sinResultado++;
+        }
+
         $fechas = $this->mapaFechas($ids);
 
         $pendientes = [];
@@ -112,6 +130,7 @@ class ImportDetallesController extends Controller
             . $this->card(count($filas) - $listos, 'Sin detalle', (count($filas) - $listos) ? 'warn' : '')
             . $this->card($mapeados, 'Jugadores mapeados')
             . $this->card($porRevisar, 'Por revisar', $porRevisar ? 'warn' : '')
+            . $this->card($sinResultado, 'Sin resultado', $sinResultado ? 'warn' : '')
             . '</div>'
 
             . '<form method="get" style="margin:12px 0">'
@@ -138,6 +157,11 @@ class ImportDetallesController extends Controller
             . '<a class="boton-sec" href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar (' . $porRevisar . ')</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.plantillas', array_filter(['tecnico_id' => $tecnicoId ?: null])))
             . '">Completar plantillas de lo ya cargado</a>'
+            . ($sinResultado
+                ? '<a class="boton-sec" href="' . e(route('import_detalles.resultados', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                    'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
+                . '">Completar resultados (' . $sinResultado . ')</a>'
+                : '')
             . '</p>';
 
         if ($listos) {
@@ -177,7 +201,7 @@ class ImportDetallesController extends Controller
                 . '<td>' . e($f->local ? $f->club_nombre : $f->rival_nombre) . '</td>'
                 . '<td class="num">vs</td>'
                 . '<td>' . e($f->local ? $f->rival_nombre : $f->club_nombre) . '</td>'
-                . '<td class="num">' . e($f->goles_favor) . ':' . e($f->goles_contra) . '</td>'
+                . '<td class="num">' . $this->resultado($f, isset($marcadores[(int) $f->partido_id]) ? $marcadores[(int) $f->partido_id] : null) . '</td>'
                 . '<td class="num">' . e($f->external_id) . '</td>'
                 . '<td class="num"><span class="id">#' . (int) $f->partido_id . '</span></td>'
                 . '<td>' . ($tiene ? '<span class="ok">' . $conAlineacion[(int) $f->partido_id] . ' jugadores</span>' : '<span class="warn">—</span>') . '</td>'
@@ -193,6 +217,30 @@ class ImportDetallesController extends Controller
         }
 
         return $this->pagina('Detalle de partidos', $cuerpo);
+    }
+
+    /**
+     * El resultado que muestra la tabla.
+     *
+     * Sale de `partidos`, no de la fila de staging. El staging guarda el
+     * marcador que tenía Transfermarkt el día que se bajó el fixture: si el
+     * partido todavía no se había jugado, ahí quedó vacío para siempre. Al
+     * bajar el detalle el marcador se escribe en `partidos.golesl/golesv`, y
+     * esa es la única fuente que se actualiza.
+     *
+     * Recién si el partido no tiene marcador se cae al staging, y ahí hay que
+     * darlo vuelta cuando el DT era visitante: el staging guarda goles a favor
+     * y en contra DEL DT, y estas columnas muestran local y visitante.
+     */
+    private function resultado($fila, $partido)
+    {
+        if ($partido && $partido->golesl !== null && $partido->golesv !== null) {
+            return (int) $partido->golesl . ':' . (int) $partido->golesv;
+        }
+        if ($fila->goles_favor === null || $fila->goles_contra === null) return ':';
+        return $fila->local
+            ? e($fila->goles_favor) . ':' . e($fila->goles_contra)
+            : e($fila->goles_contra) . ':' . e($fila->goles_favor);
     }
 
     // ═══════════════════════════ UN PARTIDO ═══════════════════════════
@@ -756,6 +804,102 @@ class ImportDetallesController extends Controller
      * plantilla del torneo, y por eso `/admin/alineaciones` no los deja editar.
      * Esto los repara sin volver a bajar nada.
      */
+    /**
+     * Completa el marcador de los partidos que quedaron sin resultado, leyendo
+     * el fixture que ya está guardado en `import_partidos`. **No gasta ninguna
+     * llamada a la API.**
+     *
+     * Hace falta porque el detalle escribe el marcador recién desde que se
+     * agregó `completarMarcador()`: todo lo que se bajó antes quedó sin
+     * resultado, y como esos partidos ya tienen la alineación, volver a darles
+     * "Bajar" corta antes de tocar nada. Nunca pisa un resultado cargado.
+     */
+    public function resultados(Request $request)
+    {
+        set_time_limit(0);
+
+        $tecnicoId = (int) $request->get('tecnico_id', 0);
+        $comp      = trim((string) $request->get('comp', ''));
+        $ronda     = trim((string) $request->get('ronda', ''));
+        $aplicar   = (string) $request->get('aplicar', '0') === '1';
+
+        $q = DB::table('import_partidos')
+            ->whereNotNull('partido_id')->whereNotNull('payload')
+            ->whereIn('estado', ['aplicado', 'duplicado']);
+        if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        if ($comp !== '')  $q->where('competencia_external_id', $comp);
+        if ($ronda !== '') $q->where('ronda', $ronda);
+
+        $ids = array_values(array_unique(array_map('intval', $q->limit(5000)->pluck('partido_id')->all())));
+
+        $r = TmDetallePartido::marcadoresDesdeStaging($ids, $aplicar);
+
+        $filtros = array_filter(['tecnico_id' => $tecnicoId ?: null, 'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', $filtros)) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Resultados de lo ya cargado</h1>'
+            . '<p class="sub">Los partidos que bajaste antes de que el detalle escribiera el marcador quedaron con las '
+            . 'incidencias completas pero <b>sin resultado</b>. Volver a darles "Bajar" no los arregla: como ya tienen '
+            . 'alineación, el importador corta antes. Esto les carga el marcador desde el fixture que ya está guardado: '
+            . '<b>no gasta ninguna llamada a la API</b> y nunca pisa un resultado que ya esté cargado.</p>';
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card(count($ids), 'Partidos mirados')
+            . $this->card($r['mirados'], 'Sin resultado', $r['mirados'] ? 'warn' : 'ok')
+            . $this->card($r['con_marcador'], 'Con marcador en el fixture', 'ok')
+            . $this->card($r['mirados'] - $r['con_marcador'], 'Sin dato', ($r['mirados'] - $r['con_marcador']) ? 'warn' : '')
+            . ($aplicar ? $this->card($r['escritos'], 'Cargados', 'ok') : '')
+            . '</div>';
+
+        if (!$r['mirados']) {
+            $cuerpo .= '<div class="ok-box">No hay ningún partido sin resultado' . ($comp !== '' || $ronda !== '' || $tecnicoId ? ' con este filtro' : '') . '.</div>';
+            return $this->pagina('Resultados', $cuerpo);
+        }
+
+        if ($aplicar) {
+            $cuerpo .= '<div class="ok-box">Listo: ' . (int) $r['escritos'] . ' partido(s) con el resultado cargado.</div>';
+        } else {
+            $params = $filtros; $params['aplicar'] = 1;
+            $cuerpo .= '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.resultados', $params))
+                . '">Cargar estos ' . (int) $r['con_marcador'] . ' resultados</a>'
+                . ' <span class="sub">recién acá se escribe</span></p>';
+        }
+
+        $fechas = $this->mapaFechas(array_map(function ($f) { return $f['partido_id']; }, $r['filas']));
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr>'
+            . '<th>Fecha</th><th>Local</th><th>Res.</th><th>Visitante</th><th>Partido</th><th></th><th></th>'
+            . '</tr></thead><tbody>';
+        foreach ($r['filas'] as $f) {
+            $inc = $this->linkIncidencias(isset($fechas[$f['partido_id']]) ? $fechas[$f['partido_id']] : null);
+            $cuerpo .= '<tr>'
+                . '<td class="num">' . e($f['dia'] ? substr($f['dia'], 0, 10) : '—') . '</td>'
+                . '<td>' . e($this->nombreEquipo($f['equipol_id'])) . '</td>'
+                . '<td class="num">' . ($f['gl'] === null ? '—' : '<b>' . (int) $f['gl'] . ':' . (int) $f['gv'] . '</b>') . '</td>'
+                . '<td>' . e($this->nombreEquipo($f['equipov_id'])) . '</td>'
+                . '<td class="num"><span class="id">#' . (int) $f['partido_id'] . '</span></td>'
+                . '<td class="sub">' . ($f['motivo'] ? '<span class="warn">' . e($f['motivo']) . '</span>'
+                    : ($aplicar ? '<span class="ok">cargado</span>' : 'listo para cargar')) . '</td>'
+                . '<td>' . ($inc !== '' ? $inc : '') . '</td>'
+                . '</tr>';
+        }
+        $cuerpo .= '</tbody></table></div>';
+
+        return $this->pagina('Resultados', $cuerpo);
+    }
+
+    /** Nombre de un equipo, cacheado: estas tablas repiten los mismos. */
+    private function nombreEquipo($id)
+    {
+        static $cache = [];
+        if (!$id) return '?';
+        if (!isset($cache[$id])) {
+            $e = \App\Equipo::select('nombre')->find($id);
+            $cache[$id] = $e ? $e->nombre : ('#' . $id);
+        }
+        return $cache[$id];
+    }
+
     public function plantillas(Request $request)
     {
         set_time_limit(0);

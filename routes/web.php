@@ -98,6 +98,7 @@ Route::group(['prefix' => 'admin'], function()
     // el desempate de la pantalla de repetidos, y las que TM manda mal ya estan
     // corregidas a mano.
     Route::post('personas/fechas/completar', 'PersonaDuplicadoController@completarFechas')->name('personas.fechas.completar');
+    Route::post('personas/fechas/desconocidas', 'PersonaDuplicadoController@fechasDesconocidas')->name('personas.fechas.desconocidas');
 
     // Se mantiene el nombre de ruta por compatibilidad, pero apunta al controller
     // nuevo: JugadorController@verificarSimilitud escribia SOLO en
@@ -270,6 +271,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-detalles/sembrar', 'ImportDetallesController@sembrar')->name('import_detalles.sembrar');
     Route::get('/import-detalles/revisar', 'ImportDetallesController@revisar')->name('import_detalles.revisar');
     Route::get('/import-detalles/plantillas', 'ImportDetallesController@plantillas')->name('import_detalles.plantillas');
+    Route::get('/import-detalles/resultados', 'ImportDetallesController@resultados')->name('import_detalles.resultados');
     Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');
     Route::get('/import-detalles/competencia', 'ImportDetallesController@competencia')->name('import_detalles.competencia');
 });

@@ -105,6 +105,8 @@ class TmDetallePartido
     private $fallidas = 0;
     /** Crudo de los árbitros del último partido, para mostrarlo en la vista previa. */
     private $crudoArbitros = null;
+    /** Por qué no se pudo sacar el marcador del fixture guardado. */
+    private $motivoMarcador = null;
 
     // ═════════════════════════════════ API ═════════════════════════════════
 
@@ -536,26 +538,55 @@ class TmDetallePartido
      * sin llamar a la API. Sirve cuando el partido ya tiene el detalle cargado
      * y por eso `importar()` corta antes de bajar nada.
      */
-    private function marcadorDesdeStaging(Partido $partido)
+    private function marcadorDesdeStaging(Partido $partido, $escribir = true)
     {
-        if ($partido->golesl !== null && $partido->golesv !== null) return false;
+        $this->motivoMarcador = null;
+
+        if ($partido->golesl !== null && $partido->golesv !== null) {
+            $this->motivoMarcador = 'ya tenía resultado';
+            return false;
+        }
 
         $fila = DB::table('import_partidos')
             ->where('partido_id', $partido->id)->whereNotNull('payload')
             ->orderBy('id', 'desc')->first();
-        if (!$fila) return false;
+        if (!$fila) {
+            $this->motivoMarcador = 'no hay fixture guardado para este partido';
+            return false;
+        }
 
         $g = json_decode($fila->payload, true);
-        if (!is_array($g) || empty($g['isFinished'])) return false;
-        if (!isset($g['score']['home']) || !isset($g['score']['away'])) return false;
+        if (!is_array($g)) {
+            $this->motivoMarcador = 'el fixture guardado no se puede leer';
+            return false;
+        }
+        if (empty($g['isFinished'])) {
+            $this->motivoMarcador = 'el fixture guardado lo tiene como no jugado: hay que bajar el detalle';
+            return false;
+        }
+        if (!isset($g['score']['home']) || !isset($g['score']['away'])) {
+            $this->motivoMarcador = 'el fixture guardado no trae el marcador';
+            return false;
+        }
 
         $tmLocal = isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null;
-        if ($tmLocal === null) return false;
+        if ($tmLocal === null) {
+            $this->motivoMarcador = 'el fixture no dice qué club era el local';
+            return false;
+        }
 
         $mapaEq = $this->mapaEquipos();
         $equipoTmLocal = isset($mapaEq[$tmLocal]) ? (int) $mapaEq[$tmLocal] : null;
-        if (!$equipoTmLocal && $fila->equipo_id) $equipoTmLocal = (int) $fila->equipo_id;
-        if (!$equipoTmLocal) return false;
+        // Rescate: la fila de staging sabe a qué equipo nuestro corresponde el
+        // club, pero `equipo_id` es el club del DT — sólo sirve como local si la
+        // fila dice que jugaba de local.
+        if (!$equipoTmLocal && $fila->equipo_id && !empty($fila->local)) {
+            $equipoTmLocal = (int) $fila->equipo_id;
+        }
+        if (!$equipoTmLocal) {
+            $this->motivoMarcador = 'el club local del fixture no está mapeado a ningún equipo';
+            return false;
+        }
 
         $home = (int) $g['score']['home']; $away = (int) $g['score']['away'];
         if ($equipoTmLocal === (int) $partido->equipol_id) {
@@ -563,13 +594,56 @@ class TmDetallePartido
         } elseif ($equipoTmLocal === (int) $partido->equipov_id) {
             $gl = $away; $gv = $home;
         } else {
+            $this->motivoMarcador = 'el local del fixture no es ninguno de los dos equipos del partido';
             return false;
         }
 
-        $partido->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
-        $this->aviso('El partido estaba sin resultado: le cargué ' . $gl . ':' . $gv
-            . ' desde el fixture que ya estaba guardado (sin gastar llamadas).');
-        return true;
+        if ($escribir) {
+            $partido->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
+            $this->aviso('El partido estaba sin resultado: le cargué ' . $gl . ':' . $gv
+                . ' desde el fixture que ya estaba guardado (sin gastar llamadas).');
+        }
+        return ['gl' => $gl, 'gv' => $gv];
+    }
+
+    /**
+     * Completa el marcador de una tanda de partidos con el payload que ya está
+     * guardado en `import_partidos`. **No gasta ninguna llamada a la API.**
+     *
+     * Es el arreglo para todo lo que se bajó antes de que el detalle escribiera
+     * el resultado: esos partidos tienen la alineación cargada, así que
+     * `importar()` corta antes de tocar nada.
+     */
+    public static function marcadoresDesdeStaging(array $partidoIds, $escribir = false)
+    {
+        $svc = new self();
+        $out = ['mirados' => 0, 'con_marcador' => 0, 'escritos' => 0, 'filas' => []];
+
+        foreach (array_unique(array_map('intval', $partidoIds)) as $id) {
+            if (!$id) continue;
+            $p = Partido::find($id);
+            if (!$p) continue;
+            if ($p->golesl !== null && $p->golesv !== null) continue;   // ya tiene resultado
+
+            $out['mirados']++;
+            $m = $svc->marcadorDesdeStaging($p, $escribir);
+
+            $out['filas'][] = [
+                'partido_id' => $id,
+                'dia'        => (string) $p->dia,
+                'equipol_id' => (int) $p->equipol_id,
+                'equipov_id' => (int) $p->equipov_id,
+                'gl'         => $m ? $m['gl'] : null,
+                'gv'         => $m ? $m['gv'] : null,
+                'motivo'     => $m ? null : $svc->motivoMarcador,
+            ];
+            if ($m) {
+                $out['con_marcador']++;
+                if ($escribir) $out['escritos']++;
+            }
+        }
+
+        return $out;
     }
 
     /**
