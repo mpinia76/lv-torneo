@@ -9,9 +9,17 @@ use Illuminate\Support\Facades\Schema;
  * Detección de personas repetidas.
  *
  * Idea central: no comparar todos contra todos (14.000 personas serían 98
- * millones de pares) sino "bloquear" por apellido usando el índice invertido
- * `persona_tokens`. Solo se puntúan los pares que comparten al menos una
- * palabra de apellido; el resto ni se toca.
+ * millones de pares) sino "bloquear" usando el índice invertido
+ * `persona_tokens`. Solo se puntúan los pares que caen en un mismo bloque.
+ *
+ * Los bloques son cuatro:
+ *   A) misma `clave_orden` (los mismos tokens, en cualquier orden).
+ *   B) comparten una palabra de apellido EXACTA (`campo = 'a'`).
+ *   C) comparten la clave reducida del apellido (`campo = 'r'`): es la que
+ *      junta "Petruchi" con "Petrucchi" y "Perez" con "Peres". Sin este
+ *      bloque esos pares no dan bajo puntaje — no se generan nunca.
+ *   D) misma fecha de nacimiento exacta, y solo si además el apellido es casi
+ *      igual: cubre los tipeos que la clave reducida no llega a juntar.
  *
  * Todo el trabajo pesado pasa acá, una vez, fuera de la pantalla.
  */
@@ -25,6 +33,12 @@ class DuplicadosPersonas
      * (generaría cientos de miles de pares inútiles). Se avisa cuáles se saltearon.
      */
     public const MAX_POR_TOKEN = 500;
+
+    /**
+     * Lo mismo para la clave reducida, que junta más gente por definición
+     * (todos los Perez y todos los Peres caen en el mismo grupo).
+     */
+    public const MAX_POR_TOKEN_R = 300;
 
     /** Cuántas personas se procesan por lote al reconstruir las claves. */
     private const LOTE = 500;
@@ -108,6 +122,43 @@ class DuplicadosPersonas
     }
 
     /**
+     * Clave reducida de un apellido: acerca las grafías que suenan igual pero
+     * se escriben distinto (Petruchi/Petrucchi, Perez/Peres, Gimenez/Jimenez).
+     *
+     * No pretende ser fonética seria. Alcanza con que las dos escrituras caigan
+     * en la misma clave para que el par LLEGUE a puntuarse: la decisión fina la
+     * toma puntuar(), que compara los apellidos de verdad.
+     */
+    public static function reducir(string $token): string
+    {
+        if ($token === '') {
+            return '';
+        }
+
+        $t = $token;
+
+        // "ll" antes de colapsar repetidas, si no se pierde el sonido.
+        $t = str_replace('ll', 'y', $t);
+        $t = str_replace(['ph', 'gh', 'qu', 'ch'], ['f', 'g', 'k', 'c'], $t);
+        $t = str_replace('h', '', $t);                    // muda en castellano
+
+        // Colapsar acá y no solo al final: "petrucchi" -> "petrucci" -> "petruci",
+        // que es lo que después iguala con "petruchi".
+        $t = preg_replace('/(.)\1+/', '$1', $t);
+
+        $t = str_replace(['v', 'w'], 'b', $t);
+        $t = str_replace('z', 's', $t);
+        $t = preg_replace('/c(?=[ei])/', 's', $t);
+        $t = preg_replace('/g(?=[ei])/', 'j', $t);
+        $t = str_replace('c', 'k', $t);
+        $t = str_replace('y', 'i', $t);
+
+        $t = preg_replace('/(.)\1+/', '$1', $t);
+
+        return (string) $t;
+    }
+
+    /**
      * Las dos claves indexadas de una persona.
      *  - clave_norm : "juan carlos perez"  (orden natural)
      *  - clave_orden: "carlos juan perez"  (tokens ordenados alfabéticamente)
@@ -186,7 +237,18 @@ class DuplicadosPersonas
             $n = $a;
         }
 
-        return ['n' => $n, 'a' => $a];
+        // Clave reducida de cada apellido, SIEMPRE, aunque sea igual al token
+        // original: si solo se guardara cuando cambia, "Perez" tendría fila
+        // 'r' => "peres" y "Peres" no tendría ninguna, y el par no se formaría.
+        $r = [];
+        foreach ($a as $t) {
+            $red = self::reducir($t);
+            if ($red !== '') {
+                $r[$red] = $red;
+            }
+        }
+
+        return ['n' => $n, 'a' => $a, 'r' => array_values($r)];
     }
 
     /**
@@ -375,6 +437,65 @@ class DuplicadosPersonas
             }
         }
 
+        // --- Bloque C: apellidos que se escriben distinto pero suenan igual.
+        // Sin esto "Petruchi" y "Petrucchi" caen en bloques distintos y el par
+        // no da bajo puntaje: directamente NUNCA se puntúa. Solo se miran los
+        // pares que no comparten ningún apellido exacto; el resto ya pasó por B.
+        $reducidos = DB::table('persona_tokens')
+            ->select('token', DB::raw('COUNT(*) as n'))
+            ->where('campo', 'r')
+            ->groupBy('token')
+            ->havingRaw('COUNT(*) > 1')
+            ->orderBy('token')
+            ->get();
+
+        $procesados = 0;
+        foreach ($reducidos as $t) {
+            $procesados++;
+
+            if ($t->n > self::MAX_POR_TOKEN_R) {
+                $saltados[] = $t->token . ' (' . $t->n . ' personas, clave reducida)';
+                continue;
+            }
+
+            $ids = DB::table('persona_tokens')
+                ->where('campo', 'r')
+                ->where('token', $t->token)
+                ->pluck('persona_id')
+                ->map(function ($v) { return (int) $v; })
+                ->all();
+
+            self::acumularPares($ids, $personas, $pares, $umbral, true);
+            $volcar($pares);
+
+            if ($avisar && $procesados % 200 === 0) {
+                $avisar($procesados, count($reducidos), $guardados + count($pares));
+            }
+        }
+
+        // --- Bloque D: misma fecha de nacimiento exacta. Levanta los apellidos
+        // mal tipeados que la clave reducida no llega a juntar. La fecha sola no
+        // es señal de nada (hay cientos de personas por día), así que acá se
+        // exige además que el apellido sea casi igual: sin eso la pantalla se
+        // llenaría de homónimos con umbrales bajos.
+        $fechas = DB::table('personas')
+            ->select('nacimiento', DB::raw('GROUP_CONCAT(id) as ids'), DB::raw('COUNT(*) as n'))
+            ->whereNotNull('nacimiento')
+            ->groupBy('nacimiento')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        foreach ($fechas as $f) {
+            if ($f->n > self::MAX_POR_TOKEN_R) {
+                $saltados[] = 'fecha ' . $f->nacimiento . ' (' . $f->n . ' personas)';
+                continue;
+            }
+
+            $ids = array_map('intval', explode(',', $f->ids));
+            self::acumularPares($ids, $personas, $pares, $umbral, true, true);
+            $volcar($pares);
+        }
+
         // El estado de los pares ya resueltos (descartado) se conserva: el
         // ON DUPLICATE KEY UPDATE de guardarPares() no toca la columna `estado`.
         $volcar($pares, true);
@@ -421,6 +542,7 @@ class DuplicadosPersonas
                         'orden'       => (string) $f->clave_orden,
                         'n'           => $tk['n'],
                         'a'           => $tk['a'],
+                        'r'           => $tk['r'],
                         // union precalculada: puntuar() se llama millones de veces
                         't'           => array_values(array_unique(array_merge($tk['n'], $tk['a']))),
                         'nacimiento'  => $f->nacimiento ? substr($f->nacimiento, 0, 10) : null,
@@ -464,8 +586,23 @@ class DuplicadosPersonas
         return $personas;
     }
 
-    /** Puntúa todas las combinaciones de un grupo y se queda con las que pasan el umbral. */
-    private static function acumularPares(array $ids, array &$personas, array &$pares, int $umbral): void
+    /**
+     * Puntúa todas las combinaciones de un grupo y se queda con las que pasan
+     * el umbral.
+     *
+     * @param bool $soloDistintoApellido saltear los pares que comparten un
+     *        apellido exacto: ya se compararon en el bloque de apellido.
+     * @param bool $exigirApellidoParecido puntuar solo si además los apellidos
+     *        son casi iguales (bloque de fecha de nacimiento).
+     */
+    private static function acumularPares(
+        array $ids,
+        array &$personas,
+        array &$pares,
+        int $umbral,
+        bool $soloDistintoApellido = false,
+        bool $exigirApellidoParecido = false
+    ): void
     {
         sort($ids);
         $n = count($ids);
@@ -484,6 +621,16 @@ class DuplicadosPersonas
                 $clave = $a . '-' . $b;
                 if (isset($pares[$clave])) {
                     continue; // ya lo puntuamos por otro token
+                }
+
+                if ($soloDistintoApellido
+                    && array_intersect($personas[$a]['a'], $personas[$b]['a'])) {
+                    continue;
+                }
+
+                if ($exigirApellidoParecido
+                    && !self::apellidosCasiIguales($personas[$a]['a'], $personas[$b]['a'])) {
+                    continue;
                 }
 
                 $r = self::puntuar($personas[$a], $personas[$b]);
@@ -515,6 +662,9 @@ class DuplicadosPersonas
         // el otro). Lo necesita el castigo por fecha, más abajo.
         $nombreFuerte = false;
 
+        // Cuánto se descuenta por haber aceptado un apellido "casi igual".
+        $descuentoApe = 0;
+
         if ($p1['orden'] !== '' && $p1['orden'] === $p2['orden']) {
             $base   = 100;
             $motivo = 'nombre idéntico';
@@ -523,14 +673,25 @@ class DuplicadosPersonas
             $inter = array_values(array_intersect($tokA, $tokB));
             $ni    = count($inter);
 
+            $apeComun = count(array_intersect($p1['a'], $p2['a'])) > 0;
+
+            // Apellido mal tipeado ("Petruchi" / "Petrucchi"): cuenta como
+            // apellido en común, pero con descuento — a veces son dos apellidos
+            // que existen de verdad por separado.
+            $cerca = $apeComun ? 0 : self::apellidosCasiIguales($p1['a'], $p2['a']);
+            if ($cerca) {
+                $apeComun     = true;
+                $ni          += $cerca;
+                $descuentoApe = 10;
+            }
+
             if ($ni === 0) {
                 return ['puntaje' => 0, 'motivo' => ''];
             }
 
-            $union     = count(array_unique(array_merge($tokA, $tokB)));
-            $jaccard   = $union ? $ni / $union : 0;
+            $union     = max(1, count(array_unique(array_merge($tokA, $tokB))) - $cerca);
+            $jaccard   = $ni / $union;
             $contenido = ($ni === count($tokA) || $ni === count($tokB));
-            $apeComun  = count(array_intersect($p1['a'], $p2['a'])) > 0;
 
             if (!$apeComun) {
                 // Comparten nombres de pila pero ningún apellido: casi nunca es lo mismo.
@@ -564,6 +725,11 @@ class DuplicadosPersonas
         }
 
         $extras = [];
+
+        if ($descuentoApe) {
+            $base -= $descuentoApe;
+            $extras[] = 'APELLIDO CASI IGUAL, no idéntico';
+        }
 
         // Fecha de nacimiento: es el desempate más confiable que hay… salvo
         // cuando el nombre es la evidencia fuerte y la fecha es justamente el
@@ -640,6 +806,69 @@ class DuplicadosPersonas
         }
 
         return ['puntaje' => $puntaje, 'motivo' => mb_substr($motivo, 0, 150)];
+    }
+
+    /**
+     * Cuántos apellidos de una ficha tienen su "casi igual" en la otra.
+     * Cada token de la otra ficha se puede usar una sola vez.
+     */
+    public static function apellidosCasiIguales(array $a1, array $a2): int
+    {
+        $usados = [];
+        $pares  = 0;
+
+        foreach ($a1 as $x) {
+            foreach ($a2 as $i => $y) {
+                if (isset($usados[$i]) || $x === $y) {
+                    continue;
+                }
+                if (self::casiIgual($x, $y)) {
+                    $usados[$i] = true;
+                    $pares++;
+                    break;
+                }
+            }
+        }
+
+        return $pares;
+    }
+
+    /**
+     * ¿Son dos escrituras del mismo apellido?
+     *
+     * Pide 5 letras para aceptar una diferencia libre: en apellidos cortos una
+     * letra cambia el apellido (Sosa/Sola son dos apellidos, no un tipeo). Con
+     * 4 letras solo pasa si además la clave reducida coincide (Diaz/Dias sí,
+     * Sosa/Sola no).
+     */
+    public static function casiIgual(string $x, string $y): bool
+    {
+        if ($x === '' || $y === '') {
+            return false;
+        }
+        if ($x === $y) {
+            return true;
+        }
+
+        $lx = mb_strlen($x);
+        $ly = mb_strlen($y);
+
+        if (min($lx, $ly) < 4 || abs($lx - $ly) > 2) {
+            return false;
+        }
+
+        $d            = levenshtein($x, $y);
+        $mismaReducida = self::reducir($x) === self::reducir($y);
+
+        if (min($lx, $ly) < 5) {
+            return $d <= 1 && $mismaReducida;
+        }
+
+        if ($d <= 1) {
+            return true;
+        }
+
+        return $d <= 2 && $mismaReducida;
     }
 
     private static function iniciales(array $tokens): array

@@ -53,7 +53,7 @@ class DetectarPersonasDuplicadas extends Command
         $this->info("Buscando pares candidatos (umbral {$umbral})...");
 
         $r = DuplicadosPersonas::recalcular($umbral, function ($hechos, $total, $pares) {
-            $this->line("  apellidos revisados: {$hechos}/{$total} — pares hasta ahora: {$pares}");
+            $this->line("  grupos revisados: {$hechos}/{$total} — pares hasta ahora: {$pares}");
         });
 
         Cache::forget('personas.nacionalidades_sin_bandera');
@@ -68,10 +68,11 @@ class DetectarPersonasDuplicadas extends Command
         );
 
         if (!empty($r['saltados'])) {
-            $this->warn('Apellidos demasiado comunes (más de ' . DuplicadosPersonas::MAX_POR_TOKEN
-                . ' personas) que no se compararon entre sí:');
+            $this->warn('Grupos demasiado grandes (más de ' . DuplicadosPersonas::MAX_POR_TOKEN
+                . ' personas por apellido, ' . DuplicadosPersonas::MAX_POR_TOKEN_R
+                . ' por clave reducida o fecha) que no se compararon entre sí:');
             $this->line('  ' . implode(', ', $r['saltados']));
-            $this->line('  Si necesitás cubrirlos, subí DuplicadosPersonas::MAX_POR_TOKEN.');
+            $this->line('  Si necesitás cubrirlos, subí esas dos constantes en DuplicadosPersonas.');
         }
 
         return 0;
