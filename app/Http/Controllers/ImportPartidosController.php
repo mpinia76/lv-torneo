@@ -427,6 +427,7 @@ class ImportPartidosController extends Controller
             . '</p>';
 
         $html .= $this->bloqueClubesSinResolver($filas, $request);
+        $html .= $this->bloqueClubesMapeados($filas, $request);
 
         if (!empty($problemas)) {
             $html .= '<h2>Revisar <span class="sub">(' . count($problemas) . ')</span></h2>'
@@ -447,6 +448,10 @@ class ImportPartidosController extends Controller
                     . '<td class="num">' . e((string) $pr['tm']) . '</td>'
                     . '<td><span class="id">#' . (int) $pr['partido_id'] . '</span> '
                     . $this->linkIncidencias(isset($mapaF[$pr['partido_id']]) ? $mapaF[$pr['partido_id']] : null)
+                    . (empty($pr['external_id']) ? ''
+                        : ' · <a href="' . e(route('import_partidos.partido',
+                                ['game_id' => $pr['external_id']]))
+                            . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
                     . '</td></tr>';
             }
             $html .= '</tbody></table></div>';
@@ -983,6 +988,7 @@ class ImportPartidosController extends Controller
 
             if ($problema !== null) {
                 $problemas[] = ['partido_id' => $pid, 'dia' => $f['dia'],
+                    'external_id' => isset($f['external_id']) ? $f['external_id'] : null,
                     'local' => $this->nombreEquipo($p->equipol_id),
                     'visitante' => $this->nombreEquipo($p->equipov_id),
                     'problema' => $problema, 'tuyo' => $tuyo, 'tm' => $deTm];
@@ -1511,7 +1517,17 @@ class ImportPartidosController extends Controller
 
         if ($gameId === '' && $request->filled('partido_id')) {
             $fila = DB::table('import_partidos')->where('partido_id', (int) $request->get('partido_id'))->first();
-            if ($fila) $gameId = (string) $fila->external_id;
+            // Si el partido_id no está en staging NO se cae al fallback de más
+            // abajo: mostraría el JSON de otro partido como si fuera este, que
+            // es peor que no contestar (y encima gasta un crédito).
+            if (!$fila) {
+                return $this->pagina('Sondeo de partido',
+                    '<p class="err-box">No hay ninguna fila de staging con <code>partido_id='
+                    . e((string) $request->get('partido_id')) . '</code>, así que no sé qué '
+                    . '<code>gameId</code> tiene ese partido. Pasá <code>?game_id=</code> a mano, o entrá '
+                    . 'desde el link «Sondear» de la pantalla del fixture, que ya lo sabe.</p>');
+            }
+            $gameId = (string) $fila->external_id;
         }
         if ($gameId === '') {
             // Si no dijo nada, agarramos el primer partido aplicado que tengamos.
@@ -1836,6 +1852,7 @@ class ImportPartidosController extends Controller
 
         $html .= $this->bloqueMapeosSospechosos($filas, $request);
         $html .= $this->bloqueClubesSinResolver($filas, $request);
+        $html .= $this->bloqueClubesMapeados($filas, $request);
 
         $titulo = $filtro !== '' ? ('Partidos con estado «' . e($filtro) . '»') : ('Primeros ' . $limite . ' partidos');
         $html .= '<h2>' . $titulo . '</h2>' . $this->tabla($filas, $limite, $filtro);
@@ -2981,7 +2998,7 @@ class ImportPartidosController extends Controller
     {
         $q = $request->query();
         unset($q['guardar'], $q['aprender'], $q['estado'], $q['limite'], $q['cache'],
-            $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre']);
+            $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre'], $q['remapear']);
         return $request->url() . '?' . http_build_query($q);
     }
 
@@ -3026,6 +3043,136 @@ class ImportPartidosController extends Controller
                 . '<td><a class="boton" href="' . e($href) . '">Corregir</a></td></tr>';
         }
         return $out . '</tbody></table></div>';
+    }
+
+
+    /**
+     * Clubes de este fixture que YA están resueltos: a qué equipo tuyo apuntan,
+     * de dónde sale el enganche y cómo reapuntarlo.
+     *
+     * Es lo único que «Clubes sin mapear» no deja hacer —ahí sólo aparecen los
+     * que faltan—, y sin esto un mapeo equivocado sólo se corrige metiendo mano
+     * en la base.
+     *
+     * Dos señales para mirar antes de aplicar una fecha:
+     *   · «por nombre»: el club NO está en equipo_tm, matcheó por el nombre
+     *     normalizado. Anda hasta que aparece un homónimo. «Fijar» lo clava.
+     *   · el mismo equipo tuyo apuntado por dos clubes de TM distintos: uno de
+     *     los dos está mal, y los partidos de ambos van a caer sobre el mismo.
+     *
+     * El select de equipos se arma sólo para la fila que se está editando
+     * (?remapear=<idTM>): son cientos de equipos y una lista por fila hincharía
+     * la página al pedo.
+     */
+    private function bloqueClubesMapeados(array $filas, Request $request)
+    {
+        $mapaTm = $this->mapaTm();
+
+        $clubes = [];
+        foreach ($filas as $f) {
+            foreach ([[$f['club_external_id'], $f['club_nombre'], $f['equipo_id']],
+                         [$f['rival_external_id'], $f['rival_nombre'], $f['rival_id']]] as $c) {
+                if (empty($c[0]) || empty($c[2])) continue;
+                $k = (string) $c[0];
+                if (!isset($clubes[$k])) {
+                    $clubes[$k] = ['nombre' => $c[1], 'equipo_id' => (int) $c[2],
+                        'fijo' => isset($mapaTm[$k]), 'n' => 0];
+                }
+                $clubes[$k]['n']++;
+            }
+        }
+        if (empty($clubes)) return '';
+
+        $porEquipo = [];
+        foreach ($clubes as $k => $d) $porEquipo[$d['equipo_id']][] = $k;
+
+        $duplicados = 0;
+        foreach ($porEquipo as $lista) if (count($lista) > 1) $duplicados++;
+        $porNombre = 0;
+        foreach ($clubes as $d) if (!$d['fijo']) $porNombre++;
+
+        uasort($clubes, function ($a, $b) { return strcmp((string) $a['nombre'], (string) $b['nombre']); });
+
+        $editando = trim((string) $request->get('remapear', ''));
+
+        // Query base de links y formularios: sin las claves de acción, para no
+        // repetir un guardado ni volver a pisar horarios al navegar.
+        $limpia = $request->query();
+        foreach (['mapear_tm', 'mapear_equipo', 'mapear_nombre', 'guardar', 'aprender', 'refrescar', 'remapear'] as $k) {
+            unset($limpia[$k]);
+        }
+        $limpia['cache'] = 1;
+        foreach ($limpia as $k => $v) if (is_array($v)) unset($limpia[$k]);
+
+        $opciones = '';
+        if ($editando !== '') {
+            $actual = isset($clubes[$editando]) ? $clubes[$editando]['equipo_id'] : 0;
+            foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $e) {
+                $opciones .= '<option value="' . $e->id . '"' . ((int) $e->id === (int) $actual ? ' selected' : '') . '>'
+                    . e($e->nombre) . ($e->pais ? ' (' . e($e->pais) . ')' : '') . '</option>';
+            }
+        }
+
+        $out = '<details' . ($editando !== '' || $duplicados ? ' open' : '') . '>'
+            . '<summary>Clubes ya mapeados <span class="sub">(' . count($clubes) . ')</span>'
+            . ($duplicados ? ' <span class="err">· ' . $duplicados . ' equipo(s) con dos clubes apuntando</span>' : '')
+            . '</summary>'
+            . '<p class="sub">A qué equipo tuyo apunta cada club de Transfermarkt de este fixture. '
+            . '<b>Cambiar</b> reapunta el mapeo y relee el staging: no toca ningún partido tuyo y, si ya guardaste '
+            . 'en staging, tampoco vuelve a bajar de TM. Ojo: los partidos <b>ya creados</b> con el mapeo viejo '
+            . 'no se arreglan solos, hay que borrarlos a mano.</p>';
+
+        if ($porNombre) {
+            $out .= '<p class="sub"><b>' . $porNombre . '</b> enganchados «por nombre»: no están en '
+                . '<code>equipo_tm</code>, matchean por el nombre normalizado. Andan, pero el día que aparezca '
+                . 'un homónimo dejan de andar. «Fijar» los clava al equipo que ya tienen.</p>';
+        }
+
+        $out .= '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th>'
+            . '<th>Apunta a</th><th>Enganche</th><th></th></tr></thead><tbody>';
+
+        foreach ($clubes as $tmId => $d) {
+            $rep = count($porEquipo[$d['equipo_id']]) > 1;
+
+            $out .= '<tr' . ($rep ? ' class="warn"' : '') . '>'
+                . '<td>' . e($d['nombre']) . '</td>'
+                . '<td class="num">' . e($tmId) . '</td>'
+                . '<td class="num">' . $d['n'] . '</td>';
+
+            if ((string) $editando === (string) $tmId) {
+                $out .= '<td colspan="3"><form method="get" action="' . e($request->url()) . '">';
+                foreach ($limpia as $k => $v) {
+                    $out .= '<input type="hidden" name="' . e($k) . '" value="' . e($v) . '">';
+                }
+                $out .= '<input type="hidden" name="mapear_tm" value="' . e($tmId) . '">'
+                    . '<input type="hidden" name="mapear_nombre" value="' . e($d['nombre']) . '">'
+                    . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select> '
+                    . '<button>Guardar mapeo</button>'
+                    . '<a class="boton-sec" href="' . e($request->url() . '?' . http_build_query($limpia)) . '">cancelar</a>'
+                    . '</form></td>';
+            } else {
+                $q = $limpia; $q['remapear'] = $tmId;
+
+                $out .= '<td>' . e($this->nombreEquipo($d['equipo_id']))
+                    . ' <span class="id">#' . $d['equipo_id'] . '</span>'
+                    . ($rep ? ' <span class="err" title="otro club de TM apunta al mismo equipo">· repetido</span>' : '')
+                    . '</td>'
+                    . '<td>' . ($d['fijo'] ? '<span class="sub">id TM</span>' : '<span class="warn">por nombre</span>') . '</td>'
+                    . '<td><a class="boton-sec" href="' . e($request->url() . '?' . http_build_query($q)) . '">Cambiar</a>';
+
+                if (!$d['fijo']) {
+                    $q2 = $limpia;
+                    $q2['mapear_tm'] = $tmId;
+                    $q2['mapear_nombre'] = $d['nombre'];
+                    $q2['mapear_equipo'] = $d['equipo_id'];
+                    $out .= '<a class="boton-sec" href="' . e($request->url() . '?' . http_build_query($q2)) . '">Fijar</a>';
+                }
+                $out .= '</td>';
+            }
+            $out .= '</tr>';
+        }
+
+        return $out . '</tbody></table></div></details>';
     }
 
     private function bloqueClubesSinResolver(array $filas, Request $request)
