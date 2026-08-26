@@ -278,6 +278,79 @@ class FusionPersonas
     }
 
     /**
+     * Unifica DOS FICHAS DEL MISMO ROL (dos jugadors, dos arbitros...) sin tocar
+     * `personas`. Es el caso de la pantalla "Reasignar" cuando las dos fichas ya
+     * cuelgan de la misma persona: ahi no hay nada que fusionar a nivel persona,
+     * pero si hay dos fichas y sus registros hay que juntarlos igual.
+     *
+     * Usa exactamente el mismo resolvedor de choques que la fusion de personas:
+     * si las dos fichas estan en la misma plantilla o en el mismo partido, la
+     * fila repetida se unifica en vez de romper por indice unico.
+     *
+     * @return array ['ok' => bool, 'mensaje' => string, 'detalle' => array]
+     */
+    public static function fusionarFilasDeRol(string $rol, int $idGanador, int $idPerdedor): array
+    {
+        $relaciones = self::relaciones();
+
+        if (!isset($relaciones[$rol])) {
+            return ['ok' => false, 'mensaje' => "Rol desconocido: {$rol}.", 'detalle' => []];
+        }
+
+        if ($idGanador === $idPerdedor) {
+            return ['ok' => false, 'mensaje' => 'Es la misma ficha.', 'detalle' => []];
+        }
+
+        $cfg     = $relaciones[$rol];
+        $tabla   = $cfg['tabla'];
+        $detalle = [];
+
+        try {
+            DB::beginTransaction();
+
+            $filas = DB::table($tabla)
+                ->whereIn('id', [$idGanador, $idPerdedor])
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $ganador  = $filas->get($idGanador);
+            $perdedor = $filas->get($idPerdedor);
+
+            if (!$ganador || !$perdedor) {
+                DB::rollBack();
+
+                return ['ok' => false, 'mensaje' => 'Alguna de las dos fichas ya no existe.', 'detalle' => []];
+            }
+
+            $detalle = self::fusionarRol($cfg, $ganador, $perdedor);
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Unificación de fichas fallida', [
+                'rol'      => $rol,
+                'ganador'  => $idGanador,
+                'perdedor' => $idPerdedor,
+                'error'    => $e->getMessage(),
+            ]);
+
+            return [
+                'ok'      => false,
+                'mensaje' => 'No se pudo unificar: ' . $e->getMessage(),
+                'detalle' => $detalle,
+            ];
+        }
+
+        return [
+            'ok'      => true,
+            'mensaje' => "Se unificó la ficha {$idPerdedor} dentro de la {$idGanador}.",
+            'detalle' => $detalle,
+        ];
+    }
+
+    /**
      * Mueve todo lo que cuelga de la fila de rol del perdedor a la del ganador,
      * resolviendo los choques sin perder información, y borra la del perdedor.
      */

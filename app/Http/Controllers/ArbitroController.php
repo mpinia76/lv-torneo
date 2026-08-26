@@ -10,6 +10,7 @@ use GuzzleHttp\TransferStats;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
+use App\Services\FusionPersonas;
 use App\Services\HttpHelper;
 use Illuminate\Support\Facades\Log;
 
@@ -994,43 +995,30 @@ class ArbitroController extends Controller
 
     public function guardarReasignar(Request $request)
     {
-        // Validar los datos de entrada
         $request->validate([
-            'arbitroId' => 'required|integer|exists:arbitros,id',
+            'arbitroId'  => 'required|integer|exists:arbitros,id',
             'arbitro_id' => 'required|integer|exists:arbitros,id|different:arbitroId',
         ]);
 
-        $arbitroActual = $request->input('arbitroId');
-        $arbitroNuevo = $request->input('arbitro_id');
+        $perdedor = Arbitro::findOrFail($request->input('arbitroId'));
+        $ganador  = Arbitro::findOrFail($request->input('arbitro_id'));
 
-        try {
-            // Inicia una transacción para garantizar que todas las actualizaciones se completen
-            DB::beginTransaction();
-
-            // Actualizar en las tablas necesarias
-
-            DB::update('UPDATE partido_arbitros SET arbitro_id = ? WHERE arbitro_id = ?', [$arbitroNuevo, $arbitroActual]);
-
-            $arbitro = Arbitro::find($arbitroActual);
-            $persona = Persona::find($arbitro->persona_id);
-            $arbitro->delete();
-// Verificar si la persona tiene una foto y eliminarla del servidor
-            if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
-                //unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
-            }
-            $persona->delete();
-            // Confirmar la transacción
-            DB::commit();
-
-            // Redirigir con un mensaje de éxito
-            return redirect()->route('jugadores.verificarPersonas')->with('success', 'Arbitro reasignado exitosamente.');
-        } catch (\Exception $e) {
-            Log::info('Error: ' . $e->getMessage(), []);
-            // Revertir los cambios si hay algún error
-            DB::rollBack();
-
-            // Regresar con un mensaje de error
-            return redirect()->back()->withErrors(['error' => 'Hubo un problema al reasignar el arbitro.']);
+        if (!$perdedor->persona_id || !$ganador->persona_id) {
+            return redirect()->back()->withErrors(['error' => 'Alguna de las dos fichas no tiene persona asociada.']);
         }
+
+        // Ver el comentario en JugadorController@guardarReasignar. En árbitros el
+        // choque es (partido_id, tipo): dos fichas del mismo juez en el mismo
+        // partido con el mismo rol se unifican en vez de romper.
+        $resultado = ((int) $perdedor->persona_id === (int) $ganador->persona_id)
+            ? FusionPersonas::fusionarFilasDeRol('arbitro', (int) $ganador->id, (int) $perdedor->id)
+            : FusionPersonas::fusionar((int) $ganador->persona_id, (int) $perdedor->persona_id);
+
+        if (!$resultado['ok']) {
+            return redirect()->back()->withErrors(['error' => $resultado['mensaje']]);
+        }
+
+        return redirect()->route('jugadores.verificarPersonas')
+            ->with('success', 'Árbitro reasignado. ' . $resultado['mensaje']);
     }
 }

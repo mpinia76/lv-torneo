@@ -12,6 +12,7 @@ use App\PartidoTecnico;
 use App\Persona;
 use App\PosicionTorneo;
 use App\TecnicoEstadisticaManual;
+use App\Services\FusionPersonas;
 use App\Services\HttpHelper;
 use App\Tecnico;
 use App\Torneo;
@@ -1739,51 +1740,35 @@ WHERE (tecnicos.id = ".$id.")";
 
     public function guardarReasignar(Request $request)
     {
-        // Validar los datos de entrada
         $request->validate([
-            'tecnicoId' => 'required|integer|exists:tecnicos,id',
-            'reasignarId' => 'required|integer|exists:jugadors,id|different:jugadorId',
+            'tecnicoId'   => 'required|integer|exists:tecnicos,id',
+            'reasignarId' => 'required|integer|exists:jugadors,id',
         ]);
 
-        $tecnicoId = $request->input('tecnicoId');
-        $jugadorNuevoId = $request->input('reasignarId');
+        $tecnico = Tecnico::findOrFail($request->input('tecnicoId'));
+        $jugador = Jugador::findOrFail($request->input('reasignarId'));
 
-        try {
-            // Inicia una transacción para garantizar que todas las actualizaciones se completen
-            DB::beginTransaction();
-
-            $tecnico = Tecnico::findOrFail($tecnicoId);
-            $jugadorNuevo = Jugador::findOrFail($jugadorNuevoId);
-            $personaNueva = Persona::findOrFail($jugadorNuevo->persona_id);
-
-            // Guardar persona anterior antes de sobrescribir
-            $personaAnterior = Persona::find($tecnico->persona_id);
-
-            // Reasignar persona al técnico
-            $tecnico->persona_id = $personaNueva->id;
-            $tecnico->save();
-
-            // Eliminar persona anterior (opcional: verificar relaciones primero)
-            if ($personaAnterior) {
-                // Eliminar la foto si existe
-                if ($personaAnterior->foto && file_exists(public_path('images/' . $personaAnterior->foto))) {
-                    // unlink(public_path('images/' . $personaAnterior->foto)); // Descomenta si deseas eliminarla
-                }
-
-                $personaAnterior->delete();
-            }
-
-            DB::commit();
-
-            // Redirigir con un mensaje de éxito
-            return redirect()->route('jugadores.verificarPersonas')->with('success', 'Técnico reasignado exitosamente.');
-        } catch (\Exception $e) {
-            // Revertir los cambios si hay algún error
-            DB::rollBack();
-
-            // Regresar con un mensaje de error
-            return redirect()->back()->withErrors(['error' => 'Hubo un problema al reasignar el jugador.']);
+        if (!$tecnico->persona_id || !$jugador->persona_id) {
+            return redirect()->back()->withErrors(['error' => 'Alguna de las dos fichas no tiene persona asociada.']);
         }
+
+        if ((int) $tecnico->persona_id === (int) $jugador->persona_id) {
+            return redirect()->back()->withErrors(['error' => 'El técnico y el jugador ya son la misma persona.']);
+        }
+
+        // Igual que en jugadores: la fusión la hace FusionPersonas. La versión
+        // vieja repunteaba `tecnicos.persona_id` y borraba la persona anterior,
+        // sin mirar si esa persona tenía además una ficha de jugador o de
+        // árbitro colgando (FK) ni si el jugador ganador ya tenía su propio
+        // técnico (dos filas de DT para la misma persona).
+        $resultado = FusionPersonas::fusionar((int) $jugador->persona_id, (int) $tecnico->persona_id);
+
+        if (!$resultado['ok']) {
+            return redirect()->back()->withErrors(['error' => $resultado['mensaje']]);
+        }
+
+        return redirect()->route('jugadores.verificarPersonas')
+            ->with('success', 'Técnico reasignado. ' . $resultado['mensaje']);
     }
 
 }

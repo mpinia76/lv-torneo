@@ -26,6 +26,7 @@ use Sunra\PhpSimple\HtmlDomParser;
 use DB;
 use GuzzleHttp\Client;
 use Carbon\Carbon;
+use App\Services\FusionPersonas;
 use App\Services\HttpHelper;
 use Illuminate\Support\Facades\Cache;
 
@@ -3438,48 +3439,38 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
     public function guardarReasignar(Request $request)
     {
-        // Validar los datos de entrada
         $request->validate([
-            'jugadorId' => 'required|integer|exists:jugadors,id',
+            'jugadorId'   => 'required|integer|exists:jugadors,id',
             'reasignarId' => 'required|integer|exists:jugadors,id|different:jugadorId',
         ]);
 
-        $jugadorActual = $request->input('jugadorId');
-        $jugadorNuevo = $request->input('reasignarId');
+        $perdedor = Jugador::findOrFail($request->input('jugadorId'));
+        $ganador  = Jugador::findOrFail($request->input('reasignarId'));
 
-        try {
-            // Inicia una transacción para garantizar que todas las actualizaciones se completen
-            DB::beginTransaction();
-
-            // Actualizar en las tablas necesarias
-            DB::update('UPDATE alineacions SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
-            DB::update('UPDATE plantilla_jugadors SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
-            DB::update('UPDATE gols SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
-            DB::update('UPDATE cambios SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
-            DB::update('UPDATE tarjetas SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
-            DB::update('UPDATE penals SET jugador_id = ? WHERE jugador_id = ?', [$jugadorNuevo, $jugadorActual]);
-
-            $jugador = Jugador::find($jugadorActual);
-            $persona = Persona::find($jugador->persona_id);
-            $jugador->delete();
-// Verificar si la persona tiene una foto y eliminarla del servidor
-            if ($persona->foto && file_exists(public_path('images/' . $persona->foto))) {
-                //unlink(public_path('images/' . $persona->foto)); // Eliminar la foto del servidor
-            }
-            $persona->delete();
-            // Confirmar la transacción
-            DB::commit();
-
-            // Redirigir con un mensaje de éxito
-            return redirect()->route('jugadores.verificarPersonas')->with('success', 'Jugador reasignado exitosamente.');
-        } catch (\Exception $e) {
-            Log::info('Error: ' . $e->getMessage(), []);
-            // Revertir los cambios si hay algún error
-            DB::rollBack();
-
-            // Regresar con un mensaje de error
-            return redirect()->back()->withErrors(['error' => 'Hubo un problema al reasignar el jugador.']);
+        if (!$perdedor->persona_id || !$ganador->persona_id) {
+            return redirect()->back()->withErrors(['error' => 'Alguna de las dos fichas no tiene persona asociada.']);
         }
+
+        // Todo el trabajo sucio (mover cada tabla hija, unificar la fila repetida
+        // cuando los dos están en la misma plantilla o en el mismo partido,
+        // completar los datos que le faltan al que queda, borrar la persona y
+        // dejar la bitácora) lo hace FusionPersonas, que es lo que usa la
+        // pantalla de repetidos. Acá NO se repite ese UPDATE a mano: la versión
+        // vieja movía seis tablas de las nueve, se llevaba puestas las
+        // estadísticas manuales por el ON DELETE CASCADE y reventaba apenas las
+        // dos fichas compartían plantilla o partido.
+        $resultado = ((int) $perdedor->persona_id === (int) $ganador->persona_id)
+            ? FusionPersonas::fusionarFilasDeRol('jugador', (int) $ganador->id, (int) $perdedor->id)
+            : FusionPersonas::fusionar((int) $ganador->persona_id, (int) $perdedor->persona_id);
+
+        if (!$resultado['ok']) {
+            // El motivo real, no "hubo un problema": sin esto no hay forma de
+            // saber qué tabla se quejó.
+            return redirect()->back()->withErrors(['error' => $resultado['mensaje']]);
+        }
+
+        return redirect()->route('jugadores.verificarPersonas')
+            ->with('success', 'Jugador reasignado. ' . $resultado['mensaje']);
     }
 
 
