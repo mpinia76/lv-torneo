@@ -1434,6 +1434,13 @@ a.t-kpi-enlace .t-kpi-rot::after {
     min-width: 0;
 }
 .t-tec-nombre { display: inline-flex; align-items: center; gap: 6px; }
+/* .t-persona-celda img redondea a 30 px CUALQUIER imagen de la celda y se comia
+   la banderita: acá se la devuelve al tamaño del resto del sitio. */
+.t-tec-tabla .t-persona-celda .bandera {
+    width: 15px; height: 11px;
+    border-radius: 2px;
+    border: 0;
+}
 .t-tec-sub {
     display: inline-flex;
     align-items: center;
