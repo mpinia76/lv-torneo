@@ -1396,8 +1396,8 @@ table.t-tabla th .bi { font-size: 10px; }
    filas de 400 px. Ahora la fila muestra sólo escudos y el detalle vive en una
    fila que se abre con el botón "+N". */
 
-.t-tec-busqueda { display: flex; gap: 8px; }
-.t-tec-busqueda input[type="search"] { width: 220px; }
+.t-lista-busqueda { display: flex; gap: 8px; }
+.t-lista-busqueda input[type="search"] { width: 220px; }
 
 /* mosaico de la tira que además filtra */
 a.t-kpi-enlace { color: inherit; display: block; }
@@ -1408,15 +1408,15 @@ a.t-kpi-enlace .t-kpi-rot::after {
     opacity: .55;
 }
 
-.t-tec-filtros {
+.t-lista-filtros {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
     margin: -4px 0 12px;
 }
-.t-tec-filtros .t-chip .bi { font-size: 10px; }
-.t-tec-ayuda {
+.t-lista-filtros .t-chip .bi { font-size: 10px; }
+.t-lista-ayuda {
     font-size: 11.5px;
     color: var(--t-muted);
     display: inline-flex;
@@ -1426,22 +1426,25 @@ a.t-kpi-enlace .t-kpi-rot::after {
 
 /* ---------- celda del técnico ---------- */
 
-.t-tec-tabla .t-persona-celda { align-items: center; }
-.t-tec-txt {
+.t-lista-tabla .t-persona-celda { align-items: center; }
+.t-lista-txt {
     display: inline-flex;
     flex-direction: column;
     gap: 2px;
     min-width: 0;
 }
-.t-tec-nombre { display: inline-flex; align-items: center; gap: 6px; }
+.t-lista-nombre { display: inline-flex; align-items: center; gap: 6px; }
+.t-lista-nombre a { color: var(--t-ink); font-weight: 500; }
+.t-lista-nombre a:hover { color: var(--t-accent); }
 /* .t-persona-celda img redondea a 30 px CUALQUIER imagen de la celda y se comia
    la banderita: acá se la devuelve al tamaño del resto del sitio. */
-.t-tec-tabla .t-persona-celda .bandera {
+.t-persona-celda .t-lista-txt .bandera,
+.t-lista-tabla .t-persona-celda .bandera {
     width: 15px; height: 11px;
     border-radius: 2px;
     border: 0;
 }
-.t-tec-sub {
+.t-lista-sub {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -1451,7 +1454,7 @@ a.t-kpi-enlace .t-kpi-rot::after {
     letter-spacing: .06em;
     color: var(--t-muted);
 }
-.t-tec-punto {
+.t-lista-punto {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--t-win);
     display: inline-block;
@@ -1460,34 +1463,34 @@ a.t-kpi-enlace .t-kpi-rot::after {
 
 /* ---------- efectividad y diferencia ---------- */
 
-.t-tec-ef {
+.t-lista-ef {
     display: inline-flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 3px;
 }
-.t-tec-ef b { font-weight: 600; }
-.t-tec-ef-pista {
+.t-lista-ef b { font-weight: 600; }
+.t-lista-ef-pista {
     display: block;
     width: 46px; height: 3px;
     border-radius: 2px;
     background: var(--t-line);
     overflow: hidden;
 }
-.t-tec-ef-pista i { display: block; height: 100%; background: var(--t-accent); }
+.t-lista-ef-pista i { display: block; height: 100%; background: var(--t-accent); }
 
 td.t-dif-pos { color: var(--t-win); }
 td.t-dif-neg { color: var(--t-loss); }
 
 /* ---------- columna de equipos ---------- */
 
-.t-tec-escudos {
+.t-lista-escudos {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     flex-wrap: nowrap;
 }
-.t-tec-mas {
+.t-lista-mas {
     border: 1px solid var(--t-line);
     background: var(--t-surface-2);
     color: var(--t-muted);
@@ -1501,29 +1504,29 @@ td.t-dif-neg { color: var(--t-loss); }
     cursor: pointer;
     flex: none;
 }
-.t-tec-mas:hover { color: var(--t-accent); border-color: var(--t-accent-soft); }
-.t-tec-mas.activo {
+.t-lista-mas:hover { color: var(--t-accent); border-color: var(--t-accent-soft); }
+.t-lista-mas.activo {
     background: var(--t-accent-soft);
     border-color: var(--t-accent-soft);
     color: var(--t-accent);
 }
-.t-tec-mas.activo .bi { transform: rotate(180deg); }
-.t-tec-mas .bi { display: inline-block; font-size: 10px; transition: transform .15s ease; }
+.t-lista-mas.activo .bi { transform: rotate(180deg); }
+.t-lista-mas .bi { display: inline-block; font-size: 10px; transition: transform .15s ease; }
 
 /* ---------- fila desplegable con el detalle por club ---------- */
 
-.t-tec-detalle > td {
+.t-lista-detalle > td {
     background: var(--t-surface-2);
     box-shadow: inset 3px 0 0 var(--t-accent-soft);
     padding: 10px 12px 12px 24px !important;
     text-align: left !important;
 }
-.t-tec-clubes {
+.t-lista-clubes {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 4px 16px;
 }
-.t-tec-club {
+.t-lista-club {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1533,15 +1536,15 @@ td.t-dif-neg { color: var(--t-loss); }
     font-size: 12.5px;
     min-width: 0;
 }
-.t-tec-club:hover { background: var(--t-surface); color: var(--t-accent); }
-.t-tec-club-nom {
+.t-lista-club:hover { background: var(--t-surface); color: var(--t-accent); }
+.t-lista-club-nom {
     font-weight: 500;
     color: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.t-tec-club-dato {
+.t-lista-club-dato {
     margin-left: auto;
     font-family: var(--t-fuente-dato);
     font-size: 11px;
@@ -1551,7 +1554,15 @@ td.t-dif-neg { color: var(--t-loss); }
 }
 
 @media (max-width: 575.98px) {
-    .t-tec-busqueda { width: 100%; }
-    .t-tec-busqueda input[type="search"] { width: auto; flex: 1; }
-    .t-tec-clubes { grid-template-columns: 1fr; }
+    .t-lista-busqueda { width: 100%; }
+    .t-lista-busqueda input[type="search"] { width: auto; flex: 1; }
+    .t-lista-clubes { grid-template-columns: 1fr; }
 }
+
+/* números de tarjetas en la tira de KPIs */
+.t-kpi-num.t-num-amarilla { color: var(--t-amarilla); }
+.t-kpi-num.t-num-roja     { color: var(--t-roja); }
+
+/* tarjetita al lado del número, en la tabla de Tarjetas */
+.t-lista-tabla .t-tarjeta-a,
+.t-lista-tabla .t-tarjeta-r { margin-right: 3px; }

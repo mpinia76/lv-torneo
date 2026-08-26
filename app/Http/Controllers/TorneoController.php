@@ -1335,17 +1335,21 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $this->cargarDatosReales($goleador, $year);
         }
 
-        $goleadores->setPath(route('torneos.goleadores', [
-            'order'     => $order,
-            'tipoOrder' => $tipoOrder,
-            'actuales'  => $actuales,
-            'torneoId'  => $torneoId,
-        ]));
+        // La vista arrastra los parametros con appends(): el path va limpio.
+        $goleadores->setPath(route('torneos.goleadores'));
+
+        // Numeros de la tira superior, sobre el listado completo (ya filtrado).
+        $kpis = [
+            'total'  => $todos->count(),
+            'goles'  => $todos->sum('goles'),
+            'cabeza' => $todos->sum('Cabeza'),
+            'penal'  => $todos->sum('Penal'),
+        ];
 
         $i = $offSet + 1;
 
         return view('torneos.goleadores',
-            compact('goleadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId'));
+            compact('goleadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId', 'kpis'));
     }
 
     /**
@@ -1366,6 +1370,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $equipos[$id] = [
                     'escudo' => $esc,
                     'goles'  => (int) $goles,
+                    'nombre' => implode('_', array_slice($parts, 3)),
                 ];
             }
         }
@@ -1388,9 +1393,13 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $equipos[$eid] = [
                     'escudo' => $manual->escudo,
                     'goles'  => 0,
+                    'nombre' => $manual->nombre ?? '',
                 ];
             }
             $equipos[$eid]['goles'] += $totalGoles;
+            if (empty($equipos[$eid]['nombre'])) {
+                $equipos[$eid]['nombre'] = $manual->nombre ?? '';
+            }
 
             // If the manual tournament belongs to the current year, mark as currently playing
             if (str_contains($manual->torneo_nombre, $year)) {
@@ -1401,7 +1410,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Rebuild escudo string
         $g->escudo = '';
         foreach ($equipos as $id => $data) {
-            $g->escudo .= $data['escudo'] . '_' . $id . '_' . $data['goles'] . ',';
+            $g->escudo .= $data['escudo'] . '_' . $id . '_' . $data['goles'] . '_' . ($data['nombre'] ?? '') . ',';
         }
     }
 
@@ -1412,7 +1421,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     private function cargarDatosReales($goleador, $year)
     {
         // Current-year teams (jugando)
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
         FROM alineacions
         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
         INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1425,17 +1434,17 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         $juega = DB::select(DB::raw($sqlJugando));
         foreach ($juega as $e) {
-            $goleador->jugando .= $e->escudo . '_' . $e->equipo_id . ',';
+            $goleador->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
         }
 
         // Escudos with goal counts per team (real matches only)
-        $sql2 = "SELECT escudo, equipo_id, COUNT(gols.id) goles
+        $sql2 = "SELECT escudo, equipo_id, equipos.nombre, COUNT(gols.id) goles
         FROM equipos
         INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
         INNER JOIN partidos ON partidos.id = alineacions.partido_id
         INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
         WHERE alineacions.jugador_id = " . $goleador->id . " AND gols.tipo <> 'En contra'
-        GROUP BY escudo, equipo_id
+        GROUP BY escudo, equipo_id, equipos.nombre
         ORDER BY partidos.dia ASC";
 
         $escudos = DB::select(DB::raw($sql2));
@@ -1451,6 +1460,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $equipos[$id] = [
                     'escudo' => $esc,
                     'goles'  => (int) $goles,
+                    'nombre' => implode('_', array_slice($parts, 3)),
                 ];
             }
         }
@@ -1461,14 +1471,18 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 $equipos[$eid] = [
                     'escudo' => $escudo->escudo,
                     'goles'  => 0,
+                    'nombre' => $escudo->nombre,
                 ];
             }
             $equipos[$eid]['goles'] += (int) $escudo->goles;
+            if (empty($equipos[$eid]['nombre'])) {
+                $equipos[$eid]['nombre'] = $escudo->nombre;
+            }
         }
 
         $goleador->escudo = '';
         foreach ($equipos as $id => $data) {
-            $goleador->escudo .= $data['escudo'] . '_' . $id . '_' . $data['goles'] . ',';
+            $goleador->escudo .= $data['escudo'] . '_' . $id . '_' . $data['goles'] . '_' . ($data['nombre'] ?? '') . ',';
         }
 
         // Matches played as starter
@@ -1693,17 +1707,18 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $this->cargarDatosRealesTarjetas($tarjeta, $year);
         }
 
-        $tarjetas->setPath(route('torneos.tarjetas', [
-            'order'     => $order,
-            'tipoOrder' => $tipoOrder,
-            'actuales'  => $actuales,
-            'torneoId'  => $torneoId,
-        ]));
+        $tarjetas->setPath(route('torneos.tarjetas'));
+
+        $kpis = [
+            'total'     => $todos->count(),
+            'amarillas' => $todos->sum('amarillas'),
+            'rojas'     => $todos->sum('rojas'),
+        ];
 
         $i = $offSet + 1;
 
         return view('torneos.tarjetas',
-            compact('tarjetas', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId'));
+            compact('tarjetas', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId', 'kpis'));
     }
 
     /**
@@ -1725,6 +1740,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     'escudo'    => $esc,
                     'rojas'     => (int) $rojas,
                     'amarillas' => (int) $amarillas,
+                    'nombre'    => implode('_', array_slice($parts, 4)),
                 ];
             }
         }
@@ -1740,7 +1756,11 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     'escudo'    => $manual->escudo,
                     'rojas'     => 0,
                     'amarillas' => 0,
+                    'nombre'    => $manual->nombre ?? '',
                 ];
+            }
+            if (empty($equipos[$eid]['nombre'])) {
+                $equipos[$eid]['nombre'] = $manual->nombre ?? '';
             }
             $equipos[$eid]['rojas']     += $manual->rojas;
             $equipos[$eid]['amarillas'] += $manual->amarillas;
@@ -1753,7 +1773,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Rebuild escudo string
         $t->escudo = '';
         foreach ($equipos as $id => $data) {
-            $t->escudo .= $data['escudo'] . '_' . $id . '_' . $data['rojas'] . '_' . $data['amarillas'] . ',';
+            $t->escudo .= $data['escudo'] . '_' . $id . '_' . $data['rojas'] . '_' . $data['amarillas'] . '_' . ($data['nombre'] ?? '') . ',';
         }
     }
 
@@ -1764,7 +1784,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     private function cargarDatosRealesTarjetas($tarjeta, $year)
     {
         // Current-year teams
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id
+        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
         FROM alineacions
         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
         INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -1776,11 +1796,11 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         WHERE torneos.year LIKE '%" . $year . "%' AND jugadors.id = " . $tarjeta->id;
 
         foreach (DB::select(DB::raw($sqlJugando)) as $e) {
-            $tarjeta->jugando .= $e->escudo . '_' . $e->equipo_id . ',';
+            $tarjeta->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
         }
 
         // Real-match escudos with card counts — merge with manual escudos if present
-        $sql2 = 'SELECT escudo, equipo_id,
+        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre,
             count(case when tarjetas.tipo=\'Amarilla\' then 1 else NULL end) as amarillas,
             count(case when tarjetas.tipo=\'Roja\' or tarjetas.tipo=\'Doble Amarilla\' then 1 else NULL end) as rojas
         FROM equipos
@@ -1788,7 +1808,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         INNER JOIN partidos ON partidos.id = alineacions.partido_id
         INNER JOIN tarjetas ON tarjetas.partido_id = partidos.id AND tarjetas.jugador_id = alineacions.jugador_id
         WHERE alineacions.jugador_id = ' . $tarjeta->id . '
-        GROUP BY escudo, equipo_id
+        GROUP BY escudo, equipo_id, equipos.nombre
         ORDER BY equipo_id ASC';
 
         // Parse existing escudo (may already contain manual data)
@@ -1803,6 +1823,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     'escudo'    => $esc,
                     'rojas'     => (int) $rojas,
                     'amarillas' => (int) $amarillas,
+                    'nombre'    => implode('_', array_slice($parts, 4)),
                 ];
             }
         }
@@ -1814,15 +1835,19 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     'escudo'    => $escudo->escudo,
                     'rojas'     => 0,
                     'amarillas' => 0,
+                    'nombre'    => $escudo->nombre,
                 ];
             }
             $equipos[$eid]['rojas']     += (int) $escudo->rojas;
             $equipos[$eid]['amarillas'] += (int) $escudo->amarillas;
+            if (empty($equipos[$eid]['nombre'])) {
+                $equipos[$eid]['nombre'] = $escudo->nombre;
+            }
         }
 
         $tarjeta->escudo = '';
         foreach ($equipos as $id => $data) {
-            $tarjeta->escudo .= $data['escudo'] . '_' . $id . '_' . $data['rojas'] . '_' . $data['amarillas'] . ',';
+            $tarjeta->escudo .= $data['escudo'] . '_' . $id . '_' . $data['rojas'] . '_' . $data['amarillas'] . '_' . ($data['nombre'] ?? '') . ',';
         }
 
         // Matches played as starter
@@ -4112,17 +4137,19 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             $this->cargarDatosRealesArqueros($arquero, $year);
         }
 
-        $arqueros->setPath(route('torneos.arqueros', [
-            'order'     => $order,
-            'tipoOrder' => $tipoOrder,
-            'actuales'  => $actuales,
-            'torneoId'  => $torneoId,
-        ]));
+        $arqueros->setPath(route('torneos.arqueros'));
+
+        $kpis = [
+            'total'     => $todos->count(),
+            'invictas'  => $todos->sum('invictas'),
+            'recibidos' => $todos->sum('recibidos'),
+            'atajos'    => $todos->sum('atajos'),
+        ];
 
         $i = $offSet + 1;
 
         return view('torneos.arqueros',
-            compact('arqueros', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId'));
+            compact('arqueros', 'i', 'order', 'tipoOrder', 'actuales', 'torneoId', 'kpis'));
     }
 
     /**
@@ -4143,6 +4170,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                     'escudo'    => $esc,
                     'recibidos' => (int) $rec,
                     'invictas'  => (int) $inv,
+                    'nombre'    => implode('_', array_slice($parts, 4)),
                 ];
             }
         }
@@ -4159,10 +4187,14 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                     'escudo'    => $manual->escudo,
                     'recibidos' => 0,
                     'invictas'  => 0,
+                    'nombre'    => $manual->nombre ?? '',
                 ];
             }
             $equipos[$eid]['recibidos'] += $manual->goles_recibidos ?? 0;
             $equipos[$eid]['invictas']  += $manual->vallas_invictas ?? 0;
+            if (empty($equipos[$eid]['nombre'])) {
+                $equipos[$eid]['nombre'] = $manual->nombre ?? '';
+            }
 
             if (str_contains($manual->torneo_nombre, $year)) {
                 $a->jugando .= $manual->escudo . '_' . $manual->equipo_id . '_' . $manual->nombre . ',';
@@ -4172,7 +4204,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         // Rebuild escudo string
         $a->escudo = '';
         foreach ($equipos as $id => $data) {
-            $a->escudo .= $data['escudo'] . '_' . $id . '_' . $data['recibidos'] . '_' . $data['invictas'] . ',';
+            $a->escudo .= $data['escudo'] . '_' . $id . '_' . $data['recibidos'] . '_' . $data['invictas'] . '_' . ($data['nombre'] ?? '') . ',';
         }
     }
 
@@ -4198,7 +4230,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         }
 
         // Real-match escudos with stats — merge with manual data
-        $sql2 = 'SELECT escudo, equipo_id, COUNT(jugadors.id) as jugados,
+        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre, COUNT(jugadors.id) as jugados,
             sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
             sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas
         FROM equipos
@@ -4207,7 +4239,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
         LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
         WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\') AND alineacions.jugador_id = ' . $arquero->id . '
-        GROUP BY escudo, equipo_id';
+        GROUP BY escudo, equipo_id, equipos.nombre';
 
         // Parse existing escudo (may already contain manual data)
         $equipos = [];
@@ -4221,6 +4253,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                     'escudo'    => $esc,
                     'recibidos' => (int) $rec,
                     'invictas'  => (int) $inv,
+                    'nombre'    => implode('_', array_slice($parts, 4)),
                 ];
             }
         }
@@ -4232,15 +4265,19 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                     'escudo'    => $escudo->escudo,
                     'recibidos' => 0,
                     'invictas'  => 0,
+                    'nombre'    => $escudo->nombre,
                 ];
             }
             $equipos[$eid]['recibidos'] += (int) $escudo->recibidos;
             $equipos[$eid]['invictas']  += (int) $escudo->invictas;
+            if (empty($equipos[$eid]['nombre'])) {
+                $equipos[$eid]['nombre'] = $escudo->nombre;
+            }
         }
 
         $arquero->escudo = '';
         foreach ($equipos as $id => $data) {
-            $arquero->escudo .= $data['escudo'] . '_' . $id . '_' . $data['recibidos'] . '_' . $data['invictas'] . ',';
+            $arquero->escudo .= $data['escudo'] . '_' . $id . '_' . $data['recibidos'] . '_' . $data['invictas'] . '_' . ($data['nombre'] ?? '') . ',';
         }
     }
 
@@ -4599,17 +4636,19 @@ group by jugador_id, jugador, foto, nacionalidad';
             $this->cargarDatosRealesJugador($jugador, $year);
         }
 
-        $jugadores->setPath(route('torneos.jugadores', [
-            'order'     => $order,
-            'tipoOrder' => $tipoOrder,
-            'actuales'  => $actuales,
-            'torneoId'  => $torneoId,
-        ]));
+        $jugadores->setPath(route('torneos.jugadores'));
+
+        $kpis = [
+            'total'   => $todos->count(),
+            'jugados' => $todos->sum('jugados'),
+            'goles'   => $todos->sum('goles'),
+            'titulos' => $todos->sum('titulos'),
+        ];
 
         $i = $offSet + 1;
 
         return view('torneos.jugadores',
-            compact('jugadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneos', 'torneoId'));
+            compact('jugadores', 'i', 'order', 'tipoOrder', 'actuales', 'torneos', 'torneoId', 'kpis'));
     }
 
     /**

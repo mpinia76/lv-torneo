@@ -209,3 +209,20 @@
         });
     });
 })();
+
+/* ------------------------------------------------------------------
+   Listados de Protagonistas: abre y cierra la fila con el detalle por
+   club. Delegado en document para que sirva en las cinco pantallas.
+   ------------------------------------------------------------------ */
+document.addEventListener('click', function (ev) {
+    var boton = ev.target.closest ? ev.target.closest('[data-lista-abre]') : null;
+    if (!boton) { return; }
+
+    var fila = document.getElementById(boton.getAttribute('data-lista-abre'));
+    if (!fila) { return; }
+
+    var abierta = !fila.hidden;
+    fila.hidden = abierta;
+    boton.classList.toggle('activo', !abierta);
+    boton.setAttribute('aria-expanded', String(!abierta));
+});
