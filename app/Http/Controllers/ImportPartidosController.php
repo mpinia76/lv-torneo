@@ -463,6 +463,8 @@ class ImportPartidosController extends Controller
                 . 'también, y los goles cargados dan el marcador.</p>';
         }
 
+        $html .= $this->bloqueLlaves($filas);
+
         $html .= '<h2>Fechas</h2><div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partidos</th>'
             . '<th>Período</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th></th></tr></thead><tbody>';
         foreach ($porFecha as $r => $d) {
@@ -596,6 +598,66 @@ class ImportPartidosController extends Controller
     }
 
     /** Un partido del fixture -> la forma que usa el staging. */
+    /**
+     * Vueltas de llave: se listan, no se auditan.
+     *
+     * En la vuelta de una eliminatoria el `score` de TM no es el marcador de
+     * ese partido —puede ser el global de la llave, la tanda, o una mezcla— y
+     * no hay forma confiable de separarlo. Compararlo contra tu resultado solo
+     * genera ruido, así que va aparte y con el número crudo a la vista.
+     */
+    private function bloqueLlaves(array $filas)
+    {
+        $rows = [];
+        foreach ($filas as $f) {
+            if (empty($f['ida_vuelta']) || empty($f['terminado'])) continue;
+            if (empty($f['partido_id']) || empty($f['marcador_tm'])) continue;
+            $rows[] = $f;
+        }
+        if (empty($rows)) return '';
+
+        $ids = array_map(function ($x) { return (int) $x['partido_id']; }, $rows);
+        $partidos = [];
+        foreach (\App\Partido::whereIn('id', $ids)->get() as $p) $partidos[(int) $p->id] = $p;
+
+        $html = '<h2>Llaves de ida y vuelta <span class="sub">(' . count($rows) . ')</span></h2>'
+            . '<p class="sub">Estos son <b>vueltas</b> de una eliminatoria (TM los manda con '
+            . '<code>firstLegScore</code>). Ahí el número que publica TM <b>no es el marcador de esos 90\'</b>: '
+            . 'según el caso es el global de la llave, la tanda de penales, o una mezcla. '
+            . '<b>No se comparan ni se cargan solos</b> — se listan para que los mires vos.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido</th><th>Tenés</th>'
+            . '<th>TM publica</th><th>Ida</th><th></th></tr></thead><tbody>';
+
+        $mapaF = $this->mapaFechas($ids);
+        foreach ($rows as $f) {
+            $pid = (int) $f['partido_id'];
+            $p = isset($partidos[$pid]) ? $partidos[$pid] : null;
+            if (!$p) continue;
+
+            $tuyo = ($p->golesl === null || $p->golesv === null)
+                ? '<span class="sub">sin resultado</span>'
+                : e($p->golesl . ':' . $p->golesv)
+                  . ($p->penalesl !== null && $p->penalesv !== null
+                      ? ' <span class="sub">y ' . e($p->penalesl . '-' . $p->penalesv) . ' p</span>' : '');
+
+            $html .= '<tr>'
+                . '<td class="num">' . e(substr((string) $f['dia'], 0, 10)) . '</td>'
+                . '<td>' . e($this->nombreEquipo($p->equipol_id) . ' vs ' . $this->nombreEquipo($p->equipov_id)) . '</td>'
+                . '<td class="num">' . $tuyo . '</td>'
+                . '<td class="num">' . e((string) $f['marcador_tm'])
+                . (!empty($f['por_penales']) ? ' <span class="sub">(hubo penales)</span>' : '') . '</td>'
+                . '<td class="num">' . e((string) (isset($f['ida_marcador']) ? $f['ida_marcador'] : '—')) . '</td>'
+                . '<td><span class="id">#' . $pid . '</span> '
+                . $this->linkIncidencias(isset($mapaF[$pid]) ? $mapaF[$pid] : null)
+                . (empty($f['external_id']) ? ''
+                    : ' · <a href="' . e(route('import_partidos.partido',
+                            ['game_id' => $f['external_id']]))
+                        . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
+                . '</td></tr>';
+        }
+        return $html . '</tbody></table></div>';
+    }
+
     private function normalizarFixture(array $g, $compId, $compNombre)
     {
         $bd = isset($g['baseDetails']) && is_array($g['baseDetails']) ? $g['baseDetails'] : [];
@@ -627,7 +689,20 @@ class ImportPartidosController extends Controller
         $penF = $porPenales ? $this->penalesConvertidos($g, 'homeClub') : null;
         $penC = $porPenales ? $this->penalesConvertidos($g, 'awayClub') : null;
 
-        if ($porPenales) {
+        // IDA Y VUELTA: si el `score` trae `firstLegScore`, este partido es la
+        // VUELTA de una llave y su `score` NO es el marcador de estos 90'.
+        // Comprobado con O'Higgins–Boca (gameId 4891294): 1:0 a los 90' y tanda
+        // 3-4, y TM publica 3:4 — que no es el partido, ni 90'+tanda, ni el
+        // global. Segun el caso puede ser una cosa u otra y no hay forma
+        // confiable de separarlo, asi que no se compara ni se carga: se lista
+        // aparte para mirarlo a mano.
+        $idaVuelta = isset($sc['firstLegScore']) && is_array($sc['firstLegScore']);
+
+        if ($idaVuelta) {
+            $gf = null; $gc = null;
+        } elseif ($porPenales) {
+            // Partido unico definido por penales: ahi si vale 90' + tanda
+            // (Riestra–Gimnasia, 1:1 con tanda 4:2, TM lo publica 5:3).
             // El detalle del partido trae la tanda y entonces se puede restar.
             // El listado del fixture no la trae: ahi el marcador queda en null
             // —mejor sin resultado que con uno inventado— y la auditoria avisa.
@@ -661,6 +736,9 @@ class ImportPartidosController extends Controller
             'payload' => json_encode($g, JSON_UNESCAPED_UNICODE),
             'terminado'     => $terminado,
             'por_penales'    => $porPenales,
+            'ida_vuelta'     => $idaVuelta,
+            'ida_marcador'   => $idaVuelta && isset($sc['firstLegScore']['home'])
+                                    ? $sc['firstLegScore']['home'] . ':' . $sc['firstLegScore']['away'] : null,
             'penales_favor'  => $penF,
             'penales_contra' => $penC,
             'marcador_tm'    => $brutoTm,
@@ -937,7 +1015,9 @@ class ImportPartidosController extends Controller
             // tanda sumada, así que lo comparable es 90' + penales. Comparar
             // contra `golesl/golesv` pelados marcaba como error TODOS los
             // partidos por penales (1:1 tuyo contra 6:7 de TM).
-            if (!empty($f['terminado']) && !empty($f['por_penales'])
+            if (!empty($f['ida_vuelta'])) {
+                $problema = null;   // no comparable: va al bloque de llaves
+            } elseif (!empty($f['terminado']) && !empty($f['por_penales'])
                 && !empty($f['marcador_tm'])
                 && $p->golesl !== null && $p->golesv !== null) {
                 list($brutoA, $brutoB) = array_map('intval', explode(':', $f['marcador_tm']));
@@ -1023,7 +1103,8 @@ class ImportPartidosController extends Controller
                     'goles_favor' => $r->goles_favor, 'goles_contra' => $r->goles_contra,
                     'payload' => $r->payload,
                     'terminado' => $r->goles_favor !== null,
-                    'por_penales' => false, 'penales_favor' => null,
+                    'por_penales' => false, 'ida_vuelta' => false, 'ida_marcador' => null,
+                    'penales_favor' => null,
                     'penales_contra' => null, 'marcador_tm' => null,
                     'hora_definida' => true, 'reprogramado' => false,
                 ];

@@ -580,6 +580,11 @@ class TmDetallePartido
         // sumada (1:1 con penales 4:2 lo publica como 5:3) y el listado no trae
         // los penales pateados, asi que no hay con que separarlo. Se baja el
         // detalle o se carga a mano: lo que no se hace es inventar el marcador.
+        if (isset($g['score']['firstLegScore'])) {
+            $this->motivoMarcador = 'es la vuelta de una llave: el numero que publica TM no es el '
+                . 'marcador de esos 90 minutos (puede ser el global o la tanda). Cargalo a mano';
+            return false;
+        }
         if (isset($g['score']['additionType']) && $g['score']['additionType'] === 'after_shootout') {
             $this->motivoMarcador = 'se definio por penales: el marcador del fixture viene con la '
                 . 'tanda sumada y no se puede separar sin bajar el detalle';
@@ -714,6 +719,15 @@ class TmDetallePartido
         // de TM no es el marcador de los 90' sino 90' + penales convertidos
         // (1:1 con tanda 4:2 lo publica como 5:3). Se separan los penales o no
         // se carga nada: un 5:3 en `golesl/golesv` es un partido que no existio.
+        // Vuelta de una llave: el `score` no es el marcador de este partido
+        // (comprobado con O'Higgins-Boca 4891294: 1:0 y tanda 3-4, TM publica
+        // 3:4). No hay como separarlo, asi que no se carga nada.
+        if (isset($sc['firstLegScore'])) {
+            $this->aviso('Es la vuelta de una llave: no le cargue el marcador, porque el numero de TM '
+                . 'no es el resultado de estos 90 minutos.');
+            return false;
+        }
+
         $penTmLocal = null; $penTmVisit = null;
         if (isset($sc['additionType']) && $sc['additionType'] === 'after_shootout') {
             $penTmLocal = $this->penalesConvertidos($game, 'homeClub');
