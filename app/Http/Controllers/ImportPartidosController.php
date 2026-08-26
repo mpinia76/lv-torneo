@@ -370,12 +370,20 @@ class ImportPartidosController extends Controller
         // La auditoría no escribe nada: se muestra siempre.
         $problemas = $this->auditarResultados($filas);
 
+        $porTipo = [];
+        foreach ($problemas as $pr) {
+            $t = isset($pr['tipo']) ? $pr['tipo'] : 'otro';
+            $porTipo[$t] = (isset($porTipo[$t]) ? $porTipo[$t] : 0) + 1;
+        }
+        $sinResultado = isset($porTipo['sin_resultado']) ? $porTipo['sin_resultado'] : 0;
+
         $html .= '<div class="cards">'
             . $this->card($cont['total'], 'partidos con fecha')
             . $this->card($saltados, 'sin programar', $saltados ? 'gris' : '')
             . $this->card($cont['jugados'], 'ya jugados')
             . $this->card($cont['pendientes'], 'por jugarse')
             . $this->card($cont['duplicado'], 'ya cargados', 'ok')
+            . $this->card($sinResultado, 'cargados sin resultado', $sinResultado ? 'warn' : 'ok')
             . $this->card($cont['nuevo'], 'nuevos a crear', $cont['nuevo'] ? 'warn' : 'ok')
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
             . '</div>';
@@ -430,15 +438,43 @@ class ImportPartidosController extends Controller
         $html .= $this->bloqueClubesMapeados($filas, $request);
 
         if (!empty($problemas)) {
+            $revisar = trim((string) $request->get('revisar', ''));
+            $visibles = $problemas;
+            if ($revisar !== '') {
+                $visibles = array_values(array_filter($problemas, function ($x) use ($revisar) {
+                    return (isset($x['tipo']) ? $x['tipo'] : 'otro') === $revisar;
+                }));
+            }
+
+            $etiquetas = ['sin_resultado' => 'sin resultado', 'distinto' => 'resultado distinto',
+                'penales' => 'penales', 'goles' => 'goles cargados', 'localia' => 'localía',
+                'otro' => 'otros'];
+            $chips = ($revisar === '' ? '<b>Todos (' . count($problemas) . ')</b>'
+                : '<a href="' . e($base . '&cache=1') . '">Todos (' . count($problemas) . ')</a>');
+            foreach ($etiquetas as $k => $lab) {
+                if (empty($porTipo[$k])) continue;
+                $chips .= ' · ' . ($revisar === $k
+                    ? '<b>' . e($lab) . ' (' . $porTipo[$k] . ')</b>'
+                    : '<a href="' . e($base . '&cache=1&revisar=' . $k) . '">' . e($lab)
+                      . ' (' . $porTipo[$k] . ')</a>');
+            }
+
             $html .= '<h2>Revisar <span class="sub">(' . count($problemas) . ')</span></h2>'
                 . '<p class="sub">Diferencias entre lo que tenés cargado y lo que dice Transfermarkt, más chequeos '
                 . 'internos de tu base. <b>No se corrige nada de esto solo</b>: puede estar mal TM o podés tenerlo '
                 . 'bien vos.</p>'
+                . ($sinResultado
+                    ? '<p class="ok-box"><b>' . $sinResultado . '</b> «sin resultado» son la excepción: el partido '
+                      . 'ya lo tenés creado —por eso no figura en NUEVOS— pero está sin marcador y TM ya lo jugó. '
+                      . 'Esos los carga solos <b>«Guardar, corregir horarios y cargar resultados»</b>. '
+                      . 'Las vueltas de llave no entran acá: van al bloque «Llaves de ida y vuelta» y se cargan a mano.</p>'
+                    : '')
+                . '<p class="acciones">' . $chips . '</p>'
                 . '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido</th><th>Qué pasa</th>'
                 . '<th>Tenés</th><th>TM / contado</th><th></th></tr></thead><tbody>';
-            $mapaF = $this->mapaFechas(array_map(function ($x) { return $x['partido_id']; }, $problemas));
+            $mapaF = $this->mapaFechas(array_map(function ($x) { return $x['partido_id']; }, $visibles));
             $n = 0;
-            foreach ($problemas as $pr) {
+            foreach ($visibles as $pr) {
                 if ($n++ >= 200) break;
                 $html .= '<tr class="warn">'
                     . '<td class="num">' . e(substr((string) $pr['dia'], 0, 10)) . '</td>'
@@ -455,8 +491,8 @@ class ImportPartidosController extends Controller
                     . '</td></tr>';
             }
             $html .= '</tbody></table></div>';
-            if (count($problemas) > 200) {
-                $html .= '<p class="sub">Se muestran 200 de ' . count($problemas) . '.</p>';
+            if (count($visibles) > 200) {
+                $html .= '<p class="sub">Se muestran 200 de ' . count($visibles) . '.</p>';
             }
         } else {
             $html .= '<p class="ok-box">Nada para revisar: los resultados que tenés coinciden con TM, la localía '
@@ -620,7 +656,16 @@ class ImportPartidosController extends Controller
         $partidos = [];
         foreach (\App\Partido::whereIn('id', $ids)->get() as $p) $partidos[(int) $p->id] = $p;
 
+        // Cuántas te faltan cargar: es la única tarea pendiente de este bloque,
+        // y sin el número queda escondida entre las que ya están.
+        $faltan = 0;
+        foreach ($ids as $pid) {
+            if (isset($partidos[$pid]) && ($partidos[$pid]->golesl === null || $partidos[$pid]->golesv === null)) $faltan++;
+        }
+
         $html = '<h2>Llaves de ida y vuelta <span class="sub">(' . count($rows) . ')</span></h2>'
+            . ($faltan ? '<p class="ok-box"><b>' . $faltan . '</b> de estas vueltas las tenés <b>sin resultado</b>. '
+                . 'Son las que no puede cargar el importador: hay que ponerles el marcador a mano.</p>' : '')
             . '<p class="sub">Estos son <b>vueltas</b> de una eliminatoria (TM los manda con '
             . '<code>firstLegScore</code>). Ahí el número que publica TM <b>no es el marcador de esos 90\'</b>: '
             . 'según el caso es el global de la llave, la tanda de penales, o una mezcla. '
@@ -1009,7 +1054,7 @@ class ImportPartidosController extends Controller
             $p = $partidos[$pid];
 
             $invertido = ((int) $p->equipol_id === (int) $f['rival_id']);
-            $problema = null; $tuyo = null; $deTm = null;
+            $problema = null; $tuyo = null; $deTm = null; $tipo = 'otro';
 
             // Partido definido por penales: el `score` de TM viene con la
             // tanda sumada, así que lo comparable es 90' + penales. Comparar
@@ -1035,6 +1080,7 @@ class ImportPartidosController extends Controller
                 // las dos: solo se marca cuando no coincide con ninguna.
                 if ($p->penalesl === null || $p->penalesv === null) {
                     $problema = 'TM lo da definido por penales y no tenés la tanda cargada';
+                    $tipo = 'penales';
                     $tuyo = $p->golesl . ':' . $p->golesv . ' sin penales';
                     $deTm = $tmL . ':' . $tmV;
                 } else {
@@ -1044,6 +1090,7 @@ class ImportPartidosController extends Controller
 
                     if (!$conGoles && !$soloTanda) {
                         $problema = 'no coincide con TM ni sumando la tanda ni tomando solo la tanda';
+                        $tipo = 'penales';
                         $tuyo = $p->golesl . ':' . $p->golesv . ' y ' . $p->penalesl . '-' . $p->penalesv . ' p';
                         $deTm = $tmL . ':' . $tmV . ' (sería ' . ((int) $p->golesl + (int) $p->penalesl)
                               . ':' . ((int) $p->golesv + (int) $p->penalesv) . ' o '
@@ -1056,9 +1103,26 @@ class ImportPartidosController extends Controller
                 $tmV = $invertido ? (int) $f['goles_favor']  : (int) $f['goles_contra'];
                 if ((int) $p->golesl !== $tmL || (int) $p->golesv !== $tmV) {
                     $problema = 'resultado distinto al de TM';
+                    $tipo = 'distinto';
                     $tuyo = $p->golesl . ':' . $p->golesv;
                     $deTm = $tmL . ':' . $tmV;
                 }
+
+            // TM ya lo jugó y vos lo tenés SIN marcador. No es un conflicto —el
+            // partido está bien cargado, por eso la columna NUEVOS no lo ve— pero
+            // tampoco es "nada para revisar": es trabajo pendiente. Sin esta rama
+            // la pantalla se quedaba muda con los partidos cargados a medias.
+            // Este es el único caso de la lista que se arregla solo, con
+            // «Guardar, corregir horarios y cargar resultados».
+            } elseif (!empty($f['terminado']) && $f['goles_favor'] !== null
+                && ($p->golesl === null || $p->golesv === null)) {
+                $tmL = $invertido ? (int) $f['goles_contra'] : (int) $f['goles_favor'];
+                $tmV = $invertido ? (int) $f['goles_favor']  : (int) $f['goles_contra'];
+                $problema = 'lo tenés sin resultado y TM ya lo tiene'
+                    . ($invertido ? ' (y además la localía te quedó invertida respecto de TM)' : '');
+                $tipo = 'sin_resultado';
+                $tuyo = 'sin resultado';
+                $deTm = $tmL . ':' . $tmV;
             }
 
             // Los goles cargados tienen que dar el marcador.
@@ -1067,6 +1131,7 @@ class ImportPartidosController extends Controller
                 $a = $anotados[$pid];
                 if ($a['l'] !== (int) $p->golesl || $a['v'] !== (int) $p->golesv) {
                     $problema = 'los goles cargados no dan el marcador';
+                    $tipo = 'goles';
                     $tuyo = $p->golesl . ':' . $p->golesv;
                     $deTm = $a['l'] . ':' . $a['v'] . ' (contados en gols)';
                 }
@@ -1074,10 +1139,12 @@ class ImportPartidosController extends Controller
 
             if ($problema === null && !empty($sinAtribuir[$pid])) {
                 $problema = $sinAtribuir[$pid] . ' gol(es) de jugadores que no están en la alineación';
+                $tipo = 'goles';
             }
 
             if ($problema === null && $invertido) {
                 $problema = 'localía invertida respecto de TM';
+                $tipo = 'localia';
                 $tuyo = $this->nombreEquipo($p->equipol_id) . ' de local';
                 $deTm = $this->nombreEquipo($f['equipo_id']) . ' de local';
             }
@@ -1087,7 +1154,8 @@ class ImportPartidosController extends Controller
                     'external_id' => isset($f['external_id']) ? $f['external_id'] : null,
                     'local' => $this->nombreEquipo($p->equipol_id),
                     'visitante' => $this->nombreEquipo($p->equipov_id),
-                    'problema' => $problema, 'tuyo' => $tuyo, 'tm' => $deTm];
+                    'problema' => $problema, 'tuyo' => $tuyo, 'tm' => $deTm,
+                    'tipo' => $tipo];
             }
         }
         return $problemas;
