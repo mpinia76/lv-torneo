@@ -607,6 +607,32 @@ class ImportPartidosController extends Controller
         $terminado = !empty($g['isFinished']);
         $sc = isset($g['score']) && is_array($g['score']) ? $g['score'] : [];
 
+        // OJO CON LOS PENALES: cuando el partido se define por tanda, el
+        // `score` de TM NO es el marcador de los 90'. Es 90' + los penales
+        // convertidos, todo sumado: 1:1 con tanda 4:2 lo publica como 5:3, y lo
+        // marca con `additionType: "after_shootout"` (en un partido normal, con
+        // "none"). Guardar eso como resultado seria cargar un marcador que
+        // nunca existio, asi que se separa la tanda o no se carga nada.
+        $porPenales = isset($sc['additionType']) && $sc['additionType'] === 'after_shootout';
+
+        $gf = ($terminado && isset($sc['home'])) ? (int) $sc['home'] : null;
+        $gc = ($terminado && isset($sc['away'])) ? (int) $sc['away'] : null;
+        $brutoTm = ($gf === null || $gc === null) ? null : $gf . ':' . $gc;
+
+        $penF = $porPenales ? $this->penalesConvertidos($g, 'homeClub') : null;
+        $penC = $porPenales ? $this->penalesConvertidos($g, 'awayClub') : null;
+
+        if ($porPenales) {
+            // El detalle del partido trae la tanda y entonces se puede restar.
+            // El listado del fixture no la trae: ahi el marcador queda en null
+            // —mejor sin resultado que con uno inventado— y la auditoria avisa.
+            if ($gf !== null && $gc !== null && $penF !== null && $penC !== null) {
+                $gf -= $penF; $gc -= $penC;
+            } else {
+                $gf = null; $gc = null;
+            }
+        }
+
         return [
             'external_id'             => isset($g['gameId']) ? (string) $g['gameId'] : null,
             'competencia_external_id' => isset($bd['competitionId']) && $bd['competitionId'] !== '' ? $bd['competitionId'] : $compId,
@@ -623,15 +649,38 @@ class ImportPartidosController extends Controller
             'rival_nombre'            => null,
             'local'                   => 1,
             'dia'                     => $dia,
-            'goles_favor'             => ($terminado && isset($sc['home'])) ? (int) $sc['home'] : null,
-            'goles_contra'            => ($terminado && isset($sc['away'])) ? (int) $sc['away'] : null,
+            'goles_favor'             => $gf,
+            'goles_contra'            => $gc,
             'equipo_id' => null, 'rival_id' => null, 'partido_id' => null,
             'estado' => 'nuevo', 'motivo' => null,
             'payload' => json_encode($g, JSON_UNESCAPED_UNICODE),
             'terminado'     => $terminado,
+            'por_penales'    => $porPenales,
+            'penales_favor'  => $penF,
+            'penales_contra' => $penC,
+            'marcador_tm'    => $brutoTm,
             'hora_definida' => !empty($fecha['isTimeDefined']),
             'reprogramado'  => !empty($g['extendedDetails']['isRescheduled']),
         ];
+    }
+
+    /**
+     * Penales convertidos por un lado en la tanda.
+     *
+     * `homeClub.actions.shootout` solo viene en el detalle del partido, no en el
+     * listado del fixture. Si no esta devuelve **null**, que no es lo mismo que
+     * cero: null significa "no se puede separar la tanda del marcador".
+     */
+    private function penalesConvertidos(array $g, $lado)
+    {
+        if (!isset($g[$lado]['actions']['shootout'])
+            || !is_array($g[$lado]['actions']['shootout'])) return null;
+
+        $n = 0;
+        foreach ($g[$lado]['actions']['shootout'] as $t) {
+            if (isset($t['action']) && $t['action'] === 'Scored') $n++;
+        }
+        return $n;
     }
 
     /** El fixture trae solo clubIds: los nombres se piden aparte (1 llamada / 50). */
@@ -783,17 +832,34 @@ class ImportPartidosController extends Controller
 
             // ¿Está en el mismo orden que TM?
             if ((int) $p->equipol_id === (int) $f['equipo_id']) {
+                $mismoOrden = true;
                 $gl = (int) $f['goles_favor']; $gv = (int) $f['goles_contra'];
             } elseif ((int) $p->equipol_id === (int) $f['rival_id']) {
+                $mismoOrden = false;
                 $gl = (int) $f['goles_contra']; $gv = (int) $f['goles_favor'];
             } else {
                 continue;   // no reconozco la orientación: no toco nada
             }
 
-            $p->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
+            $datos = ['golesl' => $gl, 'golesv' => $gv];
+
+            // Si el partido se definió por penales, el marcador que se carga es
+            // el de los 90' (`normalizarFixture` ya le restó la tanda) y la
+            // tanda va donde corresponde. Sin tanda separable no se llega acá:
+            // `goles_favor` viene en null y el partido se saltea más arriba.
+            if (!empty($f['por_penales'])
+                && isset($f['penales_favor']) && isset($f['penales_contra'])) {
+                $datos['penalesl'] = $mismoOrden ? (int) $f['penales_favor'] : (int) $f['penales_contra'];
+                $datos['penalesv'] = $mismoOrden ? (int) $f['penales_contra'] : (int) $f['penales_favor'];
+            }
+
+            $p->forceFill($datos)->save();
             $out['detalle'] .= '<tr><td class="num">' . e(substr((string) $f['dia'], 0, 10)) . '</td>'
                 . '<td>' . e($this->nombreEquipo($p->equipol_id)) . '</td>'
-                . '<td class="num"><b>' . $gl . ':' . $gv . '</b></td>'
+                . '<td class="num"><b>' . $gl . ':' . $gv . '</b>'
+                . (isset($datos['penalesl'])
+                    ? ' <span class="sub">(' . $datos['penalesl'] . '-' . $datos['penalesv'] . ' p)</span>' : '')
+                . '</td>'
                 . '<td>' . e($this->nombreEquipo($p->equipov_id)) . '</td>'
                 . '<td class="num">#' . (int) $p->id . '</td></tr>';
             $out['cargados']++;
@@ -862,7 +928,28 @@ class ImportPartidosController extends Controller
             $invertido = ((int) $p->equipol_id === (int) $f['rival_id']);
             $problema = null; $tuyo = null; $deTm = null;
 
-            if (!empty($f['terminado']) && $f['goles_favor'] !== null
+            // Partido definido por penales: el `score` de TM viene con la
+            // tanda sumada, así que lo comparable es 90' + penales. Comparar
+            // contra `golesl/golesv` pelados marcaba como error TODOS los
+            // partidos por penales (1:1 tuyo contra 6:7 de TM).
+            if (!empty($f['terminado']) && !empty($f['por_penales'])
+                && !empty($f['marcador_tm'])
+                && $p->golesl !== null && $p->golesv !== null) {
+                list($brutoA, $brutoB) = array_map('intval', explode(':', $f['marcador_tm']));
+                $tmL = $invertido ? $brutoB : $brutoA;
+                $tmV = $invertido ? $brutoA : $brutoB;
+
+                if ($p->penalesl === null || $p->penalesv === null) {
+                    $problema = 'TM lo da definido por penales y no tenés la tanda cargada';
+                    $tuyo = $p->golesl . ':' . $p->golesv . ' sin penales';
+                    $deTm = $tmL . ':' . $tmV . ' (90\' + tanda)';
+                } elseif ((int) $p->golesl + (int) $p->penalesl !== $tmL
+                       || (int) $p->golesv + (int) $p->penalesv !== $tmV) {
+                    $problema = 'resultado distinto al de TM (definido por penales)';
+                    $tuyo = $p->golesl . ':' . $p->golesv . ' y ' . $p->penalesl . '-' . $p->penalesv . ' p';
+                    $deTm = $tmL . ':' . $tmV . ' (90\' + tanda)';
+                }
+            } elseif (!empty($f['terminado']) && $f['goles_favor'] !== null
                 && $p->golesl !== null && $p->golesv !== null) {
                 $tmL = $invertido ? (int) $f['goles_contra'] : (int) $f['goles_favor'];
                 $tmV = $invertido ? (int) $f['goles_favor']  : (int) $f['goles_contra'];
@@ -930,6 +1017,8 @@ class ImportPartidosController extends Controller
                     'goles_favor' => $r->goles_favor, 'goles_contra' => $r->goles_contra,
                     'payload' => $r->payload,
                     'terminado' => $r->goles_favor !== null,
+                    'por_penales' => false, 'penales_favor' => null,
+                    'penales_contra' => null, 'marcador_tm' => null,
                     'hora_definida' => true, 'reprogramado' => false,
                 ];
             }

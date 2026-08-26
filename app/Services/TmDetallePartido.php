@@ -576,6 +576,15 @@ class TmDetallePartido
             $this->motivoMarcador = 'el fixture guardado no trae el marcador';
             return false;
         }
+        // El `score` del fixture de un partido por penales viene con la tanda
+        // sumada (1:1 con penales 4:2 lo publica como 5:3) y el listado no trae
+        // los penales pateados, asi que no hay con que separarlo. Se baja el
+        // detalle o se carga a mano: lo que no se hace es inventar el marcador.
+        if (isset($g['score']['additionType']) && $g['score']['additionType'] === 'after_shootout') {
+            $this->motivoMarcador = 'se definio por penales: el marcador del fixture viene con la '
+                . 'tanda sumada y no se puede separar sin bajar el detalle';
+            return false;
+        }
 
         $tmLocal = isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null;
         if ($tmLocal === null) {
@@ -701,21 +710,60 @@ class TmDetallePartido
         $golesTmLocal = (int) $sc['home'];
         $golesTmVisit = (int) $sc['away'];
 
+        // OJO CON LOS PENALES: si el partido se definio por tanda, el `score`
+        // de TM no es el marcador de los 90' sino 90' + penales convertidos
+        // (1:1 con tanda 4:2 lo publica como 5:3). Se separan los penales o no
+        // se carga nada: un 5:3 en `golesl/golesv` es un partido que no existio.
+        $penTmLocal = null; $penTmVisit = null;
+        if (isset($sc['additionType']) && $sc['additionType'] === 'after_shootout') {
+            $penTmLocal = $this->penalesConvertidos($game, 'homeClub');
+            $penTmVisit = $this->penalesConvertidos($game, 'awayClub');
+            if ($penTmLocal === null || $penTmVisit === null) {
+                $this->aviso('El partido se definio por penales y el JSON no trae la tanda: no le '
+                    . 'cargue el marcador, porque el de TM viene con los penales sumados.');
+                return false;
+            }
+            $golesTmLocal -= $penTmLocal;
+            $golesTmVisit -= $penTmVisit;
+        }
+
         // $lados[0] es el equipo que TM pone de local.
         $equipoTmLocal = (int) $lados[0]['equipo_id'];
 
         if ($equipoTmLocal === (int) $partido->equipol_id) {
             $gl = $golesTmLocal; $gv = $golesTmVisit;
+            $pl = $penTmLocal;   $pv = $penTmVisit;
         } elseif ($equipoTmLocal === (int) $partido->equipov_id) {
             $gl = $golesTmVisit; $gv = $golesTmLocal;
+            $pl = $penTmVisit;   $pv = $penTmLocal;
         } else {
             return false;
         }
 
-        $partido->forceFill(['golesl' => $gl, 'golesv' => $gv])->save();
-        $this->aviso('El partido estaba sin resultado: le cargué ' . $gl . ':' . $gv
-            . ' según Transfermarkt.');
+        $datos = ['golesl' => $gl, 'golesv' => $gv];
+        if ($pl !== null && $pv !== null) { $datos['penalesl'] = $pl; $datos['penalesv'] = $pv; }
+
+        $partido->forceFill($datos)->save();
+        $this->aviso('El partido estaba sin resultado: le cargue ' . $gl . ':' . $gv
+            . ($pl !== null ? ' y la tanda ' . $pl . '-' . $pv : '') . ' segun Transfermarkt.');
         return true;
+    }
+
+    /**
+     * Penales convertidos por un lado en la tanda. Devuelve **null** si el JSON
+     * no trae `actions.shootout` (el listado del fixture no lo trae), que no es
+     * lo mismo que cero: null significa "no se puede separar la tanda".
+     */
+    private function penalesConvertidos(array $game, $lado)
+    {
+        if (!isset($game[$lado]['actions']['shootout'])
+            || !is_array($game[$lado]['actions']['shootout'])) return null;
+
+        $n = 0;
+        foreach ($game[$lado]['actions']['shootout'] as $t) {
+            if (isset($t['action']) && $t['action'] === 'Scored') $n++;
+        }
+        return $n;
     }
 
     private function orientar(array $game, Partido $partido, $escribir = false)
