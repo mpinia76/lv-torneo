@@ -5198,7 +5198,9 @@ AND NOT EXISTS (
     INNER JOIN partidos ON alineacions.partido_id = partidos.id
     INNER JOIN fechas ON partidos.fecha_id = fechas.id
     INNER JOIN grupos ON grupos.id = fechas.grupo_id
-    WHERE alineacions.jugador_id = jugadors.id AND alineacions.equipo_id='.$equipo1.' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
+    LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+    WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')
+      AND alineacions.jugador_id = jugadors.id AND alineacions.equipo_id='.$equipo1.' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
 )
 GROUP BY jugadors.id, personas.foto, personas.nacionalidad, personas.nacimiento, personas.name, personas.apellido, personas.nombre, jugadors.tipoJugador
 ) a
