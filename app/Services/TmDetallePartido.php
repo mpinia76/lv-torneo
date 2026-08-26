@@ -499,8 +499,16 @@ class TmDetallePartido
                     $this->grabarFilas(Cambio::class,       $plan['cambios'],     'un cambio');
                     $this->grabarFilas(PartidoArbitro::class, $plan['arbitros'],  'un árbitro');
 
-                    // Si el partido no tenía marcador, se lo ponemos.
-                    $this->completarMarcador($game, $partido, $lados);
+                    // Si el partido no tenía marcador, se lo ponemos. Primero
+                    // con lo que acaba de bajar; si de ahí no sale, con el
+                    // fixture que ya estaba guardado. Si igual queda sin
+                    // resultado, se avisa: callado no se entiende nunca.
+                    if (!$this->completarMarcador($game, $partido, $lados)
+                        && !$this->marcadorDesdeStaging($partido)
+                        && ($partido->golesl === null || $partido->golesv === null)) {
+                        $this->aviso('El partido quedó sin resultado: '
+                            . ($this->motivoMarcador ?: 'Transfermarkt todavía no lo da por jugado') . '.');
+                    }
 
                     // El DT del club dirigido ya lo pudo haber cargado el
                     // importador de partidos: nunca pisamos ni duplicamos, sólo
@@ -658,13 +666,37 @@ class TmDetallePartido
      * es el local SEGÚN TM, que no siempre es el local de tu partido (finales
      * en cancha neutral, ver `orientar()`).
      */
+    /**
+     * ¿El partido ya se jugó, según el JSON de `/game/{id}`?
+     *
+     * OJO: ese JSON **NO trae `isFinished`** — esa clave es del fixture por
+     * competencia. Por pedirla acá, `completarMarcador()` cortaba siempre y el
+     * detalle nunca cargaba el resultado la primera vez (costó dos rondas).
+     * Lo que sí trae es `baseDetails.isGameReport`: Transfermarkt arma el
+     * informe del partido recién cuando terminó.
+     *
+     * `isWithinLiveTimeframe` marca los que están en curso: ahí el marcador es
+     * parcial y no se toca.
+     */
+    private function jugado(array $game)
+    {
+        if (!empty($game['isFinished'])) return true;               // forma del fixture
+        if (!empty($game['isWithinLiveTimeframe'])) return false;    // en curso
+        if (empty($game['baseDetails']['isGameReport'])) return false;
+
+        // Cinturón y tiradores: hay informe y la hora del partido ya pasó.
+        $cuando = isset($game['baseDetails']['date']['dateTimeUTC'])
+            ? strtotime((string) $game['baseDetails']['date']['dateTimeUTC']) : null;
+        return !$cuando || $cuando < time();
+    }
+
     private function completarMarcador(array $game, Partido $partido, array $lados)
     {
         if ($partido->golesl !== null && $partido->golesv !== null) return false;
 
         $sc = isset($game['score']) && is_array($game['score']) ? $game['score'] : [];
         if (!isset($sc['home']) || !isset($sc['away'])) return false;
-        if (empty($game['isFinished'])) return false;   // sin jugar: no hay marcador
+        if (!$this->jugado($game)) return false;   // sin jugar o en curso: no hay marcador
 
         $golesTmLocal = (int) $sc['home'];
         $golesTmVisit = (int) $sc['away'];
