@@ -5181,6 +5181,26 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE  (cambios.tipo = \'Entra\') AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.') AND alineacions.equipo_id='.$equipo1.'
+
+UNION ALL
+/* Jugadores de la plantilla que NO entraron en ningun partido del torneo: van con 0 */
+SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad, personas.nacimiento,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
+, "0" as  rojas, "0" AS recibidos,
+"0" AS invictas, MIN(plantilla_jugadors.dorsal) AS dorsal, jugadors.tipoJugador
+FROM plantilla_jugadors
+INNER JOIN plantillas ON plantillas.id = plantilla_jugadors.plantilla_id
+INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
+INNER JOIN personas ON jugadors.persona_id = personas.id
+WHERE plantillas.equipo_id='.$equipo1.' AND plantillas.grupo_id IN ('.$arrgrupos.')
+AND NOT EXISTS (
+    SELECT 1
+    FROM alineacions
+    INNER JOIN partidos ON alineacions.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id
+    WHERE alineacions.jugador_id = jugadors.id AND alineacions.equipo_id='.$equipo1.' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
+)
+GROUP BY jugadors.id, personas.foto, personas.nacionalidad, personas.nacimiento, personas.name, personas.apellido, personas.nombre, jugadors.tipoJugador
 ) a
 
 group by jugador_id,jugador, foto, nacionalidad, nacimiento, dorsal, tipoJugador
