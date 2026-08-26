@@ -1024,15 +1024,31 @@ class ImportPartidosController extends Controller
                 $tmL = $invertido ? $brutoB : $brutoA;
                 $tmV = $invertido ? $brutoA : $brutoB;
 
+                // TM publica DOS cosas distintas y desde el listado del fixture
+                // no hay con qué distinguirlas (el `score` de acá viene sin
+                // `firstLegScore`, que es lo único que marca una vuelta):
+                //   · partido único  → 90' + tanda   (Riestra–Gimnasia: 1:1 y
+                //     4-2 lo publica 5:3)
+                //   · vuelta de llave → la tanda sola (O'Higgins–Boca: 1:0 y
+                //     3-4 lo publica 3:4)
+                // Las dos verificadas contra el JSON. Se acepta cualquiera de
+                // las dos: solo se marca cuando no coincide con ninguna.
                 if ($p->penalesl === null || $p->penalesv === null) {
                     $problema = 'TM lo da definido por penales y no tenés la tanda cargada';
                     $tuyo = $p->golesl . ':' . $p->golesv . ' sin penales';
-                    $deTm = $tmL . ':' . $tmV . ' (90\' + tanda)';
-                } elseif ((int) $p->golesl + (int) $p->penalesl !== $tmL
-                       || (int) $p->golesv + (int) $p->penalesv !== $tmV) {
-                    $problema = 'resultado distinto al de TM (definido por penales)';
-                    $tuyo = $p->golesl . ':' . $p->golesv . ' y ' . $p->penalesl . '-' . $p->penalesv . ' p';
-                    $deTm = $tmL . ':' . $tmV . ' (90\' + tanda)';
+                    $deTm = $tmL . ':' . $tmV;
+                } else {
+                    $conGoles = ((int) $p->golesl + (int) $p->penalesl === $tmL
+                              && (int) $p->golesv + (int) $p->penalesv === $tmV);
+                    $soloTanda = ((int) $p->penalesl === $tmL && (int) $p->penalesv === $tmV);
+
+                    if (!$conGoles && !$soloTanda) {
+                        $problema = 'no coincide con TM ni sumando la tanda ni tomando solo la tanda';
+                        $tuyo = $p->golesl . ':' . $p->golesv . ' y ' . $p->penalesl . '-' . $p->penalesv . ' p';
+                        $deTm = $tmL . ':' . $tmV . ' (sería ' . ((int) $p->golesl + (int) $p->penalesl)
+                              . ':' . ((int) $p->golesv + (int) $p->penalesv) . ' o '
+                              . $p->penalesl . ':' . $p->penalesv . ')';
+                    }
                 }
             } elseif (!empty($f['terminado']) && $f['goles_favor'] !== null
                 && $p->golesl !== null && $p->golesv !== null) {
