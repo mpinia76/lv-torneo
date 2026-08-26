@@ -47,12 +47,27 @@ class TmFechas
     const TABLA_INTENTOS = 'persona_fecha_tm';
 
     /**
+     * Dónde quedan las que ya se buscaron en todos lados y no aparecen.
+     *
+     * Es una decisión humana, no el resultado de una consulta: por eso vive en
+     * su propia tabla y no como un estado más de TABLA_INTENTOS. Si estuviera
+     * ahí, el tilde "reintentar las ya consultadas" borraría de un saque todo
+     * lo que alguien revisó a mano.
+     */
+    const TABLA_DESCARTADAS = 'persona_sin_fecha';
+
+    /**
      * Todas las personas sin fecha de nacimiento, ordenadas por apellido.
      *
      * Devuelve [persona_id => ['tipo', 'rol_id', 'tm', 'apellido', 'nombre']],
      * con `tm` en null cuando no tenemos con qué ir a buscarla.
+     *
+     * Las marcadas a mano como "sin fecha conocida" quedan afuera: ya se
+     * buscaron y no existen, así que no son trabajo pendiente ni tiene sentido
+     * volver a preguntarlas. $incluirDescartadas las trae igual, que es lo que
+     * necesita la pantalla para listarlas y poder deshacer la marca.
      */
-    public static function pendientes(): array
+    public static function pendientes(bool $incluirDescartadas = false): array
     {
         $out = [];
 
@@ -108,6 +123,10 @@ class TmFechas
             self::sumar($out, $f, 'arbitro', $tm);
         }
 
+        if (!$incluirDescartadas && $out) {
+            $out = array_diff_key($out, self::descartadas());
+        }
+
         uasort($out, function ($a, $b) {
             $cmp = strcasecmp((string) $a['apellido'], (string) $b['apellido']);
             return $cmp !== 0 ? $cmp : strcasecmp((string) $a['nombre'], (string) $b['nombre']);
@@ -121,18 +140,30 @@ class TmFechas
      *
      * Es lo que hace falta para saber dónde meter el esfuerzo. Sale de la misma
      * lista que ya tiene el controller cacheada, así que no cuesta nada.
+     *
+     * OJO: hay que pasarle la lista COMPLETA (`pendientes(true)`), con las
+     * descartadas adentro. Las cuenta aparte y las resta de todo lo demás, así
+     * la columna "sin fecha" del cuadro es trabajo pendiente de verdad y no un
+     * número que no baja nunca.
      */
-    public static function detalle(array $pendientes = null): array
+    public static function detalle(array $todas = null): array
     {
-        $pendientes = $pendientes !== null ? $pendientes : self::pendientes();
-        $intentos   = self::intentos();
+        $todas       = $todas !== null ? $todas : self::pendientes(true);
+        $intentos    = self::intentos();
+        $descartadas = self::descartadas();
 
-        $vacio = ['total' => 0, 'con_tm' => 0, 'sin_tm' => 0, 'agotadas' => 0];
+        $vacio = ['total' => 0, 'con_tm' => 0, 'sin_tm' => 0, 'agotadas' => 0, 'descartadas' => 0];
         $out = ['jugador' => $vacio, 'tecnico' => $vacio, 'arbitro' => $vacio, 'total' => $vacio];
 
-        foreach ($pendientes as $personaId => $d) {
+        foreach ($todas as $personaId => $d) {
             $tipo = isset($out[$d['tipo']]) ? $d['tipo'] : 'jugador';
+            $fuera = array_key_exists((int) $personaId, $descartadas);
+
             foreach ([$tipo, 'total'] as $k) {
+                if ($fuera) {
+                    $out[$k]['descartadas']++;
+                    continue;
+                }
                 $out[$k]['total']++;
                 if (!empty($d['tm'])) $out[$k]['con_tm']++; else $out[$k]['sin_tm']++;
                 if (isset($intentos[(int) $personaId])) $out[$k]['agotadas']++;
@@ -140,6 +171,84 @@ class TmFechas
         }
 
         return $out;
+    }
+
+    // ------------------------------------------------------------------
+    // "De esta no hay fecha en ningún lado"
+    // ------------------------------------------------------------------
+
+    /**
+     * Las personas marcadas a mano como sin fecha conocida.
+     *
+     * Devuelve [persona_id => motivo]. El motivo puede ser cadena vacía, así
+     * que para preguntar si una está marcada va `array_key_exists`, nunca
+     * `isset` ni `empty`.
+     */
+    public static function descartadas(): array
+    {
+        if (!Schema::hasTable(self::TABLA_DESCARTADAS)) return [];
+
+        $out = [];
+        foreach (DB::table(self::TABLA_DESCARTADAS)->select('persona_id', 'motivo')->get() as $f) {
+            $out[(int) $f->persona_id] = (string) $f->motivo;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Marca personas como "no tiene fecha en ninguna fuente".
+     *
+     * No toca `personas.nacimiento` ni la bitácora de Transfermarkt: es solo
+     * sacarlas de la cola. Si mañana aparece la fecha, se carga a mano y la
+     * persona desaparece igual de la pestaña, porque la lista sale de
+     * `nacimiento IS NULL`.
+     */
+    public static function marcar(array $personaIds, string $motivo = null, $userId = null): int
+    {
+        if (!Schema::hasTable(self::TABLA_DESCARTADAS)) return 0;
+
+        $motivo = $motivo !== null ? mb_substr(trim($motivo), 0, 200) : null;
+        $n = 0;
+
+        foreach ($personaIds as $id) {
+            $id = (int) $id;
+            if ($id <= 0) continue;
+
+            $previo = DB::table(self::TABLA_DESCARTADAS)->where('persona_id', $id)->first();
+
+            DB::table(self::TABLA_DESCARTADAS)->updateOrInsert(
+                ['persona_id' => $id],
+                [
+                    // Al remarcar una que ya estaba, un motivo vacío no pisa el
+                    // que había: se supone que el viejo decía algo útil.
+                    'motivo'     => ($motivo !== null && $motivo !== '')
+                        ? $motivo
+                        : ($previo && isset($previo->motivo) ? $previo->motivo : null),
+                    'user_id'    => $userId !== null ? (int) $userId : ($previo->user_id ?? null),
+                    'updated_at' => now(),
+                    'created_at' => $previo && isset($previo->created_at) ? $previo->created_at : now(),
+                ]
+            );
+            $n++;
+        }
+
+        return $n;
+    }
+
+    /** Las devuelve a la cola. */
+    public static function desmarcar(array $personaIds): int
+    {
+        if (!Schema::hasTable(self::TABLA_DESCARTADAS)) return 0;
+
+        $ids = [];
+        foreach ($personaIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) $ids[] = $id;
+        }
+        if (!$ids) return 0;
+
+        return (int) DB::table(self::TABLA_DESCARTADAS)->whereIn('persona_id', $ids)->delete();
     }
 
     /**

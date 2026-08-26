@@ -428,18 +428,28 @@
                 <strong>solo los campos vacíos</strong>: nunca pisa lo que ya está cargado, porque TM manda
                 fechas mal seguido y lo revisado a mano vale más.
             </p>
+            <p class="text-muted small">
+                Hay personas cuya fecha no está en ninguna parte —árbitros viejos, sobre todo— y esas iban a
+                quedar en la lista para siempre. Cuando busques una y no aparezca, marcala como
+                <strong>sin fecha conocida</strong>: sale de la cola y del contador, queda anotado quién lo
+                decidió y por qué, y se puede volver a abrir cuando quieras. <strong>No borra ni inventa
+                nada</strong>: la ficha sigue sin fecha, lo único que cambia es que dejamos de buscarla.
+            </p>
 
-            @if($conteos['sinFecha'] == 0)
+            @php $verDesc = request('ver') === 'desconocidas'; @endphp
+
+            @if($conteos['sinFecha'] == 0 && $conteos['sinFechaDesc'] == 0)
                 <div class="alert alert-info">No hay personas sin fecha de nacimiento.</div>
             @else
                 @php $det = $conteos['sinFechaDet']; @endphp
                 <table class="table table-sm table-bordered w-auto mb-3">
                     <thead class="thead-light">
                         <tr>
-                            <th>Rol</th><th class="text-right">Sin fecha</th>
+                            <th>Rol</th><th class="text-right">En la cola</th>
                             <th class="text-right">Con id de TM</th>
                             <th class="text-right">Sin id de TM</th>
                             <th class="text-right">Ya consultadas</th>
+                            <th class="text-right">Sin fecha conocida</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -450,6 +460,7 @@
                             <td class="text-right">{{ $det[$k]['con_tm'] }}</td>
                             <td class="text-right">{{ $det[$k]['sin_tm'] }}</td>
                             <td class="text-right text-muted">{{ $det[$k]['agotadas'] }}</td>
+                            <td class="text-right text-muted">{{ $det[$k]['descartadas'] }}</td>
                         </tr>
                     @endforeach
                         <tr class="font-weight-bold">
@@ -458,10 +469,38 @@
                             <td class="text-right">{{ $det['total']['con_tm'] }}</td>
                             <td class="text-right">{{ $det['total']['sin_tm'] }}</td>
                             <td class="text-right">{{ $det['total']['agotadas'] }}</td>
+                            <td class="text-right">{{ $det['total']['descartadas'] }}</td>
                         </tr>
                     </tbody>
                 </table>
 
+                <ul class="nav nav-pills mb-3 small">
+                    <li class="nav-item">
+                        <a class="nav-link py-1 @if(!$verDesc) active @endif"
+                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-fecha']) }}">
+                            En la cola <span class="badge badge-light">{{ $conteos['sinFecha'] }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-1 @if($verDesc) active @endif"
+                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-fecha', 'ver' => 'desconocidas']) }}">
+                            Sin fecha conocida <span class="badge badge-light">{{ $conteos['sinFechaDesc'] }}</span>
+                        </a>
+                    </li>
+                </ul>
+
+                @if($sinFecha->total() == 0)
+                    <div class="alert alert-info">
+                        @if($verDesc)
+                            Todavía no marcaste ninguna persona como sin fecha conocida.
+                        @else
+                            No queda ninguna persona esperando fecha. Las que marcaste como sin fecha
+                            conocida están en la otra solapa.
+                        @endif
+                    </div>
+                @endif
+
+                @if(!$verDesc && $sinFecha->total() > 0)
                 <div class="card mb-3">
                     <div class="card-body py-2">
                         <form method="POST" action="{{ route('personas.fechas.completar') }}">
@@ -501,18 +540,56 @@
                         </small>
                     </div>
                 </div>
+                @endif
+
+                {{-- El <form> va vacío y afuera de la tabla, y los tildes se le
+                     enganchan con el atributo form=: un <form> no puede envolver
+                     filas de una tabla sin que el navegador lo saque de ahí.
+                     Mismo truco que usa la pestaña "Sin registros". --}}
+                @if($sinFecha->total() > 0)
+                <form id="formFechas" method="POST" action="{{ route('personas.fechas.desconocidas') }}"
+                      onsubmit="return confirmarFechas(event)"></form>
+                <input type="hidden" name="_token" value="{{ csrf_token() }}" form="formFechas">
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="small mb-0"><input type="checkbox" id="tildarTodos"> tildar todo lo visible</label>
+                    <div class="form-inline">
+                        @if($verDesc)
+                            <button form="formFechas" name="accion" value="reabrir" class="btn btn-sm btn-outline-primary">
+                                Volver a la cola
+                            </button>
+                        @else
+                            {{-- Enter acá enviaría el form sin botón, y sin botón no hay
+                                 acción: el controller recibiría "accion" vacío. --}}
+                            <input type="text" name="motivo" form="formFechas" maxlength="200"
+                                   class="form-control form-control-sm mr-2" style="width:280px;"
+                                   onkeydown="if (event.key === 'Enter') { event.preventDefault(); }"
+                                   placeholder="dónde buscaste (opcional): TM, BDFA, Wikipedia...">
+                            <button form="formFechas" name="accion" value="marcar" class="btn btn-sm btn-secondary">
+                                Marcar como sin fecha conocida
+                            </button>
+                        @endif
+                    </div>
+                </div>
 
                 <table class="table table-sm">
                     <thead>
                         <tr>
+                            <th style="width:28px;"></th>
                             <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
-                            <th>Nacionalidad</th><th>Roles</th><th>Transfermarkt</th><th></th>
+                            <th>Nacionalidad</th><th>Roles</th><th>Transfermarkt</th>
+                            @if($verDesc)<th>Marcada</th>@endif
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                     @foreach($sinFecha as $p)
                         @php $tm = $tmDe[$p->id] ?? null; @endphp
                         <tr>
+                            <td>
+                                <input type="checkbox" name="personas[]" value="{{ $p->id }}"
+                                       form="formFechas" class="tildable">
+                            </td>
                             <td>
                                 @if($p->foto)
                                     <img class="imgCircle" src="{{ url('images/'.$p->foto) }}" alt="">
@@ -543,6 +620,9 @@
                                     <span class="badge badge-secondary">sin TM</span>
                                 @endif
                             </td>
+                            @if($verDesc)
+                                <td class="small text-muted">{{ $tm['motivo'] ?? '' }}</td>
+                            @endif
                             <td>
                                 @if($p->jugador)
                                     <a href="{{ route('jugadores.edit', $p->jugador->id) }}" target="_blank" class="small">editar</a>
@@ -561,6 +641,7 @@
                     <div class="col-md-9">{{ $sinFecha->links() }}</div>
                     <div class="col-md-3 text-right"><strong>Total: {{ $sinFecha->total() }}</strong></div>
                 </div>
+                @endif
             @endif
         @endif
     </div>
@@ -582,6 +663,30 @@
                 return false;
             }
             return confirm('Se van a BORRAR ' + n + ' personas sin registros. No se puede deshacer. ¿Confirmás?');
+        }
+
+        function confirmarFechas(evento) {
+            var n = document.querySelectorAll('.tildable:checked').length;
+            if (n === 0) {
+                alert('No tildaste ninguna persona.');
+                return false;
+            }
+
+            // La acción sale del botón que disparó el envío, no de
+            // document.activeElement: en Safari/iOS un <button> no queda
+            // enfocado al clickearlo.
+            var accion = (evento && evento.submitter && evento.submitter.value) ? evento.submitter.value : '';
+
+            if (accion === 'reabrir') {
+                return confirm('Devolver ' + n + ' personas a la cola de fechas?');
+            }
+            if (accion === 'marcar') {
+                return confirm('Marcar ' + n + ' personas como sin fecha conocida? Salen de la cola y del '
+                    + 'contador (no se borra nada y se puede deshacer).');
+            }
+
+            alert('No se pudo determinar la acción. Probá de nuevo apretando directamente el botón.');
+            return false;
         }
 
         function confirmarLote(form, evento) {

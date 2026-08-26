@@ -35,6 +35,9 @@ class PersonaDuplicadoController extends Controller
     /** Clave de caché de las personas sin fecha de nacimiento (con su id de TM). */
     private const CACHE_SIN_FECHA = 'personas.sin_fecha';
 
+    /** Memoria por request de TmFechas::descartadas(). */
+    private $descartadasSinFecha = null;
+
     /**
      * El grupo `admin` de routes/web.php no tiene middleware: la autenticación
      * la pone cada controller en su constructor (igual que JugadorController).
@@ -163,7 +166,8 @@ class PersonaDuplicadoController extends Controller
             'sinRegistros' => (int) $this->contarSinRegistros(),
             'sinFecha'     => count($this->pendientesSinFecha()),
             'sinFechaTm'   => $this->contarSinFechaConTm(),
-            'sinFechaDet'  => TmFechas::detalle($this->pendientesSinFecha()),
+            'sinFechaDesc' => count($this->todasSinFecha()) - count($this->pendientesSinFecha()),
+            'sinFechaDet'  => TmFechas::detalle($this->todasSinFecha()),
             'fusiones'     => (int) DB::table('persona_fusiones')->count(),
         ];
     }
@@ -173,17 +177,41 @@ class PersonaDuplicadoController extends Controller
     // ------------------------------------------------------------------
 
     /**
-     * Las personas sin fecha, con el id de Transfermarkt de cada una.
+     * Todas las personas sin fecha, con el id de Transfermarkt de cada una.
      *
      * Se cachea igual que la lista de huérfanas: el conteo lo pide TODA carga
      * de la pantalla (esté en la pestaña que esté), y son tres joins sobre
      * `personas` enteras.
+     *
+     * Se cachea la lista COMPLETA, con las descartadas adentro. Es a propósito:
+     * marcar o desmarcar una persona no invalida esta caché (la marca se aplica
+     * afuera, en PHP), y la pestaña puede listar las descartadas sin repetir
+     * los joins.
      */
-    private function pendientesSinFecha(): array
+    private function todasSinFecha(): array
     {
         return Cache::remember(self::CACHE_SIN_FECHA, 600, function () {
-            return TmFechas::pendientes();
+            return TmFechas::pendientes(true);
         });
+    }
+
+    /**
+     * Las marcadas a mano como "sin fecha conocida", [persona_id => motivo].
+     * Se resuelve una sola vez por request: la piden los conteos y la lista.
+     */
+    private function descartadasSinFecha(): array
+    {
+        if ($this->descartadasSinFecha === null) {
+            $this->descartadasSinFecha = TmFechas::descartadas();
+        }
+
+        return $this->descartadasSinFecha;
+    }
+
+    /** Trabajo pendiente de verdad: las que todavía vale la pena buscar. */
+    private function pendientesSinFecha(): array
+    {
+        return array_diff_key($this->todasSinFecha(), $this->descartadasSinFecha());
     }
 
     /** Cuántas de esas se pueden resolver solas (tienen id de TM). */
@@ -196,11 +224,22 @@ class PersonaDuplicadoController extends Controller
         return $n;
     }
 
-    /** Se pagina sobre la lista cacheada, igual que "sin registros". */
+    /**
+     * Se pagina sobre la lista cacheada, igual que "sin registros".
+     *
+     * `?ver=desconocidas` muestra las descartadas en vez de la cola, para
+     * poder revisar la decisión y deshacerla.
+     */
     private function sinFecha(Request $request): array
     {
-        $pendientes = $this->pendientesSinFecha();
-        $ids        = array_keys($pendientes);
+        $verDescartadas = $request->query('ver') === 'desconocidas';
+        $descartadas    = $this->descartadasSinFecha();
+
+        $pendientes = $verDescartadas
+            ? array_intersect_key($this->todasSinFecha(), $descartadas)
+            : $this->pendientesSinFecha();
+
+        $ids = array_keys($pendientes);
         $pagina     = max(1, (int) $request->query('page', 1));
         $tramo      = array_slice($ids, ($pagina - 1) * self::POR_PAGINA, self::POR_PAGINA);
 
@@ -219,6 +258,8 @@ class PersonaDuplicadoController extends Controller
         $tmDe = [];
         foreach ($tramo as $id) {
             $tmDe[$id] = $pendientes[$id];
+            $tmDe[$id]['descartada'] = array_key_exists((int) $id, $descartadas);
+            $tmDe[$id]['motivo']     = $descartadas[(int) $id] ?? '';
         }
 
         $paginador = new LengthAwarePaginator(
@@ -601,6 +642,48 @@ class PersonaDuplicadoController extends Controller
         }
 
         return redirect()->back()->with('success', $mensaje);
+    }
+
+    /**
+     * "De estas no hay fecha en ningún lado": sacarlas de la cola, o devolverlas.
+     *
+     * No toca `personas.nacimiento` ni la bitácora de Transfermarkt. Es una
+     * anotación aparte y reversible, para que el contador de la pestaña mida
+     * trabajo pendiente y no incluya para siempre a los 196 árbitros viejos que
+     * no están en ninguna base.
+     */
+    public function fechasDesconocidas(Request $request)
+    {
+        $ids    = (array) $request->input('personas', []);
+        $accion = $request->input('accion');
+        $motivo = trim((string) $request->input('motivo', ''));
+
+        if (!$ids) {
+            return redirect()->back()->withErrors(['error' => 'No tildaste ninguna persona.']);
+        }
+
+        if ($accion === 'reabrir') {
+            $n = TmFechas::desmarcar($ids);
+
+            return redirect()->back()->with(
+                'success',
+                $n === 1 ? '1 persona volvió a la cola de fechas.' : "{$n} personas volvieron a la cola de fechas."
+            );
+        }
+
+        if ($accion === 'marcar') {
+            $n = TmFechas::marcar($ids, $motivo !== '' ? $motivo : null, auth()->id());
+
+            $mensaje = $n === 1
+                ? '1 persona marcada como sin fecha conocida.'
+                : "{$n} personas marcadas como sin fecha conocida.";
+            $mensaje .= ' Salen de la cola y del contador; se pueden volver a abrir desde'
+                . ' "ver las marcadas".';
+
+            return redirect()->back()->with('success', $mensaje);
+        }
+
+        return redirect()->back()->withErrors(['error' => 'Acción desconocida.']);
     }
 
     /** Acciones sobre varios pares tildados a la vez. */
