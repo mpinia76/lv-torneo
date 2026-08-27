@@ -43,7 +43,12 @@
     $golesv   = $val($p, 'golesv');
     $penalesl = $val($p, 'penalesl');
     $penalesv = $val($p, 'penalesv');
-    $esNeutral = (bool) $val($p, 'neutral');
+    // Ojo: algunas consultas devuelven 'SI'/'NO' en vez de 1/0, y (bool) 'NO'
+    // da true. Por eso se normaliza en vez de castear.
+    $neutralCrudo = $val($p, 'neutral');
+    $esNeutral = is_string($neutralCrudo)
+        ? in_array(mb_strtoupper(trim($neutralCrudo)), ['1', 'SI', 'SÍ', 'TRUE'], true)
+        : (bool) $neutralCrudo;
 
     $sinJugar   = is_null($golesl) && is_null($golesv);
     $ganaLocal  = !$sinJugar && ($golesl > $golesv || ($golesl == $golesv && $penalesl > $penalesv));
