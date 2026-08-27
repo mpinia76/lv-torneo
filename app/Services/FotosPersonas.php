@@ -168,6 +168,12 @@ class FotosPersonas
      * Mirar el TAMAÑO no alcanza y fue el error de la primera versión: los
      * archivos que rompen la pantalla pesan 2 KB, 20 KB o 280 KB. Lo que los
      * delata son los primeros bytes.
+     *
+     * **Acá no se decodifica nada.** La versión anterior llamaba a
+     * `imagecreatefromstring()` para confirmar, y con un WebP arruinado GD se
+     * muere con un FATAL ("gd-webp cannot allocate temporary buffer") que el @
+     * no tapa y que se lleva puesta la pantalla entera. Todo lo que sigue son
+     * lecturas de cabecera y aritmética.
      */
     private static function revisarArchivo(string $ruta, string $foto, int $bytes)
     {
@@ -176,7 +182,8 @@ class FotosPersonas
                     'real' => null, 'detalle' => 'el archivo está pero pesa cero'];
         }
 
-        $firma = self::firmaDe($ruta);
+        $cabecera = self::cabecera($ruta);
+        $firma    = self::firmaDeBytes($cabecera);
 
         if ($firma === null || !in_array($firma, ['png', 'jpg', 'gif', 'webp', 'bmp', 'avif', 'svg'], true)) {
             $detalle = $firma === 'html' ? 'es una página HTML guardada con nombre de imagen'
@@ -187,21 +194,24 @@ class FotosPersonas
                     'real' => $firma, 'detalle' => $detalle];
         }
 
+        // El WebP dice adentro cuánto tiene que medir. Es la forma barata y
+        // segura de pescar los que llegaron cortados o inflados por el proxy:
+        // la cabecera RIFF les quedó intacta, así que la firma sola los aprueba.
+        if ($firma === 'webp') {
+            $declarado = self::tamanoWebp($cabecera);
+
+            if ($declarado !== null && ($bytes < $declarado || $bytes > $declarado + 8)) {
+                return ['motivo' => self::CORRUPTO, 'bytes' => $bytes, 'parecido' => null,
+                        'real' => 'webp',
+                        'detalle' => 'dice ser un WebP de ' . number_format($declarado) . ' bytes y el archivo '
+                            . 'tiene ' . number_format($bytes) . ': llegó roto, hay que volver a bajarla'];
+            }
+        }
+
         $ext = mb_strtolower((string) pathinfo($foto, PATHINFO_EXTENSION));
         $ext = self::EQUIVALENTES[$ext] ?? $ext;
 
         if ($ext !== '' && $ext !== $firma) {
-            // La cabecera dice WebP, pero eso no quiere decir que la imagen esté
-            // entera: los .png-que-son-webp que aparecieron en producción tienen
-            // el RIFF intacto y el resto arruinado. Como son pocos (solo los que
-            // no coinciden con su extensión), acá sí se paga decodificar entero.
-            if (!self::decodifica($ruta, $firma)) {
-                return ['motivo' => self::CORRUPTO, 'bytes' => $bytes, 'parecido' => null,
-                        'real' => $firma,
-                        'detalle' => 'dice ser ' . strtoupper($firma) . ' pero el contenido no se '
-                            . 'puede decodificar: hay que volver a bajarla'];
-            }
-
             return ['motivo' => self::FORMATO, 'bytes' => $bytes, 'parecido' => null,
                     'real' => $firma,
                     'detalle' => 'se llama .' . $ext . ' pero por dentro es ' . strtoupper($firma)];
@@ -210,49 +220,30 @@ class FotosPersonas
         return null;
     }
 
-    /**
-     * ¿La imagen se puede decodificar de verdad?
-     *
-     * Ante la duda dice que SÍ. Si GD no está, o no sabe leer ese formato (WebP
-     * necesita soporte compilado), un "no" sería mentira y llenaría la pantalla
-     * de fotos sanas acusadas de rotas.
-     */
-    private static function decodifica(string $ruta, string $firma): bool
+    /** Los primeros 32 bytes del archivo. Lo más barato que se puede leer. */
+    private static function cabecera(string $ruta): string
     {
-        if (!function_exists('imagecreatefromstring')) return true;
-        if ($firma === 'webp' && !function_exists('imagecreatefromwebp')) return true;
-        if ($firma === 'avif' && !function_exists('imagecreatefromavif')) return true;
-        if ($firma === 'svg') return true;
+        $fh = @fopen($ruta, 'rb');
+        if ($fh === false) return '';
 
-        $datos = @file_get_contents($ruta);
-        if ($datos === false) return true;
+        $b = (string) fread($fh, 32);
+        fclose($fh);
 
-        $img = @imagecreatefromstring($datos);
-        if ($img === false) return false;
-
-        @imagedestroy($img);
-        return true;
+        return $b;
     }
 
     /**
      * Qué es un archivo de verdad, según sus primeros bytes.
      *
-     * 32 bytes por archivo: es lo más barato que hay y es lo único que distingue
-     * una foto de una página de error guardada como .png. `getimagesize()` haría
-     * lo mismo pero además parsea la imagen entera para devolver medidas que acá
-     * no se usan.
+     * Es lo único que distingue una foto de una página de error guardada como
+     * .png. `getimagesize()` haría lo mismo pero además parsea la imagen para
+     * devolver medidas que acá no se usan.
      *
      * Devuelve 'png', 'jpg', 'gif', 'webp', 'bmp', 'avif', 'svg', 'html', 'json'
      * o null (bytes ilegibles).
      */
-    public static function firmaDe(string $ruta)
+    public static function firmaDeBytes(string $b)
     {
-        $fh = @fopen($ruta, 'rb');
-        if ($fh === false) return null;
-
-        $b = (string) fread($fh, 32);
-        fclose($fh);
-
         if (strlen($b) < 4) return null;
 
         if (substr($b, 0, 8) === "\x89PNG\r\n\x1a\n")        return 'png';
@@ -268,6 +259,28 @@ class FotosPersonas
         if (strpos($texto, '{') === 0 || strpos($texto, '[') === 0)        return 'json';
 
         return null;
+    }
+
+    /**
+     * Cuánto dice medir un WebP, según su propia cabecera RIFF.
+     *
+     * Los bytes 4-7 traen el tamaño del contenido en little-endian; el archivo
+     * completo son esos + los 8 de "RIFF" y el tamaño. Los rotos de producción
+     * declaran 12.846 bytes y ocupan 20.267: cada byte alto del original se
+     * convirtió en tres (`EF BF BD`) y el archivo quedó inflado.
+     *
+     * @return int|null el tamaño total esperado, o null si no se puede leer
+     */
+    private static function tamanoWebp(string $cabecera)
+    {
+        if (strlen($cabecera) < 8) return null;
+
+        $n = @unpack('V', substr($cabecera, 4, 4));
+        if (!is_array($n) || !isset($n[1])) return null;
+
+        $total = (int) $n[1] + 8;
+
+        return $total > 8 ? $total : null;
     }
 
     /**
@@ -459,9 +472,10 @@ class FotosPersonas
      *    los archivos que rompen la pantalla son respuestas de ScraperAPI que
      *    llegan con HTTP 200 y `Content-Type: image/png` pero traen el binario
      *    pasado por UTF-8 (cada byte alto convertido en U+FFFD, `EF BF BD`).
-     *    La cabecera puede quedar intacta y `getimagesizefromstring()` dice que
-     *    sí; recién `imagecreatefromstring()` —que decodifica de verdad— se da
-     *    cuenta. Sin esto, el botón cambiaría una foto rota por otra igual.
+     *    La cabecera queda intacta y `getimagesizefromstring()` dice que sí, así
+     *    que se cuentan los reemplazos y se compara el tamaño declarado.
+     *    **Nada de `imagecreatefromstring()`**: con un WebP arruinado GD no
+     *    devuelve false, se muere con un FATAL que el @ no tapa.
      * 2. **La extensión sale de los bytes, no de la URL.** TM publica el retrato
      *    como `.png` pero responde WebP cuando el pedido acepta WebP (que es lo
      *    que manda HttpHelper). Guardarlo como `.png` deja un archivo que el
@@ -501,26 +515,31 @@ class FotosPersonas
             return $out;
         }
 
-        $medidas = @getimagesizefromstring($body);
-        if ($medidas === false) {
-            // El caso típico: el cuerpo mangleado por UTF-8. Se avisa con el
-            // dato que lo identifica, para no quedarse en "no es una imagen".
-            $mangleado = substr_count($body, "\xef\xbf\xbd");
-            $out['error'] = 'lo que volvió no es una imagen'
-                . ($mangleado > 20 ? ' — viene pasado por UTF-8 (' . $mangleado . ' bytes reemplazados): '
-                    . 'es la respuesta del proxy, no la foto' : ' (' . strlen($body) . ' bytes)');
+        // Lo primero que se pregunta, antes que el formato: ¿esto es el binario
+        // o es el binario pasado por texto? Un retrato normal no tiene NINGÚN
+        // U+FFFD; los que rompen la pantalla tienen cientos o miles.
+        $mangleado = substr_count($body, "\xef\xbf\xbd");
+        if ($mangleado > 20) {
+            $out['error'] = 'lo que volvió viene pasado por UTF-8 (' . number_format($mangleado)
+                . ' bytes reemplazados): es la respuesta del proxy, no la foto';
             return $out;
         }
 
-        // La cabecera puede estar sana y el resto no. Esto lo decodifica entero.
-        if (function_exists('imagecreatefromstring')) {
-            $gd = @imagecreatefromstring($body);
-            if ($gd === false) {
-                $out['error'] = 'la cabecera dice imagen pero el contenido no se puede decodificar '
-                    . '(está corrupto en origen o lo rompió el proxy)';
+        $medidas = @getimagesizefromstring($body);
+        if ($medidas === false) {
+            $out['error'] = 'lo que volvió no es una imagen (' . number_format(strlen($body)) . ' bytes)';
+            return $out;
+        }
+
+        // WebP: la cabecera dice cuánto tiene que medir. Si no coincide, llegó
+        // cortado o inflado, y escribirlo sería fabricar otra foto rota.
+        if (self::firmaDeBytes(substr($body, 0, 32)) === 'webp') {
+            $declarado = self::tamanoWebp(substr($body, 0, 32));
+            if ($declarado !== null && (strlen($body) < $declarado || strlen($body) > $declarado + 8)) {
+                $out['error'] = 'el WebP dice medir ' . number_format($declarado) . ' bytes y llegaron '
+                    . number_format(strlen($body)) . ': viene roto';
                 return $out;
             }
-            @imagedestroy($gd);
         }
 
         $extension = self::extensionDe($medidas, $body);
