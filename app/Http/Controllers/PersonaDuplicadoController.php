@@ -479,7 +479,9 @@ class PersonaDuplicadoController extends Controller
     {
         $datos = $this->fotos();
 
-        $vacio = ['total' => 0, 'falta' => 0, 'vacio' => 0, 'con_tm' => 0, 'sin_tm' => 0];
+        $vacio = ['total' => 0, 'con_tm' => 0, 'sin_tm' => 0];
+        foreach (FotosPersonas::MOTIVOS as $motivo) $vacio[$motivo] = 0;
+
         $out = ['jugador' => $vacio, 'tecnico' => $vacio, 'arbitro' => $vacio,
                 'sin_rol' => $vacio, 'total' => $vacio];
 
@@ -489,7 +491,7 @@ class PersonaDuplicadoController extends Controller
 
             foreach ([$tipo, 'total'] as $k) {
                 $out[$k]['total']++;
-                $out[$k][$d['motivo'] === FotosPersonas::VACIO ? 'vacio' : 'falta']++;
+                if (isset($out[$k][$d['motivo']])) $out[$k][$d['motivo']]++;
                 if ($ficha && !empty($ficha['tm'])) $out[$k]['con_tm']++; else $out[$k]['sin_tm']++;
             }
         }
@@ -510,7 +512,7 @@ class PersonaDuplicadoController extends Controller
         $problemas = $datos['problemas'];
 
         $ver = $request->query('ver');
-        if ($ver === FotosPersonas::FALTA || $ver === FotosPersonas::VACIO) {
+        if (in_array($ver, FotosPersonas::MOTIVOS, true)) {
             $problemas = array_filter($problemas, function ($d) use ($ver) {
                 return $d['motivo'] === $ver;
             });

@@ -14,33 +14,50 @@ use Illuminate\Support\Facades\DB;
  * `<img src="images/loquesea.jpg">` no dibuja nada y en pantalla se ve el
  * cuadradito roto.
  *
- * Dos problemas distintos, y conviene no mezclarlos:
- *   falta  → el archivo no está. Hay que volver a bajarlo.
- *   vacio  → el archivo está pero pesa nada o no es una imagen (típicamente una
- *            página de error guardada con extensión .jpg). El navegador tampoco
- *            lo dibuja, y como el archivo existe, un `file_exists` pelado no lo
- *            encuentra nunca.
+ * Cuatro problemas distintos, y conviene no mezclarlos:
+ *
+ *   falta    → el archivo no está. Hay que volver a bajarlo.
+ *   vacio    → el archivo está y pesa cero.
+ *   corrupto → el archivo pesa lo que tiene que pesar pero NO es una imagen:
+ *              una página de error o un JSON guardados con nombre de foto, o el
+ *              binario mangleado por UTF-8 (cada byte alto convertido en
+ *              `EF BF BD`) que devuelve el proxy cuando trata la respuesta como
+ *              texto. Es el caso más común y el más difícil de ver: el archivo
+ *              existe, pesa 20 KB, y no se dibuja.
+ *   formato  → es una imagen de verdad pero de otro formato que el que dice la
+ *              extensión (TM publica el retrato como .png y responde WebP).
+ *              El server la sirve con el content-type equivocado.
+ *
+ * **Mirar el tamaño no alcanza**: los archivos rotos que aparecieron en
+ * producción pesan 2 KB, 20 KB y 280 KB. Lo único que los delata son los
+ * primeros bytes, así que de cada archivo se leen 32.
  *
  * Lo que NO es problema y por eso no entra: `foto` vacío. Esas fichas muestran
  * `sin_foto.png` a propósito y son miles; meterlas acá sería tapar las rotas.
  *
  * La detección no cuesta una consulta por persona: se lee el directorio UNA vez
- * (nombre => tamaño) y después se compara en PHP, agrupando por nombre de
- * archivo. Dos personas con la misma foto se revisan una sola vez.
+ * (nombre => tamaño) y después se agrupa por nombre de archivo, así dos personas
+ * con la misma foto se revisan una sola vez.
  */
 class FotosPersonas
 {
     /**
-     * Debajo de esto no hay foto que valga.
-     *
-     * Un retrato de TM pesa entre 4 y 15 KB. Lo que baja de 512 bytes es un
-     * archivo cortado o un HTML de error, así que se confirma con getimagesize
-     * antes de acusarlo (que sea chico no lo hace inválido por sí solo).
+     * Piso de tamaño para ACEPTAR una descarga nueva. No se usa para acusar a
+     * un archivo que ya está: un retrato de TM pesa entre 4 y 15 KB, pero que
+     * un archivo sea chico no lo hace inválido — eso lo decide la firma.
      */
     const MIN_BYTES = 512;
 
-    const FALTA = 'falta';
-    const VACIO = 'vacio';
+    const FALTA    = 'falta';
+    const VACIO    = 'vacio';
+    const CORRUPTO = 'corrupto';
+    const FORMATO  = 'formato';
+
+    /** Los cuatro motivos, en el orden en que conviene atacarlos. */
+    const MOTIVOS = [self::CORRUPTO, self::FALTA, self::FORMATO, self::VACIO];
+
+    /** Firmas de archivo: los primeros bytes dicen qué es de verdad. */
+    const EQUIVALENTES = ['jpeg' => 'jpg', 'jpe' => 'jpg', 'jfif' => 'jpg'];
 
     /** Cuántos ids entran en una llamada a la API. Mismo tope que TmFechas. */
     const POR_LLAMADA = 50;
@@ -121,37 +138,134 @@ class FotosPersonas
         // así que se pregunta derecho por él.
         if (strpos($foto, '/') !== false || strpos($foto, '\\') !== false) {
             $ruta = public_path('images/' . $foto);
-            if (!is_file($ruta)) {
-                return ['motivo' => self::FALTA, 'bytes' => 0, 'parecido' => null];
-            }
-            return self::porTamano($ruta, (int) @filesize($ruta));
+            if (!is_file($ruta)) return self::falta(null);
+
+            return self::revisarArchivo($ruta, $foto, (int) @filesize($ruta));
         }
 
         $archivos = self::archivos();
 
         if (!array_key_exists($foto, $archivos)) {
-            $indice   = self::porMinuscula();
-            $clave    = mb_strtolower($foto);
-            $parecido = isset($indice[$clave]) ? $indice[$clave] : null;
+            $indice = self::porMinuscula();
+            $clave  = mb_strtolower($foto);
 
-            return ['motivo' => self::FALTA, 'bytes' => 0, 'parecido' => $parecido];
+            return self::falta(isset($indice[$clave]) ? $indice[$clave] : null);
         }
 
-        return self::porTamano(public_path('images/' . $foto), (int) $archivos[$foto]);
+        return self::revisarArchivo(public_path('images/' . $foto), $foto, (int) $archivos[$foto]);
     }
 
-    /** Un archivo que existe: decide si además sirve. */
-    private static function porTamano(string $ruta, int $bytes)
+    private static function falta($parecido)
+    {
+        return ['motivo' => self::FALTA, 'bytes' => 0, 'parecido' => $parecido,
+                'real' => null, 'detalle' => ''];
+    }
+
+    /**
+     * Un archivo que existe: decide si además es una imagen, y si es la que
+     * dice ser.
+     *
+     * Mirar el TAMAÑO no alcanza y fue el error de la primera versión: los
+     * archivos que rompen la pantalla pesan 2 KB, 20 KB o 280 KB. Lo que los
+     * delata son los primeros bytes.
+     */
+    private static function revisarArchivo(string $ruta, string $foto, int $bytes)
     {
         if ($bytes <= 0) {
-            return ['motivo' => self::VACIO, 'bytes' => 0, 'parecido' => null];
+            return ['motivo' => self::VACIO, 'bytes' => 0, 'parecido' => null,
+                    'real' => null, 'detalle' => 'el archivo está pero pesa cero'];
         }
 
-        // Solo los sospechosamente chicos pagan el getimagesize. Son un puñado:
-        // hacerlo con los 8000 archivos costaría más que toda la pantalla.
-        if ($bytes < self::MIN_BYTES && @getimagesize($ruta) === false) {
-            return ['motivo' => self::VACIO, 'bytes' => $bytes, 'parecido' => null];
+        $firma = self::firmaDe($ruta);
+
+        if ($firma === null || !in_array($firma, ['png', 'jpg', 'gif', 'webp', 'bmp', 'avif', 'svg'], true)) {
+            $detalle = $firma === 'html' ? 'es una página HTML guardada con nombre de imagen'
+                     : ($firma === 'json' ? 'es una respuesta JSON de error guardada con nombre de imagen'
+                     : 'los primeros bytes no son los de ninguna imagen conocida');
+
+            return ['motivo' => self::CORRUPTO, 'bytes' => $bytes, 'parecido' => null,
+                    'real' => $firma, 'detalle' => $detalle];
         }
+
+        $ext = mb_strtolower((string) pathinfo($foto, PATHINFO_EXTENSION));
+        $ext = self::EQUIVALENTES[$ext] ?? $ext;
+
+        if ($ext !== '' && $ext !== $firma) {
+            // La cabecera dice WebP, pero eso no quiere decir que la imagen esté
+            // entera: los .png-que-son-webp que aparecieron en producción tienen
+            // el RIFF intacto y el resto arruinado. Como son pocos (solo los que
+            // no coinciden con su extensión), acá sí se paga decodificar entero.
+            if (!self::decodifica($ruta, $firma)) {
+                return ['motivo' => self::CORRUPTO, 'bytes' => $bytes, 'parecido' => null,
+                        'real' => $firma,
+                        'detalle' => 'dice ser ' . strtoupper($firma) . ' pero el contenido no se '
+                            . 'puede decodificar: hay que volver a bajarla'];
+            }
+
+            return ['motivo' => self::FORMATO, 'bytes' => $bytes, 'parecido' => null,
+                    'real' => $firma,
+                    'detalle' => 'se llama .' . $ext . ' pero por dentro es ' . strtoupper($firma)];
+        }
+
+        return null;
+    }
+
+    /**
+     * ¿La imagen se puede decodificar de verdad?
+     *
+     * Ante la duda dice que SÍ. Si GD no está, o no sabe leer ese formato (WebP
+     * necesita soporte compilado), un "no" sería mentira y llenaría la pantalla
+     * de fotos sanas acusadas de rotas.
+     */
+    private static function decodifica(string $ruta, string $firma): bool
+    {
+        if (!function_exists('imagecreatefromstring')) return true;
+        if ($firma === 'webp' && !function_exists('imagecreatefromwebp')) return true;
+        if ($firma === 'avif' && !function_exists('imagecreatefromavif')) return true;
+        if ($firma === 'svg') return true;
+
+        $datos = @file_get_contents($ruta);
+        if ($datos === false) return true;
+
+        $img = @imagecreatefromstring($datos);
+        if ($img === false) return false;
+
+        @imagedestroy($img);
+        return true;
+    }
+
+    /**
+     * Qué es un archivo de verdad, según sus primeros bytes.
+     *
+     * 32 bytes por archivo: es lo más barato que hay y es lo único que distingue
+     * una foto de una página de error guardada como .png. `getimagesize()` haría
+     * lo mismo pero además parsea la imagen entera para devolver medidas que acá
+     * no se usan.
+     *
+     * Devuelve 'png', 'jpg', 'gif', 'webp', 'bmp', 'avif', 'svg', 'html', 'json'
+     * o null (bytes ilegibles).
+     */
+    public static function firmaDe(string $ruta)
+    {
+        $fh = @fopen($ruta, 'rb');
+        if ($fh === false) return null;
+
+        $b = (string) fread($fh, 32);
+        fclose($fh);
+
+        if (strlen($b) < 4) return null;
+
+        if (substr($b, 0, 8) === "\x89PNG\r\n\x1a\n")        return 'png';
+        if (substr($b, 0, 3) === "\xff\xd8\xff")               return 'jpg';
+        if (substr($b, 0, 6) === 'GIF87a' || substr($b, 0, 6) === 'GIF89a') return 'gif';
+        if (substr($b, 0, 4) === 'RIFF' && substr($b, 8, 4) === 'WEBP')     return 'webp';
+        if (substr($b, 0, 2) === 'BM')                          return 'bmp';
+        if (substr($b, 4, 4) === 'ftyp')                        return 'avif';
+
+        $texto = mb_strtolower(ltrim($b));
+        if (strpos($texto, '<?xml') === 0 || strpos($texto, '<svg') === 0) return 'svg';
+        if (strpos($texto, '<') === 0)                                     return 'html';
+        if (strpos($texto, '{') === 0 || strpos($texto, '[') === 0)        return 'json';
 
         return null;
     }
@@ -338,10 +452,22 @@ class FotosPersonas
     /**
      * Baja la imagen y devuelve el nombre del archivo guardado.
      *
-     * A diferencia del importador, acá se valida el contenido ANTES de escribir:
-     * esta pantalla existe justamente porque quedaron archivos que no eran
-     * imágenes, y volver a escribir uno igual sería cambiar una foto rota por
-     * otra foto rota.
+     * Tres diferencias con el importador, y las tres salen de lo que apareció
+     * roto en producción:
+     *
+     * 1. **Se valida el contenido ANTES de escribir**, y no solo la cabecera:
+     *    los archivos que rompen la pantalla son respuestas de ScraperAPI que
+     *    llegan con HTTP 200 y `Content-Type: image/png` pero traen el binario
+     *    pasado por UTF-8 (cada byte alto convertido en U+FFFD, `EF BF BD`).
+     *    La cabecera puede quedar intacta y `getimagesizefromstring()` dice que
+     *    sí; recién `imagecreatefromstring()` —que decodifica de verdad— se da
+     *    cuenta. Sin esto, el botón cambiaría una foto rota por otra igual.
+     * 2. **La extensión sale de los bytes, no de la URL.** TM publica el retrato
+     *    como `.png` pero responde WebP cuando el pedido acepta WebP (que es lo
+     *    que manda HttpHelper). Guardarlo como `.png` deja un archivo que el
+     *    server sirve con el content-type equivocado.
+     * 3. El nombre se filtra: sin eso, `.../big/../../etc/passwd` viajaría a un
+     *    `file_put_contents`.
      *
      * @return array ['ok' => bool, 'archivo' => ?string, 'error' => string]
      */
@@ -349,8 +475,8 @@ class FotosPersonas
     {
         $out = ['ok' => false, 'archivo' => null, 'error' => ''];
 
-        $nombre = self::nombreDe($url);
-        if ($nombre === null) {
+        $base = self::baseDe($url);
+        if ($base === null) {
             $out['error'] = 'la URL de TM no tiene nombre de archivo';
             return $out;
         }
@@ -370,12 +496,36 @@ class FotosPersonas
 
         $body = isset($img['body']) ? $img['body'] : '';
 
-        if (strlen($body) < self::MIN_BYTES || @getimagesizefromstring($body) === false) {
-            $out['error'] = 'lo que volvió no es una imagen (' . strlen($body) . ' bytes)';
+        if (strlen($body) < self::MIN_BYTES) {
+            $out['error'] = 'volvieron ' . strlen($body) . ' bytes: muy poco para una foto';
             return $out;
         }
 
-        $destino = public_path('images/') . $nombre;
+        $medidas = @getimagesizefromstring($body);
+        if ($medidas === false) {
+            // El caso típico: el cuerpo mangleado por UTF-8. Se avisa con el
+            // dato que lo identifica, para no quedarse en "no es una imagen".
+            $mangleado = substr_count($body, "\xef\xbf\xbd");
+            $out['error'] = 'lo que volvió no es una imagen'
+                . ($mangleado > 20 ? ' — viene pasado por UTF-8 (' . $mangleado . ' bytes reemplazados): '
+                    . 'es la respuesta del proxy, no la foto' : ' (' . strlen($body) . ' bytes)');
+            return $out;
+        }
+
+        // La cabecera puede estar sana y el resto no. Esto lo decodifica entero.
+        if (function_exists('imagecreatefromstring')) {
+            $gd = @imagecreatefromstring($body);
+            if ($gd === false) {
+                $out['error'] = 'la cabecera dice imagen pero el contenido no se puede decodificar '
+                    . '(está corrupto en origen o lo rompió el proxy)';
+                return $out;
+            }
+            @imagedestroy($gd);
+        }
+
+        $extension = self::extensionDe($medidas, $body);
+        $nombre    = $base . '.' . $extension;
+        $destino   = public_path('images/') . $nombre;
 
         if (@file_put_contents($destino, $body) === false) {
             $out['error'] = 'no se pudo escribir public/images/' . $nombre;
@@ -388,8 +538,8 @@ class FotosPersonas
         return $out;
     }
 
-    /** El nombre de archivo que le corresponde a una URL de retrato de TM. */
-    private static function nombreDe(string $url)
+    /** El nombre (sin extensión) que le corresponde a una URL de retrato de TM. */
+    private static function baseDe(string $url)
     {
         $ruta = parse_url($url, PHP_URL_PATH);
         $info = pathinfo((string) $ruta);
@@ -397,11 +547,30 @@ class FotosPersonas
         $archivo = isset($info['filename']) ? rtrim($info['filename'], '.') : '';
         if ($archivo === '') return null;
 
-        $extension = isset($info['extension']) && $info['extension'] !== '' ? $info['extension'] : 'jpg';
-
         // El nombre viaja a un path del filesystem: nada de barras ni de "..".
-        $nombre = preg_replace('/[^A-Za-z0-9._-]/', '', $archivo . '.' . $extension);
+        $archivo = preg_replace('/[^A-Za-z0-9._-]/', '', $archivo);
 
-        return $nombre !== '' ? $nombre : null;
+        return $archivo !== '' ? $archivo : null;
+    }
+
+    /** La extensión que corresponde a los bytes que efectivamente llegaron. */
+    private static function extensionDe($medidas, string $body): string
+    {
+        $porTipo = [
+            IMAGETYPE_PNG  => 'png',
+            IMAGETYPE_JPEG => 'jpg',
+            IMAGETYPE_GIF  => 'gif',
+            IMAGETYPE_BMP  => 'bmp',
+        ];
+
+        if (defined('IMAGETYPE_WEBP')) $porTipo[IMAGETYPE_WEBP] = 'webp';
+
+        $tipo = is_array($medidas) && isset($medidas[2]) ? (int) $medidas[2] : 0;
+        if (isset($porTipo[$tipo])) return $porTipo[$tipo];
+
+        // getimagesize no conoce WebP en PHP viejo: se mira la firma a mano.
+        if (substr($body, 0, 4) === 'RIFF' && substr($body, 8, 4) === 'WEBP') return 'webp';
+
+        return 'jpg';
     }
 }

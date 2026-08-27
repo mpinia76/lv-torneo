@@ -660,10 +660,16 @@
             <p class="text-muted small">
                 <code>personas.foto</code> guarda solo el nombre del archivo; la imagen vive en
                 <code>public/images</code>. Cuando las dos cosas no coinciden, la ficha muestra el cuadradito
-                roto. Acá están las dos formas en que pasa: <strong>no está el archivo</strong> (la descarga
-                de Transfermarkt falló y en la base quedó el nombre igual) y <strong>el archivo está pero no
-                es una imagen</strong> —pesa cero, quedó cortado, o es una página de error guardada con
-                extensión <code>.jpg</code>—, que es el caso que un <code>file_exists</code> no encuentra nunca.
+                roto. Pasa de cuatro formas: <strong>falta el archivo</strong>; <strong>no es una imagen</strong>
+                (pesa lo que tiene que pesar, pero adentro hay una página de error, un JSON, o el binario
+                arruinado por el proxy que baja las fotos de Transfermarkt); <strong>es otro formato</strong>
+                que el que dice la extensión (TM publica el retrato como <code>.png</code> y responde WebP);
+                o <strong>pesa cero</strong>.
+            </p>
+            <p class="text-muted small">
+                Los archivos que rompen la pantalla pesan 2 KB, 20 KB y hasta 280 KB, así que
+                <strong>mirar el tamaño no sirve</strong> y <code>file_exists</code> menos: los encuentra sanos
+                a todos. Lo que los delata son los primeros bytes, y eso es lo que mira esta pestaña.
             </p>
             <p class="text-muted small">
                 Las fichas con la foto vacía <strong>no aparecen acá</strong>: esas muestran la silueta a
@@ -677,13 +683,20 @@
             @if($conteos['fotos'] == 0)
                 <div class="alert alert-info">No hay fotos rotas: todas las fichas con foto apuntan a un archivo que existe y se puede dibujar.</div>
             @else
-                @php $detF = $conteos['fotosDet']; @endphp
+                @php
+                    $detF = $conteos['fotosDet'];
+                    $motivosF = [
+                        'corrupto' => 'No es una imagen',
+                        'falta'    => 'Falta el archivo',
+                        'formato'  => 'Otro formato',
+                        'vacio'    => 'Pesa cero',
+                    ];
+                @endphp
                 <table class="table table-sm table-bordered w-auto mb-3">
                     <thead class="thead-light">
                         <tr>
                             <th>Rol</th><th class="text-right">Fotos rotas</th>
-                            <th class="text-right">Falta el archivo</th>
-                            <th class="text-right">Archivo inservible</th>
+                            @foreach($motivosF as $etiquetaM)<th class="text-right">{{ $etiquetaM }}</th>@endforeach
                             <th class="text-right">Con id de TM</th>
                             <th class="text-right">Sin id de TM</th>
                         </tr>
@@ -693,8 +706,9 @@
                         <tr>
                             <td>{{ $etiquetaF }}</td>
                             <td class="text-right">{{ $detF[$kf]['total'] }}</td>
-                            <td class="text-right">{{ $detF[$kf]['falta'] }}</td>
-                            <td class="text-right">{{ $detF[$kf]['vacio'] }}</td>
+                            @foreach(array_keys($motivosF) as $mF)
+                                <td class="text-right">{{ $detF[$kf][$mF] }}</td>
+                            @endforeach
                             <td class="text-right">{{ $detF[$kf]['con_tm'] }}</td>
                             <td class="text-right text-muted">{{ $detF[$kf]['sin_tm'] }}</td>
                         </tr>
@@ -702,8 +716,9 @@
                         <tr class="font-weight-bold">
                             <td>Total</td>
                             <td class="text-right">{{ $detF['total']['total'] }}</td>
-                            <td class="text-right">{{ $detF['total']['falta'] }}</td>
-                            <td class="text-right">{{ $detF['total']['vacio'] }}</td>
+                            @foreach(array_keys($motivosF) as $mF)
+                                <td class="text-right">{{ $detF['total'][$mF] }}</td>
+                            @endforeach
                             <td class="text-right">{{ $detF['total']['con_tm'] }}</td>
                             <td class="text-right">{{ $detF['total']['sin_tm'] }}</td>
                         </tr>
@@ -717,18 +732,16 @@
                             Todas <span class="badge badge-light">{{ $detF['total']['total'] }}</span>
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-1 @if($verFoto == 'falta') active @endif"
-                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto', 'ver' => 'falta']) }}">
-                            Falta el archivo <span class="badge badge-light">{{ $detF['total']['falta'] }}</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link py-1 @if($verFoto == 'vacio') active @endif"
-                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto', 'ver' => 'vacio']) }}">
-                            Archivo inservible <span class="badge badge-light">{{ $detF['total']['vacio'] }}</span>
-                        </a>
-                    </li>
+                    @foreach($motivosF as $mF => $etiquetaM)
+                        @if($detF['total'][$mF] > 0)
+                        <li class="nav-item">
+                            <a class="nav-link py-1 @if($verFoto == $mF) active @endif"
+                               href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto', 'ver' => $mF]) }}">
+                                {{ $etiquetaM }} <span class="badge badge-light">{{ $detF['total'][$mF] }}</span>
+                            </a>
+                        </li>
+                        @endif
+                    @endforeach
                 </ul>
 
                 @if($detF['total']['con_tm'] > 0)
@@ -784,17 +797,25 @@
                             <td>{{ $p->nombre }}</td>
                             <td class="small"><code>{{ $p->foto }}</code></td>
                             <td class="small">
-                                @if($dFoto && $dFoto['motivo'] == 'vacio')
-                                    <span class="badge badge-warning">archivo inservible</span>
-                                    <span class="text-muted">{{ $dFoto['bytes'] }} bytes</span>
-                                @else
+                                @php $mot = $dFoto['motivo'] ?? 'falta'; @endphp
+                                @if($mot == 'falta')
                                     <span class="badge badge-danger">no está el archivo</span>
-                                    @if($dFoto && !empty($dFoto['parecido']))
+                                    @if(!empty($dFoto['parecido']))
                                         <div class="text-muted">
                                             existe como <code>{{ $dFoto['parecido'] }}</code> — es diferencia
                                             de mayúsculas: en Windows se ve y en el server no.
                                         </div>
                                     @endif
+                                @elseif($mot == 'formato')
+                                    <span class="badge badge-info">otro formato</span>
+                                    <div class="text-muted">{{ $dFoto['detalle'] }}</div>
+                                @elseif($mot == 'vacio')
+                                    <span class="badge badge-warning">pesa cero</span>
+                                @else
+                                    <span class="badge badge-dark">no es una imagen</span>
+                                    <div class="text-muted">
+                                        {{ $dFoto['detalle'] ?? '' }} · {{ number_format($dFoto['bytes'] ?? 0) }} bytes
+                                    </div>
                                 @endif
                             </td>
                             <td>
