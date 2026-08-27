@@ -1059,6 +1059,95 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     }
 
 
+    /**
+     * Ventana para considerar a alguien "actual": los últimos 12 meses.
+     * Antes se miraba si el torneo tenía el año en curso, y eso dejaba pegado
+     * al club a cualquiera que hubiera pasado por ahí en enero aunque se
+     * hubiera ido en marzo.
+     */
+    private function desdeActividad()
+    {
+        return date('Y-m-d', strtotime('-12 months'));
+    }
+
+    /**
+     * Clubes actuales de un JUGADOR: los del ÚLTIMO partido que jugó, y sólo si
+     * ese partido entra en la ventana. Si cambió de equipo, el anterior ya no
+     * aparece.
+     */
+    private function sqlClubActualJugador($jugadorId)
+    {
+        $jugadorId = (int) $jugadorId;
+        $desde     = $this->desdeActividad();
+
+        return "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
+            FROM alineacions
+            INNER JOIN partidos ON partidos.id = alineacions.partido_id
+            INNER JOIN equipos ON equipos.id = alineacions.equipo_id
+            WHERE alineacions.jugador_id = $jugadorId
+              AND partidos.dia >= '$desde'
+              AND partidos.dia = (
+                  SELECT MAX(P2.dia)
+                  FROM alineacions A2
+                  INNER JOIN partidos P2 ON P2.id = A2.partido_id
+                  WHERE A2.jugador_id = $jugadorId
+              )";
+    }
+
+    /**
+     * Clubes actuales de un TÉCNICO: aquellos donde dirigió dentro de la
+     * ventana y donde NINGÚN otro técnico dirigió después. O sea, sigue siendo
+     * el último técnico registrado del club. Si al club lo agarró otro, el
+     * anterior desaparece solo.
+     */
+    private function sqlClubActualTecnico($tecnicoId)
+    {
+        $tecnicoId = (int) $tecnicoId;
+        $desde     = $this->desdeActividad();
+
+        return "SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
+            FROM partido_tecnicos
+            INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
+            INNER JOIN equipos ON equipos.id = partido_tecnicos.equipo_id
+            WHERE partido_tecnicos.tecnico_id = $tecnicoId
+              AND partidos.dia >= '$desde'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM partido_tecnicos PT2
+                  INNER JOIN partidos P2 ON P2.id = PT2.partido_id
+                  WHERE PT2.equipo_id = partido_tecnicos.equipo_id
+                    AND PT2.tecnico_id <> partido_tecnicos.tecnico_id
+                    AND (P2.dia > partidos.dia
+                         OR (P2.dia = partidos.dia AND P2.id > partidos.id))
+              )";
+    }
+
+    /**
+     * La misma idea que sqlClubActualTecnico, pero como EXISTS para filtrar o
+     * contar técnicos que hoy están dirigiendo a alguien.
+     */
+    private function sqlTecnicoDirigiendo($columnaTecnico)
+    {
+        $desde = $this->desdeActividad();
+
+        return "EXISTS (
+            SELECT 1
+            FROM partido_tecnicos PT1
+            INNER JOIN partidos PA1 ON PA1.id = PT1.partido_id
+            WHERE PT1.tecnico_id = $columnaTecnico
+              AND PA1.dia >= '$desde'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM partido_tecnicos PT2
+                  INNER JOIN partidos PA2 ON PA2.id = PT2.partido_id
+                  WHERE PT2.equipo_id = PT1.equipo_id
+                    AND PT2.tecnico_id <> PT1.tecnico_id
+                    AND (PA2.dia > PA1.dia
+                         OR (PA2.dia = PA1.dia AND PA2.id > PA1.id))
+              )
+        )";
+    }
+
     public function historiales(Request $request)
     {
         $equipo1= $request->query('equipo1');
@@ -1421,20 +1510,17 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     private function cargarDatosReales($goleador, $year)
     {
         // Current-year teams (jugando)
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
-        FROM alineacions
-        INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        INNER JOIN partidos ON alineacions.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-        INNER JOIN torneos ON torneos.id = grupos.torneo_id
-        WHERE torneos.year LIKE '%" . $year . "%' AND jugadors.id = " . $goleador->id;
+        // Club actual = el del último partido jugado (ver sqlClubActualJugador).
+        $sqlJugando = $this->sqlClubActualJugador($goleador->id);
 
         $juega = DB::select(DB::raw($sqlJugando));
-        foreach ($juega as $e) {
-            $goleador->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+        // Si hay partidos reales mandan ellos: la carga manual no tiene fechas
+        // y sólo serviría de respaldo.
+        if (count($juega)) {
+            $goleador->jugando = '';
+            foreach ($juega as $e) {
+                $goleador->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+            }
         }
 
         // Escudos with goal counts per team (real matches only)
@@ -1784,19 +1870,15 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     private function cargarDatosRealesTarjetas($tarjeta, $year)
     {
         // Current-year teams
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
-        FROM alineacions
-        INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        INNER JOIN partidos ON alineacions.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-        INNER JOIN torneos ON torneos.id = grupos.torneo_id
-        WHERE torneos.year LIKE '%" . $year . "%' AND jugadors.id = " . $tarjeta->id;
+        // Club actual = el del último partido jugado (ver sqlClubActualJugador).
+        $sqlJugando = $this->sqlClubActualJugador($tarjeta->id);
 
-        foreach (DB::select(DB::raw($sqlJugando)) as $e) {
-            $tarjeta->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+        $juega = DB::select(DB::raw($sqlJugando));
+        if (count($juega)) {
+            $tarjeta->jugando = '';
+            foreach ($juega as $e) {
+                $tarjeta->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+            }
         }
 
         // Real-match escudos with card counts — merge with manual escudos if present
@@ -2745,19 +2827,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
          */
         $filtroActuales = '';
         if ($actuales) {
-            $filtroActuales = " AND EXISTS (
-            SELECT PT1.id
-            FROM partido_tecnicos PT1
-            INNER JOIN tecnicos TEC ON PT1.tecnico_id = TEC.id
-            INNER JOIN personas P2 ON TEC.persona_id = P2.id
-            INNER JOIN partidos ON PT1.partido_id = partidos.id
-            INNER JOIN fechas F1 ON partidos.fecha_id = F1.id
-            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-            WHERE T1.year LIKE ?
-            AND TEC.id = tecnicos.id
-            $nombreFiltro2
-        )";
+            $filtroActuales = ' AND ' . $this->sqlTecnicoDirigiendo('tecnicos.id');
         }
 
         $filtroCampeones = '';
@@ -2789,12 +2859,7 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
             if ($nombre) {
                 array_push($p, $like, $like); // nombreFiltro
             }
-            if ($actuales) {
-                $p[] = "%$year%"; // T1.year LIKE ?
-                if ($nombre) {
-                    array_push($p, $like, $like); // nombreFiltro2
-                }
-            }
+            // El filtro "Dirigiendo" ya no lleva parámetros: la fecha va inline.
             if ($campeones) {
                 if ($nombre) {
                     array_push($p, $like, $like); // nombreFiltro3
@@ -3112,27 +3177,17 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
                 $goleador->titulos = $totalTitulos . ' (' . trim($ligas . ' ' . $copas . ' ' . $internacionales) . ')';
             }
 
-            // Teams currently coached this year (SQL)
-            $sqlJugando = "
-            SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
-            FROM partido_tecnicos
-            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
-            INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
-            INNER JOIN fechas ON partidos.fecha_id = fechas.id
-            INNER JOIN grupos ON grupos.id = fechas.grupo_id
-            INNER JOIN equipos ON partido_tecnicos.equipo_id = equipos.id
-            INNER JOIN torneos ON torneos.id = grupos.torneo_id
-            WHERE torneos.year LIKE ? AND tecnicos.id = ?
-        ";
-
+            // Clubes que dirige hoy: es el último técnico registrado del club.
             $jugando = '';
-            $juega = DB::select($sqlJugando, ["%$year%", $goleador->tecnico_id]);
+            $juega = DB::select(DB::raw($this->sqlClubActualTecnico($goleador->tecnico_id)));
             foreach ($juega as $e) {
                 $jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
             }
 
-            // Add current-year teams from manual stats to "jugando"
-            if (isset($manualesDetalle[$goleador->tecnico_id])) {
+            // La carga manual sólo entra como respaldo: no tiene fechas, apenas
+            // el año en el nombre del torneo, así que no sirve para decidir si
+            // sigue en el cargo.
+            if ($jugando === '' && isset($manualesDetalle[$goleador->tecnico_id])) {
                 foreach ($manualesDetalle[$goleador->tecnico_id] as $manual) {
                     if (str_contains($manual->torneo_nombre, $year)) {
                         $jugando .= $manual->escudo . '_' . $manual->equipo_id . '_' . $manual->nombre . ',';
@@ -3280,16 +3335,11 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
         $totalDirigiendo = DB::selectOne("
             SELECT COUNT(DISTINCT tecnicos.id) AS c
-            FROM partido_tecnicos
-            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
+            FROM tecnicos
             INNER JOIN personas ON personas.id = tecnicos.persona_id
-            INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
-            INNER JOIN fechas ON partidos.fecha_id = fechas.id
-            INNER JOIN grupos ON grupos.id = fechas.grupo_id
-            INNER JOIN torneos ON torneos.id = grupos.torneo_id
-            WHERE torneos.year LIKE ?
+            WHERE " . $this->sqlTecnicoDirigiendo('tecnicos.id') . "
             $nombreFiltro
-        ", array_merge(["%$year%"], $paramsNombre))->c;
+        ", $paramsNombre)->c;
 
         $totalCampeones = DB::selectOne("
             SELECT COUNT(DISTINCT tecnicos.id) AS c
@@ -4239,19 +4289,15 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
     private function cargarDatosRealesArqueros($arquero, $year)
     {
         // Current-year teams
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
-        FROM alineacions
-        INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        INNER JOIN partidos ON alineacions.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-        INNER JOIN torneos ON torneos.id = grupos.torneo_id
-        WHERE torneos.year LIKE '%" . $year . "%' AND jugadors.id = " . $arquero->id;
+        // Club actual = el del último partido jugado (ver sqlClubActualJugador).
+        $sqlJugando = $this->sqlClubActualJugador($arquero->id);
 
-        foreach (DB::select(DB::raw($sqlJugando)) as $e) {
-            $arquero->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+        $juega = DB::select(DB::raw($sqlJugando));
+        if (count($juega)) {
+            $arquero->jugando = '';
+            foreach ($juega as $e) {
+                $arquero->jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
+            }
         }
 
         // Real-match escudos with stats — merge with manual data
@@ -4731,16 +4777,8 @@ group by jugador_id, jugador, foto, nacionalidad';
     private function cargarDatosRealesJugador($jugador, $year)
     {
         // Current-year teams
-        $sqlJugando = "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
-        FROM alineacions
-        INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        INNER JOIN partidos ON alineacions.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        INNER JOIN equipos ON alineacions.equipo_id = equipos.id
-        INNER JOIN torneos ON torneos.id = grupos.torneo_id
-        WHERE torneos.year LIKE '%" . $year . "%' AND jugadors.id = " . $jugador->jugador_id;
+        // Club actual = el del último partido jugado (ver sqlClubActualJugador).
+        $sqlJugando = $this->sqlClubActualJugador($jugador->jugador_id);
 
         // Parse the existing 'jugando' string (it may already contain current-year
         // teams added from manual stats) into an array indexed by equipo_id, so the
@@ -4759,8 +4797,13 @@ group by jugador_id, jugador, foto, nacionalidad';
             }
         }
 
-        foreach (DB::select(DB::raw($sqlJugando)) as $e) {
-            if (!isset($jugandoEquipos[$e->equipo_id])) {
+        $juega = DB::select(DB::raw($sqlJugando));
+
+        // Con partidos reales alcanza: pisan lo que haya dejado la carga manual,
+        // que sólo mira el año dentro del nombre del torneo.
+        if (count($juega)) {
+            $jugandoEquipos = [];
+            foreach ($juega as $e) {
                 $jugandoEquipos[$e->equipo_id] = [
                     'escudo' => $e->escudo,
                     'nombre' => $e->nombre,

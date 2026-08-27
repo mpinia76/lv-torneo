@@ -59,7 +59,7 @@
         <a class="t-kpi t-kpi-enlace {{ $actuales ? 't-kpi-acento' : '' }}"
            href="{{ $tcLink(['actuales' => $actuales ? 0 : 1]) }}">
             <div class="t-kpi-num">{{ number_format($totalDirigiendo, 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Dirigiendo en {{ $year }}</div>
+            <div class="t-kpi-rot">Dirigiendo hoy</div>
         </a>
         <a class="t-kpi t-kpi-enlace {{ $campeones ? 't-kpi-acento' : '' }}"
            href="{{ $tcLink(['campeones' => $campeones ? 0 : 1]) }}">
