@@ -69,12 +69,47 @@ class TmFechas
      */
     public static function pendientes(bool $incluirDescartadas = false): array
     {
+        $out = self::fichas(null, true);
+
+        if (!$incluirDescartadas && $out) {
+            $out = array_diff_key($out, self::descartadas());
+        }
+
+        return $out;
+    }
+
+    /**
+     * Las fichas de rol de un conjunto de personas, con el id de TM de cada una.
+     *
+     * Es el cuerpo que antes estaba metido adentro de `pendientes()`, sacado
+     * afuera para que lo pueda usar cualquier pantalla que necesite preguntarle
+     * algo a Transfermarkt y no solo la de fechas (hoy tambien la de fotos
+     * rotas). Devuelve el mismo formato de siempre:
+     * [persona_id => ['tipo', 'rol_id', 'tm', 'apellido', 'nombre']].
+     *
+     * $personaIds acota a esas personas (null = todas). OJO: entra tal cual en
+     * un whereIn, asi que el que llama tiene que partirlo en tandas si la lista
+     * es larga. Un array vacio devuelve vacio, no todo.
+     *
+     * $soloSinFecha mantiene el filtro original `nacimiento IS NULL`, que es lo
+     * unico que le importa a la pestana de fechas.
+     */
+    public static function fichas(array $personaIds = null, bool $soloSinFecha = true): array
+    {
         $out = [];
+
+        if ($personaIds !== null && !$personaIds) return $out;
+
+        $acotar = function ($q) use ($personaIds, $soloSinFecha) {
+            if ($soloSinFecha) $q->whereNull('p.nacimiento');
+            if ($personaIds !== null) $q->whereIn('p.id', $personaIds);
+            return $q;
+        };
 
         // ── Jugadores ──────────────────────────────────────────────────────
         $q = DB::table('personas as p')
-            ->join('jugadors as j', 'j.persona_id', '=', 'p.id')
-            ->whereNull('p.nacimiento');
+            ->join('jugadors as j', 'j.persona_id', '=', 'p.id');
+        $acotar($q);
 
         $cols = ['p.id as persona_id', 'p.apellido', 'p.nombre', 'j.id as rol_id'];
         if (Schema::hasTable('jugador_tm')) {
@@ -92,10 +127,11 @@ class TmFechas
 
         // ── Técnicos ───────────────────────────────────────────────────────
         if (self::tieneCol('tecnicos', 'transfermarkt_url')) {
-            $filas = DB::table('personas as p')
-                ->join('tecnicos as tc', 'tc.persona_id', '=', 'p.id')
-                ->whereNull('p.nacimiento')
-                ->select('p.id as persona_id', 'p.apellido', 'p.nombre', 'tc.id as rol_id', 'tc.transfermarkt_url as url')
+            $q = DB::table('personas as p')
+                ->join('tecnicos as tc', 'tc.persona_id', '=', 'p.id');
+            $acotar($q);
+
+            $filas = $q->select('p.id as persona_id', 'p.apellido', 'p.nombre', 'tc.id as rol_id', 'tc.transfermarkt_url as url')
                 ->get();
 
             foreach ($filas as $f) {
@@ -105,8 +141,8 @@ class TmFechas
 
         // ── Árbitros ───────────────────────────────────────────────────────
         $q = DB::table('personas as p')
-            ->join('arbitros as a', 'a.persona_id', '=', 'p.id')
-            ->whereNull('p.nacimiento');
+            ->join('arbitros as a', 'a.persona_id', '=', 'p.id');
+        $acotar($q);
 
         $cols = ['p.id as persona_id', 'p.apellido', 'p.nombre', 'a.id as rol_id'];
         $hayMapa = Schema::hasTable('arbitro_tm');
@@ -121,10 +157,6 @@ class TmFechas
             $tm = self::limpiar(isset($f->tm) ? $f->tm : null);
             if ($tm === null && $tieneUrl) $tm = self::idDeUrl(isset($f->url) ? $f->url : null, 'schiedsrichter');
             self::sumar($out, $f, 'arbitro', $tm);
-        }
-
-        if (!$incluirDescartadas && $out) {
-            $out = array_diff_key($out, self::descartadas());
         }
 
         uasort($out, function ($a, $b) {
@@ -522,8 +554,12 @@ class TmFechas
     /**
      * Una llamada por tanda. Las rutas alternativas son las mismas que probaba
      * el importador: la API cambió de nombre alguna vez y conviene no atarse.
+     *
+     * Es pública porque `FotosPersonas` pide los mismos perfiles para sacarles
+     * la URL del retrato. Devuelve [tm_id => perfil crudo] y suma en
+     * $r['llamadas'] lo que consultó.
      */
-    private static function traerPerfiles(string $tipo, array $ids, array &$r): array
+    public static function traerPerfiles(string $tipo, array $ids, array &$r): array
     {
         $qs = implode('&', array_map(function ($id) { return 'ids[]=' . urlencode($id); }, $ids));
 

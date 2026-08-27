@@ -107,6 +107,11 @@ Route::group(['prefix' => 'admin'], function()
     Route::post('personas/fechas/completar', 'PersonaDuplicadoController@completarFechas')->name('personas.fechas.completar');
     Route::post('personas/fechas/desconocidas', 'PersonaDuplicadoController@fechasDesconocidas')->name('personas.fechas.desconocidas');
 
+    // Fotos rotas: vuelve a bajar de Transfermarkt el retrato de las fichas cuyo
+    // archivo no está en public/images o no es una imagen. La URL del retrato es
+    // gratis (de a 50 por llamada); bajar cada foto sale un crédito de ScraperAPI.
+    Route::post('personas/fotos/completar', 'PersonaDuplicadoController@completarFotos')->name('personas.fotos.completar');
+
     // Se mantiene el nombre de ruta por compatibilidad, pero apunta al controller
     // nuevo: JugadorController@verificarSimilitud escribia SOLO en
     // `personas_verificadas`, asi que un par descartado por ahi reaparecia como

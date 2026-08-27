@@ -1482,27 +1482,51 @@ class TmDetallePartido
                 continue;
             }
 
+            // No está como DT, pero la PERSONA puede existir ya con otro rol:
+            // el DT que antes fue jugador es la misma fila de `personas`.
+            // Ver personaExistenteSinRol(); sin esto Persona::create() choca
+            // contra el índice único (nombre, apellido, nacimiento) y el
+            // partido se queda sin DT.
+            $libre = $this->personaExistenteSinRol($datos);
+
             if (!$escribir) {
                 $ficticio = $this->proximoPreview--;
-                $this->nombresPreview[$ficticio] = $datos['name'] . ' · DT nuevo';
+                $this->nombresPreview[$ficticio] = $datos['name'] . ($libre ? ' · DT (rol nuevo)' : ' · DT nuevo');
                 $out[(string) $tmId] = $ficticio;
                 if ($informe !== null) $informe['creados']['tecnicos'][] = $datos['apellido'] . ', ' . $datos['nombre']
-                    . ' (TM ' . $tmId . ') — SE CREARÍA';
+                    . ' (TM ' . $tmId . ')' . ($libre
+                        ? ' — YA EXISTE como persona #' . $libre['id'] . ' (' . $libre['base'] . '): se le AGREGARÍA el rol de DT'
+                        : ' — SE CREARÍA');
                 continue;
             }
 
             try {
-                $foto = $this->descargarFoto($datos['portrait'], $datos['name']);
-                if ($foto) $datos['persona']['foto'] = $foto;
+                if ($libre) {
+                    $persona = Persona::findOrFail($libre['id']);
+                } else {
+                    $foto = $this->descargarFoto($datos['portrait'], $datos['name']);
+                    if ($foto) $datos['persona']['foto'] = $foto;
+                    $persona = Persona::create($datos['persona']);
+                }
 
-                $persona = Persona::create($datos['persona']);
-                $tecnico = $persona->tecnico()->create([
-                    'transfermarkt_url' => 'https://www.transfermarkt.es/-/profil/trainer/' . $tmId,
-                ]);
+                $tecnico = $persona->tecnico;
+                if ($tecnico) {
+                    $this->grabarUrlTecnico($tecnico->id, $tmId);
+                } else {
+                    $tecnico = $persona->tecnico()->create([
+                        'transfermarkt_url' => 'https://www.transfermarkt.es/-/profil/trainer/' . $tmId,
+                    ]);
+                }
                 $out[(string) $tmId] = (int) $tecnico->id;
                 if ($this->mapaTecnicos !== null) $this->mapaTecnicos[(string) $tmId] = (int) $tecnico->id;
+                if ($libre) {
+                    $this->aviso('El DT ' . $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ') ya estaba '
+                        . 'cargado como persona #' . $libre['id'] . ' (' . $libre['base'] . ', ' . $libre['como'] . '): '
+                        . 'le agregué el rol de DT (#' . $tecnico->id . ') en vez de duplicarlo. Confirmalo.');
+                }
                 if ($informe !== null) $informe['creados']['tecnicos'][] = $datos['apellido'] . ', ' . $datos['nombre']
-                    . ' (TM ' . $tmId . ') — creado #' . $tecnico->id;
+                    . ' (TM ' . $tmId . ')' . ($libre ? ' — rol de DT agregado a la persona #' . $libre['id'] : ' — creado')
+                    . ' #' . $tecnico->id;
             } catch (\Exception $e) {
                 $this->aviso('No pude crear al DT TM ' . $tmId . ': ' . $e->getMessage());
             }
@@ -1744,23 +1768,41 @@ class TmDetallePartido
                 continue;
             }
 
+            // La persona puede existir sin el rol de árbitro (ver
+            // personaExistenteSinRol): ahí le agregamos el rol en vez de
+            // chocar contra el índice único de `personas`.
+            $libre = $this->personaExistenteSinRol($datos);
+
             if (!$escribir) {
                 $ficticio = $this->proximoPreview--;
                 $this->nombresPreview[$ficticio] = $datos['name'] . ' · árbitro nuevo';
                 $out[(string) $tmId] = $ficticio;
-                $this->aviso('Se crearía el árbitro ' . $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ').');
+                $this->aviso($libre
+                    ? 'El árbitro ' . $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ') ya existe como '
+                        . 'persona #' . $libre['id'] . ' (' . $libre['base'] . '): se le agregaría el rol de árbitro.'
+                    : 'Se crearía el árbitro ' . $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ').');
                 continue;
             }
 
             try {
-                $foto = $this->descargarFoto($datos['portrait'], $datos['name']);
-                if ($foto) $datos['persona']['foto'] = $foto;
+                if ($libre) {
+                    $persona = Persona::findOrFail($libre['id']);
+                } else {
+                    $foto = $this->descargarFoto($datos['portrait'], $datos['name']);
+                    if ($foto) $datos['persona']['foto'] = $foto;
+                    $persona = Persona::create($datos['persona']);
+                }
 
-                $persona = Persona::create($datos['persona']);
-                $arbitro = $persona->arbitro()->create([]);
+                $arbitro = $persona->arbitro ?: $persona->arbitro()->create([]);
                 $this->guardarMapeoArbitro($tmId, $arbitro->id, $datos['name'], 'auto', true);
                 $out[(string) $tmId] = (int) $arbitro->id;
-                if ($informe !== null) $informe['creados']['arbitros'][] = $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ')';
+                if ($libre) {
+                    $this->aviso('El árbitro ' . $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ') ya estaba '
+                        . 'cargado como persona #' . $libre['id'] . ' (' . $libre['base'] . ', ' . $libre['como'] . '): le agregué '
+                        . 'el rol de árbitro (#' . $arbitro->id . ') en vez de duplicarlo. Confirmalo en "Jugadores y árbitros por revisar".');
+                }
+                if ($informe !== null) $informe['creados']['arbitros'][] = $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ')'
+                    . ($libre ? ' — rol agregado a la persona #' . $libre['id'] : '');
             } catch (\Exception $e) {
                 $this->aviso('No pude crear al árbitro TM ' . $tmId . ': ' . $e->getMessage());
             }
@@ -1839,6 +1881,91 @@ class TmDetallePartido
 
         return count(array_intersect($apeTm, $tokensBase)) > 0
             && count(array_intersect($apeBase, $tokensTm)) > 0;
+    }
+
+    /**
+     * ¿La PERSONA ya está en la base, aunque sin el rol que estamos cargando?
+     *
+     * Una persona = una fila de `personas` con uno o más roles (`jugadors`,
+     * `tecnicos`, `arbitros`). buscarPersonaRol() mira SOLO la tabla del rol,
+     * así que a un DT que ya estaba cargado como jugador no lo encontraba y se
+     * intentaba crear la persona de nuevo, contra el índice único
+     * (nombre, apellido, nacimiento). La base rechaza el INSERT con un 1062:
+     *
+     *   Duplicate entry 'Juan Luciano-Pajuelo Chávez-1974-09-23' (TM 62171)
+     *
+     * y el partido se quedaba sin DT. Acá buscamos la persona y después se le
+     * AGREGA el rol que falta.
+     *
+     * El criterio es más estricto que en buscarPersonaRol() porque el candidato
+     * puede ser cualquiera de las 30.000+ personas, y un apareo equivocado le
+     * pega la carrera de uno a la ficha del otro:
+     *
+     *   1. La MISMA clave que rechaza la base (nombre + apellido + nacimiento).
+     *      Si para la base son la misma fila, son la misma persona.
+     *   2. Misma fecha de nacimiento + apellidos que se tocan + 2 o más
+     *      palabras del nombre en común (el mismo listón de
+     *      buscarJugadorExistente, que es seguro porque va atado a la fecha).
+     *
+     * SIN fecha de nacimiento no aparejamos nada: ahí el nombre solo no alcanza
+     * (ver el caso Belatti/González) y, además, sin fecha el índice único ni
+     * siquiera choca — crear la persona nueva no rompe nada y el duplicado se
+     * ve después en /admin/verificarPersonas.
+     *
+     * @return array|null  ['id' => persona_id, 'base' => 'Apellido, Nombre', 'como' => motivo]
+     */
+    private function personaExistenteSinRol(array $datos)
+    {
+        if (empty($datos['nacimiento'])) return null;
+        $nac = $datos['nacimiento'];
+
+        $nombre   = isset($datos['persona']['nombre'])   ? trim((string) $datos['persona']['nombre'])   : '';
+        $apellido = isset($datos['persona']['apellido']) ? trim((string) $datos['persona']['apellido']) : '';
+
+        // 1) La clave exacta del índice único.
+        if ($nombre !== '' && $apellido !== '') {
+            $exacta = DB::table('personas')
+                ->where('nombre', $nombre)
+                ->where('apellido', $apellido)
+                ->where('nacimiento', $nac)
+                ->select('id', 'nombre', 'apellido')->first();
+            if ($exacta) {
+                return ['id' => (int) $exacta->id,
+                    'base' => trim($exacta->apellido . ', ' . $exacta->nombre),
+                    'como' => 'misma clave nombre + apellido + fecha de nacimiento'];
+            }
+        }
+
+        // 2) Misma fecha + apellidos que se tocan + 2 palabras en común.
+        $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
+        if (count($tokensTm) < 2) return null;
+        $apeTm = $this->tokensNombre($datos['apellido']);
+
+        $cands = DB::table('personas')
+            ->where('nacimiento', $nac)
+            ->select('id', 'nombre', 'apellido')->limit(50)->get();
+
+        $mejor = null; $puntaje = 0; $empatados = 0;
+        foreach ($cands as $c) {
+            $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
+            $apeBase    = $this->tokensNombre($c->apellido);
+            if (!$this->apellidosSeTocan($apeTm, $tokensTm, $apeBase, $tokensBase)) continue;
+
+            $p = count(array_intersect($tokensTm, $tokensBase));
+            if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
+            elseif ($p === $puntaje && $p > 0) { $empatados++; }
+        }
+
+        if (!$mejor || $puntaje < 2) return null;
+
+        if ($empatados > 1) {
+            $this->aviso('Hay ' . $empatados . ' personas nacidas el ' . $nac . ' que se parecen a '
+                . $datos['apellido'] . ', ' . $datos['nombre'] . '. Uso la #' . $mejor->id . ' pero revisalo.');
+        }
+
+        return ['id' => (int) $mejor->id,
+            'base' => trim($mejor->apellido . ', ' . $mejor->nombre),
+            'como' => 'misma fecha de nacimiento y ' . $puntaje . ' palabras del nombre en común'];
     }
 
     private function guardarMapeoArbitro($tmId, $arbitroId, $nombre, $origen, $revisar)
@@ -2008,13 +2135,26 @@ class TmDetallePartido
         }
 
         try {
-            $foto = $this->descargarFoto($datos['portrait'], $etiqueta);
-            if ($foto) $datos['persona']['foto'] = $foto;
+            // La persona puede estar cargada con otro rol (un DT o un árbitro
+            // que también jugó). Ver personaExistenteSinRol().
+            $libre = $this->personaExistenteSinRol($datos);
+            if ($libre) {
+                $persona = Persona::findOrFail($libre['id']);
+            } else {
+                $foto = $this->descargarFoto($datos['portrait'], $etiqueta);
+                if ($foto) $datos['persona']['foto'] = $foto;
+                $persona = Persona::create($datos['persona']);
+            }
 
-            $persona = Persona::create($datos['persona']);
-            $jugador = $persona->jugador()->create($datos['jugador']);
+            $jugador = $persona->jugador ?: $persona->jugador()->create($datos['jugador']);
             $this->guardarMapeoJugador($tmId, $jugador->id, $datos['name'], 'auto', true);
-            return ['jugador_id' => (int) $jugador->id, 'creado' => true, 'descripcion' => $etiqueta . ' — creado #' . $jugador->id];
+            if ($libre) {
+                $this->aviso($etiqueta . ' ya estaba cargado como persona #' . $libre['id'] . ' (' . $libre['base'] . ', '
+                    . $libre['como'] . '): le agregué el rol de jugador (#' . $jugador->id . ') en vez de duplicarlo. '
+                    . 'Confirmalo en "jugadores por revisar".');
+            }
+            return ['jugador_id' => (int) $jugador->id, 'creado' => true, 'descripcion' => $etiqueta
+                . ($libre ? ' — rol de jugador agregado a la persona #' . $libre['id'] : ' — creado') . ' #' . $jugador->id];
         } catch (\Exception $e) {
             $this->aviso('No pude crear al jugador ' . $etiqueta . ': ' . $e->getMessage());
             return ['jugador_id' => null, 'creado' => false, 'descripcion' => $etiqueta];

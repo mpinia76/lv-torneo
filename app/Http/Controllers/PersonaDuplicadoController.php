@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Persona;
 use App\PersonaDuplicado;
 use App\Services\DuplicadosPersonas;
+use App\Services\FotosPersonas;
 use App\Services\FusionPersonas;
 use App\Services\MoverRegistros;
 use App\Services\RegistrosPersonas;
@@ -36,8 +37,14 @@ class PersonaDuplicadoController extends Controller
     /** Clave de caché de las personas sin fecha de nacimiento (con su id de TM). */
     private const CACHE_SIN_FECHA = 'personas.sin_fecha';
 
+    /** Clave de caché de las fotos rotas (la lista y el id de TM de cada una). */
+    private const CACHE_FOTOS = 'personas.fotos_problema';
+
     /** Memoria por request de TmFechas::descartadas(). */
     private $descartadasSinFecha = null;
+
+    /** Memoria por request de la pestaña de fotos. */
+    private $fotosProblema = null;
 
     /**
      * El grupo `admin` de routes/web.php no tiene middleware: la autenticación
@@ -70,6 +77,8 @@ class PersonaDuplicadoController extends Controller
             'sinBandera'   => null,
             'sinRegistros' => null,
             'sinFecha'     => null,
+            'fotos'        => null,
+            'fotoDe'       => [],
             'tmDe'         => [],
             'indexado'     => DB::table('personas')->whereNull('clave_orden')->count() === 0,
         ];
@@ -82,6 +91,8 @@ class PersonaDuplicadoController extends Controller
             $datos['sinRegistros'] = $this->sinRegistros($request);
         } elseif ($tab === 'sin-fecha') {
             list($datos['sinFecha'], $datos['tmDe']) = $this->sinFecha($request);
+        } elseif ($tab === 'foto') {
+            list($datos['fotos'], $datos['fotoDe'], $datos['tmDe']) = $this->fotosRotas($request);
         } else {
             list($pares, $personas, $peso, $clubes) = $this->repetidos($request, $estado, $umbral, $buscar);
             $datos['pares']    = $pares;
@@ -169,6 +180,8 @@ class PersonaDuplicadoController extends Controller
             'sinFechaTm'   => $this->contarSinFechaConTm(),
             'sinFechaDesc' => count($this->todasSinFecha()) - count($this->pendientesSinFecha()),
             'sinFechaDet'  => TmFechas::detalle($this->todasSinFecha()),
+            'fotos'        => count($this->fotos()['problemas']),
+            'fotosDet'     => $this->detalleFotos(),
             'fusiones'     => (int) DB::table('persona_fusiones')->count(),
         ];
     }
@@ -425,6 +438,119 @@ class PersonaDuplicadoController extends Controller
     }
 
     // ------------------------------------------------------------------
+    // Pestaña 6: fotos rotas
+    // ------------------------------------------------------------------
+
+    /**
+     * La lista de fotos rotas y el id de TM de cada una, cacheada.
+     *
+     * Se cachea por lo mismo que las otras: el CONTADOR de la solapa lo pide
+     * toda carga de la pantalla, esté en la pestaña que esté, y detrás hay una
+     * pasada por public/images entero más la resolución de los ids de TM.
+     *
+     * Devuelve ['problemas' => [persona_id => diagnóstico], 'fichas' => [persona_id => rol+tm]].
+     */
+    private function fotos(): array
+    {
+        if ($this->fotosProblema !== null) return $this->fotosProblema;
+
+        $this->fotosProblema = Cache::remember(self::CACHE_FOTOS, 600, function () {
+            $problemas = FotosPersonas::problemas();
+
+            $fichas = [];
+            foreach (array_chunk(array_keys($problemas), 800) as $tanda) {
+                $fichas += TmFechas::fichas($tanda, false);
+            }
+
+            return ['problemas' => $problemas, 'fichas' => $fichas];
+        });
+
+        return $this->fotosProblema;
+    }
+
+    /**
+     * Cómo está repartido el problema: por rol, por motivo y por si se puede
+     * arreglar solo. Es lo que decide si apretar el botón sirve de algo.
+     *
+     * "Sin rol" son fichas sueltas —sin jugador, técnico ni árbitro— que además
+     * tienen la foto rota: esas van a la pestaña "Sin registros", no acá.
+     */
+    private function detalleFotos(): array
+    {
+        $datos = $this->fotos();
+
+        $vacio = ['total' => 0, 'falta' => 0, 'vacio' => 0, 'con_tm' => 0, 'sin_tm' => 0];
+        $out = ['jugador' => $vacio, 'tecnico' => $vacio, 'arbitro' => $vacio,
+                'sin_rol' => $vacio, 'total' => $vacio];
+
+        foreach ($datos['problemas'] as $personaId => $d) {
+            $ficha = $datos['fichas'][(int) $personaId] ?? null;
+            $tipo  = ($ficha && isset($out[$ficha['tipo']])) ? $ficha['tipo'] : 'sin_rol';
+
+            foreach ([$tipo, 'total'] as $k) {
+                $out[$k]['total']++;
+                $out[$k][$d['motivo'] === FotosPersonas::VACIO ? 'vacio' : 'falta']++;
+                if ($ficha && !empty($ficha['tm'])) $out[$k]['con_tm']++; else $out[$k]['sin_tm']++;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * La página de la pestaña.
+     *
+     * Se pagina sobre la lista ya calculada (igual que "sin fecha" y "sin
+     * registros"): el diagnóstico no se puede expresar en SQL, sale de mirar el
+     * directorio.
+     */
+    private function fotosRotas(Request $request): array
+    {
+        $datos     = $this->fotos();
+        $problemas = $datos['problemas'];
+
+        $ver = $request->query('ver');
+        if ($ver === FotosPersonas::FALTA || $ver === FotosPersonas::VACIO) {
+            $problemas = array_filter($problemas, function ($d) use ($ver) {
+                return $d['motivo'] === $ver;
+            });
+        }
+
+        $ids    = array_keys($problemas);
+        $pagina = max(1, (int) $request->query('page', 1));
+        $tramo  = array_slice($ids, ($pagina - 1) * self::POR_PAGINA, self::POR_PAGINA);
+
+        $personas = collect();
+        if ($tramo) {
+            $orden = array_flip($tramo);
+            $personas = Persona::with(['jugador', 'tecnico', 'arbitro'])
+                ->whereIn('id', $tramo)
+                ->get()
+                ->sortBy(function ($p) use ($orden) {
+                    return $orden[$p->id] ?? PHP_INT_MAX;
+                })
+                ->values();
+        }
+
+        $fotoDe = [];
+        $tmDe   = [];
+        foreach ($tramo as $id) {
+            $fotoDe[$id] = $problemas[$id];
+            if (isset($datos['fichas'][(int) $id])) $tmDe[$id] = $datos['fichas'][(int) $id];
+        }
+
+        $paginador = new LengthAwarePaginator(
+            $personas,
+            count($ids),
+            self::POR_PAGINA,
+            $pagina,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return [$paginador, $fotoDe, $tmDe];
+    }
+
+    // ------------------------------------------------------------------
     // Acciones
     // ------------------------------------------------------------------
 
@@ -449,6 +575,11 @@ class PersonaDuplicadoController extends Controller
         }
 
         Cache::forget('personas.nacionalidades_sin_bandera');
+
+        // El botón es lo más parecido a un "refrescá todo" que tiene la pantalla:
+        // que también vuelva a mirar public/images, así el contador de fotos rotas
+        // no queda 10 minutos mostrando las que ya se arreglaron a mano.
+        Cache::forget(self::CACHE_FOTOS);
 
         $mensaje = "Se revisaron {$r['personas']} personas y quedaron {$r['pares']} pares candidatos"
             . " (umbral {$r['umbral']}). Se dieron de baja {$r['borrados']} que ya no califican.";
@@ -770,6 +901,60 @@ class PersonaDuplicadoController extends Controller
         }
         if ($r['sin_tm']) {
             $mensaje .= " Quedan {$r['sin_tm']} sin id de Transfermarkt: esas no se pueden resolver así.";
+        }
+        if ($r['quedan']) {
+            $mensaje .= " Faltan {$r['quedan']} con id de TM: volvé a apretar el botón para seguir.";
+        }
+
+        if ($r['errores']) {
+            return redirect()->back()
+                ->with('success', $mensaje)
+                ->withErrors(['error' => implode(' / ', array_slice($r['errores'], 0, 5))]);
+        }
+
+        return redirect()->back()->with('success', $mensaje);
+    }
+
+    /**
+     * Vuelve a bajar de Transfermarkt las fotos que no se ven.
+     *
+     * La API que da la URL del retrato es gratis y va de a 50, pero CADA foto
+     * que se baja sale un crédito de ScraperAPI (los hosts de imágenes de TM
+     * están geo-bloqueados para el server). Por eso el tope por pasada es
+     * bastante más chico que el de las fechas.
+     */
+    public function completarFotos(Request $request)
+    {
+        set_time_limit(0);
+
+        $limite = (int) $request->input('limite', 100);
+        $limite = $limite < 0 ? 0 : min($limite, 2000);
+
+        try {
+            $r = FotosPersonas::completar($limite, $this->fotos()['problemas']);
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors(['error' => 'No se pudieron bajar las fotos: ' . $e->getMessage()]);
+        }
+
+        Cache::forget(self::CACHE_FOTOS);
+        $this->fotosProblema = null;
+
+        $mensaje = 'Se ' . ($r['personas'] == 1 ? 'consultó 1 ficha' : "consultaron {$r['personas']} fichas")
+            . ' en ' . ($r['llamadas'] == 1 ? '1 llamada' : "{$r['llamadas']} llamadas") . ' a Transfermarkt.'
+            . ' Se ' . ($r['bajadas'] == 1 ? 'bajó 1 foto nueva' : "bajaron {$r['bajadas']} fotos nuevas") . '.';
+
+        if ($r['sin_portrait']) {
+            $mensaje .= " {$r['sin_portrait']} tienen ficha en TM pero TM tampoco tiene foto"
+                . ' (ahí no hay nada que bajar: conviene sacarles la foto a mano para que muestren la silueta).';
+        }
+        if ($r['sin_perfil']) {
+            $mensaje .= " {$r['sin_perfil']} no volvieron de la API.";
+        }
+        if ($r['fallidas']) {
+            $mensaje .= " {$r['fallidas']} fallaron al bajar y quedaron como estaban.";
+        }
+        if ($r['sin_tm']) {
+            $mensaje .= " Quedan {$r['sin_tm']} sin id de Transfermarkt: esas hay que cargarlas a mano desde Editar.";
         }
         if ($r['quedan']) {
             $mensaje .= " Faltan {$r['quedan']} con id de TM: volvé a apretar el botón para seguir.";

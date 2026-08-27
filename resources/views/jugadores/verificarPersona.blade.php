@@ -104,7 +104,7 @@
             $qs = ['estado' => $estado, 'umbral' => $umbral, 'q' => $buscar];
         @endphp
         @php
-            $tabsAparte = ['sin-nombre', 'nacionalidad', 'sin-registros', 'sin-fecha'];
+            $tabsAparte = ['sin-nombre', 'nacionalidad', 'sin-registros', 'sin-fecha', 'foto'];
         @endphp
         <ul class="nav nav-tabs mb-3">
             <li class="nav-item">
@@ -123,6 +123,12 @@
                 <a class="nav-link @if($tab=='sin-fecha') active @endif"
                    href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'sin-fecha']) }}">
                     Sin fecha de nacimiento <span class="badge badge-light">{{ $conteos['sinFecha'] }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link @if($tab=='foto') active @endif"
+                   href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto']) }}">
+                    Problema en la foto <span class="badge badge-light">{{ $conteos['fotos'] }}</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -647,6 +653,189 @@
                 @endif
             @endif
         @endif
+        {{-- ================================================================
+             Pestaña 6: fotos rotas
+        ================================================================= --}}
+        @if($tab == 'foto')
+            <p class="text-muted small">
+                <code>personas.foto</code> guarda solo el nombre del archivo; la imagen vive en
+                <code>public/images</code>. Cuando las dos cosas no coinciden, la ficha muestra el cuadradito
+                roto. Acá están las dos formas en que pasa: <strong>no está el archivo</strong> (la descarga
+                de Transfermarkt falló y en la base quedó el nombre igual) y <strong>el archivo está pero no
+                es una imagen</strong> —pesa cero, quedó cortado, o es una página de error guardada con
+                extensión <code>.jpg</code>—, que es el caso que un <code>file_exists</code> no encuentra nunca.
+            </p>
+            <p class="text-muted small">
+                Las fichas con la foto vacía <strong>no aparecen acá</strong>: esas muestran la silueta a
+                propósito y son miles. El botón consigue la URL del retrato por la API (gratis, de a 50 por
+                llamada) y después baja cada imagen por ScraperAPI, que <strong>sale un crédito por foto</strong>.
+                Si lo que vuelve no es una imagen válida no se escribe nada: la ficha queda como estaba.
+            </p>
+
+            @php $verFoto = in_array(request('ver'), ['falta', 'vacio']) ? request('ver') : null; @endphp
+
+            @if($conteos['fotos'] == 0)
+                <div class="alert alert-info">No hay fotos rotas: todas las fichas con foto apuntan a un archivo que existe y se puede dibujar.</div>
+            @else
+                @php $detF = $conteos['fotosDet']; @endphp
+                <table class="table table-sm table-bordered w-auto mb-3">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Rol</th><th class="text-right">Fotos rotas</th>
+                            <th class="text-right">Falta el archivo</th>
+                            <th class="text-right">Archivo inservible</th>
+                            <th class="text-right">Con id de TM</th>
+                            <th class="text-right">Sin id de TM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach(['jugador' => 'Jugadores', 'tecnico' => 'DTs', 'arbitro' => 'Árbitros', 'sin_rol' => 'Sin rol'] as $kf => $etiquetaF)
+                        <tr>
+                            <td>{{ $etiquetaF }}</td>
+                            <td class="text-right">{{ $detF[$kf]['total'] }}</td>
+                            <td class="text-right">{{ $detF[$kf]['falta'] }}</td>
+                            <td class="text-right">{{ $detF[$kf]['vacio'] }}</td>
+                            <td class="text-right">{{ $detF[$kf]['con_tm'] }}</td>
+                            <td class="text-right text-muted">{{ $detF[$kf]['sin_tm'] }}</td>
+                        </tr>
+                    @endforeach
+                        <tr class="font-weight-bold">
+                            <td>Total</td>
+                            <td class="text-right">{{ $detF['total']['total'] }}</td>
+                            <td class="text-right">{{ $detF['total']['falta'] }}</td>
+                            <td class="text-right">{{ $detF['total']['vacio'] }}</td>
+                            <td class="text-right">{{ $detF['total']['con_tm'] }}</td>
+                            <td class="text-right">{{ $detF['total']['sin_tm'] }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <ul class="nav nav-pills mb-3 small">
+                    <li class="nav-item">
+                        <a class="nav-link py-1 @if(!$verFoto) active @endif"
+                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto']) }}">
+                            Todas <span class="badge badge-light">{{ $detF['total']['total'] }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-1 @if($verFoto == 'falta') active @endif"
+                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto', 'ver' => 'falta']) }}">
+                            Falta el archivo <span class="badge badge-light">{{ $detF['total']['falta'] }}</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link py-1 @if($verFoto == 'vacio') active @endif"
+                           href="{{ route('jugadores.verificarPersonas', $qs + ['tab' => 'foto', 'ver' => 'vacio']) }}">
+                            Archivo inservible <span class="badge badge-light">{{ $detF['total']['vacio'] }}</span>
+                        </a>
+                    </li>
+                </ul>
+
+                @if($detF['total']['con_tm'] > 0)
+                <div class="card mb-3">
+                    <div class="card-body py-2">
+                        <form method="POST" action="{{ route('personas.fotos.completar') }}">
+                            @csrf
+                            <div class="form-inline">
+                                <label class="mr-2 mb-0">Intentar de a</label>
+                                <select name="limite" class="form-control form-control-sm mr-3">
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100" selected>100</option>
+                                    <option value="250">250</option>
+                                </select>
+                                <button class="btn btn-sm btn-primary">Bajar las fotos de Transfermarkt</button>
+                            </div>
+                        </form>
+                        <small class="text-muted d-block mt-2">
+                            El tope va por fichas consultadas, no por créditos: solo gasta crédito la que
+                            <strong>tiene retrato en TM</strong>. Las {{ $detF['total']['sin_tm'] }} sin id de
+                            Transfermarkt no se pueden resolver así — se cargan a mano desde <em>Editar</em>.
+                        </small>
+                    </div>
+                </div>
+                @endif
+
+                @if($fotos->total() == 0)
+                    <div class="alert alert-info">No hay fichas con este filtro.</div>
+                @else
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
+                            <th>Archivo</th><th>Problema</th><th>Roles</th><th>Transfermarkt</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($fotos as $p)
+                        @php
+                            $dFoto = $fotoDe[$p->id] ?? null;
+                            $tmF   = $tmDe[$p->id] ?? null;
+                        @endphp
+                        <tr>
+                            <td>
+                                {{-- A propósito sin fallback: que se vea rota es la evidencia. --}}
+                                <img class="imgCircle" src="{{ url('images/'.$p->foto) }}" alt="rota">
+                                <img src="{{ $p->bandera_url }}" alt="{{ $p->nacionalidad }}">
+                            </td>
+                            <td>{{ $p->id }}</td>
+                            <td>{{ $p->name }}</td>
+                            <td>{{ $p->apellido }}</td>
+                            <td>{{ $p->nombre }}</td>
+                            <td class="small"><code>{{ $p->foto }}</code></td>
+                            <td class="small">
+                                @if($dFoto && $dFoto['motivo'] == 'vacio')
+                                    <span class="badge badge-warning">archivo inservible</span>
+                                    <span class="text-muted">{{ $dFoto['bytes'] }} bytes</span>
+                                @else
+                                    <span class="badge badge-danger">no está el archivo</span>
+                                    @if($dFoto && !empty($dFoto['parecido']))
+                                        <div class="text-muted">
+                                            existe como <code>{{ $dFoto['parecido'] }}</code> — es diferencia
+                                            de mayúsculas: en Windows se ve y en el server no.
+                                        </div>
+                                    @endif
+                                @endif
+                            </td>
+                            <td>
+                                @if($p->jugador)<span class="badge badge-primary">Jugador {{ $p->jugador->id }}</span>@endif
+                                @if($p->tecnico)<span class="badge badge-success">DT {{ $p->tecnico->id }}</span>@endif
+                                @if($p->arbitro)<span class="badge badge-warning">Árbitro {{ $p->arbitro->id }}</span>@endif
+                            </td>
+                            <td>
+                                @if($tmF && !empty($tmF['tm']))
+                                    @php
+                                        $tramoF = $tmF['tipo'] === 'tecnico' ? 'trainer'
+                                                : ($tmF['tipo'] === 'arbitro' ? 'schiedsrichter' : 'spieler');
+                                    @endphp
+                                    <a href="https://www.transfermarkt.es/-/profil/{{ $tramoF }}/{{ $tmF['tm'] }}"
+                                       target="_blank" class="small">TM {{ $tmF['tm'] }}</a>
+                                @else
+                                    <span class="badge badge-secondary">sin TM</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($p->jugador)
+                                    <a href="{{ route('jugadores.edit', $p->jugador->id) }}" target="_blank" class="small">editar</a>
+                                @elseif($p->tecnico)
+                                    <a href="{{ route('tecnicos.edit', $p->tecnico->id) }}" target="_blank" class="small">editar</a>
+                                @elseif($p->arbitro)
+                                    <a href="{{ route('arbitros.edit', $p->arbitro->id) }}" target="_blank" class="small">editar</a>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+
+                <div class="row">
+                    <div class="col-md-9">{{ $fotos->links() }}</div>
+                    <div class="col-md-3 text-right"><strong>Total: {{ $fotos->total() }}</strong></div>
+                </div>
+                @endif
+            @endif
+        @endif
+
     </div>
 
     <script>
