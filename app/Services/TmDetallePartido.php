@@ -122,6 +122,39 @@ class TmDetallePartido
      * @param  array  $opts       ['escribir' => bool, 'forzar' => bool, 'crear_jugadores' => bool]
      * @return array  informe
      */
+    /**
+     * Crea las filas de `penals` que le falten al partido recién importado.
+     *
+     * El importador escribe los goles con tipo "Penal" pero nunca escribió
+     * `penals`, que es de donde salen los penales atajados/errados y el arquero
+     * que los recibió. Resultado: cada "Rehacer" dejaba el partido esperando un
+     * click en el control "Penales sin cargar". Esto lo hace solo.
+     *
+     * Nunca pisa un penal ya cargado, ni siquiera cuando se rehace con
+     * `forzar`: si le corregiste el arquero a mano, tu corrección sobrevive.
+     */
+    private function crearPenales(Partido $partido): array
+    {
+        try {
+            $r = app(\App\Services\ControlPenales::class)->aplicarPartido($partido->id);
+
+            if (!empty($r['creados'])) {
+                $this->aviso('Le creé ' . $r['creados'] . ' penal(es) convertido(s) con el arquero que '
+                    . 'estaba en cancha en ese minuto.');
+            }
+            if (!empty($r['sin_arquero'])) {
+                $this->aviso($r['sin_arquero'] . ' gol(es) de penal quedaron sin su fila en `penals` porque '
+                    . 'no se pudo determinar el arquero. Miralos en Controles → Penales sin cargar.');
+            }
+            return $r;
+        } catch (\Exception $e) {
+            // Que esto falle no puede tirar abajo un detalle bien importado.
+            Log::error('crearPenales partido ' . $partido->id . ': ' . $e->getMessage());
+            $this->aviso('No pude crear los penales de este partido: ' . $e->getMessage());
+            return ['creados' => 0, 'sin_arquero' => 0, 'restantes' => 0];
+        }
+    }
+
     public function importar($partidoId, $gameId, array $opts = [])
     {
         $escribir = !empty($opts['escribir']);
@@ -538,6 +571,11 @@ class TmDetallePartido
                     }
                 });
                 $informe['escrito'] = true;
+
+                // Los penales van FUERA de la transacción de arriba a propósito:
+                // el arquero se resuelve leyendo la alineación, los cambios y
+                // las rojas recién guardados.
+                $informe['penales'] = $this->crearPenales($partido);
             } catch (\Exception $e) {
                 $informe['ok']    = false;
                 $informe['error'] = 'Error guardando el detalle: ' . $e->getMessage();

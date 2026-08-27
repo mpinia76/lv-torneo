@@ -586,6 +586,24 @@ class ControlPenales
      *
      * Devuelve ['creados' => n, 'sin_arquero' => n, 'restantes' => n].
      */
+    /**
+     * Los penales que le faltan a UN partido.
+     *
+     * Es lo que llama el importador de detalle después de rehacer: el importador
+     * escribe `gols` con tipo Penal pero nunca escribió `penals`, así que cada
+     * "Rehacer" dejaba el partido en el control "Penales sin cargar" esperando
+     * un click a mano. Se llama después de la transacción, no adentro: el
+     * arquero se calcula leyendo la alineación, los cambios y las rojas que
+     * acaba de guardar.
+     *
+     * No borra ni pisa nada. Un penal ya cargado —incluso uno con el arquero
+     * corregido a mano— se queda como está: `consultaFaltantes()` lo saltea.
+     */
+    public function aplicarPartido($partidoId): array
+    {
+        return $this->aplicar(['partido' => (int) $partidoId]);
+    }
+
     public function aplicar(array $filtros): array
     {
         $filas = $this->consultaFaltantes($filtros)->limit(self::LIMITE_APLICAR + 1)->get();

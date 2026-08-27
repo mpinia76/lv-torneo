@@ -429,6 +429,13 @@ class Controles
             ->whereNotNull('partidos.golesl')
             ->whereNotNull('partidos.golesv');
 
+        // Filtrar por un partido puntual no lo usa la pantalla: lo usa el
+        // importador de detalle, que después de rehacer un partido crea los
+        // penales que le faltan a ESE partido y nada más.
+        if (!empty($filtros['partido'])) {
+            $q->where('partidos.id', (int) $filtros['partido']);
+        }
+
         if (!empty($filtros['year'])) {
             $q->where('torneo.year', $filtros['year']);
         }
