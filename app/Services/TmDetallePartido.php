@@ -3162,38 +3162,123 @@ class TmDetallePartido
     }
 
     /**
+     * Expresión SQL que saca el `NNN` de `.../spieler/NNN` (aguanta que después
+     * venga `/saison/2020` o un `?query=`). Sirve para cruzar
+     * `jugadors.transfermarkt_url` contra `jugador_tm.tm_player_id` sin traerse
+     * las dos tablas enteras a PHP.
+     */
+    const SQL_TM_ID_DE_URL = "SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(j.transfermarkt_url, '/spieler/', -1), '/', 1), '?', 1)";
+
+    /**
+     * Los dos números que mira el index del importador:
+     *   pendientes = URLs de Transfermarkt cuyo id todavía NO tiene fila en
+     *                `jugador_tm`. Es lo único que la siembra puede crear.
+     *   conflictos = URLs cuyo id YA está en `jugador_tm` pero atado a otra
+     *                ficha que también existe. La siembra no las toca (pisar el
+     *                mapeo sería peor): casi siempre es la misma persona
+     *                cargada dos veces.
+     *
+     * OJO con la cuenta vieja: hasta ago-2026 el index calculaba los pendientes
+     * como `URLs - filas con origen='url'`. Esa resta miente, porque el mapeo lo
+     * crea también el importador con `origen='api'`. Resultado: jugadores ya
+     * atados seguían contándose como pendientes, el cartel rojo no se iba nunca
+     * y la siembra contestaba "0 nuevos / N ya estaban" por más veces que la
+     * apretaras. Cualquier cuenta nueva se hace contra la tabla, no por origen.
+     */
+    public static function estadoSiembra()
+    {
+        if (!Schema::hasTable('jugador_tm')) return ['pendientes' => 0, 'conflictos' => 0];
+
+        $base = function () {
+            return DB::table('jugadors as j')
+                ->leftJoin('jugador_tm as t', function ($join) {
+                    $join->on('t.tm_player_id', '=', DB::raw(self::SQL_TM_ID_DE_URL));
+                })
+                ->whereNotNull('j.transfermarkt_url')
+                ->where('j.transfermarkt_url', 'like', '%/spieler/%');
+        };
+
+        return [
+            'pendientes' => $base()->whereNull('t.id')->count(),
+            'conflictos' => $base()->whereNotNull('t.id')
+                ->join('jugadors as v', 'v.id', '=', 't.jugador_id')
+                ->whereColumn('t.jugador_id', '!=', 'j.id')->count(),
+        ];
+    }
+
+    /**
      * Siembra `jugador_tm` con los jugadores que ya tenías cargados y tienen
      * la URL de Transfermarkt. Es lo que evita que el importador cree de nuevo
      * a alguien que ya está en la base.
+     *
+     * Cuatro finales por jugador, y los cuatro se informan:
+     *   creados     = no había mapeo para ese id de TM: se crea.
+     *   ya_estaban  = ya estaba atado a esta misma ficha. No hay nada que hacer.
+     *   repuntados  = el mapeo apuntaba a una ficha que ya no existe (se la
+     *                 llevó una fusión o el borrado de huérfanas): se lo repunta
+     *                 al jugador que tiene la URL, en vez de dejar basura.
+     *   conflictos  = el mapeo apunta a OTRA ficha que sí existe. No se toca: si
+     *                 lo pisáramos, los partidos ya cargados con ese id quedarían
+     *                 colgados de la ficha equivocada. Se listan para que los
+     *                 mires a mano — suelen ser personas duplicadas.
      */
     public static function sembrarDesdeUrls()
     {
-        $creados = 0; $yaEstaban = 0; $sinId = 0;
+        $creados = 0; $yaEstaban = 0; $sinId = 0; $repuntados = 0;
+        $conflictos = []; $nConflictos = 0;
 
+        // tm_player_id -> ['fila' => id de jugador_tm, 'jugador' => a quién apunta]
         $existentes = [];
-        foreach (DB::table('jugador_tm')->select('tm_player_id')->get() as $r) {
-            $existentes[(string) $r->tm_player_id] = true;
+        foreach (DB::table('jugador_tm')->select('id', 'tm_player_id', 'jugador_id')->get() as $r) {
+            $existentes[(string) $r->tm_player_id] = ['fila' => (int) $r->id, 'jugador' => (int) $r->jugador_id];
         }
+
+        // Fichas que todavía existen: `jugador_tm` no tiene foreign key, así que
+        // un mapeo puede estar apuntando a un id que ya no está en la base.
+        $vivos = [];
+        foreach (DB::table('jugadors')->select('id')->get() as $r) $vivos[(int) $r->id] = true;
 
         DB::table('jugadors')
             ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
             ->select('id', 'transfermarkt_url')
             ->orderBy('id')
-            ->chunk(500, function ($filas) use (&$creados, &$yaEstaban, &$sinId, &$existentes) {
+            ->chunk(500, function ($filas) use (&$creados, &$yaEstaban, &$sinId, &$repuntados,
+                &$conflictos, &$nConflictos, &$existentes, &$vivos) {
                 $insert = [];
                 foreach ($filas as $f) {
                     if (!preg_match('#/spieler/(\d+)#', (string) $f->transfermarkt_url, $m)) { $sinId++; continue; }
                     $tm = $m[1];
-                    if (isset($existentes[$tm])) { $yaEstaban++; continue; }
-                    $existentes[$tm] = true;
-                    $insert[] = ['tm_player_id' => $tm, 'jugador_id' => (int) $f->id, 'nombre_tm' => null,
-                        'origen' => 'url', 'revisar' => 0, 'created_at' => now(), 'updated_at' => now()];
-                    $creados++;
+                    $ficha = (int) $f->id;
+
+                    if (!isset($existentes[$tm])) {
+                        $existentes[$tm] = ['fila' => 0, 'jugador' => $ficha];
+                        $insert[] = ['tm_player_id' => $tm, 'jugador_id' => $ficha, 'nombre_tm' => null,
+                            'origen' => 'url', 'revisar' => 0, 'created_at' => now(), 'updated_at' => now()];
+                        $creados++;
+                        continue;
+                    }
+
+                    $atado = $existentes[$tm]['jugador'];
+                    if ($atado === $ficha) { $yaEstaban++; continue; }
+
+                    if (!isset($vivos[$atado])) {
+                        DB::table('jugador_tm')->where('id', $existentes[$tm]['fila'])
+                            ->update(['jugador_id' => $ficha, 'origen' => 'url', 'updated_at' => now()]);
+                        $existentes[$tm]['jugador'] = $ficha;
+                        $repuntados++;
+                        continue;
+                    }
+
+                    $nConflictos++;
+                    if (count($conflictos) < 300) {
+                        $conflictos[] = ['tm' => $tm, 'ficha_url' => $ficha, 'ficha_mapeo' => $atado];
+                    }
                 }
                 if (!empty($insert)) DB::table('jugador_tm')->insert($insert);
             });
 
-        return ['creados' => $creados, 'ya_estaban' => $yaEstaban, 'sin_id' => $sinId];
+        return ['creados' => $creados, 'ya_estaban' => $yaEstaban, 'sin_id' => $sinId,
+            'repuntados' => $repuntados, 'n_conflictos' => $nConflictos, 'conflictos' => $conflictos];
     }
 
     // ═══════════════════════════ UTILIDADES ═══════════════════════════

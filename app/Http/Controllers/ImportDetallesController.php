@@ -99,8 +99,13 @@ class ImportDetallesController extends Controller
         $conUrl = DB::table('jugadors')
             ->whereNotNull('transfermarkt_url')->where('transfermarkt_url', '!=', '')
             ->where('transfermarkt_url', 'like', '%/spieler/%')->count();
-        $sembrados = DB::table('jugador_tm')->where('origen', 'url')->count();
-        $porSembrar = max(0, $conUrl - $sembrados);
+        // Pendiente = la URL no tiene fila en jugador_tm. NO se cuenta por
+        // origen: el mapeo lo crea también el importador (origen='api'), así que
+        // restar los origen='url' dejaba el cartel rojo puesto para siempre.
+        $siembra = TmDetallePartido::estadoSiembra();
+        $porSembrar = $siembra['pendientes'];
+        $chocan = $siembra['conflictos'];
+        $sembrados = max(0, $conUrl - $porSembrar);
 
         // Mapeos que apuntan a una ficha que ya no existe. Mientras estén, cada
         // partido donde aparezca ese jugador escribe un id fantasma: la fila se
@@ -138,6 +143,15 @@ class ImportDetallesController extends Controller
                     . 'altas quedan en <a href="' . e(route('import_detalles.revisar')) . '">jugadores por revisar</a>.</div>'
                     : '<div class="ok-box">Mapeo sembrado: los ' . $sembrados . ' jugadores que ya tenías con URL de '
                     . 'Transfermarkt están atados a su id.</div>'))
+
+            . ($chocan
+                ? '<div class="err-box"><b>Hay ' . $chocan . ' URL(s) que chocan con el mapeo.</b><br>'
+                . 'Ese id de Transfermarkt ya está atado a <b>otra</b> ficha que también existe. La siembra no los '
+                . 'pisa —los partidos ya cargados con ese id cuelgan de la otra ficha—, casi siempre es la misma '
+                . 'persona cargada dos veces.<br>'
+                . '<a class="boton" style="margin-top:8px" href="' . e(route('import_detalles.sembrar')) . '">Ver cuáles son</a>'
+                . '</div>'
+                : '')
 
             . '<div class="cards">'
             . $this->card(count($filas), 'Partidos importados')
@@ -1014,11 +1028,61 @@ class ImportDetallesController extends Controller
             . '<p class="sub">Se lee el <code>/spieler/NNN</code> de <code>jugadors.transfermarkt_url</code> y se ata cada '
             . 'jugador a su id de Transfermarkt. Es lo que evita que el importador cree de nuevo a alguien que ya tenés.</p>'
             . '<div class="cards">'
-            . $this->card($r['creados'], 'Mapeos nuevos', 'ok')
+            . $this->card($r['creados'], 'Mapeos nuevos', $r['creados'] ? 'ok' : 'gris')
             . $this->card($r['ya_estaban'], 'Ya estaban')
-            . $this->card($r['sin_id'], 'URL sin id', $r['sin_id'] ? 'warn' : '')
+            . $this->card($r['repuntados'], 'Repuntados', $r['repuntados'] ? 'ok' : 'gris')
+            . $this->card($r['n_conflictos'], 'Chocan con otra ficha', $r['n_conflictos'] ? 'err' : 'gris')
+            . $this->card($r['sin_id'], 'URL sin id', $r['sin_id'] ? 'warn' : 'gris')
             . '</div>'
-            . '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.index')) . '">Volver</a></p>';
+
+            . (($r['creados'] === 0 && $r['repuntados'] === 0 && $r['ya_estaban'] > 0 && $r['n_conflictos'] === 0)
+                ? '<div class="ok-box"><b>No había nada que sembrar: los ' . $r['ya_estaban'] . ' ya estaban atados.</b><br>'
+                . '"Ya estaban" no es un error. El mapeo lo crea también el importador cuando baja una alineación '
+                . '(<code>origen=api</code>), así que la siembra sólo tiene trabajo con jugadores nuevos.</div>'
+                : '')
+
+            . ($r['repuntados']
+                ? '<div class="ok-box">Se repuntaron ' . $r['repuntados'] . ' mapeo(s) que apuntaban a una ficha borrada.</div>'
+                : '');
+
+        if ($r['n_conflictos']) {
+            $ids = [];
+            foreach ($r['conflictos'] as $c) { $ids[] = $c['ficha_url']; $ids[] = $c['ficha_mapeo']; }
+            $nombres = [];
+            foreach (DB::table('jugadors')
+                ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+                ->whereIn('jugadors.id', array_unique($ids))
+                ->select('jugadors.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
+                ->get() as $p) {
+                $nombres[(int) $p->id] = trim($p->apellido . ', ' . $p->nombre)
+                    . ($p->nacimiento ? ' (' . substr((string) $p->nacimiento, 0, 4) . ')' : '');
+            }
+
+            $cuerpo .= '<h2>Chocan con el mapeo (' . $r['n_conflictos'] . ')</h2>'
+                . '<p class="sub">El id de Transfermarkt de la izquierda ya está atado a la ficha de la derecha, que '
+                . 'también existe. <b>No se tocó nada</b>: pisar el mapeo dejaría los partidos ya cargados colgados de '
+                . 'la ficha equivocada. Si las dos fichas son la misma persona, fusionalas; si no, sacale la URL a la '
+                . 'que no corresponde.</p>'
+                . '<div class="scroll"><table><thead><tr>'
+                . '<th>TM</th><th>La URL la tiene</th><th>El mapeo apunta a</th><th></th></tr></thead><tbody>';
+            foreach ($r['conflictos'] as $c) {
+                $a = isset($nombres[$c['ficha_url']]) ? $nombres[$c['ficha_url']] : ('ficha ' . $c['ficha_url']);
+                $b = isset($nombres[$c['ficha_mapeo']]) ? $nombres[$c['ficha_mapeo']] : ('ficha ' . $c['ficha_mapeo']);
+                $cuerpo .= '<tr>'
+                    . '<td><a target="_blank" href="https://www.transfermarkt.es/-/profil/spieler/' . e($c['tm']) . '">' . e($c['tm']) . '</a></td>'
+                    . '<td>' . e($a) . ' <span class="sub">#' . (int) $c['ficha_url'] . '</span></td>'
+                    . '<td>' . e($b) . ' <span class="sub">#' . (int) $c['ficha_mapeo'] . '</span></td>'
+                    . '<td><a href="' . e(route('jugadores.edit', $c['ficha_url'])) . '">Editar la de la URL</a>'
+                    . ' · <a href="' . e(route('jugadores.edit', $c['ficha_mapeo'])) . '">Editar la del mapeo</a></td>'
+                    . '</tr>';
+            }
+            $cuerpo .= '</tbody></table></div>';
+            if ($r['n_conflictos'] > count($r['conflictos'])) {
+                $cuerpo .= '<p class="sub">Se muestran los primeros ' . count($r['conflictos']) . '.</p>';
+            }
+        }
+
+        $cuerpo .= '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.index')) . '">Volver</a></p>';
 
         return $this->pagina('Siembra de jugador_tm', $cuerpo);
     }
