@@ -11,7 +11,7 @@ use Illuminate\Support\Arr;
 /**
  * Panel de controles de carga.
  *
- * Una sola pantalla para los diecisiete chequeos que antes estaban repartidos
+ * Una sola pantalla para los dieciocho chequeos que antes estaban repartidos
  * en siete pantallas. Cada chequeo es un link, así que en cada carga se
  * ejecuta UNA consulta: la del chequeo que se está mirando. Los totales del
  * menú los pide el navegador aparte, contra `conteo()`, y quedan cacheados.

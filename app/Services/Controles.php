@@ -69,7 +69,7 @@ class Controles
             'Alineaciones' => [
                 'alineaciones.faltan' => [
                     'titulo'   => 'Once incompleto',
-                    'ayuda'    => 'Partidos donde algún equipo no tiene exactamente 11 titulares.',
+                    'ayuda'    => 'Los dos equipos tienen alineación cargada pero alguno no llega a los 11 titulares.',
                     'jugador'  => false,
                     'detalle'  => 'titulares',
                     'acciones' => ['alineaciones', 'incidencia'],
@@ -77,8 +77,9 @@ class Controles
                 ],
                 'alineaciones.sin_jugadores' => [
                     'titulo'   => 'Sin jugadores',
-                    'ayuda'    => 'Partidos con resultado cargado pero sin ningún titular y sin incidencia que lo justifique.',
+                    'ayuda'    => 'A alguno de los dos equipos no se le cargó ningún titular. Incluye el partido con media alineación.',
                     'jugador'  => false,
+                    'detalle'  => 'titulares',
                     'acciones' => ['alineaciones', 'incidencia'],
                     'metodo'   => 'alineacionesSinJugadores',
                 ],
@@ -107,6 +108,14 @@ class Controles
                     'detalle'  => 'goles',
                     'acciones' => ['goles', 'incidencia'],
                     'metodo'   => 'golesDiferencia',
+                ],
+                'goles.por_equipo' => [
+                    'titulo'   => 'Reparto por equipo',
+                    'ayuda'    => 'El total de goles da bien pero el reparto entre los dos equipos no: el gol quedó cargado del lado equivocado.',
+                    'jugador'  => false,
+                    'detalle'  => 'goles_equipo',
+                    'acciones' => ['goles', 'alineaciones', 'incidencia'],
+                    'metodo'   => 'golesPorEquipo',
                 ],
             ],
 
@@ -505,7 +514,7 @@ class Controles
      * Una incidencia es la forma de marcar "este partido es una excepción".
      * Un partido con incidencia no tiene que aparecer más en los controles.
      */
-    private function sinIncidencia($q)
+    public function sinIncidencia($q)
     {
         return $q->whereNotExists(function ($s) {
             $s->select(DB::raw(1))
@@ -533,35 +542,87 @@ class Controles
     // Alineaciones
     // ------------------------------------------------------------------
 
+    /**
+     * Devuelve un closure que arma el COUNT de titulares de uno de los dos
+     * equipos del partido.
+     *
+     * La gracia es que va correlacionada contra `partidos`: cuando al equipo
+     * no se le cargo ni un jugador devuelve 0, no "ninguna fila".
+     */
+    private function titularesDe()
+    {
+        return function (string $columnaEquipo) {
+            return "(SELECT COUNT(*) FROM alineacions a
+                     WHERE a.partido_id = partidos.id
+                       AND a.equipo_id = partidos.".$columnaEquipo."
+                       AND a.tipo = 'Titular')";
+        };
+    }
+
+    /**
+     * Once incompleto: los dos equipos tienen alineación pero alguno no da 11.
+     *
+     * La versión anterior salía de un `GROUP BY partido_id, equipo_id HAVING
+     * COUNT(*) != 11` sobre `alineacions`. Ese GROUP BY solo ve equipos que
+     * TIENEN filas: si a un equipo no se le cargó ningún jugador no arma
+     * grupo, nunca da 0, y el partido no aparecía en ningún lado.
+     *
+     * Es el mismo error que tenía "Goles · No coinciden con el resultado" con
+     * su `COUNT(...) GROUP BY partido_id`: hay que contar DESDE el partido,
+     * no desde la tabla de detalle.
+     *
+     * El equipo vacío no es asunto de este control sino de "Sin jugadores":
+     * acá se pide que los dos lados tengan algo cargado, así cada partido
+     * aparece en uno solo de los dos.
+     */
     private function alineacionesFaltan(array $filtros)
     {
+        $titulares = $this->titularesDe();
+        $local     = $titulares('equipol_id');
+        $visitante = $titulares('equipov_id');
+
         $q = $this->base($filtros)
             ->select($this->columnas())
             ->addSelect([
-                DB::raw('(SELECT COUNT(*) FROM alineacions a WHERE a.partido_id = partidos.id AND a.equipo_id = partidos.equipol_id AND a.tipo = \'Titular\') as titulares_local'),
-                DB::raw('(SELECT COUNT(*) FROM alineacions a WHERE a.partido_id = partidos.id AND a.equipo_id = partidos.equipov_id AND a.tipo = \'Titular\') as titulares_visitante'),
+                DB::raw($local.' as titulares_local'),
+                DB::raw($visitante.' as titulares_visitante'),
             ])
-            ->whereIn('partidos.id', function ($s) {
-                $s->select('partido_id')
-                    ->from('alineacions')
-                    ->where('tipo', 'Titular')
-                    ->groupBy('partido_id', 'equipo_id')
-                    ->havingRaw('COUNT(*) != 11');
-            });
+            ->whereRaw($local.' > 0')
+            ->whereRaw($visitante.' > 0')
+            ->whereRaw('('.$local.' != 11 OR '.$visitante.' != 11)');
 
         return $this->ordenar($this->sinIncidencia($q));
     }
 
+    /**
+     * Sin jugadores: a algún equipo no se le cargó ningún titular.
+     *
+     * Antes preguntaba si el PARTIDO tenía algún titular, y con eso el caso
+     * más común de media carga se le escapaba: alcanzaba con que estuviera
+     * cargado el rival para que el partido no apareciera.
+     *
+     * Caso testigo: Copa AUF Uruguay 2023 fecha 5, CA Universitario 1-3
+     * Boston River (partido 25142) — Boston River con sus 11 titulares, sus
+     * suplentes y su DT, Universitario sin una sola fila. Los dos controles
+     * de alineaciones marcaban 0 y el único que lo agarraba era "Sin técnico".
+     *
+     * Los titulares se cuentan por equipo del partido y no "cualquier fila de
+     * alineación": si la alineación quedó cargada contra un equipo que no
+     * juega ese partido, para el sitio el equipo no tiene jugadores.
+     */
     private function alineacionesSinJugadores(array $filtros)
     {
+        $titulares = $this->titularesDe();
+        $local     = $titulares('equipol_id');
+        $visitante = $titulares('equipov_id');
+
         $q = $this->base($filtros)
             ->select($this->columnas())
-            ->whereNotExists(function ($s) {
-                $s->select(DB::raw(1))
-                    ->from('alineacions')
-                    ->whereColumn('alineacions.partido_id', 'partidos.id')
-                    ->where('alineacions.tipo', 'Titular');
-            });
+            ->addSelect([
+                DB::raw($local.' as titulares_local'),
+                DB::raw($visitante.' as titulares_visitante'),
+            ])
+            ->whereRaw('('.$local.' = 0 OR '.$visitante.' = 0)');
 
         return $this->ordenar($this->sinIncidencia($q));
     }
@@ -635,6 +696,57 @@ class Controles
                 DB::raw('(SELECT COUNT(*) FROM gols WHERE gols.partido_id = partidos.id) as goles_cargados'),
             ])
             ->whereRaw('(partidos.golesl + partidos.golesv) != (SELECT COUNT(*) FROM gols WHERE gols.partido_id = partidos.id)');
+
+        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q)));
+    }
+
+    /**
+     * Devuelve un closure que arma el COUNT de goles de uno de los dos lados.
+     *
+     * `gols` no guarda el equipo: el equipo del gol sale de la alineacion del
+     * goleador en ese partido, y los "En Contra" cuentan para el rival. El
+     * COUNT va con DISTINCT g.id por si el jugador quedo con mas de una fila
+     * de alineacion en el mismo partido, para no contarle el gol dos veces.
+     */
+    private function golesDe()
+    {
+        return function (string $propio, string $rival) {
+            return "(SELECT COUNT(DISTINCT g.id)
+                     FROM gols g
+                     JOIN alineacions a
+                       ON a.partido_id = g.partido_id AND a.jugador_id = g.jugador_id
+                     WHERE g.partido_id = partidos.id
+                       AND ((a.equipo_id = partidos.".$propio." AND g.tipo <> 'En Contra')
+                         OR (a.equipo_id = partidos.".$rival."  AND g.tipo =  'En Contra')))";
+        };
+    }
+
+    /**
+     * El reparto de goles no coincide con el resultado.
+     *
+     * `golesDiferencia` compara el TOTAL, asi que un 2-1 con los tres goles
+     * cargados al mismo equipo le pasa por al lado: tres goles, tres cargados,
+     * todo bien. Este mira cada lado por separado y agarra el gol cargado del
+     * equipo equivocado (o el goleador que quedo en la alineacion del rival).
+     *
+     * Se pide que el total SI de bien, para no repetir en dos controles el
+     * mismo partido: si el total tampoco da, el caso es de "No coinciden con
+     * el resultado".
+     */
+    private function golesPorEquipo(array $filtros)
+    {
+        $goles = $this->golesDe();
+        $local = $goles('equipol_id', 'equipov_id');
+        $visit = $goles('equipov_id', 'equipol_id');
+
+        $q = $this->base($filtros)
+            ->select($this->columnas())
+            ->addSelect([
+                DB::raw($local.' as goles_local_cargados'),
+                DB::raw($visit.' as goles_visitante_cargados'),
+            ])
+            ->whereRaw('(partidos.golesl + partidos.golesv) = (SELECT COUNT(*) FROM gols WHERE gols.partido_id = partidos.id)')
+            ->whereRaw('('.$local.' != partidos.golesl OR '.$visit.' != partidos.golesv)');
 
         return $this->ordenar($this->conAlineacion($this->sinIncidencia($q)));
     }
