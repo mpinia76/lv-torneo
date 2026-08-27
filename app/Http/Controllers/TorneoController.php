@@ -1892,7 +1892,8 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         $nombreFiltro = '';
         if ($nombre) {
-            $nombreFiltro = " AND (equipos.nombre LIKE '%$nombre%') ";
+            $nombreEscaped = addslashes($nombre);
+            $nombreFiltro  = " AND (equipos.nombre LIKE '%$nombreEscaped%') ";
         }
 
         $tipo = '';
@@ -1906,6 +1907,12 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         $argentinos = ($request->query('argentinos')) ? 1 : 0;
+
+        // Columnas por las que se puede ordenar. "titulos" no entra: se calcula
+        // después de paginar, así que ordenar por ese campo daría cualquier cosa.
+        $ordenables = ['puntaje', 'jugados', 'ganados', 'empatados', 'perdidos', 'golesl', 'golesv', 'diferencia', 'promedio'];
+        $order      = in_array($request->query('order'), $ordenables) ? $request->query('order') : 'puntaje';
+        $tipoOrder  = strtoupper($request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
 
         $sql = 'SELECT
     foto,
@@ -2054,10 +2061,26 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         // golesl desc, equipo asc). Numeric fields are cast to float because
         // DB::select returns them as strings.
         // -----------------------------------------------------------------
-        usort($posiciones, function ($a, $b) {
+        $direccion = $tipoOrder === 'ASC' ? -1 : 1;
+
+        usort($posiciones, function ($a, $b) use ($order, $direccion) {
+            $cmp = ((float) $b->{$order} <=> (float) $a->{$order}) * $direccion;
+            if ($cmp !== 0) {
+                return $cmp;
+            }
+
             return [(float) $b->puntaje, (float) $b->promedio, (float) $b->diferencia, (float) $b->golesl, $a->equipo]
                 <=> [(float) $a->puntaje, (float) $a->promedio, (float) $a->diferencia, (float) $a->golesl, $b->equipo];
         });
+
+        // Numeros de la tira superior, sobre el listado completo (ya filtrado).
+        $kpis = ['equipos' => count($posiciones), 'partidos' => 0, 'goles' => 0];
+        foreach ($posiciones as $fila) {
+            $kpis['partidos'] += (int) $fila->jugados;
+            $kpis['goles']    += (int) $fila->golesl;
+        }
+        // Cada partido aparece una vez por equipo.
+        $kpis['partidos'] = (int) round($kpis['partidos'] / 2);
 
         // -----------------------------------------------------------------
         // STEP 3: paginate the already-merged, already-sorted set.
@@ -2171,11 +2194,13 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        $posiciones->setPath(route('torneos.posiciones', array('argentinos' => $argentinos, 'tipo' => $tipo, 'ambito' => $ambito, 'buscarpor' => $nombre)));
+        // La vista arrastra los parametros con appends(): el path va limpio.
+        $posiciones->setPath(route('torneos.posiciones'));
 
         $i = $offSet + 1;
 
-        return view('torneos.posiciones', compact('posiciones', 'i', 'argentinos'));
+        return view('torneos.posiciones',
+            compact('posiciones', 'i', 'argentinos', 'tipo', 'ambito', 'order', 'tipoOrder', 'kpis'));
     }
 
     public function estadisticasTorneo(Request $request)
@@ -5023,9 +5048,21 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
     public function titulos(Request $request)
     {
 
-        $order= ($request->query('order'))?$request->query('order'):'Titulos';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
-        $argentinos= ($request->query('argentinos'))?1:0;
+        // El campo de orden va derecho al ORDER BY: hay que validarlo contra
+        // una lista, no confiar en lo que venga por la URL.
+        $ordenables = ['titulos', 'ligas', 'copas', 'internacionales', 'nombre'];
+        $order      = in_array(strtolower((string) $request->query('order')), $ordenables)
+            ? strtolower($request->query('order'))
+            : 'titulos';
+        $tipoOrder  = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
+        $argentinos = ($request->query('argentinos')) ? 1 : 0;
+
+        if ($request->has('buscarpor')) {
+            $nombre = $request->get('buscarpor');
+            $request->session()->put('nombre_filtro_equipo', $nombre);
+        } else {
+            $nombre = $request->session()->get('nombre_filtro_equipo');
+        }
         $sql = "
     SELECT id, escudo, nombre, pais,
            SUM(titulos) titulos, SUM(ligas) ligas, SUM(copas) copas, SUM(internacionales) internacionales
@@ -5106,6 +5143,11 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
             $sql .= " AND pais = 'Argentina' ";
         }
 
+        if ($nombre) {
+            $nombreEscaped = addslashes($nombre);
+            $sql .= " AND nombre LIKE '%$nombreEscaped%' ";
+        }
+
         $sql .= "
     GROUP BY nombre, pais, escudo, id
     ORDER BY $order $tipoOrder, internacionales DESC, ligas DESC, copas DESC, nombre ASC
@@ -5113,27 +5155,29 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
 
         $posiciones = DB::select(DB::raw($sql));
 
-        $page = $request->query('page', 1);
+        // Numeros de la tira superior, sobre el listado completo (ya filtrado).
+        $kpis = ['equipos' => count($posiciones), 'titulos' => 0, 'ligas' => 0, 'copas' => 0, 'internacionales' => 0];
+        foreach ($posiciones as $fila) {
+            $kpis['titulos']         += (int) $fila->titulos;
+            $kpis['ligas']           += (int) $fila->ligas;
+            $kpis['copas']           += (int) $fila->copas;
+            $kpis['internacionales'] += (int) $fila->internacionales;
+        }
 
+        $page     = $request->query('page', 1);
         $paginate = 15;
-
-        $offSet = ($page * $paginate) - $paginate;
+        $offSet   = ($page * $paginate) - $paginate;
 
         $itemsForCurrentPage = array_slice($posiciones, $offSet, $paginate, true);
 
-
-
         $posiciones = new \Illuminate\Pagination\LengthAwarePaginator($itemsForCurrentPage, count($posiciones), $paginate, $page);
 
+        // La vista arrastra los parametros con appends(): el path va limpio.
+        $posiciones->setPath(route('torneos.titulos'));
 
+        $i = $offSet + 1;
 
-        $posiciones->setPath(route('torneos.titulos',array('order'=>$order,'tipoOrder'=>$tipoOrder,'argentinos'=>$argentinos)));
-
-
-        $i=$offSet+1;
-
-
-        return view('torneos.titulos', compact('posiciones','i','order','tipoOrder','argentinos'));
+        return view('torneos.titulos', compact('posiciones', 'i', 'order', 'tipoOrder', 'argentinos', 'kpis'));
     }
 
     public function plantillas(Request $request)

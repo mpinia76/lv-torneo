@@ -93,7 +93,7 @@
 
                     @foreach($tcColumnas as $tcKey => $tcCol)
                         <th title="{{ $tcCol['tit'] }}" class="{{ $order == $tcKey ? 't-orden-activo' : '' }}">
-                            <a href="{{ $tcLink(['order' => $tcKey, 'tipoOrder' => ($order == $tcKey && $tipoOrder == 'ASC') ? 'DESC' : 'ASC']) }}">
+                            <a href="{{ $tcLink(['order' => $tcKey, 'tipoOrder' => ($order == $tcKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
                                 {{ $tcCol['rot'] }}
                                 @if($order == $tcKey)
                                     <i class="bi {{ $tipoOrder == 'ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
@@ -106,7 +106,7 @@
 
                     @foreach($tcColumnas2 as $tcKey => $tcCol)
                         <th title="{{ $tcCol['tit'] }}" class="{{ $order == $tcKey ? 't-orden-activo' : '' }}">
-                            <a href="{{ $tcLink(['order' => $tcKey, 'tipoOrder' => ($order == $tcKey && $tipoOrder == 'ASC') ? 'DESC' : 'ASC']) }}">
+                            <a href="{{ $tcLink(['order' => $tcKey, 'tipoOrder' => ($order == $tcKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
                                 {{ $tcCol['rot'] }}
                                 @if($order == $tcKey)
                                     <i class="bi {{ $tipoOrder == 'ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>

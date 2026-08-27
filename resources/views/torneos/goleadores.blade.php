@@ -80,7 +80,7 @@
                     <th>Jugador</th>
                     @foreach($glColumnas as $glKey => $glCol)
                         <th title="{{ $glCol['tit'] }}" class="{{ $order == $glKey ? 't-orden-activo' : '' }}">
-                            <a href="{{ $glLink(['order' => $glKey, 'tipoOrder' => ($order == $glKey && $tipoOrder == 'ASC') ? 'DESC' : 'ASC']) }}">
+                            <a href="{{ $glLink(['order' => $glKey, 'tipoOrder' => ($order == $glKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
                                 {{ $glCol['rot'] }}
                                 @if($order == $glKey)
                                     <i class="bi {{ $tipoOrder == 'ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>

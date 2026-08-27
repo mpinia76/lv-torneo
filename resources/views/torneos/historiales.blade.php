@@ -3,83 +3,140 @@
 @section('pageTitle', 'Historiales')
 
 @section('content')
-    <div class="container">
 
-        <hr/>
+    @php
+        /* Prefijo hi: $torneos, $grupo y $i están tomadas a nivel global. */
+        $hiFilas = collect($posiciones)->keyBy('equipo_id');
+        $hiUno   = !empty($e1->id) ? ($hiFilas[$e1->id] ?? null) : null;
+        $hiDos   = !empty($e2->id) ? ($hiFilas[$e2->id] ?? null) : null;
 
-        <!-- Filtro de equipos -->
-        <form class="form-inline d-flex justify-content-center align-items-center mb-3">
-            <select class="form-control js-example-basic-single mr-2" id="equipo1" name="equipo1" onchange="this.form.submit()" style="width: 180px;">
-                @foreach($equipos as $equipo)
-                    <option value="{{$equipo->id}}" @if($equipo->id==$e1->id) selected @endif>
-                        {{$equipo->nombre}}
-                    </option>
+        $hiHay   = $hiUno && $hiDos;
+        $hiJug   = $hiHay ? (int) $hiUno->jugados : 0;
+        $hiGanoA = $hiHay ? (int) $hiUno->ganados : 0;
+        $hiEmp   = $hiHay ? (int) $hiUno->empatados : 0;
+        $hiGanoB = $hiHay ? (int) $hiDos->ganados : 0;
+    @endphp
+
+    <div class="t-cabecera">
+        <div>
+            <span class="t-eyebrow">Equipos</span>
+            <h1>Historial</h1>
+        </div>
+    </div>
+
+    <div class="t-panel t-panel-cuerpo">
+        <form class="t-duelo-form" method="GET" action="{{ route('torneos.historiales') }}">
+            <select class="form-control form-control-sm js-example-basic-single" id="equipo1" name="equipo1" onchange="this.form.submit()">
+                <option value="">Elegí un equipo…</option>
+                @foreach($equipos as $hiEquipo)
+                    <option value="{{ $hiEquipo->id }}" @if($hiEquipo->id == $e1->id) selected @endif>{{ $hiEquipo->nombre }}</option>
                 @endforeach
             </select>
 
-            <span class="mx-2 font-weight-bold">VS.</span>
+            <span class="t-duelo-vs">vs.</span>
 
-            <select class="form-control js-example-basic-single ml-2" id="equipo2" name="equipo2" onchange="this.form.submit()" style="width: 180px;">
-                @foreach($equipos as $equipo)
-                    <option value="{{$equipo->id}}" @if($equipo->id==$e2->id) selected @endif>
-                        {{$equipo->nombre}}
-                    </option>
+            <select class="form-control form-control-sm js-example-basic-single" id="equipo2" name="equipo2" onchange="this.form.submit()">
+                <option value="">Elegí un equipo…</option>
+                @foreach($equipos as $hiEquipo)
+                    <option value="{{ $hiEquipo->id }}" @if($hiEquipo->id == $e2->id) selected @endif>{{ $hiEquipo->nombre }}</option>
                 @endforeach
             </select>
         </form>
-        <!-- Tabla de posiciones -->
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover text-center">
-                <thead class="thead-light">
-                <tr>
-                    <th>Equipo</th>
-                    <th>Punt.</th>
-                    <th>J</th>
-                    <th>G</th>
-                    <th>E</th>
-                    <th>P</th>
-                    <th>GF</th>
-                    <th>GC</th>
-                    <th>Dif.</th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($posiciones as $equipo)
-                    <tr>
-                        <td class="text-left">
-                            <a href="{{route('equipos.ver', ['equipoId' => $equipo->equipo_id])}}">
-                                @if($equipo->foto)
-                                    <img src="{{ url('images/'.$equipo->foto) }}" height="25" class="mr-1">
-                                @endif
-                                {{$equipo->equipo}}
-                            </a>
-                        </td>
-                        <td>{{$equipo->puntaje}}</td>
-                        <td>{{$equipo->jugados}}</td>
-                        <td>{{$equipo->ganados}}</td>
-                        <td>{{$equipo->empatados}}</td>
-                        <td>{{$equipo->perdidos}}</td>
-                        <td>{{$equipo->golesl}}</td>
-                        <td>{{$equipo->golesv}}</td>
-                        <td>{{$equipo->diferencia}}</td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
-        </div>
-        <!-- Tabla de partidos -->
-        <div class="table-responsive mb-4">
-            <div class="t-panel t-lista-partidos">
-                        @foreach($partidos as $partido)
-                            <x-partido :p="$partido" :neutral="true"/>
-                        @endforeach
-                    </div>
-        </div>
-
-
-
-        <div class="d-flex justify-content-start mt-3">
-            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
-        </div>
     </div>
+
+    @if($hiHay)
+        {{-- Cara a cara --}}
+        <div class="t-panel t-duelo">
+            <a class="t-duelo-lado" href="{{ route('equipos.ver', ['equipoId' => $e1->id]) }}">
+                <x-escudo :src="$e1->escudo" :nombre="$e1->nombre" tam="xl"/>
+                <span class="t-duelo-nombre">{{ $e1->nombre }}</span>
+            </a>
+
+            <div class="t-duelo-centro">
+                <div class="t-duelo-marcador">
+                    <span class="g">{{ $hiGanoA }}</span>
+                    <span class="e">{{ $hiEmp }}</span>
+                    <span class="p">{{ $hiGanoB }}</span>
+                </div>
+                <div class="t-duelo-rot">victorias · empates · victorias</div>
+                @if($hiJug > 0)
+                    <span class="t-ge t-ge-ancha" title="{{ $hiGanoA }} · {{ $hiEmp }} · {{ $hiGanoB }}">
+                        <i class="g" style="width: {{ round($hiGanoA * 100 / $hiJug, 1) }}%"></i>
+                        <i class="e" style="width: {{ round($hiEmp * 100 / $hiJug, 1) }}%"></i>
+                        <i class="p" style="width: {{ round($hiGanoB * 100 / $hiJug, 1) }}%"></i>
+                    </span>
+                @endif
+                <div class="t-duelo-pie">{{ $hiJug }} {{ $hiJug == 1 ? 'partido' : 'partidos' }} · {{ $hiUno->golesl }}–{{ $hiDos->golesl }} en goles</div>
+            </div>
+
+            <a class="t-duelo-lado" href="{{ route('equipos.ver', ['equipoId' => $e2->id]) }}">
+                <x-escudo :src="$e2->escudo" :nombre="$e2->nombre" tam="xl"/>
+                <span class="t-duelo-nombre">{{ $e2->nombre }}</span>
+            </a>
+        </div>
+
+        {{-- Los números de la serie --}}
+        <div class="t-panel">
+            <div class="t-tabla-wrap">
+                <table class="t-tabla t-lista-tabla">
+                    <thead>
+                    <tr>
+                        <th>Equipo</th>
+                        <th title="Puntos">Pts</th>
+                        <th title="Partidos jugados">J</th>
+                        <th title="Ganados">G</th>
+                        <th title="Empatados">E</th>
+                        <th title="Perdidos">P</th>
+                        <th title="Goles a favor">GF</th>
+                        <th title="Goles en contra">GC</th>
+                        <th title="Diferencia de gol">Dif.</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($posiciones as $hiFila)
+                        <tr>
+                            <td>
+                                <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $hiFila->equipo_id])"
+                                                :nombre="$hiFila->equipo"
+                                                :escudo="$hiFila->foto"/>
+                            </td>
+                            <td class="t-pts">{{ $hiFila->puntaje }}</td>
+                            <td>{{ $hiFila->jugados }}</td>
+                            <td>{{ $hiFila->ganados }}</td>
+                            <td>{{ $hiFila->empatados }}</td>
+                            <td>{{ $hiFila->perdidos }}</td>
+                            <td>{{ $hiFila->golesl }}</td>
+                            <td>{{ $hiFila->golesv }}</td>
+                            <td class="{{ $hiFila->diferencia > 0 ? 't-dif-pos' : ($hiFila->diferencia < 0 ? 't-dif-neg' : 't-cero') }}">
+                                {{ $hiFila->diferencia > 0 ? '+' : '' }}{{ $hiFila->diferencia }}
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    {{-- Los partidos --}}
+    @if(count($partidos))
+        <div class="t-panel t-lista-partidos">
+            @foreach($partidos as $hiPartido)
+                <x-partido :p="$hiPartido" :neutral="true"/>
+            @endforeach
+        </div>
+    @elseif(!empty($e1->id) && !empty($e2->id))
+        <div class="t-panel">
+            <div class="t-vacio"><i class="bi bi-calendar-x"></i>No hay partidos cargados entre estos dos equipos.</div>
+        </div>
+    @else
+        <div class="t-panel">
+            <div class="t-vacio"><i class="bi bi-shield"></i>Elegí dos equipos para ver el historial.</div>
+        </div>
+    @endif
+
+    <div class="d-flex mt-3">
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+    </div>
+
 @endsection

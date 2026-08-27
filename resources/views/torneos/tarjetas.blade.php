@@ -73,7 +73,7 @@
                     <th>Jugador</th>
                     @foreach($tjColumnas as $tjKey => $tjCol)
                         <th title="{{ $tjCol['tit'] }}" class="{{ $order == $tjKey ? 't-orden-activo' : '' }}">
-                            <a href="{{ $tjLink(['order' => $tjKey, 'tipoOrder' => ($order == $tjKey && $tipoOrder == 'ASC') ? 'DESC' : 'ASC']) }}">
+                            <a href="{{ $tjLink(['order' => $tjKey, 'tipoOrder' => ($order == $tjKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
                                 {{ $tjCol['rot'] }}
                                 @if($order == $tjKey)
                                     <i class="bi {{ $tipoOrder == 'ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>

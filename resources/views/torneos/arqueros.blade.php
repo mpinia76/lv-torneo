@@ -78,7 +78,7 @@
                     <th>Arquero</th>
                     @foreach($aqColumnas as $aqKey => $aqCol)
                         <th title="{{ $aqCol['tit'] }}" class="{{ $order == $aqKey ? 't-orden-activo' : '' }}">
-                            <a href="{{ $aqLink(['order' => $aqKey, 'tipoOrder' => ($order == $aqKey && $tipoOrder == 'ASC') ? 'DESC' : 'ASC']) }}">
+                            <a href="{{ $aqLink(['order' => $aqKey, 'tipoOrder' => ($order == $aqKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
                                 {{ $aqCol['rot'] }}
                                 @if($order == $aqKey)
                                     <i class="bi {{ $tipoOrder == 'ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
