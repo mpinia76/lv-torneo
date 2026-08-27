@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Services\HttpHelper;
+use App\Services\NivelCompetencia;
 
 /**
  * Motor de carga de partidos, DT por DT.
@@ -1887,6 +1888,32 @@ class ImportPartidosController extends Controller
             }
         }
 
+        // ── Marcar una competencia como fuera / dentro de 1ra división ──────
+        // «Excluir» guarda una regla en `competencias_excluidas`: la misma tabla
+        // del ABM de siempre, así que vale para todos los DTs y para el scraper.
+        $excluirComp = trim((string) $request->get('excluir_comp', ''));
+        if ($excluirComp !== '') {
+            $patron = NivelCompetencia::marcarExcluida($excluirComp);
+            $avisos[] = $patron === ''
+                ? '<span class="err">No pude armar el patrón de «' . e($excluirComp) . '».</span>'
+                : 'Competencia <b>' . e($excluirComp) . '</b> excluida (patrón <code>' . e($patron) . '</code>). '
+                  . 'No se sondea más, en ningún DT. Se maneja en '
+                  . '<a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a>.';
+        }
+        $incluirComp = trim((string) $request->get('incluir_comp', ''));
+        if ($incluirComp !== '') {
+            $r = NivelCompetencia::marcarIncluida($incluirComp);
+            if ($r['patron'] === '') {
+                $avisos[] = '<span class="err">No pude armar el patrón de «' . e($incluirComp) . '».</span>';
+            } else {
+                $avisos[] = 'Competencia <b>' . e($incluirComp) . '</b> marcada como de <b>1ra división</b>: sus partidos vuelven al sondeo.'
+                    . (empty($r['apagadas']) ? ''
+                        : '<br><span class="err">Ojo:</span> para eso apagué la(s) regla(s) <code>'
+                          . implode('</code>, <code>', array_map('e', $r['apagadas'])) . '</code>, que también tapaban otras competencias. '
+                          . 'Se prenden de nuevo en <a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a>.');
+            }
+        }
+
         $nombreDT = null;
         $tecnico = null;
         if ($tecnicoId) {
@@ -1942,6 +1969,32 @@ class ImportPartidosController extends Controller
             $filas = $this->completarNombres($filas);
         }
 
+        // ── Solo torneos de primera división ───────────────────────────────
+        // Reserva, Proyección, juveniles y ascenso no se cargan. No se muestran,
+        // no se guardan en staging y —sobre todo— sus clubes («... II») no
+        // aparecen pidiendo mapeo.
+        list($filas, $fuera) = $this->separarPorNivel($filas);
+        $fueraTotal = 0;
+        foreach ($fuera as $g) $fueraTotal += $g['n'];
+
+        // Lo que quedó afuera y ya estaba guardado de un sondeo anterior se
+        // borra del staging, salvo lo que ya se aplicó (esos partidos existen).
+        if ($tecnicoId && !empty($fuera)) {
+            $compsDentro = [];
+            foreach ($filas as $f) $compsDentro[(string) $f['competencia_external_id']] = true;
+            $borrar = array_values(array_diff(array_keys($fuera), array_keys($compsDentro)));
+            if (!empty($borrar)) {
+                $borradas = DB::table('import_partidos')
+                    ->where('tecnico_id', $tecnicoId)
+                    ->whereIn('competencia_external_id', $borrar)
+                    ->where('estado', '!=', 'aplicado')
+                    ->delete();
+                if ($borradas) {
+                    $avisos[] = 'Saqué <b>' . $borradas . '</b> filas del staging que eran de competencias fuera de 1ra.';
+                }
+            }
+        }
+
         $temporadas = [];
         foreach ($filas as $f) {
             if ($f['temporada'] !== null) $temporadas[] = (int) $f['temporada'];
@@ -1981,6 +2034,7 @@ class ImportPartidosController extends Controller
         $html .= '<div class="cards">'
             . $this->card($cont['total'], 'partidos')
             . $this->card($cont['excluido'], 'fuera de alcance', 'gris')
+            . $this->card($fueraTotal, 'fuera de 1ra', 'gris')
             . $this->card($cont['duplicado'], 'ya cargados', 'ok')
             . $this->card($cont['corridos'], 'con fecha corrida', $cont['corridos'] ? 'warn' : '')
             . $this->card($cont['falta_dt'], 'sin el DT', 'warn')
@@ -2015,6 +2069,7 @@ class ImportPartidosController extends Controller
         }
         if ($guardar) $html .= '<p class="ok-box">Guardadas ' . $guardadas . ' filas en <code>import_partidos</code>.</p>';
 
+        $html .= $this->bloqueCompetencias($filas, $fuera, $request);
         $html .= $this->bloqueMapeosSospechosos($filas, $request);
         $html .= $this->bloqueClubesSinResolver($filas, $request);
         $html .= $this->bloqueClubesMapeados($filas, $request);
@@ -2076,6 +2131,15 @@ class ImportPartidosController extends Controller
             ->where('tecnico_id', $tecnicoId)->where('estado', 'nuevo')
             ->orderBy('dia')->get();
 
+        // Staging viejo: filas de reserva/juveniles/ascenso guardadas antes del
+        // filtro de 1ra. No se aplican.
+        $fueraDe1ra = 0;
+        $pendientes = $pendientes->filter(function ($r) use (&$fueraDe1ra) {
+            $d = NivelCompetencia::decidir((string) $r->competencia_nombre);
+            if ($d['excluida']) { $fueraDe1ra++; return false; }
+            return true;
+        })->values();
+
         $faltaDt = DB::table('import_partidos')
             ->where('tecnico_id', $tecnicoId)->where('estado', 'duplicado')
             ->where('motivo', 'like', '%falta el DT%')->count();
@@ -2093,6 +2157,11 @@ class ImportPartidosController extends Controller
         if ($faltaDt) {
             $html .= '<p class="ok-box">Hay <b>' . $faltaDt . '</b> partidos ya cargados donde falta este DT. '
                 . '<a class="boton" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId, 'completar_dt' => 1])) . '">Agregar el DT en esos partidos</a></p>';
+        }
+
+        if ($fueraDe1ra) {
+            $html .= '<p class="sub">Dejo afuera <b>' . $fueraDe1ra . '</b> partidos de competencias que no son de '
+                . '1ra división (reserva, juveniles, ascenso). Se limpian del staging la próxima vez que sondees.</p>';
         }
 
         if ($pendientes->isEmpty()) {
@@ -3163,7 +3232,8 @@ class ImportPartidosController extends Controller
     {
         $q = $request->query();
         unset($q['guardar'], $q['aprender'], $q['estado'], $q['limite'], $q['cache'],
-            $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre'], $q['remapear']);
+            $q['mapear_tm'], $q['mapear_equipo'], $q['mapear_nombre'], $q['remapear'],
+            $q['excluir_comp'], $q['incluir_comp']);
         return $request->url() . '?' . http_build_query($q);
     }
 
@@ -3411,6 +3481,127 @@ class ImportPartidosController extends Controller
         $lineas[] = '<details><summary>JSON crudo del primer partido</summary><pre>'
             . e(json_encode($game, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre></details>';
         return '<div class="diag">' . implode('<br>', $lineas) . '</div>';
+    }
+
+    /**
+     * Parte las filas en las que van (1ra división) y las que no.
+     *
+     * Devuelve [filas, fuera], donde `fuera` viene agrupado por competencia:
+     * comp => ['nombre', 'n', 'motivo', 'origen'].
+     *
+     * El chequeo del equipo («... II», «U20») es una red de seguridad para
+     * cuando el nombre de la competencia no delata que es reserva. No corre si
+     * el usuario marcó la competencia a mano como de 1ra: su decisión manda.
+     */
+    private function separarPorNivel(array $filas)
+    {
+        $dentro = [];
+        $fuera  = [];
+        $cache  = [];
+
+        foreach ($filas as $f) {
+            $nombre = (string) ($f['competencia_nombre'] ?: '');
+            if (!isset($cache[$nombre])) $cache[$nombre] = NivelCompetencia::decidir($nombre);
+            $d = $cache[$nombre];
+
+            if (!$d['excluida'] && $d['origen'] !== 'manual'
+                && (NivelCompetencia::esEquipoAlternativo($f['club_nombre'])
+                    || NivelCompetencia::esEquipoAlternativo($f['rival_nombre']))) {
+                $d = ['excluida' => true, 'motivo' => 'equipo alternativo (reserva / juveniles)', 'origen' => 'auto'];
+            }
+
+            if (!$d['excluida']) { $dentro[] = $f; continue; }
+
+            $k = (string) $f['competencia_external_id'];
+            if (!isset($fuera[$k])) {
+                $fuera[$k] = ['nombre' => $nombre ?: ('#' . $k), 'n' => 0,
+                    'motivo' => $d['motivo'], 'origen' => $d['origen']];
+            }
+            $fuera[$k]['n']++;
+        }
+
+        return [$dentro, $fuera];
+    }
+
+    /**
+     * Qué competencias entraron y cuáles quedaron afuera por no ser de 1ra.
+     *
+     * «Excluir» guarda una regla `contiene` en `competencias_excluidas` (sin el
+     * año, así sirve para todas las temporadas) y vale para todo el sistema.
+     * «Sí es de 1ra» apaga las reglas que la tapaban y deja una regla APAGADA
+     * con su nombre: esa marca le gana a la lista automática del servicio.
+     */
+    private function bloqueCompetencias(array $filas, array $fuera, Request $request)
+    {
+        $dentro = [];
+        foreach ($filas as $f) {
+            $k = (string) $f['competencia_external_id'];
+            if (!isset($dentro[$k])) {
+                $dentro[$k] = ['nombre' => (string) ($f['competencia_nombre'] ?: ('#' . $k)), 'n' => 0];
+            }
+            $dentro[$k]['n']++;
+        }
+        if (empty($dentro) && empty($fuera)) return '';
+
+        uasort($dentro, function ($a, $b) { return $b['n'] - $a['n']; });
+        uasort($fuera,  function ($a, $b) { return $b['n'] - $a['n']; });
+
+        $limpia = $request->query();
+        foreach (['mapear_tm', 'mapear_equipo', 'mapear_nombre', 'guardar', 'aprender',
+                     'remapear', 'excluir_comp', 'incluir_comp', 'estado'] as $k) {
+            unset($limpia[$k]);
+        }
+        foreach ($limpia as $k => $v) if (is_array($v)) unset($limpia[$k]);
+
+        // Excluir puede leerse del staging: los partidos que quedan ya los tenemos.
+        // Incluir NO: los de esa competencia se borraron del staging, hay que
+        // volver a pedirlos a Transfermarkt.
+        $urlExcluir = function ($nombre) use ($request, $limpia) {
+            $q = array_merge($limpia, ['cache' => 1, 'excluir_comp' => $nombre]);
+            return $request->url() . '?' . http_build_query($q);
+        };
+        $urlIncluir = function ($nombre) use ($request, $limpia) {
+            $q = $limpia;
+            unset($q['cache']);
+            $q = array_merge($q, ['aprender' => 1, 'guardar' => 1, 'incluir_comp' => $nombre]);
+            return $request->url() . '?' . http_build_query($q);
+        };
+
+        $nFuera = 0;
+        foreach ($fuera as $g) $nFuera += $g['n'];
+
+        $out = '<details' . (empty($fuera) ? '' : ' open') . '>'
+            . '<summary>Competencias del sondeo <span class="sub">(' . count($dentro) . ' de 1ra'
+            . (empty($fuera) ? '' : ' · ' . count($fuera) . ' afuera, ' . $nFuera . ' partidos') . ')</span></summary>'
+            . '<p class="sub">Solo se cargan los torneos de <b>primera división</b>. Reserva, Proyección, juveniles y '
+            . 'ascenso quedan afuera: no se listan abajo, no se guardan en staging y sus clubes no piden mapeo. '
+            . 'Si me equivoqué con alguna, dale al botón: la decisión queda guardada en '
+            . '<a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a> '
+            . 'y vale para todos los DTs.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Partidos</th><th>Estado</th>'
+            . '<th></th></tr></thead><tbody>';
+
+        foreach ($dentro as $k => $d) {
+            $out .= '<tr>'
+                . '<td>' . e($d['nombre']) . ' <span class="id">' . e($k) . '</span></td>'
+                . '<td class="num">' . $d['n'] . '</td>'
+                . '<td class="ok">se carga</td>'
+                . '<td><a class="boton-sec" href="' . e($urlExcluir($d['nombre'])) . '">No es de 1ra ✕</a></td>'
+                . '</tr>';
+        }
+        foreach ($fuera as $k => $d) {
+            $origen = $d['origen'] === 'regla' ? 'regla guardada' : 'automático';
+            $out .= '<tr class="gris">'
+                . '<td>' . e($d['nombre']) . ' <span class="id">' . e($k) . '</span></td>'
+                . '<td class="num">' . $d['n'] . '</td>'
+                . '<td>fuera: ' . e($d['motivo']) . ' <span class="id">(' . e($origen) . ')</span></td>'
+                . '<td><a class="boton-sec" href="' . e($urlIncluir($d['nombre'])) . '">Sí es de 1ra ✓</a></td>'
+                . '</tr>';
+        }
+
+        return $out . '</tbody></table></div>'
+            . '<p class="sub"><b>«Sí es de 1ra» vuelve a bajar los partidos de Transfermarkt</b> (1 llamada): '
+            . 'los de esa competencia ya no están en el staging.</p></details>';
     }
 
     private function card($n, $label, $tono = '')
