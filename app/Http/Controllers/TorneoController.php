@@ -1075,6 +1075,27 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
      * ese partido entra en la ventana. Si cambió de equipo, el anterior ya no
      * aparece.
      */
+    /**
+     * Ordena los clubes de una carrera del ÚLTIMO al primero, que es como se
+     * leen: primero dónde está o dónde estuvo recién. Los que sólo vienen de la
+     * carga manual no tienen fecha y quedan al final.
+     */
+    private function ordenarClubesPorFecha(array $equipos)
+    {
+        uasort($equipos, function ($a, $b) {
+            $ua = $a['ultimo'] ?? '';
+            $ub = $b['ultimo'] ?? '';
+
+            if ($ua === $ub) { return 0; }
+            if ($ua === '')  { return 1; }
+            if ($ub === '')  { return -1; }
+
+            return strcmp($ub, $ua);
+        });
+
+        return $equipos;
+    }
+
     private function sqlClubActualJugador($jugadorId)
     {
         $jugadorId = (int) $jugadorId;
@@ -1524,14 +1545,15 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         // Escudos with goal counts per team (real matches only)
-        $sql2 = "SELECT escudo, equipo_id, equipos.nombre, COUNT(gols.id) goles
+        $sql2 = "SELECT escudo, equipo_id, equipos.nombre, COUNT(gols.id) goles,
+               MAX(partidos.dia) ultimo
         FROM equipos
         INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
         INNER JOIN partidos ON partidos.id = alineacions.partido_id
         INNER JOIN gols ON gols.partido_id = partidos.id AND gols.jugador_id = alineacions.jugador_id
         WHERE alineacions.jugador_id = " . $goleador->id . " AND gols.tipo <> 'En contra'
         GROUP BY escudo, equipo_id, equipos.nombre
-        ORDER BY partidos.dia ASC";
+        ORDER BY ultimo DESC";
 
         $escudos = DB::select(DB::raw($sql2));
 
@@ -1561,10 +1583,13 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 ];
             }
             $equipos[$eid]['goles'] += (int) $escudo->goles;
+            $equipos[$eid]['ultimo'] = $escudo->ultimo;
             if (empty($equipos[$eid]['nombre'])) {
                 $equipos[$eid]['nombre'] = $escudo->nombre;
             }
         }
+
+        $equipos = $this->ordenarClubesPorFecha($equipos);
 
         $goleador->escudo = '';
         foreach ($equipos as $id => $data) {
@@ -1882,7 +1907,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         // Real-match escudos with card counts — merge with manual escudos if present
-        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre,
+        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre, MAX(partidos.dia) ultimo,
             count(case when tarjetas.tipo=\'Amarilla\' then 1 else NULL end) as amarillas,
             count(case when tarjetas.tipo=\'Roja\' or tarjetas.tipo=\'Doble Amarilla\' then 1 else NULL end) as rojas
         FROM equipos
@@ -1891,7 +1916,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         INNER JOIN tarjetas ON tarjetas.partido_id = partidos.id AND tarjetas.jugador_id = alineacions.jugador_id
         WHERE alineacions.jugador_id = ' . $tarjeta->id . '
         GROUP BY escudo, equipo_id, equipos.nombre
-        ORDER BY equipo_id ASC';
+        ORDER BY ultimo DESC';
 
         // Parse existing escudo (may already contain manual data)
         $equipos = [];
@@ -1922,10 +1947,13 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
             $equipos[$eid]['rojas']     += (int) $escudo->rojas;
             $equipos[$eid]['amarillas'] += (int) $escudo->amarillas;
+            $equipos[$eid]['ultimo']     = $escudo->ultimo;
             if (empty($equipos[$eid]['nombre'])) {
                 $equipos[$eid]['nombre'] = $escudo->nombre;
             }
         }
+
+        $equipos = $this->ordenarClubesPorFecha($equipos);
 
         $tarjeta->escudo = '';
         foreach ($equipos as $id => $data) {
@@ -4301,7 +4329,8 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         }
 
         // Real-match escudos with stats — merge with manual data
-        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre, COUNT(jugadors.id) as jugados,
+        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre, MAX(partidos.dia) ultimo,
+            COUNT(jugadors.id) as jugados,
             sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
             sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas
         FROM equipos
@@ -4310,7 +4339,8 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
         LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
         WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\') AND alineacions.jugador_id = ' . $arquero->id . '
-        GROUP BY escudo, equipo_id, equipos.nombre';
+        GROUP BY escudo, equipo_id, equipos.nombre
+        ORDER BY ultimo DESC';
 
         // Parse existing escudo (may already contain manual data)
         $equipos = [];
@@ -4341,10 +4371,13 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             }
             $equipos[$eid]['recibidos'] += (int) $escudo->recibidos;
             $equipos[$eid]['invictas']  += (int) $escudo->invictas;
+            $equipos[$eid]['ultimo']     = $escudo->ultimo;
             if (empty($equipos[$eid]['nombre'])) {
                 $equipos[$eid]['nombre'] = $escudo->nombre;
             }
         }
+
+        $equipos = $this->ordenarClubesPorFecha($equipos);
 
         $arquero->escudo = '';
         foreach ($equipos as $id => $data) {
@@ -4817,11 +4850,13 @@ group by jugador_id, jugador, foto, nacionalidad';
         }
 
         // All historic teams — merge with manual escudos if present
-        $sql2 = 'SELECT DISTINCT escudo, equipo_id, equipos.nombre
+        $sql2 = 'SELECT escudo, equipo_id, equipos.nombre, MAX(partidos.dia) ultimo
         FROM equipos
         INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
         INNER JOIN partidos ON partidos.id = alineacions.partido_id
-        WHERE alineacions.jugador_id = ' . $jugador->jugador_id;
+        WHERE alineacions.jugador_id = ' . $jugador->jugador_id . '
+        GROUP BY escudo, equipo_id, equipos.nombre
+        ORDER BY ultimo DESC';
 
         $equipos = [];
         if (!empty($jugador->escudo)) {
@@ -4844,7 +4879,10 @@ group by jugador_id, jugador, foto, nacionalidad';
                     'nombre' => $escudo->nombre,
                 ];
             }
+            $equipos[$eid]['ultimo'] = $escudo->ultimo;
         }
+
+        $equipos = $this->ordenarClubesPorFecha($equipos);
 
         $jugador->escudo = '';
         foreach ($equipos as $id => $data) {
