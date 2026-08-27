@@ -8,3 +8,9 @@
 @else
     <span class="ctrl-motivo">{{ $fila->motivo ?? 'No se pudo determinar el arquero.' }}</span>
 @endif
+
+{{-- Cómo llegó a esa conclusión. Sin esto hay que adivinar leyendo la base:
+     casi siempre el control no se equivoca, le falta un minuto en un dato. --}}
+@if(!empty($fila->traza_txt))
+    <div class="ctrl-traza">{{ implode(' · ', $fila->traza_txt) }}</div>
+@endif

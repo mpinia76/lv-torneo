@@ -184,6 +184,9 @@
 
 .ctrl-motivo { color: #842029; font-size: .85em; }
 
+/* Cómo razonó el control: se lee solo si lo buscás, no compite con los chips. */
+.ctrl-traza { margin-top: .35em; color: #6c757d; font-size: .8em; line-height: 1.45; }
+
 /* Botones de la fila.
    Sin `nowrap`: con el botón de TM en todas las filas la columna se hacía más
    ancha que la pantalla y los últimos botones quedaban fuera de vista, del

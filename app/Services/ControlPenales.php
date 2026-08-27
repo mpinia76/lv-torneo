@@ -199,6 +199,7 @@ class ControlPenales
             $fila->arquero_id        = null;
             $fila->motivo            = null;
             $fila->cargado_en_cancha = false;
+            $fila->traza             = [];
 
             $minuto = $fila->minuto;
 
@@ -227,7 +228,10 @@ class ControlPenales
             }
 
             $fila->equipo_arquero_id = $equipo;
-            $fila->arquero_id = $this->arqueroEnCancha($fila->id, $equipo, (int) $minuto, $ctx);
+
+            $pasos = [];
+            $fila->arquero_id = $this->arqueroEnCancha($fila->id, $equipo, (int) $minuto, $ctx, $pasos);
+            $fila->traza = $pasos;
 
             if ($fila->arquero_id !== null) {
                 continue;
@@ -267,9 +271,20 @@ class ControlPenales
      * Misma lógica que el `obtenerArqueroEnCancha()` original, pero leyendo de
      * los arreglos ya cargados: arquero titular por orden, después los cambios
      * de arqueros de ese equipo hasta el minuto, y al final la expulsión.
+     *
+     * `$pasos` es opcional y sirve para explicar el resultado. Cuando se pasa
+     * un arreglo, la función va anotando qué miró y qué descartó — sobre todo
+     * los datos que NO puede usar (una roja sin minuto, un cambio sin minuto),
+     * que son la causa habitual de que el control marque un penal que en
+     * realidad está bien cargado. Sin eso hay que adivinar leyendo la base.
      */
-    public function arqueroEnCancha($partidoId, $equipoId, int $minuto, array $ctx)
+    public function arqueroEnCancha($partidoId, $equipoId, int $minuto, array $ctx, &$pasos = null)
     {
+        $anotar = function ($tipo, $jugador = null, $min = null) use (&$pasos) {
+            if ($pasos === null) return;
+            $pasos[] = ['t' => $tipo, 'j' => $jugador, 'm' => $min];
+        };
+
         $actual = null;
 
         foreach ($ctx['alineaciones'][$partidoId] ?? [] as $a) {
@@ -282,37 +297,60 @@ class ControlPenales
         }
 
         if ($actual === null) {
+            $anotar('sin_titular');
             return null;
         }
+        $anotar('titular', $actual);
 
         foreach ($ctx['cambios'][$partidoId] ?? [] as $c) {
-            if ($c->minuto === null || (int) $c->minuto > $minuto) {
+            $equipoJugador = $ctx['equipoDe'][$partidoId][$c->jugador_id] ?? null;
+            $delEquipo = ($equipoJugador !== null && (int) $equipoJugador === (int) $equipoId);
+
+            if ($c->minuto === null) {
+                if ($delEquipo) $anotar('cambio_sin_minuto', (int) $c->jugador_id);
+                continue;
+            }
+            if ((int) $c->minuto > $minuto) {
                 continue;
             }
 
             // El cambio tiene que ser de un jugador de este equipo.
-            $equipoJugador = $ctx['equipoDe'][$partidoId][$c->jugador_id] ?? null;
-            if ($equipoJugador === null || (int) $equipoJugador !== (int) $equipoId) {
+            if (!$delEquipo) {
                 continue;
             }
 
             if ($c->tipo === 'Entra') {
                 $actual = (int) $c->jugador_id;
+                $anotar('entra', $actual, (int) $c->minuto);
             } elseif ($c->tipo === 'Sale' && $actual === (int) $c->jugador_id) {
+                $anotar('sale', $actual, (int) $c->minuto);
                 $actual = null;
             }
         }
 
         if ($actual === null) {
+            $anotar('nadie');
             return null;
         }
 
         foreach ($ctx['rojas'][$partidoId] ?? [] as $r) {
-            if ((int) $r->jugador_id === $actual && $r->minuto !== null && (int) $r->minuto <= $minuto) {
+            if ((int) $r->jugador_id !== $actual) {
+                continue;
+            }
+            if ($r->minuto === null) {
+                // Es EL caso a mirar: la expulsión existe pero sin minuto no se
+                // puede aplicar, y el arquero sigue figurando en cancha.
+                $anotar('roja_sin_minuto', $actual);
+                continue;
+            }
+            if ((int) $r->minuto <= $minuto) {
+                $anotar('roja', $actual, (int) $r->minuto);
                 return null;
             }
+            $anotar('roja_tarde', $actual, (int) $r->minuto);
         }
 
+        $anotar('queda', $actual);
         return $actual;
     }
 
@@ -462,6 +500,12 @@ class ControlPenales
                     $ids->push($fila->$campo);
                 }
             }
+
+            foreach ($fila->traza ?? [] as $paso) {
+                if (!empty($paso['j'])) {
+                    $ids->push($paso['j']);
+                }
+            }
         }
 
         $nombres = [];
@@ -481,9 +525,55 @@ class ControlPenales
             $fila->arquero_nombre         = $nombres[$fila->arquero_id ?? 0] ?? null;
             $fila->arquero_cargado_nombre = $nombres[$fila->arquero_cargado_id ?? 0] ?? null;
             $fila->ejecutor_nombre        = $nombres[$fila->ejecutor_id ?? 0] ?? null;
+            $fila->traza_txt              = $this->trazaLegible($fila->traza ?? [], $nombres);
         }
 
         return $filas;
+    }
+
+    /**
+     * La traza de `arqueroEnCancha()` en castellano, para mostrarla en la fila.
+     *
+     * Cada entrada es un paso del razonamiento. Los que importan son los que
+     * avisan de un dato inservible (`roja_sin_minuto`, `cambio_sin_minuto`):
+     * ahi el control no se equivoca, le falta el minuto en la base.
+     */
+    private function trazaLegible(array $pasos, array $nombres): array
+    {
+        $quien = function ($id) use ($nombres) {
+            if (empty($id)) return '?';
+            return $nombres[$id] ?? ('#'.$id);
+        };
+
+        $txt = [];
+        foreach ($pasos as $paso) {
+            $j = $quien($paso['j'] ?? null);
+            $m = isset($paso['m']) ? $paso['m']."'" : '';
+
+            switch ($paso['t']) {
+                case 'sin_titular':
+                    $txt[] = 'la alineación no tiene arquero titular'; break;
+                case 'titular':
+                    $txt[] = 'titular: '.$j; break;
+                case 'entra':
+                    $txt[] = 'entra '.$j.' al '.$m; break;
+                case 'sale':
+                    $txt[] = 'sale '.$j.' al '.$m; break;
+                case 'cambio_sin_minuto':
+                    $txt[] = '⚠ cambio de '.$j.' SIN MINUTO: no se aplica'; break;
+                case 'nadie':
+                    $txt[] = 'no queda arquero en cancha'; break;
+                case 'roja':
+                    $txt[] = 'roja de '.$j.' al '.$m; break;
+                case 'roja_sin_minuto':
+                    $txt[] = '⚠ '.$j.' tiene roja SIN MINUTO: no se descuenta'; break;
+                case 'roja_tarde':
+                    $txt[] = 'roja de '.$j.' al '.$m.', después del penal'; break;
+                case 'queda':
+                    $txt[] = 'queda '.$j; break;
+            }
+        }
+        return $txt;
     }
 
     // ------------------------------------------------------------------
