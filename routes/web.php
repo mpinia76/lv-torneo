@@ -144,6 +144,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('controles/conteo', 'ControlController@conteo')->name('controles.conteo');
     Route::post('controles/recalcular', 'ControlController@recalcular')->name('controles.recalcular');
     Route::post('controles/penales/aplicar', 'ControlController@aplicarPenales')->name('controles.penales.aplicar');
+    Route::post('controles/sin-datos', 'ControlController@marcarSinDatos')->name('controles.sinDatos');
 
     // Las URLs viejas siguen andando (links guardados, favoritos) pero caen en
     // el chequeo equivalente del panel nuevo.

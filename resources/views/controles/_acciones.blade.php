@@ -50,3 +50,26 @@
 <a href="{{ route('import_detalles.ver', ['partido_id' => $partido]) }}" target="_blank" rel="noopener"
    class="ctrl-b-rehacer"
    title="Vuelve a bajar alineación, goles, tarjetas, cambios y árbitros desde Transfermarkt. Si el partido no tiene gameId, lo busca solo por los clubes y la fecha. Primero muestra qué va a escribir.">Rehacer</a>
+
+{{--
+    "Sin datos en TM": la incidencia de un click.
+
+    Hay partidos que no tienen arreglo posible —la ficha de TM dice "no data
+    available" para uno de los dos equipos— y Rehacer no cambia nada. Este
+    botón carga la incidencia con equipo y puntos vacíos (así no se publica en
+    el front ni toca las posiciones) y el partido sale de todos los controles.
+
+    Sale solo en los chequeos que ya ofrecen "Incidencia": marcar una excepción
+    tiene sentido donde el error puede venir del origen, no en un gol repetido.
+
+    Es un POST, no un link: la pantalla no escribe sola, igual que los penales.
+--}}
+@if(in_array('incidencia', $def['acciones']))
+    <form method="POST" action="{{ route('controles.sinDatos') }}" class="ctrl-form-inline"
+          onsubmit="return confirm('El partido queda marcado como excepción y deja de aparecer en TODOS los controles. ¿Seguro?')">
+        @csrf
+        <input type="hidden" name="partido_id" value="{{ $partido }}">
+        <button type="submit" class="ctrl-b-sindatos"
+                title="Transfermarkt no tiene el detalle de este partido: se carga la incidencia y sale de los controles.">Sin datos en TM</button>
+    </form>
+@endif

@@ -192,7 +192,11 @@
    ancha que la pantalla y los últimos botones quedaban fuera de vista, del
    otro lado del scroll horizontal. Ahora bajan de renglón. */
 .ctrl-botones { text-align: right; }
-.ctrl-botones a {
+/* El boton "Sin datos en TM" es un <button> dentro de un <form> porque escribe:
+   entra en el mismo selector que los <a> para que se vea igual que los demas. */
+.ctrl-form-inline { display: inline-block; margin: 0; }
+.ctrl-botones a,
+.ctrl-botones button {
     display: inline-block;
     padding: .3em .8em;
     margin-left: .3em;
@@ -203,7 +207,8 @@
     text-decoration: none;
     border: 0;
 }
-.ctrl-botones a:hover { opacity: .88; color: #fff; text-decoration: none; }
+.ctrl-botones a:hover,
+.ctrl-botones button:hover { opacity: .88; color: #fff; text-decoration: none; }
 .ctrl-b-verde { background: #198754; }
 .ctrl-b-azul  { background: #0d6efd; }
 .ctrl-b-gris  { background: #6c757d; }
@@ -221,6 +226,7 @@
    selector tiene que ser `.ctrl-botones a.ctrl-b-rehacer`. */
 .ctrl-b-tm      { background: #1a3c5a; }
 .ctrl-b-rehacer { background: #b45309; }
+.ctrl-b-sindatos { background: #0f766e; cursor: pointer; }
 
 .ctrl-vacio {
     text-align: center;

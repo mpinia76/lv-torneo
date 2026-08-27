@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Incidencia;
 use App\Services\ControlPenales;
 use App\Services\Controles;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 
@@ -108,6 +110,57 @@ class ControlController extends Controller
         }
 
         return back()->with('success', $mensaje);
+    }
+
+    /**
+     * Marca un partido como "Transfermarkt no tiene los datos".
+     *
+     * Hay partidos que no se pueden arreglar: la ficha de TM dice "no data
+     * available" para uno de los dos equipos, o le falta un gol. Rehacer no
+     * cambia nada —el importador trae lo mismo— y el partido se queda para
+     * siempre en los controles tapando los errores que sí se pueden corregir.
+     *
+     * La salida es la de siempre, la incidencia, pero de un click. Va con
+     * `equipo_id` y `puntos` en NULL a propósito: así no se publica en el
+     * front ni toca la tabla de posiciones (ver `posicionesPublic` y
+     * `GrupoController`, que filtran por `whereNotNull('equipo_id')`), y el
+     * partido desaparece de los dieciocho controles.
+     */
+    public function marcarSinDatos(Request $request)
+    {
+        $partidoId = (int) $request->input('partido_id');
+
+        $partido = DB::table('partidos')
+            ->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
+            ->join('grupos', 'fechas.grupo_id', '=', 'grupos.id')
+            ->where('partidos.id', $partidoId)
+            ->first(['partidos.id', 'grupos.torneo_id']);
+
+        if (!$partido) {
+            return back()->with('success', 'No encontré ese partido.');
+        }
+
+        // Si ya tenía una incidencia no se agrega otra: con una alcanza para
+        // que el partido no aparezca en ningún control.
+        $yaTiene = Incidencia::where('partido_id', $partido->id)->exists();
+
+        if (!$yaTiene) {
+            Incidencia::create([
+                'partido_id'    => $partido->id,
+                'torneo_id'     => $partido->torneo_id,
+                'equipo_id'     => null,
+                'puntos'        => null,
+                'observaciones' => 'Transfermarkt no publica el detalle completo de este partido '
+                    .'(falta la alineación de alguno de los dos equipos o algún gol). '
+                    .'Marcado desde Controles de carga el '.date('d/m/Y').'.',
+            ]);
+
+            $this->controles->invalidarConteos();
+        }
+
+        return back()->with('success', $yaTiene
+            ? 'Ese partido ya tenía una incidencia cargada.'
+            : 'Listo: el partido quedó marcado como sin datos en TM y sale de todos los controles.');
     }
 
     // ------------------------------------------------------------------
