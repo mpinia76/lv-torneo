@@ -995,12 +995,41 @@ class PersonaDuplicadoController extends Controller
     {
         set_time_limit(0);
 
-        $datos     = $this->fotos();
-        $personaId = (int) $request->input('persona', 0);
+        $datos = $this->fotos();
+
+        // El id que uno tiene a mano es el que está en la URL de Editar, que es
+        // el del ROL (jugador/DT/árbitro), no el de la persona. Se acepta
+        // cualquiera de los cuatro y se traduce acá, para no obligar a nadie a
+        // abrir la base solo para probar una foto.
+        $id   = (int) $request->input('id', 0);
+        $tipo = (string) $request->input('tipo', 'jugador');
+
+        $tablas = ['jugador' => 'jugadors', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'];
+
+        $personaId = 0;
+        $comoLoPidio = '';
+
+        if ($id > 0) {
+            if ($tipo === 'persona') {
+                $personaId   = $id;
+                $comoLoPidio = 'persona #' . $id;
+            } elseif (isset($tablas[$tipo])) {
+                $personaId   = (int) DB::table($tablas[$tipo])->where('id', $id)->value('persona_id');
+                $comoLoPidio = $tipo . ' #' . $id;
+            }
+
+            if (!$personaId) {
+                return redirect()->back()->withErrors([
+                    'error' => 'No encontré ninguna ficha con ese id (' . e($comoLoPidio ?: ($tipo . ' #' . $id))
+                        . '). Fijate que el desplegable diga de qué id se trata: el que sale en la URL de '
+                        . '"Editar jugador" es el de JUGADOR, no el de persona.',
+                ]);
+            }
+        }
 
         if (!$personaId) {
-            foreach (array_keys($datos['problemas']) as $id) {
-                if (!empty($datos['fichas'][(int) $id]['tm'])) { $personaId = (int) $id; break; }
+            foreach (array_keys($datos['problemas']) as $pid) {
+                if (!empty($datos['fichas'][(int) $pid]['tm'])) { $personaId = (int) $pid; break; }
             }
         }
 
@@ -1017,8 +1046,8 @@ class PersonaDuplicadoController extends Controller
         if (!$ficha || empty($ficha['tm'])) {
             return redirect()->back()->withErrors([
                 'error' => $personaId
-                    ? ('La persona #' . $personaId . ' no existe o no tiene id de Transfermarkt, así que no hay '
-                        . 'con qué probar. Dejá el campo vacío para que agarre la primera foto rota.')
+                    ? ('La persona #' . $personaId . ($comoLoPidio ? ' (' . $comoLoPidio . ')' : '')
+                        . ' no tiene id de Transfermarkt, así que no hay con qué probar.')
                     : 'No encontré ninguna foto rota con id de Transfermarkt para probar.',
             ]);
         }

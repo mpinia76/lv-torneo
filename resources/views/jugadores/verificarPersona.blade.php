@@ -816,9 +816,15 @@
                             @csrf
                             <div class="form-inline">
                                 <button class="btn btn-sm btn-outline-secondary mr-2">Probar el camino de descarga</button>
-                                <label class="mb-0 mr-2 small">con la ficha</label>
-                                <input type="number" name="persona" class="form-control form-control-sm mr-2"
-                                       style="width:120px;" placeholder="id de persona (opcional)">
+                                <label class="mb-0 mr-2 small">con el</label>
+                                <select name="tipo" class="form-control form-control-sm mr-2">
+                                    <option value="jugador" selected>jugador</option>
+                                    <option value="tecnico">DT</option>
+                                    <option value="arbitro">árbitro</option>
+                                    <option value="persona">persona</option>
+                                </select>
+                                <input type="number" name="id" class="form-control form-control-sm mr-2"
+                                       style="width:110px;" placeholder="id (opcional)">
                                 <label class="mb-0 small">
                                     <input type="checkbox" name="creditos" value="1"> gastar créditos si las gratis fallan
                                 </label>
@@ -830,6 +836,9 @@
                                 volvió a comprobar. Si alguna de esas trae el binario sano, sobra ScraperAPI para
                                 las fotos y no se gasta un centavo. Recién si fallan las tres, y solo con el tilde,
                                 se prueban las cinco del proxy. No escribe ningún archivo.
+                                El id es el que sale en la URL de <em>Editar</em>
+                                (<code>/jugadores/<strong>76013</strong>/edit</code>); si lo dejás vacío agarra
+                                la primera foto rota de la lista.
                             </small>
                         </form>
                         <small class="text-muted d-block mt-2">
