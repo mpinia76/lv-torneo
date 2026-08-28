@@ -64,6 +64,15 @@ class FotosPersonas
     /** Cuántas personas entran en un whereIn al resolver los ids de TM. */
     const POR_WHEREIN = 800;
 
+    /**
+     * Cuántas fallas seguidas, sin ningún acierto, cortan la pasada.
+     *
+     * Bajar cada foto gasta un crédito de ScraperAPI. Si las primeras cinco
+     * fallan todas, lo que está roto es el camino de descarga y seguir hasta 100
+     * solo cuesta plata para llegar a la misma conclusión.
+     */
+    const FALLAS_SEGUIDAS = 5;
+
     /** El directorio leído una vez por request. */
     private static $archivos = null;
 
@@ -359,6 +368,7 @@ class FotosPersonas
             'bajadas'      => 0,
             'fallidas'     => 0,
             'quedan'       => 0,
+            'abandonado'   => false,  // se cortó por fallar todo seguido
             'errores'      => [],
         ];
 
@@ -410,6 +420,18 @@ class FotosPersonas
                         if ($baja['error'] !== '' && count($r['errores']) < 20) {
                             $r['errores'][] = $fila['quien'] . ': ' . $baja['error'];
                         }
+
+                        // Si viene fallando TODO desde el principio, el problema
+                        // no es esta foto: es el camino de descarga. Cada intento
+                        // gasta un crédito de ScraperAPI, así que se corta acá en
+                        // vez de quemar la tanda entera para llegar a la misma
+                        // conclusión.
+                        if ($r['bajadas'] === 0 && $r['fallidas'] >= self::FALLAS_SEGUIDAS) {
+                            $r['abandonado'] = true;
+                            $cortado = true;   // para que 'quedan' diga cuántas no se tocaron
+                            break 3;
+                        }
+
                         continue;
                     }
 

@@ -929,7 +929,7 @@ class PersonaDuplicadoController extends Controller
     {
         set_time_limit(0);
 
-        $limite = (int) $request->input('limite', 100);
+        $limite = (int) $request->input('limite', 25);
         $limite = $limite < 0 ? 0 : min($limite, 2000);
 
         try {
@@ -945,6 +945,11 @@ class PersonaDuplicadoController extends Controller
             . ' en ' . ($r['llamadas'] == 1 ? '1 llamada' : "{$r['llamadas']} llamadas") . ' a Transfermarkt.'
             . ' Se ' . ($r['bajadas'] == 1 ? 'bajó 1 foto nueva' : "bajaron {$r['bajadas']} fotos nuevas") . '.';
 
+        if (!empty($r['abandonado'])) {
+            $mensaje .= ' CORTÉ LA PASADA: fallaron las primeras ' . $r['fallidas'] . ' seguidas sin bajar'
+                . ' ninguna. Cuando falla todo desde el arranque el problema no son las fotos sino el camino'
+                . ' de descarga, y cada intento gasta un crédito — mirá el detalle del error acá abajo.';
+        }
         if ($r['sin_portrait']) {
             $mensaje .= " {$r['sin_portrait']} tienen ficha en TM pero TM tampoco tiene foto"
                 . ' (ahí no hay nada que bajar: conviene sacarles la foto a mano para que muestren la silueta).';

@@ -752,9 +752,10 @@
                             <div class="form-inline">
                                 <label class="mr-2 mb-0">Intentar de a</label>
                                 <select name="limite" class="form-control form-control-sm mr-3">
-                                    <option value="25">25</option>
+                                    <option value="5">5 (probar)</option>
+                                    <option value="25" selected>25</option>
                                     <option value="50">50</option>
-                                    <option value="100" selected>100</option>
+                                    <option value="100">100</option>
                                     <option value="250">250</option>
                                 </select>
                                 <button class="btn btn-sm btn-primary">Bajar las fotos de Transfermarkt</button>
@@ -764,6 +765,8 @@
                             El tope va por fichas consultadas, no por créditos: solo gasta crédito la que
                             <strong>tiene retrato en TM</strong>. Las {{ $detF['total']['sin_tm'] }} sin id de
                             Transfermarkt no se pueden resolver así — se cargan a mano desde <em>Editar</em>.
+                            <strong>La primera vez conviene probar con 5</strong>: si fallan las cinco seguidas
+                            la pasada se corta sola y el mensaje dice por qué, en vez de quemar la tanda entera.
                         </small>
                     </div>
                 </div>
