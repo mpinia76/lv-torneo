@@ -3454,7 +3454,7 @@ class ImportPartidosController extends Controller
 
             $out .= '<tr' . ($rep ? ' class="warn"' : '') . '>'
                 . '<td>' . e($d['nombre']) . '</td>'
-                . '<td class="num">' . e($tmId) . '</td>'
+                . '<td class="num">' . $this->linkClubTm($tmId) . '</td>'
                 . '<td class="num">' . $d['n'] . '</td>';
 
             if ((string) $editando === (string) $tmId) {
@@ -3526,7 +3526,8 @@ class ImportPartidosController extends Controller
             . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
 
         foreach ($pend as $tmId => $d) {
-            $out .= '<tr><td>' . e($d['nombre']) . '</td><td class="num">' . e($tmId) . '</td><td class="num">' . $d['n'] . '</td>'
+            $out .= '<tr><td>' . e($d['nombre']) . '</td>'
+                . '<td class="num">' . $this->linkClubTm($tmId) . '</td><td class="num">' . $d['n'] . '</td>'
                 . '<td><form method="get" action="' . e($request->url()) . '">';
             foreach ($request->query() as $k => $v) {
                 if (in_array($k, ['mapear_tm', 'mapear_equipo', 'mapear_nombre', 'guardar', 'aprender'], true)) continue;
@@ -3544,6 +3545,22 @@ class ImportPartidosController extends Controller
                 . '</td></tr>';
         }
         return $out . '</tbody></table></div>';
+    }
+
+    /**
+     * El id de Transfermarkt del club, linkeado a su perfil.
+     *
+     * El slug no hace falta: TM acepta cualquier cosa antes de
+     * `/startseite/verein/{id}` y redirige al club que corresponde.
+     */
+    private function linkClubTm($tmId)
+    {
+        $tmId = trim((string) $tmId);
+        if ($tmId === '') return '—';
+
+        $u = $this->urlsClubTm($tmId, null);
+        return '<a href="' . e($u['perfil']) . '" target="_blank" rel="noopener" '
+            . 'title="Ver este club en Transfermarkt">' . e($tmId) . ' ↗</a>';
     }
 
     private function diagnosticar(array $game)
