@@ -55,6 +55,8 @@ class ControlController extends Controller
             'torneosFiltro' => $this->controles->torneos($filtros['year']),
             'rolesTerna'   => Controles::ROLES_TERNA,
             'resumenRoles' => $def['grupo'] === 'Árbitros' ? $this->controles->resumenRoles() : [],
+            // Qué dice el botón "no se puede arreglar" en ESTE control.
+            'sinDatos'     => $this->controles->motivoSinDatos($clave),
         ]);
     }
 
@@ -145,14 +147,18 @@ class ControlController extends Controller
         $yaTiene = Incidencia::where('partido_id', $partido->id)->exists();
 
         if (!$yaTiene) {
+            // El motivo sale del control desde el que se apretó el botón, no
+            // es un texto único: en "Terna incompleta" lo que falta son los
+            // asistentes, no la alineación. `motivoSinDatos()` valida la clave.
+            $motivo = $this->controles->motivoSinDatos($request->input('check'));
+
             Incidencia::create([
                 'partido_id'    => $partido->id,
                 'torneo_id'     => $partido->torneo_id,
                 'equipo_id'     => null,
                 'puntos'        => null,
-                'observaciones' => 'Transfermarkt no publica el detalle completo de este partido '
-                    .'(falta la alineación de alguno de los dos equipos o algún gol). '
-                    .'Marcado desde Controles de carga el '.date('d/m/Y').'.',
+                'observaciones' => $motivo['texto']
+                    .' Marcado desde Controles de carga el '.date('d/m/Y').'.',
             ]);
 
             $this->controles->invalidarConteos();

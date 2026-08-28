@@ -52,7 +52,7 @@
    title="Vuelve a bajar alineación, goles, tarjetas, cambios y árbitros desde Transfermarkt. Si el partido no tiene gameId, lo busca solo por los clubes y la fecha. Primero muestra qué va a escribir.">Rehacer</a>
 
 {{--
-    "Sin datos en TM": la incidencia de un click.
+    El botón "no se puede arreglar": la incidencia de un click.
 
     Hay partidos que no tienen arreglo posible —la ficha de TM dice "no data
     available" para uno de los dos equipos— y Rehacer no cambia nada. Este
@@ -65,11 +65,22 @@
     Es un POST, no un link: la pantalla no escribe sola, igual que los penales.
 --}}
 @if(in_array('incidencia', $def['acciones']))
+    @php
+        // El texto del botón y el de la incidencia dependen del control que se
+        // está mirando: los arma `Controles::motivoSinDatos()` y los manda el
+        // controlador en $sinDatos. El `??` es por si algún día se incluye
+        // esta partial desde otra pantalla.
+        $sinDatos = $sinDatos ?? ['boton' => 'Sin datos en TM', 'texto' => ''];
+    @endphp
+    {{-- El motivo viaja por `data-motivo` y NO interpolado dentro del confirm:
+         metido en el string de JS, una comilla en el texto lo parte al medio. --}}
     <form method="POST" action="{{ route('controles.sinDatos') }}" class="ctrl-form-inline"
-          onsubmit="return confirm('El partido queda marcado como excepción y deja de aparecer en TODOS los controles. ¿Seguro?')">
+          data-motivo="{{ $sinDatos['texto'] }}"
+          onsubmit="return confirm('Se va a cargar esta incidencia:\n\n' + this.dataset.motivo + '\n\nEl partido deja de aparecer en TODOS los controles. ¿Seguro?')">
         @csrf
         <input type="hidden" name="partido_id" value="{{ $partido }}">
+        <input type="hidden" name="check" value="{{ $def['clave'] ?? '' }}">
         <button type="submit" class="ctrl-b-sindatos"
-                title="Transfermarkt no tiene el detalle de este partido: se carga la incidencia y sale de los controles.">Sin datos en TM</button>
+                title="{{ $sinDatos['texto'] }} Se carga como incidencia y el partido sale de los controles.">{{ $sinDatos['boton'] }}</button>
     </form>
 @endif

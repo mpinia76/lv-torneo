@@ -394,6 +394,70 @@ class Controles
         return $existe;
     }
 
+    /**
+     * Qué dice el botón "no se puede arreglar" y qué texto deja en la
+     * incidencia, según el control desde el que se apretó.
+     *
+     * El agujero casi nunca es "el partido entero": es una parte, y cuál es
+     * depende del control que estás mirando. En "Terna incompleta" lo que
+     * falta son los asistentes —la ficha de TM trae solo el principal— y
+     * escribir "no publica el detalle completo" ahí es mentira a medias, que
+     * dentro de dos años no le va a explicar nada a nadie.
+     *
+     * La clave llega por POST desde la fila, así que se valida contra este
+     * mapa: cualquier cosa que no esté acá cae en el texto genérico.
+     */
+    public function motivoSinDatos($clave): array
+    {
+        $motivos = [
+            'arbitros.terna' => [
+                'boton' => 'Sin asistentes',
+                'texto' => 'Sin asistentes: la ficha de Transfermarkt de este partido publica solo el árbitro principal.',
+            ],
+            'alineaciones.sin_jugadores' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'Transfermarkt no publica la alineación de alguno de los dos equipos ("no data available").',
+            ],
+            'alineaciones.faltan' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'La alineación que publica Transfermarkt para este partido está incompleta.',
+            ],
+            'tecnicos.faltan' => [
+                'boton' => 'Sin técnico en TM',
+                'texto' => 'Transfermarkt no publica el técnico de alguno de los dos equipos en este partido.',
+            ],
+            'goles.diferencia' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'La ficha de Transfermarkt no tiene todos los goles del partido: el detalle no da el resultado.',
+            ],
+            'goles.por_equipo' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'La ficha de Transfermarkt no permite saber de qué equipo es cada gol de este partido.',
+            ],
+            'goles.sin_jugar' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'El goleador no figura en la alineación que publica Transfermarkt para este partido.',
+            ],
+            'tarjetas.sin_jugar' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'El amonestado no figura en la alineación que publica Transfermarkt para este partido.',
+            ],
+            'cambios.sin_jugar' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'El jugador del cambio no figura en la alineación que publica Transfermarkt para este partido.',
+            ],
+            'cambios.impares' => [
+                'boton' => 'Sin datos en TM',
+                'texto' => 'Los cambios que publica Transfermarkt no cierran: hay un movimiento sin su contraparte.',
+            ],
+        ];
+
+        return $motivos[$clave] ?? [
+            'boton' => 'Sin datos en TM',
+            'texto' => 'Transfermarkt no publica el detalle completo de este partido.',
+        ];
+    }
+
     /** Cuántos árbitros hay cargados de cada rol; sirve para leer la terna. */
     public function resumenRoles(): array
     {
