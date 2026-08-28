@@ -539,10 +539,24 @@ class HttpHelper
     const TOPE_REEMPLAZOS = 20;
 
     // ---------------------------------------------------
-    // Descarga BINARIA (imágenes) con la misma estrategia que el JSON:
-    // los hosts de Transfermarkt están geo-bloqueados para nuestro server
-    // (dan 502/504 aunque en el navegador de casa se vean bien), así que la
-    // imagen se baja saliendo por la UE vía ScraperAPI. Otros hosts van directo.
+    // Descarga BINARIA (imágenes): PRIMERO DIRECTO, el proxy es la red de
+    // contención.
+    //
+    // Durante mucho tiempo esto salía siempre por ScraperAPI, con el argumento
+    // de que los hosts de imágenes de TM estaban geo-bloqueados para el server.
+    // Eso quedó escrito en un comentario y nunca se volvió a comprobar. El
+    // 28-ago-2026 se midió, y era falso: la descarga directa anda perfecto.
+    //
+    // Medición sobre el retrato de Almeida (TM 1116061), misma URL, mismo
+    // momento:
+    //
+    //   directo               → 200, image/webp,                  24.540 bytes, 0 rotos
+    //   directo sin webp      → 200, image/png,                  191.628 bytes, 0 rotos
+    //   proxy (5 variantes)   → 200, image/webp; CHARSET=UTF-8,   38.936 bytes, 494 rotos
+    //
+    // Ese `charset=utf-8` pegado a una respuesta binaria es la firma del delito:
+    // ScraperAPI la trata como texto y cada byte alto se convierte en `EF BF BD`.
+    // Por eso el archivo pesa 38.936 en vez de 24.540 y no lo dibuja nadie.
     //
     // OJO — el problema que originó los reintentos (ago-2026): ScraperAPI
     // devuelve **a veces** la imagen pasada por UTF-8, con cada byte alto
@@ -550,10 +564,9 @@ class HttpHelper
     // image/png, así que los chequeos de siempre la dan por buena y lo que se
     // guarda es basura: 103 fotos rotas en producción salieron de ahí.
     //
-    // No es determinístico: en una tanda de 50 salieron bien 13. Cada intento de
-    // ScraperAPI sale por otra IP, así que un cuerpo mangleado se trata como un
-    // intento fallido y se vuelve a pedir. Con ~26% de aciertos por intento,
-    // cinco intentos cubren cerca del 78%.
+    // Los reintentos por proxy quedan igual —un cuerpo mangleado cuenta como
+    // intento fallido y se vuelve a pedir, porque cada request sale por otra
+    // IP— pero ahora son el plan B: si la directa anda, no se gasta un crédito.
     //
     // Devuelve: ['ok'=>bool, 'body'=>string, 'http'=>int, 'contentType'=>string,
     //            'error'=>string, 'intentos'=>int, 'mangleados'=>int]
@@ -570,21 +583,15 @@ class HttpHelper
         }
 
         $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        $viaScraper = ($host !== '' && strpos($host, 'transfermarkt') !== false);
+        $hayProxy = ($host !== '' && strpos($host, 'transfermarkt') !== false && self::apiKey() !== '');
 
-        if ($viaScraper && self::apiKey() === '') {
-            $out['error'] = 'sin_api_key';
-            Log::error('HttpHelper: ' . self::SIN_CLAVE);
-            return $out;
-        }
-
-        $endpoint = $viaScraper
+        $endpointProxy = $hayProxy
             ? ('https://api.scraperapi.com/?' . http_build_query([
                     'api_key'      => self::apiKey(),
                     'url'          => $url,
                     'country_code' => self::country(),
                 ]))
-            : $url;
+            : '';
 
         $headers = [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -597,14 +604,20 @@ class HttpHelper
         $intentos = max(1, min($intentos, 8));
         $mangleados = 0;
 
-        // Cada request de ScraperAPI sale por otra IP: reintentar no es esperar
-        // que la red mejore, es pedirle la foto a otro proxy.
-        for ($i = 0; $i < $intentos; $i++) {
+        // El PRIMER intento va derecho al host de la imagen, sin proxy: es gratis
+        // y —medido el 28-ago-2026 contra la ficha de Almeida— es el único que
+        // trae el binario entero. El proxy queda de red de contención.
+        $planes = [['proxy' => false, 'endpoint' => $url]];
+        for ($i = 0; $i < $intentos && $hayProxy; $i++) {
+            $planes[] = ['proxy' => true, 'endpoint' => $endpointProxy];
+        }
+
+        foreach ($planes as $n => $plan) {
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $endpoint);
+            curl_setopt($ch, CURLOPT_URL, $plan['endpoint']);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 40);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $plan['proxy'] ? 40 : 15);
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_ENCODING, '');
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -615,12 +628,12 @@ class HttpHelper
             curl_close($ch);
 
             if (!$curlErr && $httpCode === 200 && !empty($body) && strpos($contentType, 'image') !== false) {
-                // Acá está la trampa: 200 + content-type de imagen NO garantiza
-                // que lo que llegó sea la imagen. Si viene mangleado se descarta
-                // y se pide de nuevo, que es lo único que lo arregla.
+                // 200 + content-type de imagen NO garantiza que lo que llegó sea
+                // la imagen: el proxy la manda pasada por texto y le pega un
+                // `charset=utf-8` al content-type, que es la firma del delito.
                 if (self::pasadoPorTexto($body)) {
                     $mangleados++;
-                    Log::warning('HttpHelper: binario mangleado por el proxy (intento ' . ($i + 1)
+                    Log::warning('HttpHelper: binario mangleado por el proxy (intento ' . ($n + 1)
                         . ') en ' . $url);
                     usleep(300000);
                     continue;
@@ -628,22 +641,30 @@ class HttpHelper
 
                 return ['ok' => true, 'body' => $body, 'http' => $httpCode,
                         'contentType' => $contentType, 'error' => '',
-                        'intentos' => $i + 1, 'mangleados' => $mangleados];
+                        'intentos' => $n + 1, 'mangleados' => $mangleados,
+                        'via' => $plan['proxy'] ? 'proxy' : 'directo'];
             }
-            // Créditos de ScraperAPI agotados: no tiene sentido reintentar.
-            if (is_string($body) && stripos($body, 'exhausted the API Credits') !== false) {
-                $out['http'] = $httpCode; $out['error'] = 'sin_creditos';
-                $out['intentos'] = $i + 1; $out['mangleados'] = $mangleados;
-                return $out;
+
+            if ($plan['proxy']) {
+                // Créditos de ScraperAPI agotados: no tiene sentido reintentar.
+                if (is_string($body) && stripos($body, 'exhausted the API Credits') !== false) {
+                    $out['http'] = $httpCode; $out['error'] = 'sin_creditos';
+                    $out['intentos'] = $n + 1; $out['mangleados'] = $mangleados;
+                    return $out;
+                }
+                usleep(300000); // 0,3s → fuerza rotación de IP en ScraperAPI
+            } else {
+                // La directa falló: recién ahí tiene sentido gastar en el proxy.
+                Log::info('HttpHelper: la descarga directa falló (HTTP ' . $httpCode
+                    . ($curlErr ? ', curl ' . $curlErr : '') . '), voy por el proxy: ' . $url);
             }
-            usleep(300000); // 0,3s → fuerza rotación de IP en ScraperAPI
         }
 
         $out['http']        = $httpCode;
         $out['contentType'] = $contentType;
-        $out['intentos']    = $intentos;
+        $out['intentos']    = count($planes);
         $out['mangleados']  = $mangleados;
-        $out['error']       = $mangleados >= $intentos
+        $out['error']       = $mangleados > 0
             ? ('binario_mangleado_' . $mangleados . '_intentos')
             : ($curlErr ? ('curl_errno_' . $curlErr) : ('http_' . $httpCode));
 
