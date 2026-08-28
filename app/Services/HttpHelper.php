@@ -664,7 +664,7 @@ class HttpHelper
      *
      * @return array filas con ['variante','http','tipo','bytes','reemplazos','firma','sirve']
      */
-    public static function probarBinario(string $url): array
+    public static function probarBinario(string $url, bool $gastarCreditos = false): array
     {
         $url = trim($url);
         if (!filter_var($url, FILTER_VALIDATE_URL)) return [];
@@ -673,9 +673,20 @@ class HttpHelper
         $aceptaClasico = 'image/jpeg,image/png,image/*;q=0.8';
 
         $variantes = [
-            // Gratis: si el geo-bloqueo ya no está, no hace falta proxy ninguno.
-            ['nombre' => 'directo (sin proxy, gratis)', 'proxy' => false,
+            // Las tres primeras son DIRECTAS: no pasan por el proxy y no cuestan
+            // un centavo. Están primero a propósito. El código asume desde hace
+            // rato que los hosts de imágenes de TM están geo-bloqueados para el
+            // server, pero eso nunca se volvió a comprobar: si alguna de estas
+            // trae el binario sano, sobra ScraperAPI para las fotos y el problema
+            // se termina acá, gratis.
+            ['nombre' => 'directo, como el navegador (gratis)', 'proxy' => false,
              'params' => [], 'accept' => $aceptaTodo, 'encoding' => ''],
+
+            ['nombre' => 'directo, sin aceptar webp (gratis)', 'proxy' => false,
+             'params' => [], 'accept' => $aceptaClasico, 'encoding' => ''],
+
+            ['nombre' => 'directo, sin compresión (gratis)', 'proxy' => false,
+             'params' => [], 'accept' => $aceptaTodo, 'encoding' => 'identity'],
 
             ['nombre' => 'proxy eu — como lo hace hoy', 'proxy' => true,
              'params' => ['country_code' => self::country()], 'accept' => $aceptaTodo, 'encoding' => ''],
@@ -699,8 +710,22 @@ class HttpHelper
         $out = [];
 
         foreach ($variantes as $v) {
+            // En cuanto una variante gratis funciona, no hay nada más que medir:
+            // esa es la respuesta y no se gasta un solo crédito.
+            if ($v['proxy'] && !$gastarCreditos) {
+                foreach ($out as $ya) {
+                    if (!empty($ya['sirve'])) return $out;
+                }
+            }
+
             $fila = ['variante' => $v['nombre'], 'http' => 0, 'tipo' => '', 'bytes' => 0,
                      'reemplazos' => 0, 'firma' => '', 'sirve' => false, 'error' => ''];
+
+            if ($v['proxy'] && !$gastarCreditos) {
+                $fila['error'] = 'no se probó (tildá "gastar créditos")';
+                $out[] = $fila;
+                continue;
+            }
 
             if ($v['proxy'] && self::apiKey() === '') {
                 $fila['error'] = 'sin_api_key';

@@ -1045,7 +1045,7 @@ class PersonaDuplicadoController extends Controller
         }
 
         try {
-            $filas = HttpHelper::probarBinario($url);
+            $filas = HttpHelper::probarBinario($url, $request->boolean('creditos'));
         } catch (\Exception $e) {
             return redirect()->back()->withErrors(['error' => 'No se pudo probar: ' . $e->getMessage()]);
         }

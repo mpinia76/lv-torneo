@@ -818,14 +818,18 @@
                                 <button class="btn btn-sm btn-outline-secondary mr-2">Probar el camino de descarga</button>
                                 <label class="mb-0 mr-2 small">con la ficha</label>
                                 <input type="number" name="persona" class="form-control form-control-sm mr-2"
-                                       style="width:120px;" placeholder="id (opcional)">
+                                       style="width:120px;" placeholder="id de persona (opcional)">
+                                <label class="mb-0 small">
+                                    <input type="checkbox" name="creditos" value="1"> gastar créditos si las gratis fallan
+                                </label>
                             </div>
                             <small class="text-muted d-block mt-1">
-                                Baja UNA foto de seis formas distintas y compara qué vuelve en cada una. Gasta
-                                5 créditos (la variante directa no cuesta nada) y no escribe ningún archivo.
-                                <strong>Probá también con una ficha que hoy se vea bien</strong> —poné su id de
-                                persona acá— para tener con qué comparar: si a esa le vuelve sana por el mismo
-                                camino, la diferencia está en la foto y no en el proxy.
+                                Baja UNA foto de varias formas y compara qué vuelve. <strong>Las tres primeras
+                                son directas, sin proxy, y no cuestan nada</strong>: el código asume desde hace
+                                rato que TM tiene geo-bloqueado al server para las imágenes, pero eso nunca se
+                                volvió a comprobar. Si alguna de esas trae el binario sano, sobra ScraperAPI para
+                                las fotos y no se gasta un centavo. Recién si fallan las tres, y solo con el tilde,
+                                se prueban las cinco del proxy. No escribe ningún archivo.
                             </small>
                         </form>
                         <small class="text-muted d-block mt-2">
