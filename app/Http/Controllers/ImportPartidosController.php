@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use App\Services\HttpHelper;
 use App\Services\NivelCompetencia;
@@ -64,6 +65,15 @@ class ImportPartidosController extends Controller
             $conDetalle[(int) $r->tecnico_id] = (int) $r->n;
         }
 
+        // El sondeo que NO deja rastro en staging. Un DT cuyos partidos son todos
+        // de Proyección/juveniles guarda 0 filas: sin este registro la lista lo
+        // muestra "sin sondear" para siempre y se le vuelve a gastar una llamada
+        // a la API cada vez. La tabla puede no existir todavía: se degrada sola.
+        $sondeos = [];
+        if (Schema::hasTable('tecnico_sondeos')) {
+            foreach (DB::table('tecnico_sondeos')->get() as $r) $sondeos[(int) $r->tecnico_id] = $r;
+        }
+
         // ── Estado de cada DT ───────────────────────────────────────────────
         $c = ['total' => 0, 'sin_url' => 0, 'sin_sondear' => 0, 'sondeados' => 0,
             'pendientes' => 0, 'conflictos' => 0, 'sin_detalle' => 0, 'listos' => 0,
@@ -79,7 +89,12 @@ class ImportPartidosController extends Controller
             $detalle   = isset($conDetalle[$t->id]) ? $conDetalle[$t->id] : 0;
 
             $sinUrl   = ($t->url === '');
-            $sondeado = ($nuevo + $conflicto + $aplicado + $duplicado) > 0;
+            // Cualquier fila en staging cuenta, incluidas las 'excluido'
+            // (pre-2000): esas no son ninguno de los cuatro estados de arriba y
+            // hacían que un DT ya sondeado figurara como sin sondear.
+            $enStaging = array_sum($s) > 0;
+            $sd = isset($sondeos[$t->id]) ? $sondeos[$t->id] : null;
+            $sondeado = $enStaging || $sd !== null;
 
             $c['total']++;
             $c['partidos'] += $aplicado;
@@ -93,7 +108,7 @@ class ImportPartidosController extends Controller
             if ($sondeado && !$nuevo && !$conflicto) $c['listos']++;
 
             $todos[] = (object) compact('t', 'nuevo', 'conflicto', 'aplicado',
-                'duplicado', 'detalle', 'sinUrl', 'sondeado');
+                'duplicado', 'detalle', 'sinUrl', 'sondeado', 'enStaging', 'sd');
         }
 
         // ── Filtros ─────────────────────────────────────────────────────────
@@ -173,7 +188,16 @@ class ImportPartidosController extends Controller
                 $estado = '<span class="err">sin slug</span>';
                 $acciones = '<a href="' . e(route('tecnico-estadisticas.createPorTecnico', $t->id)) . '" target="_blank">Cargar URL ▸</a>';
             } else {
+                $cuando = ($f->sd && $f->sd->sondeado_at)
+                    ? ' title="Último sondeo: ' . e(substr((string) $f->sd->sondeado_at, 0, 16)) . '"' : '';
+
                 if (!$f->sondeado)          $estado = '<span class="warn">sin sondear</span>';
+                elseif (!$f->enStaging && $f->sd)
+                                            $estado = '<span class="gris"' . $cuando . '>'
+                                                . (((int) $f->sd->partidos === 0)
+                                                    ? 'sondeado · TM no le da partidos'
+                                                    : 'sondeado · nada de 1ra (' . (int) $f->sd->fuera_1ra . ' afuera)')
+                                                . '</span>';
                 elseif ($f->conflicto)      $estado = '<span class="err">' . $f->conflicto . ' conflicto(s)</span>';
                 elseif ($f->nuevo)          $estado = '<span class="warn">' . $f->nuevo . ' por aplicar</span>';
                 elseif ($f->aplicado > $f->detalle) $estado = '<span class="warn">falta detalle</span>';
@@ -210,6 +234,31 @@ class ImportPartidosController extends Controller
         }
 
         return $this->pagina('Carga de partidos', $html);
+    }
+
+    /**
+     * Deja constancia del último sondeo de un DT en `tecnico_sondeos`.
+     *
+     * Hace falta porque el staging no alcanza como registro: un DT de Reserva o
+     * de juveniles guarda CERO filas —sus competencias quedan fuera de 1ra a
+     * propósito—, y la lista de DTs deducía "sondeado" de que hubiera filas. El
+     * resultado era un DT que decía "sin sondear" para siempre y al que se le
+     * gastaba una llamada a la API cada vez que se lo intentaba.
+     *
+     * Si la tabla todavía no está creada, no pasa nada: se sigue como antes.
+     */
+    private function registrarSondeo($tecnicoId, array $datos)
+    {
+        if (!Schema::hasTable('tecnico_sondeos')) return;
+
+        $fila = $datos + ['sondeado_at' => now(), 'updated_at' => now()];
+
+        $afectadas = DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->update($fila);
+        if (!$afectadas && !DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->exists()) {
+            DB::table('tecnico_sondeos')->insert(
+                $fila + ['tecnico_id' => (int) $tecnicoId, 'created_at' => now()]
+            );
+        }
     }
 
     // ═══════════════════ FIXTURE POR COMPETENCIA ═══════════════════
@@ -2022,6 +2071,20 @@ class ImportPartidosController extends Controller
             }
         }
 
+        // Queda constancia de que a este DT ya se lo sondeó, aunque no haya
+        // dejado ni una fila en staging.
+        if ($tecnicoId && $guardar) {
+            $this->registrarSondeo($tecnicoId, [
+                'partidos'      => $cont['total'] + $fueraTotal,
+                'fuera_1ra'     => $fueraTotal,
+                'fuera_alcance' => $cont['excluido'],
+                'duplicados'    => $cont['duplicado'],
+                'nuevos'        => $cont['nuevo'],
+                'conflictos'    => $cont['conflicto'],
+                'guardadas'     => $guardadas,
+            ]);
+        }
+
         sort($temporadas);
         $rango = empty($temporadas) ? '?' : (reset($temporadas) . ' – ' . end($temporadas));
 
@@ -2068,6 +2131,13 @@ class ImportPartidosController extends Controller
                 . (empty($aprendidos) ? '' : '<br><span class="sub">' . e(implode(' · ', array_slice($aprendidos, 0, 40))) . '</span>') . '</p>';
         }
         if ($guardar) $html .= '<p class="ok-box">Guardadas ' . $guardadas . ' filas en <code>import_partidos</code>.</p>';
+
+        if ($cont['total'] === 0 && $fueraTotal > 0) {
+            $html .= '<div class="ok-box"><b>Este DT no tiene nada para cargar.</b><br>'
+                . 'Los ' . $fueraTotal . ' partidos que trae Transfermarkt son de competencias que no son de primera '
+                . 'división (las de abajo). No es un sondeo fallido: no hay nada que guardar. En la lista de DTs '
+                . 'queda como <b>sondeado · nada de 1ra</b>, así no se le vuelve a gastar una llamada.</div>';
+        }
 
         $html .= $this->bloqueCompetencias($filas, $fuera, $request);
         $html .= $this->bloqueMapeosSospechosos($filas, $request);
@@ -2165,7 +2235,20 @@ class ImportPartidosController extends Controller
         }
 
         if ($pendientes->isEmpty()) {
-            return $this->pagina('Aplicar', $html . '<p class="sub">No hay partidos nuevos en staging. Corré el sondeo con <code>&guardar=1</code> primero.</p>');
+            // "Corré el sondeo primero" es un mal consejo si el sondeo ya se
+            // corrió y no dejó nada: al DT de Reserva se le gastaría una llamada
+            // a la API para volver a no guardar nada.
+            $sd = Schema::hasTable('tecnico_sondeos')
+                ? DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->first() : null;
+
+            $motivo = ($sd && (int) $sd->guardadas === 0 && (int) $sd->fuera_1ra > 0)
+                ? '<div class="ok-box"><b>No hay nada para aplicar, y está bien.</b><br>'
+                    . 'Este DT ya se sondeó el ' . e(substr((string) $sd->sondeado_at, 0, 16)) . ': sus '
+                    . (int) $sd->fuera_1ra . ' partidos son de competencias que no son de primera división. '
+                    . 'No hace falta volver a sondearlo.</div>'
+                : '<p class="sub">No hay partidos nuevos en staging. Corré el sondeo con <code>&guardar=1</code> primero.</p>';
+
+            return $this->pagina('Aplicar', $html . $motivo);
         }
 
         // Agrupar por competencia + temporada

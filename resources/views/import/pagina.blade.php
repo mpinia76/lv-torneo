@@ -45,6 +45,7 @@
         .import-tm .warn{color:#8a5d00}
         .import-tm tr.warn td{background:#fdf6e6}
         .import-tm tr.gris{color:#9aa69f}
+        .import-tm .gris{color:#9aa69f}
         .import-tm .scroll{overflow:auto;border:1px solid #dde2dd;background:#fff;max-height:70vh}
         .import-tm table{border-collapse:collapse;width:100%;font-size:12.5px;margin:0}
         .import-tm th,.import-tm td{padding:6px 10px;border-bottom:1px solid #eceee9;text-align:left;white-space:nowrap}
