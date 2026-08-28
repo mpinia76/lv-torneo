@@ -684,6 +684,56 @@
             @if($conteos['fotos'] == 0)
                 <div class="alert alert-info">No hay fotos rotas: todas las fichas con foto apuntan a un archivo que existe y se puede dibujar.</div>
             @else
+                @if(session('diagFotos'))
+                    @php $diag = session('diagFotos'); @endphp
+                    <div class="card mb-3 border-secondary">
+                        <div class="card-body py-2">
+                            <h6 class="mb-1">Prueba del camino de descarga</h6>
+                            <p class="small text-muted mb-2">
+                                Ficha: <strong>{{ $diag['quien'] }}</strong> (TM {{ $diag['tm'] }}) ·
+                                <code style="word-break:break-all;">{{ $diag['url'] }}</code>
+                            </p>
+                            <table class="table table-sm table-bordered mb-1">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Variante</th><th class="text-right">HTTP</th><th>Content-Type</th>
+                                        <th class="text-right">Bytes</th><th class="text-right">Bytes rotos</th>
+                                        <th>Es</th><th>¿Sirve?</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @foreach($diag['filas'] as $f)
+                                    <tr class="@if($f['sirve']) table-success @endif">
+                                        <td>{{ $f['variante'] }}</td>
+                                        <td class="text-right">{{ $f['http'] ?: '—' }}</td>
+                                        <td class="small">{{ $f['tipo'] }}</td>
+                                        <td class="text-right">{{ number_format($f['bytes']) }}</td>
+                                        <td class="text-right @if($f['reemplazos'] > 20) text-danger font-weight-bold @endif">
+                                            {{ number_format($f['reemplazos']) }}
+                                        </td>
+                                        <td>{{ $f['firma'] }}</td>
+                                        <td>
+                                            @if($f['sirve'])
+                                                <span class="badge badge-success">sí</span>
+                                            @elseif($f['error'])
+                                                <span class="text-muted small">{{ $f['error'] }}</span>
+                                            @else
+                                                <span class="badge badge-secondary">no</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                            <small class="text-muted">
+                                <strong>Bytes rotos</strong> es cuántas veces aparece el carácter de reemplazo
+                                UTF-8. Una imagen de verdad tiene cero: si hay cientos, lo que volvió es la foto
+                                pasada por texto. La fila verde, si hay alguna, es la forma de pedirla que funciona.
+                            </small>
+                        </div>
+                    </div>
+                @endif
+
                 @php
                     $detF = $conteos['fotosDet'];
                     $motivosF = [
@@ -760,6 +810,23 @@
                                 </select>
                                 <button class="btn btn-sm btn-primary">Bajar las fotos de Transfermarkt</button>
                             </div>
+                        </form>
+
+                        <form method="POST" action="{{ route('personas.fotos.diagnostico') }}" class="mt-2">
+                            @csrf
+                            <div class="form-inline">
+                                <button class="btn btn-sm btn-outline-secondary mr-2">Probar el camino de descarga</button>
+                                <label class="mb-0 mr-2 small">con la ficha</label>
+                                <input type="number" name="persona" class="form-control form-control-sm mr-2"
+                                       style="width:120px;" placeholder="id (opcional)">
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                Baja UNA foto de seis formas distintas y compara qué vuelve en cada una. Gasta
+                                5 créditos (la variante directa no cuesta nada) y no escribe ningún archivo.
+                                <strong>Probá también con una ficha que hoy se vea bien</strong> —poné su id de
+                                persona acá— para tener con qué comparar: si a esa le vuelve sana por el mismo
+                                camino, la diferencia está en la foto y no en el proxy.
+                            </small>
                         </form>
                         <small class="text-muted d-block mt-2">
                             El tope va por fichas consultadas, no por créditos: solo gasta crédito la que

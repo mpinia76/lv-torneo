@@ -651,6 +651,125 @@ class HttpHelper
     }
 
     /**
+     * Banco de pruebas: baja la MISMA imagen de varias formas y compara.
+     *
+     * Existe porque los reintentos no alcanzaron: 25 pedidos seguidos de 5 fotos
+     * volvieron los 25 mangleados, cuando la tanda anterior había traído 13 de 50
+     * sanas al primer intento. Si fuera azar por request, 25 fallas seguidas son
+     * una en 2.400. O sea que **depende de la foto o de la forma de pedirla**, no
+     * de la suerte, y hay que medir cuál de las dos.
+     *
+     * Cada variante que sale por el proxy gasta 1 crédito. La directa es gratis.
+     * No se escribe ningún archivo: esto solo mide.
+     *
+     * @return array filas con ['variante','http','tipo','bytes','reemplazos','firma','sirve']
+     */
+    public static function probarBinario(string $url): array
+    {
+        $url = trim($url);
+        if (!filter_var($url, FILTER_VALIDATE_URL)) return [];
+
+        $aceptaTodo  = 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8';
+        $aceptaClasico = 'image/jpeg,image/png,image/*;q=0.8';
+
+        $variantes = [
+            // Gratis: si el geo-bloqueo ya no está, no hace falta proxy ninguno.
+            ['nombre' => 'directo (sin proxy, gratis)', 'proxy' => false,
+             'params' => [], 'accept' => $aceptaTodo, 'encoding' => ''],
+
+            ['nombre' => 'proxy eu — como lo hace hoy', 'proxy' => true,
+             'params' => ['country_code' => self::country()], 'accept' => $aceptaTodo, 'encoding' => ''],
+
+            // Si el proxy re-encodea al descomprimir, pedirlo sin gzip lo evita.
+            ['nombre' => 'proxy eu, sin compresión', 'proxy' => true,
+             'params' => ['country_code' => self::country()], 'accept' => $aceptaTodo, 'encoding' => 'identity'],
+
+            // Si TM responde WebP y el proxy solo rompe WebP, pidiendo formatos
+            // viejos tendría que llegar sana.
+            ['nombre' => 'proxy eu, sin aceptar webp', 'proxy' => true,
+             'params' => ['country_code' => self::country()], 'accept' => $aceptaClasico, 'encoding' => ''],
+
+            ['nombre' => 'proxy sin country_code', 'proxy' => true,
+             'params' => [], 'accept' => $aceptaTodo, 'encoding' => ''],
+
+            ['nombre' => 'proxy us', 'proxy' => true,
+             'params' => ['country_code' => 'us'], 'accept' => $aceptaTodo, 'encoding' => ''],
+        ];
+
+        $out = [];
+
+        foreach ($variantes as $v) {
+            $fila = ['variante' => $v['nombre'], 'http' => 0, 'tipo' => '', 'bytes' => 0,
+                     'reemplazos' => 0, 'firma' => '', 'sirve' => false, 'error' => ''];
+
+            if ($v['proxy'] && self::apiKey() === '') {
+                $fila['error'] = 'sin_api_key';
+                $out[] = $fila;
+                continue;
+            }
+
+            $endpoint = $v['proxy']
+                ? ('https://api.scraperapi.com/?' . http_build_query(
+                        array_merge(['api_key' => self::apiKey(), 'url' => $url], $v['params'])))
+                : $url;
+
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $v['proxy'] ? 40 : 12);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_ENCODING, $v['encoding']);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: ' . $v['accept'],
+                'Referer: https://www.transfermarkt.com/',
+            ]);
+
+            $body = curl_exec($ch);
+            $fila['http']  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $fila['tipo']  = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $errno         = curl_errno($ch);
+            $errmsg        = curl_error($ch);
+            curl_close($ch);
+
+            if ($errno) {
+                $fila['error'] = 'curl ' . $errno . ': ' . mb_substr($errmsg, 0, 80);
+                $out[] = $fila;
+                continue;
+            }
+
+            $body = is_string($body) ? $body : '';
+            $fila['bytes']      = strlen($body);
+            $fila['reemplazos'] = substr_count($body, "\xef\xbf\xbd");
+            $fila['firma']      = self::firmaCorta($body);
+            $fila['sirve']      = $fila['http'] === 200
+                && $fila['reemplazos'] <= self::TOPE_REEMPLAZOS
+                && !in_array($fila['firma'], ['?', 'texto'], true);
+
+            $out[] = $fila;
+        }
+
+        return $out;
+    }
+
+    /** Qué es el cuerpo, mirando los primeros bytes. Para el banco de pruebas. */
+    private static function firmaCorta(string $b): string
+    {
+        if ($b === '') return 'vacío';
+        if (substr($b, 0, 8) === "\x89PNG\r\n\x1a\n") return 'PNG';
+        if (substr($b, 0, 3) === "\xff\xd8\xff")        return 'JPG';
+        if (substr($b, 0, 6) === 'GIF87a' || substr($b, 0, 6) === 'GIF89a') return 'GIF';
+        if (substr($b, 0, 4) === 'RIFF' && substr($b, 8, 4) === 'WEBP')     return 'WEBP';
+        if (substr($b, 4, 4) === 'ftyp')                 return 'AVIF';
+
+        $t = ltrim(mb_strtolower(substr($b, 0, 40)));
+        if (strpos($t, '<') === 0 || strpos($t, '{') === 0) return 'texto';
+
+        return '?';
+    }
+
+    /**
      * ¿El cuerpo binario viene pasado por texto?
      *
      * Cuenta el carácter de reemplazo UTF-8 (`EF BF BD`). Una imagen real no

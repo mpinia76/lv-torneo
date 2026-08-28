@@ -6,6 +6,7 @@ use App\Persona;
 use App\PersonaDuplicado;
 use App\Services\DuplicadosPersonas;
 use App\Services\FotosPersonas;
+use App\Services\HttpHelper;
 use App\Services\FusionPersonas;
 use App\Services\MoverRegistros;
 use App\Services\RegistrosPersonas;
@@ -976,6 +977,85 @@ class PersonaDuplicadoController extends Controller
         }
 
         return redirect()->back()->with('success', $mensaje);
+    }
+
+    /**
+     * Banco de pruebas del camino de descarga.
+     *
+     * Los reintentos no alcanzaron: 25 pedidos seguidos volvieron los 25
+     * mangleados, cuando la tanda anterior había traído 13 de 50 sanas al primer
+     * intento. Si fuera azar por request eso es una probabilidad en 2.400, así
+     * que **no es azar**: o depende de la foto, o de cómo se la pide.
+     *
+     * Esto agarra UNA foto rota y la baja de seis formas distintas, midiendo qué
+     * vuelve en cada una. Cinco gastan un crédito; la directa es gratis. No
+     * escribe ningún archivo ni toca la ficha.
+     */
+    public function diagnosticoFotos(Request $request)
+    {
+        set_time_limit(0);
+
+        $datos     = $this->fotos();
+        $personaId = (int) $request->input('persona', 0);
+
+        if (!$personaId) {
+            foreach (array_keys($datos['problemas']) as $id) {
+                if (!empty($datos['fichas'][(int) $id]['tm'])) { $personaId = (int) $id; break; }
+            }
+        }
+
+        $ficha = $datos['fichas'][$personaId] ?? null;
+
+        // Si pidieron una ficha que NO está rota —el caso de control, para
+        // comparar contra una que hoy se ve bien— se resuelve aparte: el mapa
+        // cacheado solo tiene las rotas.
+        if (!$ficha && $personaId) {
+            $sueltas = TmFechas::fichas([$personaId], false);
+            $ficha   = $sueltas[$personaId] ?? null;
+        }
+
+        if (!$ficha || empty($ficha['tm'])) {
+            return redirect()->back()->withErrors([
+                'error' => $personaId
+                    ? ('La persona #' . $personaId . ' no existe o no tiene id de Transfermarkt, así que no hay '
+                        . 'con qué probar. Dejá el campo vacío para que agarre la primera foto rota.')
+                    : 'No encontré ninguna foto rota con id de Transfermarkt para probar.',
+            ]);
+        }
+
+        $informe = ['llamadas' => 0];
+        $perfiles = TmFechas::traerPerfiles($ficha['tipo'], [(string) $ficha['tm']], $informe);
+        $perfil   = $perfiles[(string) $ficha['tm']] ?? null;
+
+        $url = '';
+        foreach (['portraitUrl', 'imageUrl', 'image'] as $clave) {
+            $candidato = isset($perfil[$clave]) ? trim((string) $perfil[$clave]) : '';
+            if ($candidato !== '' && filter_var($candidato, FILTER_VALIDATE_URL)
+                && strpos($candidato, 'default.jpg') === false) {
+                $url = $candidato;
+                break;
+            }
+        }
+
+        if ($url === '') {
+            return redirect()->back()->withErrors([
+                'error' => 'La API de TM no devolvió retrato para ' . trim($ficha['apellido'] . ', ' . $ficha['nombre'])
+                    . ' (TM ' . $ficha['tm'] . '), así que no hay nada que probar con esa ficha.',
+            ]);
+        }
+
+        try {
+            $filas = HttpHelper::probarBinario($url);
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors(['error' => 'No se pudo probar: ' . $e->getMessage()]);
+        }
+
+        return redirect()->back()->with('diagFotos', [
+            'quien' => trim($ficha['apellido'] . ', ' . $ficha['nombre']),
+            'tm'    => $ficha['tm'],
+            'url'   => $url,
+            'filas' => $filas,
+        ]);
     }
 
     /**
