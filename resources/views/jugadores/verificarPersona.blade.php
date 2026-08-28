@@ -660,11 +660,12 @@
             <p class="text-muted small">
                 <code>personas.foto</code> guarda solo el nombre del archivo; la imagen vive en
                 <code>public/images</code>. Cuando las dos cosas no coinciden, la ficha muestra el cuadradito
-                roto. Pasa de cuatro formas: <strong>falta el archivo</strong>; <strong>no es una imagen</strong>
-                (pesa lo que tiene que pesar, pero adentro hay una página de error, un JSON, o el binario
-                arruinado por el proxy que baja las fotos de Transfermarkt); <strong>es otro formato</strong>
-                que el que dice la extensión (TM publica el retrato como <code>.png</code> y responde WebP);
-                o <strong>pesa cero</strong>.
+                roto. Acá entra <strong>solo lo que el navegador no puede dibujar</strong>, de tres formas:
+                <strong>falta el archivo</strong>; <strong>no es una imagen</strong> (pesa lo que tiene que
+                pesar, pero adentro hay una página de error, un JSON, o el binario arruinado por el proxy que
+                baja las fotos de Transfermarkt); o <strong>pesa cero</strong>.
+                Que la extensión no coincida con el contenido no cuenta: un <code>.jpg</code> que por dentro
+                es WEBP el navegador lo dibuja igual.
             </p>
             <p class="text-muted small">
                 Los archivos que rompen la pantalla pesan 2 KB, 20 KB y hasta 280 KB, así que
@@ -688,7 +689,6 @@
                     $motivosF = [
                         'corrupto' => 'No es una imagen',
                         'falta'    => 'Falta el archivo',
-                        'formato'  => 'Otro formato',
                         'vacio'    => 'Pesa cero',
                     ];
                 @endphp
@@ -806,9 +806,6 @@
                                             de mayúsculas: en Windows se ve y en el server no.
                                         </div>
                                     @endif
-                                @elseif($mot == 'formato')
-                                    <span class="badge badge-info">otro formato</span>
-                                    <div class="text-muted">{{ $dFoto['detalle'] }}</div>
                                 @elseif($mot == 'vacio')
                                     <span class="badge badge-warning">pesa cero</span>
                                 @else

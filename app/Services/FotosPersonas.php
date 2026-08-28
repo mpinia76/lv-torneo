@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
  * `<img src="images/loquesea.jpg">` no dibuja nada y en pantalla se ve el
  * cuadradito roto.
  *
- * Cuatro problemas distintos, y conviene no mezclarlos:
+ * El criterio es uno solo: **entra lo que el navegador no puede dibujar**.
+ * Tres formas de que pase:
  *
  *   falta    → el archivo no está. Hay que volver a bajarlo.
  *   vacio    → el archivo está y pesa cero.
@@ -24,9 +25,11 @@ use Illuminate\Support\Facades\DB;
  *              `EF BF BD`) que devuelve el proxy cuando trata la respuesta como
  *              texto. Es el caso más común y el más difícil de ver: el archivo
  *              existe, pesa 20 KB, y no se dibuja.
- *   formato  → es una imagen de verdad pero de otro formato que el que dice la
- *              extensión (TM publica el retrato como .png y responde WebP).
- *              El server la sirve con el content-type equivocado.
+ *
+ * Lo que NO entra aunque parezca mal: que la extensión no coincida con el
+ * contenido. Un `.jpg` que por dentro es WEBP o PNG el navegador lo sniffea y lo
+ * dibuja igual. Se midió en producción: de 276 fichas marcadas por la primera
+ * versión, 157 eran de esas y se veían todas bien.
  *
  * **Mirar el tamaño no alcanza**: los archivos rotos que aparecieron en
  * producción pesan 2 KB, 20 KB y 280 KB. Lo único que los delata son los
@@ -51,13 +54,9 @@ class FotosPersonas
     const FALTA    = 'falta';
     const VACIO    = 'vacio';
     const CORRUPTO = 'corrupto';
-    const FORMATO  = 'formato';
 
-    /** Los cuatro motivos, en el orden en que conviene atacarlos. */
-    const MOTIVOS = [self::CORRUPTO, self::FALTA, self::FORMATO, self::VACIO];
-
-    /** Firmas de archivo: los primeros bytes dicen qué es de verdad. */
-    const EQUIVALENTES = ['jpeg' => 'jpg', 'jpe' => 'jpg', 'jfif' => 'jpg'];
+    /** Los tres motivos, en el orden en que conviene atacarlos. */
+    const MOTIVOS = [self::CORRUPTO, self::FALTA, self::VACIO];
 
     /** Cuántos ids entran en una llamada a la API. Mismo tope que TmFechas. */
     const POR_LLAMADA = 50;
@@ -140,7 +139,7 @@ class FotosPersonas
             $ruta = public_path('images/' . $foto);
             if (!is_file($ruta)) return self::falta(null);
 
-            return self::revisarArchivo($ruta, $foto, (int) @filesize($ruta));
+            return self::revisarArchivo($ruta, (int) @filesize($ruta));
         }
 
         $archivos = self::archivos();
@@ -152,7 +151,7 @@ class FotosPersonas
             return self::falta(isset($indice[$clave]) ? $indice[$clave] : null);
         }
 
-        return self::revisarArchivo(public_path('images/' . $foto), $foto, (int) $archivos[$foto]);
+        return self::revisarArchivo(public_path('images/' . $foto), (int) $archivos[$foto]);
     }
 
     private static function falta($parecido)
@@ -175,7 +174,7 @@ class FotosPersonas
      * no tapa y que se lleva puesta la pantalla entera. Todo lo que sigue son
      * lecturas de cabecera y aritmética.
      */
-    private static function revisarArchivo(string $ruta, string $foto, int $bytes)
+    private static function revisarArchivo(string $ruta, int $bytes)
     {
         if ($bytes <= 0) {
             return ['motivo' => self::VACIO, 'bytes' => 0, 'parecido' => null,
@@ -208,15 +207,11 @@ class FotosPersonas
             }
         }
 
-        $ext = mb_strtolower((string) pathinfo($foto, PATHINFO_EXTENSION));
-        $ext = self::EQUIVALENTES[$ext] ?? $ext;
-
-        if ($ext !== '' && $ext !== $firma) {
-            return ['motivo' => self::FORMATO, 'bytes' => $bytes, 'parecido' => null,
-                    'real' => $firma,
-                    'detalle' => 'se llama .' . $ext . ' pero por dentro es ' . strtoupper($firma)];
-        }
-
+        // Que la extensión no coincida con el contenido NO es un problema: un
+        // .jpg que por dentro es WEBP o PNG el navegador lo dibuja igual, lo
+        // sniffea. Se probó en producción: de 276 fichas marcadas, las 157 de
+        // "otro formato" se veían perfectas. Esta pantalla lista SOLO lo que no
+        // se ve, así que eso no entra.
         return null;
     }
 
