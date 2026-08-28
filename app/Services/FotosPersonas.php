@@ -367,7 +367,8 @@ class FotosPersonas
             'sin_portrait' => 0,   // vino el perfil pero TM no tiene foto
             'bajadas'      => 0,
             'fallidas'     => 0,
-            'creditos'     => 0,   // intentos de descarga = créditos de ScraperAPI
+            'directas'     => 0,   // bajadas derecho de TM, sin proxy y sin costo
+            'creditos'     => 0,   // solo los intentos que SÍ salieron por el proxy
             'quedan'       => 0,
             'abandonado'   => false,  // se cortó por fallar todo seguido
             'errores'      => [],
@@ -415,7 +416,11 @@ class FotosPersonas
                     if ($url === null) { $r['sin_portrait']++; continue; }
 
                     $baja = self::descargar($url, $fila['quien']);
-                    $r['creditos'] += isset($baja['intentos']) ? (int) $baja['intentos'] : 1;
+
+                    // El intento nº 1 es SIEMPRE el directo, que no cuesta nada:
+                    // los créditos son los intentos que sobran de ahí.
+                    $r['creditos'] += max(0, (isset($baja['intentos']) ? (int) $baja['intentos'] : 1) - 1);
+                    if (($baja['via'] ?? '') === 'directo') $r['directas']++;
 
                     if (empty($baja['ok'])) {
                         $r['fallidas']++;
@@ -506,7 +511,7 @@ class FotosPersonas
      */
     public static function descargar(string $url, string $quien = ''): array
     {
-        $out = ['ok' => false, 'archivo' => null, 'error' => '', 'intentos' => 0];
+        $out = ['ok' => false, 'archivo' => null, 'error' => '', 'intentos' => 0, 'via' => ''];
 
         $base = self::baseDe($url);
         if ($base === null) {
@@ -522,6 +527,7 @@ class FotosPersonas
         }
 
         $out['intentos'] = isset($img['intentos']) ? (int) $img['intentos'] : 1;
+        $out['via']      = isset($img['via']) ? (string) $img['via'] : '';
 
         if (empty($img['ok'])) {
             $err = isset($img['error']) ? (string) $img['error'] : '';

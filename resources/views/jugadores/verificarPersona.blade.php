@@ -675,8 +675,9 @@
             <p class="text-muted small">
                 Las fichas con la foto vacía <strong>no aparecen acá</strong>: esas muestran la silueta a
                 propósito y son miles. El botón consigue la URL del retrato por la API (gratis, de a 50 por
-                llamada) y después baja cada imagen por ScraperAPI, que <strong>sale un crédito por foto</strong>.
-                Si lo que vuelve no es una imagen válida no se escribe nada: la ficha queda como estaba.
+                llamada) y baja cada imagen <strong>derecho de Transfermarkt</strong>, que tampoco cuesta nada;
+                el proxy quedó de red de contención, para las que la vía directa no pueda traer. Si lo que
+                vuelve no es una imagen válida no se escribe nada: la ficha queda como estaba.
             </p>
 
             @php $verFoto = in_array(request('ver'), ['falta', 'vacio']) ? request('ver') : null; @endphp
@@ -684,56 +685,6 @@
             @if($conteos['fotos'] == 0)
                 <div class="alert alert-info">No hay fotos rotas: todas las fichas con foto apuntan a un archivo que existe y se puede dibujar.</div>
             @else
-                @if(session('diagFotos'))
-                    @php $diag = session('diagFotos'); @endphp
-                    <div class="card mb-3 border-secondary">
-                        <div class="card-body py-2">
-                            <h6 class="mb-1">Prueba del camino de descarga</h6>
-                            <p class="small text-muted mb-2">
-                                Ficha: <strong>{{ $diag['quien'] }}</strong> (TM {{ $diag['tm'] }}) ·
-                                <code style="word-break:break-all;">{{ $diag['url'] }}</code>
-                            </p>
-                            <table class="table table-sm table-bordered mb-1">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Variante</th><th class="text-right">HTTP</th><th>Content-Type</th>
-                                        <th class="text-right">Bytes</th><th class="text-right">Bytes rotos</th>
-                                        <th>Es</th><th>¿Sirve?</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                @foreach($diag['filas'] as $f)
-                                    <tr class="@if($f['sirve']) table-success @endif">
-                                        <td>{{ $f['variante'] }}</td>
-                                        <td class="text-right">{{ $f['http'] ?: '—' }}</td>
-                                        <td class="small">{{ $f['tipo'] }}</td>
-                                        <td class="text-right">{{ number_format($f['bytes']) }}</td>
-                                        <td class="text-right @if($f['reemplazos'] > 20) text-danger font-weight-bold @endif">
-                                            {{ number_format($f['reemplazos']) }}
-                                        </td>
-                                        <td>{{ $f['firma'] }}</td>
-                                        <td>
-                                            @if($f['sirve'])
-                                                <span class="badge badge-success">sí</span>
-                                            @elseif($f['error'])
-                                                <span class="text-muted small">{{ $f['error'] }}</span>
-                                            @else
-                                                <span class="badge badge-secondary">no</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                            </table>
-                            <small class="text-muted">
-                                <strong>Bytes rotos</strong> es cuántas veces aparece el carácter de reemplazo
-                                UTF-8. Una imagen de verdad tiene cero: si hay cientos, lo que volvió es la foto
-                                pasada por texto. La fila verde, si hay alguna, es la forma de pedirla que funciona.
-                            </small>
-                        </div>
-                    </div>
-                @endif
-
                 @php
                     $detF = $conteos['fotosDet'];
                     $motivosF = [
@@ -812,43 +763,14 @@
                             </div>
                         </form>
 
-                        <form method="POST" action="{{ route('personas.fotos.diagnostico') }}" class="mt-2">
-                            @csrf
-                            <div class="form-inline">
-                                <button class="btn btn-sm btn-outline-secondary mr-2">Probar el camino de descarga</button>
-                                <label class="mb-0 mr-2 small">con el</label>
-                                <select name="tipo" class="form-control form-control-sm mr-2">
-                                    <option value="jugador" selected>jugador</option>
-                                    <option value="tecnico">DT</option>
-                                    <option value="arbitro">árbitro</option>
-                                    <option value="persona">persona</option>
-                                </select>
-                                <input type="number" name="id" class="form-control form-control-sm mr-2"
-                                       style="width:110px;" placeholder="id (opcional)">
-                                <label class="mb-0 small">
-                                    <input type="checkbox" name="creditos" value="1"> gastar créditos si las gratis fallan
-                                </label>
-                            </div>
-                            <small class="text-muted d-block mt-1">
-                                Baja UNA foto de varias formas y compara qué vuelve. <strong>Las tres primeras
-                                son directas, sin proxy, y no cuestan nada</strong>: el código asume desde hace
-                                rato que TM tiene geo-bloqueado al server para las imágenes, pero eso nunca se
-                                volvió a comprobar. Si alguna de esas trae el binario sano, sobra ScraperAPI para
-                                las fotos y no se gasta un centavo. Recién si fallan las tres, y solo con el tilde,
-                                se prueban las cinco del proxy. No escribe ningún archivo.
-                                El id es el que sale en la URL de <em>Editar</em>
-                                (<code>/jugadores/<strong>76013</strong>/edit</code>); si lo dejás vacío agarra
-                                la primera foto rota de la lista.
-                            </small>
-                        </form>
                         <small class="text-muted d-block mt-2">
                             El tope va por fichas consultadas, no por créditos: solo gasta crédito la que
                             <strong>tiene retrato en TM</strong>. Las {{ $detF['total']['sin_tm'] }} sin id de
                             Transfermarkt no se pueden resolver así — se cargan a mano desde <em>Editar</em>.
-                            <strong>El proxy manda el binario roto una de cada cuatro veces</strong>, así que
-                            cada foto se pide hasta 5 veces hasta que llega sana: en el peor caso son 5 créditos
-                            por ficha, y en cuanto una sale bien se deja de insistir. Si fallan las primeras 5
-                            seguidas la pasada se corta sola y el mensaje dice por qué.
+                            Las fotos se bajan directo de Transfermarkt, <strong>sin gastar créditos</strong>.
+                            Solo la que la vía directa no pueda traer se reintenta por el proxy, y ahí sí paga:
+                            hasta 5 créditos, aunque en cuanto llega sana se deja de insistir. Si fallan las
+                            primeras 5 seguidas la pasada se corta sola y el mensaje dice por qué.
                         </small>
                     </div>
                 </div>

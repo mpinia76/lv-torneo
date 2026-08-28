@@ -112,10 +112,6 @@ Route::group(['prefix' => 'admin'], function()
     // gratis (de a 50 por llamada); bajar cada foto sale un crédito de ScraperAPI.
     Route::post('personas/fotos/completar', 'PersonaDuplicadoController@completarFotos')->name('personas.fotos.completar');
 
-    // Banco de pruebas: baja UNA foto de seis formas distintas y compara qué
-    // vuelve en cada una. Cinco variantes gastan un crédito; la directa es gratis.
-    Route::post('personas/fotos/diagnostico', 'PersonaDuplicadoController@diagnosticoFotos')->name('personas.fotos.diagnostico');
-
     // Se mantiene el nombre de ruta por compatibilidad, pero apunta al controller
     // nuevo: JugadorController@verificarSimilitud escribia SOLO en
     // `personas_verificadas`, asi que un par descartado por ahi reaparecia como

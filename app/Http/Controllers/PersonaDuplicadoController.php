@@ -6,7 +6,6 @@ use App\Persona;
 use App\PersonaDuplicado;
 use App\Services\DuplicadosPersonas;
 use App\Services\FotosPersonas;
-use App\Services\HttpHelper;
 use App\Services\FusionPersonas;
 use App\Services\MoverRegistros;
 use App\Services\RegistrosPersonas;
@@ -945,8 +944,10 @@ class PersonaDuplicadoController extends Controller
         $mensaje = 'Se ' . ($r['personas'] == 1 ? 'consultó 1 ficha' : "consultaron {$r['personas']} fichas")
             . ' en ' . ($r['llamadas'] == 1 ? '1 llamada' : "{$r['llamadas']} llamadas") . ' a Transfermarkt.'
             . ' Se ' . ($r['bajadas'] == 1 ? 'bajó 1 foto nueva' : "bajaron {$r['bajadas']} fotos nuevas") . '.'
-            . (empty($r['creditos']) ? '' : " Se gastaron {$r['creditos']} créditos de ScraperAPI"
-                . ' (cada foto se reintenta hasta 5 veces: el proxy manda el binario roto una de cada cuatro).');
+            . (empty($r['directas']) ? '' : " {$r['directas']} vinieron derecho de Transfermarkt, sin proxy.")
+            . (empty($r['creditos'])
+                ? ' No se gastó ningún crédito de ScraperAPI.'
+                : " Se gastaron {$r['creditos']} créditos de ScraperAPI (solo las que la descarga directa no pudo traer).");
 
         if (!empty($r['abandonado'])) {
             $mensaje .= ' CORTÉ LA PASADA: fallaron las primeras ' . $r['fallidas'] . ' seguidas sin bajar'
@@ -977,114 +978,6 @@ class PersonaDuplicadoController extends Controller
         }
 
         return redirect()->back()->with('success', $mensaje);
-    }
-
-    /**
-     * Banco de pruebas del camino de descarga.
-     *
-     * Los reintentos no alcanzaron: 25 pedidos seguidos volvieron los 25
-     * mangleados, cuando la tanda anterior había traído 13 de 50 sanas al primer
-     * intento. Si fuera azar por request eso es una probabilidad en 2.400, así
-     * que **no es azar**: o depende de la foto, o de cómo se la pide.
-     *
-     * Esto agarra UNA foto rota y la baja de seis formas distintas, midiendo qué
-     * vuelve en cada una. Cinco gastan un crédito; la directa es gratis. No
-     * escribe ningún archivo ni toca la ficha.
-     */
-    public function diagnosticoFotos(Request $request)
-    {
-        set_time_limit(0);
-
-        $datos = $this->fotos();
-
-        // El id que uno tiene a mano es el que está en la URL de Editar, que es
-        // el del ROL (jugador/DT/árbitro), no el de la persona. Se acepta
-        // cualquiera de los cuatro y se traduce acá, para no obligar a nadie a
-        // abrir la base solo para probar una foto.
-        $id   = (int) $request->input('id', 0);
-        $tipo = (string) $request->input('tipo', 'jugador');
-
-        $tablas = ['jugador' => 'jugadors', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'];
-
-        $personaId = 0;
-        $comoLoPidio = '';
-
-        if ($id > 0) {
-            if ($tipo === 'persona') {
-                $personaId   = $id;
-                $comoLoPidio = 'persona #' . $id;
-            } elseif (isset($tablas[$tipo])) {
-                $personaId   = (int) DB::table($tablas[$tipo])->where('id', $id)->value('persona_id');
-                $comoLoPidio = $tipo . ' #' . $id;
-            }
-
-            if (!$personaId) {
-                return redirect()->back()->withErrors([
-                    'error' => 'No encontré ninguna ficha con ese id (' . e($comoLoPidio ?: ($tipo . ' #' . $id))
-                        . '). Fijate que el desplegable diga de qué id se trata: el que sale en la URL de '
-                        . '"Editar jugador" es el de JUGADOR, no el de persona.',
-                ]);
-            }
-        }
-
-        if (!$personaId) {
-            foreach (array_keys($datos['problemas']) as $pid) {
-                if (!empty($datos['fichas'][(int) $pid]['tm'])) { $personaId = (int) $pid; break; }
-            }
-        }
-
-        $ficha = $datos['fichas'][$personaId] ?? null;
-
-        // Si pidieron una ficha que NO está rota —el caso de control, para
-        // comparar contra una que hoy se ve bien— se resuelve aparte: el mapa
-        // cacheado solo tiene las rotas.
-        if (!$ficha && $personaId) {
-            $sueltas = TmFechas::fichas([$personaId], false);
-            $ficha   = $sueltas[$personaId] ?? null;
-        }
-
-        if (!$ficha || empty($ficha['tm'])) {
-            return redirect()->back()->withErrors([
-                'error' => $personaId
-                    ? ('La persona #' . $personaId . ($comoLoPidio ? ' (' . $comoLoPidio . ')' : '')
-                        . ' no tiene id de Transfermarkt, así que no hay con qué probar.')
-                    : 'No encontré ninguna foto rota con id de Transfermarkt para probar.',
-            ]);
-        }
-
-        $informe = ['llamadas' => 0];
-        $perfiles = TmFechas::traerPerfiles($ficha['tipo'], [(string) $ficha['tm']], $informe);
-        $perfil   = $perfiles[(string) $ficha['tm']] ?? null;
-
-        $url = '';
-        foreach (['portraitUrl', 'imageUrl', 'image'] as $clave) {
-            $candidato = isset($perfil[$clave]) ? trim((string) $perfil[$clave]) : '';
-            if ($candidato !== '' && filter_var($candidato, FILTER_VALIDATE_URL)
-                && strpos($candidato, 'default.jpg') === false) {
-                $url = $candidato;
-                break;
-            }
-        }
-
-        if ($url === '') {
-            return redirect()->back()->withErrors([
-                'error' => 'La API de TM no devolvió retrato para ' . trim($ficha['apellido'] . ', ' . $ficha['nombre'])
-                    . ' (TM ' . $ficha['tm'] . '), así que no hay nada que probar con esa ficha.',
-            ]);
-        }
-
-        try {
-            $filas = HttpHelper::probarBinario($url, $request->boolean('creditos'));
-        } catch (\Exception $e) {
-            return redirect()->back()->withErrors(['error' => 'No se pudo probar: ' . $e->getMessage()]);
-        }
-
-        return redirect()->back()->with('diagFotos', [
-            'quien' => trim($ficha['apellido'] . ', ' . $ficha['nombre']),
-            'tm'    => $ficha['tm'],
-            'url'   => $url,
-            'filas' => $filas,
-        ]);
     }
 
     /**
