@@ -765,8 +765,10 @@
                             El tope va por fichas consultadas, no por créditos: solo gasta crédito la que
                             <strong>tiene retrato en TM</strong>. Las {{ $detF['total']['sin_tm'] }} sin id de
                             Transfermarkt no se pueden resolver así — se cargan a mano desde <em>Editar</em>.
-                            <strong>La primera vez conviene probar con 5</strong>: si fallan las cinco seguidas
-                            la pasada se corta sola y el mensaje dice por qué, en vez de quemar la tanda entera.
+                            <strong>El proxy manda el binario roto una de cada cuatro veces</strong>, así que
+                            cada foto se pide hasta 5 veces hasta que llega sana: en el peor caso son 5 créditos
+                            por ficha, y en cuanto una sale bien se deja de insistir. Si fallan las primeras 5
+                            seguidas la pasada se corta sola y el mensaje dice por qué.
                         </small>
                     </div>
                 </div>

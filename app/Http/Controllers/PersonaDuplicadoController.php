@@ -943,7 +943,9 @@ class PersonaDuplicadoController extends Controller
 
         $mensaje = 'Se ' . ($r['personas'] == 1 ? 'consultó 1 ficha' : "consultaron {$r['personas']} fichas")
             . ' en ' . ($r['llamadas'] == 1 ? '1 llamada' : "{$r['llamadas']} llamadas") . ' a Transfermarkt.'
-            . ' Se ' . ($r['bajadas'] == 1 ? 'bajó 1 foto nueva' : "bajaron {$r['bajadas']} fotos nuevas") . '.';
+            . ' Se ' . ($r['bajadas'] == 1 ? 'bajó 1 foto nueva' : "bajaron {$r['bajadas']} fotos nuevas") . '.'
+            . (empty($r['creditos']) ? '' : " Se gastaron {$r['creditos']} créditos de ScraperAPI"
+                . ' (cada foto se reintenta hasta 5 veces: el proxy manda el binario roto una de cada cuatro).');
 
         if (!empty($r['abandonado'])) {
             $mensaje .= ' CORTÉ LA PASADA: fallaron las primeras ' . $r['fallidas'] . ' seguidas sin bajar'

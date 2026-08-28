@@ -367,6 +367,7 @@ class FotosPersonas
             'sin_portrait' => 0,   // vino el perfil pero TM no tiene foto
             'bajadas'      => 0,
             'fallidas'     => 0,
+            'creditos'     => 0,   // intentos de descarga = créditos de ScraperAPI
             'quedan'       => 0,
             'abandonado'   => false,  // se cortó por fallar todo seguido
             'errores'      => [],
@@ -414,6 +415,7 @@ class FotosPersonas
                     if ($url === null) { $r['sin_portrait']++; continue; }
 
                     $baja = self::descargar($url, $fila['quien']);
+                    $r['creditos'] += isset($baja['intentos']) ? (int) $baja['intentos'] : 1;
 
                     if (empty($baja['ok'])) {
                         $r['fallidas']++;
@@ -504,7 +506,7 @@ class FotosPersonas
      */
     public static function descargar(string $url, string $quien = ''): array
     {
-        $out = ['ok' => false, 'archivo' => null, 'error' => ''];
+        $out = ['ok' => false, 'archivo' => null, 'error' => '', 'intentos' => 0];
 
         $base = self::baseDe($url);
         if ($base === null) {
@@ -519,9 +521,15 @@ class FotosPersonas
             return $out;
         }
 
+        $out['intentos'] = isset($img['intentos']) ? (int) $img['intentos'] : 1;
+
         if (empty($img['ok'])) {
-            $out['error'] = 'HTTP ' . (isset($img['http']) ? $img['http'] : '?')
-                . (empty($img['error']) ? '' : ' (' . $img['error'] . ')');
+            $err = isset($img['error']) ? (string) $img['error'] : '';
+
+            $out['error'] = strpos($err, 'binario_mangleado') === 0
+                ? 'el proxy devolvió la foto pasada por texto en los ' . $out['intentos'] . ' intentos'
+                : ('HTTP ' . (isset($img['http']) ? $img['http'] : '?') . ($err === '' ? '' : ' (' . $err . ')'));
+
             return $out;
         }
 

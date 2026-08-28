@@ -531,17 +531,38 @@ class HttpHelper
             || stripos($head, '<html') === 0;
     }
 
+    /**
+     * Cuántas veces se cuenta EF BF BD antes de decir que el binario vino
+     * pasado por texto. Una imagen de verdad no tiene ninguno: la secuencia
+     * aparece por azar cada 16 millones de bytes.
+     */
+    const TOPE_REEMPLAZOS = 20;
+
     // ---------------------------------------------------
     // Descarga BINARIA (imágenes) con la misma estrategia que el JSON:
     // los hosts de Transfermarkt están geo-bloqueados para nuestro server
     // (dan 502/504 aunque en el navegador de casa se vean bien), así que la
     // imagen se baja saliendo por la UE vía ScraperAPI. Otros hosts van directo.
-    // Devuelve: ['ok'=>bool, 'body'=>string, 'http'=>int, 'contentType'=>string, 'error'=>string]
+    //
+    // OJO — el problema que originó los reintentos (ago-2026): ScraperAPI
+    // devuelve **a veces** la imagen pasada por UTF-8, con cada byte alto
+    // convertido en U+FFFD (`EF BF BD`). Llega con HTTP 200 y Content-Type
+    // image/png, así que los chequeos de siempre la dan por buena y lo que se
+    // guarda es basura: 103 fotos rotas en producción salieron de ahí.
+    //
+    // No es determinístico: en una tanda de 50 salieron bien 13. Cada intento de
+    // ScraperAPI sale por otra IP, así que un cuerpo mangleado se trata como un
+    // intento fallido y se vuelve a pedir. Con ~26% de aciertos por intento,
+    // cinco intentos cubren cerca del 78%.
+    //
+    // Devuelve: ['ok'=>bool, 'body'=>string, 'http'=>int, 'contentType'=>string,
+    //            'error'=>string, 'intentos'=>int, 'mangleados'=>int]
     // ---------------------------------------------------
-    public static function getBinary(string $url): array
+    public static function getBinary(string $url, int $intentos = 5): array
     {
         $url = trim($url);
-        $out = ['ok' => false, 'body' => '', 'http' => 0, 'contentType' => '', 'error' => ''];
+        $out = ['ok' => false, 'body' => '', 'http' => 0, 'contentType' => '', 'error' => '',
+                'intentos' => 0, 'mangleados' => 0];
 
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
             $out['error'] = 'url_invalida';
@@ -573,8 +594,12 @@ class HttpHelper
 
         $body = false; $httpCode = 0; $contentType = ''; $curlErr = 0;
 
-        // Hasta 3 intentos: cada request de ScraperAPI sale por otra IP.
-        for ($i = 0; $i < 3; $i++) {
+        $intentos = max(1, min($intentos, 8));
+        $mangleados = 0;
+
+        // Cada request de ScraperAPI sale por otra IP: reintentar no es esperar
+        // que la red mejore, es pedirle la foto a otro proxy.
+        for ($i = 0; $i < $intentos; $i++) {
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $endpoint);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -590,11 +615,25 @@ class HttpHelper
             curl_close($ch);
 
             if (!$curlErr && $httpCode === 200 && !empty($body) && strpos($contentType, 'image') !== false) {
-                return ['ok' => true, 'body' => $body, 'http' => $httpCode, 'contentType' => $contentType, 'error' => ''];
+                // Acá está la trampa: 200 + content-type de imagen NO garantiza
+                // que lo que llegó sea la imagen. Si viene mangleado se descarta
+                // y se pide de nuevo, que es lo único que lo arregla.
+                if (self::pasadoPorTexto($body)) {
+                    $mangleados++;
+                    Log::warning('HttpHelper: binario mangleado por el proxy (intento ' . ($i + 1)
+                        . ') en ' . $url);
+                    usleep(300000);
+                    continue;
+                }
+
+                return ['ok' => true, 'body' => $body, 'http' => $httpCode,
+                        'contentType' => $contentType, 'error' => '',
+                        'intentos' => $i + 1, 'mangleados' => $mangleados];
             }
             // Créditos de ScraperAPI agotados: no tiene sentido reintentar.
             if (is_string($body) && stripos($body, 'exhausted the API Credits') !== false) {
                 $out['http'] = $httpCode; $out['error'] = 'sin_creditos';
+                $out['intentos'] = $i + 1; $out['mangleados'] = $mangleados;
                 return $out;
             }
             usleep(300000); // 0,3s → fuerza rotación de IP en ScraperAPI
@@ -602,8 +641,28 @@ class HttpHelper
 
         $out['http']        = $httpCode;
         $out['contentType'] = $contentType;
-        $out['error']       = $curlErr ? ('curl_errno_' . $curlErr) : ('http_' . $httpCode);
+        $out['intentos']    = $intentos;
+        $out['mangleados']  = $mangleados;
+        $out['error']       = $mangleados >= $intentos
+            ? ('binario_mangleado_' . $mangleados . '_intentos')
+            : ($curlErr ? ('curl_errno_' . $curlErr) : ('http_' . $httpCode));
+
         return $out;
+    }
+
+    /**
+     * ¿El cuerpo binario viene pasado por texto?
+     *
+     * Cuenta el carácter de reemplazo UTF-8 (`EF BF BD`). Una imagen real no
+     * tiene ninguno; las que devuelve rota el proxy tienen entre 60 y 80.000.
+     * Es la única señal que sirve para cualquier formato: la cabecera PNG o RIFF
+     * puede quedar intacta y engañar a `getimagesize()`.
+     */
+    public static function pasadoPorTexto($body): bool
+    {
+        if (!is_string($body) || $body === '') return false;
+
+        return substr_count($body, "\xef\xbf\xbd") > self::TOPE_REEMPLAZOS;
     }
 
     private static function getJsonViaScraper(string $url, array $extraHeaders = [])
