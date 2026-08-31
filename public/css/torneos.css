@@ -1676,3 +1676,25 @@ td.t-dif-neg { color: var(--t-loss); }
     .t-duelo { grid-template-columns: 1fr; gap: 14px; }
     .t-duelo-form select { min-width: 0; width: 100%; }
 }
+
+/* ==========================================================================
+   Íconos de eventos del partido (goles, penales, tarjetas, cambios)
+   El sprite SVG está definido en resources/views/fechas/detalle.blade.php
+   ========================================================================== */
+.ev-sprite { display: none; }
+
+.ev {
+    width: 1.3em;
+    height: 1.3em;
+    vertical-align: -.3em;
+    flex: none;
+}
+
+.ev-gol      { color: var(--t-ink); }
+.ev-contra   { color: var(--t-roja); }
+.ev-errado   { color: var(--t-roja); }
+.ev-atajado  { color: var(--t-accent); }
+.ev-amarilla { color: var(--t-amarilla); }
+.ev-roja     { color: var(--t-roja); }
+.ev-entra    { color: var(--t-win); }
+.ev-sale     { color: var(--t-loss); }

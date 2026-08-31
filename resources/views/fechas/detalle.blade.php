@@ -9,6 +9,100 @@
         $sinJugar    = is_null($partido->golesl) && is_null($partido->golesv);
     @endphp
 
+        {{-- Sprite de íconos de eventos: goles, penales, tarjetas y cambios --}}
+        <svg class="ev-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <g id="ev-ball">
+                    <circle cx="12" cy="12" r="9.15" fill="#fff" stroke="currentColor" stroke-width="1.7"/>
+                    <g fill="currentColor">
+                        <path d="M12.00 8.45 15.38 10.90 14.09 14.87 9.91 14.87 8.62 10.90Z"/>
+                        <path d="M14.06 9.17 13.02 5.98 15.73 4.01 18.44 5.98 17.41 9.17Z"/>
+                        <path d="M15.33 13.08 18.04 11.11 20.75 13.08 19.71 16.27 16.36 16.27Z"/>
+                        <path d="M12.00 15.50 14.71 17.47 13.68 20.66 10.32 20.66 9.29 17.47Z"/>
+                        <path d="M8.67 13.08 7.64 16.27 4.29 16.27 3.25 13.08 5.96 11.11Z"/>
+                        <path d="M9.94 9.17 6.59 9.17 5.56 5.98 8.27 4.01 10.98 5.98Z"/>
+                    </g>
+                </g>
+            </defs>
+
+            <symbol id="ev-pelota" viewBox="0 0 24 24">
+                <use href="#ev-ball"/>
+            </symbol>
+
+            <symbol id="ev-penal" viewBox="0 0 24 24">
+                <g transform="translate(-0.4,-0.4) scale(0.84)"><use href="#ev-ball"/></g>
+                <circle cx="18" cy="18" r="6" fill="#fff"/>
+                <circle cx="18" cy="18" r="5.1" fill="currentColor"/>
+                <text x="18" y="20.9" text-anchor="middle" font-family="system-ui,-apple-system,'Segoe UI',sans-serif"
+                      font-size="8.2" font-weight="700" fill="#fff">P</text>
+            </symbol>
+
+            <symbol id="ev-tirolibre" viewBox="0 0 24 24">
+                <g transform="translate(-1.6,3.4) scale(0.79)"><use href="#ev-ball"/></g>
+                <path d="M10.6 6.9C13.8 2.1 19.3 2.7 21.4 6.6" fill="none" stroke="currentColor"
+                      stroke-width="1.9" stroke-linecap="round" stroke-dasharray="2.9 2.4"/>
+                <path d="M22.2 7.9 18.6 5.6 21.9 3.6Z" fill="currentColor"/>
+            </symbol>
+
+            <symbol id="ev-errado" viewBox="0 0 24 24">
+                <g color="#98A0A2"><use href="#ev-ball"/></g>
+                <path d="M5 19 19 5" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round"/>
+                <path d="M5 19 19 5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </symbol>
+
+            <symbol id="ev-guante" viewBox="0 0 24 24">
+                <g fill="currentColor">
+                    <rect x="4.9" y="6.2" width="3.2" height="8" rx="1.6"/>
+                    <rect x="8.8" y="3.9" width="3.2" height="10.3" rx="1.6"/>
+                    <rect x="12.7" y="4.8" width="3.2" height="9.4" rx="1.6"/>
+                    <rect x="16.6" y="7" width="3.2" height="7.2" rx="1.6"/>
+                    <rect x="1.6" y="10.7" width="3.4" height="6.2" rx="1.7" transform="rotate(-22 3.3 13.8)"/>
+                    <rect x="4.9" y="10.2" width="14.9" height="7.7" rx="2.7"/>
+                    <rect x="6.2" y="18.9" width="12.3" height="3" rx="1.3"/>
+                </g>
+            </symbol>
+
+            <symbol id="ev-tarjeta" viewBox="0 0 24 24">
+                <g transform="rotate(9 12 12)">
+                    <rect x="7.7" y="3.8" width="8.6" height="16.4" rx="1.8" fill="currentColor"
+                          stroke="rgba(17,23,26,.3)" stroke-width=".9"/>
+                </g>
+            </symbol>
+
+            <symbol id="ev-doble" viewBox="0 0 24 24">
+                <g transform="rotate(-13 9 12)">
+                    <rect x="3.9" y="4.4" width="8" height="15.2" rx="1.7" fill="#EAB308"
+                          stroke="rgba(17,23,26,.3)" stroke-width=".9"/>
+                </g>
+                <g transform="rotate(10 15 12)">
+                    <rect x="11.7" y="4.4" width="8" height="15.2" rx="1.7" fill="#D33B2C"
+                          stroke="rgba(17,23,26,.3)" stroke-width=".9"/>
+                </g>
+            </symbol>
+
+            <symbol id="ev-cabeza" viewBox="0 0 24 24">
+                <g fill="currentColor">
+                    <circle cx="8.6" cy="13.9" r="4.9"/>
+                    <path d="M1.4 23.7C1.8 19.2 4.9 17.3 8.6 17.3s6.8 1.9 7.2 6.4Z"/>
+                </g>
+                <circle cx="17.9" cy="5.9" r="6" fill="#fff"/>
+                <circle cx="17.9" cy="5.9" r="4.39" fill="#fff" stroke="currentColor" stroke-width="1.35"/>
+                <g fill="currentColor"><path d="M17.90 4.20 19.52 5.37 18.90 7.28 16.90 7.28 16.28 5.37Z"/><path d="M18.89 4.54 18.39 3.01 19.69 2.07 20.99 3.01 20.50 4.54Z"/><path d="M19.50 6.42 20.80 5.47 22.10 6.42 21.60 7.95 19.99 7.95Z"/><path d="M17.90 7.58 19.20 8.53 18.70 10.05 17.10 10.05 16.60 8.53Z"/><path d="M16.30 6.42 15.81 7.95 14.20 7.95 13.70 6.42 15.00 5.47Z"/><path d="M16.91 4.54 15.30 4.54 14.81 3.01 16.11 2.07 17.41 3.01Z"/></g>
+            </symbol>
+
+            <symbol id="ev-entra" viewBox="0 0 24 24">
+                <g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20.2V6.6"/><path d="M6.3 12.1 12 5.9 17.7 12.1"/>
+                </g>
+            </symbol>
+
+            <symbol id="ev-sale" viewBox="0 0 24 24">
+                <g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3.8v13.6"/><path d="M6.3 11.9 12 18.1 17.7 11.9"/>
+                </g>
+            </symbol>
+        </svg>
+
     <div class="container t-detalle">
 
         <div class="t-cabecera">
@@ -198,13 +292,15 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
+                                                        <svg class="ev ev-contra" role="img"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Cabeza')
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -212,11 +308,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                            <img id="original"  src="{{ url('images/iconMatchPenaltyStopped.gif') }}" height="20" title="Penal atajado">
+                                                            <svg class="ev ev-atajado" role="img"><title>Penal atajado</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -224,15 +320,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
+                                                        <svg class="ev ev-amarilla" role="img"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
+                                                        <svg class="ev ev-roja" role="img"><title>Roja</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
+                                                        <svg class="ev ev-doble" role="img"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -243,9 +339,9 @@
                                                 @if (!empty($tieneCambio))
                                                     @foreach($tieneCambio as $t)
                                                         @if($t[0]=='Sale')
-                                                            <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
+                                                            <svg class="ev ev-sale" role="img"><title>Sale</title><use href="#ev-sale"/></svg>
                                                         @else
-                                                            <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
+                                                            <svg class="ev ev-entra" role="img"><title>Entra</title><use href="#ev-entra"/></svg>
                                                         @endif
                                                         {{$t[1]}}'
                                                 @endforeach
@@ -327,13 +423,15 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
+                                                        <svg class="ev ev-contra" role="img"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Cabeza')
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -341,11 +439,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyStopped.gif') }}" height="20" title="Penal atajado">
+                                                        <svg class="ev ev-atajado" role="img"><title>Penal atajado</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -353,15 +451,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
+                                                        <svg class="ev ev-amarilla" role="img"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
+                                                        <svg class="ev ev-roja" role="img"><title>Roja</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
+                                                        <svg class="ev ev-doble" role="img"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -372,9 +470,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
+                                                        <svg class="ev ev-sale" role="img"><title>Sale</title><use href="#ev-sale"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
+                                                        <svg class="ev ev-entra" role="img"><title>Entra</title><use href="#ev-entra"/></svg>
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -460,13 +558,15 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
+                                                        <svg class="ev ev-contra" role="img"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Cabeza')
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -474,11 +574,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyStopped.gif') }}" height="20" title="Penal atajado">
+                                                        <svg class="ev ev-atajado" role="img"><title>Penal atajado</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -486,15 +586,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
+                                                        <svg class="ev ev-amarilla" role="img"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
+                                                        <svg class="ev ev-roja" role="img"><title>Roja</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
+                                                        <svg class="ev ev-doble" role="img"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -505,9 +605,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
+                                                        <svg class="ev ev-sale" role="img"><title>Sale</title><use href="#ev-sale"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
+                                                        <svg class="ev ev-entra" role="img"><title>Entra</title><use href="#ev-entra"/></svg>
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -585,13 +685,15 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <img id="original"  src="{{ url('images/iconMatchGoalAgainst.gif') }}" height="20" title="En contra">
+                                                        <svg class="ev ev-contra" role="img"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenalty.gif') }}" height="20" title="Penal">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <img id="original"  src="{{ url('images/tiro-libre.png') }}" height="20" title="Tiro libre">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Cabeza')
+                                                        <svg class="ev ev-gol" role="img"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchGoal.gif') }}" height="20" title="Jugada">
+                                                        <svg class="ev ev-gol" role="img"><title>Gol</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -599,11 +701,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyFailed.gif') }}" height="20" title="Penal errado">
+                                                        <svg class="ev ev-errado" role="img"><title>Penal errado</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/iconMatchPenaltyStopped.gif') }}" height="20" title="Penal atajado">
+                                                        <svg class="ev ev-atajado" role="img"><title>Penal atajado</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -611,15 +713,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
+                                                        <svg class="ev ev-amarilla" role="img"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
+                                                        <svg class="ev ev-roja" role="img"><title>Roja</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
+                                                        <svg class="ev ev-doble" role="img"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -630,9 +732,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
+                                                        <svg class="ev ev-sale" role="img"><title>Sale</title><use href="#ev-sale"/></svg>
                                                     @else
-                                                        <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
+                                                        <svg class="ev ev-entra" role="img"><title>Entra</title><use href="#ev-entra"/></svg>
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -733,15 +835,15 @@
 
                             {{ $arrTarjeta['minuto']}}'
                             @if( $arrTarjeta['tipo']=='Amarilla')
-                                <img id="original"  src="{{ url('images/amarilla.gif') }}" height="15" title="Amarilla">
+                                <svg class="ev ev-amarilla" role="img"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
 
                             @endif
                             @if( $arrTarjeta['tipo']=='Roja')
-                                <img id="original"  src="{{ url('images/roja.gif') }}" height="15" title="Roja">
+                                <svg class="ev ev-roja" role="img"><title>Roja</title><use href="#ev-tarjeta"/></svg>
 
                             @endif
                             @if( $arrTarjeta['tipo']=='Doble Amarilla')
-                                <img id="original"  src="{{ url('images/doble_amarilla.gif') }}" height="15" title="Doble amarilla">
+                                <svg class="ev ev-doble" role="img"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
 
                             @endif
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrTarjeta['jugador_id']))}}" >
@@ -768,9 +870,9 @@
 
                             {{ $arrCambio['minuto']}}'
                             @if($arrCambio['tipo']=='Sale')
-                                <img id="original"  src="{{ url('images/sale.png') }}" height="15" title="Sale">
+                                <svg class="ev ev-sale" role="img"><title>Sale</title><use href="#ev-sale"/></svg>
                             @else
-                                <img id="original"  src="{{ url('images/entra.png') }}" height="15" title="Entra">
+                                <svg class="ev ev-entra" role="img"><title>Entra</title><use href="#ev-entra"/></svg>
                             @endif
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrCambio['jugador_id']))}}" >
 
