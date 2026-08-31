@@ -706,6 +706,10 @@ class ImportDetallesController extends Controller
         $ronda     = trim((string) $request->get('ronda', ''));
         $n         = max(1, min(50, (int) $request->get('n', 10)));
         $correr    = (string) $request->get('correr', '0') === '1';
+        // Un partido puntual, aunque ya esté marcado como revisado. Sirve para
+        // volver sobre uno que quedó con un aviso (por ejemplo un penal que no
+        // se pudo cargar porque faltaba el jugador) sin desmarcar nada a mano.
+        $unPartido = (int) $request->get('partido_id', 0);
 
         $filtros = array_filter(['tecnico_id' => $tecnicoId ?: null,
             'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
@@ -750,18 +754,22 @@ class ImportDetallesController extends Controller
             ->distinct()->count('partido_id');
 
         $hechos = 0; $fallaron = 0; $llamadas = 0; $conPenales = 0; $filasNuevas = 0;
-        $detalle = '';
+        $detalle = ''; $jugadoresNuevos = [];
 
-        if ($correr && $pendientes) {
+        if ($correr && ($pendientes || $unPartido)) {
             // De a uno y en orden: el más nuevo primero, que es lo que más
             // mirás. Si algo se cae, los demás siguen.
-            $lote = (clone $base())->orderByDesc('dia')->limit($n)->get();
+            $lote = $unPartido
+                ? DB::table('import_partidos')->where('partido_id', $unPartido)
+                    ->whereNotNull('external_id')->orderByDesc('id')->limit(1)->get()
+                : (clone $base())->orderByDesc('dia')->limit($n)->get();
             $imp  = new TmDetallePartido;
             $fechasLote = $this->mapaFechas($lote->pluck('partido_id')->all());
 
             foreach ($lote as $f) {
                 $r = $imp->soloPenales((int) $f->partido_id, (string) $f->external_id);
                 $llamadas += (int) $r['llamadas'];
+                foreach ((isset($r['creados']) ? $r['creados'] : []) as $c) $jugadoresNuevos[] = $c;
 
                 $etiqueta = e($f->club_nombre . ' vs ' . $f->rival_nombre) . ' <span class="id">'
                     . e(substr((string) $f->dia, 0, 10)) . ' · partido #' . (int) $f->partido_id . '</span>';
@@ -806,8 +814,19 @@ class ImportDetallesController extends Controller
             . ($correr ? $this->card($conPenales, 'Con penales', $conPenales ? 'warn' : '') : '')
             . ($correr ? $this->card($filasNuevas, 'Filas creadas', $filasNuevas ? 'warn' : '') : '')
             . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
+            . ($correr && $jugadoresNuevos ? $this->card(count($jugadoresNuevos), 'Jugadores nuevos', 'warn') : '')
             . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
             . '</div>';
+
+        if (!empty($jugadoresNuevos)) {
+            $cuerpo .= '<h2>Jugadores que no estaban en la base</h2>'
+                . '<p class="sub">Eran el pateador o el arquero de un penal y no estaban mapeados, así que los creé '
+                . 'para no perder el penal. Quedan con <b>revisar</b> puesto y sin foto: repasalos en '
+                . '<a href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar</a>.</p>'
+                . '<div class="diag">';
+            foreach ($jugadoresNuevos as $j) $cuerpo .= '<div>• ' . e($j) . '</div>';
+            $cuerpo .= '</div>';
+        }
 
         if (!$pendientes) {
             $cuerpo .= '<div class="ok-box">No queda ningún partido sin revisar'
@@ -832,7 +851,10 @@ class ImportDetallesController extends Controller
         }
 
         if ($detalle !== '') {
-            $cuerpo .= '<h2>Lo que hizo esta tanda</h2><div class="diag">' . $detalle . '</div>';
+            $cuerpo .= '<h2>Lo que hizo esta tanda</h2><div class="diag">' . $detalle . '</div>'
+                . '<p class="sub">Si alguna línea de acá arriba tiene un aviso, arreglá lo que haga falta y volvé a '
+                . 'pasar <b>ese</b> partido con <code>?partido_id=NNN&amp;correr=1</code>: eso lo rehace aunque ya '
+                . 'esté marcado como revisado, y no toca a los demás.</p>';
         }
 
         $cuerpo .= $this->bloquePendientesPenales($base());

@@ -643,9 +643,11 @@ class TmDetallePartido
      * nada de eso: una llamada, las filas de `penals`, y la marca de revisado
      * para no volver a pagarla.
      *
-     * No crea jugadores. Si el pateador o el arquero no están mapeados avisa y
-     * sigue: los dos jugaron ese partido, así que si el detalle está cargado ya
-     * tienen que estar en `jugador_tm`.
+     * Lo único que sí crea son las fichas del pateador y del arquero cuando no
+     * están mapeados (1 llamada extra, sólo en ese caso): sin eso el penal se
+     * perdería en silencio y el partido quedaría marcado como revisado igual.
+     * Las fotos van apagadas — el jugador nuevo sale en "Jugadores por revisar"
+     * y ahí se completa.
      */
     public function soloPenales($partidoId, $gameId, array $opts = [])
     {
@@ -654,6 +656,7 @@ class TmDetallePartido
         $this->avisos = [];
         $this->fotosBajadas = 0;
         $this->fallidas = 0;
+        $this->conFotos = array_key_exists('fotos', $opts) ? (bool) $opts['fotos'] : false;
 
         $informe = [
             'ok'         => false,
@@ -665,6 +668,7 @@ class TmDetallePartido
             'fallidas'   => 0,
             'llamadas'   => 0,
             'penals'     => [],
+            'creados'    => [],
         ];
 
         $partido = Partido::find($partidoId);
@@ -694,7 +698,14 @@ class TmDetallePartido
             return $informe;
         }
 
-        $filas = $this->planPenales($game, $partido, $lados, $this->mapaJugadores());
+        // El pateador o el arquero pueden no estar en `jugador_tm` aunque el
+        // partido ya tenga la alineación cargada: pasa cuando el importador
+        // viejo no pudo resolverlo, o cuando TM lo lista en las acciones pero
+        // no en el once. Si no se los resuelve acá, el penal se pierde en
+        // silencio y encima el partido queda marcado como revisado.
+        $mapa = $this->resolverProtagonistas($game, $lados, $escribir, $informe);
+
+        $filas = $this->planPenales($game, $partido, $lados, $mapa);
         $informe['penals'] = $filas;
         $informe['ok'] = true;
 
@@ -724,7 +735,65 @@ class TmDetallePartido
 
         $informe['avisos']   = $this->avisos;
         $informe['fallidas'] = $this->fallidas;
+        $informe['llamadas'] += $this->fotosBajadas;
         return $informe;
+    }
+
+    /**
+     * Resuelve al pateador y al arquero de cada penal fallado, creándolos si no
+     * están en la base.
+     *
+     * Sólo mira los ids que aparecen en `missedPenalties`, no toda la
+     * alineación: el pase de penales no está para completar fichas, está para
+     * que ningún penal se pierda porque su protagonista no estaba mapeado.
+     * Cuesta 1 llamada extra y sólo cuando falta alguien, que es raro.
+     *
+     * Las fotos van apagadas: el jugador se crea con `revisar = 1` y aparece en
+     * "Jugadores por revisar", así que la foto se resuelve ahí y no gastamos una
+     * llamada más en un pase que se corre 1900 veces.
+     */
+    private function resolverProtagonistas(array $game, array $lados, $escribir, array &$informe)
+    {
+        $mapa = $this->mapaJugadores();
+
+        $faltan = [];
+        foreach ($lados as $lado) {
+            foreach ($this->accionesDelLado($game, $lado['clave']) as $accion) {
+                if ($accion['clase'] !== 'penal') continue;
+                foreach ($accion['ids'] as $id) {
+                    if ($id === null) continue;
+                    if (!isset($mapa[(string) $id])) $faltan[(string) $id] = true;
+                }
+            }
+        }
+        $faltan = array_keys($faltan);
+        if (empty($faltan)) return $mapa;
+
+        foreach (array_intersect_key($this->mapeosRotosJugador, array_flip($faltan)) as $tmId => $fantasma) {
+            $this->aviso('El mapeo del jugador TM ' . $tmId . ' apuntaba al jugador #' . $fantasma
+                . ', que ya no existe. Lo apareo de nuevo desde el perfil.');
+        }
+
+        $perfiles = $this->traerPerfiles($faltan, $informe);
+        foreach ($faltan as $id) {
+            if (!isset($perfiles[$id])) {
+                $this->aviso('Sin perfil para el jugador TM ' . $id . ': no puedo crearlo, así que ese penal '
+                    . 'queda sin cargar. Cargalo a mano en la pantalla de penales del partido.');
+                continue;
+            }
+            $res = $this->resolverJugador($id, $perfiles[$id], $escribir);
+            if (!$res['jugador_id']) continue;
+
+            $mapa[$id] = (int) $res['jugador_id'];
+            if ($res['creado']) {
+                $informe['creados'][] = $res['descripcion'];
+                $this->aviso('El protagonista de un penal no estaba en la base: creé a '
+                    . $res['descripcion'] . '. Queda en "Jugadores por revisar".');
+            }
+        }
+
+        $this->mapaJugadores = $mapa;
+        return $mapa;
     }
 
     /**
