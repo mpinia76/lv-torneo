@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Services\TmBuscarGameId;
 use App\Services\TmDetallePartido;
 
@@ -18,6 +19,7 @@ use App\Services\TmDetallePartido;
  *   ver()     -> vista previa de UN partido, sin escribir nada
  *   bajar()   -> baja y guarda UN partido
  *   tanda()   -> baja y guarda los N primeros de la lista
+ *   penales() -> pase liviano: sólo los penales fallados de lo ya cargado
  *   sembrar() -> llena jugador_tm con los jugadores que ya tienen transfermarkt_url
  *   revisar() -> jugadores creados automáticamente que falta repasar
  *   mapeos()  -> puentes con TM que apuntan a fichas borradas (no gasta API)
@@ -112,6 +114,21 @@ class ImportDetallesController extends Controller
         // rechaza por foreign key, pero antes le saca el dorsal al que sí está.
         $nRotos = TmDetallePartido::contarMapeosRotos();
 
+        // Partidos con detalle cargado a los que todavía no se les preguntó por
+        // los penales fallados (el importador no los leía hasta el 31/08/2026).
+        // Ver `penales()`. Si la migración todavía no corrió, el cartel no sale.
+        $sinPenalesRevisar = 0;
+        if (Schema::hasColumn('import_partidos', 'penales_revisado_at')) {
+            $sinPenalesRevisar = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado'])
+                ->whereNull('penales_revisado_at')
+                ->whereIn('partido_id', function ($sub) {
+                    $sub->from('alineacions')->select('partido_id')->distinct();
+                })
+                ->distinct()->count('partido_id');
+        }
+
         $cuerpo = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Detalle de los partidos</h1>'
             . '<p class="sub">Alineaciones, goles, tarjetas, cambios y árbitros. Cada partido es <b>una</b> llamada a la API, '
@@ -194,6 +211,11 @@ class ImportDetallesController extends Controller
                 ? '<a class="boton-sec" href="' . e(route('import_detalles.resultados', array_filter(['tecnico_id' => $tecnicoId ?: null,
                     'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
                 . '">Completar resultados (' . $sinResultado . ')</a>'
+                : '')
+            . ($sinPenalesRevisar
+                ? '<a class="boton-sec" href="' . e(route('import_detalles.penales', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                    'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
+                . '">Penales fallados sin revisar (' . $sinPenalesRevisar . ')</a>'
                 : '')
             . '</p>';
 
@@ -375,7 +397,8 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_detalles.bajar', ['partido_id' => $partidoId, 'forzar' => ($yaTiene || $forzar) ? 1 : null]))
                 . '">' . ($yaTiene ? 'Rehacer y guardar' : 'Guardar esto') . '</a>'
-                . ($yaTiene ? ' <span class="sub">reemplaza alineación, goles, tarjetas, cambios y árbitros de este partido</span>' : '')
+                . ($yaTiene ? ' <span class="sub">reemplaza alineación, goles, tarjetas, cambios, penales fallados '
+                    . 'y árbitros de este partido (los penales «Convirtieron» no se tocan)</span>' : '')
                 . '</p>';
         }
 
@@ -385,6 +408,7 @@ class ImportDetallesController extends Controller
             . $this->card(count($p['gols']), 'Goles')
             . $this->card(count($p['tarjetas']), 'Tarjetas')
             . $this->card(count($p['cambios']), 'Cambios')
+            . $this->card(count(isset($p['penals']) ? $p['penals'] : []), 'Penales fallados')
             . $this->card(count($p['arbitros']), 'Árbitros')
             . $this->card(count(isset($p['tecnicos']) ? $p['tecnicos'] : []), 'Técnicos')
             . $this->card(count(isset($p['plantillas']) ? $p['plantillas'] : []), 'A la plantilla')
@@ -426,6 +450,16 @@ class ImportDetallesController extends Controller
             '_equipo' => 'Equipo', 'tipo' => 'Tipo', '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Cambios', $p['cambios'], ['minuto' => 'Min', 'tipo' => 'Tipo',
             '_nombre' => 'Jugador', '_equipo' => 'Equipo', '_fuente' => 'Cómo lo deduje']);
+        if (!empty($p['penals'])) {
+            $cuerpo .= '<p class="sub" style="margin-top:24px">Los <b>penales fallados</b> se cargan con una fila '
+                . 'por protagonista, igual que cuando los cargás a mano: el que lo tiró afuera va como '
+                . '<b>Errado</b>, y en uno atajado van los dos — el pateador como <b>Atajado</b> y el arquero '
+                . 'como <b>Atajó</b>. Los penales <b>convertidos</b> no salen en esta tabla: son un gol de tipo '
+                . 'Penal y su fila «Convirtieron» se le crea al arquero al final.</p>';
+        }
+        $cuerpo .= $this->bloque('Penales fallados', isset($p['penals']) ? $p['penals'] : [],
+            ['minuto' => 'Min', '_nombre' => 'Jugador', '_equipo' => 'Equipo', 'tipo' => 'Tipo',
+             '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Árbitros', $p['arbitros'],
             ['tipo' => 'Rol', '_nombre' => 'Árbitro', '_fuente' => 'Texto de Transfermarkt']);
 
@@ -603,6 +637,8 @@ class ImportDetallesController extends Controller
                     . count($r['plan']['gols']) . ' goles, '
                     . count($r['plan']['tarjetas']) . ' tarjetas, '
                     . count($r['plan']['cambios']) . ' cambios'
+                    . (count(isset($r['plan']['penals']) ? $r['plan']['penals'] : [])
+                        ? ', ' . count($r['plan']['penals']) . ' de penales fallados' : '')
                     . (count($r['plan']['arbitros']) ? ', ' . count($r['plan']['arbitros']) . ' árbitros' : '')
                     . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $f->partido_id])) . '">ver</a>'
                     . ($inc !== '' ? ' · ' . $inc : '') . '</div>';
@@ -643,6 +679,193 @@ class ImportDetallesController extends Controller
         }
 
         return $this->pagina('Tanda de detalles', $cuerpo);
+    }
+
+    // ═══════════════════════════ PENALES FALLADOS ═══════════════════════════
+
+    /**
+     * Los partidos a los que todavía no se les preguntó por los penales fallados.
+     *
+     * Hasta el 31/08/2026 el importador no leía `actions.missedPenalties`, así
+     * que a todo lo cargado antes le puede faltar un penal errado o atajado.
+     * **Cuáles, no se puede saber desde la base**: el dato sólo existe en
+     * Transfermarkt y hay que preguntarlo partido por partido. Por eso la lista
+     * son TODOS los partidos con detalle cargado sin revisar, y por eso el
+     * resultado queda anotado en `import_partidos.penales_revisado_at`: la
+     * llamada se paga una sola vez y la lista se achica sola.
+     *
+     * El pase escribe SÓLO `penals`. No toca alineación, goles, tarjetas,
+     * cambios ni árbitros, no crea jugadores y no baja fotos.
+     */
+    public function penales(Request $request)
+    {
+        set_time_limit(0);
+
+        $tecnicoId = (int) $request->get('tecnico_id', 0);
+        $comp      = trim((string) $request->get('comp', ''));
+        $ronda     = trim((string) $request->get('ronda', ''));
+        $n         = max(1, min(50, (int) $request->get('n', 10)));
+        $correr    = (string) $request->get('correr', '0') === '1';
+
+        $filtros = array_filter(['tecnico_id' => $tecnicoId ?: null,
+            'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', $filtros)) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Penales fallados de lo ya cargado</h1>';
+
+        if (!Schema::hasColumn('import_partidos', 'penales_revisado_at')) {
+            return $this->pagina('Penales fallados', $cuerpo
+                . '<div class="err-box">Falta la columna <code>import_partidos.penales_revisado_at</code>. '
+                . 'Corré la migración <code>2026_08_31_120000_add_penales_revisado_to_import_partidos</code> '
+                . '(o el SQL suelto <code>database/penales_revisado.sql</code>) y volvé. Sin esa columna no hay '
+                . 'dónde anotar qué partidos ya se revisaron, y el pase se repetiría entero cada vez.</div>');
+        }
+
+        $cuerpo .= '<p class="sub">Hasta el 31/08/2026 el importador no leía los penales que <b>no fueron gol</b>, '
+            . 'así que a los partidos cargados antes les puede faltar un <b>Errado</b>, un <b>Atajado</b> o un '
+            . '<b>Atajó</b>. Cuáles lo tienen no se puede saber sin preguntarle a Transfermarkt: es '
+            . '<b>1 llamada por partido</b>. Este pase pregunta y escribe <b>sólo</b> las filas de <code>penals</code> '
+            . '—no toca alineación, goles, tarjetas ni cambios, no crea jugadores y no baja fotos— y deja el partido '
+            . 'marcado como revisado, así la llamada se paga una sola vez.</p>';
+
+        // Base: partidos con detalle cargado (tienen alineación) que todavía no
+        // se revisaron. Los que no tienen detalle no van: cuando se lo bajes,
+        // el importador ya trae los penales.
+        $base = function () use ($tecnicoId, $comp, $ronda) {
+            $q = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado'])
+                ->whereNull('penales_revisado_at')
+                ->whereIn('partido_id', function ($sub) {
+                    $sub->from('alineacions')->select('partido_id')->distinct();
+                });
+            if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+            if ($comp !== '')  $q->where('competencia_external_id', $comp);
+            if ($ronda !== '') $q->where('ronda', $ronda);
+            return $q;
+        };
+
+        $pendientes = (clone $base())->distinct()->count('partido_id');
+        $revisados  = DB::table('import_partidos')->whereNotNull('penales_revisado_at')
+            ->distinct()->count('partido_id');
+
+        $hechos = 0; $fallaron = 0; $llamadas = 0; $conPenales = 0; $filasNuevas = 0;
+        $detalle = '';
+
+        if ($correr && $pendientes) {
+            // De a uno y en orden: el más nuevo primero, que es lo que más
+            // mirás. Si algo se cae, los demás siguen.
+            $lote = (clone $base())->orderByDesc('dia')->limit($n)->get();
+            $imp  = new TmDetallePartido;
+            $fechasLote = $this->mapaFechas($lote->pluck('partido_id')->all());
+
+            foreach ($lote as $f) {
+                $r = $imp->soloPenales((int) $f->partido_id, (string) $f->external_id);
+                $llamadas += (int) $r['llamadas'];
+
+                $etiqueta = e($f->club_nombre . ' vs ' . $f->rival_nombre) . ' <span class="id">'
+                    . e(substr((string) $f->dia, 0, 10)) . ' · partido #' . (int) $f->partido_id . '</span>';
+                $inc = $this->linkIncidencias(isset($fechasLote[(int) $f->partido_id])
+                    ? $fechasLote[(int) $f->partido_id] : null);
+
+                if (!$r['escrito']) {
+                    $fallaron++;
+                    $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
+                } else {
+                    $hechos++;
+                    $cuantas = count($r['penals']);
+                    if ($cuantas) {
+                        $conPenales++;
+                        $filasNuevas += $cuantas;
+                        $quienes = [];
+                        foreach ($r['penals'] as $p) {
+                            $quienes[] = e($p['_nombre']) . ' <b>' . e($p['tipo']) . '</b>'
+                                . ($p['minuto'] === null ? '' : ' (' . (int) $p['minuto'] . '\')');
+                        }
+                        $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . ' — '
+                            . implode(' · ', $quienes)
+                            . ' · <a href="' . e(route('penales.index', ['partidoId' => (int) $f->partido_id])) . '">penales</a>'
+                            . ($inc !== '' ? ' · ' . $inc : '') . '</div>';
+                    } else {
+                        $detalle .= '<div class="sub">· ' . $etiqueta . ' — sin penales fallados</div>';
+                    }
+                }
+                foreach ($r['avisos'] as $a) {
+                    $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
+                }
+            }
+
+            // Los recién revisados ya no están pendientes.
+            $pendientes = (clone $base())->distinct()->count('partido_id');
+        }
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($pendientes, 'Sin revisar', $pendientes ? 'warn' : 'ok')
+            . $this->card($revisados + $hechos, 'Ya revisados', 'ok')
+            . ($correr ? $this->card($hechos, 'Revisados ahora', 'ok') : '')
+            . ($correr ? $this->card($conPenales, 'Con penales', $conPenales ? 'warn' : '') : '')
+            . ($correr ? $this->card($filasNuevas, 'Filas creadas', $filasNuevas ? 'warn' : '') : '')
+            . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
+            . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
+            . '</div>';
+
+        if (!$pendientes) {
+            $cuerpo .= '<div class="ok-box">No queda ningún partido sin revisar'
+                . (!empty($filtros) ? ' con este filtro' : '') . '.</div>';
+        } else {
+            $params = $filtros; $params['n'] = $n; $params['correr'] = 1;
+            $cuerpo .= '<p class="acciones">'
+                . '<a class="boton" href="' . e(route('import_detalles.penales', $params)) . '">'
+                . 'Revisar los ' . min($n, $pendientes) . ' más nuevos</a>'
+                . ' <span class="sub">' . min($n, $pendientes) . ' llamadas · quedan <b>' . $pendientes . '</b></span>';
+
+            foreach ([25, 50] as $otro) {
+                if ($otro === $n || $otro > $pendientes) continue;
+                $p2 = $filtros; $p2['n'] = $otro; $p2['correr'] = 1;
+                $cuerpo .= ' <a class="boton-sec" href="' . e(route('import_detalles.penales', $p2)) . '">'
+                    . 'de a ' . $otro . '</a>';
+            }
+            $cuerpo .= '</p>'
+                . '<p class="sub">Conviene filtrar por competencia y hacer primero los torneos que te importan: '
+                . 'con <b>' . $pendientes . '</b> partidos pendientes, revisarlos todos son ' . $pendientes
+                . ' llamadas. Un partido sin penales también queda marcado, así que nunca se pregunta dos veces.</p>';
+        }
+
+        if ($detalle !== '') {
+            $cuerpo .= '<h2>Lo que hizo esta tanda</h2><div class="diag">' . $detalle . '</div>';
+        }
+
+        $cuerpo .= $this->bloquePendientesPenales($base());
+
+        return $this->pagina('Penales fallados', $cuerpo);
+    }
+
+    /** Los próximos que se van a revisar, para saber por dónde va la cosa. */
+    private function bloquePendientesPenales($consulta)
+    {
+        $filas = (clone $consulta)->orderByDesc('dia')->limit(40)->get();
+        if ($filas->isEmpty()) return '';
+
+        $fechas = $this->mapaFechas($filas->pluck('partido_id')->all());
+
+        $out = '<h2>Los próximos <span class="sub">(' . count($filas) . ' de los más nuevos)</span></h2>'
+            . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Competencia</th><th>Partido</th>'
+            . '<th>gameId</th><th></th></tr></thead><tbody>';
+
+        foreach ($filas as $f) {
+            $inc = $this->linkIncidencias(isset($fechas[(int) $f->partido_id]) ? $fechas[(int) $f->partido_id] : null);
+            $out .= '<tr>'
+                . '<td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
+                . '<td>' . e((string) $f->competencia_nombre) . '</td>'
+                . '<td>' . e($f->club_nombre . ' vs ' . $f->rival_nombre)
+                . ' <span class="id">#' . (int) $f->partido_id . '</span></td>'
+                . '<td class="num"><span class="id">' . e((string) $f->external_id) . '</span></td>'
+                . '<td><a href="' . e(route('penales.index', ['partidoId' => (int) $f->partido_id])) . '">Penales</a>'
+                . ($inc !== '' ? ' · ' . $inc : '') . '</td>'
+                . '</tr>';
+        }
+
+        return $out . '</tbody></table></div>';
     }
 
     // ═══════════════════════════ DIAGNÓSTICO ═══════════════════════════

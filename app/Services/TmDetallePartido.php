@@ -15,6 +15,7 @@ use App\Gol;
 use App\Tarjeta;
 use App\Cambio;
 use App\PartidoArbitro;
+use App\Penal;
 use App\Http\Controllers\JugadorController;
 
 /**
@@ -48,6 +49,21 @@ class TmDetallePartido
     const GOL_ENCONTRA   = 'En Contra';
 
     /**
+     * `penals` describe UNA acción por protagonista, no un penal por fila.
+     * Es el criterio con el que se vienen cargando los partidos a mano:
+     *
+     *   · lo tiró afuera / al palo  → una fila:  el PATEADOR con «Errado»
+     *   · se lo atajaron            → dos filas: el PATEADOR con «Atajado»
+     *                                            y el ARQUERO con «Atajó»
+     *   · lo convirtió              → el gol va en `gols` (tipo «Penal») y en
+     *     `penals` va el ARQUERO con «Convirtieron» (lo hace ControlPenales).
+     */
+    const PEN_ERRADO      = 'Errado';
+    const PEN_ATAJADO     = 'Atajado';
+    const PEN_ATAJO       = 'Atajó';
+    const PEN_CONVIRTIERON = 'Convirtieron';
+
+    /**
      * Claves reales del JSON de /game/{id} (confirmadas con partidos de verdad).
      * Cada acción viene así:
      *   {"action":"Yellow card","actionId":301,"reason":"Not reported","reasonId":300,
@@ -68,6 +84,12 @@ class TmDetallePartido
     private static $kDorsal    = ['shirtNumber', 'shirtNo', 'jerseyNumber', 'number', 'dorsal', 'squadNumber'];
     private static $kDescGol   = ['action', 'goalType', 'typeName', 'description', 'actionName'];
     private static $kDescCard  = ['action', 'cardType', 'typeName', 'description', 'actionName'];
+    /**
+     * En `missedPenalties` el QUÉ pasó está en `reason`, no en `action`:
+     * `action` viene "Not reported" y `reason` dice "Saved". Es la excepción a
+     * la regla de arriba.
+     */
+    private static $kMotivoPen = ['reason', 'reasonName', 'description'];
 
     /**
      * actionId de Transfermarkt. 200 = gol común, 206 = gol en contra,
@@ -123,12 +145,14 @@ class TmDetallePartido
      * @return array  informe
      */
     /**
-     * Crea las filas de `penals` que le falten al partido recién importado.
+     * Crea las filas de `penals` de los penales CONVERTIDOS: el arquero que lo
+     * recibió, con tipo «Convirtieron».
      *
-     * El importador escribe los goles con tipo "Penal" pero nunca escribió
-     * `penals`, que es de donde salen los penales atajados/errados y el arquero
-     * que los recibió. Resultado: cada "Rehacer" dejaba el partido esperando un
-     * click en el control "Penales sin cargar". Esto lo hace solo.
+     * Es sólo una parte de `penals`. Los penales que no fueron gol —el
+     * «Errado» / «Atajado» del pateador y el «Atajó» del arquero— salen de
+     * `missedPenalties` y los arma el plan, más arriba. Acá se resuelven los
+     * convertidos, que en el JSON figuran como un gol y no dicen quién era el
+     * arquero: hay que deducirlo de la alineación, los cambios y las rojas.
      *
      * Nunca pisa un penal ya cargado, ni siquiera cuando se rehace con
      * `forzar`: si le corregiste el arquero a mano, tu corrección sobrevive.
@@ -175,7 +199,7 @@ class TmDetallePartido
             'avisos'      => [],
             'fallidas'    => 0,
             'plan'        => ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
-                'arbitros' => [], 'tecnicos' => [], 'plantillas' => []],
+                'penals' => [], 'arbitros' => [], 'tecnicos' => [], 'plantillas' => []],
             'creados'     => ['jugadores' => [], 'arbitros' => [], 'tecnicos' => []],
             'llamadas'    => 0,
             'crudo'       => null,
@@ -289,7 +313,7 @@ class TmDetallePartido
 
         // ── 5) Armar el plan ───────────────────────────────────────────────
         $plan = ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
-            'arbitros' => [], 'tecnicos' => [], 'plantillas' => []];
+            'penals' => [], 'arbitros' => [], 'tecnicos' => [], 'plantillas' => []];
 
         // La plantilla de un equipo se carga UNA sola vez por torneo, en un
         // grupo, aunque después el equipo pase a otro (zona -> fase final). Por
@@ -516,6 +540,10 @@ class TmDetallePartido
             }
         }
 
+        // Penales que NO fueron gol. Van en su propio método porque el pase
+        // liviano (`soloPenales`) usa exactamente esto y nada más.
+        $plan['penals'] = $this->planPenales($game, $partido, $lados, $mapa);
+
         // Árbitros: sólo los que ya estén atados en arbitro_tm. Los que no,
         // se listan como aviso — no inventamos personas sin nombre.
         $plan['arbitros'] = $this->planArbitros($game, $partido, $escribir, $informe);
@@ -537,6 +565,13 @@ class TmDetallePartido
                         Tarjeta::where('partido_id', $partido->id)->delete();
                         Cambio::where('partido_id', $partido->id)->delete();
                         PartidoArbitro::where('partido_id', $partido->id)->delete();
+                        // De `penals` se borra SOLO lo que escribe este
+                        // importador. Los «Convirtieron» quedan: los crea
+                        // ControlPenales deduciendo el arquero, y ese arquero se
+                        // puede haber corregido a mano. Rehacer no debe pisar eso.
+                        Penal::where('partido_id', $partido->id)
+                            ->whereIn('tipo', [self::PEN_ERRADO, self::PEN_ATAJADO, self::PEN_ATAJO])
+                            ->delete();
                     }
                     // Primero la plantilla: es lo que hace que el jugador exista
                     // para la pantalla de alineaciones del torneo.
@@ -547,6 +582,7 @@ class TmDetallePartido
                     $this->grabarFilas(Tarjeta::class,      $plan['tarjetas'],    'una tarjeta');
                     $this->grabarFilas(Cambio::class,       $plan['cambios'],     'un cambio');
                     $this->grabarFilas(PartidoArbitro::class, $plan['arbitros'],  'un árbitro');
+                    $this->grabarPenales($plan['penals']);
 
                     // Si el partido no tenía marcador, se lo ponemos. Primero
                     // con lo que acaba de bajar; si de ahí no sale, con el
@@ -572,6 +608,10 @@ class TmDetallePartido
                 });
                 $informe['escrito'] = true;
 
+                // Este importador ya lee `missedPenalties`, así que el partido
+                // queda revisado y no tiene que salir en el pase de penales.
+                self::marcarPenalesRevisados([(int) $partido->id]);
+
                 // Los penales van FUERA de la transacción de arriba a propósito:
                 // el arquero se resuelve leyendo la alineación, los cambios y
                 // las rojas recién guardados.
@@ -586,6 +626,125 @@ class TmDetallePartido
         $informe['avisos']   = $this->avisos;
         $informe['fallidas'] = $this->fallidas;
         return $informe;
+    }
+
+    /**
+     * Pase liviano: baja el partido y escribe SOLO los penales fallados.
+     *
+     * Existe por una razón concreta. Hasta el 31/08/2026 el importador no leía
+     * `actions.missedPenalties`, así que hay ~1900 partidos ya cargados a los
+     * que les puede faltar un penal errado o atajado. Cuáles, no se puede saber
+     * desde la base: el dato sólo está en Transfermarkt, una llamada por
+     * partido.
+     *
+     * Rehacer el detalle completo también los traería, pero cuesta lo mismo y
+     * hace mucho más: pisa alineación, goles, tarjetas y cambios —incluidas las
+     * correcciones a mano— y puede crear jugadores y bajar fotos. Esto no toca
+     * nada de eso: una llamada, las filas de `penals`, y la marca de revisado
+     * para no volver a pagarla.
+     *
+     * No crea jugadores. Si el pateador o el arquero no están mapeados avisa y
+     * sigue: los dos jugaron ese partido, así que si el detalle está cargado ya
+     * tienen que estar en `jugador_tm`.
+     */
+    public function soloPenales($partidoId, $gameId, array $opts = [])
+    {
+        $escribir = array_key_exists('escribir', $opts) ? (bool) $opts['escribir'] : true;
+
+        $this->avisos = [];
+        $this->fotosBajadas = 0;
+        $this->fallidas = 0;
+
+        $informe = [
+            'ok'         => false,
+            'escrito'    => false,
+            'error'      => null,
+            'partido_id' => (int) $partidoId,
+            'game_id'    => (string) $gameId,
+            'avisos'     => [],
+            'fallidas'   => 0,
+            'llamadas'   => 0,
+            'penals'     => [],
+        ];
+
+        $partido = Partido::find($partidoId);
+        if (!$partido) {
+            $informe['error'] = 'No existe el partido #' . (int) $partidoId . '.';
+            return $informe;
+        }
+
+        $json = HttpHelper::getJson(self::TMAPI . '/game/' . rawurlencode($gameId));
+        $informe['llamadas']++;
+        if (!is_array($json) || empty($json)) {
+            $err = method_exists('App\Services\HttpHelper', 'getLastJsonError') ? HttpHelper::getLastJsonError() : null;
+            $informe['error'] = 'La API no devolvió el partido ' . $gameId
+                . (is_array($err) ? ' — ' . json_encode($err, JSON_UNESCAPED_UNICODE) : '');
+            return $informe;
+        }
+        $game = isset($json['data']) ? $json['data'] : $json;
+
+        // Mismo control que el importador completo: si los clubes no aparean, el
+        // gameId no es de este partido y no se escribe nada. Sin esto, un gameId
+        // equivocado le metería penales de otro partido.
+        $this->mapaStaging = $this->mapaDesdeStaging($partido->id);
+        $lados = $this->orientar($game, $partido, false);
+        if ($lados === null) {
+            $informe['error'] = $this->ultimoAviso() ?: 'No pude aparear los clubes del partido con los de la base.';
+            $informe['avisos'] = $this->avisos;
+            return $informe;
+        }
+
+        $filas = $this->planPenales($game, $partido, $lados, $this->mapaJugadores());
+        $informe['penals'] = $filas;
+        $informe['ok'] = true;
+
+        if ($escribir) {
+            try {
+                DB::transaction(function () use ($filas, $partido) {
+                    // Se rehacen sólo los tipos que escribe este pase. Los
+                    // «Convirtieron» son de ControlPenales y su arquero puede
+                    // estar corregido a mano: no se tocan nunca.
+                    Penal::where('partido_id', $partido->id)
+                        ->whereIn('tipo', [self::PEN_ERRADO, self::PEN_ATAJADO, self::PEN_ATAJO])
+                        ->delete();
+                    $this->grabarPenales($filas);
+                });
+                $informe['escrito'] = true;
+
+                // La marca va aunque no haya habido ningún penal: "revisado" es
+                // "ya le pregunté a TM", no "tenía penales". Sin esto el partido
+                // sin penales volvería a salir en la lista para siempre.
+                self::marcarPenalesRevisados([(int) $partido->id]);
+            } catch (\Exception $e) {
+                $informe['ok']    = false;
+                $informe['error'] = 'Error guardando los penales: ' . $e->getMessage();
+                Log::error('TmDetallePartido soloPenales partido ' . $partido->id . ': ' . $e->getMessage());
+            }
+        }
+
+        $informe['avisos']   = $this->avisos;
+        $informe['fallidas'] = $this->fallidas;
+        return $informe;
+    }
+
+    /**
+     * Deja anotado que a estos partidos ya se les preguntaron los penales.
+     *
+     * Silencioso si la columna todavía no existe: la migración puede no haber
+     * corrido y eso no es motivo para que falle una importación entera.
+     */
+    public static function marcarPenalesRevisados(array $partidoIds)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        if (empty($ids)) return;
+        if (!Schema::hasColumn('import_partidos', 'penales_revisado_at')) return;
+
+        try {
+            DB::table('import_partidos')->whereIn('partido_id', $ids)
+                ->update(['penales_revisado_at' => now()]);
+        } catch (\Exception $e) {
+            Log::error('marcarPenalesRevisados: ' . $e->getMessage());
+        }
     }
 
     // ═══════════════════════════ ORIENTACIÓN ═══════════════════════════
@@ -939,13 +1098,22 @@ class TmDetallePartido
         return $out;
     }
 
-    /** Goles, tarjetas y cambios de un lado, normalizados a una lista plana. */
+    /**
+     * Goles, tarjetas, cambios y penales fallados de un lado, normalizados a
+     * una lista plana.
+     *
+     * `missedPenalties` está en el bloque del club que PATEÓ: `activePlayerId`
+     * es el pateador y `passivePlayerId` el arquero del otro equipo. La rama
+     * sólo aparece cuando hubo alguno, por eso el `awayClub` de un partido sin
+     * penales fallados no la trae.
+     */
     private function accionesDelLado(array $game, $clave)
     {
         $out = [];
         $acc = isset($game[$clave]['actions']) && is_array($game[$clave]['actions']) ? $game[$clave]['actions'] : [];
 
-        foreach (['goals' => 'gol', 'cards' => 'tarjeta', 'substitutes' => 'cambio'] as $rama => $clase) {
+        foreach (['goals' => 'gol', 'cards' => 'tarjeta', 'substitutes' => 'cambio',
+                  'missedPenalties' => 'penal'] as $rama => $clase) {
             if (!isset($acc[$rama]) || !is_array($acc[$rama])) continue;
             foreach ($acc[$rama] as $a) {
                 if (!is_array($a)) continue;
@@ -963,6 +1131,14 @@ class TmDetallePartido
                         continue;
                     }
                     $out[] = ['clase' => 'cambio', 'minuto' => $minuto, 'ids' => [$activo, $pasivo], 'crudo' => $a];
+                } elseif ($clase === 'penal') {
+                    // Los dos ids importan: el pateador y el arquero. El arquero
+                    // puede faltar (una pelota afuera no la ataja nadie).
+                    if ($activo === null) {
+                        $this->aviso('Penal fallado sin id del pateador: ' . $this->resumenCrudo($a));
+                        continue;
+                    }
+                    $out[] = ['clase' => 'penal', 'minuto' => $minuto, 'ids' => [$activo, $pasivo], 'crudo' => $a];
                 } else {
                     if ($activo === null) {
                         $this->aviso(ucfirst($clase) . ' sin id de jugador: ' . $this->resumenCrudo($a));
@@ -1101,6 +1277,123 @@ class TmDetallePartido
     }
 
     /** Amarilla / Doble Amarilla / Roja. Si no la reconozco, no la cargo. */
+    /**
+     * Las filas de `penals` de los penales que NO fueron gol.
+     *
+     * Los convertidos no pasan por acá: vienen como un gol de tipo Penal y su
+     * fila —el arquero con «Convirtieron»— la crea `ControlPenales`, que es
+     * quien sabe deducir el arquero. Acá TM nos dice quién fue: el pateador en
+     * `activePlayerId` y el arquero en `passivePlayerId`.
+     *
+     * Una fila por protagonista, como se cargan a mano:
+     *   · la tiró afuera → pateador «Errado»
+     *   · se la atajaron → pateador «Atajado» + arquero «Atajó»
+     */
+    private function planPenales(array $game, Partido $partido, array $lados, array $mapa)
+    {
+        $filas = [];
+
+        foreach ($lados as $i => $lado) {
+            // El arquero es del otro equipo: `missedPenalties` está en el bloque
+            // del club que pateó.
+            $otroNombre = $lados[$i === 0 ? 1 : 0]['equipo_nombre'];
+
+            foreach ($this->accionesDelLado($game, $lado['clave']) as $accion) {
+                if ($accion['clase'] !== 'penal') continue;
+
+                $pateadorTm = $accion['ids'][0];
+                $arqueroTm  = isset($accion['ids'][1]) ? $accion['ids'][1] : null;
+
+                $pateadorId = isset($mapa[(string) $pateadorTm]) ? $mapa[(string) $pateadorTm] : null;
+                if (!$pateadorId) {
+                    $this->aviso('Penal fallado de un jugador sin resolver (TM ' . $pateadorTm . ').');
+                    continue;
+                }
+
+                $motivo = $this->motivoPenal($accion['crudo']);
+                if ($motivo['dudoso']) {
+                    $this->aviso('Penal del minuto ' . $accion['minuto'] . ': no reconozco «'
+                        . $motivo['fuente'] . '». Lo cargo como Errado; si el arquero lo atajó, '
+                        . 'corregilo a mano y avisá para sumar esa palabra al importador.');
+                }
+
+                // El pateador siempre lleva fila: Errado si la tiró afuera,
+                // Atajado si el arquero la contuvo.
+                $filas[] = [
+                    'partido_id' => $partido->id,
+                    'jugador_id' => $pateadorId,
+                    'minuto'     => $accion['minuto'],
+                    'tipo'       => $motivo['atajado'] ? self::PEN_ATAJADO : self::PEN_ERRADO,
+                    '_nombre'    => $this->nombreJugador($pateadorId),
+                    '_equipo'    => $lado['equipo_nombre'],
+                    '_fuente'    => $motivo['fuente'],
+                    '_dudoso'    => $motivo['dudoso'],
+                ];
+
+                // Y el arquero sólo cuando lo atajó: esa es SU acción. Si la
+                // tiró afuera, el arquero no hizo nada y no lleva fila.
+                if (!$motivo['atajado']) continue;
+
+                $arqueroId = ($arqueroTm !== null && isset($mapa[(string) $arqueroTm]))
+                    ? $mapa[(string) $arqueroTm] : null;
+                if (!$arqueroId) {
+                    $this->aviso('Penal atajado en el minuto ' . $accion['minuto'] . ': Transfermarkt no '
+                        . 'dice qué arquero lo atajó (o no lo pude resolver), así que cargo sólo el '
+                        . '«Atajado» del pateador. El «Atajó» del arquero ponelo a mano.');
+                    continue;
+                }
+
+                $filas[] = [
+                    'partido_id' => $partido->id,
+                    'jugador_id' => $arqueroId,
+                    'minuto'     => $accion['minuto'],
+                    'tipo'       => self::PEN_ATAJO,
+                    '_nombre'    => $this->nombreJugador($arqueroId),
+                    '_equipo'    => $otroNombre,
+                    '_fuente'    => $motivo['fuente'],
+                    '_dudoso'    => false,
+                ];
+            }
+        }
+
+        return $filas;
+    }
+
+    /**
+     * ¿El penal fallado se lo atajaron o lo tiró afuera?
+     *
+     * La diferencia importa porque cambia cuántas filas se cargan: un penal
+     * atajado tiene dos protagonistas (el que pateó y el que atajó) y uno
+     * tirado afuera tiene uno solo.
+     *
+     * Acá se mira `reason`, no `action`: en `missedPenalties` el `action` viene
+     * "Not reported" y el dato real está en `reason` ("Saved", reasonId 501,
+     * confirmado con Independiente Rivadavia–Racing, gameId 4889704).
+     */
+    private function motivoPenal(array $a)
+    {
+        $txt = mb_strtolower(trim($this->juntarTexto($a, self::$kMotivoPen)));
+
+        foreach (['saved', 'gehalten', 'atajad', 'goalkeeper', 'keeper'] as $k) {
+            if ($txt !== '' && mb_strpos($txt, $k) !== false) {
+                return ['atajado' => true, 'fuente' => $txt, 'dudoso' => false];
+            }
+        }
+
+        // Vocabulario conocido de "la tiró afuera": no hace falta avisar nada.
+        foreach (['post', 'crossbar', 'bar', 'wide', 'over', 'missed', 'miss', 'out',
+                  'blocked', 'pfosten', 'latte', 'vorbei', 'afuera', 'palo', 'travesa'] as $k) {
+            if ($txt !== '' && mb_strpos($txt, $k) !== false) {
+                return ['atajado' => false, 'fuente' => $txt, 'dudoso' => false];
+            }
+        }
+
+        // Ni una cosa ni la otra: va como Errado —es lo más probable— pero
+        // marcado, así el vocabulario nuevo se ve en pantalla y se amplía la
+        // lista de arriba en vez de quedar cargado mal en silencio.
+        return ['atajado' => false, 'fuente' => $txt !== '' ? $txt : 'sin detallar', 'dudoso' => true];
+    }
+
     private function tipoTarjeta(array $a)
     {
         $txt = mb_strtolower($this->juntarTexto($a, self::$kDescCard));
@@ -2330,6 +2623,34 @@ class TmDetallePartido
      * En InnoDB una sentencia fallida no aborta la transacción, sólo se deshace
      * ella, así que se puede seguir.
      */
+    /**
+     * Graba los penales fallados sin repetir los que ya estén.
+     *
+     * A diferencia de goles o tarjetas, `penals` puede tener filas puestas a
+     * mano y filas creadas por ControlPenales, así que no se borra todo y se
+     * reescribe: se inserta sólo lo que no está. La identidad de una fila es
+     * partido + jugador + minuto + tipo (`<=>` porque el minuto puede ser NULL).
+     */
+    private function grabarPenales(array $filas)
+    {
+        if (empty($filas)) return;
+
+        $nuevas = [];
+        foreach ($filas as $r) {
+            $f = $this->limpiar($r);
+            $ya = DB::table('penals')
+                ->where('partido_id', $f['partido_id'])
+                ->where('jugador_id', $f['jugador_id'])
+                ->where('tipo', $f['tipo'])
+                ->whereRaw('minuto <=> ?', [$f['minuto']])
+                ->exists();
+            if ($ya) continue;
+            $nuevas[] = $r;
+        }
+
+        $this->grabarFilas(Penal::class, $nuevas, 'un penal');
+    }
+
     private function grabarFilas($clase, array $filas, $que)
     {
         foreach ($filas as $r) {
