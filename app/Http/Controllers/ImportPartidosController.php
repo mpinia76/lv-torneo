@@ -438,7 +438,11 @@ class ImportPartidosController extends Controller
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
             . '</div>';
 
-        if ($usarCache) $html .= '<p class="sub">Datos del staging: no se bajó nada de Transfermarkt.</p>';
+        if ($usarCache) {
+            $html .= '<p class="sub">Datos del <b>staging</b>: no se bajó nada de Transfermarkt. Es la foto de la '
+                . 'última bajada, así que un partido que se jugó después de esa bajada acá sigue figurando sin '
+                . 'resultado. Para cargar resultados nuevos, usá «Volver a bajar de TM» primero.</p>';
+        }
         if ($saltados) {
             $html .= '<p class="sub">Se ignoraron <b>' . $saltados . '</b> partidos sin día y hora confirmados '
                 . '(<code>isTimeDefined: false</code>). Entran solos cuando TM los programe y vuelvas a bajar.</p>';
@@ -467,12 +471,25 @@ class ImportPartidosController extends Controller
         }
 
         $base = route('import_partidos.fixture', ['comp' => $comp]);
+
+        // LOS BOTONES QUE ESCRIBEN TRABAJAN SOBRE LO QUE SE ESTÁ VIENDO.
+        // Antes forzaban `cache=1` siempre, así que si venías de una bajada
+        // fresca de TM el botón descartaba esos datos y releía el staging: una
+        // foto vieja, tomada antes de que se jugaran los partidos, donde
+        // `isFinished` es false y el `score` viene vacío. Resultado: la pantalla
+        // te prometía cargar N resultados y el botón no escribía nada, porque
+        // para el staging esos partidos todavía no se habían jugado.
+        // Si la vista salió del staging, el botón sigue usando el staging; si
+        // salió de TM, el botón vuelve a bajar de TM.
+        $fuente = $usarCache ? '&cache=1' : '';
+        $costo  = $usarCache ? '' : ' <span class="sub">(vuelve a bajar de TM)</span>';
+
         $html .= '<p class="acciones">'
-            . '<a class="boton" href="' . e($base . '&cache=1&guardar=1') . '">Guardar en staging</a>'
+            . '<a class="boton" href="' . e($base . $fuente . '&guardar=1') . '">Guardar en staging</a>' . $costo
             . ' <span class="sub">no toca tus partidos; solo habilita el botón «Aplicar» de cada fecha</span>'
             . '</p>'
             . '<p class="acciones">'
-            . '<a class="boton-sec" href="' . e($base . '&cache=1&refrescar=1') . '">Guardar, corregir horarios y cargar resultados</a>'
+            . '<a class="boton-sec" href="' . e($base . $fuente . '&refrescar=1') . '">Guardar, corregir horarios y cargar resultados</a>' . $costo
             . ' <span class="sub"><b>esto sí escribe en tus partidos</b>: pisa día y hora de los que todavía no se '
             . 'jugaron, y carga el marcador en los que estén <b>sin resultado</b>. Nunca pisa un resultado que ya '
             . 'tengas cargado. Usalo cuando hayas comprobado que el emparejado es correcto.</span>'
