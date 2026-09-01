@@ -1038,7 +1038,7 @@ class ImportDetallesController extends Controller
         $detalle = '';
         // Control de TODOS los tipos de la tanda: qué decía la base y qué dice
         // Transfermarkt, gol por gol. Se acumula acá y se muestra abajo.
-        $matriz = []; $sueltosTm = 0; $sueltosBase = 0;
+        $matriz = []; $sueltosTm = 0; $sueltosBase = 0; $sinDetalle = 0;
 
         if ($correr && ($pendientes || $unPartido)) {
             $lote = $unPartido
@@ -1048,9 +1048,18 @@ class ImportDetallesController extends Controller
             $imp = new TmDetallePartido;
             $fechasLote = $this->mapaFechas($lote->pluck('partido_id')->all());
 
+            // ¿Cuáles ya tienen alineación? Decide si el link de abajo tiene que
+            // ir con `forzar` (rehacer) o alcanza con bajar. Una sola consulta.
+            $conAlineacion = [];
+            foreach (DB::table('alineacions')->whereIn('partido_id', $lote->pluck('partido_id')->all())
+                         ->select('partido_id')->distinct()->get() as $a) {
+                $conAlineacion[(int) $a->partido_id] = true;
+            }
+
             foreach ($lote as $f) {
                 $r = $imp->soloTiposDeGol((int) $f->partido_id, (string) $f->external_id);
                 $llamadas += (int) $r['llamadas'];
+                $sinDetalleTm = false;
 
                 $etiqueta = e($f->club_nombre . ' vs ' . $f->rival_nombre) . ' <span class="id">'
                     . e(substr((string) $f->dia, 0, 10)) . ' · partido #' . (int) $f->partido_id . '</span>';
@@ -1068,6 +1077,15 @@ class ImportDetallesController extends Controller
                     }
                     $sueltosTm   += (int) (isset($r['sueltos_tm']) ? $r['sueltos_tm'] : 0);
                     $sueltosBase += (int) (isset($r['sueltos_base']) ? $r['sueltos_base'] : 0);
+
+                    // Ni un gol apareó, y de los dos lados había goles: eso no es
+                    // un problema de tipos, es que a este partido NUNCA se le bajó
+                    // el detalle. Los goles son los que cargó el usuario y los
+                    // goleadores de TM no están mapeados — el mapeo lo crea la
+                    // bajada del detalle, no el emparejamiento del fixture.
+                    $sinDetalleTm = ((int) (isset($r['apareados']) ? $r['apareados'] : 0)) === 0
+                        && (int) $r['goles_tm'] > 0 && (int) $r['goles_base'] > 0;
+
                     if (!empty($r['cambios'])) {
                         $conCambios++;
                         $corregidos += count($r['cambios']);
@@ -1081,12 +1099,38 @@ class ImportDetallesController extends Controller
                         $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . ' — '
                             . implode(' · ', $qué)
                             . ($inc !== '' ? ' · ' . $inc : '') . '</div>';
+                    } elseif ($sinDetalleTm) {
+                        $detalle .= '<div class="sub"><span class="warn">·</span> ' . $etiqueta
+                            . ' — no pude comparar ninguno de sus ' . (int) $r['goles_base'] . ' gol(es)</div>';
                     } else {
                         $detalle .= '<div class="sub">· ' . $etiqueta . ' — los ' . (int) $r['goles_base']
                             . ' gol(es) ya estaban bien'
                             . ((int) $r['olimpicos'] ? ' (' . (int) $r['olimpicos'] . ' olímpico/s)' : '') . '</div>';
                     }
                 }
+                // Con el diagnóstico de arriba, una línea sirve más que un aviso
+                // por cada gol suelto.
+                if ($sinDetalleTm) {
+                    $sinDetalle++;
+                    $rehacer = isset($conAlineacion[(int) $f->partido_id]);
+                    $linkBajar = route('import_detalles.bajar', array_filter([
+                        'partido_id' => (int) $f->partido_id, 'forzar' => $rehacer ? 1 : null]));
+                    $sinMapear = (int) (isset($r['sueltos_sin_mapear']) ? $r['sueltos_sin_mapear'] : 0);
+                    $detalle .= '<div class="sub" style="margin-left:18px">• <b>A este partido nunca se le bajó el '
+                        . 'detalle de Transfermarkt.</b> Ninguno de sus ' . (int) $r['goles_base'] . ' gol(es) apareó '
+                        . 'con los ' . (int) $r['goles_tm'] . ' que tiene TM'
+                        . ($sinMapear ? ', y ' . $sinMapear . ' de los goleadores de TM ni siquiera están mapeados '
+                            . '(el mapeo lo crea la bajada del detalle)' : '')
+                        . ': los goles son los que cargaste vos. Corregirles el tipo acá no alcanza — '
+                        . '<a href="' . e($linkBajar) . '"><b>' . ($rehacer ? 'rehacele' : 'bajale') . ' el detalle</b></a>'
+                        . ', que por la misma llamada deja bien la alineación, los cambios, las tarjetas, los árbitros '
+                        . 'y los tipos de gol, y encima mapea a los jugadores para siempre.</div>';
+                } else {
+                    foreach ((isset($r['avisos_apareo']) ? $r['avisos_apareo'] : []) as $a) {
+                        $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
+                    }
+                }
+
                 foreach ($r['avisos'] as $a) {
                     $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
                 }
@@ -1181,6 +1225,7 @@ class ImportDetallesController extends Controller
             . ($correr ? $this->card($hechos, 'Revisados ahora', 'ok') : '')
             . ($correr ? $this->card($corregidos, 'Goles corregidos', $corregidos ? 'warn' : '') : '')
             . ($correr ? $this->card($olimpicos, 'Olímpicos', $olimpicos ? 'warn' : '') : '')
+            . ($correr && $sinDetalle ? $this->card($sinDetalle, 'Sin detalle de TM', 'warn') : '')
             . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
             . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
             . ($buscarIds ? $this->card($idsHallados, 'gameId encontrados', $idsHallados ? 'ok' : '') : '')
@@ -1417,18 +1462,18 @@ class ImportDetallesController extends Controller
     {
         if (empty($matriz) && !$sueltosTm && !$sueltosBase) return '';
 
-        // Orden fijo, para que la tabla se lea siempre igual. Si alguna vez
-        // aparece un tipo nuevo, se agrega al final en lugar de desaparecer.
-        $orden = ['Jugada', 'Cabeza', 'Penal', 'Tiro Libre', 'Olímpico', 'En Contra'];
-        $vistos = [];
+        // SIEMPRE los seis tipos, aparezcan o no en esta tanda. Mostrar sólo los
+        // que salieron hacía que «Olímpico» —que es raro y es justo el que se
+        // fue a buscar— desapareciera de la tabla, y no se distinguía «no hubo
+        // ninguno» de «esto no lo estoy mirando». Con la grilla fija, un cero es
+        // un dato. Si algún día TM trae un tipo que no conocemos, se agrega al
+        // final en lugar de tapar nada.
+        $tipos = ['Jugada', 'Cabeza', 'Penal', 'Tiro Libre', 'Olímpico', 'En Contra'];
         foreach ($matriz as $clave => $n) {
-            $partes = explode('||', $clave);
-            $vistos[$partes[0]] = true;
-            $vistos[isset($partes[1]) ? $partes[1] : ''] = true;
+            foreach (explode('||', $clave) as $t) {
+                if ($t !== '' && !in_array($t, $tipos, true)) $tipos[] = $t;
+            }
         }
-        $tipos = [];
-        foreach ($orden as $t) if (isset($vistos[$t])) $tipos[] = $t;
-        foreach (array_keys($vistos) as $t) if ($t !== '' && !in_array($t, $tipos, true)) $tipos[] = $t;
 
         $valor = function ($de, $a) use ($matriz) {
             $k = $de . '||' . $a;
@@ -1451,7 +1496,8 @@ class ImportDetallesController extends Controller
             . '<b>' . $iguales . '</b> coincidían y <b>' . $distintos . '</b> no'
             . ($sinTocar ? ', de los cuales ' . $sinTocar . ' toca(n) «En Contra» y quedaron sin corregir '
                 . '(cambia de equipo el gol: van a mano)' : '')
-            . '. Lo de la diagonal ya estaba bien; lo de afuera es lo que este pase corrigió.</p>';
+            . '. Lo de la diagonal ya estaba bien; lo de afuera es lo que este pase corrigió. '
+            . 'Los seis tipos están siempre, salieran o no en esta tanda: un cero también dice algo.</p>';
 
         $out .= '<div class="scroll"><table><thead><tr>'
             . '<th>Base ╲ Transfermarkt</th>';
@@ -1473,8 +1519,10 @@ class ImportDetallesController extends Controller
                     $fila .= '<td class="num warn"><b>' . $n . '</b></td>';
                 }
             }
-            if ($totalFila === 0) continue;   // un tipo que no apareció de este lado no ocupa fila
-            $out .= '<tr><th>' . e($de) . '</th>' . $fila . '<td class="num">' . $totalFila . '</td></tr>';
+            // La fila vacía se muestra igual, en gris: «no hubo ninguno» es
+            // información, y la tabla queda igual de tanda a tanda.
+            $out .= '<tr' . ($totalFila === 0 ? ' class="gris"' : '') . '><th>' . e($de) . '</th>' . $fila
+                . '<td class="num">' . ($totalFila ?: '·') . '</td></tr>';
         }
 
         $out .= '<tr><th>Total</th>';

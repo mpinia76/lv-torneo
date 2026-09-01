@@ -798,6 +798,16 @@ class TmDetallePartido
             'matriz'      => [],
             'sueltos_tm'   => 0,   // goles de TM que no aparearon con ninguno cargado
             'sueltos_base' => 0,   // goles cargados que TM no tiene
+            'apareados'    => 0,   // cuántos goles se pudieron cruzar
+            // De los goles de TM que no aparearon, cuántos son de un jugador que
+            // ni siquiera está en `jugador_tm`. Es la señal de que a este partido
+            // nunca se le bajó el detalle: el mapeo lo crea esa bajada.
+            'sueltos_sin_mapear' => 0,
+            // Los avisos del apareo van APARTE de los otros: cuando no apareó
+            // ningún gol, el problema no son los goles sino que a ese partido
+            // nunca se le bajó el detalle, y la pantalla dice eso en una línea
+            // en vez de escupir uno por gol.
+            'avisos_apareo' => [],
         ];
 
         $partido = Partido::find($partidoId);
@@ -958,21 +968,23 @@ class TmDetallePartido
         // Lo que quedó suelto de cada lado. No es error del pase: casi siempre
         // es un gol cargado a mano que TM no tiene, o un jugador sin mapear.
         foreach ($sinAparear as $g) {
+            if ($g['jugador_id'] === null) $informe['sueltos_sin_mapear']++;
             $quien = $g['jugador_id'] ? $this->nombreJugador((int) $g['jugador_id']) : 'TM ' . $g['tm_id'];
-            $this->aviso('Transfermarkt tiene un gol de ' . $quien
+            $informe['avisos_apareo'][] = ('Transfermarkt tiene un gol de ' . $quien
                 . ($g['minuto'] === null ? '' : ' (' . (int) $g['minuto'] . '\')') . ' tipo "' . $g['tipo']
                 . '" que no encontré entre los goles cargados de este partido'
                 . ($g['jugador_id'] ? '' : ' (ese jugador no está mapeado en jugador_tm)')
                 . '. No lo creo: revisá las incidencias.');
         }
         foreach ($libres as $f) {
-            $this->aviso('El gol cargado de ' . $this->nombreJugador((int) $f->jugador_id)
+            $informe['avisos_apareo'][] = ('El gol cargado de ' . $this->nombreJugador((int) $f->jugador_id)
                 . ($f->minuto === null ? '' : ' (' . (int) $f->minuto . '\')') . ', tipo "' . $f->tipo
                 . '", no aparece en Transfermarkt. Lo dejo como está.');
         }
 
         $informe['sueltos_tm']   = count($sinAparear);
         $informe['sueltos_base'] = count($libres);
+        $informe['apareados']    = count($pares);
         $informe['ok'] = true;
 
         if ($escribir) {
