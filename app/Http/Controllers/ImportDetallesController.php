@@ -2233,9 +2233,14 @@ class ImportDetallesController extends Controller
     private function avisoHtml($texto)
     {
         $html = e($texto);
-        return preg_replace_callback('/\[\[plantilla:(\d+)\]\]/', function ($m) {
+        $html = preg_replace_callback('/\[\[plantilla:(\d+)\]\]/', function ($m) {
             return '<a href="' . e(route('plantillas.edit', (int) $m[1])) . '" target="_blank">abrir la plantilla ↗</a>';
         }, $html);
+        // Dos fichas con el mismo nombre peleándose un dorsal: eso se arregla
+        // fusionando, no en la plantilla.
+        return str_replace('[[repetidos]]',
+            '<a href="' . e(route('jugadores.verificarPersonas')) . '" target="_blank">verificar personas ↗</a>',
+            $html);
     }
 
     /**

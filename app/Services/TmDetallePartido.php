@@ -3294,12 +3294,30 @@ class TmDetallePartido
                         ->where('jugador_id', '!=', $f['jugador_id'])->first();
                     if ($ocupa) {
                         $ocupa->update(['dorsal' => null]);
+
+                        // Los DOS ids van en el aviso. Sin ellos, el caso más
+                        // común queda escrito como "se lo saqué a J. Movillo y se
+                        // lo di a J. Movillo", que parece un bug y no lo es: son
+                        // dos FICHAS distintas con el mismo nombre peleándose el
+                        // dorsal en la misma plantilla, o sea la misma persona
+                        // cargada dos veces. Eso no se arregla con el dorsal:
+                        // hay que fusionar las fichas.
+                        $otroId     = (int) $ocupa->jugador_id;
+                        $otroNombre = $this->nombreJugador($otroId);
+                        $mismoNombre = mb_strtolower(trim($otroNombre)) === mb_strtolower(trim((string) $f['_nombre']));
+
                         // El token [[plantilla:N]] lo convierte en link la pantalla
                         // que muestra los avisos, DESPUÉS de escapar el texto.
                         $this->aviso('Dorsal ' . $f['dorsal'] . ' en ' . $f['_equipo'] . ': se lo saqué a "'
-                            . $this->nombreJugador($ocupa->jugador_id) . '" y se lo di a "' . $f['_nombre']
-                            . '", que es lo que dice Transfermarkt. El otro quedó sin dorsal: revisalo. '
-                            . '[[plantilla:' . (int) $plantillas[$clave] . ']]');
+                            . $otroNombre . '" (jugador #' . $otroId . ') y se lo di a "' . $f['_nombre']
+                            . '" (jugador #' . (int) $f['jugador_id'] . '), que es lo que dice Transfermarkt. '
+                            . ($mismoNombre
+                                ? 'Ojo: son dos fichas DISTINTAS con el mismo nombre en la misma plantilla, '
+                                  . 'casi seguro la misma persona cargada dos veces. Mientras estén las dos, el '
+                                  . 'dorsal se lo van a seguir sacando entre ellas: lo que hay que hacer es '
+                                  . 'fusionarlas. [[repetidos]]'
+                                : 'El otro quedó sin dorsal: revisalo.')
+                            . ' [[plantilla:' . (int) $plantillas[$clave] . ']]');
                     }
                 }
 
