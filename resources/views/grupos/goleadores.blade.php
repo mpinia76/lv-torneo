@@ -19,6 +19,7 @@
         <th>Cabeza</th>
         <th>Penal</th>
         <th>Tiro Libre</th>
+        <th>Olímpico</th>
         </thead>
         <tbody>
 
@@ -42,6 +43,7 @@
                 <td>{{$jugador->Cabeza}}</td>
                 <td>{{$jugador->Penal}}</td>
                 <td>{{$jugador->Tiro_Libre}}</td>
+                <td>{{$jugador->Olimpico}}</td>
 
 
             </tr>

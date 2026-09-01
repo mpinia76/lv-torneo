@@ -47,6 +47,8 @@ class TmDetallePartido
     const GOL_TIROLIBRE  = 'Tiro Libre';
     const GOL_CABEZA     = 'Cabeza';
     const GOL_ENCONTRA   = 'En Contra';
+    /** El que entra directo desde el saque de esquina. TM: `actionId` 211. */
+    const GOL_OLIMPICO   = 'Olímpico';
 
     /**
      * `penals` describe UNA acción por protagonista, no un penal por fila.
@@ -95,6 +97,11 @@ class TmDetallePartido
      * actionId de Transfermarkt. 200 = gol común, 206 = gol en contra,
      * 301 = amarilla, 400 = cambio. Los 2xx que no conocemos igual son goles;
      * los 3xx, tarjetas. Lo que no matchee cae al texto de `action`.
+     *
+     * El 211 ("direct corner") es el gol olímpico. Apareció en Pereira-Alianza
+     * del 17/05/2023 cayendo como Jugada dudosa: hasta el 01/09/2026 el tipo no
+     * existía en la base. Los partidos cargados antes de esa fecha lo tienen
+     * mal y se corrigen con el relevamiento (`import_detalles.tipos_gol`).
      */
     private static $accionGol = [
         200 => self::GOL_JUGADA,
@@ -104,6 +111,7 @@ class TmDetallePartido
         204 => self::GOL_TIROLIBRE,
         205 => self::GOL_JUGADA,
         206 => self::GOL_ENCONTRA,
+        211 => self::GOL_OLIMPICO,
     ];
 
     /** Avisos y datos sin reconocer que junta la corrida (se muestran en pantalla). */
@@ -740,6 +748,260 @@ class TmDetallePartido
     }
 
     /**
+     * Pase liviano: vuelve a leer el partido en Transfermarkt y corrige SÓLO el
+     * `tipo` de los goles que ya están cargados.
+     *
+     * Por qué hace falta: el tipo de gol no se puede deducir de la base. Un gol
+     * olímpico y uno de jugada son la misma fila —mismo jugador, mismo minuto—
+     * y sólo Transfermarkt sabe cuál fue. Así que para saber qué partidos tienen
+     * uno hay que preguntarlos de a uno, a 1 llamada cada uno, y por eso el
+     * partido queda marcado en `import_partidos.tipos_gol_revisado_at`: la
+     * llamada se paga una sola vez (mismo criterio que los penales fallados).
+     *
+     * NO crea nada. No toca la alineación, ni los cambios, ni las tarjetas, ni
+     * los árbitros; no crea jugadores ni baja fotos; no agrega ni borra goles.
+     * Lo único que escribe es `gols.tipo` de una fila que ya existía.
+     *
+     * **El gol en contra no se pisa nunca.** Cambiar «En Contra» por otra cosa
+     * (o al revés) mueve el gol de equipo en los cuadros y en la ficha del
+     * partido: si el apareo estuviera mal, el destrozo no se nota. Cuando TM y
+     * la base no coinciden en eso, se avisa y se deja para revisar a mano.
+     *
+     * @return array informe con 'cambios', 'olimpicos', 'dudosos' y los goles
+     *               que no se pudieron aparear de un lado o del otro.
+     */
+    public function soloTiposDeGol($partidoId, $gameId, array $opts = [])
+    {
+        $escribir = array_key_exists('escribir', $opts) ? (bool) $opts['escribir'] : true;
+
+        $this->avisos = [];
+        $this->fotosBajadas = 0;
+        $this->fallidas = 0;
+        $this->conFotos = false;
+
+        $informe = [
+            'ok'          => false,
+            'escrito'     => false,
+            'error'       => null,
+            'partido_id'  => (int) $partidoId,
+            'game_id'     => (string) $gameId,
+            'avisos'      => [],
+            'llamadas'    => 0,
+            'goles_tm'    => 0,
+            'goles_base'  => 0,
+            'cambios'     => [],   // los que hay que corregir (o se corrigieron)
+            'olimpicos'   => 0,    // cuántos quedaron como Olímpico
+            'dudosos'     => [],   // tipos de gol que el mapeo todavía no conoce
+            // Control de TODOS los tipos, no sólo del olímpico: por cada gol
+            // apareado, qué decía la base y qué dice TM. Clave 'base||tm'.
+            // La diagonal (base == tm) es lo que ya estaba bien.
+            'matriz'      => [],
+            'sueltos_tm'   => 0,   // goles de TM que no aparearon con ninguno cargado
+            'sueltos_base' => 0,   // goles cargados que TM no tiene
+        ];
+
+        $partido = Partido::find($partidoId);
+        if (!$partido) {
+            $informe['error'] = 'No existe el partido #' . (int) $partidoId . '.';
+            return $informe;
+        }
+
+        // Un partido sin goles cargados no tiene nada que corregir. Se corta
+        // ANTES de gastar la llamada.
+        $filas = DB::table('gols')->where('partido_id', $partido->id)
+            ->orderBy('minuto')->orderBy('id')->get();
+        $informe['goles_base'] = count($filas);
+        if (count($filas) === 0) {
+            $informe['ok'] = true;
+            $informe['escrito'] = true;   // no hay nada que escribir, pero se dio por revisado
+            if ($escribir) self::marcarTiposGolRevisados([(int) $partido->id]);
+            $informe['avisos'] = $this->avisos;
+            return $informe;
+        }
+
+        $json = HttpHelper::getJson(self::TMAPI . '/game/' . rawurlencode($gameId));
+        $informe['llamadas']++;
+        if (!is_array($json) || empty($json)) {
+            $err = method_exists('App\Services\HttpHelper', 'getLastJsonError') ? HttpHelper::getLastJsonError() : null;
+            $informe['error'] = 'La API no devolvió el partido ' . $gameId
+                . (is_array($err) ? ' — ' . json_encode($err, JSON_UNESCAPED_UNICODE) : '');
+            return $informe;
+        }
+        $game = isset($json['data']) ? $json['data'] : $json;
+
+        // Mismo control que el importador completo: si los clubes no aparean, el
+        // gameId no es de este partido y no se escribe nada.
+        $this->mapaStaging = $this->mapaDesdeStaging($partido->id);
+        $lados = $this->orientar($game, $partido, false);
+        if ($lados === null) {
+            $informe['error'] = $this->ultimoAviso() ?: 'No pude aparear los clubes del partido con los de la base.';
+            $informe['avisos'] = $this->avisos;
+            return $informe;
+        }
+
+        // Los goles según Transfermarkt. Acá NO se crea ningún jugador: si no
+        // está mapeado no se puede aparear el gol, y eso se avisa. Crear una
+        // ficha nueva en un pase que sólo corrige un enum sería peor el remedio.
+        $mapa = $this->mapaJugadores();
+        $tmGoles = [];
+        foreach ($lados as $lado) {
+            foreach ($this->accionesDelLado($game, $lado['clave']) as $accion) {
+                if ($accion['clase'] !== 'gol') continue;
+                $tmId = $accion['ids'][0];
+                $t = $this->tipoGol($accion['crudo']);
+                if ($t['dudoso']) $informe['dudosos'][] = $t['fuente'];
+                $tmGoles[] = [
+                    'tm_id'      => $tmId,
+                    'jugador_id' => isset($mapa[(string) $tmId]) ? $mapa[(string) $tmId] : null,
+                    'minuto'     => $accion['minuto'],
+                    'tipo'       => $t['tipo'],
+                    'fuente'     => $t['fuente'],
+                ];
+            }
+        }
+        $informe['goles_tm'] = count($tmGoles);
+
+        // ── Apareo gol por gol ────────────────────────────────────────────
+        // La clave es jugador + minuto. El minuto puede diferir en uno (TM y
+        // las crónicas no siempre cuentan igual el descuento), así que hay una
+        // segunda pasada con ±1, y una tercera para el caso fácil: el jugador
+        // hizo un solo gol en ese partido de los dos lados.
+        $libres = [];
+        foreach ($filas as $f) $libres[(int) $f->id] = $f;
+
+        $porJugador = [];
+        foreach ($filas as $f) {
+            $porJugador[(int) $f->jugador_id][] = (int) $f->id;
+        }
+
+        $buscar = function ($jugadorId, $minuto, $tolerancia) use (&$libres) {
+            foreach ($libres as $id => $f) {
+                if ((int) $f->jugador_id !== (int) $jugadorId) continue;
+                // Si a uno de los dos le falta el minuto no se puede comparar:
+                // ese caso lo levanta la tercera pasada (el gol único del jugador).
+                if ($minuto === null || $f->minuto === null) continue;
+                if (abs((int) $f->minuto - (int) $minuto) <= $tolerancia) return $id;
+            }
+            return null;
+        };
+
+        $pares = [];
+        $sinAparear = [];
+        foreach ([0, 1, null] as $tolerancia) {
+            $quedan = [];
+            $fuente = ($tolerancia === null) ? $sinAparear : $tmGoles;
+            foreach ($fuente as $g) {
+                // Sin jugador mapeado no hay con qué aparear: pasa de largo por
+                // todas las pasadas y termina en el informe de lo que quedó suelto.
+                if ($g['jugador_id'] === null) { $quedan[] = $g; continue; }
+                $id = ($tolerancia === null)
+                    ? ((isset($porJugador[$g['jugador_id']]) && count($porJugador[$g['jugador_id']]) === 1
+                        && isset($libres[$porJugador[$g['jugador_id']][0]]))
+                            ? $porJugador[$g['jugador_id']][0] : null)
+                    : $buscar($g['jugador_id'], $g['minuto'], $tolerancia);
+
+                if ($id === null) { $quedan[] = $g; continue; }
+                $pares[] = ['tm' => $g, 'fila' => $libres[$id], 'como' => $tolerancia];
+                unset($libres[$id]);
+            }
+            $sinAparear = $quedan;
+            if ($tolerancia === 0) $tmGoles = $quedan;   // la 2da pasada arranca con lo que sobró
+        }
+
+        // ── Qué hay que corregir ──────────────────────────────────────────
+        $aEscribir = [];
+        foreach ($pares as $p) {
+            $de = (string) $p['fila']->tipo;
+            $a  = (string) $p['tm']['tipo'];
+
+            // El control va ANTES del corte: la matriz cuenta todos los goles
+            // apareados, los que coincidían y los que no.
+            $clave = $de . '||' . $a;
+            $informe['matriz'][$clave] = (isset($informe['matriz'][$clave]) ? $informe['matriz'][$clave] : 0) + 1;
+
+            if ($a === self::GOL_OLIMPICO) $informe['olimpicos']++;
+            if ($de === $a) continue;
+
+            $nombre = $this->nombreJugador((int) $p['fila']->jugador_id);
+            $min    = $p['fila']->minuto;
+
+            // El gol en contra no se pisa: ver el comentario de arriba.
+            if ($de === self::GOL_ENCONTRA || $a === self::GOL_ENCONTRA) {
+                $this->aviso('Ojo con el gol de ' . $nombre . ($min === null ? '' : ' (' . (int) $min . '\')')
+                    . ': la base dice "' . $de . '" y Transfermarkt "' . $a . '". Uno de los dos lo tiene como '
+                    . 'gol en contra, y eso cambia de equipo el gol: no lo toco. Revisalo a mano en las incidencias.');
+                continue;
+            }
+
+            $cambio = [
+                'gol_id'     => (int) $p['fila']->id,
+                'jugador_id' => (int) $p['fila']->jugador_id,
+                'nombre'     => $nombre,
+                'minuto'     => $min === null ? null : (int) $min,
+                'de'         => $de,
+                'a'          => $a,
+                'fuente'     => $p['tm']['fuente'],
+                'flojo'      => ($p['como'] !== 0),
+            ];
+            $informe['cambios'][] = $cambio;
+            $aEscribir[(int) $p['fila']->id] = $a;
+
+            if ($p['como'] !== 0) {
+                $this->aviso('El gol de ' . $nombre . ' lo aparejé por ' .
+                    ($p['como'] === 1 ? 'minuto aproximado (±1)' : 'ser el único gol suyo en el partido')
+                    . ', no por minuto exacto: la base dice ' . ($min === null ? 'sin minuto' : $min . '\'')
+                    . ' y Transfermarkt ' . ($p['tm']['minuto'] === null ? 'sin minuto' : $p['tm']['minuto'] . '\'')
+                    . '. El tipo que le pongo es "' . $a . '" — si el minuto es de otro gol, revisalo.');
+            }
+        }
+
+        // Lo que quedó suelto de cada lado. No es error del pase: casi siempre
+        // es un gol cargado a mano que TM no tiene, o un jugador sin mapear.
+        foreach ($sinAparear as $g) {
+            $quien = $g['jugador_id'] ? $this->nombreJugador((int) $g['jugador_id']) : 'TM ' . $g['tm_id'];
+            $this->aviso('Transfermarkt tiene un gol de ' . $quien
+                . ($g['minuto'] === null ? '' : ' (' . (int) $g['minuto'] . '\')') . ' tipo "' . $g['tipo']
+                . '" que no encontré entre los goles cargados de este partido'
+                . ($g['jugador_id'] ? '' : ' (ese jugador no está mapeado en jugador_tm)')
+                . '. No lo creo: revisá las incidencias.');
+        }
+        foreach ($libres as $f) {
+            $this->aviso('El gol cargado de ' . $this->nombreJugador((int) $f->jugador_id)
+                . ($f->minuto === null ? '' : ' (' . (int) $f->minuto . '\')') . ', tipo "' . $f->tipo
+                . '", no aparece en Transfermarkt. Lo dejo como está.');
+        }
+
+        $informe['sueltos_tm']   = count($sinAparear);
+        $informe['sueltos_base'] = count($libres);
+        $informe['ok'] = true;
+
+        if ($escribir) {
+            try {
+                if (!empty($aEscribir)) {
+                    DB::transaction(function () use ($aEscribir) {
+                        foreach ($aEscribir as $golId => $tipo) {
+                            DB::table('gols')->where('id', $golId)->update(['tipo' => $tipo]);
+                        }
+                    });
+                }
+                $informe['escrito'] = true;
+
+                // La marca va aunque no haya cambiado nada: "revisado" es "ya le
+                // pregunté a TM", no "tenía algo mal". Sin esto, el partido que
+                // estaba bien volvería a salir en la lista para siempre.
+                self::marcarTiposGolRevisados([(int) $partido->id]);
+            } catch (\Exception $e) {
+                $informe['ok']    = false;
+                $informe['error'] = 'Error guardando los tipos de gol: ' . $e->getMessage();
+                Log::error('TmDetallePartido soloTiposDeGol partido ' . $partido->id . ': ' . $e->getMessage());
+            }
+        }
+
+        $informe['avisos'] = $this->avisos;
+        return $informe;
+    }
+
+    /**
      * Resuelve al pateador y al arquero de cada penal fallado, creándolos si no
      * están en la base.
      *
@@ -813,6 +1075,25 @@ class TmDetallePartido
                 ->update(['penales_revisado_at' => now()]);
         } catch (\Exception $e) {
             Log::error('marcarPenalesRevisados: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Lo mismo para el relevamiento de tipos de gol. Silencioso si la columna
+     * todavía no existe: la migración `2026_09_01_100000_add_gol_olimpico`
+     * puede no haber corrido y eso no es motivo para romper una importación.
+     */
+    public static function marcarTiposGolRevisados(array $partidoIds)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        if (empty($ids)) return;
+        if (!Schema::hasColumn('import_partidos', 'tipos_gol_revisado_at')) return;
+
+        try {
+            DB::table('import_partidos')->whereIn('partido_id', $ids)
+                ->update(['tipos_gol_revisado_at' => now()]);
+        } catch (\Exception $e) {
+            Log::error('marcarTiposGolRevisados: ' . $e->getMessage());
         }
     }
 
@@ -1313,9 +1594,19 @@ class TmDetallePartido
             return ['tipo' => self::GOL_JUGADA, 'fuente' => 'sin detallar', 'dudoso' => false];
         }
 
+        // El orden importa: se corta en la primera que matchea. El gol en
+        // contra manda sobre todo lo demás (un olimpico en contra sigue siendo
+        // en contra), y el olímpico va antes que el tiro libre y que la cabeza
+        // porque un córner directo también es una pelota parada.
+        //
+        // Ojo con 'corner' a secas: en `reason` (la asistencia) aparece en
+        // cualquier gol que venga de un córner. Acá leemos sólo `action`, pero
+        // igual pedimos que diga DIRECTO, no vaya a ser cosa.
         $reglas = [
             self::GOL_ENCONTRA  => ['own goal', 'own-goal', 'owngoal', 'eigentor', 'en propia', 'propia meta', 'autogol'],
             self::GOL_PENAL     => ['penalty', 'penal', 'elfmeter', 'spot kick', 'pen.'],
+            self::GOL_OLIMPICO  => ['direct corner', 'corner directo', 'córner directo', 'saque de esquina',
+                                    'olimpico', 'olímpico', 'eckball', 'direkter eckstoss'],
             self::GOL_TIROLIBRE => ['free kick', 'free-kick', 'freekick', 'freistoss', 'freistoß', 'tiro libre', 'direct free'],
             self::GOL_CABEZA    => ['header', 'head', 'kopfball', 'cabeza', 'de cabeza'],
         ];

@@ -17,6 +17,7 @@
             'Cabeza'     => ['rot' => 'Cabeza',    'tit' => 'De cabeza'],
             'Penal'      => ['rot' => 'Penal',     'tit' => 'De penal'],
             'Tiro_Libre' => ['rot' => 'T. Libre',  'tit' => 'De tiro libre'],
+            'Olimpico'   => ['rot' => 'Olímp.',    'tit' => 'Olímpicos: directo desde el córner'],
             'jugados'    => ['rot' => 'PJ',        'tit' => 'Partidos jugados'],
         ];
 
@@ -56,6 +57,10 @@
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['penal'], 0, ',', '.') }}</div>
             <div class="t-kpi-rot">De penal</div>
+        </div>
+        <div class="t-kpi">
+            <div class="t-kpi-num">{{ number_format($kpis['olimpico'] ?? 0, 0, ',', '.') }}</div>
+            <div class="t-kpi-rot">Olímpicos</div>
         </div>
     </div>
 
@@ -118,6 +123,7 @@
                         <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Cabeza']) }}">{{ $jugador->Cabeza ?: '' }}</a></td>
                         <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Penal']) }}">{{ $jugador->Penal ?: '' }}</a></td>
                         <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Tiro Libre']) }}">{{ $jugador->Tiro_Libre ?: '' }}</a></td>
+                        <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Olímpico']) }}">{{ $jugador->Olimpico ?: '' }}</a></td>
                         <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id]) }}">{{ $jugador->jugados }}</a></td>
                         <td>{{ $jugador->jugados ? number_format($jugador->goles / $jugador->jugados, 2, ',', '.') : '—' }}</td>
                         <td class="t-izq">

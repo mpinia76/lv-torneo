@@ -11,6 +11,7 @@
             'Cabeza'     => 'Cabeza',
             'Penal'      => 'Penal',
             'Tiro_Libre' => 'T. Libre',
+            'Olimpico'   => 'Olímp.',
             'jugados'    => 'PJ',
             'promedio'   => 'Prom.',
         ];
@@ -96,6 +97,7 @@
                         <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Cabeza']) }}">{{ $jugador->Cabeza }}</a></td>
                         <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Penal']) }}">{{ $jugador->Penal }}</a></td>
                         <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Tiro Libre']) }}">{{ $jugador->Tiro_Libre }}</a></td>
+                        <td><a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'tipo' => 'Olímpico']) }}">{{ $jugador->Olimpico }}</a></td>
                         <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id]) }}">{{ $jugador->jugados }}</a></td>
                         <td>{{ $jugador->jugados ? number_format($jugador->goles / $jugador->jugados, 2) : '0,00' }}</td>
                     </tr>

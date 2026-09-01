@@ -793,6 +793,7 @@ WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.
                 ($manual->goles_cabeza ?? 0) +
                 ($manual->goles_penal ?? 0) +
                 ($manual->goles_tiro_libre ?? 0) +
+                ($manual->goles_olimpico ?? 0) +
                 ($manual->goles_jugada ?? 0);
 
             $torneoManual->amarillas = $manual->amarillas ?? 0;
@@ -1290,7 +1291,8 @@ group by tecnico_id
         COUNT(CASE WHEN tipo = 'Jugada' THEN 1 END) AS totalJugada,
         COUNT(CASE WHEN tipo = 'Cabeza' THEN 1 END) AS totalCabeza,
         COUNT(CASE WHEN tipo = 'Penal' THEN 1 END) AS totalPenal,
-        COUNT(CASE WHEN tipo = 'Tiro Libre' THEN 1 END) AS totalTiroLibre
+        COUNT(CASE WHEN tipo = 'Tiro Libre' THEN 1 END) AS totalTiroLibre,
+        COUNT(CASE WHEN tipo = 'Olímpico' THEN 1 END) AS totalOlimpico
     FROM gols
     INNER JOIN jugadors ON gols.jugador_id = jugadors.id
     INNER JOIN partidos ON gols.partido_id = partidos.id
@@ -1311,6 +1313,7 @@ group by tecnico_id
         $totalCabeza    = $golStats->totalCabeza    ?? 0;
         $totalPenal     = $golStats->totalPenal     ?? 0;
         $totalTiroLibre = $golStats->totalTiroLibre ?? 0;
+        $totalOlimpico  = $golStats->totalOlimpico  ?? 0;
 
         // Goles provenientes de estadísticas manuales (sin partidos cargados)
         $golesManuales = 0;
@@ -1325,13 +1328,17 @@ group by tecnico_id
                 $cabeza    = $m->goles_cabeza     ?? 0;
                 $penal     = $m->goles_penal      ?? 0;
                 $tiroLibre = $m->goles_tiro_libre ?? 0;
+                // La columna es de setiembre de 2026: en una base donde la
+                // migración todavía no corrió, la propiedad no existe y vale 0.
+                $olimpico  = $m->goles_olimpico   ?? 0;
 
                 $totalJugada    += $jugada;
                 $totalCabeza    += $cabeza;
                 $totalPenal     += $penal;
                 $totalTiroLibre += $tiroLibre;
+                $totalOlimpico  += $olimpico;
 
-                $sumaFila = $jugada + $cabeza + $penal + $tiroLibre;
+                $sumaFila = $jugada + $cabeza + $penal + $tiroLibre + $olimpico;
                 $totalTodos    += $sumaFila;
                 $golesManuales += $sumaFila;
             }
@@ -1405,6 +1412,7 @@ group by tecnico_id
             'totalCabeza',
             'totalPenal',
             'totalTiroLibre',
+            'totalOlimpico',
             'partidos',
             'tipo',
             'golesManuales'

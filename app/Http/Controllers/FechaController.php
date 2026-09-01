@@ -8547,6 +8547,13 @@ private function normalizarMinuto(string $texto): int
             return 'Cabeza';
         } elseif (str_contains($texto, 'penal')) {
             return 'Penal';
+        } elseif (str_contains($texto, 'olimpico') || str_contains($texto, 'olímpico')
+            || str_contains($texto, 'saque de esquina') || str_contains($texto, 'corner directo')
+            || str_contains($texto, 'córner directo')) {
+            // Va ANTES que el tiro libre: el córner directo también es pelota
+            // parada y varias crónicas lo describen como "de tiro libre desde
+            // el córner". Si el texto dice esquina, es olímpico.
+            return 'Olímpico';
         } elseif (str_contains($texto, 'tiro libre')) {
             return 'Tiro Libre';
         }

@@ -1297,6 +1297,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             count(case when tipo='Cabeza' then 1 else NULL end) as Cabeza,
             count(case when tipo='Penal' then 1 else NULL end) as Penal,
             count(case when tipo='Tiro Libre' then 1 else NULL end) as Tiro_Libre,
+            count(case when tipo='Olímpico' then 1 else NULL end) as Olimpico,
             '' AS jugando
         FROM gols
         INNER JOIN jugadors ON gols.jugador_id = jugadors.id
@@ -1327,11 +1328,21 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $g->Cabeza     = (int) $g->Cabeza;
             $g->Penal      = (int) $g->Penal;
             $g->Tiro_Libre = (int) $g->Tiro_Libre;
+            $g->Olimpico   = (int) $g->Olimpico;
             $g->jugados    = (int) $g->jugados;
             return $g;
         });
 
         // 2) Fetch ALL manuals (only when not filtering by torneo)
+        //
+        // `goles_olimpico` es de setiembre de 2026: si la migración todavía no
+        // corrió en este entorno, la columna no está y pedirla revienta la
+        // pantalla PÚBLICA de goleadores. Por eso se pregunta antes y, si falta,
+        // se selecciona un cero con el mismo nombre: el resto del código no se
+        // entera.
+        $selOlimpico = \Schema::hasColumn('jugador_estadistica_manuals', 'goles_olimpico')
+            ? 'm.goles_olimpico' : DB::raw('0 as goles_olimpico');
+
         $manuales = collect();
         //if (!$request->query('torneoId')) {
             $manuales = DB::table('jugador_estadistica_manuals as m')
@@ -1343,6 +1354,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     'm.goles_penal',
                     'm.goles_tiro_libre',
                     'm.goles_jugada',
+                    $selOlimpico,
                     'm.goles_en_contra',
                     'equipos.escudo',
                     'equipos.id as equipo_id',
@@ -1398,6 +1410,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     'Cabeza'       => 0,
                     'Penal'        => 0,
                     'Tiro_Libre'   => 0,
+                    'Olimpico'     => 0,
                     'jugados'      => 0,
                     'escudo'       => '',
                     'jugando'      => '',
@@ -1413,7 +1426,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         // Map URL order param to actual property name (case sensitive)
         $orderField = $order;
-        $validFields = ['goles', 'Goles', 'Jugada', 'Cabeza', 'Penal', 'Tiro_Libre', 'jugados', 'jugador'];
+        $validFields = ['goles', 'Goles', 'Jugada', 'Cabeza', 'Penal', 'Tiro_Libre', 'Olimpico', 'jugados', 'jugador'];
         if (!in_array($orderField, $validFields)) {
             $orderField = 'goles';
         }
@@ -1454,6 +1467,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             'goles'  => $todos->sum('goles'),
             'cabeza' => $todos->sum('Cabeza'),
             'penal'  => $todos->sum('Penal'),
+            'olimpico' => $todos->sum('Olimpico'),
         ];
 
         $i = $offSet + 1;
@@ -1489,6 +1503,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $totalGoles = $manual->goles_cabeza
                 + $manual->goles_penal
                 + $manual->goles_tiro_libre
+                + ($manual->goles_olimpico ?? 0)
                 + $manual->goles_jugada;
 
             $g->jugados    += $manual->partidos;
@@ -1497,6 +1512,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $g->Cabeza     += $manual->goles_cabeza;
             $g->Penal      += $manual->goles_penal;
             $g->Tiro_Libre += $manual->goles_tiro_libre;
+            $g->Olimpico   += ($manual->goles_olimpico ?? 0);
 
             $eid = $manual->equipo_id;
             if (!isset($equipos[$eid])) {
@@ -4628,6 +4644,8 @@ group by jugador_id, jugador, foto, nacionalidad';
                 'm.goles_penal',
                 'm.goles_tiro_libre',
                 'm.goles_jugada',
+                \Schema::hasColumn('jugador_estadistica_manuals', 'goles_olimpico')
+                    ? 'm.goles_olimpico' : DB::raw('0 as goles_olimpico'),
                 'm.goles_en_contra',
                 'm.amarillas',
                 'm.rojas',
@@ -4775,7 +4793,7 @@ group by jugador_id, jugador, foto, nacionalidad';
         foreach ($items as $manual) {
             $j->jugados   += $manual->partidos;
             $j->goles     += $manual->goles_cabeza + $manual->goles_penal
-                + $manual->goles_tiro_libre + $manual->goles_jugada;
+                + $manual->goles_tiro_libre + ($manual->goles_olimpico ?? 0) + $manual->goles_jugada;
             $j->amarillas += $manual->amarillas;
             $j->rojas     += $manual->rojas;
             $j->recibidos += $manual->goles_recibidos;

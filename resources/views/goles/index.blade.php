@@ -102,7 +102,7 @@
                             </td>
                             <td>{{ Form::select('jugador[]',$jugadors, $gol->jugador->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
                             <td>{{Form::number('minuto[]', $gol->minuto, ['class' => 'form-control', 'style' => 'width:70px;'])}}</td>
-                            <td>{{ Form::select('tipo[]',['Cabeza'=>'Cabeza','En Contra'=>'En Contra','Jugada'=>'Jugada','Penal'=>'Penal','Tiro Libre'=>'Tiro Libre'], $gol->tipo,['class' => 'form-control']) }}</td>
+                            <td>{{ Form::select('tipo[]',['Cabeza'=>'Cabeza','En Contra'=>'En Contra','Jugada'=>'Jugada','Olímpico'=>'Olímpico','Penal'=>'Penal','Tiro Libre'=>'Tiro Libre'], $gol->tipo,['class' => 'form-control']) }}</td>
                             <td><a href="#" class="btn btn-danger removegol"><i class="glyphicon glyphicon-remove"></i></a></td>
                         </tr>
                     @endforeach

@@ -129,6 +129,22 @@ class ImportDetallesController extends Controller
                 ->distinct()->count('partido_id');
         }
 
+        // Lo mismo para los tipos de gol: el olímpico no existía hasta el
+        // 01/09/2026 y caía en «Jugada». Ver `tiposGol()`. Sólo cuentan los
+        // partidos que tienen algún gol cargado: los otros no tienen nada que
+        // corregir y no vale gastarles una llamada.
+        $sinTiposGolRevisar = 0;
+        if (Schema::hasColumn('import_partidos', 'tipos_gol_revisado_at')) {
+            $sinTiposGolRevisar = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado'])
+                ->whereNull('tipos_gol_revisado_at')
+                ->whereIn('partido_id', function ($sub) {
+                    $sub->from('gols')->select('partido_id')->distinct();
+                })
+                ->distinct()->count('partido_id');
+        }
+
         $cuerpo = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Detalle de los partidos</h1>'
             . '<p class="sub">Alineaciones, goles, tarjetas, cambios y árbitros. Cada partido es <b>una</b> llamada a la API, '
@@ -216,6 +232,11 @@ class ImportDetallesController extends Controller
                 ? '<a class="boton-sec" href="' . e(route('import_detalles.penales', array_filter(['tecnico_id' => $tecnicoId ?: null,
                     'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
                 . '">Penales fallados sin revisar (' . $sinPenalesRevisar . ')</a>'
+                : '')
+            . ($sinTiposGolRevisar
+                ? '<a class="boton-sec" href="' . e(route('import_detalles.tipos_gol', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                    'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
+                . '">Tipos de gol sin revisar (' . $sinTiposGolRevisar . ')</a>'
                 : '')
             . '</p>';
 
@@ -884,6 +905,389 @@ class ImportDetallesController extends Controller
                 . '<td class="num"><span class="id">' . e((string) $f->external_id) . '</span></td>'
                 . '<td><a href="' . e(route('penales.index', ['partidoId' => (int) $f->partido_id])) . '">Penales</a>'
                 . ($inc !== '' ? ' · ' . $inc : '') . '</td>'
+                . '</tr>';
+        }
+
+        return $out . '</tbody></table></div>';
+    }
+
+    // ═══════════════════════════ TIPOS DE GOL ═══════════════════════════
+
+    /**
+     * Relevamiento de tipos de gol sobre lo YA cargado.
+     *
+     * El caso que lo motivó: el gol olímpico. Transfermarkt lo manda como
+     * `actionId` 211 ("direct corner") y hasta el 01/09/2026 el importador no
+     * lo conocía, así que caía en «Jugada» con un aviso de "tipo de gol no
+     * reconocido". El tipo ya existe, pero un arreglo nuevo no repara lo viejo:
+     * los partidos cargados antes lo siguen teniendo mal.
+     *
+     * Cuáles son NO se puede saber desde la base —«Jugada» y «Olímpico» son la
+     * misma fila, mismo jugador y mismo minuto—, así que hay que preguntarle a
+     * Transfermarkt partido por partido: 1 llamada cada uno. Por eso el
+     * resultado queda anotado en `import_partidos.tipos_gol_revisado_at` y la
+     * lista se achica sola.
+     *
+     * De paso corrige cualquier otro tipo que esté distinto (una cabeza cargada
+     * como jugada, un tiro libre como penal). Lo único que escribe es
+     * `gols.tipo` de filas que ya existían: no agrega ni borra goles, no crea
+     * jugadores y no toca nada más del partido.
+     */
+    public function tiposGol(Request $request)
+    {
+        set_time_limit(0);
+
+        $tecnicoId = (int) $request->get('tecnico_id', 0);
+        $comp      = trim((string) $request->get('comp', ''));
+        $ronda     = trim((string) $request->get('ronda', ''));
+        $n         = max(1, min(50, (int) $request->get('n', 10)));
+        $correr    = (string) $request->get('correr', '0') === '1';
+        // Pasada barata: sólo los partidos que tienen algún gol cargado como
+        // «Jugada», que es donde cayeron los olímpicos. Deja afuera los que sólo
+        // pueden tener otro tipo de error, más raro.
+        $soloJugada = (string) $request->get('solo_jugada', '0') === '1';
+        // Un partido puntual, aunque ya esté marcado. Para volver sobre uno que
+        // quedó con un aviso, sin desmarcar nada a mano.
+        $unPartido = (int) $request->get('partido_id', 0);
+
+        $filtros = array_filter(['tecnico_id' => $tecnicoId ?: null,
+            'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', $filtros)) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Tipos de gol de lo ya cargado</h1>';
+
+        if (!Schema::hasColumn('import_partidos', 'tipos_gol_revisado_at')) {
+            return $this->pagina('Tipos de gol', $cuerpo
+                . '<div class="err-box">Falta la columna <code>import_partidos.tipos_gol_revisado_at</code>. '
+                . 'Corré la migración <code>2026_09_01_100000_add_gol_olimpico</code> '
+                . '(o el SQL suelto <code>database/sql/gol_olimpico.sql</code>) y volvé. Esa migración es la que '
+                . 'agrega el tipo <b>Olímpico</b> al enum de <code>gols</code>: sin ella no hay dónde guardar la '
+                . 'corrección, y sin la columna no hay dónde anotar qué partidos ya se preguntaron.</div>');
+        }
+
+        $cuerpo .= '<p class="sub">Hasta el 01/09/2026 el <b>gol olímpico</b> no existía como tipo: Transfermarkt lo '
+            . 'manda como <code>direct corner</code> (actionId 211) y el importador lo cargaba como <b>Jugada</b>. '
+            . 'Cuáles son no se puede saber desde la base —«Jugada» y «Olímpico» son la misma fila—, así que hay que '
+            . 'preguntarlo: es <b>1 llamada por partido</b>. Este pase pregunta y escribe <b>sólo</b> el '
+            . '<code>tipo</code> de goles que ya están cargados —no agrega ni borra goles, no toca la alineación, '
+            . 'los cambios ni las tarjetas, y no crea jugadores— y deja el partido marcado, así la llamada se paga '
+            . 'una sola vez.</p>'
+            . '<p class="sub">Ya que se paga la llamada, se controlan <b>todos</b> los tipos, no sólo el olímpico: '
+            . 'cualquier gol que la base tenga distinto de lo que dice Transfermarkt se corrige, y al final de la '
+            . 'tanda queda el cruce completo —lo que decía la base contra lo que dice TM— para ver si hay algún '
+            . 'error sistemático.</p>'
+            . '<p class="sub">Un gol que la base tiene como <b>En Contra</b> y Transfermarkt no (o al revés) '
+            . '<b>no se toca</b>: eso cambia de equipo el gol y, si el apareo estuviera mal, no se notaría. Esos '
+            . 'casos salen como aviso para mirarlos a mano. Los partidos sin ningún gol cargado no entran en la '
+            . 'lista: no hay nada que corregir y no vale la pena gastarles una llamada.</p>';
+
+        $base = function () use ($tecnicoId, $comp, $ronda, $soloJugada) {
+            $q = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado'])
+                ->whereNull('tipos_gol_revisado_at')
+                ->whereIn('partido_id', function ($sub) {
+                    $sub->from('gols')->select('partido_id')->distinct();
+                });
+            if ($soloJugada) {
+                $q->whereIn('partido_id', function ($sub) {
+                    $sub->from('gols')->select('partido_id')->where('tipo', 'Jugada')->distinct();
+                });
+            }
+            if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+            if ($comp !== '')  $q->where('competencia_external_id', $comp);
+            if ($ronda !== '') $q->where('ronda', $ronda);
+            return $q;
+        };
+
+        $pendientes = (clone $base())->distinct()->count('partido_id');
+        $revisados  = DB::table('import_partidos')->whereNotNull('tipos_gol_revisado_at')
+            ->distinct()->count('partido_id');
+
+        $hechos = 0; $fallaron = 0; $llamadas = 0; $corregidos = 0; $conCambios = 0; $olimpicos = 0;
+        $detalle = '';
+        // Control de TODOS los tipos de la tanda: qué decía la base y qué dice
+        // Transfermarkt, gol por gol. Se acumula acá y se muestra abajo.
+        $matriz = []; $sueltosTm = 0; $sueltosBase = 0;
+
+        if ($correr && ($pendientes || $unPartido)) {
+            $lote = $unPartido
+                ? DB::table('import_partidos')->where('partido_id', $unPartido)
+                    ->whereNotNull('external_id')->orderByDesc('id')->limit(1)->get()
+                : (clone $base())->orderByDesc('dia')->limit($n)->get();
+            $imp = new TmDetallePartido;
+            $fechasLote = $this->mapaFechas($lote->pluck('partido_id')->all());
+
+            foreach ($lote as $f) {
+                $r = $imp->soloTiposDeGol((int) $f->partido_id, (string) $f->external_id);
+                $llamadas += (int) $r['llamadas'];
+
+                $etiqueta = e($f->club_nombre . ' vs ' . $f->rival_nombre) . ' <span class="id">'
+                    . e(substr((string) $f->dia, 0, 10)) . ' · partido #' . (int) $f->partido_id . '</span>';
+                $inc = $this->linkIncidencias(isset($fechasLote[(int) $f->partido_id])
+                    ? $fechasLote[(int) $f->partido_id] : null);
+
+                if (!$r['escrito']) {
+                    $fallaron++;
+                    $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
+                } else {
+                    $hechos++;
+                    $olimpicos += (int) $r['olimpicos'];
+                    foreach ((isset($r['matriz']) ? $r['matriz'] : []) as $clave => $cuantos) {
+                        $matriz[$clave] = (isset($matriz[$clave]) ? $matriz[$clave] : 0) + $cuantos;
+                    }
+                    $sueltosTm   += (int) (isset($r['sueltos_tm']) ? $r['sueltos_tm'] : 0);
+                    $sueltosBase += (int) (isset($r['sueltos_base']) ? $r['sueltos_base'] : 0);
+                    if (!empty($r['cambios'])) {
+                        $conCambios++;
+                        $corregidos += count($r['cambios']);
+                        $qué = [];
+                        foreach ($r['cambios'] as $c) {
+                            $qué[] = e($c['nombre'])
+                                . ($c['minuto'] === null ? '' : ' ' . $c['minuto'] . '\'')
+                                . ' <span class="sub">' . e($c['de']) . ' →</span> <b>' . e($c['a']) . '</b>'
+                                . ($c['fuente'] !== '' ? ' <span class="id">(' . e($c['fuente']) . ')</span>' : '');
+                        }
+                        $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . ' — '
+                            . implode(' · ', $qué)
+                            . ($inc !== '' ? ' · ' . $inc : '') . '</div>';
+                    } else {
+                        $detalle .= '<div class="sub">· ' . $etiqueta . ' — los ' . (int) $r['goles_base']
+                            . ' gol(es) ya estaban bien'
+                            . ((int) $r['olimpicos'] ? ' (' . (int) $r['olimpicos'] . ' olímpico/s)' : '') . '</div>';
+                    }
+                }
+                foreach ($r['avisos'] as $a) {
+                    $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
+                }
+            }
+
+            $pendientes = (clone $base())->distinct()->count('partido_id');
+        }
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($pendientes, 'Sin revisar', $pendientes ? 'warn' : 'ok')
+            . $this->card($revisados + $hechos, 'Ya revisados', 'ok')
+            . ($correr ? $this->card($hechos, 'Revisados ahora', 'ok') : '')
+            . ($correr ? $this->card($corregidos, 'Goles corregidos', $corregidos ? 'warn' : '') : '')
+            . ($correr ? $this->card($olimpicos, 'Olímpicos', $olimpicos ? 'warn' : '') : '')
+            . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
+            . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
+            . '</div>';
+
+        if (!$pendientes) {
+            $cuerpo .= '<div class="ok-box">No queda ningún partido sin revisar'
+                . (!empty($filtros) ? ' con este filtro' : '') . ($soloJugada ? ' entre los que tienen goles de Jugada' : '')
+                . '.</div>';
+        } else {
+            $params = $filtros; $params['n'] = $n; $params['correr'] = 1;
+            if ($soloJugada) $params['solo_jugada'] = 1;
+            $cuerpo .= '<p class="acciones">'
+                . '<a class="boton" href="' . e(route('import_detalles.tipos_gol', $params)) . '">'
+                . 'Revisar los ' . min($n, $pendientes) . ' más nuevos</a>'
+                . ' <span class="sub">' . min($n, $pendientes) . ' llamadas · quedan <b>' . $pendientes . '</b></span>';
+
+            foreach ([25, 50] as $otro) {
+                if ($otro === $n || $otro > $pendientes) continue;
+                $p2 = $params; $p2['n'] = $otro;
+                $cuerpo .= ' <a class="boton-sec" href="' . e(route('import_detalles.tipos_gol', $p2)) . '">'
+                    . 'de a ' . $otro . '</a>';
+            }
+            $cuerpo .= '</p>';
+
+            $p3 = $filtros; $p3['n'] = $n;
+            if (!$soloJugada) $p3['solo_jugada'] = 1;
+            $cuerpo .= '<p class="acciones"><a class="boton-sec" href="' . e(route('import_detalles.tipos_gol', $p3)) . '">'
+                . ($soloJugada ? 'Mirar todos los partidos con goles' : 'Sólo los que tienen goles de «Jugada»')
+                . '</a> <span class="sub">'
+                . ($soloJugada
+                    ? 'ahora estás viendo sólo los que pueden tener un olímpico escondido'
+                    : 'es la pasada barata: el olímpico viejo siempre quedó cargado como Jugada')
+                . '</span></p>'
+                . '<p class="sub">Conviene filtrar por competencia y hacer primero los torneos que te importan. '
+                . 'Un partido que estaba todo bien también queda marcado, así que nunca se pregunta dos veces.</p>';
+        }
+
+        $cuerpo .= $this->bloqueMatrizTipos($matriz, $sueltosTm, $sueltosBase);
+
+        if ($detalle !== '') {
+            $cuerpo .= '<h2>Lo que hizo esta tanda</h2><div class="diag">' . $detalle . '</div>'
+                . '<p class="sub">Si alguna línea tiene un aviso, arreglá lo que haga falta y volvé a pasar '
+                . '<b>ese</b> partido con <code>?partido_id=NNN&amp;correr=1</code>: eso lo rehace aunque ya esté '
+                . 'marcado, y no toca a los demás.</p>';
+        }
+
+        $cuerpo .= $this->bloqueOlimpicos();
+        $cuerpo .= $this->bloquePendientesTiposGol($base());
+
+        return $this->pagina('Tipos de gol', $cuerpo);
+    }
+
+    /**
+     * Control de TODOS los tipos de gol de la tanda, no sólo del olímpico.
+     *
+     * Filas = lo que decía la base, columnas = lo que dice Transfermarkt. La
+     * diagonal es lo que ya estaba bien; todo lo de afuera es una diferencia.
+     * Sirve para ver de un vistazo si hay un error sistemático —cabezas
+     * cargadas como jugada, tiros libres como penal— y no sólo el gol que
+     * fuimos a buscar.
+     *
+     * Las diferencias que tocan «En Contra» se pintan distinto: esas NO se
+     * escriben (cambian de equipo el gol), quedan para revisar a mano.
+     */
+    private function bloqueMatrizTipos(array $matriz, $sueltosTm, $sueltosBase)
+    {
+        if (empty($matriz) && !$sueltosTm && !$sueltosBase) return '';
+
+        // Orden fijo, para que la tabla se lea siempre igual. Si alguna vez
+        // aparece un tipo nuevo, se agrega al final en lugar de desaparecer.
+        $orden = ['Jugada', 'Cabeza', 'Penal', 'Tiro Libre', 'Olímpico', 'En Contra'];
+        $vistos = [];
+        foreach ($matriz as $clave => $n) {
+            $partes = explode('||', $clave);
+            $vistos[$partes[0]] = true;
+            $vistos[isset($partes[1]) ? $partes[1] : ''] = true;
+        }
+        $tipos = [];
+        foreach ($orden as $t) if (isset($vistos[$t])) $tipos[] = $t;
+        foreach (array_keys($vistos) as $t) if ($t !== '' && !in_array($t, $tipos, true)) $tipos[] = $t;
+
+        $valor = function ($de, $a) use ($matriz) {
+            $k = $de . '||' . $a;
+            return isset($matriz[$k]) ? (int) $matriz[$k] : 0;
+        };
+
+        $iguales = 0; $distintos = 0; $sinTocar = 0;
+        foreach ($matriz as $clave => $n) {
+            $partes = explode('||', $clave);
+            $de = $partes[0]; $a = isset($partes[1]) ? $partes[1] : '';
+            if ($de === $a) { $iguales += (int) $n; continue; }
+            $distintos += (int) $n;
+            if ($de === 'En Contra' || $a === 'En Contra') $sinTocar += (int) $n;
+        }
+        $total = $iguales + $distintos;
+
+        $out = '<h2>Control de tipos de esta tanda</h2>'
+            . '<p class="sub">Los <b>' . $total . '</b> goles que se pudieron aparear, cruzados: '
+            . 'la fila es lo que tenía la base y la columna lo que dice Transfermarkt. '
+            . '<b>' . $iguales . '</b> coincidían y <b>' . $distintos . '</b> no'
+            . ($sinTocar ? ', de los cuales ' . $sinTocar . ' toca(n) «En Contra» y quedaron sin corregir '
+                . '(cambia de equipo el gol: van a mano)' : '')
+            . '. Lo de la diagonal ya estaba bien; lo de afuera es lo que este pase corrigió.</p>';
+
+        $out .= '<div class="scroll"><table><thead><tr>'
+            . '<th>Base ╲ Transfermarkt</th>';
+        foreach ($tipos as $t) $out .= '<th>' . e($t) . '</th>';
+        $out .= '<th>Total</th></tr></thead><tbody>';
+
+        foreach ($tipos as $de) {
+            $fila = ''; $totalFila = 0;
+            foreach ($tipos as $a) {
+                $n = $valor($de, $a);
+                $totalFila += $n;
+                if ($n === 0) {
+                    $fila .= '<td class="num gris">·</td>';
+                } elseif ($de === $a) {
+                    $fila .= '<td class="num gris">' . $n . '</td>';
+                } elseif ($de === 'En Contra' || $a === 'En Contra') {
+                    $fila .= '<td class="num err"><b>' . $n . '</b></td>';
+                } else {
+                    $fila .= '<td class="num warn"><b>' . $n . '</b></td>';
+                }
+            }
+            if ($totalFila === 0) continue;   // un tipo que no apareció de este lado no ocupa fila
+            $out .= '<tr><th>' . e($de) . '</th>' . $fila . '<td class="num">' . $totalFila . '</td></tr>';
+        }
+
+        $out .= '<tr><th>Total</th>';
+        foreach ($tipos as $a) {
+            $n = 0;
+            foreach ($tipos as $de) $n += $valor($de, $a);
+            $out .= '<td class="num">' . $n . '</td>';
+        }
+        $out .= '<td class="num"><b>' . $total . '</b></td></tr>';
+        $out .= '</tbody></table></div>';
+
+        $out .= '<p class="sub">Referencia: <span class="gris">gris</span> = coincidían · '
+            . '<span class="warn"><b>ámbar</b></span> = se corrigió · '
+            . '<span class="err"><b>rojo</b></span> = toca «En Contra», no se tocó.'
+            . (($sueltosTm || $sueltosBase)
+                ? ' Además quedaron afuera del cruce <b>' . (int) $sueltosTm . '</b> gol(es) que Transfermarkt '
+                . 'tiene y no encontré cargados, y <b>' . (int) $sueltosBase . '</b> cargado(s) que Transfermarkt '
+                . 'no tiene: los detalla el listado de abajo, uno por uno.'
+                : '')
+            . '</p>';
+
+        return $out;
+    }
+
+    /**
+     * Los olímpicos que hay en la base hoy. Es el resultado del relevamiento:
+     * la lista que antes no se podía hacer porque el tipo no existía.
+     */
+    private function bloqueOlimpicos()
+    {
+        $filas = DB::table('gols')
+            ->join('jugadors', 'gols.jugador_id', '=', 'jugadors.id')
+            ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            ->join('partidos', 'gols.partido_id', '=', 'partidos.id')
+            ->leftJoin('equipos as el', 'partidos.equipol_id', '=', 'el.id')
+            ->leftJoin('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
+            ->where('gols.tipo', 'Olímpico')
+            ->select('gols.id', 'gols.minuto', 'gols.partido_id', 'partidos.dia', 'partidos.fecha_id',
+                'personas.name as jugador', 'jugadors.id as jugador_id',
+                'el.nombre as local', 'ev.nombre as visitante')
+            ->orderByDesc('partidos.dia')->limit(100)->get();
+
+        $total = DB::table('gols')->where('tipo', 'Olímpico')->count();
+
+        if ($filas->isEmpty()) {
+            return '<h2>Olímpicos cargados</h2><div class="diag">Todavía no hay ninguno. '
+                . 'Aparecen acá a medida que el relevamiento los encuentra.</div>';
+        }
+
+        $out = '<h2>Olímpicos cargados <span class="sub">(' . $total . ')</span></h2>'
+            . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Partido</th><th>Jugador</th>'
+            . '<th>Min.</th><th></th></tr></thead><tbody>';
+
+        foreach ($filas as $g) {
+            $inc = $this->linkIncidencias($g->fecha_id);
+            $out .= '<tr>'
+                . '<td class="num">' . e(substr((string) $g->dia, 0, 10)) . '</td>'
+                . '<td>' . e($g->local . ' vs ' . $g->visitante)
+                . ' <span class="id">#' . (int) $g->partido_id . '</span></td>'
+                . '<td><a href="' . e(route('jugadores.ver', ['jugadorId' => (int) $g->jugador_id])) . '">'
+                . e((string) $g->jugador) . '</a></td>'
+                . '<td class="num">' . ($g->minuto === null ? '—' : (int) $g->minuto . '\'') . '</td>'
+                . '<td>' . $inc . '</td>'
+                . '</tr>';
+        }
+
+        return $out . '</tbody></table></div>'
+            . ($total > count($filas) ? '<p class="sub">Se muestran los ' . count($filas) . ' más nuevos.</p>' : '');
+    }
+
+    /** Los próximos que se van a revisar, para saber por dónde va la cosa. */
+    private function bloquePendientesTiposGol($consulta)
+    {
+        $filas = (clone $consulta)->orderByDesc('dia')->limit(40)->get();
+        if ($filas->isEmpty()) return '';
+
+        $fechas = $this->mapaFechas($filas->pluck('partido_id')->all());
+
+        $out = '<h2>Los próximos <span class="sub">(' . count($filas) . ' de los más nuevos)</span></h2>'
+            . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Competencia</th><th>Partido</th>'
+            . '<th>gameId</th><th></th></tr></thead><tbody>';
+
+        foreach ($filas as $f) {
+            $inc = $this->linkIncidencias(isset($fechas[(int) $f->partido_id]) ? $fechas[(int) $f->partido_id] : null);
+            $out .= '<tr>'
+                . '<td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
+                . '<td>' . e((string) $f->competencia_nombre) . '</td>'
+                . '<td>' . e($f->club_nombre . ' vs ' . $f->rival_nombre)
+                . ' <span class="id">#' . (int) $f->partido_id . '</span></td>'
+                . '<td class="num"><span class="id">' . e((string) $f->external_id) . '</span></td>'
+                . '<td>' . $inc . '</td>'
                 . '</tr>';
         }
 

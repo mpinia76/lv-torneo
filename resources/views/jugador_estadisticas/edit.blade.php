@@ -124,6 +124,7 @@
                     'goles_cabeza' => 'Cabeza',
                     'goles_penal' => 'Penal',
                     'goles_tiro_libre' => 'Tiro Libre',
+                    'goles_olimpico' => 'Olímpico',
                     'goles_en_contra' => 'En contra'
                 ] as $field => $label)
 

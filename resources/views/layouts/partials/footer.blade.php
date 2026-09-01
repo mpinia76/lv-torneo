@@ -264,7 +264,7 @@
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
             '<td>'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
-            '<td>'+'{{ Form::select('tipo[]',['Cabeza'=>'Cabeza','En Contra'=>'En Contra','Jugada'=>'Jugada','Penal'=>'Penal','Tiro Libre'=>'Tiro Libre'], '',['class' => 'form-control']) }}'+'</td>'+
+            '<td>'+'{{ Form::select('tipo[]',['Cabeza'=>'Cabeza','En Contra'=>'En Contra','Jugada'=>'Jugada','Olímpico'=>'Olímpico','Penal'=>'Penal','Tiro Libre'=>'Tiro Libre'], '',['class' => 'form-control']) }}'+'</td>'+
             '<td><a href="#" class="btn btn-danger removegol"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
         $('#cuerpogol').append(tr);

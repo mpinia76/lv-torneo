@@ -22,6 +22,7 @@ class JugadorEstadisticaManual extends Model
         'goles_en_contra',
         'goles_tiro_libre',
         'goles_jugada',
+        'goles_olimpico',
         'amarillas',
         'rojas',
         'penales_errados',

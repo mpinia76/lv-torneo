@@ -299,7 +299,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
         $arrpartidos = substr($arrpartidos, 0, -1);//quito última coma
 
         $sql = 'SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as foto
-, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
+, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre, count( case when tipo=\'Olímpico\' then 1 else NULL end) as  Olimpico
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id
@@ -409,7 +409,7 @@ WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN (
 
         }
         $sql = 'SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo, personas.foto, personas.nacionalidad, "0" as jugados
-, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre
+, count( case when tipo=\'Cabeza\' then 1 else NULL end) as  Cabeza, count( case when tipo=\'Penal\' then 1 else NULL end) as  Penal, count( case when tipo=\'Tiro Libre\' then 1 else NULL end) as  Tiro_Libre, count( case when tipo=\'Olímpico\' then 1 else NULL end) as  Olimpico
 FROM gols
 INNER JOIN jugadors ON gols.jugador_id = jugadors.id
 INNER JOIN personas ON jugadors.persona_id = personas.id

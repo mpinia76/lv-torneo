@@ -58,6 +58,7 @@
             <th>G. Cabeza</th>
             <th>G. Penal</th>
             <th>G. T. Libre</th>
+            <th>G. Olímpico</th>
             <th>G. en contra</th>
             <th>T. amarillas</th>
             <th>T. rojas</th>
@@ -89,6 +90,7 @@
                     <td>{{ $stat->goles_cabeza }}</td>
                     <td>{{ $stat->goles_penal }}</td>
                     <td>{{ $stat->goles_tiro_libre }}</td>
+                    <td>{{ $stat->goles_olimpico }}</td>
                     <td>{{ $stat->goles_en_contra }}</td>
                     <td>{{ $stat->amarillas }}</td>
                     <td>{{ $stat->rojas }}</td>

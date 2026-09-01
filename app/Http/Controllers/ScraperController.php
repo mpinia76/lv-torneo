@@ -1769,7 +1769,9 @@ class ScraperController extends Controller
             'Penalti'                            => 'penal',
             'Rebote de penalti'                  => 'jugada',
             'Libre directo'                      => 'tiro_libre',
-            'Gol directo de un saque de esquina' => 'tiro_libre',
+            // Hasta el 01/09/2026 el olímpico caía acá adentro del tiro libre.
+            // Ahora tiene tipo propio, igual que en `gols.tipo`.
+            'Gol directo de un saque de esquina' => 'olimpico',
             // El resto cae en 'jugada' por default
         ];
 
@@ -1910,6 +1912,7 @@ class ScraperController extends Controller
                     'jugada'      => 0,
                     'penal'       => 0,
                     'tiro_libre'  => 0,
+                    'olimpico'    => 0,
                 ];
             }
 

@@ -87,6 +87,16 @@
                 <path d="M22.2 7.9 18.6 5.6 21.9 3.6Z" fill="currentColor"/>
             </symbol>
 
+            {{-- Gol olímpico: el banderín del córner y la pelota que entra sola.
+                 Mismo lenguaje que ev-tirolibre (arco punteado = trayectoria). --}}
+            <symbol id="ev-olimpico" viewBox="0 0 24 24">
+                <g transform="translate(9.6,9.4) scale(0.58)"><use href="#ev-ball"/></g>
+                <path d="M4 21.4V3.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                <path d="M4.9 3.5 12.4 6.0 4.9 8.6Z" fill="currentColor"/>
+                <path d="M5.6 10.6C8.4 5.2 16.2 5.6 18.6 10.0" fill="none" stroke="currentColor"
+                      stroke-width="1.7" stroke-linecap="round" stroke-dasharray="2.6 2.3"/>
+            </symbol>
+
             <symbol id="ev-errado" viewBox="0 0 24 24">
                 <g color="#98A0A2"><use href="#ev-ball"/></g>
                 <path d="M5 19 19 5" fill="none" style="stroke:var(--t-surface,#fff)"
@@ -331,6 +341,8 @@
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Olímpico')
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
@@ -462,6 +474,8 @@
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Olímpico')
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
@@ -597,6 +611,8 @@
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Olímpico')
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else
@@ -724,6 +740,8 @@
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                    @elseif($g[0]=='Olímpico')
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
                                                         <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
                                                     @else

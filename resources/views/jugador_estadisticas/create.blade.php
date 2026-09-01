@@ -167,6 +167,10 @@
                     <input type="number" name="goles_tiro_libre" class="form-control" value="{{ old('goles_tiro_libre') }}">
                 </div>
                 <div class="form-group col-md-2">
+                    <label>Olímpico</label>
+                    <input type="number" name="goles_olimpico" class="form-control" value="{{ old('goles_olimpico') }}">
+                </div>
+                <div class="form-group col-md-2">
                     <label>En contra</label>
                     <input type="number" name="goles_en_contra" class="form-control" value="{{ old('goles_en_contra') }}">
                 </div>
@@ -468,6 +472,7 @@
             document.querySelector('[name="goles_jugada"]').value = item.goles_jugada ?? 0;
             document.querySelector('[name="goles_penal"]').value = 0;
             document.querySelector('[name="goles_tiro_libre"]').value = 0;
+            document.querySelector('[name="goles_olimpico"]').value = 0;
 
             if (item.torneo_logo) {
                 document.querySelector('[name="torneo_logo_guardado"]').value = item.torneo_logo;
@@ -518,7 +523,7 @@
             <table class="table table-sm table-bordered">
                 <thead><tr>
                     <th>Temp.</th><th>Competición</th><th>Club</th><th>Total</th>
-                    <th>Cabeza</th><th>Jugada</th><th>Penal</th><th>T. Libre</th><th></th>
+                    <th>Cabeza</th><th>Jugada</th><th>Penal</th><th>T. Libre</th><th>Olímp.</th><th></th>
                 </tr></thead><tbody>`;
 
                 data.forEach(g => {
@@ -538,6 +543,7 @@
                     <td>${g.jugada}</td>
                     <td>${g.penal}</td>
                     <td>${g.tiro_libre}</td>
+                    <td>${g.olimpico ?? 0}</td>
                     <td><button class="btn btn-success btn-sm" onclick='usarGolesTM(${JSON.stringify(g)})'>Usar</button></td>
                 </tr>`;
                 });
@@ -680,6 +686,8 @@
                                 <input type="number" class="form-control form-control-sm f-goles_penal" value=""></div>
                             <div class="form-group col-md-1"><label class="small mb-0">T.Libre</label>
                                 <input type="number" class="form-control form-control-sm f-goles_tiro_libre" value=""></div>
+                            <div class="form-group col-md-1"><label class="small mb-0">Olímp.</label>
+                                <input type="number" class="form-control form-control-sm f-goles_olimpico" value=""></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Contra</label>
                                 <input type="number" class="form-control form-control-sm f-goles_en_contra" value="${vacioSiCero(c.goles_en_contra)}"></div>
                             <div class="form-group col-md-1"><label class="small mb-0">Amar.</label>
@@ -885,6 +893,7 @@
                         + '<th class="text-center">Jugada</th>'
                         + '<th class="text-center">Penal</th>'
                         + '<th class="text-center">T. Libre</th>'
+                        + '<th class="text-center">Olímp.</th>'
                         + '</tr></thead><tbody>';
 
                     data.forEach(r => {
@@ -897,6 +906,7 @@
                     <td class="text-center">${r.jugada || ''}</td>
                     <td class="text-center">${r.penal  || ''}</td>
                     <td class="text-center">${r.tiro_libre || ''}</td>
+                    <td class="text-center">${r.olimpico || ''}</td>
                 </tr>`;
                     });
 
@@ -918,6 +928,7 @@
             document.querySelector('[name="goles_jugada"]').value = goles.jugada ?? 0;
             document.querySelector('[name="goles_penal"]').value = goles.penal ?? 0;
             document.querySelector('[name="goles_tiro_libre"]').value = goles.tiro_libre ?? 0;
+            document.querySelector('[name="goles_olimpico"]').value = goles.olimpico ?? 0;
         }
 
         function excluirEquipo(nombre, btn) {
@@ -988,7 +999,7 @@
             let campos = [
                 'torneo_nombre', 'equipo_id', 'tipo', 'ambito',
                 'partidos', 'posicion',
-                'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_en_contra',
+                'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_olimpico', 'goles_en_contra',
                 'amarillas', 'rojas',
                 'penales_errados', 'penales_atajados',
                 'goles_recibidos', 'vallas_invictas', 'penales_atajo', 'torneo_logo',

@@ -225,7 +225,7 @@ class JugadorEstadisticaManualController extends Controller
         $campos = [
             'equipo_id', 'torneo_nombre', 'tipo', 'ambito',
             'posicion', 'partidos',
-            'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_en_contra',
+            'goles_cabeza', 'goles_jugada', 'goles_penal', 'goles_tiro_libre', 'goles_olimpico', 'goles_en_contra',
             'amarillas', 'rojas',
             'penales_errados', 'penales_atajados',
             'goles_recibidos', 'vallas_invictas', 'penales_atajo',

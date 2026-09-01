@@ -48,11 +48,12 @@
                                             'Cabeza' => ['label' => 'Cabeza', 'count' => $totalCabeza],
                                             'Penal' => ['label' => 'Penal', 'count' => $totalPenal],
                                             'Tiro Libre' => ['label' => 'Tiro Libre', 'count' => $totalTiroLibre],
+                                            'Olímpico' => ['label' => 'Olímpico', 'count' => $totalOlimpico],
                                         ];
                                     @endphp
 
                                     @foreach($tipos as $tipoKey => $info)
-                                        <div class="col-6 col-md-2">
+                                        <div class="col-6 col-md-2 mb-2">
                                             @if($torneo)
                                                 <a href="{{ route('jugadores.goles', ['jugadorId' => $jugador->id, 'torneoId' => $torneo->id, 'tipo' => $tipoKey]) }}"
                                                    class="btn btn-sm w-100 {{ $tipo === $tipoKey ? 'btn-success' : 'btn-outline-success' }}">
@@ -120,7 +121,7 @@
         if (pie_basic_element) {
             var pie_basic = echarts.init(pie_basic_element);
             pie_basic.setOption({
-                color: ['#26eb0e','#e5cf0d','#f90a23','#ffb980'],
+                color: ['#26eb0e','#e5cf0d','#f90a23','#ffb980','#3aa0ff'],
                 tooltip: {
                     trigger: 'item',
                     formatter: "{b}: {c} ({d}%)"
@@ -128,7 +129,7 @@
                 legend: {
                     bottom: '0%',
                     left: 'center',
-                    data: ['Jugada','Cabeza','Penal','Tiro Libre']
+                    data: ['Jugada','Cabeza','Penal','Tiro Libre','Olímpico']
                 },
                 series: [{
                     name: 'Goles',
@@ -139,7 +140,8 @@
                         {value: {{ $totalJugada }}, name: 'Jugada'},
                         {value: {{ $totalCabeza }}, name: 'Cabeza'},
                         {value: {{ $totalPenal }}, name: 'Penal'},
-                        {value: {{ $totalTiroLibre }}, name: 'Tiro Libre'}
+                        {value: {{ $totalTiroLibre }}, name: 'Tiro Libre'},
+                        {value: {{ $totalOlimpico }}, name: 'Olímpico'}
                     ]
                 }]
             });
