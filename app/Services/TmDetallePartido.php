@@ -1594,6 +1594,21 @@ class TmDetallePartido
             return ['tipo' => self::GOL_JUGADA, 'fuente' => 'sin detallar', 'dudoso' => false];
         }
 
+        // ANTES que nada, el rebote. "Penalty rebound" contiene "penalty", así
+        // que cualquier regla que busque «penal» se lo lleva puesto — y un gol
+        // de rebote NO es un gol de penal: el penal lo atajaron o pegó en el
+        // palo y la jugada siguió. Pasó con M. Fernández en Sarmiento (Junín) –
+        // Independiente Rivadavia del 03/08/2026 (partido #24548), que quedó
+        // cargado como Penal. El scraper de estadísticas manuales ya lo tenía
+        // bien ('Rebote de penalti' => 'jugada' en ScraperController); acá
+        // faltaba.
+        $rebotes = ['rebound', 'rebote', 'nachschuss', 'abpraller', 'abstauber'];
+        foreach ($rebotes as $aguja) {
+            if (mb_strpos($txt, $aguja) !== false) {
+                return ['tipo' => self::GOL_JUGADA, 'fuente' => $txt, 'dudoso' => false];
+            }
+        }
+
         // El orden importa: se corta en la primera que matchea. El gol en
         // contra manda sobre todo lo demás (un olimpico en contra sigue siendo
         // en contra), y el olímpico va antes que el tiro libre y que la cabeza

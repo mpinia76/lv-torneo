@@ -1000,6 +1000,36 @@ class ImportDetallesController extends Controller
             return $q;
         };
 
+        // ── Volver a preguntar lo ya revisado ─────────────────────────────
+        // Un arreglo nuevo no repara lo viejo. Cuando el mapeo de tipos aprende
+        // algo —el 01/09/2026 aprendió que "penalty rebound" es Jugada y no
+        // Penal—, los partidos que ya se revisaron siguen con lo que se les
+        // escribió antes. Esto les saca la marca para que vuelvan a la cola.
+        // No gasta ni una llamada por sí solo: sólo repone la lista.
+        $desmarcar = trim((string) $request->get('desmarcar', ''));
+
+        $revisadosQ = function ($soloPenal = false) use ($tecnicoId, $comp, $ronda) {
+            $q = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado'])
+                ->whereNotNull('tipos_gol_revisado_at');
+            if ($soloPenal) {
+                $q->whereIn('partido_id', function ($s) {
+                    $s->from('gols')->select('partido_id')->where('tipo', 'Penal')->distinct();
+                });
+            }
+            if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+            if ($comp !== '')  $q->where('competencia_external_id', $comp);
+            if ($ronda !== '') $q->where('ronda', $ronda);
+            return $q;
+        };
+
+        $desmarcados = 0;
+        if ($desmarcar === 'penal' || $desmarcar === 'todos') {
+            $desmarcados = (clone $revisadosQ($desmarcar === 'penal'))->distinct()->count('partido_id');
+            $revisadosQ($desmarcar === 'penal')->update(['tipos_gol_revisado_at' => null]);
+        }
+
         $pendientes = (clone $base())->distinct()->count('partido_id');
         $revisados  = DB::table('import_partidos')->whereNotNull('tipos_gol_revisado_at')
             ->distinct()->count('partido_id');
@@ -1277,6 +1307,35 @@ class ImportDetallesController extends Controller
                 . '</span></p>'
                 . '<p class="sub">Conviene filtrar por competencia y hacer primero los torneos que te importan. '
                 . 'Un partido que estaba todo bien también queda marcado, así que nunca se pregunta dos veces.</p>';
+        }
+
+        // ── Volver a preguntar: los botones ───────────────────────────────
+        if ($desmarcados) {
+            $cuerpo .= '<div class="ok-box"><b>' . $desmarcados . ' partido(s) volvieron a la cola.</b> '
+                . 'Se les borró la marca de revisado, así que la próxima tanda los vuelve a preguntar con el '
+                . 'mapeo de tipos como está hoy. Eso son ' . $desmarcados . ' llamadas: hacelas cuando quieras.</div>';
+        }
+
+        $reRevisables    = (clone $revisadosQ(false))->distinct()->count('partido_id');
+        $reRevisablesPen = (clone $revisadosQ(true))->distinct()->count('partido_id');
+
+        if ($reRevisables) {
+            $cuerpo .= '<h2>Volver a preguntar lo ya revisado</h2>'
+                . '<p class="sub">Un arreglo nuevo no repara lo viejo: si el mapeo aprendió algo después de que '
+                . 'pasaste un partido, ese partido quedó con lo de antes. El <b>01/09/2026</b> aprendió que '
+                . '<code>penalty rebound</code> (rebote de penal) es <b>Jugada</b> y no Penal — antes la regla '
+                . 'del penal se lo llevaba puesto porque el texto dice "penalty". Sacarles la marca no gasta '
+                . 'nada; volver a preguntarlos, 1 llamada cada uno.</p>'
+                . '<p class="acciones">'
+                . ($reRevisablesPen
+                    ? '<a class="boton" href="' . e(route('import_detalles.tipos_gol',
+                        $filtros + ['desmarcar' => 'penal'])) . '">Los que tienen algún gol de Penal ('
+                        . $reRevisablesPen . ')</a> <span class="sub">es donde puede haber quedado mal el rebote</span>'
+                    : '')
+                . ' <a class="boton-sec" href="' . e(route('import_detalles.tipos_gol',
+                    $filtros + ['desmarcar' => 'todos'])) . '">Todos los revisados (' . $reRevisables . ')</a>'
+                . '</p>'
+                . (!empty($filtros) ? '<p class="sub">Ojo: respeta los filtros que tenés puestos.</p>' : '');
         }
 
         $cuerpo .= $this->bloqueMatrizTipos($matriz, $sueltosTm, $sueltosBase);

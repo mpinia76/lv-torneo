@@ -8545,6 +8545,11 @@ private function normalizarMinuto(string $texto): int
             return 'En Contra';
         } elseif (str_contains($texto, 'cabezazo')) {
             return 'Cabeza';
+        } elseif (str_contains($texto, 'rebote')) {
+            // Un gol de rebote de penal NO es un gol de penal: el penal lo
+            // atajaron o dio en el palo y la jugada siguió. Va antes que 'penal'
+            // porque el texto dice las dos cosas.
+            return 'Jugada';
         } elseif (str_contains($texto, 'penal')) {
             return 'Penal';
         } elseif (str_contains($texto, 'olimpico') || str_contains($texto, 'olímpico')
