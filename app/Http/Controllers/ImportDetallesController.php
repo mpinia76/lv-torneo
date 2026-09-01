@@ -1065,6 +1065,86 @@ class ImportDetallesController extends Controller
             $pendientes = (clone $base())->distinct()->count('partido_id');
         }
 
+        // ── Segunda etapa: los partidos que ni siquiera tienen gameId ──────
+        // Sin gameId no hay a quién preguntarle el tipo de gol. `TmBuscarGameId`
+        // lo encuentra con lo que ya tenemos cargado (el fixture de los dos
+        // clubes y, si hace falta, los partidos de los DTs) y lo deja anotado:
+        // a partir de ahí el partido entra solo en la lista de arriba.
+        $buscarIds = (string) $request->get('buscar_ids', '0') === '1';
+        $nIds      = max(1, min(50, (int) $request->get('n_ids', 10)));
+
+        // Va con LEFT JOIN y no con NOT EXISTS a propósito: `import_partidos`
+        // no tiene índice por `partido_id` (ver `Controles::agregarTransfermarkt`),
+        // y un NOT EXISTS correlacionado sería un scan de la tabla entera por
+        // cada partido. La migración 2026_09_01_110000 agrega ese índice; sin
+        // ella esto igual anda, pero lento.
+        $sinGameId = function () {
+            return DB::table('partidos')
+                ->whereIn('partidos.id', function ($s) {
+                    $s->from('gols')->select('partido_id')->distinct();
+                })
+                // No tiene ninguna fila de staging con gameId...
+                ->leftJoin('import_partidos as ipg', function ($j) {
+                    $j->on('ipg.partido_id', '=', 'partidos.id')->whereNotNull('ipg.external_id');
+                })
+                // ...ni una marca de "ya lo busqué y no apareció".
+                ->leftJoin('import_partidos as ipx', function ($j) {
+                    $j->on('ipx.partido_id', '=', 'partidos.id')
+                        ->whereNull('ipx.external_id')
+                        ->where('ipx.estado', 'excluido')
+                        ->where('ipx.motivo', 'like', 'sin gameId%');
+                })
+                ->whereNull('ipg.id')->whereNull('ipx.id');
+        };
+
+        $porBuscar   = (clone $sinGameId())->count();
+        $yaBuscados  = DB::table('import_partidos')->whereNotNull('partido_id')
+            ->whereNull('external_id')->where('estado', 'excluido')
+            ->where('motivo', 'like', 'sin gameId%')->distinct()->count('partido_id');
+
+        $idsHallados = 0; $idsFallados = 0; $idsLlamadas = 0; $detalleIds = '';
+
+        if ($buscarIds && $porBuscar) {
+            $lote = (clone $sinGameId())->orderByDesc('partidos.dia')
+                ->limit($nIds)->get(['partidos.id', 'partidos.dia']);
+            $buscador = new TmBuscarGameId;
+
+            foreach ($lote as $p) {
+                $r = $buscador->buscar((int) $p->id);
+                $idsLlamadas += (int) (isset($r['llamadas']) ? $r['llamadas'] : 0);
+                $resumen = $this->resumenPartido((int) $p->id);
+
+                if (!empty($r['game_id'])) {
+                    $buscador->anotar((int) $p->id, $r['game_id'], 'gameId encontrado desde el control de tipos de gol');
+                    $idsHallados++;
+                    $detalleIds .= '<div><span class="ok">✔</span> ' . $resumen . ' — gameId <b>'
+                        . e((string) $r['game_id']) . '</b>'
+                        . (!empty($r['como']) ? ' <span class="id">(' . e((string) $r['como']) . ')</span>' : '')
+                        . '</div>';
+                } else {
+                    $idsFallados++;
+                    $this->marcarSinGameId((int) $p->id, count(isset($r['candidatos']) ? $r['candidatos'] : []));
+                    $cuantos = count(isset($r['candidatos']) ? $r['candidatos'] : []);
+                    $detalleIds .= '<div><span class="warn">?</span> ' . $resumen . ' — '
+                        . ($cuantos
+                            ? 'hay ' . $cuantos . ' partido(s) posible(s) y no elijo yo'
+                            : 'no lo encontré en Transfermarkt')
+                        . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $p->id])) . '">'
+                        . ($cuantos ? 'elegir a mano' : 'ver por qué') . '</a></div>';
+                    foreach ((isset($r['avisos']) ? $r['avisos'] : []) as $a) {
+                        $detalleIds .= '<div class="sub" style="margin-left:18px">• ' . e($a) . '</div>';
+                    }
+                }
+            }
+
+            // Los que aparecieron ya son parte de la lista de arriba.
+            $porBuscar  = (clone $sinGameId())->count();
+            $pendientes = (clone $base())->distinct()->count('partido_id');
+            $yaBuscados = DB::table('import_partidos')->whereNotNull('partido_id')
+                ->whereNull('external_id')->where('estado', 'excluido')
+                ->where('motivo', 'like', 'sin gameId%')->distinct()->count('partido_id');
+        }
+
         $cuerpo .= '<div class="cards">'
             . $this->card($pendientes, 'Sin revisar', $pendientes ? 'warn' : 'ok')
             . $this->card($revisados + $hechos, 'Ya revisados', 'ok')
@@ -1073,7 +1153,98 @@ class ImportDetallesController extends Controller
             . ($correr ? $this->card($olimpicos, 'Olímpicos', $olimpicos ? 'warn' : '') : '')
             . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
             . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
+            . ($buscarIds ? $this->card($idsHallados, 'gameId encontrados', $idsHallados ? 'ok' : '') : '')
+            . ($buscarIds ? $this->card($idsFallados, 'Sin gameId', $idsFallados ? 'warn' : '') : '')
+            . ($buscarIds ? $this->card($idsLlamadas, 'Llamadas de la búsqueda') : '')
             . '</div>';
+
+        // ── De qué universo estamos hablando ──────────────────────────────
+        // Dos cosas que la pantalla no decía y hacían que «sin revisar» pareciera
+        // un número demasiado chico: qué filtros están puestos (el de la URL se
+        // arrastra y no se ve), y que el control sólo alcanza a los partidos que
+        // tienen gameId de Transfermarkt. A un partido cargado a mano no hay a
+        // quién preguntarle el tipo de gol.
+        $enLaBase = function ($sub) {
+            $sub->from('gols')->select('partido_id')->distinct();
+        };
+
+        $pendientesSinFiltro = DB::table('import_partidos')
+            ->whereNotNull('partido_id')->whereNotNull('external_id')
+            ->whereIn('estado', ['aplicado', 'duplicado'])
+            ->whereNull('tipos_gol_revisado_at')
+            ->whereIn('partido_id', $enLaBase)
+            ->distinct()->count('partido_id');
+
+        $conGoles = DB::table('gols')->distinct()->count('partido_id');
+        $alcanzables = DB::table('import_partidos')
+            ->whereNotNull('partido_id')->whereNotNull('external_id')
+            ->whereIn('estado', ['aplicado', 'duplicado'])
+            ->whereIn('partido_id', $enLaBase)
+            ->distinct()->count('partido_id');
+        $fueraDeAlcance = max(0, $conGoles - $alcanzables);
+
+        $puestos = [];
+        if ($tecnicoId) {
+            $nombreDt = (string) DB::table('tecnicos')
+                ->join('personas', 'personas.id', '=', 'tecnicos.persona_id')
+                ->where('tecnicos.id', $tecnicoId)->value('personas.name');
+            $puestos[] = 'el DT <b>' . e($nombreDt !== '' ? $nombreDt : '#' . $tecnicoId) . '</b>';
+        }
+        if ($comp !== '')  $puestos[] = 'la competencia <b>' . e($comp) . '</b>';
+        if ($ronda !== '') $puestos[] = 'la fecha <b>' . e($ronda) . '</b>';
+        if ($soloJugada)   $puestos[] = 'sólo los partidos con algún gol de <b>Jugada</b>';
+
+        if (!empty($puestos)) {
+            $cuerpo .= '<div class="diag"><b>Ojo: esos ' . $pendientes . ' son con filtro.</b> '
+                . 'Estás mirando ' . implode(' · ', $puestos) . '.<br>'
+                . 'Sin ningún filtro quedan <b>' . $pendientesSinFiltro . '</b> partidos sin revisar. '
+                . '<a href="' . e(route('import_detalles.tipos_gol')) . '">Ver todos, sin filtros</a></div>';
+        }
+
+        $cuerpo .= '<p class="sub"><b>Hasta dónde llega esto:</b> en la base hay <b>' . $conGoles
+            . '</b> partidos con goles cargados, y <b>' . $alcanzables . '</b> de ellos tienen gameId de '
+            . 'Transfermarkt. El gameId es lo único que hace falta: sin él no hay a quién preguntarle de qué fue '
+            . 'cada gol. Los otros <b>' . $fueraDeAlcance . '</b> se cargaron a mano o por planilla y nunca pasaron '
+            . 'por el importador — pero el gameId se puede <b>buscar</b>, y eso los mete en el relevamiento.</p>';
+
+        // ── El bloque de la búsqueda de gameId ────────────────────────────
+        $cuerpo .= '<h2>Partidos sin gameId <span class="sub">(' . $porBuscar . ' por buscar)</span></h2>'
+            . '<p class="sub">La búsqueda no adivina: cruza el <b>fixture de los dos clubes</b> de Transfermarkt '
+            . '(y, si hace falta, los partidos de los DTs) con la fecha y los equipos que ya tenés cargados. '
+            . 'Si en la ventana de fechas queda más de un candidato <b>no elige ninguno</b> y te los ofrece para '
+            . 'que elijas vos: un gameId equivocado escribiría el detalle de otro partido.</p>'
+            . '<p class="sub">Cuesta <b>1 a 3 llamadas por partido</b>, y bastante menos cuando son del mismo club: '
+            . 'el fixture se reusa 10 minutos. El que aparece queda anotado para siempre y pasa solo a la lista de '
+            . 'arriba (y de paso le sirve al resto del importador: detalle, penales, resultados). El que no aparece '
+            . 'queda marcado para <b>no volver a pagarlo</b> en cada tanda.</p>';
+
+        if ($porBuscar) {
+            $cuerpo .= '<p class="acciones">'
+                . '<a class="boton" href="' . e(route('import_detalles.tipos_gol',
+                    ['buscar_ids' => 1, 'n_ids' => $nIds])) . '">Buscar el gameId de ' . min($nIds, $porBuscar)
+                . ' partidos</a>';
+            foreach ([25, 50] as $otro) {
+                if ($otro === $nIds || $otro > $porBuscar) continue;
+                $cuerpo .= ' <a class="boton-sec" href="' . e(route('import_detalles.tipos_gol',
+                    ['buscar_ids' => 1, 'n_ids' => $otro])) . '">de a ' . $otro . '</a>';
+            }
+            $cuerpo .= ' <span class="sub">van del más nuevo al más viejo</span></p>';
+        } else {
+            $cuerpo .= '<div class="ok-box">No queda ningún partido con goles al que le falte el gameId '
+                . '(sin contar los que ya se buscaron sin suerte).</div>';
+        }
+
+        if ($yaBuscados) {
+            $cuerpo .= '<p class="sub"><b>' . $yaBuscados . '</b> partido(s) ya se buscaron y no salieron: quedaron '
+                . 'marcados y no se vuelven a intentar solos. Casi siempre falta que los dos equipos estén atados a '
+                . 'su club de Transfermarkt en <code>equipo_tm</code>, o que el DT tenga cargada su URL. Con eso, la '
+                . 'búsqueda los encuentra: para reintentar uno, entrá por '
+                . '<code>import-detalles/ver?partido_id=NNN</code>.</p>';
+        }
+
+        if ($detalleIds !== '') {
+            $cuerpo .= '<h3>Lo que encontró la búsqueda</h3><div class="diag">' . $detalleIds . '</div>';
+        }
 
         if (!$pendientes) {
             $cuerpo .= '<div class="ok-box">No queda ningún partido sin revisar'
@@ -1121,6 +1292,54 @@ class ImportDetallesController extends Controller
         $cuerpo .= $this->bloquePendientesTiposGol($base());
 
         return $this->pagina('Tipos de gol', $cuerpo);
+    }
+
+    /**
+     * Deja anotado que a este partido ya se le buscó el gameId y no salió.
+     *
+     * Sin esta marca, cada tanda volvería a pagar la búsqueda de los mismos
+     * partidos irresolubles. La fila va con `external_id` en NULL —así queda
+     * afuera de todas las consultas que piden gameId, incluida la de esta misma
+     * pantalla— y con `tecnico_id` en NULL, igual que las que escribe
+     * `TmBuscarGameId::anotar()`: el tablero de cobertura agrupa por DT, así que
+     * no la muestra.
+     *
+     * Si más adelante el gameId aparece (elegido a mano entre los candidatos),
+     * `anotar()` inserta SU propia fila con el gameId y el partido vuelve solo a
+     * la lista.
+     */
+    private function marcarSinGameId($partidoId, $candidatos = 0)
+    {
+        try {
+            $partido = DB::table('partidos')->where('id', (int) $partidoId)->first();
+            if (!$partido) return;
+
+            $ya = DB::table('import_partidos')->where('partido_id', (int) $partidoId)
+                ->whereNull('external_id')->where('estado', 'excluido')
+                ->where('motivo', 'like', 'sin gameId%')->first();
+            if ($ya) return;
+
+            DB::table('import_partidos')->insert([
+                'fuente'       => 'transfermarkt',
+                'external_id'  => null,
+                'tecnico_id'   => null,
+                'partido_id'   => (int) $partidoId,
+                'equipo_id'    => $partido->equipol_id,
+                'rival_id'     => $partido->equipov_id,
+                'club_nombre'  => $this->nombreEquipo($partido->equipol_id),
+                'rival_nombre' => $this->nombreEquipo($partido->equipov_id),
+                'local'        => 1,
+                'dia'          => $partido->dia,
+                'estado'       => 'excluido',
+                'motivo'       => $candidatos
+                    ? 'sin gameId: quedaron ' . (int) $candidatos . ' candidatos y hay que elegir a mano'
+                    : 'sin gameId: no lo encontré con el fixture de los clubes ni con los partidos de los DTs',
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('marcarSinGameId partido ' . (int) $partidoId . ': ' . $e->getMessage());
+        }
     }
 
     /**
