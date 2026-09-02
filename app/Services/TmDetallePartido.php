@@ -2223,6 +2223,7 @@ class TmDetallePartido
                 if ($informe !== null) $informe['creados']['tecnicos'][] = $datos['apellido'] . ', ' . $datos['nombre']
                     . ' (TM ' . $tmId . ')' . ($libre ? ' — rol de DT agregado a la persona #' . $libre['id'] : ' — creado')
                     . ' #' . $tecnico->id;
+                if (!$libre) $this->avisarApellidoParecido($datos, 'tecnico');
             } catch (\Exception $e) {
                 $this->aviso('No pude crear al DT TM ' . $tmId . ': ' . $e->getMessage());
             }
@@ -2499,12 +2500,118 @@ class TmDetallePartido
                 }
                 if ($informe !== null) $informe['creados']['arbitros'][] = $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ')'
                     . ($libre ? ' — rol agregado a la persona #' . $libre['id'] : '');
+                if (!$libre) $this->avisarApellidoParecido($datos, 'arbitro');
             } catch (\Exception $e) {
                 $this->aviso('No pude crear al árbitro TM ' . $tmId . ': ' . $e->getMessage());
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Avisa cuando la persona que se acaba de crear tiene un apellido a una o
+     * dos letras de una que YA estaba en la base.
+     *
+     * El caso real: Transfermarkt trae al árbitro **Aliende** e Iván **Alliende**
+     * ya estaba cargado. El apareo automático compara los apellidos letra por
+     * letra (ver `apellidosSeTocan`), así que no los junta, crea una ficha nueva
+     * y el duplicado recién se descubre después, en la pantalla de repetidos.
+     * Con este aviso el importador lo dice en el momento, al lado de la
+     * creación.
+     *
+     * No apareja solo a propósito: **un apareo equivocado es peor que un
+     * duplicado**. Alliende y Aliende pueden ser dos personas distintas; quien
+     * decide es el usuario, en Verificar personas.
+     *
+     * El criterio de "parecido" es `DuplicadosPersonas::casiIgual()`, el mismo
+     * que usa esa pantalla — no una regla nueva que se desincronice. La consulta
+     * va acotada con sus dos condiciones previas (misma inicial, largo a ±3),
+     * así se comparan unas pocas fichas y no la tabla entera.
+     */
+    private function avisarApellidoParecido(array $datos, $rol)
+    {
+        $tablas = ['jugador' => 'jugadors', 'arbitro' => 'arbitros', 'tecnico' => 'tecnicos'];
+        if (!isset($tablas[$rol])) return;
+
+        $apellido = trim((string) (isset($datos['apellido']) ? $datos['apellido'] : ''));
+        $nombre   = trim((string) (isset($datos['nombre']) ? $datos['nombre'] : ''));
+        $nac      = (string) (isset($datos['nacimiento']) ? $datos['nacimiento'] : '');
+        if ($apellido === '') return;
+        if (!class_exists('App\Services\DuplicadosPersonas')) return;
+
+        $norm  = \App\Services\DuplicadosPersonas::normalizar($apellido);
+        $largo = mb_strlen($norm);
+        if ($largo < 4) return;   // casiIgual() no compara nada más corto
+
+        $tokensNombre = array_values(array_filter(
+            preg_split('/\s+/', \App\Services\DuplicadosPersonas::normalizar($nombre)),
+            function ($t) { return mb_strlen($t) >= 3; }
+        ));
+
+        try {
+            $tabla = $tablas[$rol];
+            $filas = DB::table('personas')
+                ->join($tabla, $tabla . '.persona_id', '=', 'personas.id')
+                ->where('personas.apellido', 'like', mb_substr($norm, 0, 1) . '%')
+                ->where(function ($q) use ($largo, $apellido) {
+                    // O es de largo parecido (una letra de más, un acento), o uno
+                    // de los dos es el apellido compuesto del otro
+                    // ("Hoyos" / "Hoyos Marchisio").
+                    $q->whereRaw('CHAR_LENGTH(personas.apellido) BETWEEN ? AND ?', [$largo - 3, $largo + 3])
+                      ->orWhere('personas.apellido', 'like', $apellido . ' %')
+                      ->orWhereRaw("? LIKE CONCAT(personas.apellido, ' %')", [$apellido]);
+                })
+                ->select('personas.id', 'personas.apellido', 'personas.nombre', 'personas.nacimiento')
+                ->limit(400)->get();
+        } catch (\Exception $e) {
+            return;   // un aviso de más nunca puede romper una importación
+        }
+
+        $parecidos = []; $porFecha = false;
+        foreach ($filas as $f) {
+            $otro = \App\Services\DuplicadosPersonas::normalizar((string) $f->apellido);
+            if ($otro === '') continue;
+
+            $igual     = ($otro === $norm);
+            $contenido = !$igual && (mb_strpos($otro . ' ', $norm . ' ') === 0
+                                     || mb_strpos($norm . ' ', $otro . ' ') === 0);
+            $casi      = !$igual && !$contenido && \App\Services\DuplicadosPersonas::casiIgual($norm, $otro);
+            if (!$igual && !$contenido && !$casi) continue;
+
+            $suNac  = substr((string) $f->nacimiento, 0, 10);
+            $mismaF = ($nac !== '' && $suNac !== '' && $suNac === $nac);
+            $mismoAnio = ($nac !== '' && $suNac !== '' && substr($suNac, 0, 4) === substr($nac, 0, 4));
+
+            // Con el apellido idéntico o contenido hace falta una segunda señal:
+            // si no, cada "González" nuevo listaría medio padrón. Con el apellido
+            // apenas distinto ya alcanza, que es raro de por sí.
+            if ($igual || $contenido) {
+                $comparte = false;
+                foreach ($tokensNombre as $t) {
+                    if (mb_strpos(' ' . \App\Services\DuplicadosPersonas::normalizar((string) $f->nombre) . ' ',
+                            ' ' . $t . ' ') !== false) { $comparte = true; break; }
+                }
+                if (!$comparte && !$mismaF && !$mismoAnio) continue;
+            }
+
+            if (!$mismaF) $porFecha = true;
+            $parecidos[] = $f->apellido . ', ' . $f->nombre . ' (persona #' . (int) $f->id . ''
+                . ($suNac !== '' ? ', ' . $suNac : ', sin fecha') . ')';
+        }
+        if (empty($parecidos)) return;
+
+        $comoSeLlama = ['jugador' => 'jugador', 'arbitro' => 'árbitro', 'tecnico' => 'DT'];
+        $this->aviso('Creé al ' . $comoSeLlama[$rol] . ' ' . $apellido . ', ' . $nombre
+            . ($nac !== '' ? ' (' . $nac . ')' : ' (sin fecha)')
+            . ' — pero OJO: ya había ' . (count($parecidos) === 1 ? 'una ficha muy parecida' : count($parecidos) . ' fichas muy parecidas')
+            . ': ' . implode(' · ', array_slice($parecidos, 0, 5))
+            . (count($parecidos) > 5 ? ' y ' . (count($parecidos) - 5) . ' más' : '') . '. '
+            . ($porFecha
+                ? 'El apareo automático exige apellido Y fecha de nacimiento iguales, así que con la fecha '
+                  . 'distinta no lo encuentra y crea una ficha nueva. Fijate cuál de las dos fechas es la buena.'
+                : 'El apellido está escrito distinto y el apareo lo compara letra por letra, por eso no lo encontró.')
+            . ' Si es la misma persona, fusionalas en Verificar personas; si no, ignorá este aviso.');
     }
 
     /**
@@ -2849,6 +2956,8 @@ class TmDetallePartido
                     . $libre['como'] . '): le agregué el rol de jugador (#' . $jugador->id . ') en vez de duplicarlo. '
                     . 'Confirmalo en "jugadores por revisar".');
             }
+            if (!$libre) $this->avisarApellidoParecido($datos, 'jugador');
+
             return ['jugador_id' => (int) $jugador->id, 'creado' => true, 'descripcion' => $etiqueta
                 . ($libre ? ' — rol de jugador agregado a la persona #' . $libre['id'] : ' — creado') . ' #' . $jugador->id];
         } catch (\Exception $e) {
