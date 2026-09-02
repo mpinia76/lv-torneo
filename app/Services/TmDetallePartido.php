@@ -558,6 +558,10 @@ class TmDetallePartido
         if ($informe !== null) $informe['crudo_arbitros'] = $this->crudoArbitros;
         $plan['tecnicos'] = $this->planTecnicos($game, $partido, $lados, $escribir, $informe);
 
+        // Antes de mostrarlo y antes de escribirlo: el plan no puede tener dos
+        // filas que choquen contra el mismo índice único. Ver depurarPlan().
+        $plan = $this->depurarPlan($plan);
+
         $informe['plan']   = $plan;
         $informe['avisos']   = $this->avisos;
         $informe['ok']       = true;
@@ -566,7 +570,19 @@ class TmDetallePartido
         // ── 6) Guardar ─────────────────────────────────────────────────────
         if ($escribir) {
             try {
-                DB::transaction(function () use ($plan, $partido, $forzar, $game, $lados) {
+                // Los avisos de un intento que murió a mitad de camino no valen:
+                // cada reintento arranca desde los que había antes de escribir.
+                $avisosPrevios = $this->avisos;
+                $fallidasPrevias = $this->fallidas;
+
+                // 3 intentos: un deadlock (SQLSTATE 40001) no es un error de los
+                // datos, es que otra escritura se cruzó. Laravel rehace la
+                // transacción entera, que es la única forma de recuperarse: una
+                // vez que la transacción murió, reintentar la fila sola no sirve.
+                DB::transaction(function () use ($plan, $partido, $forzar, $game, $lados, $avisosPrevios, $fallidasPrevias) {
+                    $this->avisos   = $avisosPrevios;
+                    $this->fallidas = $fallidasPrevias;
+
                     if ($forzar) {
                         Alineacion::where('partido_id', $partido->id)->delete();
                         Gol::where('partido_id', $partido->id)->delete();
@@ -613,7 +629,7 @@ class TmDetallePartido
                             ->where('equipo_id', $fila['equipo_id'])->exists();
                         if (!$existe) \App\PartidoTecnico::create($fila);
                     }
-                });
+                }, 3);
                 $informe['escrito'] = true;
 
                 // Este importador ya lee `missedPenalties`, así que el partido
@@ -3036,6 +3052,83 @@ class TmDetallePartido
         }
 
         $this->grabarFilas(Penal::class, $nuevas, 'un penal');
+    }
+
+    /**
+     * Saca del plan las filas que van a chocar contra un índice único.
+     *
+     * La base tiene tres candados que el plan puede violar solo:
+     *   · `alineacions.partido_id_jugador_id`        — un jugador, una fila
+     *   · `alineacions.partido_id_equipo_id_dorsal`  — un dorsal por equipo
+     *   · `partido_arbitros.partido_id_arbitro_id`   — un juez, una fila
+     *
+     * Hasta ahora las filas repetidas se mandaban igual y la base las rechazaba
+     * una por una: el partido quedaba cargado a medias y la pantalla escupía
+     * diez líneas de SQLSTATE[23000] que no dicen nada. Peor todavía, si en el
+     * camino aparece un deadlock la transacción se cae con la mitad escrita.
+     *
+     * **Una fila repetida no es un problema de la base: es un mapeo duplicado.**
+     * Dos ids de Transfermarkt que apuntan a la misma ficha (típico después de
+     * fusionar dos personas: la fusión une las fichas y en `jugador_tm` quedan
+     * los dos ids) hacen que el mismo jugador entre dos veces en el plan. Por
+     * eso acá se saca la fila Y se avisa qué revisar, en castellano.
+     */
+    private function depurarPlan(array $plan)
+    {
+        // ── Alineación ────────────────────────────────────────────────────
+        $porJugador = []; $porDorsal = []; $limpias = [];
+        foreach ((isset($plan['alineacions']) ? $plan['alineacions'] : []) as $r) {
+            $jid    = (int) $r['jugador_id'];
+            $nombre = isset($r['_nombre']) ? $r['_nombre'] : ('jugador #' . $jid);
+
+            if (isset($porJugador[$jid])) {
+                $this->aviso('"' . $nombre . '" (jugador #' . $jid . ') aparecía DOS veces en la alineación de este '
+                    . 'partido, así que la segunda no la cargo. Casi siempre es que dos ids de Transfermarkt apuntan '
+                    . 'a la misma ficha en `jugador_tm` —queda así después de fusionar dos personas—, o que TM lo '
+                    . 'lista en el once y en el banco. Si el que falta es OTRO jugador, el mapeo está mal: revisalo '
+                    . 'en Jugadores por revisar.');
+                continue;
+            }
+            $porJugador[$jid] = true;
+
+            $d = isset($r['dorsal']) ? $r['dorsal'] : null;
+            if ($d !== null && $d !== '' && (int) $d !== 0) {
+                $clave = $r['equipo_id'] . '-' . $d;
+                if (isset($porDorsal[$clave])) {
+                    $this->aviso('El dorsal ' . $d . ' de ' . (isset($r['_equipo']) ? $r['_equipo'] : 'ese equipo')
+                        . ' le tocaba a dos jugadores en este partido ("' . $porDorsal[$clave] . '" y "' . $nombre
+                        . '"). Dejo a "' . $nombre . '" sin dorsal en la alineación para no perder la fila: '
+                        . 'corregilo a mano si te importa el número.');
+                    $r['dorsal'] = null;
+                } else {
+                    $porDorsal[$clave] = $nombre;
+                }
+            }
+
+            $limpias[] = $r;
+        }
+        $plan['alineacions'] = $limpias;
+
+        // ── Árbitros ──────────────────────────────────────────────────────
+        $porArbitro = []; $jueces = [];
+        foreach ((isset($plan['arbitros']) ? $plan['arbitros'] : []) as $r) {
+            $aid    = (int) $r['arbitro_id'];
+            $nombre = isset($r['_nombre']) ? $r['_nombre'] : ('árbitro #' . $aid);
+
+            if (isset($porArbitro[$aid])) {
+                $this->aviso('"' . $nombre . '" (árbitro #' . $aid . ') venía dos veces en la terna, como '
+                    . $porArbitro[$aid] . ' y como ' . (isset($r['tipo']) ? $r['tipo'] : 'otro rol')
+                    . '. Me quedo con el primero. Si en realidad son dos jueces distintos, hay dos ids de '
+                    . 'Transfermarkt atados al mismo árbitro en `arbitro_tm`: usá el botón "Está mal" en '
+                    . 'Jugadores y árbitros por revisar.');
+                continue;
+            }
+            $porArbitro[$aid] = isset($r['tipo']) ? $r['tipo'] : 'un rol';
+            $jueces[] = $r;
+        }
+        $plan['arbitros'] = $jueces;
+
+        return $plan;
     }
 
     private function grabarFilas($clase, array $filas, $que)
