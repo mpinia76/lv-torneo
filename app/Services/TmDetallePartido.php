@@ -2922,8 +2922,14 @@ class TmDetallePartido
 
     // ═══════════════════════ JUGADORES: RESOLVER Y CREAR ═══════════════════
 
-    /** Baja los perfiles de a 50 con /players?ids[]= */
-    private function traerPerfiles(array $ids, array &$informe)
+    /**
+     * Baja los perfiles de a 50 con /players?ids[]=
+     *
+     * Público porque la reparación de nombres los necesita sin bajar ningún
+     * partido: `$avisos` es una propiedad con valor inicial, así que se puede
+     * usar una instancia suelta sólo para esto.
+     */
+    public function traerPerfiles(array $ids, array &$informe)
     {
         $out = [];
         foreach (array_chunk(array_values($ids), 50) as $tanda) {

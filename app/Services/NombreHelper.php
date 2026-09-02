@@ -28,11 +28,51 @@ class NombreHelper
         $passport    = trim($datos['nationalityDetails']['passportName'] ?? '');
         $displayName = trim($datos['displayName'] ?? '');
 
+        // ── EL ALFABETO IMPORTA ─────────────────────────────────────────────
+        // `passportName` es el nombre legal y para varios países TM lo guarda
+        // en el alfabeto original. Bajando un Pyramids FC – Auckland City se
+        // crearon 22 fichas con el nombre en árabe («الشناوي, احمد») y una en
+        // chino: ilegibles, imposibles de buscar y de ordenar en un sitio en
+        // castellano, y encima duplicables sin que nadie lo note.
+        //
+        // Se elige el primer candidato ESCRITO EN ALFABETO LATINO, respetando
+        // el orden de siempre. Para un nombre latino —o sea, para todo lo que
+        // ya estaba— no cambia absolutamente nada.
+        $enLatino = function ($s) {
+            return $s !== ''
+                && preg_match('/\p{Latin}/u', $s)
+                && !preg_match('/[\p{Arabic}\p{Hebrew}\p{Han}\p{Hiragana}\p{Katakana}'
+                    . '\p{Hangul}\p{Cyrillic}\p{Greek}\p{Thai}\p{Devanagari}\p{Armenian}'
+                    . '\p{Georgian}]/u', $s);
+        };
+
         // Nombre completo: passportName (legal); si viene vacío, displayName
         // (ej. brasileños: "Nadson Juan Maia da Silva de Souza"); y como último
         // recurso, el name corto.
-        $completo = $passport !== '' ? $passport
-            : ($displayName !== '' ? $displayName : $nameField);
+        $completo = '';
+
+        foreach ([$passport, $displayName, $nameField, $shortName] as $cand) {
+            if ($enLatino($cand)) {
+                $completo = $cand;
+                break;
+            }
+        }
+
+        // Si TM no tiene NINGUNA forma latina de ese nombre, se vuelve al orden
+        // de siempre: mejor el nombre en su alfabeto que ninguno.
+        if ($completo === '') {
+            $completo = $passport !== '' ? $passport
+                : ($displayName !== '' ? $displayName : $nameField);
+        }
+
+        // El campo mostrado se elige aparte, y también en latino cuando se puede.
+        $paraMostrar = [$shortName, $nameField, $displayName, $passport];
+
+        // Un ancla en otro alfabeto no puede coincidir con un nombre latino, y
+        // buscarla sólo gasta el intento: se descarta y se va al fallback.
+        if ($shortName !== '' && !$enLatino($shortName) && $enLatino($completo)) {
+            $shortName = '';
+        }
 
         // Ancla de apellido: con qué palabra ARRANCA el apellido dentro del shortName.
         $primerApellido = '';
@@ -108,7 +148,17 @@ class NombreHelper
         }
 
         // Campo "name" mostrado: shortName; si no hay, name; si no, nombre+apellido.
-        $name = $shortName !== '' ? $shortName : $nameField;
+        // Con la misma regla del alfabeto: es el que se ve en las listas.
+        $name = '';
+
+        foreach ($paraMostrar as $cand) {
+            if ($enLatino($cand)) {
+                $name = $cand;
+                break;
+            }
+        }
+
+        if ($name === '') { $name = $shortName !== '' ? $shortName : $nameField; }
         if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
 
         return [

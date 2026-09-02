@@ -928,6 +928,210 @@ class ImportDetallesController extends Controller
     }
 
     /**
+     * Fichas cuyo nombre no está escrito en alfabeto latino, y su reparación.
+     *
+     * Nació de un desastre concreto: bajando Pyramids FC – Auckland City se
+     * crearon 22 fichas con el nombre en árabe y una en chino. La causa estaba
+     * en `NombreHelper::separarTM()`, que tomaba el `passportName` de TM —el
+     * nombre legal, que para varios países viene en el alfabeto original— con
+     * prioridad sobre todo lo demás. Ya está arreglado, **pero arreglarlo no
+     * repara lo que ya se cargó**: `jugador_tm` mapea esos ids de TM a esas
+     * fichas, así que volver a bajar el partido las reusa tal cual.
+     *
+     * Esto vuelve a leer el perfil de TM de cada una —de a 50, una llamada cada
+     * 50— y las renombra con la lógica corregida. Sólo escribe cuando el nombre
+     * nuevo **sí** está en latino: si TM no tiene ninguna forma latina de esa
+     * persona, se deja como está y se lista aparte para verla a mano.
+     */
+    public function nombresAlfabeto(Request $request)
+    {
+        set_time_limit(0);
+
+        $aplicar = (string) $request->get('aplicar', '0') === '1';
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Nombres en otro alfabeto</h1>'
+            . '<p class="sub">Fichas cuyo nombre no tiene <b>ni una letra latina</b>: quedaron así porque el '
+            . 'importador tomaba el <code>passportName</code> de Transfermarkt, que para varios países viene en '
+            . 'el alfabeto original. En un sitio en castellano son ilegibles, no se pueden buscar ni ordenar, y '
+            . 'se duplican sin que nadie lo note.</p>'
+            . '<p class="sub">El importador ya está corregido —ahora elige la primera forma escrita en latino—, '
+            . 'pero eso no repara las fichas que ya existen: <code>jugador_tm</code> las tiene mapeadas, así que '
+            . 'volver a bajar el partido las reusa. Acá se releen los perfiles y se renombran.</p>';
+
+        $rotas = $this->personasSinLatino();
+
+        if (!$rotas) {
+            return $this->pagina('Nombres en otro alfabeto', $cuerpo
+                . '<div class="ok-box">No hay ninguna ficha con el nombre en otro alfabeto.</div>');
+        }
+
+        // El id de TM sale de jugador_tm; sin él no hay a quién releerle el perfil.
+        $ids     = array_keys($rotas);
+        $tmPorId = [];
+
+        foreach (DB::table('jugador_tm')
+                     ->join('jugadors', 'jugadors.id', '=', 'jugador_tm.jugador_id')
+                     ->whereIn('jugadors.persona_id', $ids)
+                     ->get(['jugadors.persona_id', 'jugador_tm.tm_player_id']) as $r) {
+            $tmPorId[(int) $r->persona_id] = (string) $r->tm_player_id;
+        }
+
+        $conTm = array_values(array_filter($tmPorId));
+        $sinTm = array_diff($ids, array_keys($tmPorId));
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card(count($rotas), 'fichas en otro alfabeto', 'warn')
+            . $this->card(count($conTm), 'con ficha de TM para releer')
+            . $this->card(count($sinTm), 'sin id de TM', count($sinTm) ? 'err' : '')
+            . '</div>';
+
+        $perfiles = [];
+        $llamadas = 0;
+
+        if ($conTm) {
+            // Los perfiles se cachean 10 minutos: mirar y después aplicar no
+            // tiene que pagar dos veces la misma tanda.
+            $llave = 'tm.perfiles.reparar.' . md5(implode(',', $conTm));
+
+            if (\Illuminate\Support\Facades\Cache::has($llave)) {
+                $perfiles = \Illuminate\Support\Facades\Cache::get($llave);
+            } else {
+                $informe  = ['llamadas' => 0];
+                $perfiles = (new TmDetallePartido)->traerPerfiles($conTm, $informe);
+                $llamadas = (int) $informe['llamadas'];
+                \Illuminate\Support\Facades\Cache::put($llave, $perfiles, 600);
+            }
+        }
+
+        $cambiados = 0;
+        $sinLatino = 0;
+        $tabla     = '';
+
+        foreach ($rotas as $personaId => $vieja) {
+            $tm     = isset($tmPorId[$personaId]) ? $tmPorId[$personaId] : null;
+            $perfil = ($tm !== null && isset($perfiles[$tm])) ? $perfiles[$tm] : null;
+
+            $nuevo  = null;
+            $estado = '';
+
+            if ($tm === null) {
+                $estado = 'no tiene id de Transfermarkt: hay que corregirla a mano';
+            } elseif ($perfil === null) {
+                $estado = 'Transfermarkt no devolvió su perfil';
+            } else {
+                $d = \App\Services\NombreHelper::separarTM($perfil);
+
+                // Sólo se escribe si lo nuevo ESTÁ en latino. Si TM no tiene
+                // ninguna forma latina de esa persona, cambiar un nombre en
+                // árabe por otro en árabe no arregla nada y encima pisa.
+                if ($this->tieneLatino($d['apellido']) || $this->tieneLatino($d['nombre'])) {
+                    $nuevo = $d;
+                } else {
+                    $sinLatino++;
+                    $estado = 'Transfermarkt tampoco lo tiene en latino';
+                }
+            }
+
+            if ($nuevo && $aplicar) {
+                DB::table('personas')->where('id', $personaId)->update([
+                    'name'       => $nuevo['name'],
+                    'nombre'     => $nuevo['nombre'],
+                    'apellido'   => $nuevo['apellido'],
+                    'updated_at' => now(),
+                ]);
+                $cambiados++;
+                $estado = 'renombrada';
+            } elseif ($nuevo) {
+                $cambiados++;
+                $estado = 'lista para renombrar';
+            }
+
+            $tabla .= '<tr class="' . ($nuevo ? 'warn' : '') . '">'
+                . '<td class="num gris">#' . (int) $personaId . '</td>'
+                . '<td>' . e(trim($vieja['apellido'] . ', ' . $vieja['nombre'])) . '</td>'
+                . '<td class="num gris">' . e((string) $tm) . '</td>'
+                . '<td>' . ($nuevo ? '<b>' . e(trim($nuevo['apellido'] . ', ' . $nuevo['nombre'])) . '</b>' : '—') . '</td>'
+                . '<td>' . e($estado) . '</td>'
+                . '</tr>';
+        }
+
+        if ($llamadas) {
+            $cuerpo .= '<p class="sub">' . $llamadas . ' llamada(s) a la API para releer los perfiles.</p>';
+        }
+
+        if ($aplicar) {
+            $cuerpo .= '<div class="ok-box">Renombré <b>' . $cambiados . '</b> ficha(s).</div>'
+                . '<p class="sub">Ojo con una consecuencia: si alguna de estas personas <b>ya existía</b> con su '
+                . 'nombre en latino, ahora hay dos fichas con el mismo nombre. Pasá por '
+                . '<a href="' . e(route('jugadores.verificarPersonas')) . '">verificar personas</a> a fusionarlas.</p>';
+        } elseif ($cambiados) {
+            $cuerpo .= '<p class="acciones"><a class="boton" href="'
+                . e(route('import_detalles.nombres_alfabeto', ['aplicar' => 1])) . '">Renombrar las '
+                . $cambiados . '</a> <span class="sub">no gasta llamadas nuevas: los perfiles quedaron '
+                . 'cacheados 10 minutos</span></p>';
+        } else {
+            $cuerpo .= '<div class="err-box">No pude conseguir una forma latina para ninguna. '
+                . 'Estas hay que corregirlas a mano.</div>';
+        }
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th>Ficha</th><th>Como está</th><th>id TM</th>'
+            . '<th>Como quedaría</th><th>Estado</th></tr></thead><tbody>'
+            . $tabla . '</tbody></table></div>';
+
+        return $this->pagina('Nombres en otro alfabeto', $cuerpo);
+    }
+
+    /** ¿El texto tiene al menos una letra latina? */
+    private function tieneLatino($s)
+    {
+        return (string) $s !== '' && preg_match('/\p{Latin}/u', (string) $s);
+    }
+
+    /**
+     * Las personas cuyo nombre no tiene ni una letra latina.
+     *
+     * El prefiltro en SQL es por letras ASCII —cualquier nombre latino de
+     * verdad tiene al menos una— y después se confirma en PHP con la misma
+     * regla que usa el importador. Si el motor no soporta REGEXP, se barre la
+     * tabla por tandas: es una pantalla de reparación, no una de todos los días.
+     *
+     * @return array persona_id => ['nombre' => .., 'apellido' => ..]
+     */
+    private function personasSinLatino()
+    {
+        $out       = [];
+        $confirmar = function ($p) use (&$out) {
+            $todo = trim((string) $p->nombre . ' ' . (string) $p->apellido . ' ' . (string) $p->name);
+
+            if ($todo !== '' && !preg_match('/\p{Latin}/u', $todo)) {
+                $out[(int) $p->id] = ['nombre' => (string) $p->nombre, 'apellido' => (string) $p->apellido];
+            }
+        };
+
+        try {
+            $filas = DB::table('personas')
+                ->whereRaw("COALESCE(nombre,'') NOT REGEXP '[a-zA-Z]'")
+                ->whereRaw("COALESCE(apellido,'') NOT REGEXP '[a-zA-Z]'")
+                ->limit(500)
+                ->get(['id', 'name', 'nombre', 'apellido']);
+
+            foreach ($filas as $p) $confirmar($p);
+
+            return $out;
+        } catch (\Throwable $e) {
+            // Sin REGEXP: se barre por tandas.
+        }
+
+        DB::table('personas')->select('id', 'name', 'nombre', 'apellido')
+            ->orderBy('id')->chunk(2000, function ($filas) use ($confirmar) {
+                foreach ($filas as $p) $confirmar($p);
+            });
+
+        return $out;
+    }
+
+    /**
      * El calendario de una COMPETENCIA entera, del HTML de Transfermarkt.
      *
      * Una llamada = el torneo completo. Para el Mundial de Clubes 2025 son 63
