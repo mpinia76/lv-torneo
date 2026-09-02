@@ -83,6 +83,17 @@ class TmBuscarGameId
      */
     private $rastro = [];
 
+    /**
+     * Con qué datos se arrancó a buscar, en una línea.
+     *
+     * Va aparte del rastro a propósito: es texto largo y en una celda de la
+     * tabla queda cortado a la derecha, justo la parte que dice qué le falta
+     * al torneo.
+     *
+     * @var string
+     */
+    private $partida = '';
+
     /** @var int */
     private $llamadas = 0;
 
@@ -98,6 +109,7 @@ class TmBuscarGameId
         $this->avisos     = [];
         $this->candidatos = [];
         $this->rastro     = [];
+        $this->partida    = '';
         $this->llamadas   = 0;
 
         $partido = DB::table('partidos')->where('id', (int) $partidoId)->first();
@@ -320,7 +332,7 @@ class TmBuscarGameId
             'desde' => $desde, 'hasta' => $hasta, 'nota' => $nota];
     }
 
-    /** La primera fila del rastro: con qué datos se arrancó a buscar. */
+    /** Con qué datos se arrancó a buscar. No es una fila del rastro: ver $partida. */
     private function rastroPuntoDePartida($partido, $tmLocal, $tmVisit, array $coaches, $torneo)
     {
         $partes = [];
@@ -347,7 +359,7 @@ class TmBuscarGameId
                     : ', SIN seasonId cargado');
         }
 
-        $this->anotarRastro('Con qué arranqué', null, [], null, null, implode(' · ', $partes));
+        $this->partida = implode(' · ', $partes);
     }
 
     /**
@@ -733,13 +745,23 @@ class TmBuscarGameId
      */
     private function porCompetencia($partido, $tmLocal, $tmVisit, $torneo)
     {
+        // Un camino que no corre tiene que decirlo. Callado es indistinguible
+        // de uno que corrió y no encontró nada, y se arreglan distinto.
         if (!$torneo) {
+            $this->anotarRastro('Competencia del torneo', null, [], null, null,
+                'No pude ubicar el torneo de este partido (partidos → fechas → grupos → torneos), '
+                . 'así que no sé qué competencia pedirle a Transfermarkt.');
             return null;
         }
 
         $comp = trim((string) $torneo->tm_competition_id);
 
         if ($comp === '') {
+            $this->anotarRastro('Competencia del torneo', null, [], null, null,
+                'No la consulté: el torneo «' . $torneo->nombre . ' ' . $torneo->year . '» no tiene cargado '
+                . 'su id de competencia de Transfermarkt. Es el ÚNICO camino que puede pedir una temporada '
+                . 'pasada, así que sin eso un partido de un campeonato terminado no se encuentra solo. '
+                . 'Se carga en Editar torneo → transfermarkt.com.');
             return null;
         }
 
@@ -789,6 +811,13 @@ class TmBuscarGameId
             }
 
             break;
+        }
+
+        if ($season === '') {
+            $this->avisos[] = 'El torneo «' . $torneo->nombre . ' ' . $torneo->year . '» tiene cargado el id '
+                . 'de competencia pero no el seasonId de Transfermarkt, así que de esa competencia sólo pude '
+                . 'pedir la temporada en curso. Para un campeonato ya terminado hace falta el seasonId '
+                . '(Editar torneo → transfermarkt.com; va uno atrás del año: el Clausura 2026 es seasonId 2025).';
         }
 
         return null;
@@ -980,6 +1009,7 @@ class TmBuscarGameId
             'como'       => $como,
             // Los nombres sólo se piden si de verdad hay que mostrar la lista.
             'candidatos' => $gameId ? [] : $this->candidatosConNombres(),
+            'partida'    => $this->partida,
             'rastro'     => $this->rastro,
             'avisos'     => $this->avisos,
             'llamadas'   => $this->llamadas,

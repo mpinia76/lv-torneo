@@ -575,6 +575,11 @@ class ImportDetallesController extends Controller
         // El rastro es lo que convierte "no lo encontré" en un diagnóstico: dice si
         // cada fuente contestó, cuántos partidos trajo y de qué temporada. Sin eso,
         // "TM no lo tiene" y "TM me contestó el campeonato de este año" se ven igual.
+        if (!empty($buscado['partida'])) {
+            $html .= '<h2>Con qué arranqué</h2>'
+                . '<p class="sub">' . e((string) $buscado['partida']) . '</p>';
+        }
+
         if (!empty($buscado['rastro'])) {
             $html .= '<h2>Qué contestó cada fuente</h2>'
                 . '<p class="sub">Mirá la columna <b>Período</b>: si el día del partido no cae adentro, '

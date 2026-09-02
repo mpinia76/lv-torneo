@@ -132,7 +132,8 @@ Escenario::$respuestas[TM . '/competition/ARGC/games?seasonId=2024&gameDay=15'] 
 $r = (new TmBuscarGameId)->buscar(22437);
 chequear($r['game_id'] === '4750000', 'lo encuentra por la competencia');
 chequear(strpos((string) $r['como'], 'competencia') !== false, 'dice de dónde salió: ' . $r['como']);
-chequear(count($r['rastro']) === 5, 'una fila de rastro por fuente (' . count($r['rastro']) . ')');
+chequear(count($r['rastro']) === 4, 'una fila de rastro por fuente (' . count($r['rastro']) . ')');
+chequear(strpos($r['partida'], 'club de TM 1029') !== false, 'el punto de partida va aparte de la tabla');
 chequear(strpos(implode(' ', array_column($r['rastro'], 'nota')), 'otra temporada') !== false,
     'avisa que el club estaba mirando otra temporada');
 
@@ -191,6 +192,28 @@ Escenario::$respuestas[TM . '/clubs?ids[]=1029&ids[]=2222'] = ['data' => [
 $r = (new TmBuscarGameId)->buscar(22437);
 chequear($r['game_id'] === null, 'no elige ninguno');
 chequear(count($r['candidatos']) === 2, 'ofrece los dos para elegir a mano');
+
+echo "\n== 7) El torneo sin id de competencia: lo dice en vez de callarse\n";
+escenarioBase();
+Escenario::$torneo->tm_competition_id = '';
+Escenario::$respuestas[TM . '/club/1029/fixtures'] = ['data' => ['games' => []]];
+Escenario::$respuestas[TM . '/club/2222/fixtures'] = ['data' => ['games' => []]];
+$r = (new TmBuscarGameId)->buscar(22437);
+$notas = implode(' ', array_column($r['rastro'], 'nota'));
+chequear(strpos($notas, 'no tiene cargado su id de competencia') !== false,
+    'deja fila de rastro explicando por qué no consultó la competencia');
+chequear(!in_array(TM . '/competition/ARGC/fixtures', Escenario::$pedidas, true), 'no pidió nada de competencia');
+
+echo "\n== 8) Con id de competencia pero sin seasonId: avisa que sólo puede la temporada en curso\n";
+escenarioBase();
+Escenario::$torneo->tm_season_id = '';
+Escenario::$respuestas[TM . '/club/1029/fixtures'] = ['data' => ['games' => []]];
+Escenario::$respuestas[TM . '/club/2222/fixtures'] = ['data' => ['games' => []]];
+Escenario::$respuestas[TM . '/competition/ARGC/fixtures'] = ['data' => ['games' => [
+    juego('9001', '1029', '3333', '2026-02-10', '2025'),
+]]];
+$r = (new TmBuscarGameId)->buscar(22437);
+chequear(strpos(implode(' ', $r['avisos']), 'no el seasonId') !== false, 'avisa que falta el seasonId');
 
 echo "\n" . ($fallos ? "$fallos CHEQUEO(S) FALLIDO(S)\n" : "Todo en verde.\n");
 exit($fallos ? 1 : 0);
