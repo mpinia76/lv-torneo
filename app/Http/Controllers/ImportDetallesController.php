@@ -1269,9 +1269,12 @@ class ImportDetallesController extends Controller
 
         // ── Segunda etapa: los partidos que ni siquiera tienen gameId ──────
         // Sin gameId no hay a quién preguntarle el tipo de gol. `TmBuscarGameId`
-        // lo encuentra con lo que ya tenemos cargado (el fixture de los dos
-        // clubes y, si hace falta, los partidos de los DTs) y lo deja anotado:
-        // a partir de ahí el partido entra solo en la lista de arriba.
+        // lo encuentra con lo que ya tenemos cargado (el staging, el fixture de
+        // los dos clubes, los partidos de los DTs y el fixture de la competencia
+        // del torneo) y lo deja anotado: a partir de ahí el partido entra solo
+        // en la lista de arriba. OJO: en un campeonato ya terminado la única
+        // fuente que llega es la de los DTs — la API sólo sirve la temporada en
+        // curso. Ver la memoria [[buscar-gameid]].
         $buscarIds = (string) $request->get('buscar_ids', '0') === '1';
         $nIds      = max(1, min(50, (int) $request->get('n_ids', 10)));
 
@@ -1332,7 +1335,11 @@ class ImportDetallesController extends Controller
                             ? 'hay ' . $cuantos . ' partido(s) posible(s) y no elijo yo'
                             : 'no lo encontré en Transfermarkt')
                         . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $p->id])) . '">'
-                        . ($cuantos ? 'elegir a mano' : 'ver por qué') . '</a></div>';
+                        . ($cuantos ? 'elegir a mano' : 'ver por qué') . '</a>'
+                        // La salida está a un clic, no a dos: en un partido de un campeonato
+                        // terminado pegar la URL no es el plan B, es el único plan.
+                        . ' · <a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $p->id]))
+                        . '">pegar la URL</a></div>';
                     foreach ((isset($r['avisos']) ? $r['avisos'] : []) as $a) {
                         $detalleIds .= '<div class="sub" style="margin-left:18px">• ' . e($a) . '</div>';
                     }
@@ -1412,14 +1419,19 @@ class ImportDetallesController extends Controller
 
         // ── El bloque de la búsqueda de gameId ────────────────────────────
         $cuerpo .= '<h2>Partidos sin gameId <span class="sub">(' . $porBuscar . ' por buscar)</span></h2>'
-            . '<p class="sub">La búsqueda no adivina: cruza el <b>fixture de los dos clubes</b> de Transfermarkt '
-            . '(y, si hace falta, los partidos de los DTs) con la fecha y los equipos que ya tenés cargados. '
-            . 'Si en la ventana de fechas queda más de un candidato <b>no elige ninguno</b> y te los ofrece para '
-            . 'que elijas vos: un gameId equivocado escribiría el detalle de otro partido.</p>'
-            . '<p class="sub">Cuesta <b>1 a 3 llamadas por partido</b>, y bastante menos cuando son del mismo club: '
-            . 'el fixture se reusa 10 minutos. El que aparece queda anotado para siempre y pasa solo a la lista de '
-            . 'arriba (y de paso le sirve al resto del importador: detalle, penales, resultados). El que no aparece '
-            . 'queda marcado para <b>no volver a pagarlo</b> en cada tanda.</p>';
+            . '<p class="sub">La búsqueda no adivina: cruza la fecha y los equipos que ya tenés cargados contra '
+            . 'cuatro fuentes, en orden — el <b>staging</b> (gratis, por si el fixture ya se bajó alguna vez), el '
+            . '<b>fixture de los dos clubes</b>, los <b>partidos de los DTs</b> y el <b>fixture de la competencia</b> '
+            . 'del torneo. Si en la ventana de fechas queda más de un candidato <b>no elige ninguno</b> y te los '
+            . 'ofrece para que elijas vos: un gameId equivocado escribiría el detalle de otro partido.</p>'
+            . '<p class="sub"><b>Los partidos viejos son el caso difícil.</b> Todas las rutas de fixture de la API '
+            . 'devuelven la temporada <b>en curso</b> e ignoran el año que se les pide, así que en un campeonato ya '
+            . 'terminado la única fuente que llega es la de los DTs. Por eso conviene tener cargada la URL de '
+            . 'Transfermarkt de los DTs antes de una tanda vieja: sin eso, el partido no se encuentra.</p>'
+            . '<p class="sub">Cuesta <b>1 a 4 llamadas por partido</b>, y bastante menos cuando son del mismo club '
+            . 'o el mismo DT: cada lista se reusa 10 minutos. El que aparece queda anotado para siempre y pasa solo '
+            . 'a la lista de arriba (y de paso le sirve al resto del importador: detalle, penales, resultados). '
+            . 'El que no aparece queda marcado para <b>no volver a pagarlo</b> en cada tanda.</p>';
 
         if ($porBuscar) {
             $cuerpo .= '<p class="acciones">'
@@ -1438,11 +1450,7 @@ class ImportDetallesController extends Controller
         }
 
         if ($yaBuscados) {
-            $cuerpo .= '<p class="sub"><b>' . $yaBuscados . '</b> partido(s) ya se buscaron y no salieron: quedaron '
-                . 'marcados y no se vuelven a intentar solos. Casi siempre falta que los dos equipos estén atados a '
-                . 'su club de Transfermarkt en <code>equipo_tm</code>, o que el DT tenga cargada su URL. Con eso, la '
-                . 'búsqueda los encuentra: para reintentar uno, entrá por '
-                . '<code>import-detalles/ver?partido_id=NNN</code>.</p>';
+            $cuerpo .= $this->listaSinGameId($yaBuscados);
         }
 
         if ($detalleIds !== '') {
@@ -1540,6 +1548,60 @@ class ImportDetallesController extends Controller
      * `anotar()` inserta SU propia fila con el gameId y el partido vuelve solo a
      * la lista.
      */
+    /**
+     * Los partidos que ya se buscaron sin suerte, con su salida al lado.
+     *
+     * Antes esto era un número suelto y una instrucción para escribir una URL a
+     * mano: el residuo de cada tanda quedaba ahí y no se trabajaba nunca. Son
+     * pocos —dos de cincuenta en el Clausura 2025— y cada uno se resuelve en un
+     * clic, así que lo que hace falta es la lista, no el conteo.
+     *
+     * El consejo también cambió: **`equipo_tm` no sirve para un campeonato ya
+     * terminado.** Todas las rutas de fixture de la API devuelven la temporada
+     * en curso (verificado sep-2026), así que atar los clubes no cambia nada en
+     * un partido viejo. Lo que va hacia atrás en el tiempo son los partidos del
+     * DT, y si no, pegar la URL.
+     */
+    private function listaSinGameId($total)
+    {
+        $filas = DB::table('import_partidos')
+            ->join('partidos', 'partidos.id', '=', 'import_partidos.partido_id')
+            ->whereNotNull('import_partidos.partido_id')
+            ->whereNull('import_partidos.external_id')
+            ->where('import_partidos.estado', 'excluido')
+            ->where('import_partidos.motivo', 'like', 'sin gameId%')
+            ->orderByDesc('partidos.dia')
+            ->limit(40)
+            ->get(['import_partidos.partido_id', 'import_partidos.motivo']);
+
+        $html = '<h3>Ya buscados y sin gameId <span class="sub">(' . (int) $total . ')</span></h3>'
+            . '<p class="sub">Quedaron marcados y no se vuelven a intentar solos. '
+            . '<b>Si el partido es de un campeonato ya terminado, atar los clubes en <code>equipo_tm</code> '
+            . 'no cambia nada</b>: todas las rutas de fixture de Transfermarkt devuelven la temporada en curso. '
+            . 'Lo único que va hacia atrás en el tiempo son los partidos del DT — cargale la URL de TM a los '
+            . 'que dirigieron ese partido y volvé a entrar por «ver por qué» — o pegá la URL del partido, que '
+            . 'lo resuelve de una y para siempre.</p>'
+            . '<div class="diag">';
+
+        foreach ($filas as $f) {
+            $id = (int) $f->partido_id;
+
+            $html .= '<div><span class="warn">?</span> ' . $this->resumenPartido($id)
+                . ' <span class="sub">' . e((string) $f->motivo) . '</span>'
+                . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => $id])) . '">ver por qué</a>'
+                . ' · <a href="' . e(route('fechas.importarPartido', ['partidoId' => $id]))
+                . '">pegar la URL</a></div>';
+        }
+
+        $html .= '</div>';
+
+        if ($total > count($filas)) {
+            $html .= '<p class="sub">Se listan los ' . count($filas) . ' más nuevos de ' . (int) $total . '.</p>';
+        }
+
+        return $html;
+    }
+
     private function marcarSinGameId($partidoId, $candidatos = 0)
     {
         try {
