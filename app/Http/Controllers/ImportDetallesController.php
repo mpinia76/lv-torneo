@@ -1606,9 +1606,7 @@ class ImportDetallesController extends Controller
         };
 
         $porBuscar   = (clone $sinGameId())->count();
-        $yaBuscados  = DB::table('import_partidos')->whereNotNull('partido_id')
-            ->whereNull('external_id')->where('estado', 'excluido')
-            ->where('motivo', 'like', 'sin gameId%')->distinct()->count('partido_id');
+        $yaBuscados  = $this->sinGameIdPendientes()->distinct()->count('ipx.partido_id');
 
         $idsHallados = 0; $idsFallados = 0; $idsLlamadas = 0; $detalleIds = '';
 
@@ -1648,9 +1646,7 @@ class ImportDetallesController extends Controller
             // Los que aparecieron ya son parte de la lista de arriba.
             $porBuscar  = (clone $sinGameId())->count();
             $pendientes = (clone $base())->distinct()->count('partido_id');
-            $yaBuscados = DB::table('import_partidos')->whereNotNull('partido_id')
-                ->whereNull('external_id')->where('estado', 'excluido')
-                ->where('motivo', 'like', 'sin gameId%')->distinct()->count('partido_id');
+            $yaBuscados = $this->sinGameIdPendientes()->distinct()->count('ipx.partido_id');
         }
 
         $cuerpo .= '<div class="cards">'
@@ -1850,6 +1846,29 @@ class ImportDetallesController extends Controller
      * la lista.
      */
     /**
+     * Los partidos marcados como "lo busqué y no apareció" que SIGUEN sin gameId.
+     *
+     * La marca existe para no volver a pagar la búsqueda en cada tanda, así que
+     * no se borra nunca. Pero el partido se puede haber resuelto después por
+     * otro camino —el calendario del club, o pegando la URL a mano— y entonces
+     * seguir listándolo es mandar a trabajar sobre algo que ya está hecho. El
+     * LEFT JOIN contra una fila con `external_id` saca a esos.
+     */
+    private function sinGameIdPendientes()
+    {
+        return DB::table('import_partidos as ipx')
+            ->join('partidos', 'partidos.id', '=', 'ipx.partido_id')
+            ->leftJoin('import_partidos as ipg', function ($j) {
+                $j->on('ipg.partido_id', '=', 'ipx.partido_id')->whereNotNull('ipg.external_id');
+            })
+            ->whereNotNull('ipx.partido_id')
+            ->whereNull('ipx.external_id')
+            ->where('ipx.estado', 'excluido')
+            ->where('ipx.motivo', 'like', 'sin gameId%')
+            ->whereNull('ipg.id');
+    }
+
+    /**
      * Los partidos que ya se buscaron sin suerte, con su salida al lado.
      *
      * Antes esto era un número suelto y una instrucción para escribir una URL a
@@ -1865,15 +1884,10 @@ class ImportDetallesController extends Controller
      */
     private function listaSinGameId($total)
     {
-        $filas = DB::table('import_partidos')
-            ->join('partidos', 'partidos.id', '=', 'import_partidos.partido_id')
-            ->whereNotNull('import_partidos.partido_id')
-            ->whereNull('import_partidos.external_id')
-            ->where('import_partidos.estado', 'excluido')
-            ->where('import_partidos.motivo', 'like', 'sin gameId%')
+        $filas = $this->sinGameIdPendientes()
             ->orderByDesc('partidos.dia')
             ->limit(40)
-            ->get(['import_partidos.partido_id', 'import_partidos.motivo']);
+            ->get(['ipx.partido_id', 'ipx.motivo']);
 
         $html = '<h3>Ya buscados y sin gameId <span class="sub">(' . (int) $total . ')</span></h3>'
             . '<p class="sub">Quedaron marcados y no se vuelven a intentar solos. '
