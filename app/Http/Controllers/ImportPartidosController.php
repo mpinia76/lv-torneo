@@ -3080,91 +3080,50 @@ class ImportPartidosController extends Controller
         return $aprendidos;
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // El apareo de clubes de TM con equipos nuestros vive en
+    // `App\Services\MapeoClubesTm`. Se sacó de acá cuando hizo falta la misma
+    // lógica en el lector de calendarios HTML: dos copias del apareo de nombres
+    // es la forma segura de que una arregle un caso y la otra no, y una
+    // traducción equivocada carga el partido con el rival cambiado.
+    // Estos métodos quedan como envoltorio para no tocar los llamadores.
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** @var \App\Services\MapeoClubesTm|null */
+    private $mapeoClubes = null;
+
+    private function mapeoClubes()
+    {
+        if ($this->mapeoClubes === null) {
+            $this->mapeoClubes = new \App\Services\MapeoClubesTm;
+        }
+
+        return $this->mapeoClubes;
+    }
+
     private function guardarMapeo($tmClubId, $equipoId, $nombre, $origen)
     {
-        DB::table('equipo_tm')->updateOrInsert(
-            ['tm_club_id' => (string) $tmClubId],
-            ['equipo_id' => (int) $equipoId, 'nombre_tm' => $nombre, 'origen' => $origen,
-                'updated_at' => now(), 'created_at' => now()]
-        );
+        $this->mapeoClubes()->guardar($tmClubId, $equipoId, $nombre, $origen);
     }
 
     private function mapaTm()
     {
-        $mapa = [];
-        foreach (DB::table('equipo_tm')->select('tm_club_id', 'equipo_id')->get() as $r) {
-            $mapa[(string) $r->tm_club_id] = (int) $r->equipo_id;
-        }
-        return $mapa;
+        return $this->mapeoClubes()->porId();
     }
 
-    /**
-     * Nombre normalizado -> equipo_id. Si dos equipos comparten la misma clave
-     * (pasa con los homónimos), la clave se marca ambigua y no matchea con nadie:
-     * mejor un conflicto para resolver a mano que un partido con el rival cambiado.
-     */
     private function mapaNombres()
     {
-        $mapa = [];
-        foreach (\App\Equipo::select('id', 'nombre')->get() as $e) {
-            foreach ($this->clavesNombre($e->nombre) as $k) {
-                if ($k === '') continue;
-                if (isset($mapa[$k]) && $mapa[$k] !== $e->id) {
-                    $mapa[$k] = null;      // ambigua
-                } elseif (!array_key_exists($k, $mapa)) {
-                    $mapa[$k] = $e->id;
-                }
-            }
-        }
-        return $mapa;
+        return $this->mapeoClubes()->porNombre();
     }
 
     private function resolverClub($tmId, $nombre, array $mapaTm, array $mapaNombres)
     {
-        if ($tmId !== null && isset($mapaTm[(string) $tmId])) return $mapaTm[(string) $tmId];
-        foreach ($this->clavesNombre($nombre) as $k) {
-            if ($k !== '' && isset($mapaNombres[$k]) && $mapaNombres[$k] !== null) return $mapaNombres[$k];
-        }
-        return null;
+        return $this->mapeoClubes()->resolver($tmId, $nombre);
     }
 
-    /**
-     * Claves normalizadas de un nombre de club.
-     *
-     * REGLA IMPORTANTE: si el nombre trae un paréntesis aclaratorio —"Sarmiento (Junín)",
-     * "Central Córdoba (SdE)"— ese paréntesis es parte del nombre y NO se descarta.
-     * Sin esta regla, "CA Sarmiento (Junín)" matchea contra un "Sarmiento" cualquiera
-     * y termina creando partidos con el rival equivocado.
-     */
     private function clavesNombre($nombre)
     {
-        $nombre = (string) $nombre;
-        if (trim($nombre) === '') return [];
-
-        $base = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nombre);
-        if ($base === false) $base = $nombre;
-        $base = mb_strtolower($base);
-
-        // Los paréntesis se aplanan (pasan a ser texto), no se borran.
-        $base = str_replace(['(', ')', '.', ','], ' ', $base);
-
-        $claves = [
-            $this->soloLetras($base),
-            $this->soloLetras($this->quitarPrefijos($base)),
-        ];
-        return array_values(array_unique(array_filter($claves)));
-    }
-
-    private function quitarPrefijos($str)
-    {
-        $str = preg_replace('/\b(c\.?a\.?|a\.?a\.?|c\.?s\.?|c\.?d\.?|c\.?s\.?d\.?|a\.?c\.?|s\.?c\.?|f\.?c\.?|c\.?f\.?|c\.?b\.?|s\.?a\.?d\.?)\b/u', ' ', $str);
-        $str = preg_replace('/\b(club|atletico|atletica|deportivo|deportiva|deportes|asociacion|association|sportivo|sporting|social|futbol|football|de|del|la|el)\b/u', ' ', $str);
-        return $str;
-    }
-
-    private function soloLetras($str)
-    {
-        return (string) preg_replace('/[^\p{L}\p{N}]+/u', '', (string) $str);
+        return $this->mapeoClubes()->claves($nombre);
     }
 
     private function normalizar(array $g, $coachId)

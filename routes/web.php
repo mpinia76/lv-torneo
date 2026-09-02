@@ -291,6 +291,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');
     Route::get('/import-detalles/competencia', 'ImportDetallesController@competencia')->name('import_detalles.competencia');
     Route::get('/import-detalles/club-html', 'ImportDetallesController@clubHtml')->name('import_detalles.club_html');
+    Route::get('/import-detalles/competencia-html', 'ImportDetallesController@competenciaHtml')->name('import_detalles.competencia_html');
 });
 
 

@@ -813,7 +813,12 @@ class ImportDetallesController extends Controller
         if ($clubTm === '' || $season === '') {
             return $this->pagina('Calendario del club', $cuerpo
                 . '<p class="sub">Elegí un club y una temporada. Los clubes de la lista son los que ya están '
-                . 'atados a Transfermarkt en <code>equipo_tm</code>.</p>');
+                . 'atados a Transfermarkt en <code>equipo_tm</code>.</p>'
+                . '<p class="sub">Si lo que querés destrabar es un <b>torneo entero</b> —sobre todo uno '
+                . 'internacional, donde los clubes no están atados— conviene '
+                . '<a href="' . e(route('import_detalles.competencia_html')) . '">Calendario de una '
+                . 'competencia</a>: una llamada trae todos los partidos y de paso propone los mapeos que '
+                . 'faltan en <code>equipo_tm</code>.</p>');
         }
 
         $svc   = new \App\Services\TmFixtureClubHtml;
@@ -920,6 +925,251 @@ class ImportDetallesController extends Controller
             . 'partidos, sólo se le pone el gameId a los que ya existen.</p>';
 
         return $this->pagina('Calendario del club', $cuerpo);
+    }
+
+    /**
+     * El calendario de una COMPETENCIA entera, del HTML de Transfermarkt.
+     *
+     * Una llamada = el torneo completo. Para el Mundial de Clubes 2025 son 63
+     * partidos en una página; hacerlo club por club serían 32 llamadas y 32
+     * clubes para atar a mano.
+     *
+     * Y como la página trae el **nombre** de cada club además del id, la misma
+     * pasada propone los mapeos que faltan en `equipo_tm`. Eso es lo que
+     * destraba los torneos internacionales: ahí el problema casi nunca es
+     * encontrar el partido, es que los clubes no están atados.
+     *
+     * Las dos reglas de siempre: sólo escribe gameId de partidos que YA están
+     * en la base, y con más de un candidato en la ventana de fechas no elige.
+     */
+    public function competenciaHtml(Request $request)
+    {
+        set_time_limit(0);
+
+        $compId  = trim((string) $request->get('comp_id', ''));
+        $season  = trim((string) $request->get('season', ''));
+        $copa    = (string) $request->get('copa', '0') === '1';
+        $guardar = (string) $request->get('guardar', '0') === '1';
+        $mapear  = (string) $request->get('mapear', '0') === '1';
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Calendario de una competencia, del HTML de Transfermarkt</h1>'
+            . '<p class="sub">Trae <b>el torneo entero de una temporada</b> con el gameId de cada partido, en '
+            . '<b>una sola llamada</b>. Es el camino para los torneos internacionales y para cualquier campeonato '
+            . 'ya terminado: las rutas de la API devuelven siempre la temporada en curso.</p>'
+            . '<p class="sub"><b>Ojo con el tipo.</b> En Transfermarkt las ligas y las copas viven en rutas '
+            . 'distintas, no es un parámetro. Torneo Clausura es una <b>liga</b> (<code>ARGC</code>); '
+            . 'Copa Argentina (<code>ARCA</code>), Libertadores (<code>CLI</code>) y Mundial de Clubes '
+            . '(<code>KLUB</code>) son <b>copas</b>. Si elegís mal, la página vuelve vacía.</p>'
+            . '<p class="sub">El id de competencia lo podés sacar de la columna «Competencia» de '
+            . '<a href="' . e(route('import_detalles.club_html')) . '">Calendario de un club</a>, o de '
+            . '<code>import_partidos.competencia_external_id</code>. <b>La temporada va uno atrás del año</b>: '
+            . 'todo lo de 2025 es <code>2024</code>.</p>'
+            . '<form method="get" class="acciones">'
+            . '<input type="text" name="comp_id" value="' . e($compId) . '" size="10" placeholder="ej KLUB" required> '
+            . '<select name="copa">'
+            . '<option value="0"' . (!$copa ? ' selected' : '') . '>liga</option>'
+            . '<option value="1"' . ($copa ? ' selected' : '') . '>copa</option>'
+            . '</select> '
+            . '<input type="text" name="season" value="' . e($season) . '" size="8" placeholder="ej 2024" required> '
+            . '<button class="boton" type="submit">Leer el calendario</button>'
+            . ' <span class="sub">1 crédito</span></form>';
+
+        if ($compId === '' || $season === '') {
+            return $this->pagina('Calendario de la competencia', $cuerpo);
+        }
+
+        $svc   = new \App\Services\TmFixtureCompetenciaHtml;
+        $filas = $svc->leerComp($compId, $season, $copa);
+
+        $cuerpo .= '<p class="sub">Página leída: <a href="'
+            . e(\App\Services\TmFixtureCompetenciaHtml::urlComp($compId, $season, $copa))
+            . '" target="_blank" rel="noopener">verla en Transfermarkt</a></p>';
+
+        foreach ($svc->avisos as $a) {
+            $cuerpo .= '<div class="err-box">' . e($a) . '</div>';
+        }
+
+        if ($filas === null || !$filas) {
+            return $this->pagina('Calendario de la competencia', $cuerpo);
+        }
+
+        $mapeo     = new \App\Services\MapeoClubesTm;
+        $ids       = array_values(array_filter(array_column($filas, 'game_id')));
+        $enStaging = DB::table('import_partidos')->whereIn('external_id', $ids)
+            ->pluck('partido_id', 'external_id')->all();
+
+        $cont      = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0, 'guardados' => 0];
+        $porAtar   = [];   // tm_club_id => ['nombre' => .., 'equipo_id' => ..] reconocidos por NOMBRE
+        $sinAtar   = [];   // tm_club_id => nombre, los que no se reconocieron
+        $tabla     = '';
+
+        foreach ($filas as $f) {
+            $equipos = [];
+
+            foreach ([['local_tm', 'local_nombre'], ['visita_tm', 'visita_nombre']] as $par) {
+                $tm     = $f[$par[0]];
+                $nombre = $f[$par[1]];
+                $como   = null;
+                $eq     = $mapeo->resolver($tm, $nombre, $como);
+
+                if ($eq && $como === 'nombre' && !isset($porAtar[$tm])) {
+                    // Reconocido por nombre pero sin fila en equipo_tm: candidato
+                    // a aprender. No se guarda solo — se propone.
+                    $porAtar[$tm] = ['nombre' => $nombre, 'equipo_id' => (int) $eq];
+                }
+
+                if (!$eq && !isset($sinAtar[$tm])) {
+                    $sinAtar[$tm] = $nombre;
+                }
+
+                $equipos[] = (int) $eq;
+            }
+
+            $yaEsta    = array_key_exists($f['game_id'], $enStaging) && $enStaging[$f['game_id']];
+            $partidoId = 0;
+            $motivo    = '';
+
+            if ($yaEsta) {
+                $partidoId = (int) $enStaging[$f['game_id']];
+                $cont['ya']++;
+            } else {
+                // Con uno solo de los dos clubes atado alcanza para intentar:
+                // el apareo exige un único candidato en la ventana, así que no
+                // se arriesga nada y se rescatan los partidos donde el rival
+                // todavía no está mapeado.
+                $eqA = $equipos[0];
+                $eqB = $equipos[1];
+
+                if (!$eqA && $eqB) {
+                    $eqA = $eqB;
+                    $eqB = 0;
+                }
+
+                list($partidoId, $motivo) = $this->partidoDeFila($f, $eqA, $eqB);
+
+                if ($partidoId) {
+                    $cont['nuevos']++;
+
+                    if ($guardar) {
+                        $ok = (new TmBuscarGameId)->anotar($partidoId, $f['game_id'],
+                            'calendario de la competencia ' . $compId . ' temporada ' . $season
+                            . ' (HTML de Transfermarkt)');
+                        if ($ok) $cont['guardados']++;
+                    }
+                } else {
+                    $cont['sin']++;
+                }
+            }
+
+            $tabla .= '<tr class="' . ($partidoId && !$yaEsta ? 'warn' : '') . '">'
+                . '<td class="num">' . e((string) ($f['dia'] ?: $f['dia_crudo'])) . '</td>'
+                . '<td>' . e((string) $f['local_nombre']) . ' vs ' . e((string) $f['visita_nombre']) . '</td>'
+                . '<td class="num">' . e((string) $f['resultado']) . '</td>'
+                . '<td class="num gris">' . e((string) $f['game_id']) . '</td>'
+                . '<td>' . ($partidoId
+                    ? '<a href="' . e(route('import_detalles.ver', ['partido_id' => $partidoId])) . '">partido #'
+                        . $partidoId . '</a>' . ($yaEsta ? ' <span class="sub">ya lo tenía</span>' : '')
+                    : '<span class="sub">' . e($motivo) . '</span>') . '</td>'
+                . '</tr>';
+        }
+
+        // ── Aprender los mapeos de clubes ───────────────────────────────────
+        $aprendidos = 0;
+
+        if ($mapear && $porAtar) {
+            foreach ($porAtar as $tm => $d) {
+                $mapeo->guardar($tm, $d['equipo_id'], $d['nombre'], 'calendario html');
+                $aprendidos++;
+            }
+
+            $cuerpo .= '<div class="ok-box">Até <b>' . $aprendidos . '</b> clubes de Transfermarkt a equipos '
+                . 'tuyos en <code>equipo_tm</code>. Volvé a leer el calendario: ahora deberían aparear más '
+                . 'partidos.</div>';
+            $porAtar = [];
+        }
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($cont['leidos'], 'partidos del torneo')
+            . $this->card($cont['ya'], 'ya tenían gameId', 'ok')
+            . $this->card($cont['nuevos'], $guardar ? 'apareados' : 'para guardar', $cont['nuevos'] ? 'warn' : '')
+            . $this->card($cont['sin'], 'sin partido en tu base')
+            . $this->card(count($porAtar), 'clubes por atar', count($porAtar) ? 'warn' : '')
+            . $this->card(count($sinAtar), 'clubes desconocidos', count($sinAtar) ? 'err' : '')
+            . ($guardar ? $this->card($cont['guardados'], 'guardados', 'ok') : '')
+            . '</div>';
+
+        if ($svc->descartadas) {
+            $cuerpo .= '<p class="sub">Se descartaron <b>' . $svc->descartadas . '</b> filas sin fecha o sin los '
+                . 'dos clubes.</p>';
+        }
+
+        // ── Primero atar, después guardar ───────────────────────────────────
+        // El orden importa: cada club que se ata hace aparear más partidos, así
+        // que guardar antes de atar deja plata sobre la mesa.
+        if ($porAtar) {
+            $cuerpo .= '<h2>Clubes que reconocí por el nombre</h2>'
+                . '<p class="sub">Estos clubes de Transfermarkt no están en <code>equipo_tm</code>, pero su '
+                . 'nombre coincide sin ambigüedad con un equipo tuyo. <b>Revisalos antes de atarlos:</b> un club '
+                . 'mal atado carga partidos con el rival cambiado. Los homónimos no aparecen acá — cuando dos '
+                . 'equipos tuyos comparten nombre normalizado, el apareo por nombre se abstiene a propósito.</p>'
+                . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th>'
+                . '<th>Equipo tuyo</th></tr></thead><tbody>';
+
+            foreach ($porAtar as $tm => $d) {
+                $nombreEq = $this->nombreEquipo($d['equipo_id']);
+                $cuerpo .= '<tr>'
+                    . '<td>' . e((string) $d['nombre']) . '</td>'
+                    . '<td class="num gris">' . e((string) $tm) . '</td>'
+                    . '<td>' . e((string) $nombreEq) . ' <span class="sub">#' . $d['equipo_id'] . '</span></td>'
+                    . '</tr>';
+            }
+
+            $cuerpo .= '</tbody></table></div>'
+                . '<p class="acciones"><a class="boton" href="'
+                . e(route('import_detalles.competencia_html',
+                    ['comp_id' => $compId, 'season' => $season, 'copa' => $copa ? 1 : 0, 'mapear' => 1]))
+                . '">Atar los ' . count($porAtar) . ' clubes</a> '
+                . '<span class="sub">hacelo antes de guardar los gameId: cada club atado aparea más partidos</span></p>';
+        }
+
+        if ($sinAtar) {
+            $cuerpo .= '<h2>Clubes que no reconocí</h2>'
+                . '<p class="sub">No están en <code>equipo_tm</code> y su nombre no coincide con ningún equipo '
+                . 'tuyo (o coincide con más de uno). Si el equipo existe en tu base con otro nombre, atalo a mano '
+                . 'desde la carga de partidos; si no existe, los partidos de ese club no se van a poder aparear.</p>'
+                . '<div class="diag">';
+
+            foreach ($sinAtar as $tm => $nombre) {
+                $cuerpo .= '<div>• ' . e((string) $nombre) . ' <span class="sub">— id de TM '
+                    . e((string) $tm) . '</span> · <a href="'
+                    . e(route('import_partidos.fixture', ['mapear_tm' => $tm, 'mapear_nombre' => $nombre]))
+                    . '">atarlo a un equipo tuyo</a></div>';
+            }
+
+            $cuerpo .= '</div>';
+        }
+
+        if ($guardar) {
+            $cuerpo .= '<div class="ok-box">Guardados <b>' . $cont['guardados'] . '</b> gameId.</div>';
+        } elseif ($cont['nuevos']) {
+            $cuerpo .= '<p class="acciones"><a class="boton" href="'
+                . e(route('import_detalles.competencia_html',
+                    ['comp_id' => $compId, 'season' => $season, 'copa' => $copa ? 1 : 0, 'guardar' => 1]))
+                . '">Guardar los ' . $cont['nuevos'] . ' gameId</a> '
+                . '<span class="sub">vuelve a leer la página, así que cuesta 1 crédito más</span></p>';
+        } else {
+            $cuerpo .= '<div class="ok-box"><b>No se escribió nada.</b> No hay ningún partido nuevo para atar '
+                . 'en este torneo.</div>';
+        }
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido en TM</th><th>Res.</th>'
+            . '<th>gameId</th><th>Partido tuyo</th></tr></thead><tbody>'
+            . $tabla . '</tbody></table></div>'
+            . '<p class="sub">Las filas resaltadas son las que se van a guardar. Acá <b>no se crean partidos</b>: '
+            . 'los que Transfermarkt tiene y vos no se listan, pero no se escriben.</p>';
+
+        return $this->pagina('Calendario de la competencia', $cuerpo);
     }
 
     /**
@@ -1896,11 +2146,14 @@ class ImportDetallesController extends Controller
             . 'Lo único que va hacia atrás en el tiempo son los partidos del DT — cargale la URL de TM a los '
             . 'que dirigieron ese partido y volvé a entrar acá — o entrá al partido y pegá ahí la URL de '
             . 'Transfermarkt, que lo resuelve de una y para siempre.</p>'
-            . '<p class="sub"><b>Atajo para una temporada entera:</b> '
-            . '<a href="' . e(route('import_detalles.club_html')) . '">Calendario de un club</a> lee del sitio '
-            . '(no de la API) todos los partidos de un club en una temporada, con su gameId, en <b>una sola '
-            . 'llamada</b>, y le pone el gameId a todos los que ya tenés cargados. Es el camino barato para '
-            . 'destrabar un campeonato viejo completo.</p>'
+            . '<p class="sub"><b>Atajos, que leen del sitio y no de la API:</b> '
+            . '<a href="' . e(route('import_detalles.club_html')) . '">Calendario de un club</a> trae todos los '
+            . 'partidos de un club en una temporada con su gameId, en <b>una sola llamada</b> — sirve cuando los '
+            . 'que faltan se repiten entre pocos clubes. '
+            . '<a href="' . e(route('import_detalles.competencia_html')) . '">Calendario de una competencia</a> '
+            . 'trae el <b>torneo entero</b>, también en una llamada, y encima propone los mapeos de '
+            . '<code>equipo_tm</code> que falten: es el que hay que usar en los torneos internacionales, donde '
+            . 'lo que falla no es encontrar el partido sino que los clubes no están atados.</p>'
             . '<div class="diag">';
 
         foreach ($filas as $f) {

@@ -184,10 +184,17 @@ class TmFixtureClubHtml
 
         // El id de competencia está DENTRO de la fila: la celda de la jornada
         // linkea a la competencia. De ahí salen ARGC, ARG1, etc.
+        //
+        // OJO CON LAS COPAS: en TM las ligas van por `/wettbewerb/` y las copas
+        // por `/pokalwettbewerb/` — Copa Argentina es `pokalwettbewerb/ARCA`,
+        // Libertadores `CLI`, Mundial de Clubes `KLUB`. Buscando "/wettbewerb/"
+        // con la barra adelante, las copas no matcheaban: quedaban sin id y,
+        // peor, heredaban el nombre del último encabezado de liga, así que un
+        // partido de la Copa Argentina figuraba como «Torneo Clausura».
         $compId = null;
 
-        foreach ($xp->query('.//a[contains(@href, "/wettbewerb/")]', $tr) as $link) {
-            if (preg_match('#/wettbewerb/([A-Za-z0-9]+)#', $link->getAttribute('href'), $m)) {
+        foreach ($xp->query('.//a[contains(@href, "wettbewerb/")]', $tr) as $link) {
+            if (preg_match('#/(?:pokal)?wettbewerb/([A-Za-z0-9]+)#', $link->getAttribute('href'), $m)) {
                 $compId = $m[1];
                 break;
             }
@@ -199,7 +206,7 @@ class TmFixtureClubHtml
         // cada partido se quedaba con la jornada del anterior — pasó, y se veía
         // como una competencia llamada «15».
         $competencia = null;
-        $previos     = $xp->query('preceding::a[contains(@href, "/wettbewerb/")]', $tr);
+        $previos     = $xp->query('preceding::a[contains(@href, "wettbewerb/")]', $tr);
 
         if ($previos && $previos->length) {
             for ($i = $previos->length - 1; $i >= 0; $i--) {
@@ -233,7 +240,7 @@ class TmFixtureClubHtml
      * las fechas del 1 al 12— se usa dd/mm, que es lo que sirve el sitio en
      * español, y se avisa.
      */
-    private function convertirFechas(array $filas)
+    protected function convertirFechas(array $filas)
     {
         $formato = $this->detectarFormato($filas);
 
@@ -258,7 +265,7 @@ class TmFixtureClubHtml
         return $filas;
     }
 
-    private function detectarFormato(array $filas)
+    protected function detectarFormato(array $filas)
     {
         $primeroGrande = false;
         $segundoGrande = false;
