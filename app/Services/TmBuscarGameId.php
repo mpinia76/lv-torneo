@@ -94,6 +94,15 @@ class TmBuscarGameId
      */
     private $partida = '';
 
+    /**
+     * Lo mismo que `$partida` pero en crudo, para poder armar links.
+     *
+     * La frase sirve para leer; los links necesitan los ids sueltos.
+     *
+     * @var array ['torneo' => array|null, 'clubes' => array, 'dia' => string]
+     */
+    private $contexto = [];
+
     /** @var int */
     private $llamadas = 0;
 
@@ -110,6 +119,7 @@ class TmBuscarGameId
         $this->candidatos = [];
         $this->rastro     = [];
         $this->partida    = '';
+        $this->contexto   = [];
         $this->llamadas   = 0;
 
         $partido = DB::table('partidos')->where('id', (int) $partidoId)->first();
@@ -360,6 +370,21 @@ class TmBuscarGameId
         }
 
         $this->partida = implode(' · ', $partes);
+
+        $this->contexto = [
+            'dia'    => substr((string) $partido->dia, 0, 10),
+            'torneo' => $torneo ? [
+                'id'     => (int) $torneo->torneo_id,
+                'nombre' => (string) $torneo->nombre,
+                'year'   => (string) $torneo->year,
+                'comp'   => trim((string) $torneo->tm_competition_id),
+                'season' => trim((string) $torneo->tm_season_id),
+            ] : null,
+            'clubes' => [
+                ['nombre' => $this->nombreEquipo($partido->equipol_id), 'tm' => $tmLocal],
+                ['nombre' => $this->nombreEquipo($partido->equipov_id), 'tm' => $tmVisit],
+            ],
+        ];
     }
 
     /**
@@ -1010,6 +1035,7 @@ class TmBuscarGameId
             // Los nombres sólo se piden si de verdad hay que mostrar la lista.
             'candidatos' => $gameId ? [] : $this->candidatosConNombres(),
             'partida'    => $this->partida,
+            'contexto'   => $this->contexto,
             'rastro'     => $this->rastro,
             'avisos'     => $this->avisos,
             'llamadas'   => $this->llamadas,

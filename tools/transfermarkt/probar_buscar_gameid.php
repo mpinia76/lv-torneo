@@ -202,6 +202,10 @@ $r = (new TmBuscarGameId)->buscar(22437);
 $notas = implode(' ', array_column($r['rastro'], 'nota'));
 chequear(strpos($notas, 'no tiene cargado su id de competencia') !== false,
     'deja fila de rastro explicando por qué no consultó la competencia');
+// El contexto en crudo es lo que la pantalla usa para armar los links de "Cómo completarlo".
+chequear($r['contexto']['torneo']['id'] === 5 && $r['contexto']['torneo']['comp'] === ''
+    && $r['contexto']['clubes'][0]['tm'] === '1029' && $r['contexto']['dia'] === '2025-11-15',
+    'devuelve el contexto en crudo (torneo + clubes + día) para armar los links');
 chequear(!in_array(TM . '/competition/ARGC/fixtures', Escenario::$pedidas, true), 'no pidió nada de competencia');
 
 echo "\n== 8) Con id de competencia pero sin seasonId: avisa que sólo puede la temporada en curso\n";

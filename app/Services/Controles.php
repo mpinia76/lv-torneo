@@ -45,6 +45,17 @@ class Controles
     /** La ficha del partido en Transfermarkt, para pegarle el gameId atrás. */
     public const TM_PARTIDO = 'https://www.transfermarkt.com/spielbericht/index/spielbericht/';
 
+    /**
+     * El fixture de un club en una temporada: TM_CLUB_TEMPORADA . id . '/saison_id/' . temporada
+     *
+     * Lista los partidos de esa temporada agrupados por competencia, y de los
+     * links de esa página salen los dos datos que la API necesita y no se
+     * pueden adivinar: el id de competencia (`wettbewerb/<ID>`) y el seasonId
+     * (`saison_id=<N>`). El primer segmento de la ruta es el nombre del club y
+     * TM lo ignora: con un guion alcanza (verificado sep-2026).
+     */
+    public const TM_CLUB_TEMPORADA = 'https://www.transfermarkt.com/-/spielplandatum/verein/';
+
     /** Los tres roles que tiene que tener sí o sí una terna arbitral. */
     public const ROLES_TERNA = [
         'Principal' => 'Principal',

@@ -604,6 +604,8 @@ class ImportDetallesController extends Controller
             $html .= '</tbody></table></div>';
         }
 
+        $html .= $this->comoCompletarTorneo($buscado);
+
         $html .= '<p class="sub"><b>Para que se rehaga solo la próxima vez</b>, alcanza con cualquiera de estas: '
             . 'que los dos equipos estén atados a su club de Transfermarkt en <code>equipo_tm</code> '
             . '(el sondeo del DT aprende esos mapeos solo); que los DTs del partido tengan cargada su '
@@ -615,6 +617,83 @@ class ImportDetallesController extends Controller
             . '<a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $partidoId])) . '">'
             . 'pegar la URL de Transfermarkt a mano</a>. Pegándola una vez queda anotado el gameId y de ahí en más '
             . 'este partido se rehace solo.</p>';
+
+        return $html;
+    }
+
+    /**
+     * Los pasos concretos para completarle al torneo lo que le falta de TM.
+     *
+     * El id de competencia y el seasonId no se pueden adivinar desde acá, pero
+     * SÍ se puede llevar al usuario derecho a la página donde están: el fixture
+     * del club en esa temporada lista los partidos agrupados por competencia, y
+     * de esos links salen los dos datos. Decirle "cargalos" sin el link es
+     * mandarlo a buscar a mano lo que ya sabemos dónde está.
+     *
+     * La temporada del link es TENTATIVA: se usa la del torneo si está cargada
+     * y si no el año del partido menos uno (que es lo que vale para los
+     * campeonatos de año calendario). Si no es esa, el desplegable de la propia
+     * página de TM la cambia.
+     */
+    private function comoCompletarTorneo($buscado)
+    {
+        $ctx = isset($buscado['contexto']) && is_array($buscado['contexto']) ? $buscado['contexto'] : [];
+        $t   = isset($ctx['torneo']) && is_array($ctx['torneo']) ? $ctx['torneo'] : null;
+
+        if (!$t) {
+            return '';
+        }
+
+        $faltaComp   = $t['comp'] === '';
+        $faltaSeason = $t['season'] === '';
+
+        if (!$faltaComp && !$faltaSeason) {
+            return '';
+        }
+
+        $anio      = (int) substr((string) (isset($ctx['dia']) ? $ctx['dia'] : ''), 0, 4);
+        $tentativa = $t['season'] !== '' ? $t['season'] : (string) ($anio - 1);
+        $nombre    = trim($t['nombre'] . ' ' . $t['year']);
+
+        $falta = $faltaComp && $faltaSeason ? 'el <b>id de competencia</b> y el <b>seasonId</b>'
+            : ($faltaComp ? 'el <b>id de competencia</b>' : 'el <b>seasonId</b>');
+
+        $html = '<h2>Cómo completarlo</h2>'
+            . '<p class="sub">Al torneo «' . e($nombre) . '» le falta ' . $falta . ' de Transfermarkt. '
+            . 'Los dos están en la URL de la competencia en TM, y la forma más corta de llegar es por el '
+            . 'fixture de uno de estos dos clubes en esa temporada:</p><ol class="sub">';
+
+        $links = '';
+
+        foreach ((isset($ctx['clubes']) ? $ctx['clubes'] : []) as $c) {
+            if (empty($c['tm'])) {
+                continue;
+            }
+
+            $links .= ($links !== '' ? ' · ' : '')
+                . '<a href="' . e(\App\Services\Controles::TM_CLUB_TEMPORADA . $c['tm']
+                    . '/saison_id/' . $tentativa) . '" target="_blank" rel="noopener">'
+                . e((string) $c['nombre']) . ' en TM →</a>';
+        }
+
+        $html .= $links !== ''
+            ? '<li>' . $links . ' <span class="gris">(temporada ' . e($tentativa) . ', tentativa: '
+                . 'si el partido del ' . e((string) $ctx['dia']) . ' no aparece ahí, cambiala en el '
+                . 'desplegable «Season» de esa misma página)</span></li>'
+            : '<li>Buscá el torneo en Transfermarkt. <span class="gris">No te puedo dar el link directo: '
+                . 'ninguno de los dos equipos está atado a un club de TM en <code>equipo_tm</code>.</span></li>';
+
+        $html .= '<li>Ubicá ahí la fila de este partido y hacé clic en el <b>nombre de la competencia</b>. '
+                . 'De esa URL salen los dos datos: '
+                . '<code>.../wettbewerb/<b>ARGC</b>/...?saison_id=<b>2024</b></code> — '
+                . '<code>wettbewerb</code> es el <b>id de competencia</b> y <code>saison_id</code> es el '
+                . '<b>seasonId</b>, tal cual, sin convertir nada.</li>'
+            . '<li>Pegalos en <a href="' . e(route('torneos.edit', $t['id'])) . '">'
+                . 'Editar «' . e($nombre) . '» → transfermarkt.com</a> y volvé a apretar el botón acá.</li>'
+            . '</ol>'
+            . '<p class="sub">Ojo con dos cosas: el <b>seasonId va uno atrás del año</b> que usás vos '
+            . '(el Clausura 2026 es seasonId 2025), y en TM el <b>Apertura y el Clausura son competencias '
+            . 'distintas</b>, con ids distintos, aunque sean del mismo año.</p>';
 
         return $html;
     }
