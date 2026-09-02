@@ -342,7 +342,10 @@ class ImportDetallesController extends Controller
         // copiar la barra de direcciones es lo natural.
         $pegado    = trim((string) $request->get('game_id', ''));
         $gameId    = $this->gameIdDesde($pegado);
-        $malPegado = $pegado !== '' && $gameId === '';
+        // Ojo con el vacío: si el campo VINO en la URL pero llegó sin nada, el
+        // usuario apretó el botón sin pegar. Volver a salir a buscar ahí sería
+        // gastar créditos para mostrarle exactamente la misma pantalla.
+        $malPegado = $request->has('game_id') && $gameId === '';
         $forzar    = (string) $request->get('forzar', '0') === '1';
 
         // Si el gameId viene en la URL es porque lo eligió el usuario entre los
@@ -376,11 +379,17 @@ class ImportDetallesController extends Controller
         }
 
         if (!$partidoId || $gameId === '') {
-            $error = $malPegado
-                ? 'No pude sacar un gameId de «' . e($pegado) . '». Tiene que ser la URL de la <b>ficha del '
+            $error = '';
+
+            if ($malPegado && $pegado === '') {
+                $error = 'El campo llegó <b>vacío</b>. El texto gris que ves en el recuadro es sólo un ejemplo, '
+                    . 'no un valor cargado: hay que <b>escribir o pegar adentro</b> la URL y recién ahí apretar '
+                    . 'el botón.';
+            } elseif ($malPegado) {
+                $error = 'No pude sacar un gameId de «' . e($pegado) . '». Tiene que ser la URL de la <b>ficha del '
                     . 'partido</b> en Transfermarkt (la que lleva <code>/spielbericht/</code>) o el número solo. '
-                    . 'No alcanza con la URL del club, la del torneo ni la de una fecha.'
-                : '';
+                    . 'La URL del club, la del torneo o la de una fecha no alcanzan: no dicen cuál es el partido.';
+            }
 
             return $this->pagina('Detalle', $this->sinGameId($partidoId, $buscado, $error));
         }
@@ -640,13 +649,16 @@ class ImportDetallesController extends Controller
         // que pegar es la URL del partido EN TRANSFERMARKT, y el que la usa es
         // este importador.
         $html .= '<h2>Cargarlo a mano</h2>'
-            . '<p class="sub">Si ya sabés cuál es el partido en Transfermarkt, abrilo en el navegador y copiá acá '
-            . 'la barra de direcciones. No recortes nada: de la URL saco el <b>gameId</b> solo. '
-            . 'También podés pegar el número pelado.</p>'
+            . '<p class="sub">Si ya sabés cuál es el partido en Transfermarkt, abrí <b>su ficha</b> (la página del '
+            . 'partido, no la del club ni la del torneo) y copiá acá la barra de direcciones. No recortes nada: de '
+            . 'la URL saco el <b>gameId</b> solo. También podés pegar el número pelado. Queda así: '
+            . '<code>transfermarkt.com/spielbericht/index/spielbericht/<b>4643374</b></code>.</p>'
             . '<form method="get" action="' . e(route('import_detalles.ver')) . '" class="acciones">'
             . '<input type="hidden" name="partido_id" value="' . (int) $partidoId . '">'
-            . '<input type="text" name="game_id" size="70" '
-            . 'placeholder="https://www.transfermarkt.com/spielbericht/index/spielbericht/4643374"> '
+            // El placeholder NO puede parecer un valor ya cargado: con una URL
+            // completa de ejemplo, se aprieta el botón creyendo que está puesta.
+            . '<input type="text" name="game_id" size="70" required '
+            . 'placeholder="pegá acá la URL del partido en Transfermarkt…"> '
             . '<button class="boton" type="submit">Ver qué trae →</button>'
             . '</form>'
             . '<p class="sub">Eso abre la <b>vista previa</b>: muestra la alineación, los goles, las tarjetas y los '
@@ -2008,8 +2020,13 @@ class ImportDetallesController extends Controller
             . 'Es lo único que falta para cargar un torneo en curso: con el gameId, el importador de detalle '
             . 'ya trae alineaciones e incidencias. <b>Cada ruta cuesta 1 crédito.</b><br>'
             . 'Ya sabemos que <code>/games</code>, <code>/matches</code>, <code>matchday</code> y <code>round</code> '
-            . 'dan 404. Acá probamos el vocabulario propio de TM (<code>gameDay</code>) y el espejo de '
-            . '<code>/coach/{id}/performance-game</code> a nivel club.<br>'
+            . 'dan 404, y que <code>/competition/{id}/fixtures?seasonId=</code> <b>ignora la temporada</b>: '
+            . 'pedida la 2024 de ARGC devolvió el Clausura 2026 (verificado sep-2026).<br>'
+            . '<b>La pregunta abierta es si hay alguna forma de pedir una temporada pasada.</b> El sitio la tiene '
+            . '(<code>transfermarkt.es/cd-riestra/spielplan/verein/19775/saison_id/2024</code> lista el Clausura '
+            . '2025 entero), así que acá se prueban todas las formas de la ruta del <b>club con temporada</b>, que '
+            . 'nunca se probaron. Si alguna contesta la temporada pedida, los partidos viejos se pueden traer solos; '
+            . 'si no, hay que cargarlos a mano de a uno.<br>'
             . 'El id de competencia sale de <code>primaryCompetitionId</code> de un club (ej <code>ARGC</code>) '
             . 'o de <code>import_partidos.competencia_external_id</code>. El de club, de <code>equipo_tm</code> '
             . '(Vélez es <code>1029</code>).</p>'
@@ -2036,19 +2053,35 @@ class ImportDetallesController extends Controller
             . '</div>';
 
         $cuerpo .= '<div class="scroll"><table><thead><tr><th>Ruta</th><th>¿Responde?</th>'
-            . '<th>Items</th><th>Rama</th><th>Claves de primer nivel</th></tr></thead><tbody>';
+            . '<th>Items</th><th>Temporadas TM</th><th>Período</th><th>Rama</th>'
+            . '<th>Claves de primer nivel</th></tr></thead><tbody>';
         foreach ($r['rutas'] as $ruta => $info) {
-            $cuerpo .= '<tr' . ((int) $info['items'] > 1 ? ' class="warn"' : '') . '>'
+            // Se resalta la que trae la temporada PEDIDA, no la que trae muchos
+            // items: una ruta que contesta 240 partidos del año en curso no
+            // sirve para un partido viejo, y es exactamente lo que venía
+            // pasando sin que se notara.
+            $laPedida = $season !== '' && in_array((string) $season, $info['temporadas'], true);
+
+            $cuerpo .= '<tr' . ($laPedida ? ' class="warn"' : '') . '>'
                 . '<td><code>' . e($ruta) . '</code></td>'
                 . '<td>' . (!empty($info['ok']) ? '<span class="ok">sí</span>' : '<span class="err">no</span>') . '</td>'
                 . '<td class="num">' . ((int) $info['items'] ?: '—') . '</td>'
+                . '<td class="num">' . ($info['temporadas']
+                    ? ($laPedida ? '<b class="ok">' : '<span class="gris">')
+                        . e(implode(', ', $info['temporadas']))
+                        . ($laPedida ? '</b>' : '</span>')
+                    : '—') . '</td>'
+                . '<td class="num">' . e($info['periodo'] ?: '—') . '</td>'
                 . '<td>' . e($info['rama'] ?: '—') . '</td>'
                 . '<td>' . e(implode(', ', $info['claves']) ?: '—') . '</td>'
                 . '</tr>';
         }
         $cuerpo .= '</tbody></table></div>'
-            . '<p class="sub">La candidata es la fila resaltada con muchos <b>items</b>: ahí está la lista de partidos. '
-            . 'La columna <b>Rama</b> dice de qué clave cuelga.</p>';
+            . '<p class="sub"><b>La columna que decide es «Temporadas TM».</b> Sirve la ruta que devuelve la '
+            . 'temporada que le pediste' . ($season !== '' ? ' (<b>' . e($season) . '</b>)' : '')
+            . ', no la que devuelve más items: contestar 240 partidos del año en curso cuando pediste el anterior '
+            . 'es contestar que no sabe. La columna <b>Período</b> lo confirma con las fechas reales, y '
+            . '<b>Rama</b> dice de qué clave cuelga la lista.</p>';
 
         foreach ($r['rutas'] as $ruta => $info) {
             if (empty($info['ok'])) continue;

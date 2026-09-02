@@ -2383,8 +2383,32 @@ class TmDetallePartido
             $rutas[] = '/club/' . $k . '/performance-game';
             $rutas[] = '/club/' . $k . '/games';
             $rutas[] = '/club/' . $k . '/fixtures';
-            if ($s !== null) $rutas[] = '/club/' . $k . '/season/' . $s . '/games';
         }
+
+        // (c) LA PREGUNTA QUE IMPORTA (sep-2026): ¿hay alguna forma de pedirle
+        // a la API una temporada PASADA? El sitio la tiene —
+        // transfermarkt.es/cd-riestra/spielplan/verein/19775/saison_id/2024
+        // lista el Clausura 2025 entero — pero la API contesta siempre la
+        // temporada en curso: `/competition/{c}/fixtures?seasonId=2024`
+        // devolvió el Clausura 2026. De la ruta del CLUB con temporada nunca se
+        // probó ninguna forma, y es la que decide si los partidos viejos se
+        // pueden traer solos o hay que cargarlos a mano uno por uno.
+        if ($k !== null && $s !== null) {
+            $rutas[] = '/club/' . $k . '/fixtures?seasonId=' . $s;
+            $rutas[] = '/club/' . $k . '/fixtures/' . $s;
+            $rutas[] = '/club/' . $k . '/fixtures?saison_id=' . $s;
+            $rutas[] = '/club/' . $k . '/games?seasonId=' . $s;
+            $rutas[] = '/club/' . $k . '/season/' . $s . '/games';
+            $rutas[] = '/club/' . $k . '/season/' . $s . '/fixtures';
+        }
+
+        if ($c !== '' && $s !== null) {
+            $rutas[] = '/competition/' . $c . '/fixtures/' . $s;
+            $rutas[] = '/competition/' . $c . '/season/' . $s . '/fixtures';
+        }
+
+        // Repetir una ruta es pagarla dos veces.
+        $rutas = array_values(array_unique($rutas));
 
         $out = ['rutas' => [], 'llamadas' => 0];
 
@@ -2392,7 +2416,8 @@ class TmDetallePartido
             $json = HttpHelper::getJson(self::TMAPI . $ruta);
             $out['llamadas']++;
 
-            $info = ['ok' => false, 'claves' => [], 'items' => 0, 'rama' => null, 'json' => $json];
+            $info = ['ok' => false, 'claves' => [], 'items' => 0, 'rama' => null,
+                'temporadas' => [], 'periodo' => null, 'json' => $json];
             if (is_array($json) && !empty($json)) {
                 $exito = !array_key_exists('success', $json) || !empty($json['success']);
                 $data  = array_key_exists('data', $json) ? $json['data'] : $json;
@@ -2415,6 +2440,34 @@ class TmDetallePartido
                     }
                 }
             }
+            // Cuántos items trae no alcanza para decidir: hay que ver DE QUÉ
+            // TEMPORADA son. Una ruta que contesta 240 partidos del año que
+            // viene no sirve para el partido de hace diez meses. El barrido es
+            // recursivo a propósito: cada ruta tiene su propia forma y acá
+            // justamente no sabemos cuál es.
+            if (is_array($json)) {
+                $temporadas = [];
+                $fechas     = [];
+
+                array_walk_recursive($json, function ($v, $clave) use (&$temporadas, &$fechas) {
+                    if ($clave === 'seasonId' && $v !== null && $v !== '') {
+                        $temporadas[(string) $v] = true;
+                    }
+
+                    if (($clave === 'dateTimeUTC' || $clave === 'dateTime') && $v && !is_array($v)) {
+                        $ts = strtotime((string) $v);
+                        if ($ts) $fechas[] = date('Y-m-d', $ts);
+                    }
+                });
+
+                ksort($temporadas);
+                $info['temporadas'] = array_keys($temporadas);
+
+                if ($fechas) {
+                    $info['periodo'] = min($fechas) . ' → ' . max($fechas);
+                }
+            }
+
             $out['rutas'][$ruta] = $info;
         }
 
