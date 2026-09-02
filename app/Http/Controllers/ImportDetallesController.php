@@ -760,6 +760,219 @@ class ImportDetallesController extends Controller
     }
 
     /**
+     * El calendario de un club en una temporada, leído del HTML del sitio.
+     *
+     * **Una llamada trae todos los partidos de ese club en esa temporada**, con
+     * su gameId. Existe porque la API no puede: once formas probadas en
+     * sep-2026 —incluidas `/club/{id}/fixtures?seasonId=` y `?saison_id=`—
+     * devuelven siempre la temporada en curso. El sitio sí tiene el pasado.
+     *
+     * Un crédito por club-temporada contra uno por partido de la búsqueda
+     * automática, y contra pegar la URL a mano de a una.
+     *
+     * **Sólo escribe filas de partidos que YA están en la base.** Los que TM
+     * tiene y nosotros no se listan, pero no se guardan: una fila «nueva» en el
+     * staging la puede tomar el importador de fixture y crear un partido
+     * duplicado. Acá el objetivo es resolverle el gameId a lo que ya existe.
+     */
+    public function clubHtml(Request $request)
+    {
+        set_time_limit(0);
+
+        $clubTm  = trim((string) $request->get('club_tm', ''));
+        $season  = trim((string) $request->get('season', ''));
+        $guardar = (string) $request->get('guardar', '0') === '1';
+
+        $clubes = DB::table('equipo_tm')
+            ->join('equipos', 'equipos.id', '=', 'equipo_tm.equipo_id')
+            ->whereNotNull('equipo_tm.tm_club_id')
+            ->orderBy('equipos.nombre')
+            ->get(['equipo_tm.tm_club_id', 'equipo_tm.equipo_id', 'equipos.nombre']);
+
+        $opciones = '<option value="">— elegí un club —</option>';
+        foreach ($clubes as $c) {
+            $opciones .= '<option value="' . e($c->tm_club_id) . '"'
+                . ((string) $c->tm_club_id === $clubTm ? ' selected' : '') . '>'
+                . e($c->nombre . '  ·  TM ' . $c->tm_club_id) . '</option>';
+        }
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Calendario de un club, del HTML de Transfermarkt</h1>'
+            . '<p class="sub">Trae <b>todos los partidos de un club en una temporada</b> con su gameId, en '
+            . '<b>una sola llamada</b>. Es el único camino que llega a las temporadas cerradas: las rutas de la '
+            . 'API devuelven siempre la temporada en curso, aunque se les pida otra (probado con once formas '
+            . 'distintas). Lo que se lee acá es la misma página que ves vos en el navegador.</p>'
+            . '<p class="sub"><b>La temporada va uno atrás del año</b>, igual que en el resto del importador: '
+            . 'el Clausura 2025 es <code>2024</code>.</p>'
+            . '<form method="get" class="acciones">'
+            . '<select name="club_tm">' . $opciones . '</select> '
+            . '<input type="text" name="season" value="' . e($season) . '" size="8" placeholder="ej 2024" required> '
+            . '<button class="boton" type="submit">Leer el calendario</button>'
+            . ' <span class="sub">1 crédito</span></form>';
+
+        if ($clubTm === '' || $season === '') {
+            return $this->pagina('Calendario del club', $cuerpo
+                . '<p class="sub">Elegí un club y una temporada. Los clubes de la lista son los que ya están '
+                . 'atados a Transfermarkt en <code>equipo_tm</code>.</p>');
+        }
+
+        $svc   = new \App\Services\TmFixtureClubHtml;
+        $filas = $svc->leer($clubTm, $season);
+
+        $cuerpo .= '<p class="sub">Página leída: <a href="' . e(\App\Services\TmFixtureClubHtml::url($clubTm, $season))
+            . '" target="_blank" rel="noopener">verla en Transfermarkt</a></p>';
+
+        foreach ($svc->avisos as $a) {
+            $cuerpo .= '<div class="err-box">' . e($a) . '</div>';
+        }
+
+        if ($filas === null) {
+            return $this->pagina('Calendario del club', $cuerpo);
+        }
+
+        // Mapa de clubes de TM a equipos nuestros: sin el rival mapeado el
+        // apareo se hace igual, pero exigiendo un único candidato.
+        $mapa      = DB::table('equipo_tm')->whereNotNull('tm_club_id')->pluck('equipo_id', 'tm_club_id')->all();
+        $equipoId  = isset($mapa[$clubTm]) ? (int) $mapa[$clubTm] : 0;
+
+        $ids       = array_values(array_filter(array_column($filas, 'game_id')));
+        $enStaging = $ids
+            ? DB::table('import_partidos')->whereIn('external_id', $ids)
+                ->pluck('partido_id', 'external_id')->all()
+            : [];
+
+        $cont = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0, 'guardados' => 0];
+        $tabla = '';
+
+        foreach ($filas as $f) {
+            $rivalId = (!empty($f['rival_tm']) && isset($mapa[$f['rival_tm']])) ? (int) $mapa[$f['rival_tm']] : 0;
+            $yaEsta  = array_key_exists($f['game_id'], $enStaging) && $enStaging[$f['game_id']];
+
+            $partidoId = 0;
+            $motivo    = '';
+
+            if ($yaEsta) {
+                $partidoId = (int) $enStaging[$f['game_id']];
+                $cont['ya']++;
+                $motivo = 'ya lo tenía';
+            } else {
+                list($partidoId, $motivo) = $this->partidoDeFila($f, $equipoId, $rivalId);
+
+                if ($partidoId) {
+                    $cont['nuevos']++;
+
+                    if ($guardar) {
+                        $ok = (new TmBuscarGameId)->anotar($partidoId, $f['game_id'],
+                            'calendario del club ' . $clubTm . ' temporada ' . $season . ' (HTML de Transfermarkt)');
+                        if ($ok) $cont['guardados']++;
+                    }
+                } else {
+                    $cont['sin']++;
+                }
+            }
+
+            $clase = $partidoId ? ($yaEsta ? '' : 'warn') : '';
+            $tabla .= '<tr class="' . $clase . '">'
+                . '<td class="num">' . e((string) ($f['dia'] ?: $f['dia_crudo'])) . '</td>'
+                . '<td>' . e((string) $f['competencia']) . '</td>'
+                . '<td>' . ($f['local'] === null ? '—' : ($f['local'] ? 'local' : 'visitante')) . '</td>'
+                . '<td>' . e((string) $f['rival_nombre'])
+                    . ($rivalId ? '' : ' <span class="err">(sin atar en equipo_tm)</span>') . '</td>'
+                . '<td class="num">' . e((string) $f['resultado']) . '</td>'
+                . '<td class="num gris">' . e((string) $f['game_id']) . '</td>'
+                . '<td>' . ($partidoId
+                    ? '<a href="' . e(route('import_detalles.ver', ['partido_id' => $partidoId])) . '">partido #'
+                        . $partidoId . '</a>'
+                    : '<span class="sub">' . e($motivo) . '</span>') . '</td>'
+                . '</tr>';
+        }
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($cont['leidos'], 'partidos en la página')
+            . $this->card($cont['ya'], 'ya tenían gameId', 'ok')
+            . $this->card($cont['nuevos'], $guardar ? 'apareados' : 'para guardar', $cont['nuevos'] ? 'warn' : '')
+            . $this->card($cont['sin'], 'sin partido en tu base')
+            . ($guardar ? $this->card($cont['guardados'], 'guardados', 'ok') : '')
+            . '</div>';
+
+        if ($svc->descartadas) {
+            $cuerpo .= '<p class="sub">Se descartaron <b>' . $svc->descartadas . '</b> filas sin fecha.</p>';
+        }
+
+        if ($guardar) {
+            $cuerpo .= '<div class="ok-box">Guardados <b>' . $cont['guardados'] . '</b> gameId. '
+                . 'Esos partidos ya se pueden bajar como cualquier otro.</div>';
+        } elseif ($cont['nuevos']) {
+            $cuerpo .= '<p class="acciones"><a class="boton" href="'
+                . e(route('import_detalles.club_html', ['club_tm' => $clubTm, 'season' => $season, 'guardar' => 1]))
+                . '">Guardar los ' . $cont['nuevos'] . ' gameId</a> '
+                . '<span class="sub">vuelve a leer la página, así que cuesta 1 crédito más</span></p>';
+        } else {
+            $cuerpo .= '<div class="ok-box"><b>No se escribió nada.</b> No hay ningún partido nuevo para atar '
+                . 'en esta temporada de este club.</div>';
+        }
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th>Día</th><th>Competencia</th><th>Localía</th>'
+            . '<th>Rival en TM</th><th>Res.</th><th>gameId</th><th>Partido tuyo</th></tr></thead><tbody>'
+            . $tabla . '</tbody></table></div>'
+            . '<p class="sub">Las filas resaltadas son las que se van a guardar. Las que dicen <b>ya lo tenía</b> '
+            . 'no se tocan. Y las que no aparean con ningún partido tuyo <b>no se guardan</b>: acá no se crean '
+            . 'partidos, sólo se le pone el gameId a los que ya existen.</p>';
+
+        return $this->pagina('Calendario del club', $cuerpo);
+    }
+
+    /**
+     * A qué partido de la base corresponde una fila del calendario de TM.
+     *
+     * Ventana de ±3 días como en el resto del importador: TM guarda la fecha
+     * original de los postergados y la hora UTC puede correr el día. **Si queda
+     * más de un candidato no elige ninguno**: un gameId equivocado escribe la
+     * alineación de otro partido y después no se nota.
+     */
+    private function partidoDeFila(array $f, $equipoId, $rivalId)
+    {
+        if (empty($f['dia'])) {
+            return [0, 'no pude leerle la fecha'];
+        }
+
+        if (!$equipoId) {
+            return [0, 'el club no está atado en equipo_tm'];
+        }
+
+        $desde = date('Y-m-d', strtotime($f['dia'] . ' -3 days'));
+        $hasta = date('Y-m-d', strtotime($f['dia'] . ' +3 days'));
+
+        $q = DB::table('partidos')->whereDate('dia', '>=', $desde)->whereDate('dia', '<=', $hasta);
+
+        if ($rivalId) {
+            $q->where(function ($w) use ($equipoId, $rivalId) {
+                $w->where(function ($x) use ($equipoId, $rivalId) {
+                    $x->where('equipol_id', $equipoId)->where('equipov_id', $rivalId);
+                })->orWhere(function ($x) use ($equipoId, $rivalId) {
+                    $x->where('equipol_id', $rivalId)->where('equipov_id', $equipoId);
+                });
+            });
+        } else {
+            $q->where(function ($w) use ($equipoId) {
+                $w->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
+            });
+        }
+
+        $ids = $q->pluck('id')->all();
+
+        if (count($ids) === 1) {
+            return [(int) $ids[0], ''];
+        }
+
+        if (count($ids) > 1) {
+            return [0, 'hay ' . count($ids) . ' partidos posibles en esa ventana: no elijo'];
+        }
+
+        return [0, $rivalId ? 'no está en tu base' : 'no está en tu base (y el rival no está atado)'];
+    }
+
+    /**
      * El gameId que hay adentro de lo que el usuario pegó.
      *
      * Acepta el número pelado o la URL de la ficha del partido. **No adivina:**
@@ -1511,9 +1724,11 @@ class ImportDetallesController extends Controller
             . 'del torneo. Si en la ventana de fechas queda más de un candidato <b>no elige ninguno</b> y te los '
             . 'ofrece para que elijas vos: un gameId equivocado escribiría el detalle de otro partido.</p>'
             . '<p class="sub"><b>Los partidos viejos son el caso difícil.</b> Todas las rutas de fixture de la API '
-            . 'devuelven la temporada <b>en curso</b> e ignoran el año que se les pide, así que en un campeonato ya '
-            . 'terminado la única fuente que llega es la de los DTs. Por eso conviene tener cargada la URL de '
-            . 'Transfermarkt de los DTs antes de una tanda vieja: sin eso, el partido no se encuentra.</p>'
+            . 'devuelven la temporada <b>en curso</b> e ignoran el año que se les pide (once formas probadas), así '
+            . 'que de la API la única fuente que llega al pasado es la de los DTs. Para un campeonato terminado '
+            . 'conviene, antes de la tanda, o bien tener cargada la URL de Transfermarkt de los DTs, o bien pasar '
+            . 'por <a href="' . e(route('import_detalles.club_html')) . '">Calendario de un club</a>, que lee la '
+            . 'temporada entera del sitio en una sola llamada.</p>'
             . '<p class="sub">Cuesta <b>1 a 4 llamadas por partido</b>, y bastante menos cuando son del mismo club '
             . 'o el mismo DT: cada lista se reusa 10 minutos. El que aparece queda anotado para siempre y pasa solo '
             . 'a la lista de arriba (y de paso le sirve al resto del importador: detalle, penales, resultados). '
@@ -1667,6 +1882,11 @@ class ImportDetallesController extends Controller
             . 'Lo único que va hacia atrás en el tiempo son los partidos del DT — cargale la URL de TM a los '
             . 'que dirigieron ese partido y volvé a entrar acá — o entrá al partido y pegá ahí la URL de '
             . 'Transfermarkt, que lo resuelve de una y para siempre.</p>'
+            . '<p class="sub"><b>Atajo para una temporada entera:</b> '
+            . '<a href="' . e(route('import_detalles.club_html')) . '">Calendario de un club</a> lee del sitio '
+            . '(no de la API) todos los partidos de un club en una temporada, con su gameId, en <b>una sola '
+            . 'llamada</b>, y le pone el gameId a todos los que ya tenés cargados. Es el camino barato para '
+            . 'destrabar un campeonato viejo completo.</p>'
             . '<div class="diag">';
 
         foreach ($filas as $f) {
