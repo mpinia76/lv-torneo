@@ -117,25 +117,30 @@ function escenarioBase() {
         'tm_competition_id' => 'ARGC', 'tm_season_id' => '2024', 'ronda' => '15'];
 }
 
-echo "\n== 1) El fixture del club sólo trae la temporada en curso\n";
+echo "\n== 1) TM está en otra temporada: no se gasta un crédito en la competencia\n";
+// El fixture del club sólo devuelve la temporada en curso, y las rutas de
+// competencia también: preguntarle a la competencia sería pagar por la misma
+// respuesta. Verificado en producción (sep-2026) con ARGC.
 escenarioBase();
 Escenario::$respuestas[TM . '/club/1029/fixtures'] = ['data' => ['games' => [
-    juego('9001', '1029', '3333', '2026-02-10', '2025'),
-    juego('9002', '4444', '1029', '2026-08-30', '2025'),
+    juego('9001', '1029', '3333', '2026-02-13', '2025'),
+    juego('9002', '4444', '1029', '2026-10-16', '2025'),
 ]]];
 Escenario::$respuestas[TM . '/club/2222/fixtures'] = ['data' => ['games' => [
-    juego('9003', '2222', '5555', '2026-03-01', '2025'),
+    juego('9003', '2222', '5555', '2026-01-25', '2025'),
 ]]];
-Escenario::$respuestas[TM . '/competition/ARGC/games?seasonId=2024&gameDay=15'] = ['data' => ['games' => [
-    juego('4750000', '1029', '2222', '2025-11-15', '2024'),
+Escenario::$respuestas[TM . '/competition/ARGC/fixtures'] = ['data' => ['games' => [
+    juego('9500', '1029', '2222', '2026-08-30', '2025'),
 ]]];
 $r = (new TmBuscarGameId)->buscar(22437);
-chequear($r['game_id'] === '4750000', 'lo encuentra por la competencia');
-chequear(strpos((string) $r['como'], 'competencia') !== false, 'dice de dónde salió: ' . $r['como']);
-chequear(count($r['rastro']) === 4, 'una fila de rastro por fuente (' . count($r['rastro']) . ')');
+chequear($r['game_id'] === null, 'no inventa nada');
+chequear(!in_array(TM . '/competition/ARGC/fixtures', Escenario::$pedidas, true),
+    'NO pidió la competencia: ya sabía que TM está en otro año');
+chequear(strpos(implode(' ', array_column($r['rastro'], 'nota')), 'No la consulté') !== false,
+    'y deja dicho por qué no la consultó');
+chequear(!empty($r['contexto']['temporada_ajena']),
+    'marca temporada_ajena, que es lo que apaga el "cargá los ids" en la pantalla');
 chequear(strpos($r['partida'], 'club de TM 1029') !== false, 'el punto de partida va aparte de la tabla');
-chequear(strpos(implode(' ', array_column($r['rastro'], 'nota')), 'otra temporada') !== false,
-    'avisa que el club estaba mirando otra temporada');
 
 echo "\n== 2) El staging ya lo tenía: cero llamadas\n";
 escenarioBase();
@@ -146,33 +151,34 @@ chequear($r['game_id'] === '4750000', 'sale del staging');
 chequear($r['llamadas'] === 0, 'no gastó ninguna llamada (' . $r['llamadas'] . ')');
 chequear(count(Escenario::$pedidas) === 0, 'no tocó la API');
 
-echo "\n== 3) TM ignora el seasonId: lo dice y no paga la ruta redundante\n";
+echo "\n== 3) La competencia contesta otra temporada: lo dice con todas las letras\n";
+// Sin fixture de club que avise antes, la competencia se consulta igual y es
+// ella la que muestra que TM ignora el seasonId.
 escenarioBase();
-$soloEnCurso = ['data' => ['games' => [juego('9001', '1029', '3333', '2026-02-10', '2025')]]];
-Escenario::$respuestas[TM . '/club/1029/fixtures'] = $soloEnCurso;
-Escenario::$respuestas[TM . '/competition/ARGC/games?seasonId=2024&gameDay=15'] = ['data' => ['games' => []]];
-Escenario::$respuestas[TM . '/competition/ARGC/fixtures?seasonId=2024'] = $soloEnCurso;
-Escenario::$respuestas[TM . '/competition/ARGC/fixtures'] = $soloEnCurso;
+Escenario::$respuestas[TM . '/competition/ARGC/fixtures'] = ['data' => ['games' => [
+    juego('9500', '6666', '7777', '2026-07-23', '2025'),
+]]];
 $r = (new TmBuscarGameId)->buscar(22437);
 chequear($r['game_id'] === null, 'no inventa nada');
-chequear(!in_array(TM . '/competition/ARGC/fixtures', Escenario::$pedidas, true),
-    'no pide la ruta sin seasonId, que devolvería lo mismo');
-chequear(strpos(implode(' ', $r['avisos']), 'ignora el `seasonId`') !== false,
-    'avisa que esa ruta de la API ignora el seasonId');
+chequear(strpos(implode(' ', $r['avisos']), 'siempre la temporada en curso') !== false,
+    'avisa que la API no sabe traer temporadas cerradas');
+chequear(!empty($r['contexto']['temporada_ajena']), 'y lo marca en el contexto');
 
-echo "\n== 4) El gameDay nuestro no es el de TM: sigue con la temporada entera\n";
+echo "\n== 4) Partido de la temporada en curso con los clubes sin atar: lo encuentra por la competencia\n";
+// Es para lo que sirve el camino 3: los otros no llegan porque no hay mapeos.
 escenarioBase();
-Escenario::$respuestas[TM . '/club/1029/fixtures'] = ['data' => ['games' => []]];
-Escenario::$respuestas[TM . '/club/2222/fixtures'] = ['data' => ['games' => []]];
-Escenario::$respuestas[TM . '/competition/ARGC/games?seasonId=2024&gameDay=15'] = ['data' => ['games' => [
-    juego('9500', '6666', '7777', '2025-10-01', '2024'),
-]]];
-// Forma anidada del fixture de competencia, localía al revés y un día corrido.
-Escenario::$respuestas[TM . '/competition/ARGC/fixtures?seasonId=2024'] = ['data' => ['fixtures' => [
-    ['games' => [juego('4750000', '2222', '1029', '2025-11-16', '2024')]],
+Escenario::$partido->dia = '2026-08-30 21:30:00';
+Escenario::$equipoTm = [];
+Escenario::$torneo->year = 2026;
+Escenario::$torneo->tm_season_id = '2025';
+// Forma anidada del fixture de competencia: fixtures[].games[]
+Escenario::$respuestas[TM . '/competition/ARGC/fixtures'] = ['data' => ['fixtures' => [
+    ['games' => [juego('4750000', '1029', '2222', '2026-08-30', '2025')]],
+    ['games' => [juego('4750001', '3333', '4444', '2026-09-06', '2025')]],
 ]]];
 $r = (new TmBuscarGameId)->buscar(22437);
-chequear($r['game_id'] === '4750000', 'lo encuentra igual');
+chequear($r['game_id'] === '4750000', 'lo encuentra: ' . var_export($r['game_id'], true));
+chequear($r['llamadas'] === 1, 'con una sola llamada (' . $r['llamadas'] . ')');
 
 echo "\n== 5) Sin nada cargado: no arranca y lo explica\n";
 escenarioBase();
@@ -206,18 +212,8 @@ chequear(strpos($notas, 'no tiene cargado su id de competencia') !== false,
 chequear($r['contexto']['torneo']['id'] === 5 && $r['contexto']['torneo']['comp'] === ''
     && $r['contexto']['clubes'][0]['tm'] === '1029' && $r['contexto']['dia'] === '2025-11-15',
     'devuelve el contexto en crudo (torneo + clubes + día) para armar los links');
-chequear(!in_array(TM . '/competition/ARGC/fixtures', Escenario::$pedidas, true), 'no pidió nada de competencia');
-
-echo "\n== 8) Con id de competencia pero sin seasonId: avisa que sólo puede la temporada en curso\n";
-escenarioBase();
-Escenario::$torneo->tm_season_id = '';
-Escenario::$respuestas[TM . '/club/1029/fixtures'] = ['data' => ['games' => []]];
-Escenario::$respuestas[TM . '/club/2222/fixtures'] = ['data' => ['games' => []]];
-Escenario::$respuestas[TM . '/competition/ARGC/fixtures'] = ['data' => ['games' => [
-    juego('9001', '1029', '3333', '2026-02-10', '2025'),
-]]];
-$r = (new TmBuscarGameId)->buscar(22437);
-chequear(strpos(implode(' ', $r['avisos']), 'no el seasonId') !== false, 'avisa que falta el seasonId');
+chequear(empty($r['contexto']['temporada_ajena']),
+    'sin temporada ajena detectada, así que la pantalla sí ofrece cargar los ids');
 
 echo "\n" . ($fallos ? "$fallos CHEQUEO(S) FALLIDO(S)\n" : "Todo en verde.\n");
 exit($fallos ? 1 : 0);

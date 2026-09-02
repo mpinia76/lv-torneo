@@ -609,10 +609,13 @@ class ImportDetallesController extends Controller
         $html .= '<p class="sub"><b>Para que se rehaga solo la próxima vez</b>, alcanza con cualquiera de estas: '
             . 'que los dos equipos estén atados a su club de Transfermarkt en <code>equipo_tm</code> '
             . '(el sondeo del DT aprende esos mapeos solo); que los DTs del partido tengan cargada su '
-            . 'URL de Transfermarkt; o que el torneo tenga cargados su <b>id de competencia</b> y su '
-            . '<b>seasonId</b> de Transfermarkt (Editar torneo → transfermarkt.com). '
-            . 'Esta última es la que sirve para los campeonatos ya terminados: el fixture del club sólo '
-            . 'devuelve la temporada en curso.</p>'
+            . 'URL de Transfermarkt; o que el torneo tenga cargado su <b>id de competencia</b> de '
+            . 'Transfermarkt (Editar torneo → transfermarkt.com).</p>'
+            . '<p class="sub"><b>Ojo con los campeonatos ya terminados.</b> Todas las rutas de fixture de '
+            . 'la API devuelven la temporada <b>en curso</b> e ignoran el año que se les pide (verificado). '
+            . 'Lo único que va hacia atrás en el tiempo son los partidos del DT, así que en un partido '
+            . 'viejo la vía rápida es cargarle la URL de Transfermarkt a los DTs que lo dirigieron — '
+            . 'o pegar la del partido, acá abajo.</p>'
             . '<p class="sub">Última salida, sólo para este partido: '
             . '<a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $partidoId])) . '">'
             . 'pegar la URL de Transfermarkt a mano</a>. Pegándola una vez queda anotado el gameId y de ahí en más '
@@ -644,24 +647,33 @@ class ImportDetallesController extends Controller
             return '';
         }
 
-        $faltaComp   = $t['comp'] === '';
-        $faltaSeason = $t['season'] === '';
+        $nombre = trim($t['nombre'] . ' ' . $t['year']);
+        $ajena  = isset($ctx['temporada_ajena']) ? $ctx['temporada_ajena'] : null;
 
-        if (!$faltaComp && !$faltaSeason) {
+        // Si TM está devolviendo otra temporada, cargarle los ids al torneo no
+        // cambia nada para este partido: la API no sabe traer campeonatos
+        // terminados. Mandarlo a cargarlos igual sería hacerle perder el tiempo.
+        if ($ajena !== null) {
+            return '<h2>Cómo completarlo</h2>'
+                . '<p class="sub">Para <b>este</b> partido no hay nada que cargar. Transfermarkt está '
+                . 'devolviendo otra temporada (' . e((string) $ajena) . ') y sus rutas de fixture ignoran '
+                . 'el año que se les pide, así que un partido de un campeonato ya terminado no se puede '
+                . 'encontrar por la API. La salida es pegar la URL a mano, acá abajo. '
+                . 'Cargarle al torneo su id de competencia sigue valiendo la pena, pero para los partidos '
+                . 'del campeonato <b>en curso</b>.</p>';
+        }
+
+        if ($t['comp'] !== '') {
             return '';
         }
 
         $anio      = (int) substr((string) (isset($ctx['dia']) ? $ctx['dia'] : ''), 0, 4);
         $tentativa = $t['season'] !== '' ? $t['season'] : (string) ($anio - 1);
-        $nombre    = trim($t['nombre'] . ' ' . $t['year']);
-
-        $falta = $faltaComp && $faltaSeason ? 'el <b>id de competencia</b> y el <b>seasonId</b>'
-            : ($faltaComp ? 'el <b>id de competencia</b>' : 'el <b>seasonId</b>');
 
         $html = '<h2>Cómo completarlo</h2>'
-            . '<p class="sub">Al torneo «' . e($nombre) . '» le falta ' . $falta . ' de Transfermarkt. '
-            . 'Los dos están en la URL de la competencia en TM, y la forma más corta de llegar es por el '
-            . 'fixture de uno de estos dos clubes en esa temporada:</p><ol class="sub">';
+            . '<p class="sub">Al torneo «' . e($nombre) . '» le falta su <b>id de competencia</b> de '
+            . 'Transfermarkt. Está en la URL de la competencia en TM, y la forma más corta de llegar es '
+            . 'por el fixture de uno de estos dos clubes en esa temporada:</p><ol class="sub">';
 
         $links = '';
 

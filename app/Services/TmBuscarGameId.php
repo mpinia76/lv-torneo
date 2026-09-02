@@ -103,6 +103,16 @@ class TmBuscarGameId
      */
     private $contexto = [];
 
+    /**
+     * La temporada que TM está devolviendo, cuando NO es la del partido.
+     *
+     * Es el dato que decide si al torneo le sirve de algo cargarle los ids:
+     * si TM está en otro año, no.
+     *
+     * @var string|null
+     */
+    private $ajena = null;
+
     /** @var int */
     private $llamadas = 0;
 
@@ -120,6 +130,7 @@ class TmBuscarGameId
         $this->rastro     = [];
         $this->partida    = '';
         $this->contexto   = [];
+        $this->ajena      = null;
         $this->llamadas   = 0;
 
         $partido = DB::table('partidos')->where('id', (int) $partidoId)->first();
@@ -760,13 +771,19 @@ class TmBuscarGameId
     /**
      * El fixture de la competencia del torneo del partido.
      *
-     * Es el único camino que puede nombrar una temporada: el fixture del club
-     * devuelve la que TM tiene por en curso, así que para un campeonato ya
-     * terminado los otros caminos no llegan.
+     * **tmapi NO sabe traer temporadas cerradas.** Verificado en producción
+     * (sep-2026): a `/competition/ARGC/fixtures?seasonId=2024` le pedimos el
+     * Clausura 2025 y devolvió 240 partidos del 2026-07-23 al 2026-11-08, que
+     * es el Clausura 2026. El `seasonId` se ignora. Y
+     * `/competition/{c}/games?seasonId=..&gameDay=..` directamente no contesta.
+     * Por eso acá quedó **una sola ruta y sin parámetros**: pedir la misma
+     * competencia de otra forma devuelve lo mismo y cuesta otro crédito.
      *
-     * Se prueban hasta tres formas de URL, de la más barata a la más amplia, y
-     * se corta apenas una trae la temporada entera: pedir la misma competencia
-     * de otra forma devolvería la misma lista y se pagaría dos veces.
+     * Entonces este camino sirve para un partido de la temporada EN CURSO al
+     * que los otros no llegaron —típicamente porque los equipos no están
+     * atados en `equipo_tm`—, no para rescatar campeonatos viejos. Para esos,
+     * lo único que va hacia atrás es `/coach/{id}/performance-game` o pegar la
+     * URL a mano.
      */
     private function porCompetencia($partido, $tmLocal, $tmVisit, $torneo)
     {
@@ -784,65 +801,70 @@ class TmBuscarGameId
         if ($comp === '') {
             $this->anotarRastro('Competencia del torneo', null, [], null, null,
                 'No la consulté: el torneo «' . $torneo->nombre . ' ' . $torneo->year . '» no tiene cargado '
-                . 'su id de competencia de Transfermarkt. Es el ÚNICO camino que puede pedir una temporada '
-                . 'pasada, así que sin eso un partido de un campeonato terminado no se encuentra solo. '
-                . 'Se carga en Editar torneo → transfermarkt.com.');
+                . 'su id de competencia de Transfermarkt. Sirve para los partidos de la temporada en curso; '
+                . 'se carga en Editar torneo → transfermarkt.com.');
             return null;
         }
 
-        $season = trim((string) $torneo->tm_season_id);
-        $ronda  = trim((string) $torneo->ronda);
-        $c      = rawurlencode($comp);
+        $dia = substr((string) $partido->dia, 0, 10);
 
-        // El segundo elemento es "trae la temporada entera". Una ruta que sólo
-        // trae una fecha puede no tener el partido porque nuestro número de
-        // fecha no es el `gameDay` de TM: después de esa se sigue probando.
-        $rutas = [];
+        // Si una fuente anterior ya mostró que TM está parado en otra
+        // temporada, la competencia va a contestar esa misma. No se paga un
+        // crédito para que nos diga lo que ya sabemos.
+        $this->ajena = $this->temporadaAjena($dia);
 
-        if ($season !== '') {
-            if ($ronda !== '') {
-                $rutas[] = ['/competition/' . $c . '/games?seasonId=' . rawurlencode($season)
-                    . '&gameDay=' . rawurlencode($ronda), false];
-            }
-
-            $rutas[] = ['/competition/' . $c . '/fixtures?seasonId=' . rawurlencode($season), true];
+        if ($this->ajena !== null) {
+            $this->anotarRastro('Competencia ' . $comp, null, [], null, null,
+                'No la consulté: el fixture del club ya mostró que Transfermarkt está en otra temporada ('
+                . $this->ajena . '), y la competencia devuelve la misma — sus rutas ignoran el `seasonId`. '
+                . 'Este partido no se puede encontrar por la API: hay que pegar la URL a mano.');
+            return null;
         }
 
-        $rutas[] = ['/competition/' . $c . '/fixtures', true];
+        $ruta   = '/competition/' . rawurlencode($comp) . '/fixtures';
+        $juegos = $this->juegosDeRuta($ruta);
 
-        foreach ($rutas as $r) {
-            list($ruta, $completa) = $r;
+        $hallado = $this->probar($juegos, $partido, $tmLocal, $tmVisit, 'Competencia · ' . $ruta);
 
-            $juegos  = $this->juegosDeRuta($ruta);
-            $hallado = $this->probar($juegos, $partido, $tmLocal, $tmVisit, 'Competencia · ' . $ruta);
+        if ($hallado) {
+            return $hallado;
+        }
 
-            if ($hallado) {
-                return $hallado;
-            }
+        // Red de seguridad por si TM algún día empieza a respetar el seasonId:
+        // se compara lo que vino contra lo que el torneo dice tener.
+        $season = trim((string) $torneo->tm_season_id);
 
-            if (!$completa || empty($juegos)) {
+        if (!empty($juegos) && $season !== '' && !$this->tieneTemporada($juegos, $season)) {
+            $this->ajena = 'temporada TM ' . implode(', ', $this->resumir($juegos)['temporadas']);
+            $this->avisos[] = 'La competencia ' . $comp . ' me contestó la ' . $this->ajena . ' y no la '
+                . $season . ' que tiene cargada el torneo: tmapi devuelve siempre la temporada en curso. '
+                . 'Un partido de un campeonato ya terminado no se encuentra por la API — la URL hay que '
+                . 'pegarla a mano.';
+        }
+
+        return null;
+    }
+
+    /**
+     * ¿Alguna fuente ya mostró que TM está mirando otra temporada?
+     *
+     * Devuelve la descripción de esa temporada, o null si ninguna lo mostró.
+     * Se apoya en el rastro: si una fuente trajo partidos y el día que
+     * buscamos no cae en su período, esa fuente está en otro campeonato.
+     */
+    private function temporadaAjena($dia)
+    {
+        foreach ($this->rastro as $r) {
+            if (empty($r['desde']) || empty($r['hasta'])) {
                 continue;
             }
 
-            // Trajo la temporada entera y el partido no estaba. Si encima la
-            // temporada que trajo no es la que se pidió, TM ignoró el
-            // `seasonId`: hay que decirlo, porque entonces lo que falla no es
-            // el torneo sino que la API no sabe traer temporadas viejas.
-            if ($season !== '' && !$this->tieneTemporada($juegos, $season)) {
-                $this->avisos[] = 'Le pedí a Transfermarkt la temporada ' . $season . ' de la competencia '
-                    . $comp . ' y me devolvió otra: esa ruta de la API ignora el `seasonId` y contesta '
-                    . 'siempre la temporada en curso. Para partidos de campeonatos ya terminados, entonces, '
-                    . 'la URL hay que pegarla a mano.';
+            if ($dia >= $r['desde'] && $dia <= $r['hasta']) {
+                continue;
             }
 
-            break;
-        }
-
-        if ($season === '') {
-            $this->avisos[] = 'El torneo «' . $torneo->nombre . ' ' . $torneo->year . '» tiene cargado el id '
-                . 'de competencia pero no el seasonId de Transfermarkt, así que de esa competencia sólo pude '
-                . 'pedir la temporada en curso. Para un campeonato ya terminado hace falta el seasonId '
-                . '(Editar torneo → transfermarkt.com; va uno atrás del año: el Clausura 2026 es seasonId 2025).';
+            return (!empty($r['temporadas']) ? 'temporada TM ' . implode(', ', $r['temporadas']) . ': ' : '')
+                . $r['desde'] . ' → ' . $r['hasta'];
         }
 
         return null;
@@ -1035,7 +1057,7 @@ class TmBuscarGameId
             // Los nombres sólo se piden si de verdad hay que mostrar la lista.
             'candidatos' => $gameId ? [] : $this->candidatosConNombres(),
             'partida'    => $this->partida,
-            'contexto'   => $this->contexto,
+            'contexto'   => $this->contexto + ['temporada_ajena' => $this->ajena],
             'rastro'     => $this->rastro,
             'avisos'     => $this->avisos,
             'llamadas'   => $this->llamadas,
