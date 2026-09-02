@@ -13,21 +13,37 @@ use Illuminate\Support\Facades\Schema;
  * el detalle. Hasta ahora el gameId sólo aparecía si el partido había pasado
  * por el importador de DTs, y para todos los demás había que ir a buscar la
  * URL a mano y pegarla. Esto lo busca solo, con lo que ya tenemos cargado:
- * los dos clubes (`equipo_tm`), la fecha y, si hace falta, los DTs.
+ * el staging, los dos clubes (`equipo_tm`), la fecha, los DTs y —cuando el
+ * torneo lo tiene cargado— la competencia de Transfermarkt.
  *
- * Dos caminos, en este orden:
+ * Cuatro caminos, en este orden:
  *
- *   1. El fixture del club (`/club/{id}/fixtures`). Una llamada trae todos los
- *      partidos del club en la temporada, con gameId, los dos clubes y la
- *      fecha. Es el camino barato y el que sirve para lo que se está cargando
- *      ahora.
- *   2. Los partidos del DT (`/coach/{id}/performance-game`), que es lo que usa
- *      el importador de partidos. Va hacia atrás en el tiempo, así que rescata
- *      los partidos viejos que el fixture del club ya no lista.
+ *   0. El **staging** (`import_partidos`). No gasta ni una llamada: si alguna
+ *      vez se bajó el fixture de esa competencia, el gameId ya está guardado,
+ *      aunque la fila haya quedado sin `partido_id` porque el emparejado
+ *      automático por fecha no cerró.
+ *   1. El **fixture del club** (`/club/{id}/fixtures`). Una llamada trae los
+ *      partidos del club, pero sólo de la temporada que TM considera en curso:
+ *      para un partido de una temporada ya cerrada no alcanza. Es el camino
+ *      barato para lo que se está cargando ahora.
+ *   2. Los **partidos del DT** (`/coach/{id}/performance-game`). Va hacia atrás
+ *      en el tiempo, así que rescata los viejos — pero necesita que el partido
+ *      tenga DTs en `partido_tecnicos`, y a los DTs los carga justamente el
+ *      detalle que se está tratando de bajar. Para un partido que nunca se
+ *      importó, esta puerta suele estar cerrada.
+ *   3. El **fixture de la competencia** del torneo del partido
+ *      (`torneos.tm_competition_id` + `tm_season_id`). Es el único camino que
+ *      puede nombrar una temporada pasada, así que es el que sirve para los
+ *      partidos de campeonatos ya terminados.
  *
  * Nunca inventa: si en la ventana de fechas hay más de un candidato posible, no
  * elige ninguno y lo dice. Un gameId equivocado escribe la alineación de otro
  * partido encima del que estabas mirando.
+ *
+ * Y deja un RASTRO de lo que contestó cada fuente: cuántos partidos, de qué
+ * temporadas y entre qué fechas. Sin eso "no lo encontré" es indistinguible de
+ * "TM no contestó" y de "me contestó otra temporada", que se arreglan de
+ * maneras completamente distintas.
  */
 class TmBuscarGameId
 {
@@ -43,7 +59,7 @@ class TmBuscarGameId
      */
     const DIAS = 3;
 
-    /** Los fixtures de un club se reusan mientras se corrigen varias filas. */
+    /** Las listas de partidos se reusan mientras se corrigen varias filas. */
     const TTL = 600;
 
     /** @var array */
@@ -60,6 +76,13 @@ class TmBuscarGameId
      */
     private $candidatos = [];
 
+    /**
+     * Qué contestó cada fuente consultada.
+     *
+     * @var array de ['fuente','partidos','temporadas','desde','hasta','nota']
+     */
+    private $rastro = [];
+
     /** @var int */
     private $llamadas = 0;
 
@@ -67,12 +90,14 @@ class TmBuscarGameId
      * Busca el gameId de un partido.
      *
      * Devuelve ['game_id' => string|null, 'como' => string|null,
-     *           'candidatos' => array, 'avisos' => string[], 'llamadas' => int].
+     *           'candidatos' => array, 'rastro' => array, 'avisos' => string[],
+     *           'llamadas' => int].
      */
     public function buscar($partidoId): array
     {
         $this->avisos     = [];
         $this->candidatos = [];
+        $this->rastro     = [];
         $this->llamadas   = 0;
 
         $partido = DB::table('partidos')->where('id', (int) $partidoId)->first();
@@ -94,11 +119,22 @@ class TmBuscarGameId
         // partidos son suyos, así que ahí alcanza con la fecha exacta (nadie
         // dirige dos partidos el mismo día).
         $coaches = $this->coachesDelPartido($partido->id);
+        $torneo  = $this->torneoDelPartido($partido->id);
+        $comp    = $torneo ? trim((string) $torneo->tm_competition_id) : '';
 
-        if (!$tmLocal && !$tmVisit && !$coaches) {
-            return $this->resultado(null, null, 'Ninguno de los dos equipos está atado a un club de Transfermarkt '
-                . '(tabla `equipo_tm`) y el partido no tiene DTs con su URL de Transfermarkt cargada, '
-                . 'así que no tengo por dónde empezar a buscar.');
+        $this->rastroPuntoDePartida($partido, $tmLocal, $tmVisit, $coaches, $torneo);
+
+        if (!$tmLocal && !$tmVisit && !$coaches && $comp === '') {
+            return $this->resultado(null, null, 'No tengo por dónde empezar a buscar: ninguno de los dos equipos '
+                . 'está atado a un club de Transfermarkt (tabla `equipo_tm`), el partido no tiene DTs con su URL '
+                . 'de Transfermarkt cargada, y el torneo no tiene cargado su id de competencia de Transfermarkt.');
+        }
+
+        // ── 0) El staging, que no cuesta una llamada ────────────────────────
+        $hallado = $this->desdeStaging($partido);
+
+        if ($hallado) {
+            return $this->resultado($hallado, 'el fixture que ya estaba guardado en el staging');
         }
 
         // ── 1) El fixture del club ──────────────────────────────────────────
@@ -107,13 +143,11 @@ class TmBuscarGameId
                 continue;
             }
 
-            $juegos = $this->fixtureDeClub($club);
-
-            if ($juegos === null) {
-                continue;
-            }
-
-            $hallado = $this->elegir($juegos, $partido->dia, $tmLocal, $tmVisit);
+            $hallado = $this->probar(
+                $this->juegosDeRuta('/club/' . rawurlencode($club) . '/fixtures'),
+                $partido, $tmLocal, $tmVisit,
+                'Fixture del club ' . $club
+            );
 
             if ($hallado) {
                 return $this->resultado($hallado, 'el fixture del club ' . $club);
@@ -122,21 +156,27 @@ class TmBuscarGameId
 
         // ── 2) Los partidos de los DTs ──────────────────────────────────────
         foreach ($coaches as $coachId) {
-            $juegos = $this->partidosDelDt($coachId);
-
-            if ($juegos === null) {
-                continue;
-            }
-
-            $hallado = $this->elegir($juegos, $partido->dia, $tmLocal, $tmVisit);
+            $hallado = $this->probar(
+                $this->partidosDelDt($coachId),
+                $partido, $tmLocal, $tmVisit,
+                'Partidos del DT ' . $coachId
+            );
 
             if ($hallado) {
                 return $this->resultado($hallado, 'los partidos del DT ' . $coachId);
             }
         }
 
-        return $this->resultado(null, null, 'Transfermarkt no me devolvió ningún partido de estos dos equipos '
-            . 'alrededor del ' . substr((string) $partido->dia, 0, 10) . '.');
+        // ── 3) El fixture de la competencia del torneo ──────────────────────
+        $hallado = $this->porCompetencia($partido, $tmLocal, $tmVisit, $torneo);
+
+        if ($hallado) {
+            return $this->resultado($hallado, 'el fixture de la competencia ' . $comp);
+        }
+
+        return $this->resultado(null, null, 'Ninguna de las fuentes que consulté trae un partido de estos dos '
+            . 'equipos alrededor del ' . substr((string) $partido->dia, 0, 10)
+            . '. La tabla de abajo dice qué contestó cada una.');
     }
 
     /**
@@ -207,6 +247,108 @@ class TmBuscarGameId
     }
 
     // ══════════════════════════════ búsqueda ══════════════════════════════
+
+    /**
+     * Corre una lista de partidos de TM contra este partido y deja el rastro.
+     *
+     * `$juegos` en null significa que la fuente no contestó, que no es lo mismo
+     * que haber contestado y no tenerlo: se anota distinto.
+     */
+    private function probar($juegos, $partido, $tmLocal, $tmVisit, $etiqueta)
+    {
+        if ($juegos === null) {
+            $this->anotarRastro($etiqueta, null, [], null, null, 'Transfermarkt no me contestó.');
+            return null;
+        }
+
+        if (empty($juegos)) {
+            $this->anotarRastro($etiqueta, 0, [], null, null, 'Contestó, pero sin ningún partido.');
+            return null;
+        }
+
+        $resumen = $this->resumir($juegos);
+        $hallado = $this->elegir($juegos, $partido->dia, $tmLocal, $tmVisit);
+
+        $nota = $hallado
+            ? 'Acá estaba: gameId ' . $hallado . '.'
+            : 'Ninguno de estos es el partido que busco.';
+
+        if (!$hallado && $resumen['desde'] && $resumen['hasta']) {
+            $dia = substr((string) $partido->dia, 0, 10);
+
+            if ($dia < $resumen['desde'] || $dia > $resumen['hasta']) {
+                $nota .= ' El ' . $dia . ' ni siquiera cae en el período que trajo: '
+                    . 'esta fuente está mirando otra temporada.';
+            }
+        }
+
+        $this->anotarRastro($etiqueta, $resumen['partidos'], $resumen['temporadas'],
+            $resumen['desde'], $resumen['hasta'], $nota);
+
+        return $hallado;
+    }
+
+    /** Cuántos partidos, de qué temporadas y entre qué fechas. */
+    private function resumir(array $juegos): array
+    {
+        $temporadas = [];
+        $desde      = null;
+        $hasta      = null;
+
+        foreach ($juegos as $j) {
+            if (!empty($j['temporada'])) {
+                $temporadas[(string) $j['temporada']] = true;
+            }
+
+            if (empty($j['dia'])) {
+                continue;
+            }
+
+            if ($desde === null || $j['dia'] < $desde) $desde = $j['dia'];
+            if ($hasta === null || $j['dia'] > $hasta) $hasta = $j['dia'];
+        }
+
+        ksort($temporadas);
+
+        return ['partidos' => count($juegos), 'temporadas' => array_keys($temporadas),
+            'desde' => $desde, 'hasta' => $hasta];
+    }
+
+    private function anotarRastro($fuente, $partidos, array $temporadas, $desde, $hasta, $nota)
+    {
+        $this->rastro[] = ['fuente' => $fuente, 'partidos' => $partidos, 'temporadas' => $temporadas,
+            'desde' => $desde, 'hasta' => $hasta, 'nota' => $nota];
+    }
+
+    /** La primera fila del rastro: con qué datos se arrancó a buscar. */
+    private function rastroPuntoDePartida($partido, $tmLocal, $tmVisit, array $coaches, $torneo)
+    {
+        $partes = [];
+
+        foreach ([[$partido->equipol_id, $tmLocal], [$partido->equipov_id, $tmVisit]] as $par) {
+            $partes[] = $this->nombreEquipo($par[0]) . ': '
+                . ($par[1] ? 'club de TM ' . $par[1] : 'SIN atar en equipo_tm');
+        }
+
+        $partes[] = $coaches
+            ? 'DTs con URL de TM: ' . implode(', ', $coaches)
+            : 'ningún DT del partido tiene cargada su URL de TM';
+
+        if (!$torneo) {
+            $partes[] = 'no pude ubicar el torneo del partido';
+        } elseif (trim((string) $torneo->tm_competition_id) === '') {
+            $partes[] = 'el torneo «' . $torneo->nombre . ' ' . $torneo->year
+                . '» no tiene cargado su id de competencia de TM';
+        } else {
+            $partes[] = 'torneo «' . $torneo->nombre . ' ' . $torneo->year . '»: competencia '
+                . $torneo->tm_competition_id
+                . (trim((string) $torneo->tm_season_id) !== ''
+                    ? ', temporada ' . $torneo->tm_season_id
+                    : ', SIN seasonId cargado');
+        }
+
+        $this->anotarRastro('Con qué arranqué', null, [], null, null, implode(' · ', $partes));
+    }
 
     /**
      * De todos los partidos que trajo TM, el que es este.
@@ -420,32 +562,146 @@ class TmBuscarGameId
     // ══════════════════════════════ fuentes ══════════════════════════════
 
     /**
-     * Los partidos del fixture de un club, aplanados a lo que nos importa.
+     * El gameId que ya estaba guardado en el staging. GRATIS.
      *
-     * Devuelve null si TM no contestó (y deja el aviso), array si contestó,
-     * aunque venga vacío.
+     * `correrUno()` busca la fila del staging por `partido_id`, así que este
+     * camino cubre el caso que a esa búsqueda se le escapa: la fila existe —el
+     * fixture de la competencia se bajó alguna vez— pero quedó con
+     * `partido_id` en null porque el emparejado automático no la reconoció.
+     *
+     * Se compara el par de equipos en los dos órdenes: en el flujo del fixture
+     * `equipo_id` es el local, pero en el del DT es el club del DT.
      */
-    private function fixtureDeClub($clubId)
+    private function desdeStaging($partido)
     {
-        $llave = 'tm.fixture.club.' . $clubId;
+        try {
+            if (!Schema::hasTable('import_partidos')) {
+                return null;
+            }
+
+            $dia   = substr((string) $partido->dia, 0, 10);
+            $desde = date('Y-m-d', strtotime($dia . ' -' . self::DIAS . ' days'));
+            $hasta = date('Y-m-d', strtotime($dia . ' +' . self::DIAS . ' days'));
+
+            $filas = DB::table('import_partidos')
+                ->whereNotNull('external_id')
+                ->whereDate('dia', '>=', $desde)
+                ->whereDate('dia', '<=', $hasta)
+                ->where(function ($q) use ($partido) {
+                    $q->where(function ($q2) use ($partido) {
+                        $q2->where('equipo_id', $partido->equipol_id)
+                           ->where('rival_id', $partido->equipov_id);
+                    })->orWhere(function ($q2) use ($partido) {
+                        $q2->where('equipo_id', $partido->equipov_id)
+                           ->where('rival_id', $partido->equipol_id);
+                    });
+                })
+                ->get();
+        } catch (\Throwable $e) {
+            $this->anotarRastro('Staging (import_partidos)', null, [], null, null,
+                'No pude consultarlo: ' . $e->getMessage());
+            return null;
+        }
+
+        $encontrados = [];
+        $datos       = [];
+
+        foreach ($filas as $f) {
+            // Una fila ya atada a OTRO partido no es ésta: no se toca.
+            if ($f->partido_id && (int) $f->partido_id !== (int) $partido->id) {
+                continue;
+            }
+
+            $clave               = (string) $f->external_id;
+            $encontrados[$clave] = true;
+            $datos[$clave]       = [
+                'dia'  => substr((string) $f->dia, 0, 10),
+                'home' => $f->club_external_id,
+                'away' => $f->rival_external_id,
+            ];
+        }
+
+        if (count($encontrados) === 1) {
+            $gameId = (string) key($encontrados);
+            $this->anotarRastro('Staging (import_partidos)', count($filas), [], null, null,
+                'Ya lo tenía guardado: gameId ' . $gameId . '. No gasté ninguna llamada.');
+            return $gameId;
+        }
+
+        if (count($encontrados) > 1) {
+            $this->anotarCandidatos($encontrados, $datos);
+            $this->anotarRastro('Staging (import_partidos)', count($filas), [], null, null,
+                'Hay ' . count($encontrados) . ' filas guardadas que podrían ser este partido. No elijo yo.');
+            return null;
+        }
+
+        $this->anotarRastro('Staging (import_partidos)', count($filas), [], null, null,
+            'No hay ninguna fila guardada de estos dos equipos en esa fecha.');
+
+        return null;
+    }
+
+    /**
+     * Los partidos de una ruta de TM que devuelve una lista, aplanados.
+     *
+     * Aguanta las tres formas que usan las rutas de partidos: `data.games[]`
+     * (fixture de club), `data.fixtures[].games[]` (fixture de competencia) y
+     * la lista pelada en la raíz. Devuelve null si TM no contestó, array si
+     * contestó, aunque venga vacío.
+     */
+    private function juegosDeRuta($ruta)
+    {
+        $llave = 'tm.juegos.' . md5($ruta);
 
         if (Cache::has($llave)) {
             return Cache::get($llave);
         }
 
         $this->llamadas++;
-        $resp = HttpHelper::getJson(self::TMAPI . '/club/' . rawurlencode($clubId) . '/fixtures');
+        $resp = HttpHelper::getJson(self::TMAPI . $ruta);
 
         if (!is_array($resp)) {
-            $this->avisos[] = 'No pude traer el fixture del club ' . $clubId . ' de Transfermarkt.';
             return null;
         }
 
         $data   = isset($resp['data']) ? $resp['data'] : $resp;
-        $juegos = isset($data['games']) && is_array($data['games']) ? $data['games'] : [];
-        $out    = [];
+        $crudos = [];
 
-        foreach ($juegos as $g) {
+        if (isset($data['games']) && is_array($data['games'])) {
+            $crudos = $data['games'];
+        } elseif (isset($data['fixtures']) && is_array($data['fixtures'])) {
+            foreach ($data['fixtures'] as $bloque) {
+                if (!is_array($bloque) || empty($bloque['games']) || !is_array($bloque['games'])) {
+                    continue;
+                }
+
+                foreach ($bloque['games'] as $g) {
+                    if (is_array($g)) $crudos[] = $g;
+                }
+            }
+        } elseif (isset($data[0]) && is_array($data[0])) {
+            $crudos = $data;
+        }
+
+        $out = $this->aplanar($crudos);
+
+        Cache::put($llave, $out, self::TTL);
+
+        return $out;
+    }
+
+    /**
+     * Un partido del fixture, reducido a lo que hace falta para reconocerlo.
+     *
+     * Es la misma forma que lee `ImportPartidosController::normalizarFixture()`:
+     * `gameId`, `homeClub`/`awayClub` explícitos y `baseDetails`. **No** es la
+     * forma de `/coach/{id}/performance-game`, que se aplana aparte.
+     */
+    private function aplanar(array $crudos): array
+    {
+        $out = [];
+
+        foreach ($crudos as $g) {
             if (!is_array($g)) {
                 continue;
             }
@@ -453,19 +709,109 @@ class TmBuscarGameId
             $bd = isset($g['baseDetails']) && is_array($g['baseDetails']) ? $g['baseDetails'] : [];
 
             $out[] = [
-                'game_id' => isset($g['gameId']) ? (string) $g['gameId'] : null,
-                'home'    => isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null,
-                'away'    => isset($g['awayClub']['clubId']) ? (string) $g['awayClub']['clubId'] : null,
-                'dia'     => $this->fecha(isset($bd['date']) ? $bd['date'] : null),
+                'game_id'   => isset($g['gameId']) ? (string) $g['gameId'] : null,
+                'home'      => isset($g['homeClub']['clubId']) ? (string) $g['homeClub']['clubId'] : null,
+                'away'      => isset($g['awayClub']['clubId']) ? (string) $g['awayClub']['clubId'] : null,
+                'dia'       => $this->fecha(isset($bd['date']) ? $bd['date'] : null),
+                'temporada' => isset($bd['seasonId']) ? (string) $bd['seasonId'] : null,
             ];
         }
-
-        Cache::put($llave, $out, self::TTL);
 
         return $out;
     }
 
-    /** Lo mismo, pero de los partidos dirigidos por un DT. */
+    /**
+     * El fixture de la competencia del torneo del partido.
+     *
+     * Es el único camino que puede nombrar una temporada: el fixture del club
+     * devuelve la que TM tiene por en curso, así que para un campeonato ya
+     * terminado los otros caminos no llegan.
+     *
+     * Se prueban hasta tres formas de URL, de la más barata a la más amplia, y
+     * se corta apenas una trae la temporada entera: pedir la misma competencia
+     * de otra forma devolvería la misma lista y se pagaría dos veces.
+     */
+    private function porCompetencia($partido, $tmLocal, $tmVisit, $torneo)
+    {
+        if (!$torneo) {
+            return null;
+        }
+
+        $comp = trim((string) $torneo->tm_competition_id);
+
+        if ($comp === '') {
+            return null;
+        }
+
+        $season = trim((string) $torneo->tm_season_id);
+        $ronda  = trim((string) $torneo->ronda);
+        $c      = rawurlencode($comp);
+
+        // El segundo elemento es "trae la temporada entera". Una ruta que sólo
+        // trae una fecha puede no tener el partido porque nuestro número de
+        // fecha no es el `gameDay` de TM: después de esa se sigue probando.
+        $rutas = [];
+
+        if ($season !== '') {
+            if ($ronda !== '') {
+                $rutas[] = ['/competition/' . $c . '/games?seasonId=' . rawurlencode($season)
+                    . '&gameDay=' . rawurlencode($ronda), false];
+            }
+
+            $rutas[] = ['/competition/' . $c . '/fixtures?seasonId=' . rawurlencode($season), true];
+        }
+
+        $rutas[] = ['/competition/' . $c . '/fixtures', true];
+
+        foreach ($rutas as $r) {
+            list($ruta, $completa) = $r;
+
+            $juegos  = $this->juegosDeRuta($ruta);
+            $hallado = $this->probar($juegos, $partido, $tmLocal, $tmVisit, 'Competencia · ' . $ruta);
+
+            if ($hallado) {
+                return $hallado;
+            }
+
+            if (!$completa || empty($juegos)) {
+                continue;
+            }
+
+            // Trajo la temporada entera y el partido no estaba. Si encima la
+            // temporada que trajo no es la que se pidió, TM ignoró el
+            // `seasonId`: hay que decirlo, porque entonces lo que falla no es
+            // el torneo sino que la API no sabe traer temporadas viejas.
+            if ($season !== '' && !$this->tieneTemporada($juegos, $season)) {
+                $this->avisos[] = 'Le pedí a Transfermarkt la temporada ' . $season . ' de la competencia '
+                    . $comp . ' y me devolvió otra: esa ruta de la API ignora el `seasonId` y contesta '
+                    . 'siempre la temporada en curso. Para partidos de campeonatos ya terminados, entonces, '
+                    . 'la URL hay que pegarla a mano.';
+            }
+
+            break;
+        }
+
+        return null;
+    }
+
+    private function tieneTemporada(array $juegos, $season)
+    {
+        foreach ($juegos as $j) {
+            if (!empty($j['temporada']) && (string) $j['temporada'] === (string) $season) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Los partidos dirigidos por un DT.
+     *
+     * `/coach/{id}/performance-game` tiene forma propia: no hay `homeClub` ni
+     * `awayClub` sino `club` (el del DT) y `opponent`. Como el apareo mira el
+     * par completo sin orden, da igual cuál es cuál.
+     */
     private function partidosDelDt($coachId)
     {
         $llave = 'tm.partidos.dt.' . $coachId;
@@ -488,7 +834,6 @@ class TmBuscarGameId
         }
 
         if ($perf === null) {
-            $this->avisos[] = 'No pude traer los partidos del DT ' . $coachId . ' de Transfermarkt.';
             return null;
         }
 
@@ -502,13 +847,23 @@ class TmBuscarGameId
             $gi = isset($g['gameInformation']) && is_array($g['gameInformation']) ? $g['gameInformation'] : [];
             $ci = isset($g['clubsInformation']) && is_array($g['clubsInformation']) ? $g['clubsInformation'] : [];
 
-            // Acá no hay local/visitante: son "el club del DT" y "el rival".
-            // Como el apareo mira el par completo sin orden, da igual.
+            $temporada = null;
+
+            foreach ([isset($gi['seasonId']) ? $gi['seasonId'] : null,
+                      isset($g['seasonId']) ? $g['seasonId'] : null,
+                      isset($gi['season']['id']) ? $gi['season']['id'] : null] as $cand) {
+                if (!empty($cand) && !is_array($cand)) {
+                    $temporada = (string) $cand;
+                    break;
+                }
+            }
+
             $out[] = [
-                'game_id' => isset($gi['gameId']) ? (string) $gi['gameId'] : null,
-                'home'    => isset($ci['club']['clubId']) ? (string) $ci['club']['clubId'] : null,
-                'away'    => isset($ci['opponent']['clubId']) ? (string) $ci['opponent']['clubId'] : null,
-                'dia'     => $this->fecha(isset($gi['date']) ? $gi['date'] : null),
+                'game_id'   => isset($gi['gameId']) ? (string) $gi['gameId'] : null,
+                'home'      => isset($ci['club']['clubId']) ? (string) $ci['club']['clubId'] : null,
+                'away'      => isset($ci['opponent']['clubId']) ? (string) $ci['opponent']['clubId'] : null,
+                'dia'       => $this->fecha(isset($gi['date']) ? $gi['date'] : null),
+                'temporada' => $temporada,
             ];
         }
 
@@ -581,6 +936,32 @@ class TmBuscarGameId
         return array_keys($ids);
     }
 
+    /**
+     * El torneo del partido, con su competencia de TM y el número de fecha.
+     *
+     * partidos → fechas → grupos → torneos. El `numero` de la fecha se usa como
+     * `gameDay` tentativo: si no coincide con el de TM no rompe nada, porque
+     * después se sigue probando con la temporada entera.
+     */
+    private function torneoDelPartido($partidoId)
+    {
+        try {
+            if (!Schema::hasTable('torneos') || !Schema::hasColumn('torneos', 'tm_competition_id')) {
+                return null;
+            }
+
+            return DB::table('partidos')
+                ->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
+                ->join('grupos', 'fechas.grupo_id', '=', 'grupos.id')
+                ->join('torneos', 'grupos.torneo_id', '=', 'torneos.id')
+                ->where('partidos.id', (int) $partidoId)
+                ->first(['torneos.id as torneo_id', 'torneos.nombre', 'torneos.year',
+                    'torneos.tm_competition_id', 'torneos.tm_season_id', 'fechas.numero as ronda']);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     private function nombreEquipo($equipoId)
     {
         $e = DB::table('equipos')->where('id', (int) $equipoId)->first();
@@ -599,6 +980,7 @@ class TmBuscarGameId
             'como'       => $como,
             // Los nombres sólo se piden si de verdad hay que mostrar la lista.
             'candidatos' => $gameId ? [] : $this->candidatosConNombres(),
+            'rastro'     => $this->rastro,
             'avisos'     => $this->avisos,
             'llamadas'   => $this->llamadas,
         ];

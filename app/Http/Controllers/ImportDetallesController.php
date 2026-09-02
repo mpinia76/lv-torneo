@@ -559,7 +559,9 @@ class ImportDetallesController extends Controller
                 . 'nada, y si los equipos no aparean con los de la base te avisa ahí mismo.</p>';
         } else {
             $html .= '<p class="sub">Para bajarle el detalle hace falta el <b>gameId</b> de Transfermarkt. '
-                . 'Lo busqué por el fixture de los dos clubes y por los partidos de los DTs, y no apareció.</p>';
+                . 'Lo busqué en el staging, en el fixture de los dos clubes, en los partidos de los DTs '
+                . 'y en el fixture de la competencia del torneo, y no apareció. La tabla de abajo dice '
+                . 'qué contestó cada uno.</p>';
         }
 
         if (!empty($buscado['avisos'])) {
@@ -570,10 +572,40 @@ class ImportDetallesController extends Controller
             $html .= '</div>';
         }
 
-        $html .= '<p class="sub"><b>Para que se rehaga solo la próxima vez</b>, lo que falta es una de estas dos: '
+        // El rastro es lo que convierte "no lo encontré" en un diagnóstico: dice si
+        // cada fuente contestó, cuántos partidos trajo y de qué temporada. Sin eso,
+        // "TM no lo tiene" y "TM me contestó el campeonato de este año" se ven igual.
+        if (!empty($buscado['rastro'])) {
+            $html .= '<h2>Qué contestó cada fuente</h2>'
+                . '<p class="sub">Mirá la columna <b>Período</b>: si el día del partido no cae adentro, '
+                . 'esa fuente estaba mirando otra temporada y por eso no lo tenía.</p>'
+                . '<div class="scroll"><table><thead><tr><th>Fuente</th><th>Partidos</th>'
+                . '<th>Temporadas TM</th><th>Período</th><th>Qué pasó</th></tr></thead><tbody>';
+
+            foreach ($buscado['rastro'] as $r) {
+                $temps = !empty($r['temporadas']) ? implode(', ', $r['temporadas']) : '—';
+                $per   = (!empty($r['desde']) && !empty($r['hasta']))
+                    ? $r['desde'] . ' → ' . $r['hasta'] : '—';
+
+                $html .= '<tr>'
+                    . '<td>' . e((string) $r['fuente']) . '</td>'
+                    . '<td class="num">' . ($r['partidos'] === null ? '—' : (int) $r['partidos']) . '</td>'
+                    . '<td class="num gris">' . e($temps) . '</td>'
+                    . '<td class="num">' . e($per) . '</td>'
+                    . '<td>' . e((string) $r['nota']) . '</td>'
+                    . '</tr>';
+            }
+
+            $html .= '</tbody></table></div>';
+        }
+
+        $html .= '<p class="sub"><b>Para que se rehaga solo la próxima vez</b>, alcanza con cualquiera de estas: '
             . 'que los dos equipos estén atados a su club de Transfermarkt en <code>equipo_tm</code> '
-            . '(el sondeo del DT aprende esos mapeos solo), o que los DTs del partido tengan cargada su '
-            . 'URL de Transfermarkt. Con cualquiera de las dos, este mismo botón lo encuentra sin ayuda.</p>'
+            . '(el sondeo del DT aprende esos mapeos solo); que los DTs del partido tengan cargada su '
+            . 'URL de Transfermarkt; o que el torneo tenga cargados su <b>id de competencia</b> y su '
+            . '<b>seasonId</b> de Transfermarkt (Editar torneo → transfermarkt.com). '
+            . 'Esta última es la que sirve para los campeonatos ya terminados: el fixture del club sólo '
+            . 'devuelve la temporada en curso.</p>'
             . '<p class="sub">Última salida, sólo para este partido: '
             . '<a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $partidoId])) . '">'
             . 'pegar la URL de Transfermarkt a mano</a>. Pegándola una vez queda anotado el gameId y de ahí en más '
