@@ -2406,7 +2406,8 @@ class ImportPartidosController extends Controller
                         . '<input type="hidden" name="temp" value="' . e($temp) . '">'
                         . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
                         . '<input type="hidden" name="confirmar" value="1">'
-                        . '<select name="grupo_id">' . $opts . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
+                        . '<select name="grupo_id" class="s2" data-placeholder="elegí el grupo…">' . $opts
+                        . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
                 }
             }
         }

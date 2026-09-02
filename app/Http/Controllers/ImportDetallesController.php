@@ -805,7 +805,7 @@ class ImportDetallesController extends Controller
             . '<p class="sub"><b>La temporada va uno atrás del año</b>, igual que en el resto del importador: '
             . 'el Clausura 2025 es <code>2024</code>.</p>'
             . '<form method="get" class="acciones">'
-            . '<select name="club_tm">' . $opciones . '</select> '
+            . '<select name="club_tm" class="s2" data-placeholder="buscá el club…">' . $opciones . '</select> '
             . '<input type="text" name="season" value="' . e($season) . '" size="8" placeholder="ej 2024" required> '
             . '<button class="boton" type="submit">Leer el calendario</button>'
             . ' <span class="sub">1 crédito</span></form>';
@@ -947,7 +947,8 @@ class ImportDetallesController extends Controller
     {
         set_time_limit(0);
 
-        $aplicar = (string) $request->get('aplicar', '0') === '1';
+        $aplicar  = (string) $request->get('aplicar', '0') === '1';
+        $escanear = (string) $request->get('escanear', '0') === '1';
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
             . '<h1>Nombres en otro alfabeto</h1>'
@@ -959,11 +960,17 @@ class ImportDetallesController extends Controller
             . 'pero eso no repara las fichas que ya existen: <code>jugador_tm</code> las tiene mapeadas, así que '
             . 'volver a bajar el partido las reusa. Acá se releen los perfiles y se renombran.</p>';
 
-        $rotas = $this->personasSinLatino();
+        $rotas = $this->personasSinLatino($escanear);
 
         if (!$rotas) {
             return $this->pagina('Nombres en otro alfabeto', $cuerpo
-                . '<div class="ok-box">No hay ninguna ficha con el nombre en otro alfabeto.</div>');
+                . '<div class="ok-box">No hay ninguna ficha con el nombre o el apellido en otro alfabeto'
+                . ($escanear ? ' (mirando la tabla entera)' : '') . '.</div>'
+                . ($escanear ? '' : '<p class="sub">La búsqueda usa un filtro en SQL para no recorrer toda la '
+                    . 'tabla. Si sabés que hay fichas rotas y acá no aparecen, <a href="'
+                    . e(route('import_detalles.nombres_alfabeto', ['escanear' => 1]))
+                    . '">mirá la tabla entera</a> — es más lento pero no depende de cómo se porte el '
+                    . 'REGEXP del motor.</p>'));
         }
 
         // El id de TM sale de jugador_tm; sin él no hay a quién releerle el perfil.
@@ -1049,7 +1056,9 @@ class ImportDetallesController extends Controller
 
             $tabla .= '<tr class="' . ($nuevo ? 'warn' : '') . '">'
                 . '<td class="num gris">#' . (int) $personaId . '</td>'
-                . '<td>' . e(trim($vieja['apellido'] . ', ' . $vieja['nombre'])) . '</td>'
+                . '<td>' . e(trim($vieja['apellido'] . ', ' . $vieja['nombre']))
+                    . ($vieja['name'] !== '' ? ' <span class="sub">· name: ' . e($vieja['name']) . '</span>' : '')
+                    . '</td>'
                 . '<td class="num gris">' . e((string) $tm) . '</td>'
                 . '<td>' . ($nuevo ? '<b>' . e(trim($nuevo['apellido'] . ', ' . $nuevo['nombre'])) . '</b>' : '—') . '</td>'
                 . '<td>' . e($estado) . '</td>'
@@ -1089,38 +1098,64 @@ class ImportDetallesController extends Controller
     }
 
     /**
-     * Las personas cuyo nombre no tiene ni una letra latina.
+     * Las personas con el nombre o el apellido escritos en otro alfabeto.
+     *
+     * **Se miran `nombre` y `apellido`, NO `name`.** Es el error que tuvo la
+     * primera versión y por el que la pantalla decía «no hay ninguna» teniendo
+     * 22 adelante: metía las tres columnas en una sola bolsa, y `name` guarda
+     * el `shortName` de TM, que en estos casos sí venía en latino
+     * («A. El Shenawy»). Con eso alcanzaba para que la ficha pareciera sana,
+     * cuando lo roto es justamente lo que se muestra en todos lados —el
+     * apellido y el nombre—. Que `name` esté en latino no es la prueba de que
+     * está bien: es la prueba de que TM tenía la forma buena y no se usó.
+     *
+     * Alcanza con que **una** de las dos esté en otro alfabeto: media ficha en
+     * árabe también está rota, y así se cubren las mezclas.
      *
      * El prefiltro en SQL es por letras ASCII —cualquier nombre latino de
-     * verdad tiene al menos una— y después se confirma en PHP con la misma
-     * regla que usa el importador. Si el motor no soporta REGEXP, se barre la
+     * verdad tiene al menos una— y después se confirma en PHP buscando
+     * caracteres de otros alfabetos. Si el motor no soporta REGEXP, se barre la
      * tabla por tandas: es una pantalla de reparación, no una de todos los días.
      *
-     * @return array persona_id => ['nombre' => .., 'apellido' => ..]
+     * @return array persona_id => ['nombre' => .., 'apellido' => .., 'name' => ..]
      */
-    private function personasSinLatino()
+    private function personasSinLatino($escanear = false)
     {
-        $out       = [];
-        $confirmar = function ($p) use (&$out) {
-            $todo = trim((string) $p->nombre . ' ' . (string) $p->apellido . ' ' . (string) $p->name);
+        $otroAlfabeto = '/[\p{Arabic}\p{Hebrew}\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}'
+            . '\p{Cyrillic}\p{Greek}\p{Thai}\p{Devanagari}\p{Armenian}\p{Georgian}]/u';
 
-            if ($todo !== '' && !preg_match('/\p{Latin}/u', $todo)) {
-                $out[(int) $p->id] = ['nombre' => (string) $p->nombre, 'apellido' => (string) $p->apellido];
+        $out       = [];
+        $confirmar = function ($p) use (&$out, $otroAlfabeto) {
+            $partes = trim((string) $p->nombre . ' ' . (string) $p->apellido);
+
+            if ($partes !== '' && preg_match($otroAlfabeto, $partes)) {
+                $out[(int) $p->id] = [
+                    'nombre'   => (string) $p->nombre,
+                    'apellido' => (string) $p->apellido,
+                    'name'     => (string) $p->name,
+                ];
             }
         };
 
-        try {
-            $filas = DB::table('personas')
-                ->whereRaw("COALESCE(nombre,'') NOT REGEXP '[a-zA-Z]'")
-                ->whereRaw("COALESCE(apellido,'') NOT REGEXP '[a-zA-Z]'")
-                ->limit(500)
-                ->get(['id', 'name', 'nombre', 'apellido']);
+        // El escaneo completo es la red por si el REGEXP del motor no se
+        // comporta como se espera: es lo que pasó una vez y dejó la pantalla
+        // diciendo «no hay ninguna» con 22 adelante.
+        if (!$escanear) {
+            try {
+                $filas = DB::table('personas')
+                    ->where(function ($q) {
+                        $q->whereRaw("COALESCE(nombre,'') NOT REGEXP '[a-zA-Z]'")
+                          ->orWhereRaw("COALESCE(apellido,'') NOT REGEXP '[a-zA-Z]'");
+                    })
+                    ->limit(500)
+                    ->get(['id', 'name', 'nombre', 'apellido']);
 
-            foreach ($filas as $p) $confirmar($p);
+                foreach ($filas as $p) $confirmar($p);
 
-            return $out;
-        } catch (\Throwable $e) {
-            // Sin REGEXP: se barre por tandas.
+                return $out;
+            } catch (\Throwable $e) {
+                // Sin REGEXP: se barre por tandas.
+            }
         }
 
         DB::table('personas')->select('id', 'name', 'nombre', 'apellido')
@@ -1171,7 +1206,7 @@ class ImportDetallesController extends Controller
             . 'todo lo de 2025 es <code>2024</code>.</p>'
             . '<form method="get" class="acciones">'
             . '<input type="text" name="comp_id" value="' . e($compId) . '" size="10" placeholder="ej KLUB" required> '
-            . '<select name="copa">'
+            . '<select name="copa" class="s2" data-placeholder="liga o copa">'
             . '<option value="0"' . (!$copa ? ' selected' : '') . '>liga</option>'
             . '<option value="1"' . ($copa ? ' selected' : '') . '>copa</option>'
             . '</select> '
@@ -2619,7 +2654,7 @@ class ImportDetallesController extends Controller
             . '(<code>personaDesdePerfil</code>). Si a alguno le falta la fecha de nacimiento o la nacionalidad, '
             . 'es porque su JSON usa otras claves. Mirá un jugador también: ese es el que el parser SÍ entiende.</p>'
             . '<form method="get" style="margin:12px 0">'
-            . '<select name="tipo">' . $opts . '</select> '
+            . '<select name="tipo" class="s2" data-placeholder="qué tipo de ficha">' . $opts . '</select> '
             . '<input name="tm_id" value="' . e($tmId) . '" placeholder="id de TM, ej 5325" size="18"> <button>Ver</button>'
             . ' <span class="sub">el id sale del link TM de la lista de revisión, o de la URL del perfil</span></form>';
 
