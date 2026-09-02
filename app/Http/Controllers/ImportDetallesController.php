@@ -338,7 +338,11 @@ class ImportDetallesController extends Controller
         set_time_limit(0);
 
         $partidoId = (int) $request->get('partido_id', 0);
-        $gameId    = trim((string) $request->get('game_id', ''));
+        // El campo acepta la URL entera de Transfermarkt, no sólo el número:
+        // copiar la barra de direcciones es lo natural.
+        $pegado    = trim((string) $request->get('game_id', ''));
+        $gameId    = $this->gameIdDesde($pegado);
+        $malPegado = $pegado !== '' && $gameId === '';
         $forzar    = (string) $request->get('forzar', '0') === '1';
 
         // Si el gameId viene en la URL es porque lo eligió el usuario entre los
@@ -355,8 +359,10 @@ class ImportDetallesController extends Controller
         // Sin gameId en el staging lo buscamos en Transfermarkt: con los dos
         // clubes y la fecha alcanza. Así "Rehacer" anda en cualquier partido y
         // no sólo en los que pasaron por el importador de DTs.
+        // Si pegó algo y no se pudo sacar el gameId, NO se sale a buscar: sería
+        // gastar créditos para volver a la misma pantalla. Se le dice qué pasó.
         $buscado = null;
-        if ($partidoId && $gameId === '') {
+        if ($partidoId && $gameId === '' && !$malPegado) {
             $buscador = new TmBuscarGameId;
             $buscado  = $buscador->buscar($partidoId);
 
@@ -370,7 +376,13 @@ class ImportDetallesController extends Controller
         }
 
         if (!$partidoId || $gameId === '') {
-            return $this->pagina('Detalle', $this->sinGameId($partidoId, $buscado));
+            $error = $malPegado
+                ? 'No pude sacar un gameId de «' . e($pegado) . '». Tiene que ser la URL de la <b>ficha del '
+                    . 'partido</b> en Transfermarkt (la que lleva <code>/spielbericht/</code>) o el número solo. '
+                    . 'No alcanza con la URL del club, la del torneo ni la de una fecha.'
+                : '';
+
+            return $this->pagina('Detalle', $this->sinGameId($partidoId, $buscado, $error));
         }
 
         // &fotos=0 para no gastar una llamada por cada persona nueva.
@@ -523,16 +535,19 @@ class ImportDetallesController extends Controller
      * muestran los candidatos con fecha y nombres, y elige de un clic. Lo que
      * elige queda anotado, así que el partido no vuelve a preguntar.
      */
-    private function sinGameId($partidoId, $buscado)
+    private function sinGameId($partidoId, $buscado, $error = '')
     {
         if (!$partidoId) {
             return '<p class="err">Falta <code>?partido_id=</code>.</p>';
         }
 
+        $encabezado = $error !== '' ? '<div class="err-box">' . $error . '</div>' : '';
+
         $candidatos = isset($buscado['candidatos']) ? $buscado['candidatos'] : [];
 
         $html = '<h1>' . ($candidatos ? '¿Cuál de estos es?' : 'No encontré este partido en Transfermarkt') . '</h1>'
-            . '<p class="sub">' . $this->resumenPartido($partidoId) . '</p>';
+            . '<p class="sub">' . $this->resumenPartido($partidoId) . '</p>'
+            . $encabezado;
 
         if ($candidatos) {
             $html .= '<p class="sub">Estos son los partidos de Transfermarkt que podrían ser éste. '
@@ -615,11 +630,33 @@ class ImportDetallesController extends Controller
             . 'la API devuelven la temporada <b>en curso</b> e ignoran el año que se les pide (verificado). '
             . 'Lo único que va hacia atrás en el tiempo son los partidos del DT, así que en un partido '
             . 'viejo la vía rápida es cargarle la URL de Transfermarkt a los DTs que lo dirigieron — '
-            . 'o pegar la del partido, acá abajo.</p>'
-            . '<p class="sub">Última salida, sólo para este partido: '
+            . 'o pegar la del partido, acá abajo.</p>';
+
+        // Antes acá había un link al importador VIEJO (el de promiedos /
+        // livefutbol, con tres campos de URL). Confundía por dos motivos: no se
+        // entendía qué URL había que pegar, y ese camino usa otro escritor de
+        // incidencias, sin los arreglos del importador nuevo (roles de árbitro
+        // leídos y no inferidos, gol olímpico, penales, plantillas). Lo que hay
+        // que pegar es la URL del partido EN TRANSFERMARKT, y el que la usa es
+        // este importador.
+        $html .= '<h2>Cargarlo a mano</h2>'
+            . '<p class="sub">Si ya sabés cuál es el partido en Transfermarkt, abrilo en el navegador y copiá acá '
+            . 'la barra de direcciones. No recortes nada: de la URL saco el <b>gameId</b> solo. '
+            . 'También podés pegar el número pelado.</p>'
+            . '<form method="get" action="' . e(route('import_detalles.ver')) . '" class="acciones">'
+            . '<input type="hidden" name="partido_id" value="' . (int) $partidoId . '">'
+            . '<input type="text" name="game_id" size="70" '
+            . 'placeholder="https://www.transfermarkt.com/spielbericht/index/spielbericht/4643374"> '
+            . '<button class="boton" type="submit">Ver qué trae →</button>'
+            . '</form>'
+            . '<p class="sub">Eso abre la <b>vista previa</b>: muestra la alineación, los goles, las tarjetas y los '
+            . 'árbitros que va a escribir <b>antes</b> de tocar nada, y si los equipos no aparean con los de la base '
+            . 'te avisa ahí mismo. Se guarda recién cuando lo confirmás, y ahí el gameId queda anotado para siempre: '
+            . 'de ahí en más este partido se rehace solo.</p>'
+            . '<p class="sub">Si el partido no está en Transfermarkt, queda el importador viejo, que carga las '
+            . 'incidencias pegando la URL de <b>promiedos</b> o <b>livefutbol</b>: '
             . '<a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $partidoId])) . '">'
-            . 'pegar la URL de Transfermarkt a mano</a>. Pegándola una vez queda anotado el gameId y de ahí en más '
-            . 'este partido se rehace solo.</p>';
+            . 'importar desde otra fuente</a>.</p>';
 
         return $html;
     }
@@ -708,6 +745,47 @@ class ImportDetallesController extends Controller
             . 'distintas</b>, con ids distintos, aunque sean del mismo año.</p>';
 
         return $html;
+    }
+
+    /**
+     * El gameId que hay adentro de lo que el usuario pegó.
+     *
+     * Acepta el número pelado o la URL de la ficha del partido. **No adivina:**
+     * si no puede identificarlo con seguridad devuelve vacío, y quien llama lo
+     * dice. Un gameId equivocado escribe la alineación de OTRO partido encima
+     * del que se estaba mirando, y eso después no se nota.
+     *
+     * El caso que obliga a tener cuidado es `?saison_id=2024`: si se toma
+     * cualquier número de la URL, un año de cuatro dígitos pasa por gameId.
+     */
+    private function gameIdDesde($texto)
+    {
+        $texto = trim((string) $texto);
+
+        if ($texto === '') {
+            return '';
+        }
+
+        if (preg_match('/^\d+$/', $texto)) {
+            return $texto;
+        }
+
+        // La URL de la ficha lo dice explícitamente: es la lectura confiable.
+        if (preg_match('#spielbericht/(\d+)#i', $texto, $m)) {
+            return $m[1];
+        }
+
+        // Si no, sólo un número largo, y sólo si es el único: un gameId tiene
+        // siete dígitos y un año cuatro, pero ante el empate no se elige.
+        if (preg_match_all('/\d{6,}/', $texto, $m)) {
+            $unicos = array_values(array_unique($m[0]));
+
+            if (count($unicos) === 1) {
+                return $unicos[0];
+            }
+        }
+
+        return '';
     }
 
     /** "Equipo A vs Equipo B · 2026-08-19", para saber de qué partido hablamos. */
@@ -1335,11 +1413,7 @@ class ImportDetallesController extends Controller
                             ? 'hay ' . $cuantos . ' partido(s) posible(s) y no elijo yo'
                             : 'no lo encontré en Transfermarkt')
                         . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $p->id])) . '">'
-                        . ($cuantos ? 'elegir a mano' : 'ver por qué') . '</a>'
-                        // La salida está a un clic, no a dos: en un partido de un campeonato
-                        // terminado pegar la URL no es el plan B, es el único plan.
-                        . ' · <a href="' . e(route('fechas.importarPartido', ['partidoId' => (int) $p->id]))
-                        . '">pegar la URL</a></div>';
+                        . ($cuantos ? 'elegir a mano' : 'ver por qué y cargarlo a mano') . '</a></div>';
                     foreach ((isset($r['avisos']) ? $r['avisos'] : []) as $a) {
                         $detalleIds .= '<div class="sub" style="margin-left:18px">• ' . e($a) . '</div>';
                     }
@@ -1579,8 +1653,8 @@ class ImportDetallesController extends Controller
             . '<b>Si el partido es de un campeonato ya terminado, atar los clubes en <code>equipo_tm</code> '
             . 'no cambia nada</b>: todas las rutas de fixture de Transfermarkt devuelven la temporada en curso. '
             . 'Lo único que va hacia atrás en el tiempo son los partidos del DT — cargale la URL de TM a los '
-            . 'que dirigieron ese partido y volvé a entrar por «ver por qué» — o pegá la URL del partido, que '
-            . 'lo resuelve de una y para siempre.</p>'
+            . 'que dirigieron ese partido y volvé a entrar acá — o entrá al partido y pegá ahí la URL de '
+            . 'Transfermarkt, que lo resuelve de una y para siempre.</p>'
             . '<div class="diag">';
 
         foreach ($filas as $f) {
@@ -1588,9 +1662,8 @@ class ImportDetallesController extends Controller
 
             $html .= '<div><span class="warn">?</span> ' . $this->resumenPartido($id)
                 . ' <span class="sub">' . e((string) $f->motivo) . '</span>'
-                . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => $id])) . '">ver por qué</a>'
-                . ' · <a href="' . e(route('fechas.importarPartido', ['partidoId' => $id]))
-                . '">pegar la URL</a></div>';
+                . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => $id]))
+                . '">ver por qué y cargarlo a mano</a></div>';
         }
 
         $html .= '</div>';
