@@ -1512,6 +1512,8 @@ class ImportDetallesController extends Controller
         $mapear   = (string) $request->get('mapear', '0') === '1';
         $crudo    = (string) $request->get('crudo', '0') === '1';
         $pais     = trim((string) $request->get('pais', ''));
+        $atar     = (array) $request->get('atar', []);          // tm_club_id => equipo_id
+        $atarNom  = (array) $request->get('atar_nombre', []);   // tm_club_id => nombre en TM
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
             . '<h1>Calendario de una competencia, del HTML de Transfermarkt</h1>'
@@ -1543,6 +1545,28 @@ class ImportDetallesController extends Controller
 
         if ($compId === '' || $season === '') {
             return $this->pagina('Calendario de la competencia', $cuerpo);
+        }
+
+        // ── Atar a mano lo que el nombre no alcanzó a resolver ──────────────
+        // Se guarda ANTES de leer la página, no después: así el apareo de
+        // esta misma corrida ya usa el mapeo recién hecho y los partidos de
+        // ese club aparecen atados sin gastar otra lectura.
+        $atados = 0;
+        if ($atar) {
+            $mapeoManual = new \App\Services\MapeoClubesTm;
+            foreach ($atar as $tmClub => $eqId) {
+                $tmClub = trim((string) $tmClub);
+                $eqId   = (int) $eqId;
+                if ($tmClub === '' || !$eqId) continue;   // el que dejó vacío el select no se toca
+                $mapeoManual->guardar($tmClub, $eqId,
+                    isset($atarNom[$tmClub]) ? (string) $atarNom[$tmClub] : '',
+                    'calendario html a mano');
+                $atados++;
+            }
+        }
+        if ($atados) {
+            $cuerpo .= '<div class="ok-box">Até <b>' . $atados . '</b> club(es) a mano en '
+                . '<code>equipo_tm</code>. Ya valen para esta lectura y para todas las que vengan.</div>';
         }
 
         $svc = new \App\Services\TmFixtureCompetenciaHtml;
@@ -1745,20 +1769,55 @@ class ImportDetallesController extends Controller
         }
 
         if ($sinAtar) {
-            $cuerpo .= '<h2>Clubes que no reconocí</h2>'
-                . '<p class="sub">No están en <code>equipo_tm</code> y su nombre no coincide con ningún equipo '
-                . 'tuyo (o coincide con más de uno). Si el equipo existe en tu base con otro nombre, atalo a mano '
-                . 'desde la carga de partidos; si no existe, los partidos de ese club no se van a poder aparear.</p>'
-                . '<div class="diag">';
+            // Acá NO se manda a otra pantalla. La versión anterior linkeaba a
+            // `import_partidos.fixture?mapear_tm=…`, pero ese parámetro sólo
+            // hace algo cuando esa pantalla ya tiene un fixture cargado: el
+            // link abría una página en blanco. El mapeo se resuelve donde está
+            // el problema, y con select2 como todas las demás.
+            $volverAca = route('import_detalles.competencia_html',
+                ['comp_id' => $compId, 'season' => $season, 'copa' => $copa ? 1 : 0, 'pais' => $pais]);
 
-            foreach ($sinAtar as $tm => $nombre) {
-                $cuerpo .= '<div>• ' . e((string) $nombre) . ' <span class="sub">— id de TM '
-                    . e((string) $tm) . '</span> · <a href="'
-                    . e(route('import_partidos.fixture', ['mapear_tm' => $tm, 'mapear_nombre' => $nombre]))
-                    . '">atarlo a un equipo tuyo</a></div>';
+            $opciones = '<option value=""></option>';
+            foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $eq) {
+                $opciones .= '<option value="' . (int) $eq->id . '">' . e((string) $eq->nombre)
+                    . ($eq->pais ? ' (' . e((string) $eq->pais) . ')' : '') . '</option>';
             }
 
-            $cuerpo .= '</div>';
+            $cuerpo .= '<h2>Clubes que no reconocí <span class="sub">(' . count($sinAtar) . ')</span></h2>'
+                . '<p class="sub">No están en <code>equipo_tm</code> y su nombre no coincide con ningún equipo '
+                . 'tuyo (o coincide con más de uno, y entonces me abstengo). Elegí el equipo y guardá: queda atado '
+                . 'por el id de Transfermarkt y no se vuelve a preguntar nunca más. Si el club <b>no existe</b> en '
+                . 'tu base, «Crear desde TM» lo da de alta con nombre, siglas, país y escudo y lo ata solo '
+                . '(cuesta 2 llamadas). Los que dejes vacíos quedan como están.</p>'
+                . '<form method="get">'
+                . '<input type="hidden" name="comp_id" value="' . e($compId) . '">'
+                . '<input type="hidden" name="season" value="' . e($season) . '">'
+                . '<input type="hidden" name="copa" value="' . ($copa ? '1' : '0') . '">'
+                . '<input type="hidden" name="pais" value="' . e($pais) . '">'
+                . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th>'
+                . '<th>Equipo tuyo</th><th></th></tr></thead><tbody>';
+
+            foreach ($sinAtar as $tm => $nombre) {
+                $cuerpo .= '<tr>'
+                    . '<td>' . e((string) $nombre) . '</td>'
+                    . '<td class="num gris"><a target="_blank" rel="noopener" href="'
+                        . e('https://www.transfermarkt.es/-/startseite/verein/' . rawurlencode((string) $tm))
+                        . '">' . e((string) $tm) . '</a></td>'
+                    . '<td><input type="hidden" name="atar_nombre[' . e((string) $tm) . ']" value="'
+                        . e((string) $nombre) . '">'
+                        . '<select name="atar[' . e((string) $tm) . ']" class="s2" '
+                        . 'data-placeholder="buscar equipo tuyo…">' . $opciones . '</select></td>'
+                    . '<td><a class="boton-sec" target="_blank" rel="noopener" href="'
+                        . e(route('import_partidos.crear_equipo',
+                            ['tm_id' => $tm, 'volver' => $volverAca]))
+                        . '">Crear desde TM ↗</a></td>'
+                    . '</tr>';
+            }
+
+            $cuerpo .= '</tbody></table></div>'
+                . '<p class="acciones"><button class="boton" type="submit">Atar y volver a leer</button> '
+                . '<span class="sub">vuelve a leer la página, así que cuesta 1 crédito; los partidos de esos '
+                . 'clubes ya salen apareados en la misma corrida</span></p></form>';
         }
 
         if ($guardar) {
