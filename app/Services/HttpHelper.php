@@ -831,17 +831,33 @@ class HttpHelper
     // Para páginas de transfermarkt.com.ar geo-bloqueadas por CloudFront.
     // Devuelve el HTML crudo o false.
     // ---------------------------------------------------
-    private static function getHtmlViaScraper(string $url)
+    /**
+     * El HTML de Transfermarkt por ScraperAPI, con el país de salida a elección.
+     *
+     * `$pais` existe porque el país importa y no siempre para bien: `eu` es lo
+     * que hace pasar el geo-block de **tmapi**, pero saliendo desde Europa el
+     * **sitio** puede contestar el muro de consentimiento en vez de la página.
+     * Son dos cosas distintas y conviene poder probarlas por separado sin tocar
+     * el .env.
+     */
+    public static function getHtmlTm(string $url, $pais = null)
+    {
+        return self::getHtmlViaScraper($url, $pais);
+    }
+
+    private static function getHtmlViaScraper(string $url, $pais = null)
     {
         if (self::apiKey() === '') {
             Log::error('HttpHelper: ' . self::SIN_CLAVE);
             return false;
         }
 
+        $pais = trim((string) $pais);
+
         $endpoint = 'https://api.scraperapi.com/?' . http_build_query([
                 'api_key'      => self::apiKey(),
                 'url'          => $url,
-                'country_code' => self::country(), // 'eu' pasa el geo-block de TM
+                'country_code' => $pais !== '' ? $pais : self::country(),
             ]);
 
         $response = false;

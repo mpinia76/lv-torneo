@@ -41,17 +41,22 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      *    'visita_tm', 'visita_nombre', 'resultado']
      * o null si no se pudo traer la página.
      */
-    public function leerComp($compId, $season, $copa = false)
+    public function leerComp($compId, $season, $copa = false, $guardarCrudo = false, $pais = null)
     {
         $this->avisos      = [];
         $this->descartadas = 0;
+        $this->crudo       = '';
 
         $url  = self::urlComp($compId, $season, $copa);
-        $html = HttpHelper::getHtmlContent($url);
+        $html = HttpHelper::getHtmlTm($url, $pais);
 
         if (!$html) {
             $this->avisos[] = 'No pude traer ' . $url;
             return null;
+        }
+
+        if ($guardarCrudo) {
+            $this->crudo = $html;
         }
 
         $dom = new \DOMDocument();

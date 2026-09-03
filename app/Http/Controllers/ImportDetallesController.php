@@ -807,8 +807,12 @@ class ImportDetallesController extends Controller
             . '<form method="get" class="acciones">'
             . '<select name="club_tm" class="s2" data-placeholder="buscá el club…">' . $opciones . '</select> '
             . '<input type="text" name="season" value="' . e($season) . '" size="8" placeholder="ej 2024" required> '
+            . '<input type="text" name="pais" value="' . e($pais) . '" size="4" placeholder="país"> '
             . '<button class="boton" type="submit">Leer el calendario</button>'
-            . ' <span class="sub">1 crédito</span></form>';
+            . ' <span class="sub">1 crédito</span></form>'
+            . '<p class="sub"><b>El campo «país»</b> es por dónde sale la petición. Vacío usa el del '
+            . '<code>.env</code> (<code>eu</code>). Si la página vuelve sin partidos, probá <code>us</code>: '
+            . 'desde Europa el sitio puede contestar el muro de consentimiento.</p>';
 
         if ($clubTm === '' || $season === '') {
             return $this->pagina('Calendario del club', $cuerpo
@@ -821,8 +825,10 @@ class ImportDetallesController extends Controller
                 . 'faltan en <code>equipo_tm</code>.</p>');
         }
 
+        $crudo = (string) $request->get('crudo', '0') === '1';
+        $pais  = trim((string) $request->get('pais', ''));
         $svc   = new \App\Services\TmFixtureClubHtml;
-        $filas = $svc->leer($clubTm, $season);
+        $filas = $svc->leer($clubTm, $season, $crudo, $pais);
 
         $cuerpo .= '<p class="sub">Página leída: <a href="' . e(\App\Services\TmFixtureClubHtml::url($clubTm, $season))
             . '" target="_blank" rel="noopener">verla en Transfermarkt</a></p>';
@@ -831,7 +837,17 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<div class="err-box">' . e($a) . '</div>';
         }
 
-        if ($filas === null) {
+        if ($filas === null || !$filas) {
+            $cuerpo .= $crudo
+                ? $this->diagnosticoCrudo($svc->crudo, \App\Services\TmFixtureClubHtml::url($clubTm, $season))
+                : '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.club_html',
+                    ['club_tm' => $clubTm, 'season' => $season, 'pais' => $pais ?: null, 'crudo' => 1]))
+                    . '">Ver qué llegó de verdad</a> '
+                    . '<a class="boton-sec" href="' . e(route('import_detalles.club_html',
+                        ['club_tm' => $clubTm, 'season' => $season, 'pais' => 'us']))
+                    . '">Probar saliendo desde EE.UU.</a> '
+                    . '<span class="sub">cada una vuelve a pedir la página: 1 crédito</span></p>';
+
             return $this->pagina('Calendario del club', $cuerpo);
         }
 
@@ -1091,6 +1107,58 @@ class ImportDetallesController extends Controller
         return $this->pagina('Nombres en otro alfabeto', $cuerpo);
     }
 
+
+    /**
+     * Qué llegó de verdad del sitio, cuando lo que llegó no se parece a lo que
+     * se ve en el navegador.
+     *
+     * La primera vez que la pantalla de competencias dijo «no tiene ningún link
+     * a una ficha de partido», la misma URL abierta a mano mostraba el
+     * calendario completo. Sin ver el HTML que recibió el servidor no hay forma
+     * de distinguir un muro de cookies, un bloqueo por IP, una respuesta
+     * recortada o un cambio de maquetado: los cuatro se ven igual desde acá.
+     */
+    private function diagnosticoCrudo($html, $url)
+    {
+        $largo = strlen((string) $html);
+
+        $marcas = [
+            'spielbericht'      => 'links a fichas de partido',
+            'gesamtspielplan'   => 'la palabra gesamtspielplan',
+            'spielplandatum'    => 'la palabra spielplandatum',
+            'consent'           => 'muro de consentimiento (consent)',
+            'Zustimmung'        => 'muro de consentimiento en alemán',
+            'cookiebot'         => 'Cookiebot',
+            'Just a moment'     => 'desafío de Cloudflare',
+            'cf-browser'        => 'desafío de Cloudflare',
+            'captcha'           => 'captcha',
+            'Access Denied'     => 'acceso denegado',
+            '403 Forbidden'     => 'HTTP 403 en el cuerpo',
+            'API Credits'       => 'créditos de ScraperAPI agotados',
+        ];
+
+        $filas = '';
+
+        foreach ($marcas as $aguja => $texto) {
+            $n = substr_count(strtolower((string) $html), strtolower($aguja));
+            $filas .= '<tr class="' . ($n ? 'warn' : '') . '"><td>' . e($texto) . '</td>'
+                . '<td class="num gris">' . e($aguja) . '</td>'
+                . '<td class="num">' . ($n ?: '—') . '</td></tr>';
+        }
+
+        return '<h2>Qué llegó de verdad</h2>'
+            . '<p class="sub">Esto es lo que recibió <b>el servidor</b>, que no es necesariamente lo que ves vos '
+            . 'en el navegador: la petición sale por ScraperAPI desde Europa, con otra IP y sin tus cookies. '
+            . 'Si acá no hay links a fichas de partido pero en tu pantalla sí, el problema no es el parseo.</p>'
+            . '<div class="cards">' . $this->card($largo, 'bytes recibidos', $largo ? '' : 'err') . '</div>'
+            . '<div class="scroll"><table><thead><tr><th>Qué busco</th><th>Texto</th><th>Veces</th></tr></thead>'
+            . '<tbody>' . $filas . '</tbody></table></div>'
+            . '<h3>Primeros 4 KB</h3><pre>' . e(substr((string) $html, 0, 4000)) . '</pre>'
+            . '<p class="sub">La página tal como la ves vos: <a href="' . e($url) . '" target="_blank" '
+            . 'rel="noopener">abrirla en Transfermarkt</a>. Si ahí están los partidos y acá no, es la salida del '
+            . 'servidor la que está viendo otra cosa.</p>';
+    }
+
     /** ¿El texto tiene al menos una letra latina? */
     private function tieneLatino($s)
     {
@@ -1211,15 +1279,22 @@ class ImportDetallesController extends Controller
             . '<option value="1"' . ($copa ? ' selected' : '') . '>copa</option>'
             . '</select> '
             . '<input type="text" name="season" value="' . e($season) . '" size="8" placeholder="ej 2024" required> '
+            . '<input type="text" name="pais" value="' . e($pais) . '" size="4" placeholder="país"> '
             . '<button class="boton" type="submit">Leer el calendario</button>'
-            . ' <span class="sub">1 crédito</span></form>';
+            . ' <span class="sub">1 crédito</span></form>'
+            . '<p class="sub"><b>El campo «país»</b> es por dónde sale la petición (ScraperAPI). Vacío usa el del '
+            . '<code>.env</code>, que está en <code>eu</code> porque es lo que hace pasar el geo-block de la API. '
+            . 'Pero el <b>sitio</b> no es la API: saliendo desde Europa puede contestar el muro de '
+            . 'consentimiento en vez de la página. Si vuelve vacía, probá <code>us</code>.</p>';
 
         if ($compId === '' || $season === '') {
             return $this->pagina('Calendario de la competencia', $cuerpo);
         }
 
+        $crudo = (string) $request->get('crudo', '0') === '1';
+        $pais  = trim((string) $request->get('pais', ''));
         $svc   = new \App\Services\TmFixtureCompetenciaHtml;
-        $filas = $svc->leerComp($compId, $season, $copa);
+        $filas = $svc->leerComp($compId, $season, $copa, $crudo, $pais);
 
         $cuerpo .= '<p class="sub">Página leída: <a href="'
             . e(\App\Services\TmFixtureCompetenciaHtml::urlComp($compId, $season, $copa))
@@ -1230,7 +1305,23 @@ class ImportDetallesController extends Controller
         }
 
         if ($filas === null || !$filas) {
+            $cuerpo .= $crudo
+                ? $this->diagnosticoCrudo($svc->crudo, \App\Services\TmFixtureCompetenciaHtml::urlComp($compId, $season, $copa))
+                : '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.competencia_html',
+                    ['comp_id' => $compId, 'season' => $season, 'copa' => $copa ? 1 : 0,
+                     'pais' => $pais ?: null, 'crudo' => 1]))
+                    . '">Ver qué llegó de verdad</a> '
+                    . '<a class="boton-sec" href="' . e(route('import_detalles.competencia_html',
+                        ['comp_id' => $compId, 'season' => $season, 'copa' => $copa ? 1 : 0, 'pais' => 'us']))
+                    . '">Probar saliendo desde EE.UU.</a> '
+                    . '<span class="sub">cada una vuelve a pedir la página: 1 crédito</span></p>';
+
             return $this->pagina('Calendario de la competencia', $cuerpo);
+        }
+
+        if ($crudo) {
+            $cuerpo .= $this->diagnosticoCrudo($svc->crudo,
+                \App\Services\TmFixtureCompetenciaHtml::urlComp($compId, $season, $copa));
         }
 
         $mapeo     = new \App\Services\MapeoClubesTm;

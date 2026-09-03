@@ -60,14 +60,14 @@ class TmFixtureClubHtml
      *    'rival_tm', 'rival_nombre', 'competencia', 'resultado']
      * o null si no se pudo traer la página.
      */
-    public function leer($clubTm, $season, $guardarCrudo = false)
+    public function leer($clubTm, $season, $guardarCrudo = false, $pais = null)
     {
         $this->avisos      = [];
         $this->descartadas = 0;
         $this->crudo       = '';
 
         $url  = self::url($clubTm, $season);
-        $html = HttpHelper::getHtmlContent($url);
+        $html = HttpHelper::getHtmlTm($url, $pais);
 
         if (!$html) {
             $this->avisos[] = 'No pude traer ' . $url;
