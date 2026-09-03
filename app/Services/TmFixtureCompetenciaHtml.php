@@ -47,8 +47,20 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         $this->descartadas = 0;
         $this->crudo       = '';
 
-        $url  = self::urlComp($compId, $season, $copa);
-        $html = HttpHelper::getHtmlTm($url, $pais);
+        $url = self::urlComp($compId, $season, $copa);
+
+            // `getHtmlTm` es nuevo. Si el deploy subió los servicios pero no
+            // HttpHelper, llamarlo tira «Call to undefined method» y la pantalla
+            // se cae con un 500 pelado. Se cae con red: se usa el método viejo y
+            // se avisa, que es mucho más fácil de diagnosticar que una pantalla
+            // en blanco.
+        if (method_exists(HttpHelper::class, 'getHtmlTm')) {
+            $html = HttpHelper::getHtmlTm($url, $pais);
+        } else {
+            $this->avisos[] = 'Este servidor todavía tiene la versión vieja de HttpHelper: no puedo elegir el '
+                . 'país de salida. Falta subir app/Services/HttpHelper.php.';
+            $html = HttpHelper::getHtmlContent($url);
+        }
 
         if (!$html) {
             $this->avisos[] = 'No pude traer ' . $url;

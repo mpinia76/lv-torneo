@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use App\Services\TmBuscarGameId;
 use App\Services\TmDetallePartido;
+use App\Services\FusionPersonas;
 
 /**
  * Segunda etapa de la carga: el DETALLE de cada partido.
@@ -779,9 +780,13 @@ class ImportDetallesController extends Controller
     {
         set_time_limit(0);
 
+        // Ver el comentario de `competenciaHtml`: `$pais` se usa en el
+        // formulario, así que va acá arriba con el resto.
         $clubTm  = trim((string) $request->get('club_tm', ''));
         $season  = trim((string) $request->get('season', ''));
         $guardar = (string) $request->get('guardar', '0') === '1';
+        $crudo   = (string) $request->get('crudo', '0') === '1';
+        $pais    = trim((string) $request->get('pais', ''));
 
         $clubes = DB::table('equipo_tm')
             ->join('equipos', 'equipos.id', '=', 'equipo_tm.equipo_id')
@@ -825,10 +830,13 @@ class ImportDetallesController extends Controller
                 . 'faltan en <code>equipo_tm</code>.</p>');
         }
 
-        $crudo = (string) $request->get('crudo', '0') === '1';
-        $pais  = trim((string) $request->get('pais', ''));
-        $svc   = new \App\Services\TmFixtureClubHtml;
-        $filas = $svc->leer($clubTm, $season, $crudo, $pais);
+        $svc = new \App\Services\TmFixtureClubHtml;
+
+        try {
+            $filas = $svc->leer($clubTm, $season, $crudo, $pais);
+        } catch (\Throwable $e) {
+            return $this->pagina('Calendario del club', $cuerpo . $this->cajaError($e));
+        }
 
         $cuerpo .= '<p class="sub">Página leída: <a href="' . e(\App\Services\TmFixtureClubHtml::url($clubTm, $season))
             . '" target="_blank" rel="noopener">verla en Transfermarkt</a></p>';
@@ -1029,6 +1037,8 @@ class ImportDetallesController extends Controller
 
         $cambiados = 0;
         $sinLatino = 0;
+        $fusiones  = 0;
+        $fallaron  = 0;
         $tabla     = '';
 
         foreach ($rotas as $personaId => $vieja) {
@@ -1056,15 +1066,66 @@ class ImportDetallesController extends Controller
                 }
             }
 
-            if ($nuevo && $aplicar) {
-                DB::table('personas')->where('id', $personaId)->update([
-                    'name'       => $nuevo['name'],
-                    'nombre'     => $nuevo['nombre'],
-                    'apellido'   => $nuevo['apellido'],
-                    'updated_at' => now(),
-                ]);
-                $cambiados++;
-                $estado = 'renombrada';
+            // La misma persona puede YA estar cargada con su nombre en latino:
+            // es el caso normal, no el raro. Renombrarla a secas choca contra el
+            // índice único (nombre, apellido, nacimiento) y la pantalla entera se
+            // caía con un 500 —«Duplicate entry 'Andriy-Lunin-1999-02-11'»— sin
+            // aplicar nada de lo que venía después. Cuando ya está, no se
+            // renombra: se fusiona, que es lo que corresponde.
+            $choque = $nuevo ? $this->personaConEseNombre($personaId, $nuevo, $vieja['nacimiento']) : null;
+
+            if ($nuevo && $choque && $aplicar) {
+                $peso     = FusionPersonas::peso([$personaId, $choque]);
+                $ganador  = PersonaDuplicadoController::sugerirGanador($personaId, $choque, $peso);
+                $perdedor = $ganador === $personaId ? $choque : $personaId;
+
+                try {
+                    $r = FusionPersonas::fusionar($ganador, $perdedor);
+                } catch (\Throwable $e) {
+                    $r = ['ok' => false, 'mensaje' => $e->getMessage()];
+                }
+
+                if ($r['ok']) {
+                    $fusiones++;
+                    $estado = 'fusionada con #' . $choque . ' — queda la ficha #' . $ganador;
+
+                    // Si la que sobrevivió es la rota, ahora sí se la puede
+                    // renombrar: la otra ya no existe, no hay contra qué chocar.
+                    if ($ganador === $personaId) {
+                        DB::table('personas')->where('id', $personaId)->update([
+                            'name'       => $nuevo['name'],
+                            'nombre'     => $nuevo['nombre'],
+                            'apellido'   => $nuevo['apellido'],
+                            'updated_at' => now(),
+                        ]);
+                        $cambiados++;
+                        $estado .= ', renombrada';
+                    }
+                } else {
+                    $fallaron++;
+                    $estado = 'no se pudo fusionar con #' . $choque . ': ' . $r['mensaje'];
+                }
+            } elseif ($nuevo && $choque) {
+                $fusiones++;
+                $estado = 'ya existe la ficha #' . $choque . ' con ese nombre: se fusionan';
+            } elseif ($nuevo && $aplicar) {
+                // Red por si el choque es contra un índice que no es el que se
+                // mira acá: una ficha que revienta no puede tirar abajo la tanda.
+                try {
+                    DB::table('personas')->where('id', $personaId)->update([
+                        'name'       => $nuevo['name'],
+                        'nombre'     => $nuevo['nombre'],
+                        'apellido'   => $nuevo['apellido'],
+                        'updated_at' => now(),
+                    ]);
+                    $cambiados++;
+                    $estado = 'renombrada';
+                } catch (\Illuminate\Database\QueryException $e) {
+                    $fallaron++;
+                    $estado = ((int) ($e->errorInfo[1] ?? 0) === 1062)
+                        ? 'ya hay otra ficha con ese nombre: hay que fusionarlas a mano'
+                        : 'la base rechazó el cambio';
+                }
             } elseif ($nuevo) {
                 $cambiados++;
                 $estado = 'lista para renombrar';
@@ -1086,15 +1147,35 @@ class ImportDetallesController extends Controller
         }
 
         if ($aplicar) {
-            $cuerpo .= '<div class="ok-box">Renombré <b>' . $cambiados . '</b> ficha(s).</div>'
-                . '<p class="sub">Ojo con una consecuencia: si alguna de estas personas <b>ya existía</b> con su '
-                . 'nombre en latino, ahora hay dos fichas con el mismo nombre. Pasá por '
-                . '<a href="' . e(route('jugadores.verificarPersonas')) . '">verificar personas</a> a fusionarlas.</p>';
-        } elseif ($cambiados) {
+            \Illuminate\Support\Facades\Cache::forget('personas.sin_registros_ids');
+            \Illuminate\Support\Facades\Cache::forget('personas.sin_fecha');
+
+            $cuerpo .= '<div class="ok-box">Renombré <b>' . $cambiados . '</b> ficha(s)'
+                . ($fusiones ? ' y fusioné <b>' . $fusiones . '</b> con la ficha que ya existía' : '')
+                . '.</div>';
+
+            if ($fallaron) {
+                $cuerpo .= '<div class="err-box"><b>' . $fallaron . '</b> quedaron sin tocar: mirá el estado '
+                    . 'en la tabla y resolvelas desde <a href="' . e(route('jugadores.verificarPersonas'))
+                    . '">verificar personas</a>.</div>';
+            }
+        } elseif ($cambiados || $fusiones) {
+            $etiqueta = $cambiados
+                ? 'Renombrar las ' . $cambiados . ($fusiones ? ' y fusionar ' . $fusiones : '')
+                : 'Fusionar las ' . $fusiones;
+
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
-                . e(route('import_detalles.nombres_alfabeto', ['aplicar' => 1])) . '">Renombrar las '
-                . $cambiados . '</a> <span class="sub">no gasta llamadas nuevas: los perfiles quedaron '
+                . e(route('import_detalles.nombres_alfabeto', ['aplicar' => 1])) . '">' . e($etiqueta)
+                . '</a> <span class="sub">no gasta llamadas nuevas: los perfiles quedaron '
                 . 'cacheados 10 minutos</span></p>';
+
+            if ($fusiones) {
+                $cuerpo .= '<p class="sub">Las marcadas «ya existe la ficha #N» <b>no se renombran</b>: esa '
+                    . 'persona ya está cargada con su nombre en latino, así que las dos fichas se fusionan con '
+                    . 'el mismo motor que <a href="' . e(route('jugadores.verificarPersonas'))
+                    . '">verificar personas</a> — se queda la que tiene más registros y no se pierde ningún '
+                    . 'dato de la otra.</p>';
+            }
         } else {
             $cuerpo .= '<div class="err-box">No pude conseguir una forma latina para ninguna. '
                 . 'Estas hay que corregirlas a mano.</div>';
@@ -1105,6 +1186,35 @@ class ImportDetallesController extends Controller
             . $tabla . '</tbody></table></div>';
 
         return $this->pagina('Nombres en otro alfabeto', $cuerpo);
+    }
+
+    /**
+     * La ficha que YA tiene ese nombre, si existe.
+     *
+     * `personas` tiene un índice único (nombre, apellido, nacimiento), así que
+     * renombrar a una persona que ya está cargada en latino no es un repetido
+     * silencioso: es un 1062 que corta la pantalla en la mitad de la tanda.
+     * Y es el caso esperable — el jugador entró bien por un partido y mal por
+     * otro—, por eso se busca antes de escribir.
+     *
+     * Con `nacimiento` en NULL MySQL no considera choque (dos NULL no son
+     * iguales para un índice único): ahí no hay nada que evitar, y el repetido
+     * lo decide a ojo verificar personas, que mira clubes y años.
+     */
+    private function personaConEseNombre($personaId, array $nuevo, $nacimiento)
+    {
+        if ($nacimiento === null || $nacimiento === '') {
+            return null;
+        }
+
+        $fila = DB::table('personas')
+            ->where('id', '<>', (int) $personaId)
+            ->where('nombre', (string) $nuevo['nombre'])
+            ->where('apellido', (string) $nuevo['apellido'])
+            ->where('nacimiento', $nacimiento)
+            ->first(['id']);
+
+        return $fila ? (int) $fila->id : null;
     }
 
 
@@ -1159,6 +1269,25 @@ class ImportDetallesController extends Controller
             . 'servidor la que está viendo otra cosa.</p>';
     }
 
+    /**
+     * El error, mostrado en la pantalla en vez de un 500 en blanco.
+     *
+     * En producción `APP_DEBUG` está apagado —y está bien que lo esté—, así que
+     * una excepción no deja rastro visible: sólo «500 Server Error». En las
+     * pantallas de diagnóstico eso es lo peor que puede pasar, porque son
+     * justamente las que uno abre cuando algo ya está fallando. Se muestra la
+     * clase, el mensaje y el archivo:línea, que es lo que hace falta para saber
+     * si es un bug, un deploy incompleto o el sitio del otro lado.
+     */
+    private function cajaError(\Throwable $e)
+    {
+        return '<div class="err-box"><b>' . e(get_class($e)) . '</b><br>' . e($e->getMessage()) . '</div>'
+            . '<p class="sub">' . e($e->getFile()) . ':' . (int) $e->getLine() . '</p>'
+            . '<p class="sub">Si dice <i>Call to undefined method</i>, el deploy subió unos archivos y otros no: '
+            . 'revisá que hayan viajado <code>app/Services/HttpHelper.php</code> y los dos lectores de '
+            . 'calendarios.</p>';
+    }
+
     /** ¿El texto tiene al menos una letra latina? */
     private function tieneLatino($s)
     {
@@ -1198,9 +1327,10 @@ class ImportDetallesController extends Controller
 
             if ($partes !== '' && preg_match($otroAlfabeto, $partes)) {
                 $out[(int) $p->id] = [
-                    'nombre'   => (string) $p->nombre,
-                    'apellido' => (string) $p->apellido,
-                    'name'     => (string) $p->name,
+                    'nombre'     => (string) $p->nombre,
+                    'apellido'   => (string) $p->apellido,
+                    'name'       => (string) $p->name,
+                    'nacimiento' => $p->nacimiento,
                 ];
             }
         };
@@ -1216,7 +1346,7 @@ class ImportDetallesController extends Controller
                           ->orWhereRaw("COALESCE(apellido,'') NOT REGEXP '[a-zA-Z]'");
                     })
                     ->limit(500)
-                    ->get(['id', 'name', 'nombre', 'apellido']);
+                    ->get(['id', 'name', 'nombre', 'apellido', 'nacimiento']);
 
                 foreach ($filas as $p) $confirmar($p);
 
@@ -1226,7 +1356,7 @@ class ImportDetallesController extends Controller
             }
         }
 
-        DB::table('personas')->select('id', 'name', 'nombre', 'apellido')
+        DB::table('personas')->select('id', 'name', 'nombre', 'apellido', 'nacimiento')
             ->orderBy('id')->chunk(2000, function ($filas) use ($confirmar) {
                 foreach ($filas as $p) $confirmar($p);
             });
@@ -1253,11 +1383,18 @@ class ImportDetallesController extends Controller
     {
         set_time_limit(0);
 
-        $compId  = trim((string) $request->get('comp_id', ''));
-        $season  = trim((string) $request->get('season', ''));
-        $copa    = (string) $request->get('copa', '0') === '1';
-        $guardar = (string) $request->get('guardar', '0') === '1';
-        $mapear  = (string) $request->get('mapear', '0') === '1';
+        // Todos los parámetros juntos y arriba: `$pais` se usa en el formulario,
+        // que se arma en seguida, y definirlo más abajo —al lado de donde se
+        // usa por segunda vez— dejó la pantalla tirando 500 por «Undefined
+        // variable». Si una variable se usa en dos lugares, se declara antes
+        // del primero, no del más obvio.
+        $compId   = trim((string) $request->get('comp_id', ''));
+        $season   = trim((string) $request->get('season', ''));
+        $copa     = (string) $request->get('copa', '0') === '1';
+        $guardar  = (string) $request->get('guardar', '0') === '1';
+        $mapear   = (string) $request->get('mapear', '0') === '1';
+        $crudo    = (string) $request->get('crudo', '0') === '1';
+        $pais     = trim((string) $request->get('pais', ''));
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
             . '<h1>Calendario de una competencia, del HTML de Transfermarkt</h1>'
@@ -1291,10 +1428,15 @@ class ImportDetallesController extends Controller
             return $this->pagina('Calendario de la competencia', $cuerpo);
         }
 
-        $crudo = (string) $request->get('crudo', '0') === '1';
-        $pais  = trim((string) $request->get('pais', ''));
-        $svc   = new \App\Services\TmFixtureCompetenciaHtml;
-        $filas = $svc->leerComp($compId, $season, $copa, $crudo, $pais);
+        $svc = new \App\Services\TmFixtureCompetenciaHtml;
+
+        // Si esto explota, explota con el motivo a la vista. Una pantalla que
+        // existe para diagnosticar no puede contestar un 500 pelado.
+        try {
+            $filas = $svc->leerComp($compId, $season, $copa, $crudo, $pais);
+        } catch (\Throwable $e) {
+            return $this->pagina('Calendario de la competencia', $cuerpo . $this->cajaError($e));
+        }
 
         $cuerpo .= '<p class="sub">Página leída: <a href="'
             . e(\App\Services\TmFixtureCompetenciaHtml::urlComp($compId, $season, $copa))
