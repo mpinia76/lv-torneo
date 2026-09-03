@@ -300,7 +300,16 @@ class TmBuscarGameId
                 return false;
             }
 
-            DB::table('import_partidos')->insert($clave + [
+            // Las tres columnas que identifican la fila. Estaban en un
+            // `$clave` que se armaba arriba, junto al lookup; al reescribir
+            // el lookup (que ahora NO filtra por `tecnico_id`) se fue la
+            // variable y quedó el insert usándola: 68 partidos apareados y
+            // 68 «Undefined variable: clave». Van acá, pegadas a su uso.
+            DB::table('import_partidos')->insert([
+                'fuente'      => 'transfermarkt',
+                'external_id' => $gameId,
+                'tecnico_id'  => null,
+            ] + [
                 'club_nombre'  => $this->nombreEquipo($partido->equipol_id),
                 'rival_nombre' => $this->nombreEquipo($partido->equipov_id),
                 'local'        => 1,

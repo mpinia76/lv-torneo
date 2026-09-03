@@ -47,50 +47,156 @@ $despuesDe = function ($i) use ($tokens, $n) {
 };
 
 /**
- * ¿Está dentro de una lista de parámetros o de un `use (...)`?
+ * Los `(` que ABREN una lista de parámetros, no una lista de argumentos.
  *
- * Se camina hacia atrás saltando el tipo (`Request`, `?array`, `\App\X`) hasta
- * dar con el `(` o la `,` que abre el parámetro.
+ * ESTE ERA EL AGUJERO. La versión anterior decidía "es un parámetro" mirando
+ * si atrás había un `(` o una `,`, y `insert($clave + [...])` cumple eso igual
+ * que `function f($clave)`. Resultado: toda variable usada como primer
+ * argumento de una llamada se daba por definida. Así pasó `$clave` en
+ * `TmBuscarGameId::anotar()`, que en producción fueron 68 partidos apareados y
+ * 68 «Undefined variable: clave» — con el chequeo en verde.
+ *
+ * Un `(` declara cuando lo precede `function`, `fn`, el nombre de una función
+ * declarada, `use`, `catch` o `list`. Cualquier otro `(` es una llamada.
  */
-$esParametro = function ($i) use ($tokens) {
-    // OJO CON PHP 8: `\Throwable` y `\DOMNode` ya no son T_NS_SEPARATOR +
-    // T_STRING, son un solo token T_NAME_FULLY_QUALIFIED. Sin contemplarlo,
-    // todo `catch (\Throwable $e)` y todo parámetro con tipo con namespace
-    // salían como "usada sin definirse" — seis avisos, todos falsos.
-    $saltables = [T_STRING, T_ARRAY, T_NS_SEPARATOR, T_WHITESPACE, T_COMMENT, T_DOC_COMMENT, T_CALLABLE];
+$declara = [];
+for ($i = 0; $i < $n; $i++) {
+    if ($tokens[$i] !== '(') continue;
 
-    foreach (['T_NAME_FULLY_QUALIFIED', 'T_NAME_QUALIFIED', 'T_NAME_RELATIVE'] as $nuevoToken) {
-        if (defined($nuevoToken)) $saltables[] = constant($nuevoToken);
+    $prev = $antesDe($i);
+    if ($prev === null) continue;
+
+    $abre = is_array($prev) && in_array($prev[0], [T_FUNCTION, T_USE, T_CATCH, T_LIST], true);
+    if (!$abre && defined('T_FN') && is_array($prev) && $prev[0] === constant('T_FN')) $abre = true;
+
+    // `function nombre(` → el token de atrás es el nombre, y atrás de ese, la
+    // palabra `function`. Sin este paso, ningún método declararía nada.
+    if (!$abre && is_array($prev) && $prev[0] === T_STRING) {
+        for ($j = $i - 1; $j >= 0; $j--) {
+            if (is_array($tokens[$j]) && in_array($tokens[$j][0],
+                [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) continue;
+            if (is_array($tokens[$j]) && $tokens[$j][0] === T_STRING) continue;
+            $abre = is_array($tokens[$j]) && $tokens[$j][0] === T_FUNCTION;
+            break;
+        }
     }
 
+    if ($abre) $declara[$i] = 1;
+}
+
+/**
+ * Funciones que definen un argumento en vez de leerlo (lo toman por
+ * referencia). `preg_match($re, $txt, $m)` no usa `$m`: lo crea. Sin esta
+ * lista, cada `preg_match` del proyecto salía como aviso.
+ */
+$porReferencia = ['preg_match' => 1, 'preg_match_all' => 1, 'sscanf' => 1,
+    'similar_text' => 1, 'str_replace' => 1, 'str_ireplace' => 1,
+    'preg_replace' => 1, 'parse_str' => 1, 'settype' => 1, 'exec' => 1,
+    'array_multisort' => 1, 'openssl_sign' => 1];
+
+/** El nombre de la función que abre este `(`, o '' si no es una llamada. */
+$nombreLlamada = function ($abre) use ($tokens, $antesDe) {
+    $prev = $antesDe($abre);
+    return (is_array($prev) && $prev[0] === T_STRING) ? strtolower($prev[1]) : '';
+};
+
+/** El `(` o `[` que encierra al token $i, o null si está suelto. */
+$encierra = function ($i) use ($tokens) {
+    $hondo = 0;
     for ($j = $i - 1; $j >= 0; $j--) {
         $t = $tokens[$j];
-        if (is_array($t) && in_array($t[0], $saltables, true)) continue;
-        if ($t === '?' || $t === '&' || $t === '|') continue;
-        return $t === '(' || $t === ',';
+        if ($t === ')' || $t === ']') { $hondo++; continue; }
+        if ($t === '(' || $t === '[') {
+            if ($hondo === 0) return [$j, $t];
+            $hondo--;
+            continue;
+        }
+        // Un `;` o una llave a nivel cero cortan: ya salimos de la expresión.
+        if ($hondo === 0 && ($t === ';' || $t === '{' || $t === '}')) return null;
+    }
+    return null;
+};
+
+/**
+ * ¿Es un destino de asignación desestructurada? `[$a, $b] = loQueSea()`.
+ *
+ * Define las dos variables, aunque por dentro parezcan un uso cualquiera.
+ */
+$esDestructuring = function ($abre) use ($tokens, $n, $despuesDe) {
+    $hondo = 0;
+    for ($j = $abre; $j < $n; $j++) {
+        $t = $tokens[$j];
+        if ($t === '[' || $t === '(') { $hondo++; continue; }
+        if ($t === ')') { $hondo--; continue; }
+        if ($t === ']') {
+            $hondo--;
+            if ($hondo === 0) return $despuesDe($j) === '=';
+        }
     }
     return false;
 };
 
-$siempre = ['this' => 1, 'GLOBALS' => 1, '_GET' => 1, '_POST' => 1, '_SERVER' => 1,
+$siempre = ['this' => 1, 'GLOBALS' => 1, 'argv' => 1, 'argc' => 1,
+    '_GET' => 1, '_POST' => 1, '_SERVER' => 1,
     '_SESSION' => 1, '_COOKIE' => 1, '_FILES' => 1, '_ENV' => 1, '_REQUEST' => 1];
 
 $problemas = 0;
 $metodo    = '(raíz)';
 $definidas = $siempre;
 
+// Ámbitos anidados, contando llaves. `FechaController` declara funciones
+// ADENTRO de un método, y sin llevar la cuenta el chequeo se quedaba con el
+// ámbito de la función interna para todo el resto del archivo: nueve avisos
+// falsos seguidos, que es la forma más segura de que nadie corra el chequeo.
+$pila      = [];
+$llaves    = 0;
+$pendiente = null;   // vimos `function nombre` y estamos juntando sus parámetros
+$params    = [];
+
 for ($i = 0; $i < $n; $i++) {
     $t = $tokens[$i];
 
-    // Sólo las funciones CON NOMBRE reinician el ámbito. Las anónimas heredan
-    // lo de afuera a propósito: no es exacto, pero evita el ruido de tratar
-    // cada closure como un ámbito nuevo, que fue lo que hizo inservible la
-    // primera versión de este chequeo.
+    // Abre llave: si venimos de declarar una función con nombre, acá empieza
+    // su cuerpo, y con él un ámbito nuevo que hay que apilar.
+    if ($t === '{' || (is_array($t)
+            && in_array($t[0], [T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES], true))) {
+        $llaves++;
+        if ($pendiente !== null) {
+            $pila[]    = [$metodo, $definidas, $llaves];
+            $metodo    = $pendiente;
+            $definidas = $siempre + $params;
+            $pendiente = null;
+            $params    = [];
+        }
+        continue;
+    }
+
+    if ($t === '}') {
+        $llaves--;
+        if ($pila && $llaves < $pila[count($pila) - 1][2]) {
+            $ultimo    = array_pop($pila);
+            $metodo    = $ultimo[0];
+            $definidas = $ultimo[1];
+        }
+        continue;
+    }
+
+    // Método abstracto o de interfaz: se declara y se cierra con `;`, sin cuerpo.
+    if ($t === ';' && $pendiente !== null) {
+        $pendiente = null;
+        $params    = [];
+        continue;
+    }
+
+    // Sólo las funciones CON NOMBRE abren ámbito. Las anónimas heredan lo de
+    // afuera a propósito: no es exacto, pero evita el ruido de tratar cada
+    // closure como un ámbito nuevo, que fue lo que hizo inservible la primera
+    // versión de este chequeo.
     if (is_array($t) && $t[0] === T_FUNCTION) {
         $sigue = $despuesDe($i);
         if (is_array($sigue) && $sigue[0] === T_STRING) {
-            $metodo    = $sigue[1];
-            $definidas = $siempre;
+            $pendiente = $sigue[1];
+            $params    = [];
         }
         continue;
     }
@@ -123,12 +229,27 @@ for ($i = 0; $i < $n; $i++) {
         // `array &$informe` ya no llega como el carácter '&'.
         || (is_array($antes) && defined('T_AMPERSAND_FOLLOWED_BY_VAR_OR_VARARG')
             && $antes[0] === constant('T_AMPERSAND_FOLLOWED_BY_VAR_OR_VARARG'))
-        || $esParametro($i);
+        || (function () use ($i, $encierra, $declara, $esDestructuring,
+                $porReferencia, $nombreLlamada) {
+            $env = $encierra($i);
+            if (!$env) return false;
+            if ($env[1] === '(') {
+                if (isset($declara[$env[0]])) return true;
+                return isset($porReferencia[$nombreLlamada($env[0])]);
+            }
+            return $esDestructuring($env[0]);
+        })();
 
     if ($define) {
-        $definidas[$nombre] = 1;
+        // Si todavía no entramos al cuerpo, esto es un parámetro: va al ámbito
+        // que está por abrirse, no al de afuera.
+        if ($pendiente !== null) $params[$nombre] = 1;
+        else                     $definidas[$nombre] = 1;
         continue;
     }
+
+    // Adentro de la lista de parámetros no hay usos que mirar.
+    if ($pendiente !== null) continue;
 
     if (!isset($definidas[$nombre])) {
         printf("  %s(): \$%s en la línea %d\n", $metodo, $nombre, $t[2]);

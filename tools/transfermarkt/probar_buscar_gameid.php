@@ -253,6 +253,27 @@ chequear(strpos($anotador2->ultimoError, '#99999') !== false,
     'y el motivo nombra al otro partido: ' . var_export($anotador2->ultimoError, true));
 chequear(count(Escenario::$updates) === 0 && count(Escenario::$inserts) === 0, 'sin tocar nada');
 
+echo "\n== 11) anotar(): si no hay NADA en staging, inserta la fila\n";
+// Este camino no lo tocaba ningún caso: los dos anteriores sembraban staging,
+// así que siempre salían por el update o por el «ya es de otro partido». Al
+// reescribir el lookup se fue la variable `$clave` que armaba las columnas
+// clave del insert, y el banco siguió en verde mientras producción tiraba 68
+// «Undefined variable: clave» seguidos. Un camino sin caso es un camino roto
+// que todavía no se notó.
+escenarioBase();
+Escenario::$staging = [];
+$anotador3 = new TmBuscarGameId;
+$ok3 = $anotador3->anotar(22437, '4643244', 'prueba');
+chequear($ok3 === true, 'devuelve true (motivo: ' . var_export($anotador3->ultimoError, true) . ')');
+chequear(count(Escenario::$inserts) === 1, 'inserta una fila (' . count(Escenario::$inserts) . ')');
+$fila = Escenario::$inserts ? Escenario::$inserts[0] : [];
+chequear(isset($fila['fuente']) && $fila['fuente'] === 'transfermarkt', 'con la fuente');
+chequear(isset($fila['external_id']) && (string) $fila['external_id'] === '4643244', 'con el gameId');
+chequear(array_key_exists('tecnico_id', $fila) && $fila['tecnico_id'] === null,
+    'con tecnico_id en null: la fila es del partido, no del sondeo de un DT');
+chequear(isset($fila['partido_id']) && $fila['partido_id'] === 22437, 'atada al partido');
+chequear(count(Escenario::$updates) === 0, 'y sin updates');
+
 echo "\n" . ($fallos ? "$fallos CHEQUEO(S) FALLIDO(S)\n" : "Todo en verde.\n");
 exit($fallos ? 1 : 0);
 
