@@ -1263,10 +1263,101 @@ class ImportDetallesController extends Controller
             . '<div class="cards">' . $this->card($largo, 'bytes recibidos', $largo ? '' : 'err') . '</div>'
             . '<div class="scroll"><table><thead><tr><th>Qué busco</th><th>Texto</th><th>Veces</th></tr></thead>'
             . '<tbody>' . $filas . '</tbody></table></div>'
+            . $this->diagnosticoParser($html)
             . '<h3>Primeros 4 KB</h3><pre>' . e(substr((string) $html, 0, 4000)) . '</pre>'
             . '<p class="sub">La página tal como la ves vos: <a href="' . e($url) . '" target="_blank" '
             . 'rel="noopener">abrirla en Transfermarkt</a>. Si ahí están los partidos y acá no, es la salida del '
             . 'servidor la que está viendo otra cosa.</p>';
+    }
+
+
+    /**
+     * Qué ve el parser con el mismo HTML, probando las variantes de carga.
+     *
+     * Hizo falta porque llegó el caso que rompe la intuición: el servidor
+     * recibió los 640 KB **con los 240 links adentro** y aun así el lector
+     * encontró cero. O sea que el problema no era la red ni el país: era cómo
+     * se le da ese HTML a DOMDocument. Con esto se ve en una sola pantalla cuál
+     * de las formas de cargarlo funciona, sin gastar otra llamada.
+     */
+    private function diagnosticoParser($html)
+    {
+        $html = (string) $html;
+
+        if ($html === '') {
+            return '';
+        }
+
+        $variantes = [
+            'loadHTML con el prefijo <?xml encoding="UTF-8"> (lo que usa el lector)'
+                => function ($h) { $d = new \DOMDocument(); $d->loadHTML('<?xml encoding="UTF-8">' . $h); return $d; },
+            'loadHTML pelado'
+                => function ($h) { $d = new \DOMDocument(); $d->loadHTML($h); return $d; },
+            'loadHTML con LIBXML_NOWARNING | LIBXML_NOERROR'
+                => function ($h) { $d = new \DOMDocument(); $d->loadHTML($h, LIBXML_NOWARNING | LIBXML_NOERROR); return $d; },
+            'loadHTML con LIBXML_PARSEHUGE'
+                => function ($h) { $d = new \DOMDocument(); $d->loadHTML($h, LIBXML_PARSEHUGE); return $d; },
+            'loadHTML con <meta charset> adelante'
+                => function ($h) { $d = new \DOMDocument();
+                    $d->loadHTML('<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' . $h);
+                    return $d; },
+        ];
+
+        $filas = '';
+
+        foreach ($variantes as $texto => $cargar) {
+            libxml_use_internal_errors(true);
+            libxml_clear_errors();
+
+            $aTodos = $aExacto = $aFlojo = 0;
+            $fallo  = '';
+
+            try {
+                $dom = $cargar($html);
+                $xp  = new \DOMXPath($dom);
+
+                $aTodos  = $xp->query('//a')->length;
+                $aExacto = $xp->query('//a[contains(@href, "/spielbericht/")]')->length;
+                $aFlojo  = $xp->query('//a[contains(@href, "spielbericht")]')->length;
+            } catch (\Throwable $e) {
+                $fallo = get_class($e) . ': ' . $e->getMessage();
+            }
+
+            $errores = libxml_get_errors();
+            libxml_clear_errors();
+
+            $primero = '';
+            foreach ($errores as $err) {
+                $primero = trim($err->message) . ' (línea ' . $err->line . ')';
+                break;
+            }
+
+            $filas .= '<tr class="' . ($aExacto ? 'warn' : '') . '">'
+                . '<td>' . e($texto) . '</td>'
+                . '<td class="num">' . $aTodos . '</td>'
+                . '<td class="num"><b>' . $aExacto . '</b></td>'
+                . '<td class="num">' . $aFlojo . '</td>'
+                . '<td class="num">' . count($errores) . '</td>'
+                . '<td class="sub">' . e($fallo !== '' ? $fallo : $primero) . '</td>'
+                . '</tr>';
+        }
+
+        // Sin DOM: contar con una expresión regular sobre el texto crudo. Si
+        // acá salen y en el DOM no, la salida es no usar DOMDocument.
+        preg_match_all('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $html, $m);
+        $porRegex = count(array_unique($m[1]));
+
+        return '<h2>Qué ve el parser</h2>'
+            . '<p class="sub">El mismo HTML, cargado de cinco maneras. La columna que importa es '
+            . '<b>links /spielbericht/</b>: es la que usa el lector para encontrar los partidos. '
+            . 'Si una fila trae links y la primera no, ya sabemos con qué reemplazarla.</p>'
+            . '<div class="cards">' . $this->card($porRegex, 'gameId distintos por regex', $porRegex ? 'ok' : '') . '</div>'
+            . '<div class="scroll"><table><thead><tr><th>Cómo se carga</th><th>&lt;a&gt; en total</th>'
+            . '<th>links /spielbericht/</th><th>con «spielbericht»</th><th>Errores libxml</th>'
+            . '<th>Primer error</th></tr></thead><tbody>' . $filas . '</tbody></table></div>'
+            . '<p class="sub">Los <b>gameId por regex</b> salen de buscar el patrón directamente en el texto, sin '
+            . 'DOM. Si ese número es alto y todas las filas dan cero, el HTML está bien y el que no sirve es '
+            . 'DOMDocument con esta página.</p>';
     }
 
     /**
