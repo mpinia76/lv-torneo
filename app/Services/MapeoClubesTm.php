@@ -98,6 +98,12 @@ class MapeoClubesTm
     /** Deja aprendido el mapeo para que la próxima salga por id. */
     public function guardar($tmClubId, $equipoId, $nombre, $origen)
     {
+        // `origen` es varchar(20) y `nombre_tm` varchar(191). Un texto mas
+        // largo no es un dato mejor: es un 500 en la cara del usuario en
+        // medio de una pantalla que estaba andando. Se recorta y se sigue.
+        $origen = mb_substr((string) $origen, 0, 20);
+        $nombre = mb_substr((string) $nombre, 0, 191);
+
         DB::table('equipo_tm')->updateOrInsert(
             ['tm_club_id' => (string) $tmClubId],
             ['equipo_id' => (int) $equipoId, 'nombre_tm' => $nombre, 'origen' => $origen,

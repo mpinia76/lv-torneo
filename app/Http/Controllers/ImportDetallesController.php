@@ -1560,7 +1560,7 @@ class ImportDetallesController extends Controller
                 if ($tmClub === '' || !$eqId) continue;   // el que dejó vacío el select no se toca
                 $mapeoManual->guardar($tmClub, $eqId,
                     isset($atarNom[$tmClub]) ? (string) $atarNom[$tmClub] : '',
-                    'calendario html a mano');
+                    'manual');
                 $atados++;
             }
         }
