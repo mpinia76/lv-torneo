@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TM &rarr; CSV &mdash; Importar fechas desde Transfermarkt</title>
+<style>
+ body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:820px;margin:24px auto;padding:0 16px;color:#1c2530;line-height:1.5}
+ h1{font-size:22px} h2{font-size:17px;margin-top:28px;border-bottom:1px solid #e4e8ee;padding-bottom:4px}
+ .bm{display:inline-block;background:#2f6fb0;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none;font-weight:600}
+ code,pre{background:#f4f6f9;border:1px solid #e4e8ee;border-radius:5px}
+ code{padding:1px 5px} pre{padding:12px;overflow:auto;font-size:12px;line-height:1.35}
+ ol{padding-left:20px} li{margin:6px 0} .muted{color:#5b6774;font-size:13px}
+ .warn{background:#fff8e6;border:1px solid #f0dca0;padding:10px 12px;border-radius:6px}
+</style></head><body>
+<h1>TM &rarr; CSV &mdash; Importar fechas desde Transfermarkt</h1>
+<p class="muted">Genera el CSV de una fecha desde la p&aacute;gina de la jornada de Transfermarkt, para subir en <b>Administraci&oacute;n &rarr; Importar fechas</b>. No usa el servidor ni ScraperAPI: trabaja en tu navegador.</p>
+
+<h2>1. Instalar el bot&oacute;n (una sola vez)</h2>
+<p>Arrastr&aacute; este bot&oacute;n a tu barra de favoritos:</p>
+<p><a class="bm" href="javascript:(function%20()%20%7B%20var%20DELIM%20%3D%20'%3B'%3B%20var%20ALIAS%20%3D%20%7B%20'gimnasia%20(m)'%3A%20'Gimnasia%20de%20Mendoza'%2C%20'gimnasia'%3A%20'Gimnasia%20de%20La%20Plata'%2C%20'argentinos%20jrs.'%3A%20'Argentinos'%2C%20'estudiantes%20rc'%3A%20'R%C3%ADo%20Cuarto'%2C%20'estudiantes%20lp'%3A%20'Estudiantes%20(LP)'%2C%20'racing'%3A%20'Racing'%2C%20'barracas'%3A%20'Barracas'%2C%20'def.%20y%20justicia'%3A%20'Defensa'%2C%20'dep.%20riestra'%3A%20'Riestra'%2C%20'instituto%20acc'%3A%20'Instituto'%2C%20'v%C3%A9lez%20sarsfield'%3A%20'V%C3%A9lez'%2C%20'ind.%20rivadavia'%3A%20'Rivadavia'%2C%20'atl.%20tucum%C3%A1n'%3A%20'Tucum%C3%A1n'%2C%20'boca%20juniors'%3A%20'Boca'%2C%20'uni%C3%B3n'%3A%20'Uni%C3%B3n%20de%20Santa%20Fe'%2C%20'sarmiento'%3A%20'Sarmiento'%20%7D%3B%20function%20strip(s)%20%7B%20return%20String(s%20%7C%7C%20'')%20.replace(%2F%5Cs%2B%2Fg%2C%20'%20').trim()%20.replace(%2F%5E%5C(%5Cd%2B%5C.%5C)%5Cs*%2F%2C%20'')%20.replace(%2F%5Cs*%5C(%5Cd%2B%5C.%5C)%24%2F%2C%20'')%20.trim()%3B%20%7D%20function%20mapName(n)%20%7B%20var%20k%20%3D%20n.toLowerCase()%3B%20return%20ALIAS%5Bk%5D%20%7C%7C%20n%3B%20%7D%20var%20mJ%20%3D%20location.pathname.match(%2Fspieltag%5C%2F(%5Cd%2B)%2F)%3B%20if%20(!mJ)%20%7B%20alert('Abr%C3%AD%20primero%20la%20p%C3%A1gina%20de%20la%20JORNADA%20en%20Transfermarkt%5Cn(...%2Fspieltag%2Fwettbewerb%2FXXX%2Fsaison_id%2FAAAA%2Fspieltag%2FN)')%3B%20return%3B%20%7D%20var%20jornada%20%3D%20mJ%5B1%5D%3B%20var%20mComp%20%3D%20location.pathname.match(%2Fwettbewerb%5C%2F(%5BA-Z0-9%5D%2B)%2F)%3B%20var%20comp%20%3D%20mComp%20%3F%20mComp%5B1%5D%20%3A%20'TM'%3B%20var%20gameRows%20%3D%20%5B%5D.slice.call(document.querySelectorAll('tr')).filter(function%20(r)%20%7B%20return%20r.querySelector('a%5Bhref*%3D%22%2Fspielbericht%2Findex%2Fspielbericht%2F%22%5D')%20%26%26%20r.querySelector('.spieltagsansicht-vereinsname')%3B%20%7D)%3B%20var%20lines%20%3D%20%5B%5D%3B%20gameRows.forEach(function%20(r)%20%7B%20var%20cells%20%3D%20%5B%5D.slice.call(r.querySelectorAll('td.spieltagsansicht-vereinsname.hide-for-small'))%20.map(function%20(c)%20%7B%20return%20strip(c.textContent)%3B%20%7D)%3B%20if%20(cells.length%20%3C%202)%20return%3B%20var%20home%20%3D%20mapName(cells%5B0%5D)%3B%20var%20away%20%3D%20mapName(cells%5B1%5D)%3B%20var%20resCell%20%3D%20r.querySelector('.spieltagsansicht-ergebnis')%3B%20var%20res%20%3D%20(resCell%20%3F%20resCell.textContent%20%3A%20'').trim().replace(%2F%5Cs%2B%2Fg%2C%20'')%3B%20res%20%3D%20%2F%5E%5Cd%2B%3A%5Cd%2B%24%2F.test(res)%20%3F%20res%20%3A%20''%3B%20var%20fecha%20%3D%20''%2C%20hora%20%3D%20''%2C%20node%20%3D%20r%3B%20for%20(var%20k%20%3D%200%3B%20k%20%3C%204%20%26%26%20node%3B%20k%2B%2B)%20%7B%20node%20%3D%20node.nextElementSibling%3B%20if%20(!node)%20break%3B%20var%20m%20%3D%20node.textContent.match(%2F(%5Cd%7B2%7D)%5C%2F(%5Cd%7B2%7D)%5C%2F(%5Cd%7B2%2C4%7D).*%3F(%5Cd%7B1%2C2%7D%3A%5Cd%7B2%7D)%2F)%3B%20if%20(m)%20%7B%20var%20yy%20%3D%20m%5B3%5D.length%20%3D%3D%3D%202%20%3F%20('20'%20%2B%20m%5B3%5D)%20%3A%20m%5B3%5D%3B%20fecha%20%3D%20yy%20%2B%20'-'%20%2B%20m%5B2%5D%20%2B%20'-'%20%2B%20m%5B1%5D%3B%20hora%20%3D%20m%5B4%5D%3B%20break%3B%20%7D%20%7D%20lines.push(%5Bjornada%2C%20''%2C%20fecha%2C%20hora%2C%20home%2C%20res%2C%20away%5D.join(DELIM))%3B%20%7D)%3B%20if%20(!lines.length)%20%7B%20alert('No%20se%20encontraron%20partidos%20en%20esta%20p%C3%A1gina.%20%C2%BFEs%20la%20vista%20de%20jornada%20(spieltag)%3F')%3B%20return%3B%20%7D%20var%20csv%20%3D%20lines.join('%5Cr%5Cn')%20%2B%20'%5Cr%5Cn'%3B%20var%20blob%20%3D%20new%20Blob(%5Bcsv%5D%2C%20%7B%20type%3A%20'text%2Fcsv%3Bcharset%3Dutf-8'%20%7D)%3B%20var%20a%20%3D%20document.createElement('a')%3B%20a.href%20%3D%20URL.createObjectURL(blob)%3B%20a.download%20%3D%20'fecha_'%20%2B%20comp%20%2B%20'_'%20%2B%20String(jornada).padStart(2%2C%20'0')%20%2B%20'.csv'%3B%20document.body.appendChild(a)%3B%20a.click()%3B%20a.remove()%3B%20try%20%7B%20navigator.clipboard.writeText(csv)%3B%20%7D%20catch%20(e)%20%7B%7D%20alert('CSV%20generado%3A%20'%20%2B%20lines.length%20%2B%20'%20partidos%20(fecha%20'%20%2B%20jornada%20%2B%20').%5CnSe%20descarg%C3%B3%20y%20se%20copi%C3%B3%20al%20portapapeles.')%3B%20%7D)()%3B">TM &rarr; CSV fecha</a></p>
+<p class="muted">Si no te deja arrastrarlo: click derecho en la barra de favoritos &rarr; Agregar p&aacute;gina &rarr; peg&aacute; en URL el contenido de <code>bookmarklet.txt</code>.</p>
+
+<h2>2. Usarlo</h2>
+<ol>
+ <li>Abr&iacute; en Transfermarkt la p&aacute;gina de la <b>jornada</b>. Ej:<br>
+   <code>transfermarkt.com.ar/torneo-clausura/spieltag/wettbewerb/ARGC/saison_id/2025/spieltag/2</code></li>
+ <li>Hac&eacute; click en el favorito <b>TM &rarr; CSV fecha</b>. Se descarga <code>fecha_ARGC_02.csv</code>.</li>
+ <li>En tu panel &rarr; <b>Importar fechas</b>: sub&iacute; ese CSV, eleg&iacute; el <b>Grupo</b> y <b>Guardar</b>.</li>
+</ol>
+<div class="warn">El <b>grupo_id</b> del CSV va vac&iacute;o a prop&oacute;sito: se toma del Grupo que eleg&iacute;s en el formulario (ajuste ya hecho en el importador). El <b>resultado vac&iacute;o</b> = partido no jugado (no fuerza 0:0).</div>
+
+<h2>3. Si un equipo sale &quot;NO encontrado&quot;</h2>
+<p>El importador busca por <code>nombre LIKE %texto%</code>, as&iacute; que el texto del CSV debe estar <b>contenido</b> en el nombre de tu base. Edit&aacute; el mapa <code>ALIAS</code> del c&oacute;digo (clave = nombre corto de TM en min&uacute;scula sin la posici&oacute;n; valor = un trozo distintivo del nombre en tu base) y volv&eacute; a generar.</p>
+
+<h2>Formato del CSV</h2>
+<p><code>numero ; grupo_id(vac&iacute;o) ; fecha(YYYY-MM-DD) ; hora ; local ; resultado ; visitante</code> &mdash; separador <code>;</code></p>
+
+<h2>C&oacute;digo (editable)</h2>
+<p class="muted">Mismo contenido que <code>tm_fecha_a_csv.js</code>. Tambi&eacute;n pod&eacute;s pegarlo en la consola (F12) en la p&aacute;gina de la jornada.</p>
+<pre>/*
+ * TM → CSV  (Torneos Piña)
+ * -------------------------------------------------------------
+ * Genera el CSV de una fecha para importar en:
+ *   Administracion → Importar fechas  (campo "Archivo CSV")
+ *
+ * CÓMO USAR
+ *   1. Abrí en Transfermarkt la página de la JORNADA, por ejemplo:
+ *      https://www.transfermarkt.com.ar/torneo-clausura/spieltag/wettbewerb/ARGC/saison_id/2025/spieltag/2
+ *   2. Ejecutá este script (bookmarklet o pegándolo en la consola F12).
+ *   3. Se descarga un CSV. Subilo en el formulario, elegí el Grupo y Guardar.
+ *
+ * FORMATO DE SALIDA (separador ";")
+ *   numero ; grupo_id(vacío) ; fecha(YYYY-MM-DD) ; hora ; local ; resultado ; visitante
+ *   - grupo_id va vacío a propósito: lo toma del Grupo que elegís en el formulario.
+ *   - resultado vacío = partido no jugado (no fuerza 0:0).
+ *
+ * NOMBRES DE EQUIPOS
+ *   El importador busca por  nombre LIKE %texto% , así que el texto del CSV debe
+ *   estar CONTENIDO en el nombre de tu base. Editá el mapa ALIAS de abajo si algún
+ *   equipo sale "NO encontrado": clave = nombre corto de TM (en minúscula, sin la
+ *   posición), valor = un trozo distintivo del nombre en tu base.
+ */
+(function () {
+  var DELIM = ';';
+
+  // Mapa editable: nombre corto TM (minúscula, sin "(NN.)") -&gt; texto que matchea tu base.
+  var ALIAS = {
+    'gimnasia (m)': 'Gimnasia de Mendoza',
+    'gimnasia': 'Gimnasia de La Plata',
+    'argentinos jrs.': 'Argentinos',
+    'estudiantes rc': 'Río Cuarto',
+    'estudiantes lp': 'Estudiantes (LP)',
+    'racing': 'Racing',
+    'barracas': 'Barracas',
+    'def. y justicia': 'Defensa',
+    'dep. riestra': 'Riestra',
+    'instituto acc': 'Instituto',
+    'vélez sarsfield': 'Vélez',
+    'ind. rivadavia': 'Rivadavia',
+    'atl. tucumán': 'Tucumán',
+    'boca juniors': 'Boca',
+    'unión': 'Unión de Santa Fe',
+    'sarmiento': 'Sarmiento'
+  };
+
+  function strip(s) {
+    return String(s || '')
+      .replace(/\s+/g, ' ').trim()
+      .replace(/^\(\d+\.\)\s*/, '')   // posición al inicio (local)
+      .replace(/\s*\(\d+\.\)$/, '')   // posición al final (visitante)
+      .trim();
+  }
+  function mapName(n) {
+    var k = n.toLowerCase();
+    return ALIAS[k] || n;
+  }
+
+  var mJ = location.pathname.match(/spieltag\/(\d+)/);
+  if (!mJ) {
+    alert('Abrí primero la página de la JORNADA en Transfermarkt\n(.../spieltag/wettbewerb/XXX/saison_id/AAAA/spieltag/N)');
+    return;
+  }
+  var jornada = mJ[1];
+  var mComp = location.pathname.match(/wettbewerb\/([A-Z0-9]+)/);
+  var comp = mComp ? mComp[1] : 'TM';
+
+  var gameRows = [].slice.call(document.querySelectorAll('tr')).filter(function (r) {
+    return r.querySelector('a[href*="/spielbericht/index/spielbericht/"]') &amp;&amp;
+           r.querySelector('.spieltagsansicht-vereinsname');
+  });
+
+  var lines = [];
+  gameRows.forEach(function (r) {
+    var cells = [].slice.call(r.querySelectorAll('td.spieltagsansicht-vereinsname.hide-for-small'))
+      .map(function (c) { return strip(c.textContent); });
+    if (cells.length &lt; 2) return;
+    var home = mapName(cells[0]);
+    var away = mapName(cells[1]);
+
+    var resCell = r.querySelector('.spieltagsansicht-ergebnis');
+    var res = (resCell ? resCell.textContent : '').trim().replace(/\s+/g, '');
+    res = /^\d+:\d+$/.test(res) ? res : '';
+
+    var fecha = '', hora = '', node = r;
+    for (var k = 0; k &lt; 4 &amp;&amp; node; k++) {
+      node = node.nextElementSibling;
+      if (!node) break;
+      var m = node.textContent.match(/(\d{2})\/(\d{2})\/(\d{2,4}).*?(\d{1,2}:\d{2})/);
+      if (m) {
+        var yy = m[3].length === 2 ? ('20' + m[3]) : m[3];
+        fecha = yy + '-' + m[2] + '-' + m[1];
+        hora = m[4];
+        break;
+      }
+    }
+    lines.push([jornada, '', fecha, hora, home, res, away].join(DELIM));
+  });
+
+  if (!lines.length) {
+    alert('No se encontraron partidos en esta página. ¿Es la vista de jornada (spieltag)?');
+    return;
+  }
+
+  var csv = lines.join('\r\n') + '\r\n';
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fecha_' + comp + '_' + String(jornada).padStart(2, '0') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  // Copia al portapapeles como respaldo (por si el navegador bloquea la descarga).
+  try { navigator.clipboard.writeText(csv); } catch (e) {}
+  alert('CSV generado: ' + lines.length + ' partidos (fecha ' + jornada + ').\nSe descargó y se copió al portapapeles.');
+})();
+</pre>
+</body></html>
