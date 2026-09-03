@@ -293,6 +293,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-detalles/club-html', 'ImportDetallesController@clubHtml')->name('import_detalles.club_html');
     Route::get('/import-detalles/competencia-html', 'ImportDetallesController@competenciaHtml')->name('import_detalles.competencia_html');
     Route::get('/import-detalles/nombres-alfabeto', 'ImportDetallesController@nombresAlfabeto')->name('import_detalles.nombres_alfabeto');
+    Route::get('/import-detalles/clubes-tm', 'ImportDetallesController@clubesTm')->name('import_detalles.clubes_tm');
 });
 
 

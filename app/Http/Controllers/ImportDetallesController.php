@@ -219,6 +219,7 @@ class ImportDetallesController extends Controller
             . '<p class="acciones">'
             . '<a class="boton-sec" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm desde las URLs</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar (' . $porRevisar . ')</a>'
+            . '<a class="boton-sec" href="' . e(route('import_detalles.clubes_tm')) . '">Clubes de Transfermarkt</a>'
             . ($nRotos
                 ? '<a class="boton-sec" href="' . e(route('import_detalles.mapeos')) . '">Mapeos rotos (' . $nRotos . ')</a>'
                 : '')
@@ -1865,7 +1866,11 @@ class ImportDetallesController extends Controller
             . '<th>gameId</th><th>Partido tuyo</th></tr></thead><tbody>'
             . $tabla . '</tbody></table></div>'
             . '<p class="sub">Las filas resaltadas son las que se van a guardar. Acá <b>no se crean partidos</b>: '
-            . 'los que Transfermarkt tiene y vos no se listan, pero no se escriben.</p>';
+            . 'los que Transfermarkt tiene y vos no se listan, pero no se escriben. '
+            . 'Si alguna dice <b>«no está en tu base»</b> de un partido que vos sabés que está, el problema '
+            . 'no es el partido sino el mapeo del club: mirálo en '
+            . '<a href="' . e(route('import_detalles.clubes_tm')) . '">Clubes de Transfermarkt</a>, '
+            . 'que además acepta el número del partido y te dice si sus dos equipos están atados.</p>';
 
         return $this->pagina('Calendario de la competencia', $cuerpo);
     }
@@ -1935,6 +1940,20 @@ class ImportDetallesController extends Controller
                 })
                 ->get(['id', 'dia']);
 
+            // Dos candidatos lejos suele ser una llave de ida y vuelta: el
+            // mismo cruce, dos veces. El orden local/visitante los distingue
+            // sin ambigüedad, y abstenerse ahí era decir «no está en tu base»
+            // de un partido que sí está.
+            if (count($lejos) > 1) {
+                $mismoOrden = DB::table('partidos')
+                    ->whereDate('dia', '>=', date('Y-m-d', strtotime($f['dia'] . ' -150 days')))
+                    ->whereDate('dia', '<=', date('Y-m-d', strtotime($f['dia'] . ' +150 days')))
+                    ->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
+                    ->get(['id', 'dia']);
+
+                if (count($mismoOrden) === 1) $lejos = $mismoOrden;
+            }
+
             if (count($lejos) === 1) {
                 $otro  = $lejos[0];
                 $suyo  = substr((string) $otro->dia, 0, 10);
@@ -1949,7 +1968,26 @@ class ImportDetallesController extends Controller
             }
         }
 
-        return [0, $rivalId ? 'no está en tu base' : 'no está en tu base (y el rival no está atado)', 0];
+        // «No está en tu base» a secas es un callejón sin salida: no se puede
+        // saber si el partido falta de verdad o si un club quedó atado al
+        // equipo equivocado (hay dos Fortaleza, dos Nacional, dos Independiente
+        // …). Se dice a qué equipo tuyo resolvió cada nombre de TM: si uno no
+        // es, el problema está en `equipo_tm` y se ve de una.
+        $nomTm = [];
+        foreach (['local_nombre', 'visita_nombre', 'rival_nombre'] as $k) {
+            if (!empty($f[$k])) $nomTm[] = (string) $f[$k];
+        }
+
+        $atados = [];
+        if ($equipoId) $atados[] = '#' . $equipoId . ' ' . $this->nombreEquipo($equipoId);
+        if ($rivalId)  $atados[] = '#' . $rivalId . ' ' . $this->nombreEquipo($rivalId);
+
+        return [0, 'no está en tu base'
+            . ($nomTm ? ' — TM dice «' . implode('» vs «', $nomTm) . '»' : '')
+            . ($atados ? ' y eso quedó atado a ' . implode(' y ', $atados)
+                . '. Si alguno de esos dos no es el club que jugó, el mapeo de equipo_tm '
+                . 'está mal y por eso no aparea' : '')
+            . ($rivalId ? '' : ' (el rival no está atado)'), 0];
     }
 
     /**
@@ -2884,6 +2922,9 @@ class ImportDetallesController extends Controller
             . 'trae el <b>torneo entero</b>, también en una llamada, y encima propone los mapeos de '
             . '<code>equipo_tm</code> que falten: es el que hay que usar en los torneos internacionales, donde '
             . 'lo que falla no es encontrar el partido sino que los clubes no están atados.</p>'
+            . '<p class="sub"><a href="' . e(route('import_detalles.clubes_tm')) . '">Clubes de '
+            . 'Transfermarkt</a> muestra a qué equipo tuyo está atado cada club, y al revés. Es la pantalla '
+            . 'para cuando el calendario dice «no está en tu base» de un partido que sí está.</p>'
             . '<div class="diag">';
 
         foreach ($filas as $f) {
@@ -3862,6 +3903,182 @@ class ImportDetallesController extends Controller
      * apellido + fecha de nacimiento y vuelve a atar la fila, esta vez a la
      * ficha que sobrevivió.
      */
+
+    /**
+     * Qué club de Transfermarkt está atado a qué equipo tuyo.
+     *
+     * Existe por un caso concreto: el calendario de la Libertadores decía «no
+     * está en tu base» de un Vélez–Fortaleza que SÍ estaba cargado, y no había
+     * ninguna forma de mirar `equipo_tm` desde la aplicación. Un mapeo no se
+     * puede confiar a la memoria: hay dos Fortaleza, dos Nacional, dos
+     * Independiente, y el que está mal no avisa — simplemente deja de aparear.
+     *
+     * Se puede entrar por tres lados: por un nombre, por el id de TM, o por un
+     * partido tuyo, que es el que contesta «¿por qué este partido no aparea?».
+     */
+    public function clubesTm(Request $request)
+    {
+        $buscar    = trim((string) $request->get('buscar', ''));
+        $partidoId = (int) $request->get('partido_id', 0);
+        $mapTm     = trim((string) $request->get('map_tm', ''));
+        $mapEquipo = (int) $request->get('map_equipo', 0);
+        $mapNombre = trim((string) $request->get('map_nombre', ''));
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Clubes de Transfermarkt atados a equipos tuyos</h1>'
+            . '<p class="sub">Es el contenido de <code>equipo_tm</code>, que es lo que decide si una fila del '
+            . 'calendario de TM encuentra tu partido. Cuando el calendario dice <b>«no está en tu base»</b> de un '
+            . 'partido que vos sabés que está, casi siempre el problema es acá: un club atado al equipo '
+            . 'equivocado, o no atado a ninguno.</p>'
+            . '<form method="get" class="acciones">'
+            . '<input type="text" name="buscar" value="' . e($buscar) . '" size="24" '
+            . 'placeholder="nombre o id de TM, ej Fortaleza"> '
+            . '<input type="text" name="partido_id" value="' . ($partidoId ?: '') . '" size="8" '
+            . 'placeholder="o partido #"> '
+            . '<button class="boton" type="submit">Ver</button> '
+            . '<span class="sub">no gasta ninguna llamada: es todo de tu base</span></form>';
+
+        // ── Guardar un remapeo ──────────────────────────────────────────────
+        if ($mapTm !== '' && $mapEquipo) {
+            (new \App\Services\MapeoClubesTm)->guardar($mapTm, $mapEquipo, $mapNombre, 'manual');
+            $cuerpo .= '<div class="ok-box">Club de TM <code>' . e($mapTm) . '</code> atado a '
+                . e((string) $this->nombreEquipo($mapEquipo)) . ' <span class="sub">#' . $mapEquipo . '</span>. '
+                . 'Volvé a leer el calendario y el partido debería aparear.</div>';
+        }
+
+        // ── Por un partido tuyo: «¿por qué éste no aparea?» ─────────────────
+        if ($partidoId) {
+            $p = DB::table('partidos')->where('id', $partidoId)->first();
+
+            if (!$p) {
+                $cuerpo .= '<div class="err-box">No existe el partido #' . $partidoId . '.</div>';
+            } else {
+                $cuerpo .= '<h2>Partido #' . $partidoId . '</h2>'
+                    . '<p class="sub">' . e((string) $this->nombreEquipo($p->equipol_id)) . ' vs '
+                    . e((string) $this->nombreEquipo($p->equipov_id)) . ' · '
+                    . e(substr((string) $p->dia, 0, 10)) . '</p>'
+                    . '<p class="sub">Para que el calendario de Transfermarkt encuentre este partido, los dos '
+                    . 'clubes de TM tienen que estar atados <b>a estos dos equipos</b>. Si en TM el partido lo '
+                    . 'juegan otros ids, no hay apareo posible por más que el partido exista.</p>'
+                    . '<div class="scroll"><table><thead><tr><th>Equipo tuyo</th><th>Clubes de TM que lo apuntan</th>'
+                    . '</tr></thead><tbody>';
+
+                foreach ([$p->equipol_id, $p->equipov_id] as $eqId) {
+                    $ates = DB::table('equipo_tm')->where('equipo_id', (int) $eqId)
+                        ->get(['tm_club_id', 'nombre_tm', 'origen']);
+
+                    $celda = count($ates) ? '' : '<span class="err">ninguno — este equipo no está atado a '
+                        . 'ningún club de Transfermarkt, así que ningún calendario lo va a encontrar</span>';
+
+                    foreach ($ates as $a) {
+                        $celda .= ($celda !== '' ? '<br>' : '')
+                            . '<a target="_blank" rel="noopener" href="'
+                            . e('https://www.transfermarkt.es/-/startseite/verein/' . rawurlencode((string) $a->tm_club_id))
+                            . '">' . e((string) $a->tm_club_id) . '</a> · ' . e((string) $a->nombre_tm)
+                            . ' <span class="sub">(' . e((string) $a->origen) . ')</span>';
+                    }
+
+                    $cuerpo .= '<tr><td>' . e((string) $this->nombreEquipo($eqId))
+                        . ' <span class="sub">#' . (int) $eqId . '</span></td>'
+                        . '<td>' . $celda . '</td></tr>';
+                }
+
+                $cuerpo .= '</tbody></table></div>';
+            }
+        }
+
+        // ── Por nombre o por id de TM ───────────────────────────────────────
+        if ($buscar !== '') {
+            $opciones = '<option value=""></option>';
+            foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $eq) {
+                $opciones .= '<option value="' . (int) $eq->id . '">' . e((string) $eq->nombre)
+                    . ($eq->pais ? ' (' . e((string) $eq->pais) . ')' : '') . '</option>';
+            }
+
+            $ates = DB::table('equipo_tm')
+                ->where(function ($w) use ($buscar) {
+                    $w->where('nombre_tm', 'like', '%' . $buscar . '%')
+                        ->orWhere('tm_club_id', $buscar);
+                })
+                ->orderBy('nombre_tm')->get(['tm_club_id', 'nombre_tm', 'equipo_id', 'origen']);
+
+            $cuerpo .= '<h2>Atados que coinciden con «' . e($buscar) . '» <span class="sub">('
+                . count($ates) . ')</span></h2>';
+
+            if (!count($ates)) {
+                $cuerpo .= '<div class="err-box">Ningún club de Transfermarkt con ese nombre o ese id está '
+                    . 'atado. Si el calendario igual no lo marcó como «desconocido», es que lo resolvió '
+                    . '<b>por nombre</b>, que anda hasta que aparece un homónimo.</div>';
+            } else {
+                $cuerpo .= '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th>'
+                    . '<th>Apunta a</th><th>Enganche</th><th>Cambiar</th></tr></thead><tbody>';
+
+                foreach ($ates as $a) {
+                    $cuerpo .= '<tr><td>' . e((string) $a->nombre_tm) . '</td>'
+                        . '<td class="num gris"><a target="_blank" rel="noopener" href="'
+                        . e('https://www.transfermarkt.es/-/startseite/verein/' . rawurlencode((string) $a->tm_club_id))
+                        . '">' . e((string) $a->tm_club_id) . '</a></td>'
+                        . '<td>' . e((string) $this->nombreEquipo($a->equipo_id))
+                        . ' <span class="sub">#' . (int) $a->equipo_id . '</span></td>'
+                        . '<td class="sub">' . e((string) $a->origen) . '</td>'
+                        . '<td><form method="get">'
+                        . '<input type="hidden" name="buscar" value="' . e($buscar) . '">'
+                        . '<input type="hidden" name="map_tm" value="' . e((string) $a->tm_club_id) . '">'
+                        . '<input type="hidden" name="map_nombre" value="' . e((string) $a->nombre_tm) . '">'
+                        . '<select name="map_equipo" class="s2" data-placeholder="otro equipo…">' . $opciones
+                        . '</select> <button>Cambiar</button></form></td></tr>';
+                }
+
+                $cuerpo .= '</tbody></table></div>';
+            }
+        }
+
+        // ── Equipos tuyos con ese nombre, atados o no ────────────────────────
+        // La otra mitad de la pregunta: si el club de TM no aparece atado, hay
+        // que saber a qué equipo tuyo habría que atarlo — y si tenés dos con el
+        // mismo nombre, que es la trampa que hace fallar el apareo por nombre.
+        if ($buscar !== '') {
+            $mios = \App\Equipo::where('nombre', 'like', '%' . $buscar . '%')
+                ->orderBy('nombre')->get(['id', 'nombre', 'pais']);
+
+            $cuerpo .= '<h2>Equipos tuyos que coinciden <span class="sub">(' . count($mios) . ')</span></h2>';
+
+            if (!count($mios)) {
+                $cuerpo .= '<div class="err-box">Ninguno. Si el club juega el torneo y no está en tu base, '
+                    . 'los partidos de ese club no se van a poder aparear hasta que lo crees.</div>';
+            } else {
+                if (count($mios) > 1) {
+                    $cuerpo .= '<div class="err-box"><b>Ojo: hay ' . count($mios) . ' equipos tuyos con nombre '
+                        . 'parecido.</b> El apareo por nombre se abstiene cuando hay homónimos, así que estos '
+                        . 'clubes <b>tienen</b> que estar atados por id de TM o no van a aparear nunca.</div>';
+                }
+
+                $cuerpo .= '<div class="scroll"><table><thead><tr><th>Equipo tuyo</th><th>País</th>'
+                    . '<th>Clubes de TM atados</th></tr></thead><tbody>';
+
+                foreach ($mios as $eq) {
+                    $ids = DB::table('equipo_tm')->where('equipo_id', (int) $eq->id)
+                        ->pluck('tm_club_id')->all();
+
+                    $cuerpo .= '<tr><td>' . e((string) $eq->nombre) . ' <span class="sub">#' . (int) $eq->id
+                        . '</span></td><td class="sub">' . e((string) $eq->pais) . '</td>'
+                        . '<td>' . ($ids ? e(implode(', ', $ids))
+                            : '<span class="warn">ninguno</span>') . '</td></tr>';
+                }
+
+                $cuerpo .= '</tbody></table></div>';
+            }
+        }
+
+        if ($buscar === '' && !$partidoId) {
+            $total = DB::table('equipo_tm')->count();
+            $cuerpo .= '<p class="sub">Hay <b>' . (int) $total . '</b> clubes atados. Buscá uno por nombre, '
+                . 'o poné el número de un partido tuyo para ver si sus dos equipos están atados.</p>';
+        }
+
+        return $this->pagina('Clubes de Transfermarkt', $cuerpo);
+    }
+
     public function mapeos(Request $request)
     {
         if ((string) $request->get('limpiar', '0') === '1') {
