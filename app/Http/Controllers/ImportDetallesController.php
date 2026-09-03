@@ -866,12 +866,22 @@ class ImportDetallesController extends Controller
 
         $ids       = array_values(array_filter(array_column($filas, 'game_id')));
         $enStaging = $ids
+            // `whereNotNull('partido_id')` no es un detalle: un mismo gameId puede
+            // tener varias filas —la del sondeo del DT y la del fixture— y sin
+            // el filtro `pluck` se queda con la última, que puede ser la que
+            // tiene `partido_id` en null. La pantalla mostraba entonces como
+            // pendiente algo que ya estaba guardado, y parecía que el botón
+            // «Guardar» no hacía nada.
             ? DB::table('import_partidos')->whereIn('external_id', $ids)
+                ->whereNotNull('partido_id')
                 ->pluck('partido_id', 'external_id')->all()
             : [];
 
-        $cont = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0, 'guardados' => 0];
-        $tabla = '';
+        $cont        = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0,
+            'guardados' => 0, 'fallados' => 0];
+        $anotador    = new TmBuscarGameId;
+        $primerFallo = '';
+        $tabla       = '';
 
         foreach ($filas as $f) {
             $rivalId = (!empty($f['rival_tm']) && isset($mapa[$f['rival_tm']])) ? (int) $mapa[$f['rival_tm']] : 0;
@@ -892,9 +902,15 @@ class ImportDetallesController extends Controller
                     $cont['nuevos']++;
 
                     if ($guardar) {
-                        $ok = (new TmBuscarGameId)->anotar($partidoId, $f['game_id'],
+                        $ok = $anotador->anotar($partidoId, $f['game_id'],
                             'calendario del club ' . $clubTm . ' temporada ' . $season . ' (HTML de Transfermarkt)');
-                        if ($ok) $cont['guardados']++;
+
+                        if ($ok) {
+                            $cont['guardados']++;
+                        } else {
+                            $cont['fallados']++;
+                            if ($primerFallo === '') $primerFallo = $anotador->ultimoError;
+                        }
                     }
                 } else {
                     $cont['sin']++;
@@ -915,7 +931,10 @@ class ImportDetallesController extends Controller
                         . $partidoId . '</a>'
                     : '<span class="sub">' . e($motivo) . '</span>'
                         . ($sospecha ? ' <a href="' . e(route('import_detalles.ver', ['partido_id' => $sospecha]))
-                            . '">partido #' . $sospecha . ' →</a>' : '')) . '</td>'
+                            . '">partido #' . $sospecha . '</a>'
+                            . ' · <a href="' . e(route('import_detalles.ver',
+                                ['partido_id' => $sospecha, 'game_id' => $f['game_id']]))
+                            . '"><b>es éste igual →</b></a>' : '')) . '</td>'
                 . '</tr>';
         }
 
@@ -933,7 +952,11 @@ class ImportDetallesController extends Controller
 
         if ($guardar) {
             $cuerpo .= '<div class="ok-box">Guardados <b>' . $cont['guardados'] . '</b> gameId. '
-                . 'Esos partidos ya se pueden bajar como cualquier otro.</div>';
+                . 'Esos partidos ya se pueden bajar como cualquier otro.</div>'
+                . ($cont['fallados']
+                    ? '<div class="err-box"><b>' . $cont['fallados'] . '</b> no se pudieron guardar. '
+                        . 'El primero: ' . e($primerFallo) . '</div>'
+                    : '');
         } elseif ($cont['nuevos']) {
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_detalles.club_html', ['club_tm' => $clubTm, 'season' => $season, 'guardar' => 1]))
@@ -1562,12 +1585,18 @@ class ImportDetallesController extends Controller
 
         $mapeo     = new \App\Services\MapeoClubesTm;
         $ids       = array_values(array_filter(array_column($filas, 'game_id')));
+        // Ver el comentario de `clubHtml`: sin `whereNotNull` una fila del
+        // sondeo del DT tapa a la del fixture y el partido figura pendiente
+        // para siempre.
         $enStaging = DB::table('import_partidos')->whereIn('external_id', $ids)
+            ->whereNotNull('partido_id')
             ->pluck('partido_id', 'external_id')->all();
 
-        $cont      = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0,
-            'guardados' => 0, 'otraFecha' => 0];
-        $porAtar   = [];   // tm_club_id => ['nombre' => .., 'equipo_id' => ..] reconocidos por NOMBRE
+        $cont        = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0,
+            'guardados' => 0, 'fallados' => 0, 'otraFecha' => 0];
+        $anotador    = new TmBuscarGameId;
+        $primerFallo = '';
+        $porAtar     = [];   // tm_club_id => ['nombre' => .., 'equipo_id' => ..] reconocidos por NOMBRE
         $sinAtar   = [];   // tm_club_id => nombre, los que no se reconocieron
         $tabla     = '';
 
@@ -1620,10 +1649,16 @@ class ImportDetallesController extends Controller
                     $cont['nuevos']++;
 
                     if ($guardar) {
-                        $ok = (new TmBuscarGameId)->anotar($partidoId, $f['game_id'],
+                        $ok = $anotador->anotar($partidoId, $f['game_id'],
                             'calendario de la competencia ' . $compId . ' temporada ' . $season
                             . ' (HTML de Transfermarkt)');
-                        if ($ok) $cont['guardados']++;
+
+                        if ($ok) {
+                            $cont['guardados']++;
+                        } else {
+                            $cont['fallados']++;
+                            if ($primerFallo === '') $primerFallo = $anotador->ultimoError;
+                        }
                     }
                 } else {
                     $cont['sin']++;
@@ -1641,7 +1676,10 @@ class ImportDetallesController extends Controller
                         . $partidoId . '</a>' . ($yaEsta ? ' <span class="sub">ya lo tenía</span>' : '')
                     : '<span class="sub">' . e($motivo) . '</span>'
                         . ($sospecha ? ' <a href="' . e(route('import_detalles.ver', ['partido_id' => $sospecha]))
-                            . '">partido #' . $sospecha . ' →</a>' : '')) . '</td>'
+                            . '">partido #' . $sospecha . '</a>'
+                            . ' · <a href="' . e(route('import_detalles.ver',
+                                ['partido_id' => $sospecha, 'game_id' => $f['game_id']]))
+                            . '"><b>es éste igual →</b></a>' : '')) . '</td>'
                 . '</tr>';
         }
 
@@ -1724,7 +1762,11 @@ class ImportDetallesController extends Controller
         }
 
         if ($guardar) {
-            $cuerpo .= '<div class="ok-box">Guardados <b>' . $cont['guardados'] . '</b> gameId.</div>';
+            $cuerpo .= '<div class="ok-box">Guardados <b>' . $cont['guardados'] . '</b> gameId.</div>'
+                . ($cont['fallados']
+                    ? '<div class="err-box"><b>' . $cont['fallados'] . '</b> no se pudieron guardar. '
+                        . 'El primero: ' . e($primerFallo) . '</div>'
+                    : '');
         } elseif ($cont['nuevos']) {
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_detalles.competencia_html',
@@ -1817,7 +1859,10 @@ class ImportDetallesController extends Controller
 
                 return [0, 'el mismo cruce está en tu base pero el ' . $suyo . ', '
                     . abs($dias) . ' días ' . ($dias > 0 ? 'después' : 'antes')
-                    . ': revisá la fecha antes de atarlo', (int) $otro->id];
+                    . '. Puede ser un partido suspendido y reanudado (TM guarda la fecha original '
+                    . 'y vos la de la reanudación) o una reprogramación: en los dos casos es el mismo '
+                    . 'partido y el mismo gameId. Si al abrirlo ves que es éste, atalo igual: la fecha '
+                    . 'es un dato tuyo y no cambia qué trae el gameId', (int) $otro->id];
             }
         }
 

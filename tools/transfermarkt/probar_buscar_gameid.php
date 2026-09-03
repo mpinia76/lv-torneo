@@ -29,9 +29,12 @@ namespace {
         public static $staging  = [];        // filas de import_partidos
         public static $respuestas = [];      // url => json que devuelve TM
         public static $pedidas   = [];       // urls efectivamente pedidas
+        public static $updates   = [];       // updates que hizo anotar()
+        public static $inserts   = [];       // inserts que hizo anotar()
         public static function reset() {
             self::$equipoTm = []; self::$coaches = []; self::$torneo = null;
             self::$staging = []; self::$respuestas = []; self::$pedidas = [];
+            self::$updates = []; self::$inserts = [];
         }
     }
 
@@ -51,11 +54,20 @@ namespace {
             return null;
         }
         public function get() { return Escenario::$staging; }
+        public function update($datos) { Escenario::$updates[] = $datos; return count(Escenario::$staging); }
+        public function insert($datos) { Escenario::$inserts[] = $datos; return true; }
         public function pluck($a, $b = null) {
             if ($this->tabla === 'equipo_tm') return new FakeColeccion(Escenario::$equipoTm);
             if ($this->tabla === 'partido_tecnicos') return new FakeColeccion(Escenario::$coaches);
             return new FakeColeccion([]);
         }
+    }
+
+    // `now()` es un helper de Laravel y acá no hay Laravel. Sin esto, anotar()
+    // llegaba al update, tiraba «Call to undefined function now()», el catch se
+    // lo tragaba y devolvía false: el mismo síntoma que estamos arreglando.
+    if (!function_exists('now')) {
+        function now() { return date('Y-m-d H:i:s'); }
     }
 
     class FakeColeccion {
@@ -214,6 +226,32 @@ chequear($r['contexto']['torneo']['id'] === 5 && $r['contexto']['torneo']['comp'
     'devuelve el contexto en crudo (torneo + clubes + día) para armar los links');
 chequear(empty($r['contexto']['temporada_ajena']),
     'sin temporada ajena detectada, así que la pantalla sí ofrece cargar los ids');
+
+echo "\n== 9) anotar(): completa la fila que ya existe en vez de duplicarla\n";
+// El bug que hacía parecer que el botón «Guardar» no hacía nada: el sondeo de
+// un DT deja la fila con SU tecnico_id, y anotar() la buscaba exigiendo
+// `tecnico_id null`. No la encontraba, insertaba una segunda fila con el mismo
+// gameId, y después `pluck` se quedaba con la que tenía partido_id en null: el
+// partido seguía figurando pendiente para siempre.
+escenarioBase();
+Escenario::$staging = [(object) ['id' => 5, 'partido_id' => null]];
+$anotador = new TmBuscarGameId;
+$ok = $anotador->anotar(22437, '4643244', 'prueba');
+chequear($ok === true, 'devuelve true');
+chequear(count(Escenario::$updates) === 1, 'completa la fila existente (' . count(Escenario::$updates) . ' update)');
+chequear(count(Escenario::$inserts) === 0, 'y NO inserta una fila nueva (' . count(Escenario::$inserts) . ' insert)');
+chequear(isset(Escenario::$updates[0]['partido_id']) && Escenario::$updates[0]['partido_id'] === 22437,
+    'con el partido_id correcto');
+
+echo "\n== 10) anotar(): si el gameId ya es de otro partido, lo dice\n";
+escenarioBase();
+Escenario::$staging = [(object) ['id' => 7, 'partido_id' => 99999]];
+$anotador2 = new TmBuscarGameId;
+$ok2 = $anotador2->anotar(22437, '4643244', 'prueba');
+chequear($ok2 === false, 'no devuelve true');
+chequear(strpos($anotador2->ultimoError, '#99999') !== false,
+    'y el motivo nombra al otro partido: ' . var_export($anotador2->ultimoError, true));
+chequear(count(Escenario::$updates) === 0 && count(Escenario::$inserts) === 0, 'sin tocar nada');
 
 echo "\n" . ($fallos ? "$fallos CHEQUEO(S) FALLIDO(S)\n" : "Todo en verde.\n");
 exit($fallos ? 1 : 0);

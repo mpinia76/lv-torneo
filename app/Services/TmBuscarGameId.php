@@ -113,6 +113,17 @@ class TmBuscarGameId
      */
     private $ajena = null;
 
+    /**
+     * Por qué falló el último `anotar()`.
+     *
+     * `anotar()` es un extra y se traga los errores para no voltear al que lo
+     * llama. Pero tragárselos **y no dejar rastro** convierte un fallo en
+     * «apreté guardar y no pasó nada», que es lo peor de los dos mundos.
+     *
+     * @var string
+     */
+    public $ultimoError = '';
+
     /** @var int */
     private $llamadas = 0;
 
@@ -225,25 +236,58 @@ class TmBuscarGameId
      */
     public function anotar($partidoId, $gameId, $motivo = 'encontrado en Transfermarkt')
     {
-        $gameId    = trim((string) $gameId);
-        $partidoId = (int) $partidoId;
+        $gameId          = trim((string) $gameId);
+        $partidoId       = (int) $partidoId;
+        $this->ultimoError = '';
 
         if ($partidoId <= 0 || !preg_match('/^\d{1,20}$/', $gameId)) {
+            $this->ultimoError = 'gameId o partido inválido (' . $gameId . ' / ' . $partidoId . ')';
             return false;
         }
 
         try {
             if (!Schema::hasTable('import_partidos')) {
+                $this->ultimoError = 'no existe la tabla import_partidos';
                 return false;
             }
 
-            $clave = ['fuente' => 'transfermarkt', 'external_id' => $gameId, 'tecnico_id' => null];
-            $ya    = DB::table('import_partidos')->where($clave)->first();
+            // OJO: se busca por `fuente + external_id`, **sin filtrar por
+            // tecnico_id**. La versión anterior exigía `tecnico_id null`, que
+            // es la fila que crea el importador de fixture; pero el sondeo de
+            // un DT crea la MISMA fila con su `tecnico_id`, y entonces no la
+            // encontraba y insertaba una segunda fila con el mismo gameId.
+            // Resultado: se guardaba, sí, pero la pantalla seguía mostrando el
+            // partido como pendiente y parecía que el botón no hacía nada.
+            $existentes = DB::table('import_partidos')
+                ->where('fuente', 'transfermarkt')
+                ->where('external_id', $gameId)
+                ->get(['id', 'partido_id']);
 
-            if ($ya) {
-                if (!$ya->partido_id) {
-                    DB::table('import_partidos')->where('id', $ya->id)
+            if (count($existentes)) {
+                $sinAtar = [];
+                $ajeno   = 0;
+
+                foreach ($existentes as $f) {
+                    if (!$f->partido_id) {
+                        $sinAtar[] = $f->id;
+                    } elseif ((int) $f->partido_id !== $partidoId) {
+                        $ajeno = (int) $f->partido_id;
+                    }
+                }
+
+                if ($sinAtar) {
+                    DB::table('import_partidos')->whereIn('id', $sinAtar)
                         ->update(['partido_id' => $partidoId, 'updated_at' => now()]);
+
+                    return true;
+                }
+
+                // Ninguna fila quedó por atar: o ya estaba atada a este mismo
+                // partido, o el gameId está tomado por otro. Lo segundo hay que
+                // decirlo: dos partidos con el mismo gameId es un error de datos.
+                if ($ajeno) {
+                    $this->ultimoError = 'el gameId ' . $gameId . ' ya está atado al partido #' . $ajeno;
+                    return false;
                 }
 
                 return true;
@@ -252,6 +296,7 @@ class TmBuscarGameId
             $partido = DB::table('partidos')->where('id', $partidoId)->first();
 
             if (!$partido) {
+                $this->ultimoError = 'no existe el partido #' . $partidoId;
                 return false;
             }
 
@@ -275,6 +320,7 @@ class TmBuscarGameId
 
             return true;
         } catch (\Throwable $e) {
+            $this->ultimoError = get_class($e) . ': ' . $e->getMessage();
             return false;
         }
     }
