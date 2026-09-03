@@ -129,6 +129,8 @@ echo "\n== 5) El calendario de una COMPETENCIA entera\n";
 // clubes salen del orden en que aparecen. Verificado contra
 // `gesamtspielplan/pokalwettbewerb/KLUB/saison_id/2024` el 2026-09-02, que
 // devuelve los 63 partidos del Mundial de Clubes 2025.
+// $dia vacío = la celda de fecha viene sin nada, que es como TM escribe el
+// segundo y el tercer partido de un mismo día.
 function filaComp($dia, $localId, $local, $visitaId, $visita, $gameId, $res) {
     return '<tr><td>' . $dia . '</td><td>21:00</td>'
         . '<td><a href="/x/startseite/verein/' . $localId . '">' . $local . '</a>'
@@ -139,6 +141,8 @@ function filaComp($dia, $localId, $local, $visitaId, $visita, $gameId, $res) {
 
 HttpHelper::$html = '<html><body><table>'
     . filaComp('15/06/2025', '7', 'Al Ahly', '69261', 'Inter Miami', '4504579', '0:0')
+    // Mismo día que el anterior: TM deja la celda de fecha VACÍA.
+    . filaComp('', '1023', 'Palmeiras', '720', 'Oporto', '4504578', '0:0')
     . filaComp('01/07/2025', '281', 'Man. City', '1114', 'Al-Hilal', '4506865', '3:4')
     // Una fila con un solo club no sirve para aparear: se descarta.
     . '<tr><td>02/07/2025</td><td><a href="/x/startseite/verein/281">Man. City</a></td>'
@@ -150,8 +154,15 @@ $fc   = $comp->leerComp('KLUB', 2024, true);
 $pc   = [];
 foreach ((array) $fc as $f) $pc[$f['game_id']] = $f;
 
-chequear(is_array($fc) && count($fc) === 2, 'lee las 2 filas completas y descarta la que tiene un solo club ('
+chequear(is_array($fc) && count($fc) === 3, 'lee las 3 filas completas y descarta la que tiene un solo club ('
     . (is_array($fc) ? count($fc) : 'null') . ')');
+// El bug que costó dos de cada tres partidos: 74 leídos y 166 descartados de 240.
+chequear(isset($pc['4504578']) && $pc['4504578']['dia'] === '2025-06-15',
+    'la fila SIN celda de fecha hereda el día de la anterior: '
+    . (isset($pc['4504578']) ? var_export($pc['4504578']['dia'], true) : 'no la leyó'));
+chequear($comp->sinFecha === 0 && $comp->sinClubes === 1,
+    'y las descartadas se cuentan por motivo (sin fecha: ' . $comp->sinFecha
+    . ', sin clubes: ' . $comp->sinClubes . ')');
 chequear(isset($pc['4506865']) && $pc['4506865']['dia'] === '2025-07-01', 'la fecha sale bien');
 chequear(isset($pc['4506865']) && $pc['4506865']['local_tm'] === '281'
     && $pc['4506865']['visita_tm'] === '1114',

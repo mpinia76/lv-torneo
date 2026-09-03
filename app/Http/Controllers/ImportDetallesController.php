@@ -879,13 +879,14 @@ class ImportDetallesController extends Controller
 
             $partidoId = 0;
             $motivo    = '';
+            $sospecha  = 0;
 
             if ($yaEsta) {
                 $partidoId = (int) $enStaging[$f['game_id']];
                 $cont['ya']++;
                 $motivo = 'ya lo tenía';
             } else {
-                list($partidoId, $motivo) = $this->partidoDeFila($f, $equipoId, $rivalId);
+                list($partidoId, $motivo, $sospecha) = $this->partidoDeFila($f, $equipoId, $rivalId);
 
                 if ($partidoId) {
                     $cont['nuevos']++;
@@ -912,7 +913,9 @@ class ImportDetallesController extends Controller
                 . '<td>' . ($partidoId
                     ? '<a href="' . e(route('import_detalles.ver', ['partido_id' => $partidoId])) . '">partido #'
                         . $partidoId . '</a>'
-                    : '<span class="sub">' . e($motivo) . '</span>') . '</td>'
+                    : '<span class="sub">' . e($motivo) . '</span>'
+                        . ($sospecha ? ' <a href="' . e(route('import_detalles.ver', ['partido_id' => $sospecha]))
+                            . '">partido #' . $sospecha . ' →</a>' : '')) . '</td>'
                 . '</tr>';
         }
 
@@ -1562,7 +1565,8 @@ class ImportDetallesController extends Controller
         $enStaging = DB::table('import_partidos')->whereIn('external_id', $ids)
             ->pluck('partido_id', 'external_id')->all();
 
-        $cont      = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0, 'guardados' => 0];
+        $cont      = ['leidos' => count($filas), 'ya' => 0, 'nuevos' => 0, 'sin' => 0,
+            'guardados' => 0, 'otraFecha' => 0];
         $porAtar   = [];   // tm_club_id => ['nombre' => .., 'equipo_id' => ..] reconocidos por NOMBRE
         $sinAtar   = [];   // tm_club_id => nombre, los que no se reconocieron
         $tabla     = '';
@@ -1592,6 +1596,7 @@ class ImportDetallesController extends Controller
             $yaEsta    = array_key_exists($f['game_id'], $enStaging) && $enStaging[$f['game_id']];
             $partidoId = 0;
             $motivo    = '';
+            $sospecha  = 0;
 
             if ($yaEsta) {
                 $partidoId = (int) $enStaging[$f['game_id']];
@@ -1609,7 +1614,7 @@ class ImportDetallesController extends Controller
                     $eqB = 0;
                 }
 
-                list($partidoId, $motivo) = $this->partidoDeFila($f, $eqA, $eqB);
+                list($partidoId, $motivo, $sospecha) = $this->partidoDeFila($f, $eqA, $eqB);
 
                 if ($partidoId) {
                     $cont['nuevos']++;
@@ -1622,10 +1627,11 @@ class ImportDetallesController extends Controller
                     }
                 } else {
                     $cont['sin']++;
+                    if ($sospecha) $cont['otraFecha']++;
                 }
             }
 
-            $tabla .= '<tr class="' . ($partidoId && !$yaEsta ? 'warn' : '') . '">'
+            $tabla .= '<tr class="' . ($partidoId && !$yaEsta ? 'warn' : ($sospecha ? 'err' : '')) . '">'
                 . '<td class="num">' . e((string) ($f['dia'] ?: $f['dia_crudo'])) . '</td>'
                 . '<td>' . e((string) $f['local_nombre']) . ' vs ' . e((string) $f['visita_nombre']) . '</td>'
                 . '<td class="num">' . e((string) $f['resultado']) . '</td>'
@@ -1633,7 +1639,9 @@ class ImportDetallesController extends Controller
                 . '<td>' . ($partidoId
                     ? '<a href="' . e(route('import_detalles.ver', ['partido_id' => $partidoId])) . '">partido #'
                         . $partidoId . '</a>' . ($yaEsta ? ' <span class="sub">ya lo tenía</span>' : '')
-                    : '<span class="sub">' . e($motivo) . '</span>') . '</td>'
+                    : '<span class="sub">' . e($motivo) . '</span>'
+                        . ($sospecha ? ' <a href="' . e(route('import_detalles.ver', ['partido_id' => $sospecha]))
+                            . '">partido #' . $sospecha . ' →</a>' : '')) . '</td>'
                 . '</tr>';
         }
 
@@ -1656,15 +1664,17 @@ class ImportDetallesController extends Controller
             . $this->card($cont['leidos'], 'partidos del torneo')
             . $this->card($cont['ya'], 'ya tenían gameId', 'ok')
             . $this->card($cont['nuevos'], $guardar ? 'apareados' : 'para guardar', $cont['nuevos'] ? 'warn' : '')
-            . $this->card($cont['sin'], 'sin partido en tu base')
+            . $this->card($cont['sin'] - $cont['otraFecha'], 'sin partido en tu base')
+            . $this->card($cont['otraFecha'], 'con otra fecha en tu base', $cont['otraFecha'] ? 'err' : '')
             . $this->card(count($porAtar), 'clubes por atar', count($porAtar) ? 'warn' : '')
             . $this->card(count($sinAtar), 'clubes desconocidos', count($sinAtar) ? 'err' : '')
             . ($guardar ? $this->card($cont['guardados'], 'guardados', 'ok') : '')
             . '</div>';
 
         if ($svc->descartadas) {
-            $cuerpo .= '<p class="sub">Se descartaron <b>' . $svc->descartadas . '</b> filas sin fecha o sin los '
-                . 'dos clubes.</p>';
+            $cuerpo .= '<p class="sub">Se descartaron <b>' . $svc->descartadas . '</b> filas: '
+                . '<b>' . (int) $svc->sinFecha . '</b> sin fecha y '
+                . '<b>' . (int) $svc->sinClubes . '</b> sin los dos clubes.</p>';
         }
 
         // ── Primero atar, después guardar ───────────────────────────────────
@@ -1746,11 +1756,11 @@ class ImportDetallesController extends Controller
     private function partidoDeFila(array $f, $equipoId, $rivalId)
     {
         if (empty($f['dia'])) {
-            return [0, 'no pude leerle la fecha'];
+            return [0, 'no pude leerle la fecha', 0];
         }
 
         if (!$equipoId) {
-            return [0, 'el club no está atado en equipo_tm'];
+            return [0, 'el club no está atado en equipo_tm', 0];
         }
 
         $desde = date('Y-m-d', strtotime($f['dia'] . ' -3 days'));
@@ -1775,14 +1785,43 @@ class ImportDetallesController extends Controller
         $ids = $q->pluck('id')->all();
 
         if (count($ids) === 1) {
-            return [(int) $ids[0], ''];
+            return [(int) $ids[0], '', 0];
         }
 
         if (count($ids) > 1) {
-            return [0, 'hay ' . count($ids) . ' partidos posibles en esa ventana: no elijo'];
+            return [0, 'hay ' . count($ids) . ' partidos posibles en esa ventana: no elijo', 0];
         }
 
-        return [0, $rivalId ? 'no está en tu base' : 'no está en tu base (y el rival no está atado)'];
+        // NO ESTÁ EN ESA FECHA NO ES NO ESTÁ. Con los dos equipos atados se
+        // busca el mismo cruce en una ventana ancha: si aparece uno solo, el
+        // partido existe y lo que no coincide es la fecha — que es un dato malo
+        // en la base, no un partido faltante. Decir «no está en tu base» ahí es
+        // mandar a cargar un duplicado.
+        if ($rivalId) {
+            $lejos = DB::table('partidos')
+                ->whereDate('dia', '>=', date('Y-m-d', strtotime($f['dia'] . ' -150 days')))
+                ->whereDate('dia', '<=', date('Y-m-d', strtotime($f['dia'] . ' +150 days')))
+                ->where(function ($w) use ($equipoId, $rivalId) {
+                    $w->where(function ($x) use ($equipoId, $rivalId) {
+                        $x->where('equipol_id', $equipoId)->where('equipov_id', $rivalId);
+                    })->orWhere(function ($x) use ($equipoId, $rivalId) {
+                        $x->where('equipol_id', $rivalId)->where('equipov_id', $equipoId);
+                    });
+                })
+                ->get(['id', 'dia']);
+
+            if (count($lejos) === 1) {
+                $otro  = $lejos[0];
+                $suyo  = substr((string) $otro->dia, 0, 10);
+                $dias  = (int) round((strtotime($suyo) - strtotime($f['dia'])) / 86400);
+
+                return [0, 'el mismo cruce está en tu base pero el ' . $suyo . ', '
+                    . abs($dias) . ' días ' . ($dias > 0 ? 'después' : 'antes')
+                    . ': revisá la fecha antes de atarlo', (int) $otro->id];
+            }
+        }
+
+        return [0, $rivalId ? 'no está en tu base' : 'no está en tu base (y el rival no está atado)', 0];
     }
 
     /**

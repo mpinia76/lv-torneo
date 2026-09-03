@@ -88,6 +88,14 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 
         $filas = [];
 
+        // LA FECHA SE ESCRIBE UNA SOLA VEZ POR DÍA. En el calendario de TM, el
+        // primer partido de una fecha trae la celda con el día y los que siguen
+        // ese mismo día la traen VACÍA. Leyendo cada fila por separado se
+        // descartaban dos de cada tres partidos: 74 leídos y 166 descartados de
+        // 240. Se arrastra el último día visto, que es lo que hace el ojo al
+        // mirar la tabla.
+        $ultimoDia = null;
+
         foreach ($links as $a) {
             if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
                 continue;
@@ -109,12 +117,14 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
                 continue;
             }
 
-            $fila = $this->leerFilaComp($xp, $tr);
+            $fila = $this->leerFilaComp($xp, $tr, $ultimoDia);
 
             if ($fila === null) {
                 $this->descartadas++;
                 continue;
             }
+
+            $ultimoDia = $fila['dia_crudo'];
 
             $fila['resultado']  = trim(preg_replace('/\s+/u', ' ', $a->textContent));
             $filas[$gameId]     = ['game_id' => $gameId] + $fila;
@@ -131,7 +141,7 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      * al mismo club con el texto vacío, así que se junta por id y se le pone el
      * primer nombre no vacío.
      */
-    private function leerFilaComp(\DOMXPath $xp, \DOMNode $tr)
+    private function leerFilaComp(\DOMXPath $xp, \DOMNode $tr, $ultimoDia = null)
     {
         $diaCrudo = null;
 
@@ -144,7 +154,13 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
             }
         }
 
+        // Sin celda de fecha, es un partido del mismo día que el anterior.
         if ($diaCrudo === null) {
+            $diaCrudo = $ultimoDia;
+        }
+
+        if ($diaCrudo === null) {
+            $this->sinFecha++;
             return null;
         }
 
@@ -169,6 +185,7 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 
         // Sin los dos clubes la fila no sirve para aparear: no se inventa.
         if (count($orden) < 2) {
+            $this->sinClubes++;
             return null;
         }
 

@@ -41,8 +41,14 @@ class TmFixtureClubHtml
     /** @var array */
     public $avisos = [];
 
-    /** Cuántas filas se descartaron y por qué. */
+    /** Cuántas filas se descartaron. */
     public $descartadas = 0;
+
+    /** De ésas, cuántas por no tener fecha y cuántas por no tener los dos clubes. */
+    public $sinFecha = 0;
+
+    /** @var int */
+    public $sinClubes = 0;
 
     /** @var string */
     public $crudo = '';
@@ -106,6 +112,11 @@ class TmFixtureClubHtml
 
         $filas = [];
 
+        // Ver el comentario de `TmFixtureCompetenciaHtml`: en el calendario de
+        // la competencia la fecha se escribe una sola vez por día. Acá cada
+        // fila trae la suya, pero el arrastre no molesta y cubre el caso.
+        $ultimoDia = null;
+
         foreach ($links as $a) {
             if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
                 continue;
@@ -127,10 +138,11 @@ class TmFixtureClubHtml
                 continue;
             }
 
-            $fila = $this->leerFila($xp, $tr, (string) $clubTm);
+            $fila = $this->leerFila($xp, $tr, (string) $clubTm, $ultimoDia);
 
             if ($fila !== null) {
                 $fila['resultado'] = trim(preg_replace('/\s+/u', ' ', $a->textContent));
+                $ultimoDia         = $fila['dia_crudo'];
             }
 
             if ($fila === null) {
@@ -145,7 +157,7 @@ class TmFixtureClubHtml
     }
 
     /** Lo que hay que sacar de una fila del calendario. */
-    private function leerFila(\DOMXPath $xp, \DOMNode $tr, $clubTm)
+    private function leerFila(\DOMXPath $xp, \DOMNode $tr, $clubTm, $ultimoDia = null)
     {
         $diaCrudo = null;
         $local    = null;
@@ -166,7 +178,12 @@ class TmFixtureClubHtml
         }
 
         if ($diaCrudo === null) {
-            return null;   // sin fecha no sirve para aparear
+            $diaCrudo = $ultimoDia;   // mismo día que el partido anterior
+        }
+
+        if ($diaCrudo === null) {
+            $this->sinFecha++;
+            return null;              // sin fecha no sirve para aparear
         }
 
         $rivalTm     = null;
