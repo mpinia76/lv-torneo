@@ -914,7 +914,7 @@ class ImportDetallesController extends Controller
 
             $partidoId = 0;
             $motivo    = '';
-            $sospecha  = 0;
+            $sospecha  = [];   // candidatos cuando no elijo solo
 
             if ($yaEsta) {
                 $partidoId = (int) $enStaging[$f['game_id']];
@@ -955,11 +955,7 @@ class ImportDetallesController extends Controller
                     ? '<a href="' . e(route('import_detalles.ver', ['partido_id' => $partidoId])) . '">partido #'
                         . $partidoId . '</a>'
                     : '<span class="sub">' . e($motivo) . '</span>'
-                        . ($sospecha ? ' <a href="' . e(route('import_detalles.ver', ['partido_id' => $sospecha]))
-                            . '">partido #' . $sospecha . '</a>'
-                            . ' · <a href="' . e(route('import_detalles.ver',
-                                ['partido_id' => $sospecha, 'game_id' => $f['game_id']]))
-                            . '"><b>es éste igual →</b></a>' : '')) . '</td>'
+                        . $this->linksCandidatos($sospecha, $f['game_id'])) . '</td>'
                 . '</tr>';
         }
 
@@ -1674,7 +1670,7 @@ class ImportDetallesController extends Controller
             $yaEsta    = array_key_exists($f['game_id'], $enStaging) && $enStaging[$f['game_id']];
             $partidoId = 0;
             $motivo    = '';
-            $sospecha  = 0;
+            $sospecha  = [];   // candidatos cuando no elijo solo
 
             if ($yaEsta) {
                 $partidoId = (int) $enStaging[$f['game_id']];
@@ -1724,11 +1720,7 @@ class ImportDetallesController extends Controller
                     ? '<a href="' . e(route('import_detalles.ver', ['partido_id' => $partidoId])) . '">partido #'
                         . $partidoId . '</a>' . ($yaEsta ? ' <span class="sub">ya lo tenía</span>' : '')
                     : '<span class="sub">' . e($motivo) . '</span>'
-                        . ($sospecha ? ' <a href="' . e(route('import_detalles.ver', ['partido_id' => $sospecha]))
-                            . '">partido #' . $sospecha . '</a>'
-                            . ' · <a href="' . e(route('import_detalles.ver',
-                                ['partido_id' => $sospecha, 'game_id' => $f['game_id']]))
-                            . '"><b>es éste igual →</b></a>' : '')) . '</td>'
+                        . $this->linksCandidatos($sospecha, $f['game_id'])) . '</td>'
                 . '</tr>';
         }
 
@@ -1752,7 +1744,9 @@ class ImportDetallesController extends Controller
             . $this->card($cont['ya'], 'ya tenían gameId', 'ok')
             . $this->card($cont['nuevos'], $guardar ? 'apareados' : 'para guardar', $cont['nuevos'] ? 'warn' : '')
             . $this->card($cont['sin'] - $cont['otraFecha'], 'sin partido en tu base')
-            . $this->card($cont['otraFecha'], 'con otra fecha en tu base', $cont['otraFecha'] ? 'err' : '')
+            // Ya no es sólo «otra fecha»: acá caen todas las filas donde no elegí
+            // solo y te dejé los candidatos a un clic.
+            . $this->card($cont['otraFecha'], 'para elegir a mano', $cont['otraFecha'] ? 'err' : '')
             . $this->card(count($porAtar), 'clubes por atar', count($porAtar) ? 'warn' : '')
             . $this->card(count($sinAtar), 'clubes desconocidos', count($sinAtar) ? 'err' : '')
             . ($guardar ? $this->card($cont['guardados'], 'guardados', 'ok') : '')
@@ -1883,14 +1877,58 @@ class ImportDetallesController extends Controller
      * más de un candidato no elige ninguno**: un gameId equivocado escribe la
      * alineación de otro partido y después no se nota.
      */
+
+
+    /**
+     * Los candidatos, en la forma mínima que la pantalla necesita para ofrecerlos.
+     *
+     * `partidoDeFila()` devuelve esto como tercer valor cuando NO eligió. Antes
+     * devolvía un solo id sospechado y el resto se perdía: si había dos
+     * candidatos, la pantalla decía «no elijo» y ahí terminaba todo. Elegir
+     * automáticamente sigue estando mal —un gameId equivocado escribe la
+     * alineación de otro partido—, pero no ofrecer también: el que sabe cuál es
+     * sos vos, y con un link alcanza.
+     */
+    private function candidatos($filas)
+    {
+        $out = [];
+
+        foreach ($filas as $c) {
+            $out[] = ['id' => (int) $c->id, 'dia' => substr((string) $c->dia, 0, 10)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Los links «¿es éste?», uno por candidato.
+     *
+     * Cada uno abre la vista previa del partido CON el gameId de esta fila, así
+     * que se ve qué alineación trae antes de escribir nada. No ata solo.
+     */
+    private function linksCandidatos(array $cands, $gameId)
+    {
+        if (!$cands) return '';
+
+        $links = [];
+
+        foreach ($cands as $c) {
+            $links[] = '<a href="' . e(route('import_detalles.ver',
+                    ['partido_id' => $c['id'], 'game_id' => $gameId]))
+                . '"><b>¿es el #' . $c['id'] . '?</b> <span class="sub">' . e($c['dia']) . '</span></a>';
+        }
+
+        return ' ' . implode(' · ', $links);
+    }
+
     private function partidoDeFila(array $f, $equipoId, $rivalId)
     {
         if (empty($f['dia'])) {
-            return [0, 'no pude leerle la fecha', 0];
+            return [0, 'no pude leerle la fecha', []];
         }
 
         if (!$equipoId) {
-            return [0, 'el club no está atado en equipo_tm', 0];
+            return [0, 'el club no está atado en equipo_tm', []];
         }
 
         $desde = date('Y-m-d', strtotime($f['dia'] . ' -3 days'));
@@ -1912,14 +1950,24 @@ class ImportDetallesController extends Controller
             });
         }
 
-        $ids = $q->pluck('id')->all();
+        $cerca = $q->get(['id', 'dia', 'equipol_id', 'equipov_id', 'golesl', 'golesv']);
 
-        if (count($ids) === 1) {
-            return [(int) $ids[0], '', 0];
+        if (count($cerca) === 1) {
+            return [(int) $cerca[0]->id, '', []];
         }
 
-        if (count($ids) > 1) {
-            return [0, 'hay ' . count($ids) . ' partidos posibles en esa ventana: no elijo', 0];
+        if (count($cerca) > 1) {
+            // Dos partidos del mismo cruce a menos de tres días es raro, pero
+            // si el resultado señala a uno solo, es ése.
+            $uno = \App\Services\DesempatePartido::porResultado($cerca,
+                isset($f['resultado']) ? $f['resultado'] : '', $equipoId, $rivalId);
+            if ($uno) return [(int) $uno->id, '', []];
+
+            // No elegir NO es no ofrecer. Se devuelven los candidatos para que
+            // los elijas vos: la pantalla los pone como links y cada uno abre
+            // la vista previa con este gameId, así ves qué trae antes de atar.
+            return [0, 'hay ' . count($cerca) . ' partidos posibles en esa ventana y el resultado no '
+                . 'desempata, así que elegí vos', $this->candidatos($cerca)];
         }
 
         // NO ESTÁ EN ESA FECHA NO ES NO ESTÁ. Con los dos equipos atados se
@@ -1927,6 +1975,7 @@ class ImportDetallesController extends Controller
         // partido existe y lo que no coincide es la fecha — que es un dato malo
         // en la base, no un partido faltante. Decir «no está en tu base» ahí es
         // mandar a cargar un duplicado.
+        $lejos = [];
         if ($rivalId) {
             $lejos = DB::table('partidos')
                 ->whereDate('dia', '>=', date('Y-m-d', strtotime($f['dia'] . ' -150 days')))
@@ -1938,7 +1987,7 @@ class ImportDetallesController extends Controller
                         $x->where('equipol_id', $rivalId)->where('equipov_id', $equipoId);
                     });
                 })
-                ->get(['id', 'dia']);
+                ->get(['id', 'dia', 'equipol_id', 'equipov_id', 'golesl', 'golesv']);
 
             // Dos candidatos lejos suele ser una llave de ida y vuelta: el
             // mismo cruce, dos veces. El orden local/visitante los distingue
@@ -1949,9 +1998,18 @@ class ImportDetallesController extends Controller
                     ->whereDate('dia', '>=', date('Y-m-d', strtotime($f['dia'] . ' -150 days')))
                     ->whereDate('dia', '<=', date('Y-m-d', strtotime($f['dia'] . ' +150 days')))
                     ->where('equipol_id', $equipoId)->where('equipov_id', $rivalId)
-                    ->get(['id', 'dia']);
+                    ->get(['id', 'dia', 'equipol_id', 'equipov_id', 'golesl', 'golesv']);
 
                 if (count($mismoOrden) === 1) $lejos = $mismoOrden;
+            }
+
+            // Y si siguen empatados —el mismo cruce, de local, dos veces en el
+            // mismo mes: fecha del campeonato y semifinal— desempata el
+            // resultado, que es un dato tuyo y de TM a la vez.
+            if (count($lejos) > 1) {
+                $uno = \App\Services\DesempatePartido::porResultado($lejos,
+                    isset($f['resultado']) ? $f['resultado'] : '', $equipoId, $rivalId);
+                if ($uno) $lejos = [$uno];
             }
 
             if (count($lejos) === 1) {
@@ -1964,7 +2022,7 @@ class ImportDetallesController extends Controller
                     . '. Puede ser un partido suspendido y reanudado (TM guarda la fecha original '
                     . 'y vos la de la reanudación) o una reprogramación: en los dos casos es el mismo '
                     . 'partido y el mismo gameId. Si al abrirlo ves que es éste, atalo igual: la fecha '
-                    . 'es un dato tuyo y no cambia qué trae el gameId', (int) $otro->id];
+                    . 'es un dato tuyo y no cambia qué trae el gameId', $this->candidatos($lejos)];
             }
         }
 
@@ -1982,12 +2040,29 @@ class ImportDetallesController extends Controller
         if ($equipoId) $atados[] = '#' . $equipoId . ' ' . $this->nombreEquipo($equipoId);
         if ($rivalId)  $atados[] = '#' . $rivalId . ' ' . $this->nombreEquipo($rivalId);
 
+        // Y sobre todo: qué encontró la ventana ancha. Cero y «varios» son
+        // diagnósticos opuestos —falta el partido / está pero no elijo— y
+        // hasta acá los dos salían con la misma frase, que no dejaba avanzar.
+        $ancha = '';
+        if ($rivalId && count($lejos) > 1) {
+            $cuales = [];
+            foreach ($lejos as $l) {
+                $cuales[] = '#' . (int) $l->id . ' del ' . substr((string) $l->dia, 0, 10);
+            }
+            $ancha = '. Ojo: entre esos dos equipos hay ' . count($lejos) . ' partidos tuyos en ±150 días ('
+                . implode(', ', $cuales) . '), y ni el orden local/visitante ni el resultado los '
+                . 'desempatan, así que no elijo. Si alguno de ésos es este partido, abrilo y atalo a mano';
+        } elseif ($rivalId) {
+            $ancha = '. Tampoco hay ningún partido entre esos dos equipos en ±150 días, así que o el '
+                . 'partido no está cargado, o está cargado con OTROS equipos tuyos (dos fichas del mismo '
+                . 'club). Ponelo en «Clubes de Transfermarkt» por número de partido y salís de la duda';
+        }
+
         return [0, 'no está en tu base'
             . ($nomTm ? ' — TM dice «' . implode('» vs «', $nomTm) . '»' : '')
-            . ($atados ? ' y eso quedó atado a ' . implode(' y ', $atados)
-                . '. Si alguno de esos dos no es el club que jugó, el mapeo de equipo_tm '
-                . 'está mal y por eso no aparea' : '')
-            . ($rivalId ? '' : ' (el rival no está atado)'), 0];
+            . ($atados ? ' y eso quedó atado a ' . implode(' y ', $atados) : '')
+            . $ancha
+            . ($rivalId ? '' : ' (el rival no está atado)'), $this->candidatos($lejos)];
     }
 
     /**
