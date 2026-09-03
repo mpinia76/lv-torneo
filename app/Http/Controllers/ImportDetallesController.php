@@ -365,14 +365,26 @@ class ImportDetallesController extends Controller
         // no sólo en los que pasaron por el importador de DTs.
         // Si pegó algo y no se pudo sacar el gameId, NO se sale a buscar: sería
         // gastar créditos para volver a la misma pantalla. Se le dice qué pasó.
-        $buscado = null;
+        $buscado    = null;
+        $noGuardado = '';   // por qué el gameId encontrado no llegó a la base
         if ($partidoId && $gameId === '' && !$malPegado) {
             $buscador = new TmBuscarGameId;
             $buscado  = $buscador->buscar($partidoId);
 
             if (!empty($buscado['game_id'])) {
                 $gameId = (string) $buscado['game_id'];
-                $buscador->anotar($partidoId, $gameId, 'encontrado solo por ' . $buscado['como']);
+
+                // El resultado de anotar() NO se puede ignorar. Se ignoraba, y
+                // el efecto era esta pantalla mostrando «gameId 4618774» tan
+                // campante mientras la fila no se escribía: el partido seguía
+                // en «ya buscados y sin gameId» para siempre y no había forma
+                // de saber por qué. Un guardado que falla en silencio es peor
+                // que uno que falla a los gritos.
+                if (!$buscador->anotar($partidoId, $gameId, 'encontrado solo por ' . $buscado['como'])) {
+                    $noGuardado = $buscador->ultimoError !== ''
+                        ? $buscador->ultimoError
+                        : 'no sé por qué (anotar() devolvió false sin motivo)';
+                }
 
                 $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
                     ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
@@ -404,7 +416,12 @@ class ImportDetallesController extends Controller
         // El importador aborta si los clubes no aparean, así que llegar hasta acá
         // sin error es la confirmación de que el gameId elegido era el correcto.
         if ($elegido && empty($r['error'])) {
-            (new TmBuscarGameId)->anotar($partidoId, $gameId, 'elegido entre los candidatos de Transfermarkt');
+            $anotador = new TmBuscarGameId;
+            if (!$anotador->anotar($partidoId, $gameId, 'elegido entre los candidatos de Transfermarkt')) {
+                $noGuardado = $anotador->ultimoError !== ''
+                    ? $anotador->ultimoError
+                    : 'no sé por qué (anotar() devolvió false sin motivo)';
+            }
 
             if (!$fila) {
                 $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
@@ -423,6 +440,13 @@ class ImportDetallesController extends Controller
                 . ' · ' . e(substr((string) $fila->dia, 0, 10)) . ' · ' . e((string) $fila->competencia_nombre)
                 . ' · gameId ' . e($gameId) . ' · ' . (int) $r['llamadas'] . ' llamada(s) a la API'
                 . ($inc !== '' ? ' · ' . $inc : '') . '</p>';
+        }
+
+        if ($noGuardado !== '') {
+            $cuerpo .= '<div class="err-box"><b>El gameId ' . e($gameId) . ' no se pudo guardar.</b> '
+                . e($noGuardado) . '<br>Lo de abajo se bajó igual y es correcto, pero como la fila no '
+                . 'quedó escrita, este partido va a seguir apareciendo en «ya buscados y sin gameId» '
+                . 'y cada vez que entres acá se va a volver a pagar la búsqueda.</div>';
         }
 
         if ($r['error']) {
