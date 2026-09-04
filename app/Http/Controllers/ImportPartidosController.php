@@ -388,6 +388,9 @@ class ImportPartidosController extends Controller
         }
 
         $saltados = 0;
+        $fuenteHtml = false;
+        $avisosHtml = [];
+
         if (!$usarCache) {
             $crudo = $this->traerFixture($comp, $season);
             if (is_string($crudo)) return $this->pagina('Fixture', $html . '<p class="err-box">' . $crudo . '</p>');
@@ -398,7 +401,29 @@ class ImportPartidosController extends Controller
                 if (!$f['hora_definida'] || !$f['dia']) { $saltados++; continue; }
                 $filas[] = $f;
             }
-            $filas = $this->completarNombresClubes($filas);
+
+            // ¿La API contestó la edición que pedimos? No sabe de temporadas:
+            // devuelve 200 y la que está en curso. Si no es la del torneo, el
+            // fixture correcto se saca del CALENDARIO EN HTML, que sí la
+            // respeta. Cuesta una llamada más y sólo pasa en ediciones viejas.
+            if ($season !== '' && !$this->esTemporada($filas, $season)) {
+                $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml);
+
+                if (is_array($porHtml) && !empty($porHtml)) {
+                    $filas      = $porHtml;
+                    $fuenteHtml = true;
+                    $saltados   = 0;
+                } else {
+                    return $this->pagina('Fixture', $html
+                        . '<p class="err-box">La API devolvió la temporada en curso en vez de la '
+                        . e($season) . ', y el calendario en HTML tampoco vino'
+                        . ($avisosHtml ? ': ' . e(implode(' · ', $avisosHtml)) : '.') . '</p>');
+                }
+            }
+
+            // Los nombres de los clubes cuestan una llamada aparte en la API;
+            // el calendario en HTML ya los trae.
+            if (!$fuenteHtml) $filas = $this->completarNombresClubes($filas);
         }
 
         if (empty($filas)) {
@@ -427,33 +452,34 @@ class ImportPartidosController extends Controller
             }
             $vino = implode(' — ', $lista) ?: 'no vino ninguna';
 
-            if ($season === '') {
+            if ($fuenteHtml) {
+                $sinRonda = 0;
+                foreach ($filas as $f) if ((string) $f['ronda'] === '—') $sinRonda++;
+
+                $html .= '<p class="ok-box"><b>Temporada ' . e($season) . '</b>, la del torneo, '
+                    . 'leída del <b>calendario en HTML</b> de Transfermarkt. '
+                    . 'La API no sabe de temporadas —contesta la edición en curso le pidas la que le pidas—, '
+                    . 'así que para las ediciones viejas se lee la página del torneo. '
+                    . 'Vino: <b>' . $vino . '</b>.</p>'
+                    . '<p class="warn-box">De esta fuente <b>no viene la hora</b>, sólo el día: por eso los '
+                    . 'partidos figuran a las 00:00 y el botón que corrige horarios está apagado —escribiría esa '
+                    . 'hora falsa—. Los partidos definidos <b>por penales</b> quedan sin marcador: el calendario '
+                    . 'publica la tanda sumada a los 90\' y no hay con qué separarla.'
+                    . ($sinRonda ? ' Además, <b>' . $sinRonda . '</b> partido(s) quedaron sin número de fecha '
+                        . '(agrupados en «—»): TM no los tenía bajo ningún encabezado de ronda.' : '')
+                    . '</p>';
+            } elseif ($season === '') {
                 $html .= '<p class="warn-box">Temporada que devolvió Transfermarkt: <b>' . $vino . '</b>. '
                     . 'Este torneo <b>no tiene cargada la temporada</b>, así que vino la que está en curso. '
                     . 'Si el torneo no es el de este año, lo que estás mirando no es el suyo: cargale el '
                     . '<b>Id Temporada</b> en Editar torneo.</p>';
-            } elseif (count($temporadas) === 1 && array_key_exists($season, $temporadas)) {
+            } else {
                 $html .= '<p class="ok-box">Temporada <b>' . e($season) . '</b>, que es la del torneo. '
                     . 'Vino: <b>' . $vino . '</b>.</p>';
-            } else {
-                // Comprobado el 2026-09-04: `/competition/{id}/fixtures` ignora
-                // el seasonId y contesta 200 con la temporada en curso. No es un
-                // error del torneo ni del id: la API no sabe de ediciones. Lo
-                // que sí las sabe es el calendario en HTML, así que en vez de
-                // dejar al usuario mirando el fixture equivocado, se lo manda
-                // ahí con todo puesto.
-                $urlHtml = route('import_detalles.competencia_html', [
-                    'comp_id' => $comp,
-                    'season'  => $season,
-                    'copa'    => ($torneoElegido && strcasecmp((string) $torneoElegido->tipo, 'Copa') === 0) ? 1 : 0,
-                ]);
-                $html .= '<p class="err-box"><b>Este no es el fixture del torneo que elegiste.</b> '
-                    . 'Pediste la temporada <b>' . e($season) . '</b> y vino <b>' . $vino . '</b>: '
-                    . 'la API de Transfermarkt <b>no sabe de temporadas</b> —contesta 200 y te manda igual la '
-                    . 'edición en curso—. No lo arregla ningún parámetro. '
-                    . 'Para esta edición usá <a href="' . e($urlHtml) . '"><b>el calendario en HTML</b></a>, '
-                    . 'que sí la respeta (ya va con la competencia y la temporada puestas). '
-                    . '<b>No guardes nada de esta pantalla</b>: son partidos de otro año.</p>';
+            }
+
+            foreach ($avisosHtml as $a) {
+                $html .= '<p class="warn-box">' . e($a) . '</p>';
             }
         }
 
@@ -481,8 +507,11 @@ class ImportPartidosController extends Controller
         }
         $resultados = ['cargados' => 0, 'detalle' => ''];
         if ($refrescar) {
-            $refrescadas = $this->refrescarHorarios($filas);
-            $resultados  = $this->completarResultados($filas);
+            // Del calendario en HTML no viene la hora: las filas traen 00:00.
+            // Pisar con eso el horario de un partido sería romperlo. Los
+            // resultados sí se cargan: el día y el marcador son buenos.
+            if (!$fuenteHtml) $refrescadas = $this->refrescarHorarios($filas);
+            $resultados = $this->completarResultados($filas);
         }
 
         // La auditoría no escribe nada: se muestra siempre.
@@ -518,9 +547,11 @@ class ImportPartidosController extends Controller
         if ($guardar || $refrescar) {
             $html .= '<p class="ok-box">Guardadas <b>' . $guardadas . '</b> filas en staging.'
                 . ($refrescar
-                    ? ($refrescadas
-                        ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos que todavía no se jugaron.'
-                        : ' Ningún horario necesitaba corrección.')
+                    ? ($fuenteHtml
+                        ? ' <b>No toqué ningún horario</b>: el calendario en HTML no trae la hora.'
+                        : ($refrescadas
+                            ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos que todavía no se jugaron.'
+                            : ' Ningún horario necesitaba corrección.'))
                       . ($resultados['cargados']
                         ? ' Cargué el resultado de <b>' . $resultados['cargados'] . '</b> partidos que estaban sin marcador.'
                         : ' Ningún partido estaba sin resultado.')
@@ -744,6 +775,119 @@ class ImportPartidosController extends Controller
             . 'Copiá el <b>Id</b> y el <b>seasonId</b> en «Editar torneo → transfermarkt.com» del torneo '
             . 'cuyo año coincida con la columna «Es tu año». A partir de ahí aparece en el desplegable de arriba.</p>';
 
+        return $out;
+    }
+
+    /** ¿Todo lo que vino es de la temporada que pedimos? */
+    private function esTemporada(array $filas, $season)
+    {
+        if (empty($filas)) return false;
+
+        foreach ($filas as $f) {
+            $t = trim((string) (isset($f['temporada']) ? $f['temporada'] : ''));
+            if ($t !== '' && $t !== (string) $season) return false;
+        }
+        return true;
+    }
+
+    /**
+     * El fixture de una edición vieja, leído del calendario en HTML.
+     *
+     * La API no sabe de temporadas: `/competition/{id}/fixtures` contesta 200 y
+     * te manda la edición en curso, le pases el seasonId o no (comprobado con
+     * ARCA y 2021). El calendario del sitio sí la respeta, y trae lo esencial:
+     * gameId, día, y los DOS clubes con su id de TM — que es lo único que hace
+     * falta para aparear.
+     *
+     * Lo que NO trae, y por qué no importa acá:
+     *   · la HORA. Sólo el día. Por eso estas filas se marcan con
+     *     `sin_hora`, y la pantalla apaga el botón que corrige horarios: sin
+     *     hora real escribiría 00:00 en partidos que no se jugaron.
+     *   · el marcador estructurado. Viene el texto del link («5:0», «4:5pen.»).
+     *     Los definidos por penales quedan SIN marcador, igual que en el
+     *     importador de la API: el texto trae la tanda sumada y no hay con qué
+     *     separarla, y un marcador inventado es peor que ninguno.
+     */
+    private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [])
+    {
+        $copa = $torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : false;
+
+        $svc   = new \App\Services\TmFixtureCompetenciaHtml;
+        $leido = $svc->leerComp($comp, $season, $copa);
+
+        if (!empty($svc->avisos)) $avisos = array_merge($avisos, (array) $svc->avisos);
+        if (!is_array($leido) || empty($leido)) return null;
+
+        $anio = $torneo ? (string) $torneo->year : '';
+        $filas = [];
+
+        foreach ($leido as $r) {
+            if (empty($r['game_id']) || empty($r['dia'])) continue;
+            if (empty($r['local_tm']) || empty($r['visita_tm'])) continue;
+
+            $res = $this->marcadorDeTexto(isset($r['resultado']) ? $r['resultado'] : '');
+
+            $filas[] = [
+                'external_id'             => (string) $r['game_id'],
+                'competencia_external_id' => $comp,
+                'competencia_nombre'      => $compNombre,
+                'temporada'               => (string) $season,
+                'anio'                    => $anio,
+                'ronda'                   => isset($r['ronda']) && $r['ronda'] !== null ? (string) $r['ronda'] : '—',
+                'club_external_id'        => (string) $r['local_tm'],
+                'club_nombre'             => isset($r['local_nombre']) ? $r['local_nombre'] : null,
+                'rival_external_id'       => (string) $r['visita_tm'],
+                'rival_nombre'            => isset($r['visita_nombre']) ? $r['visita_nombre'] : null,
+                'local'                   => 1,
+                // Sin hora: se guarda el día a las 00:00 y se marca la fila.
+                'dia'                     => substr((string) $r['dia'], 0, 10) . ' 00:00:00',
+                'goles_favor'             => $res['gf'],
+                'goles_contra'            => $res['gc'],
+                'equipo_id' => null, 'rival_id' => null, 'partido_id' => null,
+                'estado' => 'nuevo', 'motivo' => null,
+                // El payload NO es un game de la API. Se marca para que
+                // `fixtureDesdeStaging()` no intente parsearlo como tal.
+                'payload' => json_encode(['_fuente' => 'html'] + $r, JSON_UNESCAPED_UNICODE),
+                'terminado'      => $res['terminado'],
+                'por_penales'    => $res['por_penales'],
+                'ida_vuelta'     => false,
+                'ida_marcador'   => null,
+                'penales_favor'  => null,
+                'penales_contra' => null,
+                'marcador_tm'    => $res['crudo'],
+                'hora_definida'  => true,
+                'sin_hora'       => true,
+                'reprogramado'   => false,
+            ];
+        }
+
+        return $filas;
+    }
+
+    /**
+     * El marcador del calendario en HTML, que es texto: «5:0», «4:5pen.», «-:-».
+     *
+     * Un partido definido por penales se deja SIN marcador a propósito: TM
+     * publica la tanda sumada a los 90' y desde el calendario no hay con qué
+     * separarla. Mismo criterio que `normalizarFixture()`.
+     */
+    private function marcadorDeTexto($txt)
+    {
+        $txt = trim((string) $txt);
+        $out = ['gf' => null, 'gc' => null, 'terminado' => false,
+            'por_penales' => false, 'crudo' => ($txt !== '' ? $txt : null)];
+
+        if ($txt === '' || !preg_match('/(\d+)\s*:\s*(\d+)/', $txt, $m)) return $out;
+
+        $out['terminado'] = true;
+
+        if (stripos($txt, 'pen') !== false || stripos($txt, 'e.t.') !== false) {
+            $out['por_penales'] = (stripos($txt, 'pen') !== false);
+            return $out;   // con tanda sumada, mejor sin marcador
+        }
+
+        $out['gf'] = (int) $m[1];
+        $out['gc'] = (int) $m[2];
         return $out;
     }
 
@@ -1316,7 +1460,16 @@ class ImportPartidosController extends Controller
 
         foreach ($rows as $r) {
             $g = $r->payload ? json_decode($r->payload, true) : null;
-            if (is_array($g) && !empty($g)) {
+
+            // El payload es un `game` de la API sólo si lo parece. Las filas que
+            // vinieron del calendario en HTML guardan otra cosa (y van marcadas
+            // con `_fuente`): pasarlas por `normalizarFixture()` devolvía una
+            // fila de puros nulls, sin ruido ni error.
+            $esDeLaApi = is_array($g) && !empty($g)
+                && empty($g['_fuente'])
+                && (isset($g['baseDetails']) || isset($g['gameId']));
+
+            if ($esDeLaApi) {
                 $f = $this->normalizarFixture($g, $compId, $r->competencia_nombre);
                 if ($r->club_nombre)  $f['club_nombre']  = $r->club_nombre;
                 if ($r->rival_nombre) $f['rival_nombre'] = $r->rival_nombre;
