@@ -362,7 +362,8 @@ class ImportPartidosController extends Controller
             . '<form method="get" style="display:inline">'
             . '<input name="comp" value="' . e($comp) . '" placeholder="ej ARGC" size="12"> '
             . '<button>Ver</button></form></p>'
-            . '</div></details>';
+            . '</div></details>'
+            . $this->bloqueProbarTemporada($request, $comp);
 
         foreach ($avisos as $a) $html .= '<p class="ok-box">' . $a . '</p>';
 
@@ -723,6 +724,109 @@ class ImportPartidosController extends Controller
     }
 
     /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */
+    /**
+     * ¿Hay alguna forma de pedirle a la API el fixture de una edición vieja?
+     *
+     * `/competition/{id}/fixtures` devuelve la temporada en curso y `?seasonId=`
+     * lo ignora (probado con ARCA y 2021: vino 2025). Antes de dar por perdida
+     * la idea conviene agotar las variantes de una sola vez, porque cada intento
+     * suelto cuesta un crédito igual y a ciegas se van de a uno.
+     *
+     * Mide el resultado por el `seasonId` que traen los partidos, no por el HTTP
+     * status: la API contesta 200 y un fixture perfecto aunque ignore lo que le
+     * pediste. Ese es justamente el modo en que engaña.
+     */
+    private function bloqueProbarTemporada(Request $request, $comp)
+    {
+        $pedida = trim((string) $request->get('probar_temporada', ''));
+        $base   = route('import_partidos.fixture', array_filter([
+            'comp' => $comp ?: null, 'probar_temporada' => '2021']));
+
+        $out = '<details' . ($pedida !== '' ? ' open' : '') . '>'
+            . '<summary>Probar si la API acepta una temporada</summary><div class="diag" style="margin-top:8px">'
+            . '<p class="sub">El id de competencia no distingue ediciones, así que sin temporada siempre viene la '
+            . 'que está en curso. Esto prueba <b>cinco formas distintas</b> de pedirle una vieja y muestra qué '
+            . 'temporada devolvió cada una. <b>Cuesta 1 crédito por variante</b>.</p>'
+            . '<form method="get">'
+            . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+            . '<input name="probar_temporada" value="' . e($pedida !== '' ? $pedida : '2021') . '" size="8"> '
+            . '<button>Probar</button> <span class="sub">5 créditos</span></form>';
+
+        if ($pedida === '' || $comp === '') {
+            return $out . '</div></details>';
+        }
+
+        // Las cinco formas plausibles: cuatro nombres de parámetro y el estilo
+        // REST con la temporada en el path.
+        $variantes = [
+            '?seasonId='  => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?seasonId=' . rawurlencode($pedida),
+            '?season_id=' => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?season_id=' . rawurlencode($pedida),
+            '?season='    => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?season=' . rawurlencode($pedida),
+            '?saison_id=' => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?saison_id=' . rawurlencode($pedida),
+            '/fixtures/{temporada}' => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures/' . rawurlencode($pedida),
+        ];
+
+        $out .= '<div class="scroll" style="margin-top:10px"><table><thead><tr><th>Variante</th>'
+            . '<th>Partidos</th><th>Temporada que vino</th><th>Período</th><th></th></tr></thead><tbody>';
+
+        $gano = null;
+        foreach ($variantes as $etiqueta => $url) {
+            $json = HttpHelper::getJson($url);
+
+            if (!is_array($json) || empty($json)) {
+                $err = HttpHelper::getLastJsonError();
+                $out .= '<tr><td><code>' . e($etiqueta) . '</code></td><td colspan="4" class="sub">'
+                    . 'sin datos' . (is_array($err) ? ' — ' . e(json_encode($err, JSON_UNESCAPED_UNICODE)) : '')
+                    . '</td></tr>';
+                continue;
+            }
+
+            $data = isset($json['data']) ? $json['data'] : $json;
+            $bloques = isset($data['fixtures']) && is_array($data['fixtures']) ? $data['fixtures'] : [];
+            $temps = []; $n = 0; $desde = null; $hasta = null;
+            foreach ($bloques as $b) {
+                if (!is_array($b) || empty($b['games']) || !is_array($b['games'])) continue;
+                foreach ($b['games'] as $g) {
+                    if (!is_array($g)) continue;
+                    $n++;
+                    $bd = isset($g['baseDetails']) && is_array($g['baseDetails']) ? $g['baseDetails'] : [];
+                    $t = isset($bd['seasonId']) ? (string) $bd['seasonId'] : '';
+                    if ($t !== '') $temps[$t] = true;
+                    $d = isset($bd['date']['dateTimeUTC']) ? substr((string) $bd['date']['dateTimeUTC'], 0, 10) : null;
+                    if ($d) {
+                        if ($desde === null || $d < $desde) $desde = $d;
+                        if ($hasta === null || $d > $hasta) $hasta = $d;
+                    }
+                }
+            }
+
+            $vinieron = array_keys($temps);
+            $acerto = (count($vinieron) === 1 && (string) $vinieron[0] === $pedida);
+            if ($acerto && $gano === null) $gano = $etiqueta;
+
+            $out .= '<tr class="' . ($acerto ? 'ok' : 'warn') . '">'
+                . '<td><code>' . e($etiqueta) . '</code></td>'
+                . '<td class="num">' . $n . '</td>'
+                . '<td class="num">' . ($vinieron ? e(implode(', ', $vinieron)) : '—') . '</td>'
+                . '<td class="num">' . e((string) $desde) . ' → ' . e((string) $hasta) . '</td>'
+                . '<td>' . ($acerto ? '<b class="ok">✔ la respeta</b>' : '<span class="sub">la ignora</span>') . '</td>'
+                . '</tr>';
+        }
+
+        $out .= '</tbody></table></div>';
+
+        $out .= $gano !== null
+            ? '<p class="ok-box">La API <b>sí</b> acepta la temporada con <code>' . e($gano) . '</code>. '
+              . 'Con eso se puede guardar el seasonId en cada torneo y que elegirlo baje la edición correcta.</p>'
+            : '<p class="err-box">Ninguna variante sirvió: <code>/competition/{id}/fixtures</code> devuelve '
+              . '<b>siempre la temporada en curso</b>. Para las ediciones viejas hay que seguir yendo por el '
+              . 'sondeo del DT (<code>/coach/{id}/performance-game</code>), que sí va hacia atrás en el tiempo. '
+              . 'Ojo: contestan 200 y un fixture entero igual, así que sin mirar el <code>seasonId</code> parece '
+              . 'que anduvo.</p>';
+
+        return $out . '</div></details>';
+    }
+
     private function traerFixture($compId, $season = '')
     {
         // OJO: el id de competencia identifica la COPA, no la edición. `ARCA` es
@@ -2458,8 +2562,7 @@ class ImportPartidosController extends Controller
                         . '<input type="hidden" name="temp" value="' . e($temp) . '">'
                         . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
                         . '<input type="hidden" name="confirmar" value="1">'
-                        . '<select name="grupo_id" class="s2" data-placeholder="elegí el grupo…">' . $opts
-                        . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
+                        . '<select name="grupo_id">' . $opts . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
                 }
             }
         }
@@ -3133,50 +3236,91 @@ class ImportPartidosController extends Controller
         return $aprendidos;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // El apareo de clubes de TM con equipos nuestros vive en
-    // `App\Services\MapeoClubesTm`. Se sacó de acá cuando hizo falta la misma
-    // lógica en el lector de calendarios HTML: dos copias del apareo de nombres
-    // es la forma segura de que una arregle un caso y la otra no, y una
-    // traducción equivocada carga el partido con el rival cambiado.
-    // Estos métodos quedan como envoltorio para no tocar los llamadores.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /** @var \App\Services\MapeoClubesTm|null */
-    private $mapeoClubes = null;
-
-    private function mapeoClubes()
-    {
-        if ($this->mapeoClubes === null) {
-            $this->mapeoClubes = new \App\Services\MapeoClubesTm;
-        }
-
-        return $this->mapeoClubes;
-    }
-
     private function guardarMapeo($tmClubId, $equipoId, $nombre, $origen)
     {
-        $this->mapeoClubes()->guardar($tmClubId, $equipoId, $nombre, $origen);
+        DB::table('equipo_tm')->updateOrInsert(
+            ['tm_club_id' => (string) $tmClubId],
+            ['equipo_id' => (int) $equipoId, 'nombre_tm' => $nombre, 'origen' => $origen,
+                'updated_at' => now(), 'created_at' => now()]
+        );
     }
 
     private function mapaTm()
     {
-        return $this->mapeoClubes()->porId();
+        $mapa = [];
+        foreach (DB::table('equipo_tm')->select('tm_club_id', 'equipo_id')->get() as $r) {
+            $mapa[(string) $r->tm_club_id] = (int) $r->equipo_id;
+        }
+        return $mapa;
     }
 
+    /**
+     * Nombre normalizado -> equipo_id. Si dos equipos comparten la misma clave
+     * (pasa con los homónimos), la clave se marca ambigua y no matchea con nadie:
+     * mejor un conflicto para resolver a mano que un partido con el rival cambiado.
+     */
     private function mapaNombres()
     {
-        return $this->mapeoClubes()->porNombre();
+        $mapa = [];
+        foreach (\App\Equipo::select('id', 'nombre')->get() as $e) {
+            foreach ($this->clavesNombre($e->nombre) as $k) {
+                if ($k === '') continue;
+                if (isset($mapa[$k]) && $mapa[$k] !== $e->id) {
+                    $mapa[$k] = null;      // ambigua
+                } elseif (!array_key_exists($k, $mapa)) {
+                    $mapa[$k] = $e->id;
+                }
+            }
+        }
+        return $mapa;
     }
 
     private function resolverClub($tmId, $nombre, array $mapaTm, array $mapaNombres)
     {
-        return $this->mapeoClubes()->resolver($tmId, $nombre);
+        if ($tmId !== null && isset($mapaTm[(string) $tmId])) return $mapaTm[(string) $tmId];
+        foreach ($this->clavesNombre($nombre) as $k) {
+            if ($k !== '' && isset($mapaNombres[$k]) && $mapaNombres[$k] !== null) return $mapaNombres[$k];
+        }
+        return null;
     }
 
+    /**
+     * Claves normalizadas de un nombre de club.
+     *
+     * REGLA IMPORTANTE: si el nombre trae un paréntesis aclaratorio —"Sarmiento (Junín)",
+     * "Central Córdoba (SdE)"— ese paréntesis es parte del nombre y NO se descarta.
+     * Sin esta regla, "CA Sarmiento (Junín)" matchea contra un "Sarmiento" cualquiera
+     * y termina creando partidos con el rival equivocado.
+     */
     private function clavesNombre($nombre)
     {
-        return $this->mapeoClubes()->claves($nombre);
+        $nombre = (string) $nombre;
+        if (trim($nombre) === '') return [];
+
+        $base = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nombre);
+        if ($base === false) $base = $nombre;
+        $base = mb_strtolower($base);
+
+        // Los paréntesis se aplanan (pasan a ser texto), no se borran.
+        $base = str_replace(['(', ')', '.', ','], ' ', $base);
+
+        $claves = [
+            $this->soloLetras($base),
+            $this->soloLetras($this->quitarPrefijos($base)),
+        ];
+        return array_values(array_unique(array_filter($claves)));
+    }
+
+    private function quitarPrefijos($str)
+    {
+        $str = preg_replace('/\b(c\.?a\.?|a\.?a\.?|c\.?s\.?|c\.?d\.?|c\.?s\.?d\.?|a\.?c\.?|s\.?c\.?|f\.?c\.?|c\.?f\.?|c\.?b\.?|s\.?a\.?d\.?)\b/u', ' ', $str);
+        $str = preg_replace('/\b(club|atletico|atletica|deportivo|deportiva|deportes|asociacion|association|sportivo|sporting|social|futbol|football|de|del|la|el)\b/u', ' ', $str);
+        return $str;
+    }
+
+    private function soloLetras($str)
+    {
+        return (string) preg_replace('/[^\p{L}\p{N}]+/u', '', (string) $str);
     }
 
     private function normalizar(array $g, $coachId)
