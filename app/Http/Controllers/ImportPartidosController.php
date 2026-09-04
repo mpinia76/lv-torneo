@@ -290,6 +290,9 @@ class ImportPartidosController extends Controller
         $refrescar = (string) $request->get('refrescar', '0') === '1';
         $filtro  = trim((string) $request->get('estado', ''));
         $gameday = trim((string) $request->get('gameday', ''));
+        // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
+        // la que está en curso. Ver `traerFixture()`.
+        $season  = trim((string) $request->get('season', ''));
 
         $avisos = [];
 
@@ -336,8 +339,14 @@ class ImportPartidosController extends Controller
         } else {
             $html .= '<form method="get" style="margin:12px 0">'
                 . '<select name="torneo_id" class="s2" data-placeholder="elegí un torneo tuyo…">' . $opts . '</select> '
+                . '<input name="season" value="' . e($season) . '" placeholder="temporada, ej 2021" size="10"> '
                 . '<button>Ver fixture</button> '
-                . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>';
+                . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>'
+                . '<p class="sub">El id de competencia es de la <b>copa</b>, no de la edición: tus cinco Copas '
+                . 'Argentina comparten <code>ARCA</code>. Sin temporada, Transfermarkt manda la que está en curso, '
+                . 'así que elegir un torneo viejo igual baja el fixture de este año. La temporada es el <b>año de '
+                . 'arranque</b>, uno menos que el nombre del torneo en Argentina: la Copa Argentina 2022 es '
+                . '<code>2021</code>. Pedir temporada siempre baja de TM —el staging no distingue ediciones—.</p>';
         }
 
         $html .= '<details' . ($comp === '' ? ' open' : '') . '><summary>No sé el id de competencia de un torneo</summary>'
@@ -359,7 +368,10 @@ class ImportPartidosController extends Controller
 
         if ($comp === '') return $this->pagina('Fixture', $html);
 
-        $usarCache = (string) $request->get('cache', '0') === '1';
+        // Pedir una temporada obliga a bajar: el staging no distingue ediciones
+        // (guarda por `competencia_external_id` y nada más), así que releerlo
+        // devolvería las cinco Copas Argentina mezcladas.
+        $usarCache = (string) $request->get('cache', '0') === '1' && $season === '';
         $filas = [];
 
         if ($usarCache) {
@@ -369,7 +381,7 @@ class ImportPartidosController extends Controller
 
         $saltados = 0;
         if (!$usarCache) {
-            $crudo = $this->traerFixture($comp);
+            $crudo = $this->traerFixture($comp, $season);
             if (is_string($crudo)) return $this->pagina('Fixture', $html . '<p class="err-box">' . $crudo . '</p>');
 
             $compNombre = $this->nombreCompetencia($comp);
@@ -388,6 +400,37 @@ class ImportPartidosController extends Controller
         }
 
         $filas = $this->clasificarFixture($filas);
+
+        // Qué temporada vino DE VERDAD. Sin esto no hay forma de saber si TM
+        // respetó el `seasonId` o te devolvió la edición en curso igual: los
+        // partidos se ven bien y son de otro año.
+        $temporadas = [];   // seasonId => ['n' => partidos, 'anio' => nombre lindo]
+        foreach ($filas as $f) {
+            $t = trim((string) (isset($f['temporada']) ? $f['temporada'] : ''));
+            if ($t === '') continue;
+            if (!isset($temporadas[$t])) $temporadas[$t] = ['n' => 0, 'anio' => ''];
+            $temporadas[$t]['n']++;
+            if ($temporadas[$t]['anio'] === '' && !empty($f['anio'])) $temporadas[$t]['anio'] = (string) $f['anio'];
+        }
+        if (!$usarCache) {
+            $lista = [];
+            foreach ($temporadas as $t => $d) {
+                $lista[] = e($t) . ($d['anio'] !== '' ? ' (' . e($d['anio']) . ')' : '') . ' · ' . $d['n'] . ' partidos';
+            }
+            $vino = implode(' — ', $lista) ?: 'no vino ninguna';
+
+            if ($season === '') {
+                $html .= '<p class="sub">Temporada que devolvió Transfermarkt: <b>' . $vino . '</b>. '
+                    . 'No se pidió ninguna, así que es la que está en curso.</p>';
+            } elseif (count($temporadas) === 1 && array_key_exists($season, $temporadas)) {
+                $html .= '<p class="ok-box">Pediste la temporada <b>' . e($season) . '</b> y eso vino: <b>'
+                    . $vino . '</b>.</p>';
+            } else {
+                $html .= '<p class="err-box">Pediste la temporada <b>' . e($season) . '</b> y vino <b>' . $vino
+                    . '</b>. Transfermarkt <b>ignoró</b> el parámetro (o esa edición no existe con ese id): '
+                    . 'lo que estás mirando no es el fixture que pediste.</p>';
+            }
+        }
 
         $cont = ['total' => count($filas), 'nuevo' => 0, 'duplicado' => 0, 'conflicto' => 0,
             'jugados' => 0, 'pendientes' => 0];
@@ -680,9 +723,18 @@ class ImportPartidosController extends Controller
     }
 
     /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */
-    private function traerFixture($compId)
+    private function traerFixture($compId, $season = '')
     {
-        $resp = HttpHelper::getJson(self::TMAPI . '/competition/' . rawurlencode($compId) . '/fixtures');
+        // OJO: el id de competencia identifica la COPA, no la edición. `ARCA` es
+        // la Copa Argentina de todos los años, así que sin temporada TM devuelve
+        // la que está en curso: elegir "Copa Argentina 2022" bajaba el fixture
+        // 2026. `seasonId` es el año de ARRANQUE (la edición 2022 es la 2021,
+        // igual que el `saison_id` de la web).
+        $url = self::TMAPI . '/competition/' . rawurlencode($compId) . '/fixtures';
+        $season = trim((string) $season);
+        if ($season !== '') $url .= '?seasonId=' . rawurlencode($season);
+
+        $resp = HttpHelper::getJson($url);
         if (!is_array($resp)) {
             $err = HttpHelper::getLastJsonError();
             return 'No pude bajar el fixture de ' . e($compId) . '. '
