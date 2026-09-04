@@ -307,12 +307,18 @@ class ImportPartidosController extends Controller
             }
         }
 
-        // Si viene un torneo tuyo, la competencia sale de ahí.
+        // Si viene un torneo tuyo, la competencia Y LA TEMPORADA salen de ahí.
+        // El torneo ya guarda las dos cosas (`tm_competition_id` y
+        // `tm_season_id`, que se cargan en Editar torneo): no hay que tipear
+        // nada acá ni volver a mirar en qué año era cada edición.
         $torneoElegido = null;
         if ((int) $request->get('torneo_id')) {
             $torneoElegido = \App\Torneo::find((int) $request->get('torneo_id'));
             if ($torneoElegido && trim((string) $torneoElegido->tm_competition_id) !== '') {
                 $comp = trim((string) $torneoElegido->tm_competition_id);
+            }
+            if ($torneoElegido && $season === '' && trim((string) $torneoElegido->tm_season_id) !== '') {
+                $season = trim((string) $torneoElegido->tm_season_id);
             }
         }
 
@@ -322,8 +328,10 @@ class ImportPartidosController extends Controller
         $opts = '<option value="">— elegí un torneo tuyo —</option>';
         foreach ($conTm as $t) {
             $sel = ($torneoElegido && $torneoElegido->id === $t->id) ? ' selected' : '';
+            $temp = trim((string) $t->tm_season_id);
             $opts .= '<option value="' . $t->id . '"' . $sel . '>'
-                . e($t->nombre . ' ' . $t->year . '  ·  ' . $t->tm_competition_id) . '</option>';
+                . e($t->nombre . ' ' . $t->year . '  ·  ' . $t->tm_competition_id
+                    . ($temp !== '' ? ' · temporada ' . $temp : ' · SIN TEMPORADA')) . '</option>';
         }
 
         $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
@@ -339,14 +347,13 @@ class ImportPartidosController extends Controller
         } else {
             $html .= '<form method="get" style="margin:12px 0">'
                 . '<select name="torneo_id" class="s2" data-placeholder="elegí un torneo tuyo…">' . $opts . '</select> '
-                . '<input name="season" value="' . e($season) . '" placeholder="temporada, ej 2021" size="10"> '
                 . '<button>Ver fixture</button> '
                 . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>'
-                . '<p class="sub">El id de competencia es de la <b>copa</b>, no de la edición: tus cinco Copas '
-                . 'Argentina comparten <code>ARCA</code>. Sin temporada, Transfermarkt manda la que está en curso, '
-                . 'así que elegir un torneo viejo igual baja el fixture de este año. La temporada es el <b>año de '
-                . 'arranque</b>, uno menos que el nombre del torneo en Argentina: la Copa Argentina 2022 es '
-                . '<code>2021</code>. Pedir temporada siempre baja de TM —el staging no distingue ediciones—.</p>';
+                . '<p class="sub">La temporada sale del torneo (<b>Editar torneo → Id Temporada</b>), no se tipea '
+                . 'acá. Hace falta porque el id de competencia es de la <b>copa</b>, no de la edición: tus cinco '
+                . 'Copas Argentina comparten <code>ARCA</code>, y sin temporada Transfermarkt manda la que está en '
+                . 'curso. Si un torneo del desplegable dice <b>SIN TEMPORADA</b>, cargásela primero o vas a bajar '
+                . 'el fixture de este año creyendo que bajás el suyo.</p>';
         }
 
         $html .= '<details' . ($comp === '' ? ' open' : '') . '><summary>No sé el id de competencia de un torneo</summary>'
@@ -363,7 +370,7 @@ class ImportPartidosController extends Controller
             . '<input name="comp" value="' . e($comp) . '" placeholder="ej ARGC" size="12"> '
             . '<button>Ver</button></form></p>'
             . '</div></details>'
-            . $this->bloqueProbarTemporada($request, $comp);
+            ;
 
         foreach ($avisos as $a) $html .= '<p class="ok-box">' . $a . '</p>';
 
@@ -421,15 +428,32 @@ class ImportPartidosController extends Controller
             $vino = implode(' — ', $lista) ?: 'no vino ninguna';
 
             if ($season === '') {
-                $html .= '<p class="sub">Temporada que devolvió Transfermarkt: <b>' . $vino . '</b>. '
-                    . 'No se pidió ninguna, así que es la que está en curso.</p>';
+                $html .= '<p class="warn-box">Temporada que devolvió Transfermarkt: <b>' . $vino . '</b>. '
+                    . 'Este torneo <b>no tiene cargada la temporada</b>, así que vino la que está en curso. '
+                    . 'Si el torneo no es el de este año, lo que estás mirando no es el suyo: cargale el '
+                    . '<b>Id Temporada</b> en Editar torneo.</p>';
             } elseif (count($temporadas) === 1 && array_key_exists($season, $temporadas)) {
-                $html .= '<p class="ok-box">Pediste la temporada <b>' . e($season) . '</b> y eso vino: <b>'
-                    . $vino . '</b>.</p>';
+                $html .= '<p class="ok-box">Temporada <b>' . e($season) . '</b>, que es la del torneo. '
+                    . 'Vino: <b>' . $vino . '</b>.</p>';
             } else {
-                $html .= '<p class="err-box">Pediste la temporada <b>' . e($season) . '</b> y vino <b>' . $vino
-                    . '</b>. Transfermarkt <b>ignoró</b> el parámetro (o esa edición no existe con ese id): '
-                    . 'lo que estás mirando no es el fixture que pediste.</p>';
+                // Comprobado el 2026-09-04: `/competition/{id}/fixtures` ignora
+                // el seasonId y contesta 200 con la temporada en curso. No es un
+                // error del torneo ni del id: la API no sabe de ediciones. Lo
+                // que sí las sabe es el calendario en HTML, así que en vez de
+                // dejar al usuario mirando el fixture equivocado, se lo manda
+                // ahí con todo puesto.
+                $urlHtml = route('import_detalles.competencia_html', [
+                    'comp_id' => $comp,
+                    'season'  => $season,
+                    'copa'    => ($torneoElegido && strcasecmp((string) $torneoElegido->tipo, 'Copa') === 0) ? 1 : 0,
+                ]);
+                $html .= '<p class="err-box"><b>Este no es el fixture del torneo que elegiste.</b> '
+                    . 'Pediste la temporada <b>' . e($season) . '</b> y vino <b>' . $vino . '</b>: '
+                    . 'la API de Transfermarkt <b>no sabe de temporadas</b> —contesta 200 y te manda igual la '
+                    . 'edición en curso—. No lo arregla ningún parámetro. '
+                    . 'Para esta edición usá <a href="' . e($urlHtml) . '"><b>el calendario en HTML</b></a>, '
+                    . 'que sí la respeta (ya va con la competencia y la temporada puestas). '
+                    . '<b>No guardes nada de esta pantalla</b>: son partidos de otro año.</p>';
             }
         }
 
@@ -724,108 +748,6 @@ class ImportPartidosController extends Controller
     }
 
     /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */
-    /**
-     * ¿Hay alguna forma de pedirle a la API el fixture de una edición vieja?
-     *
-     * `/competition/{id}/fixtures` devuelve la temporada en curso y `?seasonId=`
-     * lo ignora (probado con ARCA y 2021: vino 2025). Antes de dar por perdida
-     * la idea conviene agotar las variantes de una sola vez, porque cada intento
-     * suelto cuesta un crédito igual y a ciegas se van de a uno.
-     *
-     * Mide el resultado por el `seasonId` que traen los partidos, no por el HTTP
-     * status: la API contesta 200 y un fixture perfecto aunque ignore lo que le
-     * pediste. Ese es justamente el modo en que engaña.
-     */
-    private function bloqueProbarTemporada(Request $request, $comp)
-    {
-        $pedida = trim((string) $request->get('probar_temporada', ''));
-        $base   = route('import_partidos.fixture', array_filter([
-            'comp' => $comp ?: null, 'probar_temporada' => '2021']));
-
-        $out = '<details' . ($pedida !== '' ? ' open' : '') . '>'
-            . '<summary>Probar si la API acepta una temporada</summary><div class="diag" style="margin-top:8px">'
-            . '<p class="sub">El id de competencia no distingue ediciones, así que sin temporada siempre viene la '
-            . 'que está en curso. Esto prueba <b>cinco formas distintas</b> de pedirle una vieja y muestra qué '
-            . 'temporada devolvió cada una. <b>Cuesta 1 crédito por variante</b>.</p>'
-            . '<form method="get">'
-            . '<input type="hidden" name="comp" value="' . e($comp) . '">'
-            . '<input name="probar_temporada" value="' . e($pedida !== '' ? $pedida : '2021') . '" size="8"> '
-            . '<button>Probar</button> <span class="sub">5 créditos</span></form>';
-
-        if ($pedida === '' || $comp === '') {
-            return $out . '</div></details>';
-        }
-
-        // Las cinco formas plausibles: cuatro nombres de parámetro y el estilo
-        // REST con la temporada en el path.
-        $variantes = [
-            '?seasonId='  => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?seasonId=' . rawurlencode($pedida),
-            '?season_id=' => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?season_id=' . rawurlencode($pedida),
-            '?season='    => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?season=' . rawurlencode($pedida),
-            '?saison_id=' => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures?saison_id=' . rawurlencode($pedida),
-            '/fixtures/{temporada}' => self::TMAPI . '/competition/' . rawurlencode($comp) . '/fixtures/' . rawurlencode($pedida),
-        ];
-
-        $out .= '<div class="scroll" style="margin-top:10px"><table><thead><tr><th>Variante</th>'
-            . '<th>Partidos</th><th>Temporada que vino</th><th>Período</th><th></th></tr></thead><tbody>';
-
-        $gano = null;
-        foreach ($variantes as $etiqueta => $url) {
-            $json = HttpHelper::getJson($url);
-
-            if (!is_array($json) || empty($json)) {
-                $err = HttpHelper::getLastJsonError();
-                $out .= '<tr><td><code>' . e($etiqueta) . '</code></td><td colspan="4" class="sub">'
-                    . 'sin datos' . (is_array($err) ? ' — ' . e(json_encode($err, JSON_UNESCAPED_UNICODE)) : '')
-                    . '</td></tr>';
-                continue;
-            }
-
-            $data = isset($json['data']) ? $json['data'] : $json;
-            $bloques = isset($data['fixtures']) && is_array($data['fixtures']) ? $data['fixtures'] : [];
-            $temps = []; $n = 0; $desde = null; $hasta = null;
-            foreach ($bloques as $b) {
-                if (!is_array($b) || empty($b['games']) || !is_array($b['games'])) continue;
-                foreach ($b['games'] as $g) {
-                    if (!is_array($g)) continue;
-                    $n++;
-                    $bd = isset($g['baseDetails']) && is_array($g['baseDetails']) ? $g['baseDetails'] : [];
-                    $t = isset($bd['seasonId']) ? (string) $bd['seasonId'] : '';
-                    if ($t !== '') $temps[$t] = true;
-                    $d = isset($bd['date']['dateTimeUTC']) ? substr((string) $bd['date']['dateTimeUTC'], 0, 10) : null;
-                    if ($d) {
-                        if ($desde === null || $d < $desde) $desde = $d;
-                        if ($hasta === null || $d > $hasta) $hasta = $d;
-                    }
-                }
-            }
-
-            $vinieron = array_keys($temps);
-            $acerto = (count($vinieron) === 1 && (string) $vinieron[0] === $pedida);
-            if ($acerto && $gano === null) $gano = $etiqueta;
-
-            $out .= '<tr class="' . ($acerto ? 'ok' : 'warn') . '">'
-                . '<td><code>' . e($etiqueta) . '</code></td>'
-                . '<td class="num">' . $n . '</td>'
-                . '<td class="num">' . ($vinieron ? e(implode(', ', $vinieron)) : '—') . '</td>'
-                . '<td class="num">' . e((string) $desde) . ' → ' . e((string) $hasta) . '</td>'
-                . '<td>' . ($acerto ? '<b class="ok">✔ la respeta</b>' : '<span class="sub">la ignora</span>') . '</td>'
-                . '</tr>';
-        }
-
-        $out .= '</tbody></table></div>';
-
-        $out .= $gano !== null
-            ? '<p class="ok-box">La API <b>sí</b> acepta la temporada con <code>' . e($gano) . '</code>. '
-              . 'Con eso se puede guardar el seasonId en cada torneo y que elegirlo baje la edición correcta.</p>'
-            : '<p class="err-box">Ninguna variante sirvió: <code>/competition/{id}/fixtures</code> devuelve '
-              . '<b>siempre la temporada en curso</b>. Para las ediciones viejas hay que seguir yendo por el '
-              . 'sondeo del DT (<code>/coach/{id}/performance-game</code>), que sí va hacia atrás en el tiempo. '
-              . 'Ojo: contestan 200 y un fixture entero igual, así que sin mirar el <code>seasonId</code> parece '
-              . 'que anduvo.</p>';
-
-        return $out . '</div></details>';
-    }
 
     private function traerFixture($compId, $season = '')
     {
