@@ -407,17 +407,40 @@ class ImportPartidosController extends Controller
             // fixture correcto se saca del CALENDARIO EN HTML, que sí la
             // respeta. Cuesta una llamada más y sólo pasa en ediciones viejas.
             if ($season !== '' && !$this->esTemporada($filas, $season)) {
-                $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml);
+                // `pais` es por dónde sale la petición (ScraperAPI). El sitio no
+                // es la API: saliendo de Europa TM puede contestar el muro de
+                // consentimiento en vez de la página. Con `&pais=us` se prueba
+                // desde otro lado sin tocar el .env.
+                $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml,
+                    trim((string) $request->get('pais', '')) ?: null);
 
                 if (is_array($porHtml) && !empty($porHtml)) {
                     $filas      = $porHtml;
                     $fuenteHtml = true;
                     $saltados   = 0;
                 } else {
+                    $urlPantalla = route('import_detalles.competencia_html', [
+                        'comp_id' => $comp, 'season' => $season,
+                        'copa' => ($torneoElegido && strcasecmp((string) $torneoElegido->tipo, 'Copa') === 0) ? 1 : 0,
+                    ]);
+                    $detalle = '';
+                    foreach ($avisosHtml as $a) $detalle .= '<div>• ' . e($a) . '</div>';
+
                     return $this->pagina('Fixture', $html
-                        . '<p class="err-box">La API devolvió la temporada en curso en vez de la '
-                        . e($season) . ', y el calendario en HTML tampoco vino'
-                        . ($avisosHtml ? ': ' . e(implode(' · ', $avisosHtml)) : '.') . '</p>');
+                        . '<p class="err-box"><b>No pude traer la temporada ' . e($season) . '.</b> '
+                        . 'La API devolvió la edición en curso (no sabe de temporadas) y el calendario en HTML '
+                        . 'tampoco trajo partidos.</p>'
+                        . ($detalle ? '<div class="diag">' . $detalle . '</div>' : '')
+                        . '<p class="sub">Abrí las URLs de arriba en el navegador: si la página existe y tiene '
+                        . 'partidos, el problema es por dónde sale la petición —Transfermarkt contesta el muro de '
+                        . 'consentimiento a algunos países—. Probá agregando <code>&amp;pais=us</code> a esta '
+                        . 'pantalla. Si la página viene vacía en el navegador también, revisá el <b>Id '
+                        . 'Competencia</b> y el <b>Id Temporada</b> del torneo.</p>'
+                        . '<p class="acciones">'
+                        . '<a class="boton-sec" href="' . e($request->fullUrl()
+                            . (strpos($request->fullUrl(), '?') === false ? '?' : '&') . 'pais=us') . '">Reintentar desde EE.UU.</a> '
+                        . '<a class="boton-sec" href="' . e($urlPantalla) . '">Abrir el calendario de la competencia</a>'
+                        . '</p>');
                 }
             }
 
@@ -808,15 +831,44 @@ class ImportPartidosController extends Controller
      *     importador de la API: el texto trae la tanda sumada y no hay con qué
      *     separarla, y un marcador inventado es peor que ninguno.
      */
-    private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [])
+    private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [], $pais = null)
     {
-        $copa = $torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : false;
+        // En TM las ligas van por `/wettbewerb/` y las copas por
+        // `/pokalwettbewerb/`: es otra ruta, no un parámetro, y pedir la que no
+        // es devuelve una página sin un solo partido.
+        //
+        // El tipo del torneo dice cuál debería ser, pero NO se le cree del todo:
+        // es un campo que se carga a mano y un torneo mal tipeado dejaba la
+        // pantalla diciendo "no hay ningún link a una ficha de partido", que no
+        // le explica nada a nadie. Se prueba la que corresponde y, si vuelve
+        // vacía, la otra. La segunda llamada sólo ocurre cuando la primera
+        // falló, que es exactamente cuando vale la pena gastarla.
+        $esCopa = $torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : true;
 
-        $svc   = new \App\Services\TmFixtureCompetenciaHtml;
-        $leido = $svc->leerComp($comp, $season, $copa);
+        $svc = new \App\Services\TmFixtureCompetenciaHtml;
+        $leido = null;
+        $intentos = [];
+
+        foreach ([$esCopa, !$esCopa] as $copa) {
+            $url = \App\Services\TmFixtureCompetenciaHtml::urlComp($comp, $season, $copa);
+            $r   = $svc->leerComp($comp, $season, $copa, false, $pais);
+
+            $intentos[] = ($copa ? 'copa' : 'liga') . ': ' . $url
+                . ' → ' . (is_array($r) ? count($r) . ' partidos' : 'no vino la página');
+
+            if (is_array($r) && !empty($r)) { $leido = $r; break; }
+        }
 
         if (!empty($svc->avisos)) $avisos = array_merge($avisos, (array) $svc->avisos);
-        if (!is_array($leido) || empty($leido)) return null;
+
+        if (!is_array($leido) || empty($leido)) {
+            // Sin las URLs probadas esto es imposible de diagnosticar: abrís la
+            // que corresponda en el navegador y en un segundo sabés si el
+            // problema es el id, la temporada o que TM contestó el muro de
+            // consentimiento.
+            $avisos[] = 'Probé estas dos rutas y ninguna trajo partidos — ' . implode(' · ', $intentos);
+            return null;
+        }
 
         $anio = $torneo ? (string) $torneo->year : '';
         $filas = [];
