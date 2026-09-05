@@ -64,14 +64,14 @@ class ImportDetallesController extends Controller
             }
         }
 
-        // El resultado sale de `partidos`, NO del staging: cuando se baja el
+        // El resultado y la FECHA salen de `partidos`, NO del staging: cuando se baja el
         // detalle el marcador se escribe en `partidos.golesl/golesv`, mientras
         // que la fila de `import_partidos` conserva lo que traía Transfermarkt
         // el día del fixture — vacío si el partido todavía no se había jugado.
         $marcadores = [];
         if (!empty($ids)) {
             foreach (DB::table('partidos')->whereIn('id', $ids)
-                         ->select('id', 'golesl', 'golesv')->get() as $r) {
+                         ->select('id', 'dia', 'golesl', 'golesv')->get() as $r) {
                 $marcadores[(int) $r->id] = $r;
             }
         }
@@ -274,7 +274,7 @@ class ImportDetallesController extends Controller
             $tiene = isset($conAlineacion[(int) $f->partido_id]);
             $inc = $this->linkIncidencias(isset($fechas[(int) $f->partido_id]) ? $fechas[(int) $f->partido_id] : null);
             $cuerpo .= '<tr>'
-                . '<td class="num">' . e($f->dia ? substr($f->dia, 0, 10) : '—') . '</td>'
+                . '<td class="num">' . $this->diaDelPartido($f, isset($marcadores[(int) $f->partido_id]) ? $marcadores[(int) $f->partido_id] : null) . '</td>'
                 . '<td>' . e($f->competencia_nombre) . '</td>'
                 . '<td>' . e($f->local ? $f->club_nombre : $f->rival_nombre) . '</td>'
                 . '<td class="num">vs</td>'
@@ -319,6 +319,55 @@ class ImportDetallesController extends Controller
         return $fila->local
             ? e($fila->goles_favor) . ':' . e($fila->goles_contra)
             : e($fila->goles_contra) . ':' . e($fila->goles_favor);
+    }
+
+    /**
+     * La fecha que muestra la tabla. Misma regla que el resultado: sale de
+     * `partidos`, no de la fila de staging.
+     *
+     * `import_partidos.dia` es la fecha que tenía Transfermarkt EL DÍA QUE SE
+     * BAJÓ EL FIXTURE. Si después al partido lo adelantaron o lo postergaron,
+     * esa columna se quedó con la vieja, y la pantalla anunciaba un partido ya
+     * jugado para un día que todavía no llegó. El staging queda sólo como
+     * respaldo para las filas que no tienen partido creado.
+     *
+     * Cuando las dos fechas no coinciden se marca con «≠» y el título del
+     * recuadro dice la del staging: es la pista de que a ese partido lo movieron.
+     */
+    private function diaDelPartido($fila, $partido = null)
+    {
+        $base = ($partido && !empty($partido->dia)) ? substr((string) $partido->dia, 0, 10) : '';
+        $stg  = !empty($fila->dia) ? substr((string) $fila->dia, 0, 10) : '';
+
+        if ($base === '') return $stg !== '' ? e($stg) : '—';
+        if ($stg === '' || $stg === $base) return e($base);
+
+        return e($base) . ' <span class="warn" title="Transfermarkt lo tenía para el ' . e($stg)
+            . ' cuando se bajó el fixture">≠</span>';
+    }
+
+    /**
+     * La fecha del partido según el JSON de `/game/{id}` que ya se bajó.
+     *
+     * Devuelve `['dia' => 'Y-m-d H:i:s', 'hora_definida' => bool]`, o `dia` en
+     * blanco si el JSON no la trae. `dateTimeUTC` viene en UTC: la conversión
+     * la hace `date()`, que usa el timezone de `config/app.php`. Partiendo el
+     * texto a mano, los partidos nocturnos se van al día siguiente.
+     */
+    private function diaDesdeJson($game)
+    {
+        $vacio = ['dia' => '', 'hora_definida' => false];
+        if (!is_array($game)) return $vacio;
+
+        $fecha = isset($game['baseDetails']['date']) && is_array($game['baseDetails']['date'])
+            ? $game['baseDetails']['date'] : [];
+        $raw = isset($fecha['dateTimeUTC']) ? (string) $fecha['dateTimeUTC'] : '';
+        if ($raw === '') return $vacio;
+
+        $ts = strtotime($raw);
+        if (!$ts) return $vacio;
+
+        return ['dia' => date('Y-m-d H:i:s', $ts), 'hora_definida' => !empty($fecha['isTimeDefined'])];
     }
 
     // ═══════════════════════════ UN PARTIDO ═══════════════════════════
@@ -433,14 +482,55 @@ class ImportDetallesController extends Controller
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
             . '<h1>' . ($escribir ? 'Detalle cargado' : 'Vista previa') . ' · partido #' . $partidoId . '</h1>';
 
+        // LA FECHA DEL ENCABEZADO SALE DE `partidos`, NO DEL STAGING.
+        // `import_partidos.dia` es la que tenía Transfermarkt el día que se bajó
+        // el fixture: a un partido adelantado o postergado después de eso, esta
+        // pantalla lo anunciaba para un día que no era (uno jugado el viernes
+        // titulado como del domingo). Y como el JSON del detalle YA está bajado,
+        // de yapa se puede comparar contra la fecha que TM tiene hoy sin gastar
+        // una sola llamada.
+        $partidoRow = DB::table('partidos')->where('id', $partidoId)->select('id', 'dia')->first();
+        $diaBase = ($partidoRow && $partidoRow->dia) ? substr((string) $partidoRow->dia, 0, 10) : '';
+        $tmFecha = $this->diaDesdeJson(isset($r['crudo']) ? $r['crudo'] : null);
+        $diaTm   = $tmFecha['dia'] !== '' ? substr($tmFecha['dia'], 0, 10) : '';
+
         if ($fila) {
             $mapa = $this->mapaFechas([$partidoId]);
             $inc  = $this->linkIncidencias(isset($mapa[$partidoId]) ? $mapa[$partidoId] : null,
                 'Incidencias del partido →');
             $cuerpo .= '<p class="sub">' . e($fila->club_nombre . ' vs ' . $fila->rival_nombre)
-                . ' · ' . e(substr((string) $fila->dia, 0, 10)) . ' · ' . e((string) $fila->competencia_nombre)
+                . ' · ' . e($diaBase !== '' ? $diaBase : substr((string) $fila->dia, 0, 10))
+                . ' · ' . e((string) $fila->competencia_nombre)
                 . ' · gameId ' . e($gameId) . ' · ' . (int) $r['llamadas'] . ' llamada(s) a la API'
                 . ($inc !== '' ? ' · ' . $inc : '') . '</p>';
+        }
+
+        // Las dos fechas no coinciden: se avisa y se deja que decida el usuario.
+        // NO se corrige solo, y no es una formalidad: Transfermarkt guarda la
+        // fecha ORIGINAL de los partidos postergados, así que cuando difieren
+        // el que suele estar bien es el nuestro. Pisarla de prepo cambiaría un
+        // dato bueno por uno viejo sin que nadie se entere.
+        if ($diaBase !== '' && $diaTm !== '' && $diaTm !== $diaBase) {
+            // Sin hora definida en TM (`isTimeDefined` en false) sólo se cambia
+            // el día: la hora que ya está cargada es mejor que un 00:00 inventado.
+            $nueva = $tmFecha['hora_definida']
+                ? $tmFecha['dia']
+                : $diaTm . ' ' . (strlen((string) $partidoRow->dia) >= 19
+                    ? substr((string) $partidoRow->dia, 11, 8) : '00:00:00');
+
+            $corridos = (int) round((strtotime($diaTm) - strtotime($diaBase)) / 86400);
+
+            $cuerpo .= '<div class="warn-box"><b>La fecha no coincide.</b> Vos lo tenés el <b>'
+                . e($diaBase) . '</b> y Transfermarkt lo da el <b>' . e($diaTm) . '</b> ('
+                . ($corridos > 0 ? $corridos . ' día(s) después' : abs($corridos) . ' día(s) antes')
+                . ($tmFecha['hora_definida'] ? ', ' . e(substr($tmFecha['dia'], 11, 5)) . ' hs' : ', sin hora definida')
+                . ').<br>Bajar el detalle <b>no toca la fecha</b>: se guarda igual y el partido queda con el día '
+                . 'que vos tenés. Ojo antes de corregir — a los partidos postergados TM les deja la fecha '
+                . '<b>original</b>, y en ese caso el que está bien es el tuyo. Corregilo sólo si el que se movió '
+                . 'fue el tuyo.'
+                . '<p class="acciones"><a class="boton" href="'
+                . e(route('import_detalles.fecha', ['partido_id' => $partidoId, 'dia' => $nueva]))
+                . '">Poner el ' . e($diaTm) . '</a></p></div>';
         }
 
         if ($noGuardado !== '') {
@@ -783,6 +873,87 @@ class ImportDetallesController extends Controller
             . 'distintas</b>, con ids distintos, aunque sean del mismo año.</p>';
 
         return $html;
+    }
+
+    /**
+     * Corrige `partidos.dia` a mano, desde el aviso de la vista previa.
+     *
+     * Es la ÚNICA parte del motor de detalle que toca la fecha, y sólo con un
+     * clic del usuario. La regla del importador sigue en pie: bajar el detalle
+     * nunca pisa la fecha, porque Transfermarkt guarda la ORIGINAL de los
+     * partidos postergados y ahí el dato bueno es el nuestro. Acá el que sabe
+     * cuál de los dos se movió es el usuario, y decide él.
+     *
+     * No gasta API: la fecha viene en la URL, calculada del JSON que la vista
+     * previa ya había bajado.
+     *
+     * **La fila de staging no se toca a propósito**: `import_partidos` es la
+     * foto del día que se bajó el fixture, no el estado de la base. Retocarla
+     * borraría la evidencia de que al partido lo movieron, y ninguna pantalla
+     * la usa más para mostrar la fecha.
+     */
+    public function fecha(Request $request)
+    {
+        $partidoId = (int) $request->get('partido_id', 0);
+        $dia       = trim((string) $request->get('dia', ''));
+
+        $volver = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>';
+
+        // Formato estricto: esto llega por la barra de direcciones y termina
+        // escrito en la base sin pasar por ningún parser.
+        if (!$partidoId || !preg_match('/^(\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2})(?::(\d{2}))?)?$/', $dia, $m)) {
+            return $this->pagina('Fecha del partido', $volver
+                . '<div class="err-box">Me falta el partido o la fecha viene mal escrita. '
+                . 'Tiene que ser <code>AAAA-MM-DD</code> u <code>AAAA-MM-DD HH:MM:SS</code>.</div>');
+        }
+        $nueva = $m[1] . ' ' . (isset($m[2]) && $m[2] !== '' ? $m[2] : '00:00')
+            . ':' . (isset($m[3]) && $m[3] !== '' ? $m[3] : '00');
+
+        if (!strtotime($nueva) || checkdate((int) substr($nueva, 5, 2), (int) substr($nueva, 8, 2),
+                (int) substr($nueva, 0, 4)) === false) {
+            return $this->pagina('Fecha del partido', $volver
+                . '<div class="err-box">La fecha <b>' . e($dia) . '</b> no existe en el calendario.</div>');
+        }
+
+        $partido = \App\Partido::find($partidoId);
+        if (!$partido) {
+            return $this->pagina('Fecha del partido', $volver
+                . '<div class="err-box">No existe el partido #' . $partidoId . '.</div>');
+        }
+
+        $vieja = (string) $partido->dia;
+        if (substr($vieja, 0, 19) === $nueva || substr($vieja, 0, 16) === substr($nueva, 0, 16)) {
+            return $this->pagina('Fecha del partido', $volver
+                . '<div class="ok-box">El partido #' . $partidoId . ' ya está el <b>'
+                . e(substr($vieja, 0, 16)) . '</b>. No cambié nada.</div>');
+        }
+
+        // Un salto enorme es casi siempre una URL vieja o mal armada, no una
+        // reprogramación. Antes que escribir cualquier cosa, se pregunta.
+        $salto = $vieja !== '' ? abs((strtotime(substr($nueva, 0, 10)) - strtotime(substr($vieja, 0, 10))) / 86400) : 0;
+        if ($salto > 400) {
+            return $this->pagina('Fecha del partido', $volver
+                . '<div class="err-box">No lo cambio: pasar el partido #' . $partidoId . ' del <b>'
+                . e(substr($vieja, 0, 10)) . '</b> al <b>' . e(substr($nueva, 0, 10)) . '</b> son '
+                . (int) $salto . ' días. Con esa distancia lo más probable es que el partido de la base '
+                . 'y el de Transfermarkt no sean el mismo. Revisá el gameId antes de tocar la fecha.</div>');
+        }
+
+        $partido->forceFill(['dia' => $nueva])->save();
+
+        $mapa = $this->mapaFechas([$partidoId]);
+        $inc  = $this->linkIncidencias(isset($mapa[$partidoId]) ? $mapa[$partidoId] : null,
+            'Incidencias del partido →');
+
+        return $this->pagina('Fecha del partido', $volver
+            . '<div class="ok-box">Listo: el partido #' . $partidoId . ' pasó del <b>'
+            . e(substr($vieja, 0, 16)) . '</b> al <b>' . e(substr($nueva, 0, 16)) . '</b>.</div>'
+            . '<p class="sub">Sólo cambió <code>partidos.dia</code>. La fila del importador conserva la fecha '
+            . 'vieja a propósito: es la foto del día que se bajó el fixture y por eso el listado ahora la '
+            . 'marca con «≠».' . ($inc !== '' ? ' ' . $inc : '') . '</p>'
+            . '<p class="acciones"><a class="boton-sec" href="'
+            . e(route('import_detalles.fecha', ['partido_id' => $partidoId, 'dia' => substr($vieja, 0, 19)]))
+            . '">Deshacer (volver al ' . e(substr($vieja, 0, 10)) . ')</a></p>');
     }
 
     /**
