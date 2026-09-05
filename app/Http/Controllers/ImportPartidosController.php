@@ -1869,6 +1869,46 @@ class ImportPartidosController extends Controller
 
         $unico = $grupos->count() === 1 ? (int) $grupos->keys()->first() : null;
 
+        // ── ¿ESTE TORNEO TIENE LLAVES? ──────────────────────────────────────
+        // El grupo de playoffs es el que tiene `penales` prendido: sus fechas
+        // no son números sino «Octavos de final», y sus partidos cruzan zonas
+        // POR DEFINICIÓN. Rutear por la plantilla del local ahí no sirve de
+        // nada: los marca a todos «interzonal» y no crea ninguno.
+        //
+        // El interzonal de verdad —dos zonas del mismo torneo que se cruzan en
+        // una fecha común— es cosa de Argentina, y sigue funcionando igual en
+        // los torneos que no tienen grupo de llaves.
+        $conPenales = $grupos->filter(function ($g) { return !empty($g->penales); });
+        $playoffId  = $conPenales->count() === 1 ? (int) $conPenales->keys()->first() : null;
+
+        // Cuántos partidos de ESTA fecha cruzan zonas.
+        $cruzan = 0; $conDosGrupos = 0;
+        foreach ($filas as $r) {
+            $a = isset($grupoDe[(int) $r->equipo_id]) ? $grupoDe[(int) $r->equipo_id] : null;
+            $b = isset($grupoDe[(int) $r->rival_id]) ? $grupoDe[(int) $r->rival_id] : null;
+            if ($a && $b) { $conDosGrupos++; if ($a !== $b) $cruzan++; }
+        }
+
+        // LA DECISIÓN ES POR FECHA ENTERA, NO PARTIDO POR PARTIDO. De cuartos
+        // en adelante pueden cruzarse dos equipos del mismo grupo: mirando
+        // partido por partido, ése sería el único que caería en la zona A
+        // mientras sus hermanos van a Playoffs.
+        $proponeLlaves = $playoffId && $conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos;
+
+        // `grupo_destino` = toda la fecha va a ese grupo. Sin él se rutea por
+        // plantilla, que es lo que corresponde en una liga con zonas.
+        $grupoDestino = (int) $request->get('grupo_destino', 0);
+        if ($grupoDestino && !$grupos->has($grupoDestino)) $grupoDestino = 0;
+        if (!$grupoDestino && $proponeLlaves && (string) $request->get('modo', '') !== 'plantilla') {
+            $grupoDestino = $playoffId;
+        }
+
+        // En un grupo de llaves la plantilla no decide nada, así que un equipo
+        // sin plantilla no es motivo para no crear el partido: los que se van
+        // en la primera ronda nunca la tienen. Se avisa igual, porque que no
+        // exista NINGUNO de los dos suele significar torneo equivocado.
+        $sinPlantillaIgual = (string) $request->get('sin_plantilla', '0') === '1';
+
         $plan = []; $sinPlantilla = []; $inter = [];
         foreach ($filas as $r) {
             $lId = (int) $r->equipo_id; $vId = (int) $r->rival_id;
@@ -1876,6 +1916,16 @@ class ImportPartidosController extends Controller
             $gv = isset($grupoDe[$vId]) ? $grupoDe[$vId] : null;
 
             if ($unico !== null) { $gl = $gl ?: $unico; $gv = $gv ?: $unico; }
+
+            if ($grupoDestino) {
+                if (!$gl && !$gv) {
+                    $sinPlantilla[] = $r;
+                    if (!$sinPlantillaIgual) continue;
+                }
+                $plan[] = ['fila' => $r, 'grupo_id' => $grupoDestino,
+                    'nota' => (!$gl && !$gv) ? 'ninguno de los dos tiene plantilla en el torneo' : ''];
+                continue;
+            }
 
             $destino = $gl; $nota = '';
             if (!$gl && !$gv) {
@@ -1903,11 +1953,14 @@ class ImportPartidosController extends Controller
 
             $html .= '<div class="cards">'
                 . $this->card(count($plan), 'a crear', count($plan) ? 'ok' : '')
-                . $this->card(count($inter), 'interzonales', count($inter) ? 'warn' : '')
-                . $this->card(count($sinPlantilla), 'sin plantilla', count($sinPlantilla) ? 'err' : '')
+                . ($grupoDestino ? '' : $this->card(count($inter), 'interzonales', count($inter) ? 'warn' : ''))
+                . $this->card(count($sinPlantilla), 'sin plantilla',
+                    count($sinPlantilla) ? ($grupoDestino ? 'warn' : 'err') : '')
                 . '</div>';
 
-            if (!empty($porGrupo)) {
+            // Cuando la fecha entera va a un grupo, este cuadro dice una sola
+            // cosa y la dice el formulario de abajo: sobra.
+            if (!$grupoDestino && !empty($porGrupo)) {
                 $html .= '<h2>A qué grupo va cada uno</h2><div class="scroll"><table><thead><tr>'
                     . '<th>Grupo</th><th>Partidos</th></tr></thead><tbody>';
                 foreach ($porGrupo as $g => $n) {
@@ -1917,22 +1970,90 @@ class ImportPartidosController extends Controller
                 $html .= '</tbody></table></div>';
             }
 
+            // ── A qué grupo y a qué FECHA va, cuando va entera ──────────
+            $fechaDestino = 0; $fechaNombre = '';
+            if ($grupoDestino) {
+                $fechaDestino = (int) $request->get('fecha_destino', 0);
+                $fechaNombre  = trim((string) $request->get('fecha_nombre', ''));
+
+                if (!$request->has('fecha_destino') && $fechaNombre === '') {
+                    // La ida ya cargada es el mejor dato que hay: si estas
+                    // mismas llaves ya tienen partido en una fecha de este
+                    // torneo, la vuelta va ahí. Sirve igual para reaplicar una
+                    // fecha que quedó a medias.
+                    $fechaDestino = (int) $this->fechaDeLasLlaves($filas, $torneo->id);
+                    if (!$fechaDestino) $fechaNombre = $this->nombreDeRonda(count($filas), $gameday);
+                }
+
+                $optsG = '';
+                foreach ($grupos as $gid => $g) {
+                    $optsG .= '<option value="' . (int) $gid . '"' . ((int) $gid === $grupoDestino ? ' selected' : '')
+                        . '>' . e($g->nombre) . (!empty($g->penales) ? ' · llaves' : '') . '</option>';
+                }
+
+                $optsF = '<option value="0">— fecha nueva —</option>';
+                foreach (\App\Fecha::where('grupo_id', $grupoDestino)->orderBy('orden')->orderBy('id')->get() as $fx) {
+                    $optsF .= '<option value="' . (int) $fx->id . '"' . ($fechaDestino === (int) $fx->id ? ' selected' : '')
+                        . '>' . e($fx->numero) . '</option>';
+                }
+
+                $html .= '<div class="ok-box"><b>Toda la fecha va a un solo grupo.</b> '
+                    . ($grupoDestino === $playoffId
+                        ? 'Los dos equipos de cada partido están en zonas distintas: esto es una ronda de playoffs, '
+                          . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
+                          . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
+                        : 'Elegido a mano.')
+                    . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
+                    . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+                    . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
+                    . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
+                    . '<div>Grupo: <select name="grupo_destino" class="s2" data-placeholder="grupo destino…">'
+                    . $optsG . '</select></div>'
+                    . '<div style="margin-top:6px">Fecha: <select name="fecha_destino" class="s2" data-placeholder="fecha del grupo…">'
+                    . $optsF . '</select> o una nueva llamada '
+                    . '<input type="text" name="fecha_nombre" value="' . e($fechaDestino ? '' : $fechaNombre) . '" '
+                    . 'placeholder="Cuartos de final"></div>'
+                    . (!empty($sinPlantilla) ? '<div style="margin-top:6px"><label><input type="checkbox" '
+                        . 'name="sin_plantilla" value="1"' . ($sinPlantillaIgual ? ' checked' : '') . '> crear igual los '
+                        . count($sinPlantilla) . ' partidos sin plantilla</label></div>' : '')
+                    . '<p class="acciones"><button>Ver de nuevo con esto</button> '
+                    . '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar', ['comp' => $comp,
+                        'gameday' => $gameday, 'torneo_id' => $torneo->id, 'modo' => 'plantilla']))
+                    . '">Mejor rutear por plantilla</a></p></form></div>';
+
+                if ($fechaDestino === 0 && $fechaNombre === '') {
+                    $html .= '<p class="err-box">Falta decir a qué fecha del grupo van: elegí una de la lista o '
+                        . 'escribí el nombre de una nueva.</p>';
+                }
+            }
+
             if (!empty($sinPlantilla)) {
-                $html .= '<p class="err-box"><b>' . count($sinPlantilla) . ' partidos sin grupo:</b> ni el local ni el '
-                    . 'visitante tienen plantilla en este torneo. Puede que hayas elegido el torneo equivocado, o que '
-                    . 'falte cargarles la plantilla. Esos no se crean.<br><span class="sub">';
+                $html .= '<p class="' . ($grupoDestino ? 'warn-box' : 'err-box') . '"><b>' . count($sinPlantilla)
+                    . ' partidos sin plantilla:</b> ni el local ni el visitante tienen plantilla en este torneo. '
+                    . ($grupoDestino
+                        ? 'En un grupo de llaves eso es normal en las primeras rondas —el que queda eliminado nunca '
+                          . 'llega a tener plantilla—, pero que pase en TODOS suele significar que el torneo elegido '
+                          . 'no es éste. ' . ($sinPlantillaIgual ? 'Los estás creando igual.' : 'Por ahora no se crean.')
+                        : 'Puede que hayas elegido el torneo equivocado, o que falte cargarles la plantilla. '
+                          . 'Esos no se crean.')
+                    . '<br><span class="sub">';
                 foreach (array_slice($sinPlantilla, 0, 10) as $r) {
                     $html .= e($r->club_nombre . ' vs ' . $r->rival_nombre) . ' · ';
                 }
                 $html .= '</span></p>';
             }
 
-            if (!empty($inter)) {
+            if (!$grupoDestino && !empty($inter)) {
                 $html .= '<p class="ok-box"><b>' . count($inter) . ' interzonales</b> (los dos equipos están en grupos '
                     . 'distintos). Por defecto <b>no</b> se crean, porque hay que decidir en qué zona van.<br>'
                     . '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar', ['comp' => $comp,
-                        'gameday' => $gameday, 'torneo_id' => $torneo->id, 'interzonales' => 1]))
-                    . '">Incluirlos, en el grupo del local</a></p>';
+                        'gameday' => $gameday, 'torneo_id' => $torneo->id, 'modo' => 'plantilla', 'interzonales' => 1]))
+                    . '">Incluirlos, en el grupo del local</a>'
+                    . ($playoffId ? ' <a class="boton" href="' . e(route('import_partidos.fixture_aplicar',
+                        ['comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id,
+                         'grupo_destino' => $playoffId]))
+                        . '">Mandar toda la fecha a ' . e($grupos[$playoffId]->nombre) . '</a>' : '')
+                    . '</p>';
             }
 
             $html .= '<h2>Detalle</h2><div class="scroll"><table><thead><tr><th>Día</th><th>Local</th>'
@@ -1953,21 +2074,68 @@ class ImportPartidosController extends Controller
                 return $this->pagina('Aplicar fecha', $html . '<p class="err-box">No hay nada que crear.</p>');
             }
 
+            if ($grupoDestino && !$fechaDestino && $fechaNombre === '') {
+                return $this->pagina('Aplicar fecha', $html);
+            }
+
             $html .= '<p class="acciones"><a class="boton" href="'
-                . e(route('import_partidos.fixture_aplicar', array_filter(['comp' => $comp, 'gameday' => $gameday,
-                    'torneo_id' => $torneo->id, 'interzonales' => $interzonales ? 1 : null, 'confirmar' => 1])))
-                . '">Crear estos ' . count($plan) . ' partidos</a>'
-                . ' <span class="sub">recién acá se escribe</span></p>';
+                . e(route('import_partidos.fixture_aplicar', array_filter([
+                    'comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id,
+                    'interzonales'  => (!$grupoDestino && $interzonales) ? 1 : null,
+                    'modo'          => (!$grupoDestino && $playoffId) ? 'plantilla' : null,
+                    'grupo_destino' => $grupoDestino ?: null,
+                    'fecha_destino' => ($grupoDestino && $fechaDestino) ? $fechaDestino : null,
+                    'fecha_nombre'  => ($grupoDestino && !$fechaDestino) ? $fechaNombre : null,
+                    'sin_plantilla' => $sinPlantillaIgual ? 1 : null,
+                    'confirmar' => 1])))
+                . '">Crear estos ' . count($plan) . ' partidos'
+                . ($grupoDestino ? ' en ' . e($grupos[$grupoDestino]->nombre) . ' · '
+                    . e($fechaDestino ? \App\Fecha::where('id', $fechaDestino)->value('numero') : $fechaNombre) : '')
+                . '</a> <span class="sub">recién acá se escribe</span></p>';
 
             return $this->pagina('Aplicar fecha', $html);
         }
 
         // ── Crear ───────────────────────────────────────────────────────────
+        // LA FECHA DESTINO, cuando la fecha entera va a un grupo. En un grupo de
+        // llaves el `numero` no es el gameday de TM sino el nombre de la ronda,
+        // y dos gamedays —ida y vuelta— caen en la MISMA fecha, así que se
+        // resuelve una sola vez y fuera del loop.
+        $fechaFijada = null;
+        if ($grupoDestino) {
+            $fechaDestino = (int) $request->get('fecha_destino', 0);
+            $fechaNombre  = trim((string) $request->get('fecha_nombre', ''));
+
+            if ($fechaDestino) {
+                $fechaFijada = \App\Fecha::where('grupo_id', $grupoDestino)->where('id', $fechaDestino)->first();
+            }
+            if (!$fechaFijada && $fechaNombre !== '') {
+                $fechaFijada = \App\Fecha::where('grupo_id', $grupoDestino)->where('numero', $fechaNombre)->first();
+            }
+            if (!$fechaFijada) {
+                if ($fechaNombre === '') {
+                    return $this->pagina('Aplicar fecha', $html
+                        . '<p class="err-box">No creé nada: falta decir a qué fecha del grupo van. Volvé a la '
+                        . 'previsualización y elegí una fecha existente o escribí el nombre de una nueva.</p>');
+                }
+                $fechaFijada = new \App\Fecha();
+                $fechaFijada->forceFill([
+                    'numero'     => $fechaNombre,
+                    'grupo_id'   => $grupoDestino,
+                    'orden'      => ((int) \App\Fecha::where('grupo_id', $grupoDestino)->max('orden')) + 1,
+                    'url_nombre' => Str::slug($fechaNombre),
+                ])->save();
+            }
+        }
+
         $creados = 0; $errores = []; $detalle = ''; $fechasTocadas = [];
         foreach ($plan as $x) {
             $r = $x['fila']; $gId = (int) $x['grupo_id'];
             try {
-                $fecha = \App\Fecha::where('grupo_id', $gId)->where('numero', $gameday)->first();
+                $fecha = $fechaFijada;
+                if (!$fecha) {
+                    $fecha = \App\Fecha::where('grupo_id', $gId)->where('numero', $gameday)->first();
+                }
                 if (!$fecha) {
                     $fecha = new \App\Fecha();
                     $fecha->forceFill([
@@ -1981,15 +2149,32 @@ class ImportPartidosController extends Controller
 
                 $lId = (int) $r->equipo_id; $vId = (int) $r->rival_id;
 
-                $ya = \App\Partido::where('fecha_id', $fecha->id)
-                    ->where(function ($q) use ($lId, $vId) {
-                        $q->where('equipol_id', $lId)->orWhere('equipov_id', $lId)
-                            ->orWhere('equipol_id', $vId)->orWhere('equipov_id', $vId);
-                    })->first();
-                if ($ya) {
-                    $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($lId) . ' en la fecha ' . $gameday
-                        . ' del grupo ' . $grupos[$gId]->nombre . ' (#' . $ya->id . ').';
-                    continue;
+                // EN UNA LLAVE EL MISMO PAR JUEGA DOS VECES y las dos van en la
+                // misma fecha: «Octavos de final» tiene la ida y la vuelta.
+                // El control de siempre —«ya hay un partido de este equipo en
+                // esta fecha»— dejaría afuera la vuelta SIEMPRE, así que en un
+                // grupo con penales se bloquea sólo el mismo partido: mismo par
+                // y misma localía. En un grupo normal el control queda como
+                // estaba, que es la red que atrapa un mapeo de club equivocado.
+                if (!empty($grupos[$gId]->penales)) {
+                    $ya = \App\Partido::where('fecha_id', $fecha->id)
+                        ->where('equipol_id', $lId)->where('equipov_id', $vId)->first();
+                    if ($ya) {
+                        $errores[] = 'Ya está cargado ' . $this->nombreEquipo($lId) . ' vs '
+                            . $this->nombreEquipo($vId) . ' en ' . $fecha->numero . ' (#' . $ya->id . ').';
+                        continue;
+                    }
+                } else {
+                    $ya = \App\Partido::where('fecha_id', $fecha->id)
+                        ->where(function ($q) use ($lId, $vId) {
+                            $q->where('equipol_id', $lId)->orWhere('equipov_id', $lId)
+                                ->orWhere('equipol_id', $vId)->orWhere('equipov_id', $vId);
+                        })->first();
+                    if ($ya) {
+                        $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($lId) . ' en la fecha ' . $gameday
+                            . ' del grupo ' . $grupos[$gId]->nombre . ' (#' . $ya->id . ').';
+                        continue;
+                    }
                 }
 
                 $partido = new \App\Partido();
@@ -2022,7 +2207,9 @@ class ImportPartidosController extends Controller
         foreach (array_keys($fechasTocadas) as $gId) $this->recontarEquipos($gId);
 
         $html .= '<h1>Creados ' . $creados . ' partidos</h1>'
-            . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · fecha ' . e($gameday) . '</p>';
+            . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · fecha ' . e($gameday)
+            . ($fechaFijada ? ' de TM → <b>' . e($fechaFijada->numero) . '</b> del grupo '
+                . e($grupos[$grupoDestino]->nombre) : '') . '</p>';
 
         if (!empty($errores)) {
             $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>' . e(implode(' — ', $errores)) . '</p>';
@@ -2036,6 +2223,67 @@ class ImportPartidosController extends Controller
             . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
 
         return $this->pagina('Aplicar fecha', $html);
+    }
+
+    /**
+     * A qué fecha de llaves pertenecen estos partidos, según lo YA cargado.
+     *
+     * La vuelta de una llave es el mismo par de equipos con la localía dada
+     * vuelta, y va en la misma fecha que la ida. Así que si estos pares ya
+     * tienen partido en una fecha de un grupo con penales de este torneo, ésa
+     * es la fecha: no hay que adivinar el nombre de la ronda ni preguntarlo dos
+     * veces. Sirve igual para reaplicar una fecha que quedó a medias.
+     *
+     * Devuelve el id de la fecha donde cayeron MÁS de estos pares, o null.
+     */
+    private function fechaDeLasLlaves($filas, $torneoId)
+    {
+        $pares = [];
+        foreach ($filas as $r) {
+            $a = (int) $r->equipo_id; $b = (int) $r->rival_id;
+            if ($a && $b) $pares[] = [$a, $b];
+        }
+        if (empty($pares)) return null;
+
+        $rows = DB::table('partidos')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->where('grupos.torneo_id', $torneoId)
+            ->where('grupos.penales', 1)
+            ->where(function ($w) use ($pares) {
+                foreach ($pares as $p) {
+                    $w->orWhere(function ($x) use ($p) {
+                        $x->where('partidos.equipol_id', $p[0])->where('partidos.equipov_id', $p[1]);
+                    });
+                    $w->orWhere(function ($x) use ($p) {
+                        $x->where('partidos.equipol_id', $p[1])->where('partidos.equipov_id', $p[0]);
+                    });
+                }
+            })
+            ->select('fechas.id AS fecha_id')->get();
+
+        $cuenta = [];
+        foreach ($rows as $f) {
+            $id = (int) $f->fecha_id;
+            $cuenta[$id] = isset($cuenta[$id]) ? $cuenta[$id] + 1 : 1;
+        }
+        if (empty($cuenta)) return null;
+        arsort($cuenta);
+        return (int) key($cuenta);
+    }
+
+    /**
+     * Nombre sugerido para una ronda de llaves, por cuántos partidos trae.
+     *
+     * Es una SUGERENCIA editable, no una deducción: cuatro partidos pueden ser
+     * los cuartos o una tercera ronda previa. TM manda un número de gameday y
+     * nada más, así que el nombre lo termina de decidir el usuario.
+     */
+    private function nombreDeRonda($cuantos, $gameday)
+    {
+        $mapa = [1 => 'Final', 2 => 'Semifinal', 4 => 'Cuartos de final',
+            8 => 'Octavos de final', 16 => 'Dieciseisavos de final'];
+        return isset($mapa[$cuantos]) ? $mapa[$cuantos] : 'Ronda ' . $gameday;
     }
 
     // ═══════════════════════════ CREAR EQUIPO DESDE TM ═══════════════════════════
