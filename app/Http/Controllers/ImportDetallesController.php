@@ -2649,8 +2649,17 @@ class ImportDetallesController extends Controller
         $tecnicoId = (int) $request->get('tecnico_id', 0);
         $comp      = trim((string) $request->get('comp', ''));
         $ronda     = trim((string) $request->get('ronda', ''));
-        $n         = max(1, min(50, (int) $request->get('n', 10)));
+        // El tope es 100 y no más: `set_time_limit(0)` saca el límite de PHP pero
+        // NO el del servidor web. Una tanda de 200 son 10-15 minutos en una sola
+        // request y el hosting la corta con un 504 — el trabajo igual se hace y
+        // se marca partido por partido, pero te quedás sin el informe, que es
+        // justamente para lo que se corre. Para tandas largas está `seguir`.
+        $n         = max(1, min(100, (int) $request->get('n', 10)));
         $correr    = (string) $request->get('correr', '0') === '1';
+        // Encadenar tandas: al terminar una, la página se vuelve a pedir sola
+        // hasta que no quede ninguno. Cada request sigue siendo corta (no hay
+        // 504) y el informe de cada tanda se ve pasar.
+        $seguir    = (string) $request->get('seguir', '0') === '1';
         // Pasada barata: sólo los partidos que tienen algún gol cargado como
         // «Jugada», que es donde cayeron los olímpicos. Deja afuera los que sólo
         // pueden tener otro tipo de error, más raro.
@@ -3002,6 +3011,40 @@ class ImportDetallesController extends Controller
             . ($buscarIds ? $this->card($idsLlamadas, 'Llamadas de la búsqueda') : '')
             . '</div>';
 
+        // ── Encadenar tandas ──────────────────────────────────────────────
+        // Con `seguir`, al terminar una tanda la página se vuelve a pedir sola
+        // hasta vaciar la cola. Cada request sigue siendo corta —por eso no se
+        // sube el tope de la tanda— y el informe de cada una se ve pasar.
+        //
+        // El freno importante es el segundo: si la tanda no pudo con NINGUNO
+        // (la API caída, la clave vencida, el proxy bloqueado), la siguiente
+        // haría exactamente lo mismo y quedaría dando vueltas para siempre.
+        if ($seguir && $correr && $pendientes > 0 && $hechos > 0) {
+            $prox = $filtros;
+            $prox['n'] = $n; $prox['correr'] = 1; $prox['seguir'] = 1;
+            if ($soloJugada) $prox['solo_jugada'] = 1;
+            $urlProx = route('import_detalles.tipos_gol', $prox);
+
+            $cuerpo .= '<div class="ok-box" id="seguir-caja"><b>Sigo solo.</b> Quedan <b>' . $pendientes
+                . '</b> partidos: arranco la próxima tanda de ' . min($n, $pendientes)
+                . ' en <b id="seguir-seg">8</b> segundos. '
+                . '<a class="boton-sec" href="#" id="seguir-parar">Parar</a> '
+                . '<span class="sub">o cerrá la pestaña — lo que ya se hizo está guardado y marcado.</span></div>'
+                . '<script>(function(){var s=8,'
+                . 'c=document.getElementById("seguir-seg"),p=document.getElementById("seguir-parar"),'
+                . 't=setInterval(function(){s--;if(c){c.textContent=s;}'
+                . 'if(s<=0){clearInterval(t);location.href=' . json_encode($urlProx) . ';}},1000);'
+                . 'if(p){p.addEventListener("click",function(e){e.preventDefault();clearInterval(t);'
+                . 'document.getElementById("seguir-caja").innerHTML='
+                . json_encode('<b>Parado.</b> Quedan ' . $pendientes . ' partidos sin revisar.') . ';});}})();</script>';
+        } elseif ($seguir && $correr && $pendientes > 0 && $hechos === 0) {
+            $cuerpo .= '<div class="err-box"><b>Corté la cadena.</b> Esta tanda no pudo con ninguno de los '
+                . 'partidos que intentó, así que la siguiente haría lo mismo. Mirá los errores de abajo '
+                . '—casi siempre es la API— antes de volver a largarla.</div>';
+        } elseif ($seguir && $correr && $pendientes === 0) {
+            $cuerpo .= '<div class="ok-box"><b>Listo: no queda ningún partido sin revisar.</b></div>';
+        }
+
         // ── De qué universo estamos hablando ──────────────────────────────
         // Dos cosas que la pantalla no decía y hacían que «sin revisar» pareciera
         // un número demasiado chico: qué filtros están puestos (el de la URL se
@@ -3107,13 +3150,23 @@ class ImportDetallesController extends Controller
                 . 'Revisar los ' . min($n, $pendientes) . ' más nuevos</a>'
                 . ' <span class="sub">' . min($n, $pendientes) . ' llamadas · quedan <b>' . $pendientes . '</b></span>';
 
-            foreach ([25, 50] as $otro) {
+            foreach ([25, 50, 100] as $otro) {
                 if ($otro === $n || $otro > $pendientes) continue;
                 $p2 = $params; $p2['n'] = $otro;
                 $cuerpo .= ' <a class="boton-sec" href="' . e(route('import_detalles.tipos_gol', $p2)) . '">'
                     . 'de a ' . $otro . '</a>';
             }
             $cuerpo .= '</p>';
+
+            // Para las tandas largas: en vez de pedir 500 de una —que el
+            // hosting corta— se piden de a $n y la página se encadena sola.
+            $pSeguir = $params; $pSeguir['seguir'] = 1;
+            $cuerpo .= '<p class="acciones">'
+                . '<a class="boton" href="' . e(route('import_detalles.tipos_gol', $pSeguir)) . '">'
+                . 'Seguir solo hasta terminar</a> <span class="sub">tandas de ' . $n
+                . ', una atrás de otra, con 8 segundos para frenar entre una y otra. '
+                . 'Son <b>' . $pendientes . '</b> llamadas en total: dejá la pestaña abierta y andá a hacer otra cosa. '
+                . 'Si algo se rompe, corta solo.</span></p>';
 
             $p3 = $filtros; $p3['n'] = $n;
             if (!$soloJugada) $p3['solo_jugada'] = 1;
