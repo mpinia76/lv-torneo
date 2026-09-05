@@ -57,9 +57,13 @@ class ControlPenales
     /**
      * Goles de penal sin su penal convertido.
      *
-     * El match con `penals` va por partido + minuto usando `<=>` (igualdad
-     * segura para NULL): con `=` un gol sin minuto nunca encontraba su penal
-     * y volvía a aparecer como faltante para siempre.
+     * El match con `penals` va por partido + minuto + descuento usando `<=>`
+     * (igualdad segura para NULL): con `=` un gol sin minuto nunca encontraba
+     * su penal y volvía a aparecer como faltante para siempre.
+     *
+     * El descuento entra en el cruce porque desde el 05/09/2026 el minuto son
+     * DOS columnas: un gol a los 90+6 y su «Convirtieron» comparten las dos, y
+     * cruzar sólo por el reloj ataría el gol del 90+6 al penal del 90.
      */
     public function consultaFaltantes(array $filtros)
     {
@@ -69,6 +73,7 @@ class ControlPenales
             ->addSelect([
                 'gols.id as gol_id',
                 'gols.minuto as minuto',
+                'gols.adicionado as adicionado',
                 'gols.jugador_id as ejecutor_id',
             ])
             ->where('gols.tipo', 'Penal')
@@ -77,6 +82,7 @@ class ControlPenales
                     ->from('penals')
                     ->whereColumn('penals.partido_id', 'gols.partido_id')
                     ->whereRaw('penals.minuto <=> gols.minuto')
+                    ->whereRaw('penals.adicionado <=> gols.adicionado')
                     ->where('penals.tipo', 'Convirtieron');
             });
 
@@ -127,6 +133,7 @@ class ControlPenales
             ->addSelect([
                 'penals.id as penal_id',
                 'penals.minuto as minuto',
+                'penals.adicionado as adicionado',
                 'penals.jugador_id as arquero_cargado_id',
             ])
             ->where('penals.tipo', 'Convirtieron');
@@ -231,8 +238,13 @@ class ControlPenales
 
             $fila->equipo_arquero_id = $equipo;
 
+            // Se compara con `orden()` —reloj × 100 + descuento— y no con el
+            // minuto pelado: así una roja del 90+2 pesa más que el penal del 90
+            // y menos que el del 90+5. Ver App\Services\MinutoHelper.
+            $orden = MinutoHelper::orden($minuto, $fila->adicionado ?? null);
+
             $pasos = [];
-            $fila->arquero_id = $this->arqueroEnCancha($fila->id, $equipo, (int) $minuto, $ctx, $pasos);
+            $fila->arquero_id = $this->arqueroEnCancha($fila->id, $equipo, $orden, $ctx, $pasos);
             $fila->traza = $pasos;
 
             if ($fila->arquero_id !== null) {
@@ -246,7 +258,7 @@ class ControlPenales
             // hay nada que corregir.
             if (!isset($fila->ejecutor_id) && isset($fila->arquero_cargado_id)) {
                 $fila->cargado_en_cancha = $this->estabaEnCancha(
-                    $fila->id, $fila->arquero_cargado_id, $equipo, (int) $minuto, $ctx
+                    $fila->id, $fila->arquero_cargado_id, $equipo, $orden, $ctx
                 );
 
                 if ($fila->cargado_en_cancha) {
@@ -280,8 +292,12 @@ class ControlPenales
      * que son la causa habitual de que el control marque un penal que en
      * realidad está bien cargado. Sin eso hay que adivinar leyendo la base.
      */
-    public function arqueroEnCancha($partidoId, $equipoId, int $minuto, array $ctx, &$pasos = null)
+    public function arqueroEnCancha($partidoId, $equipoId, int $orden, array $ctx, &$pasos = null)
     {
+        // OJO: `$orden` NO es un minuto, es `MinutoHelper::orden()` — reloj × 100
+        // más el descuento. Todo lo que se compare acá adentro tiene que pasar
+        // por el mismo molde; un minuto pelado sería 90 contra 9000.
+
         $anotar = function ($tipo, $jugador = null, $min = null) use (&$pasos) {
             if ($pasos === null) return;
             $pasos[] = ['t' => $tipo, 'j' => $jugador, 'm' => $min];
@@ -312,7 +328,7 @@ class ControlPenales
                 if ($delEquipo) $anotar('cambio_sin_minuto', (int) $c->jugador_id);
                 continue;
             }
-            if ((int) $c->minuto > $minuto) {
+            if (MinutoHelper::orden($c->minuto, $c->adicionado ?? null) > $orden) {
                 continue;
             }
 
@@ -323,9 +339,9 @@ class ControlPenales
 
             if ($c->tipo === 'Entra') {
                 $actual = (int) $c->jugador_id;
-                $anotar('entra', $actual, (int) $c->minuto);
+                $anotar('entra', $actual, MinutoHelper::texto($c->minuto, $c->adicionado ?? null));
             } elseif ($c->tipo === 'Sale' && $actual === (int) $c->jugador_id) {
-                $anotar('sale', $actual, (int) $c->minuto);
+                $anotar('sale', $actual, MinutoHelper::texto($c->minuto, $c->adicionado ?? null));
                 $actual = null;
             }
         }
@@ -345,11 +361,11 @@ class ControlPenales
                 $anotar('roja_sin_minuto', $actual);
                 continue;
             }
-            if ((int) $r->minuto <= $minuto) {
-                $anotar('roja', $actual, (int) $r->minuto);
+            if (MinutoHelper::orden($r->minuto, $r->adicionado ?? null) <= $orden) {
+                $anotar('roja', $actual, MinutoHelper::texto($r->minuto, $r->adicionado ?? null));
                 return null;
             }
-            $anotar('roja_tarde', $actual, (int) $r->minuto);
+            $anotar('roja_tarde', $actual, MinutoHelper::texto($r->minuto, $r->adicionado ?? null));
         }
 
         $anotar('queda', $actual);
@@ -366,8 +382,10 @@ class ControlPenales
      * Titular hasta que lo cambien, suplente desde que entra, y afuera si vio
      * la roja (o la doble amarilla) antes del minuto.
      */
-    public function estabaEnCancha($partidoId, $jugadorId, $equipoId, int $minuto, array $ctx): bool
+    public function estabaEnCancha($partidoId, $jugadorId, $equipoId, int $orden, array $ctx): bool
     {
+        // `$orden` es MinutoHelper::orden(), igual que en arqueroEnCancha().
+
         $jugadorId = (int) $jugadorId;
         $adentro   = null;
 
@@ -392,7 +410,7 @@ class ControlPenales
                 continue;
             }
 
-            if ($c->minuto === null || (int) $c->minuto > $minuto) {
+            if ($c->minuto === null || MinutoHelper::orden($c->minuto, $c->adicionado ?? null) > $orden) {
                 continue;
             }
 
@@ -408,7 +426,8 @@ class ControlPenales
         }
 
         foreach ($ctx['rojas'][$partidoId] ?? [] as $r) {
-            if ((int) $r->jugador_id === $jugadorId && $r->minuto !== null && (int) $r->minuto <= $minuto) {
+            if ((int) $r->jugador_id === $jugadorId && $r->minuto !== null
+                && MinutoHelper::orden($r->minuto, $r->adicionado ?? null) <= $orden) {
                 return false;
             }
         }
@@ -460,12 +479,14 @@ class ControlPenales
             ->join('jugadors', 'cambios.jugador_id', '=', 'jugadors.id')
             ->whereIn('cambios.partido_id', $partidoIds)
             ->orderBy('cambios.minuto')
+            ->orderBy('cambios.adicionado')
             ->orderBy('cambios.id')
             ->get([
                 'cambios.partido_id',
                 'cambios.jugador_id',
                 'cambios.tipo',
                 'cambios.minuto',
+                'cambios.adicionado',
                 'jugadors.tipoJugador',
             ]);
 
@@ -482,7 +503,7 @@ class ControlPenales
         $rojas = DB::table('tarjetas')
             ->whereIn('partido_id', $partidoIds)
             ->whereIn('tipo', ['Roja', 'Doble Amarilla'])
-            ->get(['partido_id', 'jugador_id', 'minuto']);
+            ->get(['partido_id', 'jugador_id', 'minuto', 'adicionado']);
 
         foreach ($rojas as $r) {
             $ctx['rojas'][$r->partido_id][] = $r;
@@ -632,8 +653,9 @@ class ControlPenales
                 }
 
                 // Dos goles de penal en el mismo partido y minuto generan un
-                // solo registro: el chequeo de duplicados va por (partido, minuto).
-                $clave = $fila->id.'-'.$fila->minuto;
+                // solo registro: el chequeo de duplicados va por (partido,
+                // minuto, descuento) — el del 90+2 y el del 90+7 son dos.
+                $clave = $fila->id.'-'.$fila->minuto.'-'.($fila->adicionado ?? '');
                 if (isset($vistos[$clave])) {
                     continue;
                 }
@@ -643,6 +665,7 @@ class ControlPenales
                     'partido_id' => $fila->id,
                     'jugador_id' => $fila->arquero_id,
                     'minuto'     => $fila->minuto,
+                    'adicionado' => $fila->adicionado ?? null,
                     'tipo'       => 'Convirtieron',
                     'created_at' => $ahora,
                     'updated_at' => $ahora,

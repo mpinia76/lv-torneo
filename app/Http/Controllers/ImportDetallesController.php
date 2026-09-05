@@ -602,11 +602,24 @@ class ImportDetallesController extends Controller
         $cuerpo .= $this->bloque('Alineación', $p['alineacions'], ['_equipo' => 'Equipo', 'tipo' => 'Tipo',
             '_nombre' => 'Jugador', 'dorsal' => 'Dorsal', '_fuente' => 'De dónde sale el dorsal',
             'orden' => 'Puesto']);
-        $cuerpo .= $this->bloque('Goles', $p['gols'], ['minuto' => 'Min', '_nombre' => 'Jugador',
+        // El minuto y el descuento se muestran juntos («90+6»): son dos columnas
+        // en la base pero un solo dato para leer. `_min` empieza con guión bajo,
+        // así que es de puro display y no llega a la base.
+        $conMin = function ($filas) {
+            foreach ($filas as &$fila) {
+                $fila['_min'] = \App\Services\MinutoHelper::texto(
+                    isset($fila['minuto']) ? $fila['minuto'] : null,
+                    isset($fila['adicionado']) ? $fila['adicionado'] : null, '');
+            }
+            unset($fila);
+            return $filas;
+        };
+
+        $cuerpo .= $this->bloque('Goles', $conMin($p['gols']), ['_min' => 'Min', '_nombre' => 'Jugador',
             '_equipo' => 'Equipo', 'tipo' => 'Tipo', '_fuente' => 'Texto de Transfermarkt']);
-        $cuerpo .= $this->bloque('Tarjetas', $p['tarjetas'], ['minuto' => 'Min', '_nombre' => 'Jugador',
+        $cuerpo .= $this->bloque('Tarjetas', $conMin($p['tarjetas']), ['_min' => 'Min', '_nombre' => 'Jugador',
             '_equipo' => 'Equipo', 'tipo' => 'Tipo', '_fuente' => 'Texto de Transfermarkt']);
-        $cuerpo .= $this->bloque('Cambios', $p['cambios'], ['minuto' => 'Min', 'tipo' => 'Tipo',
+        $cuerpo .= $this->bloque('Cambios', $conMin($p['cambios']), ['_min' => 'Min', 'tipo' => 'Tipo',
             '_nombre' => 'Jugador', '_equipo' => 'Equipo', '_fuente' => 'Cómo lo deduje']);
         if (!empty($p['penals'])) {
             $cuerpo .= '<p class="sub" style="margin-top:24px">Los <b>penales fallados</b> se cargan con una fila '
@@ -615,8 +628,8 @@ class ImportDetallesController extends Controller
                 . 'como <b>Atajó</b>. Los penales <b>convertidos</b> no salen en esta tabla: son un gol de tipo '
                 . 'Penal y su fila «Convirtieron» se le crea al arquero al final.</p>';
         }
-        $cuerpo .= $this->bloque('Penales fallados', isset($p['penals']) ? $p['penals'] : [],
-            ['minuto' => 'Min', '_nombre' => 'Jugador', '_equipo' => 'Equipo', 'tipo' => 'Tipo',
+        $cuerpo .= $this->bloque('Penales fallados', $conMin(isset($p['penals']) ? $p['penals'] : []),
+            ['_min' => 'Min', '_nombre' => 'Jugador', '_equipo' => 'Equipo', 'tipo' => 'Tipo',
              '_fuente' => 'Texto de Transfermarkt']);
         $cuerpo .= $this->bloque('Árbitros', $p['arbitros'],
             ['tipo' => 'Rol', '_nombre' => 'Árbitro', '_fuente' => 'Texto de Transfermarkt']);
@@ -2504,7 +2517,8 @@ class ImportDetallesController extends Controller
                         $quienes = [];
                         foreach ($r['penals'] as $p) {
                             $quienes[] = e($p['_nombre']) . ' <b>' . e($p['tipo']) . '</b>'
-                                . ($p['minuto'] === null ? '' : ' (' . (int) $p['minuto'] . '\')');
+                                . ($p['minuto'] === null ? '' : ' ('
+                                    . \App\Services\MinutoHelper::texto($p['minuto'], $p['adicionado'] ?? null) . '\')');
                         }
                         $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . ' — '
                             . implode(' · ', $quienes)
@@ -2649,7 +2663,7 @@ class ImportDetallesController extends Controller
             'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', $filtros)) . '">← Detalle de los partidos</a></p>'
-            . '<h1>Tipos de gol de lo ya cargado</h1>';
+            . '<h1>Repaso de lo ya cargado</h1>';
 
         if (!Schema::hasColumn('import_partidos', 'tipos_gol_revisado_at')) {
             return $this->pagina('Tipos de gol', $cuerpo
@@ -2660,7 +2674,25 @@ class ImportDetallesController extends Controller
                 . 'corrección, y sin la columna no hay dónde anotar qué partidos ya se preguntaron.</div>');
         }
 
-        $cuerpo .= '<p class="sub">Hasta el 01/09/2026 el <b>gol olímpico</b> no existía como tipo: Transfermarkt lo '
+        if (!Schema::hasColumn('import_partidos', 'minutos_revisado_at')) {
+            return $this->pagina('Repaso de lo ya cargado', $cuerpo
+                . '<div class="err-box">Falta la columna <code>import_partidos.minutos_revisado_at</code>. '
+                . 'Corré la migración <code>2026_09_05_100000_add_adicionado_a_incidencias</code> y volvé. Esa '
+                . 'migración agrega la columna <code>adicionado</code> —el «+6» del 90+6— a goles, tarjetas, '
+                . 'cambios y penales, y la marca de qué partidos ya se repasaron.</div>');
+        }
+
+        $cuerpo .= '<p class="sub">Este pase hace <b>dos</b> repasos con la misma llamada, porque los dos salen '
+            . 'del mismo JSON: el <b>tipo de cada gol</b> y el <b>minuto</b> de cada incidencia.</p>'
+            . '<p class="sub"><b>Los minutos de descuento.</b> Hasta el 05/09/2026 el descuento se perdía, y cada '
+            . 'fuente lo perdía distinto: el importador de Transfermarkt tiraba el <code>addedTime</code> (el gol '
+            . 'de los 90+6 quedaba cargado como 90) y el scraper de promiedos lo sumaba (quedaba como 96), salvo '
+            . 'el del primer tiempo, que colapsaba a 45. Dos goles del mismo jugador en el descuento quedaban '
+            . 'indistinguibles de una carga duplicada — por eso los marcaba el control «Goles repetidos». Este pase '
+            . 'les escribe el minuto del reloj y el descuento por separado, en las <b>cuatro</b> tablas: goles, '
+            . 'tarjetas, cambios y penales. Acepta las tres formas viejas para reconocer la misma jugada, y '
+            . '<b>no crea ni borra ninguna fila</b>: sólo corrige el minuto de las que ya estaban.</p>'
+            . '<p class="sub">Hasta el 01/09/2026 el <b>gol olímpico</b> no existía como tipo: Transfermarkt lo '
             . 'manda como <code>direct corner</code> (actionId 211) y el importador lo cargaba como <b>Jugada</b>. '
             . 'Cuáles son no se puede saber desde la base —«Jugada» y «Olímpico» son la misma fila—, así que hay que '
             . 'preguntarlo: es <b>1 llamada por partido</b>. Este pase pregunta y escribe <b>sólo</b> el '
@@ -2680,9 +2712,21 @@ class ImportDetallesController extends Controller
             $q = DB::table('import_partidos')
                 ->whereNotNull('partido_id')->whereNotNull('external_id')
                 ->whereIn('estado', ['aplicado', 'duplicado'])
-                ->whereNull('tipos_gol_revisado_at')
-                ->whereIn('partido_id', function ($sub) {
-                    $sub->from('gols')->select('partido_id')->distinct();
+                // Entra si le falta cualquiera de los dos repasos. Son marcas
+                // distintas a propósito: los 6323 que ya figuran revisados de
+                // tipo lo fueron cuando el descuento todavía se tiraba.
+                ->where(function ($w) {
+                    $w->whereNull('tipos_gol_revisado_at')->orWhereNull('minutos_revisado_at');
+                })
+                // Con algo cargado que repasar. Mira las cuatro tablas: un 0 a 0
+                // con tarjetas no tiene goles pero sí minutos para corregir.
+                // EXISTS y no IN: `partido_id` está indexado en las cuatro (es
+                // FK), así que es una búsqueda por índice y no una tabla derivada.
+                ->where(function ($w) {
+                    foreach (['gols', 'tarjetas', 'cambios', 'penals'] as $t) {
+                        $w->orWhereRaw('EXISTS (SELECT 1 FROM `' . $t . '` WHERE `' . $t
+                            . '`.partido_id = import_partidos.partido_id)');
+                    }
                 });
             if ($soloJugada) {
                 $q->whereIn('partido_id', function ($sub) {
@@ -2703,11 +2747,11 @@ class ImportDetallesController extends Controller
         // No gasta ni una llamada por sí solo: sólo repone la lista.
         $desmarcar = trim((string) $request->get('desmarcar', ''));
 
-        $revisadosQ = function ($soloPenal = false) use ($tecnicoId, $comp, $ronda) {
+        $revisadosQ = function ($soloPenal = false, $columna = 'tipos_gol_revisado_at') use ($tecnicoId, $comp, $ronda) {
             $q = DB::table('import_partidos')
                 ->whereNotNull('partido_id')->whereNotNull('external_id')
                 ->whereIn('estado', ['aplicado', 'duplicado'])
-                ->whereNotNull('tipos_gol_revisado_at');
+                ->whereNotNull($columna);
             if ($soloPenal) {
                 $q->whereIn('partido_id', function ($s) {
                     $s->from('gols')->select('partido_id')->where('tipo', 'Penal')->distinct();
@@ -2723,13 +2767,24 @@ class ImportDetallesController extends Controller
         if ($desmarcar === 'penal' || $desmarcar === 'todos') {
             $desmarcados = (clone $revisadosQ($desmarcar === 'penal'))->distinct()->count('partido_id');
             $revisadosQ($desmarcar === 'penal')->update(['tipos_gol_revisado_at' => null]);
+        } elseif ($desmarcar === 'minutos') {
+            // Para cuando el repaso de minutos aprenda algo nuevo. Hoy no hace
+            // falta para el barrido inicial: ningún partido tiene esa marca.
+            $desmarcados = (clone $revisadosQ(false, 'minutos_revisado_at'))->distinct()->count('partido_id');
+            $revisadosQ(false, 'minutos_revisado_at')->update(['minutos_revisado_at' => null]);
         }
 
         $pendientes = (clone $base())->distinct()->count('partido_id');
+        // Revisado del todo es con los DOS repasos hechos: el de tipos y el de
+        // minutos. Con uno solo el partido sigue en la cola, así que contarlo
+        // como revisado haría que los dos números no cierren.
         $revisados  = DB::table('import_partidos')->whereNotNull('tipos_gol_revisado_at')
+            ->whereNotNull('minutos_revisado_at')
             ->distinct()->count('partido_id');
 
         $hechos = 0; $fallaron = 0; $llamadas = 0; $corregidos = 0; $conCambios = 0; $olimpicos = 0;
+        // El repaso de minutos, que viaja en la misma llamada.
+        $minCorregidos = 0; $minPartidos = 0; $minSueltos = 0;
         $detalle = '';
         // Control de TODOS los tipos de la tanda: qué decía la base y qué dice
         // Transfermarkt, gol por gol. Se acumula acá y se muestra abajo.
@@ -2787,7 +2842,7 @@ class ImportDetallesController extends Controller
                         $qué = [];
                         foreach ($r['cambios'] as $c) {
                             $qué[] = e($c['nombre'])
-                                . ($c['minuto'] === null ? '' : ' ' . $c['minuto'] . '\'')
+                                . ($c['minuto'] === null ? '' : ' ' . ($c['minuto_texto'] ?? $c['minuto']) . '\'')
                                 . ' <span class="sub">' . e($c['de']) . ' →</span> <b>' . e($c['a']) . '</b>'
                                 . ($c['fuente'] !== '' ? ' <span class="id">(' . e($c['fuente']) . ')</span>' : '');
                         }
@@ -2801,6 +2856,25 @@ class ImportDetallesController extends Controller
                         $detalle .= '<div class="sub">· ' . $etiqueta . ' — los ' . (int) $r['goles_base']
                             . ' gol(es) ya estaban bien'
                             . ((int) $r['olimpicos'] ? ' (' . (int) $r['olimpicos'] . ' olímpico/s)' : '') . '</div>';
+                    }
+
+                    // ── Los minutos, en la misma llamada ──────────────────
+                    $min = (isset($r['minutos']) && is_array($r['minutos'])) ? $r['minutos'] : null;
+                    if ($min !== null) {
+                        $minSueltos += (int) $min['sueltos_tm'];
+                        if (!empty($min['cambios'])) {
+                            $minPartidos++;
+                            $minCorregidos += count($min['cambios']);
+                            $qm = [];
+                            foreach ($min['cambios'] as $c) {
+                                $qm[] = e($c['nombre']) . ' <span class="id">' . e($c['que'])
+                                    . ($c['tipo'] ? ' ' . e($c['tipo']) : '') . '</span> '
+                                    . '<span class="sub">' . e($c['de']) . ' →</span> <b>' . e($c['a']) . '</b>'
+                                    . ($c['flojo'] ? ' <span class="id">(apareo flojo)</span>' : '');
+                            }
+                            $detalle .= '<div style="margin-left:18px"><span class="ok">✔</span> '
+                                . '<b>minutos</b> — ' . implode(' · ', $qm) . '</div>';
+                        }
                     }
                 }
                 // Con el diagnóstico de arriba, una línea sirve más que un aviso
@@ -2919,6 +2993,7 @@ class ImportDetallesController extends Controller
             . ($correr ? $this->card($hechos, 'Revisados ahora', 'ok') : '')
             . ($correr ? $this->card($corregidos, 'Goles corregidos', $corregidos ? 'warn' : '') : '')
             . ($correr ? $this->card($olimpicos, 'Olímpicos', $olimpicos ? 'warn' : '') : '')
+            . ($correr ? $this->card($minCorregidos, 'Minutos corregidos', $minCorregidos ? 'warn' : '') : '')
             . ($correr && $sinDetalle ? $this->card($sinDetalle, 'Sin detalle de TM', 'warn') : '')
             . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
             . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
@@ -2940,7 +3015,9 @@ class ImportDetallesController extends Controller
         $pendientesSinFiltro = DB::table('import_partidos')
             ->whereNotNull('partido_id')->whereNotNull('external_id')
             ->whereIn('estado', ['aplicado', 'duplicado'])
-            ->whereNull('tipos_gol_revisado_at')
+            ->where(function ($w) {
+                $w->whereNull('tipos_gol_revisado_at')->orWhereNull('minutos_revisado_at');
+            })
             ->whereIn('partido_id', $enLaBase)
             ->distinct()->count('partido_id');
 
@@ -3339,7 +3416,7 @@ class ImportDetallesController extends Controller
             ->leftJoin('equipos as el', 'partidos.equipol_id', '=', 'el.id')
             ->leftJoin('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
             ->where('gols.tipo', 'Olímpico')
-            ->select('gols.id', 'gols.minuto', 'gols.partido_id', 'partidos.dia', 'partidos.fecha_id',
+            ->select('gols.id', 'gols.minuto', 'gols.adicionado', 'gols.partido_id', 'partidos.dia', 'partidos.fecha_id',
                 'personas.name as jugador', 'jugadors.id as jugador_id',
                 'el.nombre as local', 'ev.nombre as visitante')
             ->orderByDesc('partidos.dia')->limit(100)->get();
@@ -3363,7 +3440,8 @@ class ImportDetallesController extends Controller
                 . ' <span class="id">#' . (int) $g->partido_id . '</span></td>'
                 . '<td><a href="' . e(route('jugadores.ver', ['jugadorId' => (int) $g->jugador_id])) . '">'
                 . e((string) $g->jugador) . '</a></td>'
-                . '<td class="num">' . ($g->minuto === null ? '—' : (int) $g->minuto . '\'') . '</td>'
+                . '<td class="num">' . ($g->minuto === null ? '—'
+                    : \App\Services\MinutoHelper::texto($g->minuto, $g->adicionado) . '\'') . '</td>'
                 . '<td>' . $inc . '</td>'
                 . '</tr>';
         }
@@ -4095,7 +4173,7 @@ class ImportDetallesController extends Controller
             $out .= '<tr' . $clase . '>';
             foreach ($columnas as $k => $t) {
                 $v = isset($f[$k]) ? $f[$k] : null;
-                $num = in_array($k, ['minuto', 'orden', 'dorsal'], true) ? ' class="num"' : '';
+                $num = in_array($k, ['minuto', '_min', 'orden', 'dorsal'], true) ? ' class="num"' : '';
                 $out .= '<td' . $num . '>' . e($v === null || $v === '' ? '—' : (string) $v) . '</td>';
             }
             $out .= '</tr>';

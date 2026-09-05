@@ -24,7 +24,7 @@ class CambioController extends Controller
 
         $partido=Partido::findOrFail($partido_id);
 
-        $cambios=Cambio::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
+        $cambios=Cambio::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->orderBy('adicionado','ASC')->get();
 
 
         $torneo_id = $partido->fecha->grupo->torneo->id;
@@ -115,10 +115,19 @@ class CambioController extends Controller
 
             foreach($request->jugador as $item=>$v){
 
+                $min = \App\Services\MinutoHelper::normalizar(
+                    $request->minuto[$item] ?? null,
+                    $request->adicionado[$item] ?? null
+                );
+
                 $data2=array(
                     'partido_id'=>$partido_id,
                     'jugador_id'=>$request->jugador[$item],
-                    'minuto'=>$request->minuto[$item],
+                    // El minuto son dos campos: el del reloj y el descuento. `normalizar()`
+                    // guarda 0 como NULL y suma un descuento colgado de un minuto que no
+                    // cierra ningún período («70+3» es el minuto 73).
+                    'minuto'=>$min['minuto'],
+                    'adicionado'=>$min['adicionado'],
                     'tipo'=>$request->tipo[$item]
                 );
 

@@ -263,7 +263,7 @@
     {
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
-            '<td>'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
+            '<td style="white-space:nowrap">'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;display:inline-block', 'min' => 0, 'title' => 'Minuto del reloj'])}}'+'<span class="text-muted"> + </span>'+'{{Form::number('adicionado[]', '', ['class' => 'form-control', 'style' => 'width:60px;display:inline-block', 'min' => 0, 'title' => 'Descuento: el «+6» del 90+6'])}}'+'</td>'+
             '<td>'+'{{ Form::select('tipo[]',['Cabeza'=>'Cabeza','En Contra'=>'En Contra','Jugada'=>'Jugada','Olímpico'=>'Olímpico','Penal'=>'Penal','Tiro Libre'=>'Tiro Libre'], '',['class' => 'form-control']) }}'+'</td>'+
             '<td><a href="#" class="btn btn-danger removegol"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
@@ -290,7 +290,7 @@
     {
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
-            '<td>'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
+            '<td style="white-space:nowrap">'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;display:inline-block', 'min' => 0, 'title' => 'Minuto del reloj'])}}'+'<span class="text-muted"> + </span>'+'{{Form::number('adicionado[]', '', ['class' => 'form-control', 'style' => 'width:60px;display:inline-block', 'min' => 0, 'title' => 'Descuento: el «+6» del 90+6'])}}'+'</td>'+
             '<td>'+'{{ Form::select('tipo[]',['Errado'=>'Errado','Atajado'=>'Atajado','Atajó'=>'Atajó','Convirtieron'=>'Convirtieron'], '',['class' => 'form-control']) }}'+'</td>'+
             '<td><a href="#" class="btn btn-danger removepenal"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
@@ -317,7 +317,7 @@
     {
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
-            '<td>'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
+            '<td style="white-space:nowrap">'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;display:inline-block', 'min' => 0, 'title' => 'Minuto del reloj'])}}'+'<span class="text-muted"> + </span>'+'{{Form::number('adicionado[]', '', ['class' => 'form-control', 'style' => 'width:60px;display:inline-block', 'min' => 0, 'title' => 'Descuento: el «+6» del 90+6'])}}'+'</td>'+
             '<td>'+'{{ Form::select('tipo[]',['Amarilla'=>'Amarilla','Doble Amarilla'=>'Doble Amarilla','Roja'=>'Roja'], '',['class' => 'form-control']) }}'+'</td>'+
             '<td><a href="#" class="btn btn-danger removetarjeta"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
@@ -490,7 +490,7 @@
         var tr='<tr>'+
             '<td></td><td>'+'{{ Form::select('jugador[]',$jugadors ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}'+'</td>'+
             '<td>'+'{{ Form::select('tipo[]',['Entra'=>'Entra','Sale'=>'Sale'], '',['class' => 'form-control']) }}'+'</td>'+
-            '<td>'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;'])}}'+'</td>'+
+            '<td style="white-space:nowrap">'+'{{Form::number('minuto[]', '', ['class' => 'form-control', 'style' => 'width:70px;display:inline-block', 'min' => 0, 'title' => 'Minuto del reloj'])}}'+'<span class="text-muted"> + </span>'+'{{Form::number('adicionado[]', '', ['class' => 'form-control', 'style' => 'width:60px;display:inline-block', 'min' => 0, 'title' => 'Descuento: el «+6» del 90+6'])}}'+'</td>'+
 
             '<td><a href="#" class="btn btn-danger removecambio"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';

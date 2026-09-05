@@ -1,6 +1,6 @@
 {{-- El arquero cargado contra el que estaba en cancha en ese minuto. --}}
 @if(isset($fila->minuto) && $fila->minuto !== null)
-    <span class="ctrl-chip neutro">minuto {{ $fila->minuto }}</span>
+    <span class="ctrl-chip neutro">minuto {{ \App\Services\MinutoHelper::texto($fila->minuto, $fila->adicionado ?? null) }}</span>
 @endif
 <span class="ctrl-chip mal">cargado: {{ $fila->arquero_cargado_nombre ?? '—' }}</span>
 @if(!empty($fila->arquero_nombre))

@@ -463,6 +463,7 @@ class TmDetallePartido
                         'partido_id' => $partido->id,
                         'jugador_id' => $jugadorId,
                         'minuto'     => $accion['minuto'],
+                        'adicionado' => $accion['adicionado'],
                         'tipo'       => $tipo['tipo'],
                         '_nombre'    => $this->nombreJugador($jugadorId),
                         // En un gol en contra, el goleador juega para el rival.
@@ -487,6 +488,7 @@ class TmDetallePartido
                         'partido_id' => $partido->id,
                         'jugador_id' => $jugadorId,
                         'minuto'     => $accion['minuto'],
+                        'adicionado' => $accion['adicionado'],
                         'tipo'       => $tipo['tipo'],
                         '_nombre'    => $this->nombreJugador($jugadorId),
                         '_equipo'    => $lado['equipo_nombre'],
@@ -501,12 +503,12 @@ class TmDetallePartido
                     if ($dir['sale'] !== null) {
                         $s = (string) $dir['sale'];
                         if (!isset($titulares[$s]) && !isset($yaEntraron[$s])) {
-                            $this->aviso('Minuto ' . $accion['minuto'] . ': sale el jugador TM ' . $s
+                            $this->aviso('Minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': sale el jugador TM ' . $s
                                 . ' pero no era titular ni lo vi entrar antes. Revisá ese cambio.');
                             $dir['dudoso'] = true;
                         }
                         if (isset($yaSalieron[$s])) {
-                            $this->aviso('Minuto ' . $accion['minuto'] . ': el jugador TM ' . $s . ' sale dos veces.');
+                            $this->aviso('Minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': el jugador TM ' . $s . ' sale dos veces.');
                             $dir['dudoso'] = true;
                         }
                         $yaSalieron[$s] = true;
@@ -514,11 +516,11 @@ class TmDetallePartido
                     if ($dir['entra'] !== null) {
                         $en = (string) $dir['entra'];
                         if (isset($yaEntraron[$en])) {
-                            $this->aviso('Minuto ' . $accion['minuto'] . ': el jugador TM ' . $en . ' entra dos veces.');
+                            $this->aviso('Minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': el jugador TM ' . $en . ' entra dos veces.');
                             $dir['dudoso'] = true;
                         }
                         if (isset($titulares[$en])) {
-                            $this->aviso('Minuto ' . $accion['minuto'] . ': entra el jugador TM ' . $en
+                            $this->aviso('Minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': entra el jugador TM ' . $en
                                 . ' pero figura como titular. Revisá ese cambio.');
                             $dir['dudoso'] = true;
                         }
@@ -529,7 +531,7 @@ class TmDetallePartido
                         if ($par[1] === null) continue;   // cambio con un solo jugador informado
                         $jugadorId = isset($mapa[(string) $par[1]]) ? $mapa[(string) $par[1]] : null;
                         if (!$jugadorId) {
-                            $this->aviso('Cambio del minuto ' . $accion['minuto'] . ': jugador TM ' . $par[1]
+                            $this->aviso('Cambio del minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': jugador TM ' . $par[1]
                                 . ' sin resolver, salteo el "' . $par[0] . '".');
                             continue;
                         }
@@ -537,6 +539,7 @@ class TmDetallePartido
                             'partido_id' => $partido->id,
                             'jugador_id' => $jugadorId,
                             'minuto'     => $accion['minuto'],
+                            'adicionado' => $accion['adicionado'],
                             'tipo'       => $par[0],
                             '_nombre'    => $this->nombreJugador($jugadorId),
                             '_equipo'    => $lado['equipo_nombre'],
@@ -824,6 +827,8 @@ class TmDetallePartido
             // nunca se le bajó el detalle, y la pantalla dice eso en una línea
             // en vez de escupir uno por gol.
             'avisos_apareo' => [],
+            // El repaso de minutos, que va en el mismo viaje: ver repasarMinutos().
+            'minutos'       => null,
         ];
 
         $partido = Partido::find($partidoId);
@@ -832,15 +837,29 @@ class TmDetallePartido
             return $informe;
         }
 
-        // Un partido sin goles cargados no tiene nada que corregir. Se corta
+        // Un partido sin NADA cargado no tiene nada que corregir. Se corta
         // ANTES de gastar la llamada.
+        //
+        // Mira las cuatro tablas, no sólo los goles: desde que el pase también
+        // repasa los minutos (ver `repasarMinutos()`), un partido sin goles
+        // pero con tarjetas o cambios cargados sí tiene qué corregir. Cortar
+        // por los goles solos lo dejaría afuera para siempre.
         $filas = DB::table('gols')->where('partido_id', $partido->id)
-            ->orderBy('minuto')->orderBy('id')->get();
+            ->orderBy('minuto')->orderBy('adicionado')->orderBy('id')->get();
         $informe['goles_base'] = count($filas);
-        if (count($filas) === 0) {
+
+        $otras = 0;
+        foreach (['tarjetas', 'cambios', 'penals'] as $t) {
+            $otras += DB::table($t)->where('partido_id', $partido->id)->count();
+        }
+
+        if (count($filas) === 0 && $otras === 0) {
             $informe['ok'] = true;
             $informe['escrito'] = true;   // no hay nada que escribir, pero se dio por revisado
-            if ($escribir) self::marcarTiposGolRevisados([(int) $partido->id]);
+            if ($escribir) {
+                self::marcarTiposGolRevisados([(int) $partido->id]);
+                self::marcarMinutosRevisados([(int) $partido->id]);
+            }
             $informe['avisos'] = $this->avisos;
             return $informe;
         }
@@ -880,6 +899,7 @@ class TmDetallePartido
                     'tm_id'      => $tmId,
                     'jugador_id' => isset($mapa[(string) $tmId]) ? $mapa[(string) $tmId] : null,
                     'minuto'     => $accion['minuto'],
+                    'adicionado' => $accion['adicionado'],
                     'tipo'       => $t['tipo'],
                     'fuente'     => $t['fuente'],
                 ];
@@ -900,13 +920,25 @@ class TmDetallePartido
             $porJugador[(int) $f->jugador_id][] = (int) $f->id;
         }
 
-        $buscar = function ($jugadorId, $minuto, $tolerancia) use (&$libres) {
+        $buscar = function ($jugadorId, $minuto, $adicionado, $tolerancia) use (&$libres) {
             foreach ($libres as $id => $f) {
                 if ((int) $f->jugador_id !== (int) $jugadorId) continue;
                 // Si a uno de los dos le falta el minuto no se puede comparar:
                 // ese caso lo levanta la tercera pasada (el gol único del jugador).
                 if ($minuto === null || $f->minuto === null) continue;
-                if (abs((int) $f->minuto - (int) $minuto) <= $tolerancia) return $id;
+
+                // Se compara con `orden()` y contra las formas viejas del minuto:
+                // el gol de los 90+6 puede estar cargado como 90 (TM tiraba el
+                // descuento) o como 96 (promiedos lo sumaba), y las dos son el
+                // mismo gol. Ver MinutoHelper.
+                $of = MinutoHelper::orden($f->minuto, isset($f->adicionado) ? $f->adicionado : null);
+                $ordenes = [MinutoHelper::orden($minuto, $adicionado)];
+                foreach (MinutoHelper::formasViejas($minuto, $adicionado) as $m) {
+                    $ordenes[] = MinutoHelper::orden($m, null);
+                }
+                foreach ($ordenes as $o) {
+                    if (abs($of - $o) <= $tolerancia * 100) return $id;
+                }
             }
             return null;
         };
@@ -924,7 +956,7 @@ class TmDetallePartido
                     ? ((isset($porJugador[$g['jugador_id']]) && count($porJugador[$g['jugador_id']]) === 1
                         && isset($libres[$porJugador[$g['jugador_id']][0]]))
                             ? $porJugador[$g['jugador_id']][0] : null)
-                    : $buscar($g['jugador_id'], $g['minuto'], $tolerancia);
+                    : $buscar($g['jugador_id'], $g['minuto'], $g['adicionado'], $tolerancia);
 
                 if ($id === null) { $quedan[] = $g; continue; }
                 $pares[] = ['tm' => $g, 'fila' => $libres[$id], 'como' => $tolerancia];
@@ -950,10 +982,12 @@ class TmDetallePartido
 
             $nombre = $this->nombreJugador((int) $p['fila']->jugador_id);
             $min    = $p['fila']->minuto;
+            $minTxt = MinutoHelper::texto($min, isset($p['fila']->adicionado) ? $p['fila']->adicionado : null, 'sin minuto');
+            $tmTxt  = MinutoHelper::texto($p['tm']['minuto'], $p['tm']['adicionado'], 'sin minuto');
 
             // El gol en contra no se pisa: ver el comentario de arriba.
             if ($de === self::GOL_ENCONTRA || $a === self::GOL_ENCONTRA) {
-                $this->aviso('Ojo con el gol de ' . $nombre . ($min === null ? '' : ' (' . (int) $min . '\')')
+                $this->aviso('Ojo con el gol de ' . $nombre . ($min === null ? '' : ' (' . $minTxt . '\')')
                     . ': la base dice "' . $de . '" y Transfermarkt "' . $a . '". Uno de los dos lo tiene como '
                     . 'gol en contra, y eso cambia de equipo el gol: no lo toco. Revisalo a mano en las incidencias.');
                 continue;
@@ -964,6 +998,7 @@ class TmDetallePartido
                 'jugador_id' => (int) $p['fila']->jugador_id,
                 'nombre'     => $nombre,
                 'minuto'     => $min === null ? null : (int) $min,
+                'minuto_texto' => $minTxt,
                 'de'         => $de,
                 'a'          => $a,
                 'fuente'     => $p['tm']['fuente'],
@@ -975,8 +1010,8 @@ class TmDetallePartido
             if ($p['como'] !== 0) {
                 $this->aviso('El gol de ' . $nombre . ' lo aparejé por ' .
                     ($p['como'] === 1 ? 'minuto aproximado (±1)' : 'ser el único gol suyo en el partido')
-                    . ', no por minuto exacto: la base dice ' . ($min === null ? 'sin minuto' : $min . '\'')
-                    . ' y Transfermarkt ' . ($p['tm']['minuto'] === null ? 'sin minuto' : $p['tm']['minuto'] . '\'')
+                    . ', no por minuto exacto: la base dice ' . $minTxt
+                    . ' y Transfermarkt ' . $tmTxt
                     . '. El tipo que le pongo es "' . $a . '" — si el minuto es de otro gol, revisalo.');
             }
         }
@@ -987,14 +1022,14 @@ class TmDetallePartido
             if ($g['jugador_id'] === null) $informe['sueltos_sin_mapear']++;
             $quien = $g['jugador_id'] ? $this->nombreJugador((int) $g['jugador_id']) : 'TM ' . $g['tm_id'];
             $informe['avisos_apareo'][] = ('Transfermarkt tiene un gol de ' . $quien
-                . ($g['minuto'] === null ? '' : ' (' . (int) $g['minuto'] . '\')') . ' tipo "' . $g['tipo']
+                . ($g['minuto'] === null ? '' : ' (' . MinutoHelper::texto($g['minuto'], $g['adicionado']) . '\')') . ' tipo "' . $g['tipo']
                 . '" que no encontré entre los goles cargados de este partido'
                 . ($g['jugador_id'] ? '' : ' (ese jugador no está mapeado en jugador_tm)')
                 . '. No lo creo: revisá las incidencias.');
         }
         foreach ($libres as $f) {
             $informe['avisos_apareo'][] = ('El gol cargado de ' . $this->nombreJugador((int) $f->jugador_id)
-                . ($f->minuto === null ? '' : ' (' . (int) $f->minuto . '\')') . ', tipo "' . $f->tipo
+                . ($f->minuto === null ? '' : ' (' . MinutoHelper::texto($f->minuto, isset($f->adicionado) ? $f->adicionado : null) . '\')') . ', tipo "' . $f->tipo
                 . '", no aparece en Transfermarkt. Lo dejo como está.');
         }
 
@@ -1025,8 +1060,282 @@ class TmDetallePartido
             }
         }
 
+        // ── El repaso de minutos, en el mismo viaje ───────────────────────
+        // El JSON ya está bajado y trae el descuento en la MISMA acción que el
+        // tipo de gol: preguntarlo aparte sería pagar dos veces lo mismo. Por
+        // eso cuesta 0 llamadas y por eso los dos repasos comparten pantalla.
+        //
+        // Va en su propio try: un error acá no puede tirar abajo la corrección
+        // de tipos, que ya está escrita.
+        try {
+            $informe['minutos'] = $this->repasarMinutos($partido, $game, $lados, $mapa, $escribir);
+            if ($escribir) self::marcarMinutosRevisados([(int) $partido->id]);
+        } catch (\Exception $e) {
+            $informe['minutos'] = null;
+            $this->aviso('No pude repasar los minutos de este partido: ' . $e->getMessage());
+            Log::error('TmDetallePartido repasarMinutos partido ' . $partido->id . ': ' . $e->getMessage());
+        }
+
         $informe['avisos'] = $this->avisos;
         return $informe;
+    }
+
+
+    /**
+     * Repaso de minutos: le pone el descuento a lo que YA estaba cargado.
+     *
+     * Va pegado al repaso de tipos de gol y por el mismo motivo: el JSON del
+     * partido ya está bajado y pago (1 llamada), y trae el descuento en la
+     * misma acción que el tipo. Preguntarlo dos veces sería pagar dos veces lo
+     * mismo.
+     *
+     * Qué repara. Antes del 05/09/2026 el descuento se perdía, y cada fuente lo
+     * perdía distinto:
+     *   · Transfermarkt: tiraba `addedTime`      → el 90+6 quedó como 90
+     *   · promiedos:     sumaba el del 2º tiempo → el 90+6 quedó como 96
+     *                    y colapsaba el del 1º   → el 45+2 quedó como 45
+     * Por eso el apareo acepta las TRES formas (ver MinutoHelper::formasViejas):
+     * la fila vieja no dice el mismo número que TM aunque sea la misma jugada.
+     *
+     * Toca las cuatro tablas —goles, tarjetas, cambios y penales— porque el
+     * descuento se perdía en las cuatro. NO crea ni borra ninguna fila: lo
+     * único que escribe es `minuto` y `adicionado` de filas que ya existían.
+     * Un evento de TM que no aparea con nada cargado se informa y se deja
+     * pasar; una fila cargada que TM no tiene se deja como está.
+     *
+     * Un cambio y un penal atajado tienen dos protagonistas y una sola hora: el
+     * minuto del evento vale para los dos jugadores.
+     *
+     * Las filas «Convirtieron» de `penals` no aparean contra nada de TM —las
+     * crea ControlPenales a partir del gol de penal, no vienen del JSON—, así
+     * que se mueven pegadas a su gol: ControlPenales cruza `gols` con `penals`
+     * por partido + minuto, y corregir el gol sin corregirlas rompería el cruce.
+     *
+     * @param bool  $escribir  false = vista previa, no toca la base
+     * @return array informe del repaso
+     */
+    private function repasarMinutos(Partido $partido, array $game, array $lados, array $mapa, $escribir)
+    {
+        $res = [
+            'cambios'      => [],   // qué hay que corregir (o se corrigió)
+            'por_tabla'    => [],   // tabla => cuántas filas cambian
+            'apareados'    => 0,
+            'sueltos_tm'   => 0,    // eventos de TM sin fila cargada
+            'sueltos_base' => 0,    // filas cargadas que TM no tiene
+            'escrito'      => false,
+        ];
+
+        $tablas = [
+            'gol'     => ['tabla' => 'gols',     'nombre' => 'gol'],
+            'tarjeta' => ['tabla' => 'tarjetas', 'nombre' => 'tarjeta'],
+            'cambio'  => ['tabla' => 'cambios',  'nombre' => 'cambio'],
+            'penal'   => ['tabla' => 'penals',   'nombre' => 'penal'],
+        ];
+
+        // ── Los eventos según Transfermarkt, uno por protagonista ─────────
+        $eventos = [];
+        foreach ($lados as $lado) {
+            foreach ($this->accionesDelLado($game, $lado['clave']) as $accion) {
+                if (!isset($tablas[$accion['clase']])) continue;
+
+                // El tipo sólo se usa para desempatar dos filas del mismo
+                // jugador que caen en el mismo minuto. En los cambios y los
+                // penales no se puede saber sin la alineación, y no hace falta.
+                $tipo = null;
+                if ($accion['clase'] === 'gol') {
+                    $t = $this->tipoGol($accion['crudo']);
+                    $tipo = $t['tipo'];
+                } elseif ($accion['clase'] === 'tarjeta') {
+                    $t = $this->tipoTarjeta($accion['crudo']);
+                    $tipo = $t['tipo'];
+                }
+
+                foreach (array_values($accion['ids']) as $i => $tmId) {
+                    if ($tmId === null) continue;
+                    $jid = isset($mapa[(string) $tmId]) ? $mapa[(string) $tmId] : null;
+                    if ($jid === null) continue;   // sin mapear no hay con qué aparear
+
+                    $eventos[$accion['clase']][] = [
+                        'jugador_id' => (int) $jid,
+                        'minuto'     => $accion['minuto'],
+                        'adicionado' => $accion['adicionado'],
+                        'tipo'       => $tipo,
+                        'tm_id'      => $tmId,
+                        // El segundo protagonista de un penal es el arquero, y
+                        // sólo lleva fila cuando lo atajó: que no aparee es lo
+                        // normal, no un evento perdido.
+                        'opcional'   => ($accion['clase'] === 'penal' && $i > 0),
+                    ];
+                }
+            }
+        }
+
+        $aEscribir = [];
+
+        foreach ($tablas as $clase => $cfg) {
+            $filas = DB::table($cfg['tabla'])->where('partido_id', $partido->id)
+                ->orderBy('minuto')->orderBy('adicionado')->orderBy('id')->get();
+
+            $libres = [];
+            foreach ($filas as $f) {
+                // Ver arriba: las «Convirtieron» viajan con su gol.
+                if ($cfg['tabla'] === 'penals' && (string) $f->tipo === self::PEN_CONVIRTIERON) continue;
+                $libres[(int) $f->id] = $f;
+            }
+
+            // Tres pasadas, de la más exigente a la más floja: minuto
+            // compatible, minuto ±1, y el caso fácil —el jugador tiene una sola
+            // fila de esa clase en el partido—.
+            $pares = [];
+            $pendientes = isset($eventos[$clase]) ? $eventos[$clase] : [];
+            foreach ([0, 1, null] as $tolerancia) {
+                $quedan = [];
+                foreach ($pendientes as $ev) {
+                    $id = $this->filaParaEvento($ev, $libres, $tolerancia);
+                    if ($id === null) { $quedan[] = $ev; continue; }
+                    $pares[] = ['ev' => $ev, 'fila' => $libres[$id], 'como' => $tolerancia];
+                    unset($libres[$id]);
+                }
+                $pendientes = $quedan;
+            }
+
+            $res['apareados'] += count($pares);
+            foreach ($pendientes as $ev) {
+                if (empty($ev['opcional'])) $res['sueltos_tm']++;
+            }
+            $res['sueltos_base'] += count($libres);
+
+            foreach ($pares as $p) {
+                $f = $p['fila'];
+
+                $mAct = ($f->minuto === null || $f->minuto === '') ? null : (int) $f->minuto;
+                $aAct = (isset($f->adicionado) && $f->adicionado !== null && $f->adicionado !== '')
+                    ? (int) $f->adicionado : null;
+                $mTm  = $p['ev']['minuto'];
+                $aTm  = $p['ev']['adicionado'];
+
+                // Si TM no sabe el minuto, no se pisa lo que haya cargado:
+                // un dato que falta nunca gana contra uno que está.
+                if ($mTm === null) continue;
+                if ($mAct === $mTm && (int) $aAct === (int) $aTm) continue;
+
+                $cambio = [
+                    'tabla'      => $cfg['tabla'],
+                    'que'        => $cfg['nombre'],
+                    'fila_id'    => (int) $f->id,
+                    'jugador_id' => (int) $f->jugador_id,
+                    'nombre'     => $this->nombreJugador((int) $f->jugador_id),
+                    'tipo'       => isset($f->tipo) ? (string) $f->tipo : null,
+                    'de'         => MinutoHelper::texto($mAct, $aAct, 'sin minuto'),
+                    'a'          => MinutoHelper::texto($mTm, $aTm),
+                    'flojo'      => ($p['como'] !== 0),
+                ];
+                $res['cambios'][] = $cambio;
+                $res['por_tabla'][$cfg['tabla']] = (isset($res['por_tabla'][$cfg['tabla']])
+                    ? $res['por_tabla'][$cfg['tabla']] : 0) + 1;
+
+                $aEscribir[$cfg['tabla']][(int) $f->id] = ['minuto' => $mTm, 'adicionado' => $aTm];
+
+                if ($p['como'] !== 0) {
+                    $this->aviso('El ' . $cfg['nombre'] . ' de ' . $cambio['nombre'] . ' lo aparejé por '
+                        . ($p['como'] === 1 ? 'minuto aproximado (±1)' : 'ser el único suyo en el partido')
+                        . ', no por minuto exacto: la base dice ' . $cambio['de'] . ' y Transfermarkt '
+                        . $cambio['a'] . '. Si es de otra jugada, revisalo.');
+                }
+
+                // Las «Convirtieron» viajan con su gol de penal.
+                if ($cfg['tabla'] === 'gols' && (string) $f->tipo === self::GOL_PENAL) {
+                    $companeras = DB::table('penals')
+                        ->where('partido_id', $partido->id)
+                        ->where('tipo', self::PEN_CONVIRTIERON)
+                        ->whereRaw('minuto <=> ?', [$mAct])
+                        ->whereRaw('adicionado <=> ?', [$aAct])
+                        ->pluck('id')->all();
+
+                    if (count($companeras) === 1) {
+                        $aEscribir['penals'][(int) $companeras[0]] = ['minuto' => $mTm, 'adicionado' => $aTm];
+                        $res['por_tabla']['penals'] = (isset($res['por_tabla']['penals'])
+                            ? $res['por_tabla']['penals'] : 0) + 1;
+                    } elseif (count($companeras) > 1) {
+                        $this->aviso('El gol de penal de ' . $cambio['nombre'] . ' pasa de ' . $cambio['de']
+                            . ' a ' . $cambio['a'] . ', pero hay ' . count($companeras) . ' filas «Convirtieron» '
+                            . 'en ese mismo minuto y no sé cuál es la suya: movelas a mano o volvé a correr el '
+                            . 'control de penales.');
+                    }
+                }
+            }
+        }
+
+        if ($escribir && !empty($aEscribir)) {
+            DB::transaction(function () use ($aEscribir) {
+                foreach ($aEscribir as $tabla => $filas) {
+                    foreach ($filas as $id => $vals) {
+                        DB::table($tabla)->where('id', $id)->update($vals);
+                    }
+                }
+            });
+            $res['escrito'] = true;
+        }
+
+        return $res;
+    }
+
+    /**
+     * Qué fila cargada le corresponde a un evento de Transfermarkt.
+     *
+     * Se busca SOLO entre las filas del mismo jugador y de la misma tabla, así
+     * que el tipo no hace falta para acertar: sirve nada más para desempatar
+     * cuando el jugador tiene dos filas que caen igual de cerca.
+     *
+     * `$tolerancia` en minutos: 0 exige que el minuto coincida, 1 lo afloja a
+     * ±1 (las crónicas no siempre cuentan igual el descuento) y `null` es la
+     * última pasada, la del caso fácil: el jugador tiene una sola fila.
+     *
+     * El minuto se compara con `MinutoHelper::orden()`, que ordena bien el 90,
+     * el 90+6 y el 91; y se acepta cualquiera de las formas viejas del evento
+     * porque la fila cargada puede tener el descuento tirado o sumado.
+     */
+    private function filaParaEvento(array $ev, array $libres, $tolerancia)
+    {
+        $candidatos = [];
+        foreach ($libres as $id => $f) {
+            if ((int) $f->jugador_id !== (int) $ev['jugador_id']) continue;
+            $candidatos[$id] = $f;
+        }
+        if (empty($candidatos)) return null;
+
+        if ($tolerancia === null) {
+            if (count($candidatos) !== 1) return null;
+            $ids = array_keys($candidatos);
+            return $ids[0];
+        }
+
+        if ($ev['minuto'] === null) return null;
+
+        // Los valores con los que este evento pudo haber quedado guardado.
+        $ordenes = [MinutoHelper::orden($ev['minuto'], $ev['adicionado'])];
+        foreach (MinutoHelper::formasViejas($ev['minuto'], $ev['adicionado']) as $m) {
+            $ordenes[] = MinutoHelper::orden($m, null);
+        }
+
+        $mejor = null;
+        $mejorPeso = null;
+        foreach ($candidatos as $id => $f) {
+            if ($f->minuto === null || $f->minuto === '') continue;
+            $of = MinutoHelper::orden($f->minuto, isset($f->adicionado) ? $f->adicionado : null);
+
+            foreach ($ordenes as $o) {
+                $d = abs($of - $o);
+                if ($d > $tolerancia * 100) continue;
+                // A igual distancia gana el del mismo tipo.
+                $peso = $d - (($ev['tipo'] !== null && isset($f->tipo) && (string) $f->tipo === (string) $ev['tipo']) ? 1 : 0);
+                if ($mejorPeso === null || $peso < $mejorPeso) {
+                    $mejor = $id;
+                    $mejorPeso = $peso;
+                }
+            }
+        }
+        return $mejor;
     }
 
     /**
@@ -1122,6 +1431,28 @@ class TmDetallePartido
                 ->update(['tipos_gol_revisado_at' => now()]);
         } catch (\Exception $e) {
             Log::error('marcarTiposGolRevisados: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Lo mismo para el repaso de minutos (`repasarMinutos()`).
+     *
+     * La marca es SUYA y no la comparte con `tipos_gol_revisado_at`: los
+     * partidos que ya figuraban revisados de tipo lo fueron antes de que el
+     * descuento existiera, así que esa marca no dice nada sobre los minutos.
+     * Compartirla los daría por repasados sin haberlos mirado nunca.
+     */
+    public static function marcarMinutosRevisados(array $partidoIds)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        if (empty($ids)) return;
+        if (!Schema::hasColumn('import_partidos', 'minutos_revisado_at')) return;
+
+        try {
+            DB::table('import_partidos')->whereIn('partido_id', $ids)
+                ->update(['minutos_revisado_at' => now()]);
+        } catch (\Exception $e) {
+            Log::error('marcarMinutosRevisados: ' . $e->getMessage());
         }
     }
 
@@ -1498,8 +1829,24 @@ class TmDetallePartido
                 $minuto = $this->valor($a, self::$kMinuto);
                 $minuto = ($minuto === null || $minuto === '') ? null : (int) $minuto;
 
-                // El minuto que guardamos es el del reloj: 90+7 se carga como 90,
-                // igual que hace el import de incidencias de promiedos.
+                // El descuento va APARTE del minuto del reloj: el 90+6 se guarda
+                // como minuto 90 + adicionado 6.
+                //
+                // Hasta el 05/09/2026 `addedTime` ni se leía —la clave estaba
+                // declarada en $kAgregado y nadie la usaba—, así que el 90+6 y el
+                // 90+9 entraban los dos como minuto 90: dos goles distintos del
+                // mismo jugador quedaban indistinguibles de una carga duplicada, y
+                // el control «Goles repetidos» los marcaba como tal.
+                //
+                // `normalizar()` acomoda lo que manda TM al criterio de la base:
+                // descuento 0 → NULL, y un descuento colgado de un minuto que no
+                // cierra ningún período se suma. Ver App\Services\MinutoHelper.
+                $adicionado = $this->valor($a, self::$kAgregado);
+                $adicionado = ($adicionado === null || $adicionado === '') ? null : (int) $adicionado;
+                $norm       = MinutoHelper::normalizar($minuto, $adicionado);
+                $minuto     = $norm['minuto'];
+                $adicionado = $norm['adicionado'];
+
                 $activo  = $this->valor($a, self::$kJugador);
                 $pasivo  = $this->valor($a, self::$kOtro);
 
@@ -1508,7 +1855,8 @@ class TmDetallePartido
                         $this->aviso('Cambio sin ids de jugador: ' . $this->resumenCrudo($a));
                         continue;
                     }
-                    $out[] = ['clase' => 'cambio', 'minuto' => $minuto, 'ids' => [$activo, $pasivo], 'crudo' => $a];
+                    $out[] = ['clase' => 'cambio', 'minuto' => $minuto, 'adicionado' => $adicionado,
+                              'ids' => [$activo, $pasivo], 'crudo' => $a];
                 } elseif ($clase === 'penal') {
                     // Los dos ids importan: el pateador y el arquero. El arquero
                     // puede faltar (una pelota afuera no la ataja nadie).
@@ -1516,13 +1864,15 @@ class TmDetallePartido
                         $this->aviso('Penal fallado sin id del pateador: ' . $this->resumenCrudo($a));
                         continue;
                     }
-                    $out[] = ['clase' => 'penal', 'minuto' => $minuto, 'ids' => [$activo, $pasivo], 'crudo' => $a];
+                    $out[] = ['clase' => 'penal', 'minuto' => $minuto, 'adicionado' => $adicionado,
+                              'ids' => [$activo, $pasivo], 'crudo' => $a];
                 } else {
                     if ($activo === null) {
                         $this->aviso(ucfirst($clase) . ' sin id de jugador: ' . $this->resumenCrudo($a));
                         continue;
                     }
-                    $out[] = ['clase' => $clase, 'minuto' => $minuto, 'ids' => [$activo], 'crudo' => $a];
+                    $out[] = ['clase' => $clase, 'minuto' => $minuto, 'adicionado' => $adicionado,
+                              'ids' => [$activo], 'crudo' => $a];
                 }
             }
         }
@@ -1535,8 +1885,12 @@ class TmDetallePartido
         foreach ($out as &$o) { $o['_i'] = $i++; }
         unset($o);
         usort($out, function ($x, $y) {
-            $mx = $x['minuto'] === null ? PHP_INT_MAX : $x['minuto'];
-            $my = $y['minuto'] === null ? PHP_INT_MAX : $y['minuto'];
+            // El orden mira minuto Y descuento: el 90 va antes del 90+6, y el
+            // 90+6 antes del 90+9. Comparar sólo el minuto del reloj dejaba a
+            // todo el descuento empatado en 90 y el desempate quedaba en el
+            // orden en que TM los mandó.
+            $mx = MinutoHelper::orden($x['minuto'], isset($x['adicionado']) ? $x['adicionado'] : null);
+            $my = MinutoHelper::orden($y['minuto'], isset($y['adicionado']) ? $y['adicionado'] : null);
             if ($mx !== $my) return $mx < $my ? -1 : 1;
             return $x['_i'] < $y['_i'] ? -1 : ($x['_i'] > $y['_i'] ? 1 : 0);
         });
@@ -1715,7 +2069,7 @@ class TmDetallePartido
 
                 $motivo = $this->motivoPenal($accion['crudo']);
                 if ($motivo['dudoso']) {
-                    $this->aviso('Penal del minuto ' . $accion['minuto'] . ': no reconozco «'
+                    $this->aviso('Penal del minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': no reconozco «'
                         . $motivo['fuente'] . '». Lo cargo como Errado; si el arquero lo atajó, '
                         . 'corregilo a mano y avisá para sumar esa palabra al importador.');
                 }
@@ -1726,6 +2080,7 @@ class TmDetallePartido
                     'partido_id' => $partido->id,
                     'jugador_id' => $pateadorId,
                     'minuto'     => $accion['minuto'],
+                    'adicionado' => $accion['adicionado'],
                     'tipo'       => $motivo['atajado'] ? self::PEN_ATAJADO : self::PEN_ERRADO,
                     '_nombre'    => $this->nombreJugador($pateadorId),
                     '_equipo'    => $lado['equipo_nombre'],
@@ -1740,7 +2095,7 @@ class TmDetallePartido
                 $arqueroId = ($arqueroTm !== null && isset($mapa[(string) $arqueroTm]))
                     ? $mapa[(string) $arqueroTm] : null;
                 if (!$arqueroId) {
-                    $this->aviso('Penal atajado en el minuto ' . $accion['minuto'] . ': Transfermarkt no '
+                    $this->aviso('Penal atajado en el minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado']) . ': Transfermarkt no '
                         . 'dice qué arquero lo atajó (o no lo pude resolver), así que cargo sólo el '
                         . '«Atajado» del pateador. El «Atajó» del arquero ponelo a mano.');
                     continue;
@@ -1750,6 +2105,7 @@ class TmDetallePartido
                     'partido_id' => $partido->id,
                     'jugador_id' => $arqueroId,
                     'minuto'     => $accion['minuto'],
+                    'adicionado' => $accion['adicionado'],
                     'tipo'       => self::PEN_ATAJO,
                     '_nombre'    => $this->nombreJugador($arqueroId),
                     '_equipo'    => $otroNombre,
@@ -3200,7 +3556,11 @@ class TmDetallePartido
      * A diferencia de goles o tarjetas, `penals` puede tener filas puestas a
      * mano y filas creadas por ControlPenales, así que no se borra todo y se
      * reescribe: se inserta sólo lo que no está. La identidad de una fila es
-     * partido + jugador + minuto + tipo (`<=>` porque el minuto puede ser NULL).
+     * partido + jugador + minuto + descuento + tipo (`<=>` porque los dos
+     * minutos pueden ser NULL).
+     *
+     * El descuento entra en la identidad: dos penales del mismo jugador a los
+     * 90+2 y a los 90+8 son dos penales, no una carga repetida.
      */
     private function grabarPenales(array $filas)
     {
@@ -3214,6 +3574,7 @@ class TmDetallePartido
                 ->where('jugador_id', $f['jugador_id'])
                 ->where('tipo', $f['tipo'])
                 ->whereRaw('minuto <=> ?', [$f['minuto']])
+                ->whereRaw('adicionado <=> ?', [isset($f['adicionado']) ? $f['adicionado'] : null])
                 ->exists();
             if ($ya) continue;
             $nuevas[] = $r;

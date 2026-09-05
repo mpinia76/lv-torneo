@@ -4,5 +4,5 @@
     <span class="ctrl-chip neutro">{{ $fila->tipo }}</span>
 @endif
 @if(isset($fila->minuto) && $fila->minuto !== null)
-    <span class="ctrl-sub">minuto {{ $fila->minuto }}</span>
+    <span class="ctrl-sub">minuto {{ \App\Services\MinutoHelper::texto($fila->minuto, $fila->adicionado ?? null) }}</span>
 @endif

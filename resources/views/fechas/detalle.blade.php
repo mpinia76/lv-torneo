@@ -290,7 +290,7 @@
                                         $goleador=array();
                                         foreach ($arrayGoles as &$arrayGol){
                                             if ($titularl->jugador->id==$arrayGol['jugador_id']){
-                                                $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                $goleador[]=array($arrayGol['tipo'], \App\Services\MinutoHelper::texto($arrayGol['minuto'], $arrayGol['adicionado'] ?? null, ''));
                                                 $arrayGol['dorsal']=$titularl->dorsal;
                                                 $arrayGol['jugador']=$titularl->jugador->persona->full_name;
                                                 $arrayGol['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
@@ -301,7 +301,7 @@
                                         $incPenales=array();
                                         foreach ($arrayPenales as &$arrayPenal){
                                             if ($titularl->jugador->id==$arrayPenal['jugador_id']){
-                                                $incPenales[]=array($arrayPenal['tipo'],$arrayPenal['minuto']);
+                                                $incPenales[]=array($arrayPenal['tipo'], \App\Services\MinutoHelper::texto($arrayPenal['minuto'], $arrayPenal['adicionado'] ?? null, ''));
                                                 $arrayPenal['dorsal']=$titularl->dorsal;
                                                 $arrayPenal['jugador']=$titularl->jugador->persona->full_name;
                                                 $arrayPenal['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
@@ -312,7 +312,7 @@
                                         $tarjetero=array();
                                         foreach ($arrayTarjetas as &$arrayTarjeta){
                                             if ($titularl->jugador->id==$arrayTarjeta['jugador_id']){
-                                                $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                $tarjetero[]=array($arrayTarjeta['tipo'], \App\Services\MinutoHelper::texto($arrayTarjeta['minuto'], $arrayTarjeta['adicionado'] ?? null, ''));
                                                 $arrayTarjeta['dorsal']=$titularl->dorsal;
                                                 $arrayTarjeta['jugador']=$titularl->jugador->persona->full_name;
                                                 $arrayTarjeta['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
@@ -323,7 +323,7 @@
                                         $tieneCambio=array();
                                         foreach ($arrayCambios as &$arrayCambio){
                                             if ($titularl->jugador->id==$arrayCambio['jugador_id']){
-                                                $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                $tieneCambio[]=array($arrayCambio['tipo'], \App\Services\MinutoHelper::texto($arrayCambio['minuto'], $arrayCambio['adicionado'] ?? null, ''));
                                                 $arrayCambio['dorsal']=$titularl->dorsal;
                                                 $arrayCambio['jugador']=$titularl->jugador->persona->full_name;
                                                 $arrayCambio['foto']=($titularl->jugador->persona->foto)?$titularl->jugador->persona->foto:'sin_foto.png';
@@ -424,7 +424,7 @@
                                                     //print_r($arrayGol);
                                                     if ($titularv->jugador->id==$arrayGol['jugador_id']){
 
-                                                        $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                        $goleador[]=array($arrayGol['tipo'], \App\Services\MinutoHelper::texto($arrayGol['minuto'], $arrayGol['adicionado'] ?? null, ''));
                                                         $arrayGol['dorsal']=$titularv->dorsal;
                                                         $arrayGol['jugador']=$titularv->jugador->persona->full_name;
                                                         $arrayGol['foto']=($titularv->jugador->persona->foto)?$titularv->jugador->persona->foto:'sin_foto.png';
@@ -434,7 +434,7 @@
                                                 $incPenales=array();
                                                 foreach ($arrayPenales as &$arrayPenal){
                                                     if ($titularv->jugador->id==$arrayPenal['jugador_id']){
-                                                        $incPenales[]=array($arrayPenal['tipo'],$arrayPenal['minuto']);
+                                                        $incPenales[]=array($arrayPenal['tipo'], \App\Services\MinutoHelper::texto($arrayPenal['minuto'], $arrayPenal['adicionado'] ?? null, ''));
                                                         $arrayPenal['dorsal']=$titularv->dorsal;
                                                         $arrayPenal['jugador']=$titularv->jugador->persona->full_name;
                                                         $arrayPenal['foto']=($titularv->jugador->persona->foto)?$titularv->jugador->persona->foto:'sin_foto.png';
@@ -445,7 +445,7 @@
                                                 $tarjetero=array();
                                                 foreach ($arrayTarjetas as &$arrayTarjeta){
                                                     if ($titularv->jugador->id==$arrayTarjeta['jugador_id']){
-                                                        $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                        $tarjetero[]=array($arrayTarjeta['tipo'], \App\Services\MinutoHelper::texto($arrayTarjeta['minuto'], $arrayTarjeta['adicionado'] ?? null, ''));
                                                         $arrayTarjeta['dorsal']=$titularv->dorsal;
                                                         $arrayTarjeta['jugador']=$titularv->jugador->persona->full_name;
                                                         $arrayTarjeta['foto']=($titularv->jugador->persona->foto)?$titularv->jugador->persona->foto:'sin_foto.png';
@@ -456,7 +456,7 @@
                                                 $tieneCambio=array();
                                                 foreach ($arrayCambios as &$arrayCambio){
                                                     if ($titularv->jugador->id==$arrayCambio['jugador_id']){
-                                                        $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                        $tieneCambio[]=array($arrayCambio['tipo'], \App\Services\MinutoHelper::texto($arrayCambio['minuto'], $arrayCambio['adicionado'] ?? null, ''));
                                                         $arrayCambio['dorsal']=$titularv->dorsal;
                                                         $arrayCambio['jugador']=$titularv->jugador->persona->full_name;
                                                         $arrayCambio['foto']=($titularv->jugador->persona->foto)?$titularv->jugador->persona->foto:'sin_foto.png';
@@ -561,7 +561,7 @@
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
                                                     if ($suplentel->jugador->id==$arrayGol['jugador_id']){
-                                                        $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                        $goleador[]=array($arrayGol['tipo'], \App\Services\MinutoHelper::texto($arrayGol['minuto'], $arrayGol['adicionado'] ?? null, ''));
                                                         $arrayGol['dorsal']=$suplentel->dorsal;
                                                         $arrayGol['jugador']=$suplentel->jugador->persona->full_name;
                                                         $arrayGol['foto']=($suplentel->jugador->persona->foto)?$suplentel->jugador->persona->foto:'sin_foto.png';
@@ -571,7 +571,7 @@
                                                 $incPenales=array();
                                                 foreach ($arrayPenales as &$arrayPenal){
                                                     if ($suplentel->jugador->id==$arrayPenal['jugador_id']){
-                                                        $incPenales[]=array($arrayPenal['tipo'],$arrayPenal['minuto']);
+                                                        $incPenales[]=array($arrayPenal['tipo'], \App\Services\MinutoHelper::texto($arrayPenal['minuto'], $arrayPenal['adicionado'] ?? null, ''));
                                                         $arrayPenal['dorsal']=$suplentel->dorsal;
                                                         $arrayPenal['jugador']=$suplentel->jugador->persona->full_name;
                                                         $arrayPenal['foto']=($suplentel->jugador->persona->foto)?$suplentel->jugador->persona->foto:'sin_foto.png';
@@ -582,7 +582,7 @@
                                                 $tarjetero=array();
                                                 foreach ($arrayTarjetas as &$arrayTarjeta){
                                                     if ($suplentel->jugador->id==$arrayTarjeta['jugador_id']){
-                                                        $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                        $tarjetero[]=array($arrayTarjeta['tipo'], \App\Services\MinutoHelper::texto($arrayTarjeta['minuto'], $arrayTarjeta['adicionado'] ?? null, ''));
                                                         $arrayTarjeta['dorsal']=$suplentel->dorsal;
                                                         $arrayTarjeta['jugador']=$suplentel->jugador->persona->full_name;
                                                         $arrayTarjeta['foto']=($suplentel->jugador->persona->foto)?$suplentel->jugador->persona->foto:'sin_foto.png';
@@ -593,7 +593,7 @@
                                                 $tieneCambio=array();
                                                 foreach ($arrayCambios as &$arrayCambio){
                                                     if ($suplentel->jugador->id==$arrayCambio['jugador_id']){
-                                                        $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                        $tieneCambio[]=array($arrayCambio['tipo'], \App\Services\MinutoHelper::texto($arrayCambio['minuto'], $arrayCambio['adicionado'] ?? null, ''));
                                                         $arrayCambio['dorsal']=$suplentel->dorsal;
                                                         $arrayCambio['jugador']=$suplentel->jugador->persona->full_name;
                                                         $arrayCambio['foto']=($suplentel->jugador->persona->foto)?$suplentel->jugador->persona->foto:'sin_foto.png';
@@ -690,7 +690,7 @@
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
                                                     if ($suplentev->jugador->id==$arrayGol['jugador_id']){
-                                                        $goleador[]=array($arrayGol['tipo'],$arrayGol['minuto']);
+                                                        $goleador[]=array($arrayGol['tipo'], \App\Services\MinutoHelper::texto($arrayGol['minuto'], $arrayGol['adicionado'] ?? null, ''));
                                                         $arrayGol['dorsal']=$suplentev->dorsal;
                                                         $arrayGol['jugador']=$suplentev->jugador->persona->full_name;
                                                         $arrayGol['foto']=($suplentev->jugador->persona->foto)?$suplentev->jugador->persona->foto:'sin_foto.png';
@@ -700,7 +700,7 @@
                                                 $incPenales=array();
                                                 foreach ($arrayPenales as &$arrayPenal){
                                                     if ($suplentev->jugador->id==$arrayPenal['jugador_id']){
-                                                        $incPenales[]=array($arrayPenal['tipo'],$arrayPenal['minuto']);
+                                                        $incPenales[]=array($arrayPenal['tipo'], \App\Services\MinutoHelper::texto($arrayPenal['minuto'], $arrayPenal['adicionado'] ?? null, ''));
                                                         $arrayPenal['dorsal']=$suplentev->dorsal;
                                                         $arrayPenal['jugador']=$suplentev->jugador->persona->full_name;
                                                         $arrayPenal['foto']=($suplentev->jugador->persona->foto)?$suplentev->jugador->persona->foto:'sin_foto.png';
@@ -711,7 +711,7 @@
                                                 $tarjetero=array();
                                                 foreach ($arrayTarjetas as &$arrayTarjeta){
                                                     if ($suplentev->jugador->id==$arrayTarjeta['jugador_id']){
-                                                        $tarjetero[]=array($arrayTarjeta['tipo'],$arrayTarjeta['minuto']);
+                                                        $tarjetero[]=array($arrayTarjeta['tipo'], \App\Services\MinutoHelper::texto($arrayTarjeta['minuto'], $arrayTarjeta['adicionado'] ?? null, ''));
                                                         $arrayTarjeta['dorsal']=$suplentev->dorsal;
                                                         $arrayTarjeta['jugador']=$suplentev->jugador->persona->full_name;
                                                         $arrayTarjeta['foto']=($suplentev->jugador->persona->foto)?$suplentev->jugador->persona->foto:'sin_foto.png';
@@ -722,7 +722,7 @@
                                                 $tieneCambio=array();
                                                 foreach ($arrayCambios as &$arrayCambio){
                                                     if ($suplentev->jugador->id==$arrayCambio['jugador_id']){
-                                                        $tieneCambio[]=array($arrayCambio['tipo'],$arrayCambio['minuto']);
+                                                        $tieneCambio[]=array($arrayCambio['tipo'], \App\Services\MinutoHelper::texto($arrayCambio['minuto'], $arrayCambio['adicionado'] ?? null, ''));
                                                         $arrayCambio['dorsal']=$suplentev->dorsal;
                                                         $arrayCambio['jugador']=$suplentev->jugador->persona->full_name;
                                                         $arrayCambio['foto']=($suplentev->jugador->persona->foto)?$suplentev->jugador->persona->foto:'sin_foto.png';
@@ -862,7 +862,7 @@
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             <img id="original" height="20" src="{{ url('images/'.$arrGol['escudo']) }}" >
 
-                            {{ $arrGol['minuto']}}'
+                            {{ \App\Services\MinutoHelper::texto($arrGol['minuto'], $arrGol['adicionado'] ?? null, '') }}'
                                     <a href="{{route('jugadores.ver', array('jugadorId' => $arrGol['jugador_id']))}}" >
 
 
@@ -885,7 +885,7 @@
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             <img id="original" height="20" src="{{ url('images/'.$arrTarjeta['escudo']) }}" >
 
-                            {{ $arrTarjeta['minuto']}}'
+                            {{ \App\Services\MinutoHelper::texto($arrTarjeta['minuto'], $arrTarjeta['adicionado'] ?? null, '') }}'
                             @if( $arrTarjeta['tipo']=='Amarilla')
                                 <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
 
@@ -920,7 +920,7 @@
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             <img id="original" height="20" src="{{ url('images/'.$arrCambio['escudo']) }}" >
 
-                            {{ $arrCambio['minuto']}}'
+                            {{ \App\Services\MinutoHelper::texto($arrCambio['minuto'], $arrCambio['adicionado'] ?? null, '') }}'
                             @if($arrCambio['tipo']=='Sale')
                                 <svg class="ev ev-sale" role="img" width="18" height="18"><title>Sale</title><use href="#ev-sale"/></svg>
                             @else
@@ -968,7 +968,7 @@
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             <img id="original" height="20" src="{{ url('images/'.$arrPenal['escudo']) }}" >
 
-                            {{ $arrPenal['minuto']}}'
+                            {{ \App\Services\MinutoHelper::texto($arrPenal['minuto'], $arrPenal['adicionado'] ?? null, '') }}'
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrPenal['jugador_id']))}}" >
 
 

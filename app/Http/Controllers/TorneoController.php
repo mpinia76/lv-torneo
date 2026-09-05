@@ -5822,7 +5822,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
                     // Goles en DB
                     $dbGoles = Gol::where('partido_id', $partido->id)
-                        ->orderBy('minuto', 'ASC')
+                        ->orderBy('minuto', 'ASC')->orderBy('adicionado', 'ASC')
                         ->get();
 
                     // Goles desde SofaScore
@@ -5841,7 +5841,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
                         $juegaEn = ($alineacion && $alineacion->equipo) ? $alineacion->equipo->nombre : 'Desconocido';
 
-                        $mensajes[] = "DB - Jugador: {$gol->jugador->persona->nombre} {$gol->jugador->persona->apellido} | Equipo: {$juegaEn} | Tipo: {$gol->tipo} | Minuto: {$gol->minuto}";
+                        $mensajes[] = "DB - Jugador: {$gol->jugador->persona->nombre} {$gol->jugador->persona->apellido} | Equipo: {$juegaEn} | Tipo: {$gol->tipo} | Minuto: {$gol->minuto_texto}";
                     }
 
                     // Mostrar goles de SofaScore

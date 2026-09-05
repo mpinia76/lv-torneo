@@ -5430,6 +5430,17 @@ $string = str_replace(
 return $string;
 }
 
+/**
+ * OJO: esto es del scraper de promiedos y sigue devolviendo UN solo número:
+ * el 90+6 lo suma (96) y el 45+2 lo colapsa (45). Desde el 05/09/2026 la base
+ * guarda el descuento aparte, en `adicionado` — ver App\Services\MinutoHelper.
+ *
+ * No se tocó a propósito: la carga pasa por Transfermarkt, y lo que este
+ * scraper escriba mal lo repara después el repaso de minutos del pase liviano
+ * (`TmDetallePartido::repasarMinutos()`), que acepta las dos formas viejas.
+ * Si algún día vuelve a ser la fuente principal, hay que partirlo en dos
+ * números acá y en los seis lugares que guardan `'minuto' => $minuto`.
+ */
 private function normalizarMinuto(string $texto): int
 {
     $texto = trim($texto);
@@ -7358,7 +7369,7 @@ private function normalizarMinuto(string $texto): int
                     $golesVisitantes = $partido->golesv;
                     //Log::channel('mi_log')->info('Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre, []);
                     $success .= '<span style="color:orange">Partido ' . $partido->equipol->nombre . ' VS ' . $partido->equipov->nombre . ' - ' . $fecha->numero . '</span><br>';
-                    $goles = Gol::where('partido_id', '=', "$partido->id")->orderBy('minuto', 'ASC')->get();
+                    $goles = Gol::where('partido_id', '=', "$partido->id")->orderBy('minuto', 'ASC')->orderBy('adicionado', 'ASC')->get();
 
                     $jugadorGolArray = array();
 
@@ -7645,7 +7656,7 @@ private function normalizarMinuto(string $texto): int
                                             utf8_decode($fecha->numero),
                                             utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
                                             utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
-                                            utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                            utf8_decode($gol->tipo.' - '.$gol->minuto_texto),
                                             utf8_decode('No se econtró la URL de cabezas'),
                                             $urlCabeza
                                         ], "|");*/
@@ -7769,7 +7780,7 @@ private function normalizarMinuto(string $texto): int
                                             utf8_decode($fecha->numero),
                                             utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
                                             utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
-                                            utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                            utf8_decode($gol->tipo.' - '.$gol->minuto_texto),
                                             utf8_decode('No se econtró la URL de tiros libres'),
                                             $urlLibres
                                         ], "|");*/
@@ -7894,7 +7905,7 @@ private function normalizarMinuto(string $texto): int
                                             utf8_decode($fecha->numero),
                                             utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
                                             utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
-                                            utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                            utf8_decode($gol->tipo.' - '.$gol->minuto_texto),
                                             utf8_decode('No se econtró la URL de penales'),
                                             $urlPenales
                                         ], "|");*/
@@ -7914,7 +7925,7 @@ private function normalizarMinuto(string $texto): int
                                     utf8_decode($fecha->numero),
                                     utf8_decode($partido->equipol->nombre . ' VS ' . $partido->equipov->nombre),
                                     utf8_decode($gol->jugador->persona->nombre.' - '.$gol->jugador->persona->apellido),
-                                    utf8_decode($gol->tipo.' - '.$gol->minuto),
+                                    utf8_decode($gol->tipo.' - '.$gol->minuto_texto),
                                     utf8_decode('No se econtró la URL del jugador'),
                                     $urlJugador
                                 ], "|");*/
@@ -8427,11 +8438,16 @@ private function normalizarMinuto(string $texto): int
         $fechaOrden = $request->query('fechaOrden');
 
         if (empty($fechaOrden)) {
-            $ultimaFecha = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
-                ->orderBy('orden', 'desc')
-                ->orderBy('id', 'desc')
-                ->first();
-            $fechaOrden = $ultimaFecha->orden;
+            $fechaOrden = $this->ordenFechaVigente(explode(',', $arrgrupos));
+
+            if ($fechaOrden === null) {
+                // Ninguna fecha tiene partidos con dia cargado: ultima fecha, como antes.
+                $ultimaFecha = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
+                    ->orderBy('orden', 'desc')
+                    ->orderBy('id', 'desc')
+                    ->first();
+                $fechaOrden = optional($ultimaFecha)->orden;
+            }
         }
 
         $fechas = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
@@ -8467,6 +8483,57 @@ private function normalizarMinuto(string $texto): int
         return view('fechas.ver', compact('fechas', 'torneo', 'partidos', 'fecha', 'partidosAgrupados', 'hayIdaVuelta'));
     }
 
+    /**
+     * Orden de la fecha vigente de un torneo: la ultima que ya empezo, es
+     * decir aquella cuyo primer partido ya se jugo o esta en juego. Mientras
+     * la fecha se disputa muestra esa, y cuando termina la sigue mostrando
+     * hasta que arranca la siguiente, en vez de abrir en un fixture entero
+     * "Programado".
+     *
+     * Se compara contra el PRIMER partido de cada fecha (MIN) y no contra el
+     * ultimo: asi un partido postergado y reprogramado semanas despues no
+     * deja a una fecha vieja figurando como la vigente.
+     *
+     * Devuelve la primera fecha si el torneo todavia no arranco, y null si
+     * ninguna fecha tiene partidos con dia cargado (ahi decide el llamador).
+     */
+    private function ordenFechaVigente(array $grupoIds)
+    {
+        $grupoIds = array_filter($grupoIds, 'strlen');
+
+        if (empty($grupoIds)) {
+            return null;
+        }
+
+        $inicios = DB::table('partidos')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->whereIn('fechas.grupo_id', $grupoIds)
+            ->whereNotNull('partidos.dia')
+            ->where('partidos.dia', '>', '1900-01-01')
+            ->groupBy('fechas.orden')
+            ->orderBy('fechas.orden', 'asc')
+            ->get([
+                'fechas.orden as orden',
+                DB::raw('MIN(partidos.dia) as inicio'),
+            ]);
+
+        if ($inicios->isEmpty()) {
+            return null;
+        }
+
+        $ahora = Carbon::now();
+        $vigente = null;
+
+        foreach ($inicios as $fila) {
+            if (Carbon::parse($fila->inicio)->lte($ahora)) {
+                $vigente = $fila->orden;
+            }
+        }
+
+        // Torneo que todavia no empezo: la primera fecha.
+        return $vigente !== null ? $vigente : $inicios->first()->orden;
+    }
+
 
     /**
      * Display a listing of the resource.
@@ -8479,9 +8546,9 @@ private function normalizarMinuto(string $texto): int
 
         $partido=Partido::findOrFail($partido_id);
 
-        $goles=Gol::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
+        $goles=Gol::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->orderBy('adicionado','ASC')->get();
 
-        $penales=penal::where('partido_id','=',"$partido_id")->where('tipo','!=','Convirtieron')->orderBy('minuto','ASC')->get();
+        $penales=penal::where('partido_id','=',"$partido_id")->where('tipo','!=','Convirtieron')->orderBy('minuto','ASC')->orderBy('adicionado','ASC')->get();
 
 
         $titularesL=Alineacion::where('partido_id','=',"$partido_id")->where('equipo_id','=',$partido->equipol->id)->where('tipo','=',"Titular")->orderBy('orden', 'asc')->get();
@@ -8496,9 +8563,9 @@ private function normalizarMinuto(string $texto): int
 
 
 
-        $tarjetas=Tarjeta::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
+        $tarjetas=Tarjeta::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->orderBy('adicionado','ASC')->get();
 
-        $cambios=Cambio::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->get();
+        $cambios=Cambio::where('partido_id','=',"$partido_id")->orderBy('minuto','ASC')->orderBy('adicionado','ASC')->get();
 
 
 

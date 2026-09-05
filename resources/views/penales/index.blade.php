@@ -80,7 +80,7 @@
                     <thead>
                     <th></th>
                     <th>Jugador</th>
-                    <th>Minuto</th>
+                    <th>Minuto <span class="text-muted" style="font-weight:normal">+ descuento</span></th>
                     <th>Tipo</th>
                     <th><a href="#" class="addRowPenal"><i class="glyphicon glyphicon-plus"></i></a></th>
 
@@ -101,7 +101,7 @@
                                 {{Form::hidden('penal_id[]',$penal->id)}}
                             </td>
                             <td>{{ Form::select('jugador[]',$jugadors, $penal->jugador->id,['class' => 'form-control js-example-basic-single', 'style' => 'width: 300px']) }}</td>
-                            <td>{{Form::number('minuto[]', $penal->minuto, ['class' => 'form-control', 'style' => 'width:70px;'])}}</td>
+                            <td style="white-space:nowrap">{{Form::number('minuto[]', $penal->minuto, ['class' => 'form-control', 'style' => 'width:70px;display:inline-block', 'min' => 0, 'title' => 'Minuto del reloj'])}}<span class="text-muted"> + </span>{{Form::number('adicionado[]', $penal->adicionado, ['class' => 'form-control', 'style' => 'width:60px;display:inline-block', 'min' => 0, 'title' => 'Descuento: el «+6» del 90+6. Vacío si el minuto es redondo.'])}}</td>
                             <td>{{ Form::select('tipo[]',['Errado'=>'Errado','Atajado'=>'Atajado','Atajó'=>'Atajó','Convirtieron'=>'Convirtieron'], $penal->tipo,['class' => 'form-control']) }}</td>
                             <td><a href="#" class="btn btn-danger removepenal"><i class="glyphicon glyphicon-remove"></i></a></td>
                         </tr>

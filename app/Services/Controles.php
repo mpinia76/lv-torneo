@@ -719,7 +719,7 @@ class Controles
     {
         $q = $this->base($filtros, ['tabla' => 'gols', 'partido' => 'gols.partido_id'])
             ->select($this->columnas())
-            ->addSelect(['gols.minuto as minuto'])
+            ->addSelect(['gols.minuto as minuto', 'gols.adicionado as adicionado'])
             ->whereNotExists(function ($s) {
                 $s->select(DB::raw(1))
                     ->from('alineacions as a')
@@ -740,14 +740,18 @@ class Controles
 
     private function golesRepetidos(array $filtros)
     {
-        $derivada = 'SELECT partido_id, jugador_id, minuto, COUNT(*) AS cantidad
+        // El descuento es parte de la clave: dos goles del mismo jugador a los
+        // 90+6 y a los 90+9 son dos goles, no una carga duplicada. Agrupar sólo
+        // por el minuto del reloj los daba por repetidos, que es exactamente lo
+        // que pasaba cuando el importador tiraba el `addedTime` de Transfermarkt.
+        $derivada = 'SELECT partido_id, jugador_id, minuto, adicionado, COUNT(*) AS cantidad
                      FROM gols
-                     GROUP BY partido_id, jugador_id, minuto
+                     GROUP BY partido_id, jugador_id, minuto, adicionado
                      HAVING COUNT(*) > 1';
 
         $q = $this->base($filtros, ['raw' => $derivada, 'alias' => 't1', 'partido' => 't1.partido_id'])
             ->select($this->columnas())
-            ->addSelect(['t1.cantidad as cantidad', 't1.minuto as minuto']);
+            ->addSelect(['t1.cantidad as cantidad', 't1.minuto as minuto', 't1.adicionado as adicionado']);
 
         return $this->ordenar($this->conJugador($q, 't1.jugador_id'));
     }
@@ -834,7 +838,7 @@ class Controles
     {
         $q = $this->base($filtros, ['tabla' => 'tarjetas', 'partido' => 'tarjetas.partido_id'])
             ->select($this->columnas())
-            ->addSelect(['tarjetas.minuto as minuto', 'tarjetas.tipo as tipo'])
+            ->addSelect(['tarjetas.minuto as minuto', 'tarjetas.adicionado as adicionado', 'tarjetas.tipo as tipo'])
             ->whereNotExists(function ($s) {
                 $s->select(DB::raw(1))
                     ->from('alineacions')
@@ -867,7 +871,7 @@ class Controles
     {
         $q = $this->base($filtros, ['tabla' => 'cambios', 'partido' => 'cambios.partido_id'])
             ->select($this->columnas())
-            ->addSelect(['cambios.minuto as minuto', 'cambios.tipo as tipo'])
+            ->addSelect(['cambios.minuto as minuto', 'cambios.adicionado as adicionado', 'cambios.tipo as tipo'])
             ->whereNotExists(function ($s) {
                 $s->select(DB::raw(1))
                     ->from('alineacions')
@@ -899,11 +903,17 @@ class Controles
      */
     private function cambiosImpares(array $filtros)
     {
-        $derivada = "SELECT partido_id, GROUP_CONCAT(minuto ORDER BY minuto SEPARATOR ', ') AS minutos
+        // Se agrupa por minuto Y descuento, y se muestra «90+3»: el que entra y
+        // el que sale de un mismo cambio comparten los dos números. Agrupando
+        // sólo por el reloj, un cambio del 90+3 y otro del 90 se compensaban
+        // entre ellos y el descalce no salía.
+        $derivada = "SELECT partido_id, GROUP_CONCAT(etiqueta ORDER BY orden SEPARATOR ', ') AS minutos
                      FROM (
-                         SELECT partido_id, minuto
+                         SELECT partido_id,
+                                CONCAT(minuto, IF(COALESCE(adicionado,0) > 0, CONCAT('+', adicionado), '')) AS etiqueta,
+                                (minuto * 100 + COALESCE(adicionado, 0)) AS orden
                          FROM cambios
-                         GROUP BY partido_id, minuto
+                         GROUP BY partido_id, minuto, adicionado
                          HAVING SUM(CASE WHEN tipo = 'Entra' THEN 1 ELSE 0 END)
                               <> SUM(CASE WHEN tipo = 'Sale'  THEN 1 ELSE 0 END)
                      ) AS x
@@ -925,7 +935,7 @@ class Controles
                     ->where('cambios.tipo', '=', 'Entra');
             })
             ->select($this->columnas())
-            ->addSelect(['cambios.minuto as minuto'])
+            ->addSelect(['cambios.minuto as minuto', 'cambios.adicionado as adicionado'])
             ->where('alineacions.tipo', 'Titular');
 
         return $this->ordenar($this->conJugador($this->sinIncidencia($q), 'alineacions.jugador_id'));
