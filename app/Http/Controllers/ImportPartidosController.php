@@ -598,7 +598,19 @@ class ImportPartidosController extends Controller
                 . 'y recién después guardá.</p>';
         }
 
-        $base = route('import_partidos.fixture', ['comp' => $comp]);
+        // EL TORNEO VIAJA EN TODOS LOS BOTONES. Antes `$base` llevaba sólo la
+        // competencia, así que elegías el torneo del desplegable, veías la
+        // temporada correcta, apretabas cualquier botón y el link salía con
+        // `comp=` pelado: sin temporada, Transfermarkt manda la EDICIÓN EN
+        // CURSO. Con `ARCA` —tus cinco Copas Argentina comparten ese id— eso
+        // significa escribir en los partidos de un año mirando el fixture de
+        // otro. El cartel amarillo avisaba, pero lo disparaba el propio botón.
+        // De paso, con el torneo la segunda pasada del emparejador puede filtrar
+        // por `grupos.torneo_id`.
+        $base = route('import_partidos.fixture', array_filter([
+            'comp' => $comp,
+            'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
+        ]));
 
         // LOS BOTONES QUE ESCRIBEN TRABAJAN SOBRE LO QUE SE ESTÁ VIENDO.
         // Antes forzaban `cache=1` siempre, así que si venías de una bajada
@@ -636,6 +648,15 @@ class ImportPartidosController extends Controller
                 . ($jugadas['salteadas']
                     ? ' Dejé <b>' . $jugadas['salteadas'] . '</b> sin tocar porque el corrimiento pasa los 10 días: '
                       . 'ésos van de a uno, mirándolos.' : '')
+                // El resultado NO se toca acá: este botón escribe la fecha y
+                // nada más, como dice su nombre. Pero un partido al que recién
+                // le arreglaste la fecha es, casi siempre, uno que hasta hoy no
+                // aparejaba y por eso también está sin marcador. Dejar el link
+                // a mano evita la vuelta por la pantalla anterior.
+                . ($jugadas['cargadas']
+                    ? '<br>Les falta el marcador: hasta recién no aparejaban, así que ninguna pasada se lo pudo '
+                      . 'cargar. <a href="' . e($base . $fuente . '&refrescar=1') . '"><b>Cargar los resultados '
+                      . 'ahora →</b></a>' : '')
                 . '</p>'
                 . ($jugadas['detalle']
                     ? '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partido</th><th>Antes</th>'
@@ -725,7 +746,8 @@ class ImportPartidosController extends Controller
                 . '<td class="num">' . ($d['conflicto'] ? '<b class="err">' . $d['conflicto'] . '</b>' : '0') . '</td>'
                 . '<td>' . ($d['nuevo']
                     ? '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar',
-                        ['comp' => $comp, 'gameday' => $r])) . '">Aplicar ' . $d['nuevo'] . ' →</a>'
+                        array_filter(['comp' => $comp, 'gameday' => $r,
+                            'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null]))) . '">Aplicar ' . $d['nuevo'] . ' →</a>'
                     : '<span class="sub">nada por crear</span>')
                 . ' <a class="boton-sec" href="' . e(route('import_detalles.index',
                     ['comp' => $comp, 'ronda' => $r])) . '">Detalles →</a>'
@@ -1771,8 +1793,13 @@ class ImportPartidosController extends Controller
         $confirmar = (string) $request->get('confirmar', '0') === '1';
         $interzonales = (string) $request->get('interzonales', '0') === '1';
 
-        $volver = '<p class="sub"><a href="' . e(route('import_partidos.fixture', ['comp' => $comp, 'cache' => 1]))
-            . '">← Volver al fixture</a></p>';
+        // El torneo vuelve con vos. Sin él, la pantalla de fixture pierde la
+        // temporada y Transfermarkt manda la edición en curso: ver el comentario
+        // de `$base` en fixture().
+        $alFixture = route('import_partidos.fixture',
+            array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null]));
+
+        $volver = '<p class="sub"><a href="' . e($alFixture) . '">← Volver al fixture</a></p>';
 
         if ($comp === '' || $gameday === '') {
             return $this->pagina('Aplicar fecha', $volver . '<p class="err">Faltan <code>comp</code> y <code>gameday</code>.</p>');
@@ -2005,7 +2032,7 @@ class ImportPartidosController extends Controller
                 . '<th>Visitante</th><th>Grupo</th><th>Partido</th></tr></thead><tbody>' . $detalle . '</tbody></table></div>';
         }
         $html .= '<p class="acciones">'
-            . '<a class="boton" href="' . e(route('import_partidos.fixture', ['comp' => $comp, 'cache' => 1])) . '">Seguir con otra fecha →</a>'
+            . '<a class="boton" href="' . e($alFixture) . '">Seguir con otra fecha →</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
 
         return $this->pagina('Aplicar fecha', $html);
@@ -3461,10 +3488,15 @@ class ImportPartidosController extends Controller
      */
     private function buscarPartidoPorRonda($equipoId, $rivalId, $dia, $ronda, $torneoId = null)
     {
-        $ronda = trim((string) $ronda);
-        if ($ronda === '' || !$dia) return null;
-        $nRonda = preg_replace('/\D/', '', $ronda);
-        if ($nRonda === '') return null;
+        if (!$dia) return null;
+        $nRonda = preg_replace('/\D/', '', trim((string) $ronda));
+
+        // EN LAS COPAS NO HAY NÚMERO DE FECHA. Transfermarkt no manda `gameDay`
+        // y tus fechas se llaman «8VOS», «CUARTOS»: de los dos lados queda una
+        // llave vacía. Ahí el reemplazo es el TORNEO: en una copa dos equipos se
+        // cruzan una sola vez por edición, así que par + torneo alcanza. Sin
+        // torneo (se entró por `comp=` a mano) no hay con qué, y se devuelve null.
+        if ($nRonda === '' && !$torneoId) return null;
 
         $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -120 days'));
         $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +120 days'));
@@ -3490,15 +3522,28 @@ class ImportPartidosController extends Controller
         // COMPARAR COMO NÚMERO, NO COMO TEXTO: tus fechas se llaman «08» o
         // «Fecha 08» y la ronda de TM viene «8». Como cadenas no coinciden
         // nunca, y la segunda pasada no encontraría jamás un partido.
+        $todos = [];
         $cands = [];
         foreach ($q->get() as $r) {
+            $todos[] = (int) $r->id;
             $suyo = preg_replace('/\D/', '', (string) $r->numero);
-            if ($suyo === '') continue;
+            if ($suyo === '' || $nRonda === '') continue;
             if ((int) $suyo === (int) $nRonda) $cands[] = (int) $r->id;
         }
+        $todos = array_values(array_unique($todos));
         $cands = array_values(array_unique($cands));
 
-        return count($cands) === 1 ? \App\Partido::find($cands[0]) : null;
+        if (count($cands) === 1) return \App\Partido::find($cands[0]);
+
+        // Sin número de fecha de algún lado: queda el par dentro del torneo, y
+        // sólo si hay UN candidato. Con dos (una llave de ida y vuelta, un
+        // torneo que se juega dos veces) no se elige: mejor que caiga en
+        // «nuevo» y lo mire una persona que atarlo al partido equivocado.
+        if ($nRonda === '' && $torneoId && count($todos) === 1) {
+            return \App\Partido::find($todos[0]);
+        }
+
+        return null;
     }
 
     private function buscarPartido($equipoId, $rivalId, $dia)
