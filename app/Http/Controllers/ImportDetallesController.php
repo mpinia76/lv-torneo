@@ -4162,6 +4162,17 @@ class ImportDetallesController extends Controller
      * Se puede entrar por tres lados: por un nombre, por el id de TM, o por un
      * partido tuyo, que es el que contesta «¿por qué este partido no aparea?».
      */
+    /** El <option> de todos tus equipos, para los selects de atado. */
+    private function opcionesEquipos()
+    {
+        $out = '<option value=""></option>';
+        foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $eq) {
+            $out .= '<option value="' . (int) $eq->id . '">' . e((string) $eq->nombre)
+                . ($eq->pais ? ' (' . e((string) $eq->pais) . ')' : '') . '</option>';
+        }
+        return $out;
+    }
+
     public function clubesTm(Request $request)
     {
         $buscar    = trim((string) $request->get('buscar', ''));
@@ -4191,6 +4202,34 @@ class ImportDetallesController extends Controller
                 . e((string) $this->nombreEquipo($mapEquipo)) . ' <span class="sub">#' . $mapEquipo . '</span>. '
                 . 'Volvé a leer el calendario y el partido debería aparear.</div>';
         }
+
+        // El <select> de equipos se usa en varios bloques de abajo: se arma una
+        // sola vez. Antes vivía adentro del bloque de búsqueda, y por eso atar
+        // un club sólo se podía desde ahí.
+        $opcionesEquipos = $this->opcionesEquipos();
+
+        // ── Atar un club a mano, exista o no la fila ─────────────────────────
+        // ESTE ES EL CASO QUE FALTABA. La búsqueda de más abajo sólo encuentra
+        // clubes que YA están en `equipo_tm`, y el bloque del partido no tenía
+        // ningún botón: si el club se venía resolviendo por NOMBRE —que no
+        // escribe en `equipo_tm`— o estaba atado con otro `nombre_tm`, la
+        // pantalla te mostraba el problema y no te dejaba tocarlo.
+        $cuerpo .= '<details' . ($buscar === '' && !$partidoId ? '' : ' open') . '>'
+            . '<summary>Atar un club de Transfermarkt a mano</summary>'
+            . '<div class="diag" style="margin-top:8px">'
+            . '<p class="sub">Sirve aunque el club <b>no aparezca en ninguna búsqueda</b>: si TM lo venía '
+            . 'resolviendo por nombre no hay fila en <code>equipo_tm</code> que encontrar. El id está en la URL '
+            . 'del club: <code>/startseite/verein/<b>1234</b></code>. Atar por id le gana al nombre para siempre, '
+            . 'y si ya existía la fila la pisa.</p>'
+            . '<form method="get" class="acciones">'
+            . ($partidoId ? '<input type="hidden" name="partido_id" value="' . $partidoId . '">' : '')
+            . ($buscar !== '' ? '<input type="hidden" name="buscar" value="' . e($buscar) . '">' : '')
+            . '<input type="text" name="map_tm" size="10" placeholder="id de TM" required> '
+            . '<input type="text" name="map_nombre" size="22" placeholder="nombre en TM (opcional)"> '
+            . '<select name="map_equipo" class="s2" data-placeholder="equipo tuyo…" required>'
+            . $opcionesEquipos . '</select> '
+            . '<button class="boton">Atar</button>'
+            . '</form></div></details>';
 
         // ── Por un partido tuyo: «¿por qué éste no aparea?» ─────────────────
         if ($partidoId) {
@@ -4224,6 +4263,16 @@ class ImportDetallesController extends Controller
                             . ' <span class="sub">(' . e((string) $a->origen) . ')</span>';
                     }
 
+                    // Poder atar DESDE ACÁ es el punto: éste es el bloque al que
+                    // llegás cuando el detalle te dice que los clubes no
+                    // coinciden, y era el único que no dejaba hacer nada.
+                    $celda .= '<div style="margin-top:6px"><form method="get" class="acciones">'
+                        . '<input type="hidden" name="partido_id" value="' . $partidoId . '">'
+                        . '<input type="hidden" name="map_equipo" value="' . (int) $eqId . '">'
+                        . '<input type="text" name="map_tm" size="10" placeholder="id de TM" required> '
+                        . '<input type="text" name="map_nombre" size="18" placeholder="nombre en TM"> '
+                        . '<button>Atar a este equipo</button></form></div>';
+
                     $cuerpo .= '<tr><td>' . e((string) $this->nombreEquipo($eqId))
                         . ' <span class="sub">#' . (int) $eqId . '</span></td>'
                         . '<td>' . $celda . '</td></tr>';
@@ -4235,11 +4284,7 @@ class ImportDetallesController extends Controller
 
         // ── Por nombre o por id de TM ───────────────────────────────────────
         if ($buscar !== '') {
-            $opciones = '<option value=""></option>';
-            foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $eq) {
-                $opciones .= '<option value="' . (int) $eq->id . '">' . e((string) $eq->nombre)
-                    . ($eq->pais ? ' (' . e((string) $eq->pais) . ')' : '') . '</option>';
-            }
+            $opciones = $opcionesEquipos;
 
             $ates = DB::table('equipo_tm')
                 ->where(function ($w) use ($buscar) {
@@ -4254,7 +4299,9 @@ class ImportDetallesController extends Controller
             if (!count($ates)) {
                 $cuerpo .= '<div class="err-box">Ningún club de Transfermarkt con ese nombre o ese id está '
                     . 'atado. Si el calendario igual no lo marcó como «desconocido», es que lo resolvió '
-                    . '<b>por nombre</b>, que anda hasta que aparece un homónimo.</div>';
+                    . '<b>por nombre</b>, que anda hasta que aparece un homónimo. '
+                    . '<b>Ese es el caso que se arregla atándolo por id</b>: usá «Atar un club de Transfermarkt '
+                    . 'a mano», arriba — buscar acá no lo va a encontrar nunca, porque no hay fila.</div>';
             } else {
                 $cuerpo .= '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th>'
                     . '<th>Apunta a</th><th>Enganche</th><th>Cambiar</th></tr></thead><tbody>';

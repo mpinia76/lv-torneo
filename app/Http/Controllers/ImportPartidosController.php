@@ -290,6 +290,9 @@ class ImportPartidosController extends Controller
         $refrescar = (string) $request->get('refrescar', '0') === '1';
         $filtro  = trim((string) $request->get('estado', ''));
         $gameday = trim((string) $request->get('gameday', ''));
+        // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
+        // la que está en curso. Ver `traerFixture()`.
+        $season  = trim((string) $request->get('season', ''));
 
         $avisos = [];
 
@@ -304,12 +307,18 @@ class ImportPartidosController extends Controller
             }
         }
 
-        // Si viene un torneo tuyo, la competencia sale de ahí.
+        // Si viene un torneo tuyo, la competencia Y LA TEMPORADA salen de ahí.
+        // El torneo ya guarda las dos cosas (`tm_competition_id` y
+        // `tm_season_id`, que se cargan en Editar torneo): no hay que tipear
+        // nada acá ni volver a mirar en qué año era cada edición.
         $torneoElegido = null;
         if ((int) $request->get('torneo_id')) {
             $torneoElegido = \App\Torneo::find((int) $request->get('torneo_id'));
             if ($torneoElegido && trim((string) $torneoElegido->tm_competition_id) !== '') {
                 $comp = trim((string) $torneoElegido->tm_competition_id);
+            }
+            if ($torneoElegido && $season === '' && trim((string) $torneoElegido->tm_season_id) !== '') {
+                $season = trim((string) $torneoElegido->tm_season_id);
             }
         }
 
@@ -319,8 +328,10 @@ class ImportPartidosController extends Controller
         $opts = '<option value="">— elegí un torneo tuyo —</option>';
         foreach ($conTm as $t) {
             $sel = ($torneoElegido && $torneoElegido->id === $t->id) ? ' selected' : '';
+            $temp = trim((string) $t->tm_season_id);
             $opts .= '<option value="' . $t->id . '"' . $sel . '>'
-                . e($t->nombre . ' ' . $t->year . '  ·  ' . $t->tm_competition_id) . '</option>';
+                . e($t->nombre . ' ' . $t->year . '  ·  ' . $t->tm_competition_id
+                    . ($temp !== '' ? ' · temporada ' . $temp : ' · SIN TEMPORADA')) . '</option>';
         }
 
         $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
@@ -337,7 +348,12 @@ class ImportPartidosController extends Controller
             $html .= '<form method="get" style="margin:12px 0">'
                 . '<select name="torneo_id" class="s2" data-placeholder="elegí un torneo tuyo…">' . $opts . '</select> '
                 . '<button>Ver fixture</button> '
-                . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>';
+                . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>'
+                . '<p class="sub">La temporada sale del torneo (<b>Editar torneo → Id Temporada</b>), no se tipea '
+                . 'acá. Hace falta porque el id de competencia es de la <b>copa</b>, no de la edición: tus cinco '
+                . 'Copas Argentina comparten <code>ARCA</code>, y sin temporada Transfermarkt manda la que está en '
+                . 'curso. Si un torneo del desplegable dice <b>SIN TEMPORADA</b>, cargásela primero o vas a bajar '
+                . 'el fixture de este año creyendo que bajás el suyo.</p>';
         }
 
         $html .= '<details' . ($comp === '' ? ' open' : '') . '><summary>No sé el id de competencia de un torneo</summary>'
@@ -353,13 +369,17 @@ class ImportPartidosController extends Controller
             . '<form method="get" style="display:inline">'
             . '<input name="comp" value="' . e($comp) . '" placeholder="ej ARGC" size="12"> '
             . '<button>Ver</button></form></p>'
-            . '</div></details>';
+            . '</div></details>'
+            ;
 
         foreach ($avisos as $a) $html .= '<p class="ok-box">' . $a . '</p>';
 
         if ($comp === '') return $this->pagina('Fixture', $html);
 
-        $usarCache = (string) $request->get('cache', '0') === '1';
+        // Pedir una temporada obliga a bajar: el staging no distingue ediciones
+        // (guarda por `competencia_external_id` y nada más), así que releerlo
+        // devolvería las cinco Copas Argentina mezcladas.
+        $usarCache = (string) $request->get('cache', '0') === '1' && $season === '';
         $filas = [];
 
         if ($usarCache) {
@@ -368,8 +388,11 @@ class ImportPartidosController extends Controller
         }
 
         $saltados = 0;
+        $fuenteHtml = false;
+        $avisosHtml = [];
+
         if (!$usarCache) {
-            $crudo = $this->traerFixture($comp);
+            $crudo = $this->traerFixture($comp, $season);
             if (is_string($crudo)) return $this->pagina('Fixture', $html . '<p class="err-box">' . $crudo . '</p>');
 
             $compNombre = $this->nombreCompetencia($comp);
@@ -378,7 +401,52 @@ class ImportPartidosController extends Controller
                 if (!$f['hora_definida'] || !$f['dia']) { $saltados++; continue; }
                 $filas[] = $f;
             }
-            $filas = $this->completarNombresClubes($filas);
+
+            // ¿La API contestó la edición que pedimos? No sabe de temporadas:
+            // devuelve 200 y la que está en curso. Si no es la del torneo, el
+            // fixture correcto se saca del CALENDARIO EN HTML, que sí la
+            // respeta. Cuesta una llamada más y sólo pasa en ediciones viejas.
+            if ($season !== '' && !$this->esTemporada($filas, $season)) {
+                // `pais` es por dónde sale la petición (ScraperAPI). El sitio no
+                // es la API: saliendo de Europa TM puede contestar el muro de
+                // consentimiento en vez de la página. Con `&pais=us` se prueba
+                // desde otro lado sin tocar el .env.
+                $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml,
+                    trim((string) $request->get('pais', '')) ?: null);
+
+                if (is_array($porHtml) && !empty($porHtml)) {
+                    $filas      = $porHtml;
+                    $fuenteHtml = true;
+                    $saltados   = 0;
+                } else {
+                    $urlPantalla = route('import_detalles.competencia_html', [
+                        'comp_id' => $comp, 'season' => $season,
+                        'copa' => ($torneoElegido && strcasecmp((string) $torneoElegido->tipo, 'Copa') === 0) ? 1 : 0,
+                    ]);
+                    $detalle = '';
+                    foreach ($avisosHtml as $a) $detalle .= '<div>• ' . e($a) . '</div>';
+
+                    return $this->pagina('Fixture', $html
+                        . '<p class="err-box"><b>No pude traer la temporada ' . e($season) . '.</b> '
+                        . 'La API devolvió la edición en curso (no sabe de temporadas) y el calendario en HTML '
+                        . 'tampoco trajo partidos.</p>'
+                        . ($detalle ? '<div class="diag">' . $detalle . '</div>' : '')
+                        . '<p class="sub">Abrí las URLs de arriba en el navegador: si la página existe y tiene '
+                        . 'partidos, el problema es por dónde sale la petición —Transfermarkt contesta el muro de '
+                        . 'consentimiento a algunos países—. Probá agregando <code>&amp;pais=us</code> a esta '
+                        . 'pantalla. Si la página viene vacía en el navegador también, revisá el <b>Id '
+                        . 'Competencia</b> y el <b>Id Temporada</b> del torneo.</p>'
+                        . '<p class="acciones">'
+                        . '<a class="boton-sec" href="' . e($request->fullUrl()
+                            . (strpos($request->fullUrl(), '?') === false ? '?' : '&') . 'pais=us') . '">Reintentar desde EE.UU.</a> '
+                        . '<a class="boton-sec" href="' . e($urlPantalla) . '">Abrir el calendario de la competencia</a>'
+                        . '</p>');
+                }
+            }
+
+            // Los nombres de los clubes cuestan una llamada aparte en la API;
+            // el calendario en HTML ya los trae.
+            if (!$fuenteHtml) $filas = $this->completarNombresClubes($filas);
         }
 
         if (empty($filas)) {
@@ -388,6 +456,55 @@ class ImportPartidosController extends Controller
         }
 
         $filas = $this->clasificarFixture($filas);
+
+        // Qué temporada vino DE VERDAD. Sin esto no hay forma de saber si TM
+        // respetó el `seasonId` o te devolvió la edición en curso igual: los
+        // partidos se ven bien y son de otro año.
+        $temporadas = [];   // seasonId => ['n' => partidos, 'anio' => nombre lindo]
+        foreach ($filas as $f) {
+            $t = trim((string) (isset($f['temporada']) ? $f['temporada'] : ''));
+            if ($t === '') continue;
+            if (!isset($temporadas[$t])) $temporadas[$t] = ['n' => 0, 'anio' => ''];
+            $temporadas[$t]['n']++;
+            if ($temporadas[$t]['anio'] === '' && !empty($f['anio'])) $temporadas[$t]['anio'] = (string) $f['anio'];
+        }
+        if (!$usarCache) {
+            $lista = [];
+            foreach ($temporadas as $t => $d) {
+                $lista[] = e($t) . ($d['anio'] !== '' ? ' (' . e($d['anio']) . ')' : '') . ' · ' . $d['n'] . ' partidos';
+            }
+            $vino = implode(' — ', $lista) ?: 'no vino ninguna';
+
+            if ($fuenteHtml) {
+                $sinRonda = 0;
+                foreach ($filas as $f) if ((string) $f['ronda'] === '—') $sinRonda++;
+
+                $html .= '<p class="ok-box"><b>Temporada ' . e($season) . '</b>, la del torneo, '
+                    . 'leída del <b>calendario en HTML</b> de Transfermarkt. '
+                    . 'La API no sabe de temporadas —contesta la edición en curso le pidas la que le pidas—, '
+                    . 'así que para las ediciones viejas se lee la página del torneo. '
+                    . 'Vino: <b>' . $vino . '</b>.</p>'
+                    . '<p class="warn-box">De esta fuente <b>no viene la hora</b>, sólo el día: por eso los '
+                    . 'partidos figuran a las 00:00 y el botón que corrige horarios está apagado —escribiría esa '
+                    . 'hora falsa—. Los partidos definidos <b>por penales</b> quedan sin marcador: el calendario '
+                    . 'publica la tanda sumada a los 90\' y no hay con qué separarla.'
+                    . ($sinRonda ? ' Además, <b>' . $sinRonda . '</b> partido(s) quedaron sin número de fecha '
+                        . '(agrupados en «—»): TM no los tenía bajo ningún encabezado de ronda.' : '')
+                    . '</p>';
+            } elseif ($season === '') {
+                $html .= '<p class="warn-box">Temporada que devolvió Transfermarkt: <b>' . $vino . '</b>. '
+                    . 'Este torneo <b>no tiene cargada la temporada</b>, así que vino la que está en curso. '
+                    . 'Si el torneo no es el de este año, lo que estás mirando no es el suyo: cargale el '
+                    . '<b>Id Temporada</b> en Editar torneo.</p>';
+            } else {
+                $html .= '<p class="ok-box">Temporada <b>' . e($season) . '</b>, que es la del torneo. '
+                    . 'Vino: <b>' . $vino . '</b>.</p>';
+            }
+
+            foreach ($avisosHtml as $a) {
+                $html .= '<p class="warn-box">' . e($a) . '</p>';
+            }
+        }
 
         $cont = ['total' => count($filas), 'nuevo' => 0, 'duplicado' => 0, 'conflicto' => 0,
             'jugados' => 0, 'pendientes' => 0];
@@ -413,8 +530,11 @@ class ImportPartidosController extends Controller
         }
         $resultados = ['cargados' => 0, 'detalle' => ''];
         if ($refrescar) {
-            $refrescadas = $this->refrescarHorarios($filas);
-            $resultados  = $this->completarResultados($filas);
+            // Del calendario en HTML no viene la hora: las filas traen 00:00.
+            // Pisar con eso el horario de un partido sería romperlo. Los
+            // resultados sí se cargan: el día y el marcador son buenos.
+            if (!$fuenteHtml) $refrescadas = $this->refrescarHorarios($filas);
+            $resultados = $this->completarResultados($filas);
         }
 
         // La auditoría no escribe nada: se muestra siempre.
@@ -450,9 +570,11 @@ class ImportPartidosController extends Controller
         if ($guardar || $refrescar) {
             $html .= '<p class="ok-box">Guardadas <b>' . $guardadas . '</b> filas en staging.'
                 . ($refrescar
-                    ? ($refrescadas
-                        ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos que todavía no se jugaron.'
-                        : ' Ningún horario necesitaba corrección.')
+                    ? ($fuenteHtml
+                        ? ' <b>No toqué ningún horario</b>: el calendario en HTML no trae la hora.'
+                        : ($refrescadas
+                            ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos que todavía no se jugaron.'
+                            : ' Ningún horario necesitaba corrección.'))
                       . ($resultados['cargados']
                         ? ' Cargué el resultado de <b>' . $resultados['cargados'] . '</b> partidos que estaban sin marcador.'
                         : ' Ningún partido estaba sin resultado.')
@@ -679,10 +801,162 @@ class ImportPartidosController extends Controller
         return $out;
     }
 
-    /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */
-    private function traerFixture($compId)
+    /** ¿Todo lo que vino es de la temporada que pedimos? */
+    private function esTemporada(array $filas, $season)
     {
-        $resp = HttpHelper::getJson(self::TMAPI . '/competition/' . rawurlencode($compId) . '/fixtures');
+        if (empty($filas)) return false;
+
+        foreach ($filas as $f) {
+            $t = trim((string) (isset($f['temporada']) ? $f['temporada'] : ''));
+            if ($t !== '' && $t !== (string) $season) return false;
+        }
+        return true;
+    }
+
+    /**
+     * El fixture de una edición vieja, leído del calendario en HTML.
+     *
+     * La API no sabe de temporadas: `/competition/{id}/fixtures` contesta 200 y
+     * te manda la edición en curso, le pases el seasonId o no (comprobado con
+     * ARCA y 2021). El calendario del sitio sí la respeta, y trae lo esencial:
+     * gameId, día, y los DOS clubes con su id de TM — que es lo único que hace
+     * falta para aparear.
+     *
+     * Lo que NO trae, y por qué no importa acá:
+     *   · la HORA. Sólo el día. Por eso estas filas se marcan con
+     *     `sin_hora`, y la pantalla apaga el botón que corrige horarios: sin
+     *     hora real escribiría 00:00 en partidos que no se jugaron.
+     *   · el marcador estructurado. Viene el texto del link («5:0», «4:5pen.»).
+     *     Los definidos por penales quedan SIN marcador, igual que en el
+     *     importador de la API: el texto trae la tanda sumada y no hay con qué
+     *     separarla, y un marcador inventado es peor que ninguno.
+     */
+    private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [], $pais = null)
+    {
+        // En TM las ligas van por `/wettbewerb/` y las copas por
+        // `/pokalwettbewerb/`: es otra ruta, no un parámetro, y pedir la que no
+        // es devuelve una página sin un solo partido.
+        //
+        // El tipo del torneo dice cuál debería ser, pero NO se le cree del todo:
+        // es un campo que se carga a mano y un torneo mal tipeado dejaba la
+        // pantalla diciendo "no hay ningún link a una ficha de partido", que no
+        // le explica nada a nadie. Se prueba la que corresponde y, si vuelve
+        // vacía, la otra. La segunda llamada sólo ocurre cuando la primera
+        // falló, que es exactamente cuando vale la pena gastarla.
+        $esCopa = $torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : true;
+
+        $svc = new \App\Services\TmFixtureCompetenciaHtml;
+        $leido = null;
+        $intentos = [];
+
+        foreach ([$esCopa, !$esCopa] as $copa) {
+            $url = \App\Services\TmFixtureCompetenciaHtml::urlComp($comp, $season, $copa);
+            $r   = $svc->leerComp($comp, $season, $copa, false, $pais);
+
+            $intentos[] = ($copa ? 'copa' : 'liga') . ': ' . $url
+                . ' → ' . (is_array($r) ? count($r) . ' partidos' : 'no vino la página');
+
+            if (is_array($r) && !empty($r)) { $leido = $r; break; }
+        }
+
+        if (!empty($svc->avisos)) $avisos = array_merge($avisos, (array) $svc->avisos);
+
+        if (!is_array($leido) || empty($leido)) {
+            // Sin las URLs probadas esto es imposible de diagnosticar: abrís la
+            // que corresponda en el navegador y en un segundo sabés si el
+            // problema es el id, la temporada o que TM contestó el muro de
+            // consentimiento.
+            $avisos[] = 'Probé estas dos rutas y ninguna trajo partidos — ' . implode(' · ', $intentos);
+            return null;
+        }
+
+        $anio = $torneo ? (string) $torneo->year : '';
+        $filas = [];
+
+        foreach ($leido as $r) {
+            if (empty($r['game_id']) || empty($r['dia'])) continue;
+            if (empty($r['local_tm']) || empty($r['visita_tm'])) continue;
+
+            $res = $this->marcadorDeTexto(isset($r['resultado']) ? $r['resultado'] : '');
+
+            $filas[] = [
+                'external_id'             => (string) $r['game_id'],
+                'competencia_external_id' => $comp,
+                'competencia_nombre'      => $compNombre,
+                'temporada'               => (string) $season,
+                'anio'                    => $anio,
+                'ronda'                   => isset($r['ronda']) && $r['ronda'] !== null ? (string) $r['ronda'] : '—',
+                'club_external_id'        => (string) $r['local_tm'],
+                'club_nombre'             => isset($r['local_nombre']) ? $r['local_nombre'] : null,
+                'rival_external_id'       => (string) $r['visita_tm'],
+                'rival_nombre'            => isset($r['visita_nombre']) ? $r['visita_nombre'] : null,
+                'local'                   => 1,
+                // Sin hora: se guarda el día a las 00:00 y se marca la fila.
+                'dia'                     => substr((string) $r['dia'], 0, 10) . ' 00:00:00',
+                'goles_favor'             => $res['gf'],
+                'goles_contra'            => $res['gc'],
+                'equipo_id' => null, 'rival_id' => null, 'partido_id' => null,
+                'estado' => 'nuevo', 'motivo' => null,
+                // El payload NO es un game de la API. Se marca para que
+                // `fixtureDesdeStaging()` no intente parsearlo como tal.
+                'payload' => json_encode(['_fuente' => 'html'] + $r, JSON_UNESCAPED_UNICODE),
+                'terminado'      => $res['terminado'],
+                'por_penales'    => $res['por_penales'],
+                'ida_vuelta'     => false,
+                'ida_marcador'   => null,
+                'penales_favor'  => null,
+                'penales_contra' => null,
+                'marcador_tm'    => $res['crudo'],
+                'hora_definida'  => true,
+                'sin_hora'       => true,
+                'reprogramado'   => false,
+            ];
+        }
+
+        return $filas;
+    }
+
+    /**
+     * El marcador del calendario en HTML, que es texto: «5:0», «4:5pen.», «-:-».
+     *
+     * Un partido definido por penales se deja SIN marcador a propósito: TM
+     * publica la tanda sumada a los 90' y desde el calendario no hay con qué
+     * separarla. Mismo criterio que `normalizarFixture()`.
+     */
+    private function marcadorDeTexto($txt)
+    {
+        $txt = trim((string) $txt);
+        $out = ['gf' => null, 'gc' => null, 'terminado' => false,
+            'por_penales' => false, 'crudo' => ($txt !== '' ? $txt : null)];
+
+        if ($txt === '' || !preg_match('/(\d+)\s*:\s*(\d+)/', $txt, $m)) return $out;
+
+        $out['terminado'] = true;
+
+        if (stripos($txt, 'pen') !== false || stripos($txt, 'e.t.') !== false) {
+            $out['por_penales'] = (stripos($txt, 'pen') !== false);
+            return $out;   // con tanda sumada, mejor sin marcador
+        }
+
+        $out['gf'] = (int) $m[1];
+        $out['gc'] = (int) $m[2];
+        return $out;
+    }
+
+    /** Trae el fixture completo y lo aplana: fixtures[].games[] -> lista. */
+
+    private function traerFixture($compId, $season = '')
+    {
+        // OJO: el id de competencia identifica la COPA, no la edición. `ARCA` es
+        // la Copa Argentina de todos los años, así que sin temporada TM devuelve
+        // la que está en curso: elegir "Copa Argentina 2022" bajaba el fixture
+        // 2026. `seasonId` es el año de ARRANQUE (la edición 2022 es la 2021,
+        // igual que el `saison_id` de la web).
+        $url = self::TMAPI . '/competition/' . rawurlencode($compId) . '/fixtures';
+        $season = trim((string) $season);
+        if ($season !== '') $url .= '?seasonId=' . rawurlencode($season);
+
+        $resp = HttpHelper::getJson($url);
         if (!is_array($resp)) {
             $err = HttpHelper::getLastJsonError();
             return 'No pude bajar el fixture de ' . e($compId) . '. '
@@ -1238,7 +1512,16 @@ class ImportPartidosController extends Controller
 
         foreach ($rows as $r) {
             $g = $r->payload ? json_decode($r->payload, true) : null;
-            if (is_array($g) && !empty($g)) {
+
+            // El payload es un `game` de la API sólo si lo parece. Las filas que
+            // vinieron del calendario en HTML guardan otra cosa (y van marcadas
+            // con `_fuente`): pasarlas por `normalizarFixture()` devolvía una
+            // fila de puros nulls, sin ruido ni error.
+            $esDeLaApi = is_array($g) && !empty($g)
+                && empty($g['_fuente'])
+                && (isset($g['baseDetails']) || isset($g['gameId']));
+
+            if ($esDeLaApi) {
                 $f = $this->normalizarFixture($g, $compId, $r->competencia_nombre);
                 if ($r->club_nombre)  $f['club_nombre']  = $r->club_nombre;
                 if ($r->rival_nombre) $f['rival_nombre'] = $r->rival_nombre;
@@ -2406,8 +2689,7 @@ class ImportPartidosController extends Controller
                         . '<input type="hidden" name="temp" value="' . e($temp) . '">'
                         . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
                         . '<input type="hidden" name="confirmar" value="1">'
-                        . '<select name="grupo_id" class="s2" data-placeholder="elegí el grupo…">' . $opts
-                        . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
+                        . '<select name="grupo_id">' . $opts . '</select> <button>Aplicar ' . $filas->count() . '</button></form>');
                 }
             }
         }
@@ -3081,50 +3363,91 @@ class ImportPartidosController extends Controller
         return $aprendidos;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // El apareo de clubes de TM con equipos nuestros vive en
-    // `App\Services\MapeoClubesTm`. Se sacó de acá cuando hizo falta la misma
-    // lógica en el lector de calendarios HTML: dos copias del apareo de nombres
-    // es la forma segura de que una arregle un caso y la otra no, y una
-    // traducción equivocada carga el partido con el rival cambiado.
-    // Estos métodos quedan como envoltorio para no tocar los llamadores.
-    // ─────────────────────────────────────────────────────────────────────
-
-    /** @var \App\Services\MapeoClubesTm|null */
-    private $mapeoClubes = null;
-
-    private function mapeoClubes()
-    {
-        if ($this->mapeoClubes === null) {
-            $this->mapeoClubes = new \App\Services\MapeoClubesTm;
-        }
-
-        return $this->mapeoClubes;
-    }
-
     private function guardarMapeo($tmClubId, $equipoId, $nombre, $origen)
     {
-        $this->mapeoClubes()->guardar($tmClubId, $equipoId, $nombre, $origen);
+        DB::table('equipo_tm')->updateOrInsert(
+            ['tm_club_id' => (string) $tmClubId],
+            ['equipo_id' => (int) $equipoId, 'nombre_tm' => $nombre, 'origen' => $origen,
+                'updated_at' => now(), 'created_at' => now()]
+        );
     }
 
     private function mapaTm()
     {
-        return $this->mapeoClubes()->porId();
+        $mapa = [];
+        foreach (DB::table('equipo_tm')->select('tm_club_id', 'equipo_id')->get() as $r) {
+            $mapa[(string) $r->tm_club_id] = (int) $r->equipo_id;
+        }
+        return $mapa;
     }
 
+    /**
+     * Nombre normalizado -> equipo_id. Si dos equipos comparten la misma clave
+     * (pasa con los homónimos), la clave se marca ambigua y no matchea con nadie:
+     * mejor un conflicto para resolver a mano que un partido con el rival cambiado.
+     */
     private function mapaNombres()
     {
-        return $this->mapeoClubes()->porNombre();
+        $mapa = [];
+        foreach (\App\Equipo::select('id', 'nombre')->get() as $e) {
+            foreach ($this->clavesNombre($e->nombre) as $k) {
+                if ($k === '') continue;
+                if (isset($mapa[$k]) && $mapa[$k] !== $e->id) {
+                    $mapa[$k] = null;      // ambigua
+                } elseif (!array_key_exists($k, $mapa)) {
+                    $mapa[$k] = $e->id;
+                }
+            }
+        }
+        return $mapa;
     }
 
     private function resolverClub($tmId, $nombre, array $mapaTm, array $mapaNombres)
     {
-        return $this->mapeoClubes()->resolver($tmId, $nombre);
+        if ($tmId !== null && isset($mapaTm[(string) $tmId])) return $mapaTm[(string) $tmId];
+        foreach ($this->clavesNombre($nombre) as $k) {
+            if ($k !== '' && isset($mapaNombres[$k]) && $mapaNombres[$k] !== null) return $mapaNombres[$k];
+        }
+        return null;
     }
 
+    /**
+     * Claves normalizadas de un nombre de club.
+     *
+     * REGLA IMPORTANTE: si el nombre trae un paréntesis aclaratorio —"Sarmiento (Junín)",
+     * "Central Córdoba (SdE)"— ese paréntesis es parte del nombre y NO se descarta.
+     * Sin esta regla, "CA Sarmiento (Junín)" matchea contra un "Sarmiento" cualquiera
+     * y termina creando partidos con el rival equivocado.
+     */
     private function clavesNombre($nombre)
     {
-        return $this->mapeoClubes()->claves($nombre);
+        $nombre = (string) $nombre;
+        if (trim($nombre) === '') return [];
+
+        $base = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nombre);
+        if ($base === false) $base = $nombre;
+        $base = mb_strtolower($base);
+
+        // Los paréntesis se aplanan (pasan a ser texto), no se borran.
+        $base = str_replace(['(', ')', '.', ','], ' ', $base);
+
+        $claves = [
+            $this->soloLetras($base),
+            $this->soloLetras($this->quitarPrefijos($base)),
+        ];
+        return array_values(array_unique(array_filter($claves)));
+    }
+
+    private function quitarPrefijos($str)
+    {
+        $str = preg_replace('/\b(c\.?a\.?|a\.?a\.?|c\.?s\.?|c\.?d\.?|c\.?s\.?d\.?|a\.?c\.?|s\.?c\.?|f\.?c\.?|c\.?f\.?|c\.?b\.?|s\.?a\.?d\.?)\b/u', ' ', $str);
+        $str = preg_replace('/\b(club|atletico|atletica|deportivo|deportiva|deportes|asociacion|association|sportivo|sporting|social|futbol|football|de|del|la|el)\b/u', ' ', $str);
+        return $str;
+    }
+
+    private function soloLetras($str)
+    {
+        return (string) preg_replace('/[^\p{L}\p{N}]+/u', '', (string) $str);
     }
 
     private function normalizar(array $g, $coachId)

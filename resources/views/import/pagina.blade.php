@@ -40,6 +40,7 @@
         .import-tm .card.gris b{color:#9aa69f}
         .import-tm .ok-box{background:#ddede4;border:1px solid #15714e;padding:10px 14px;margin:10px 0}
         .import-tm .err-box{background:#f6e2de;border:1px solid #9c3529;padding:10px 14px;margin:10px 0}
+        .import-tm .warn-box{background:#faf0d7;border:1px solid #8a5d00;padding:10px 14px;margin:10px 0}
         .import-tm .warn-box{background:#fdf6e6;border:1px solid #d8b154;padding:10px 14px;margin:10px 0}
         .import-tm .err{color:#9c3529}
         .import-tm .ok{color:#15714e}

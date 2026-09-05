@@ -38,8 +38,14 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      *
      * Devuelve una lista de:
      *   ['game_id', 'dia' => 'Y-m-d', 'dia_crudo', 'local_tm', 'local_nombre',
-     *    'visita_tm', 'visita_nombre', 'resultado']
+     *    'visita_tm', 'visita_nombre', 'resultado', 'ronda']
      * o null si no se pudo traer la página.
+     *
+     * `ronda` es el nombre de la jornada («Segunda ronda», «Octavos de final»,
+     * «1ª jornada»). En el calendario va como una fila de encabezado sola, y
+     * hace falta: sin ella el importador de fixture no puede agrupar por fecha
+     * ni aplicar de a una. Queda null si TM cambió el maquetado — mejor null
+     * que un número inventado.
      */
     public function leerComp($compId, $season, $copa = false, $guardarCrudo = false, $pais = null)
     {
@@ -78,6 +84,12 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 
         $xp    = new \DOMXPath($dom);
         $links = $xp->query('//a[contains(@href, "/spielbericht/")]');
+
+        // A qué ronda pertenece cada fila de partido. Se resuelve en una pasada
+        // por el documento ANTES de leer los partidos, porque la ronda es una
+        // fila aparte que precede al grupo y desde el link del partido no hay
+        // forma de mirar "hacia arriba" sin recorrer hermanos a mano.
+        $rondaDe = $this->rondasPorFila($xp);
 
         if (!$links || $links->length === 0) {
             $this->avisos[] = 'La página no tiene ningún link a una ficha de partido. Puede ser que la '
@@ -126,11 +138,59 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 
             $ultimoDia = $fila['dia_crudo'];
 
+            $clave = spl_object_hash($tr);
+            $fila['ronda']      = isset($rondaDe[$clave]) ? $rondaDe[$clave] : null;
             $fila['resultado']  = trim(preg_replace('/\s+/u', ' ', $a->textContent));
             $filas[$gameId]     = ['game_id' => $gameId] + $fila;
         }
 
         return $this->convertirFechas(array_values($filas));
+    }
+
+    /**
+     * A qué ronda pertenece cada `<tr>` de partido.
+     *
+     * En el calendario la jornada es una fila SOLA, sin clubes y sin link a
+     * ninguna ficha, que encabeza al grupo: «Segunda ronda», «Octavos de
+     * final», «1ª jornada». Se recorren todas las filas en orden y se arrastra
+     * la última vista, igual que con el día.
+     *
+     * El reconocimiento va por descarte —una fila sin link a partido y sin link
+     * a club, con texto corto— y no por clase de CSS a propósito: el maquetado
+     * de TM cambia y las clases se renombran, pero "la fila que no tiene ni
+     * partido ni clubes" se sigue cumpliendo.
+     *
+     * Devuelve spl_object_hash($tr) => nombre de la ronda.
+     */
+    private function rondasPorFila(\DOMXPath $xp)
+    {
+        $mapa  = [];
+        $filas = $xp->query('//tr');
+        if (!$filas) return $mapa;
+
+        $actual = null;
+
+        foreach ($filas as $tr) {
+            $tienePartido = $xp->query('.//a[contains(@href, "/spielbericht/")]', $tr)->length > 0;
+
+            if ($tienePartido) {
+                if ($actual !== null) $mapa[spl_object_hash($tr)] = $actual;
+                continue;
+            }
+
+            if ($xp->query('.//a[contains(@href, "/verein/")]', $tr)->length > 0) continue;
+
+            $txt = trim(preg_replace('/\s+/u', ' ', $tr->textContent));
+
+            // Ni vacía (separadores), ni larga (cabeceras de tabla con todos los
+            // títulos de columna juntos), ni una fecha suelta.
+            if ($txt === '' || mb_strlen($txt) > 60) continue;
+            if (preg_match('#\d{1,2}/\d{1,2}/\d{2,4}#', $txt)) continue;
+
+            $actual = $txt;
+        }
+
+        return $mapa;
     }
 
     /**
@@ -192,6 +252,7 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         return [
             'dia_crudo'     => $diaCrudo,
             'dia'           => null,
+            'ronda'         => null,
             'local_tm'      => $orden[0],
             'local_nombre'  => $clubes[$orden[0]],
             'visita_tm'     => $orden[1],
