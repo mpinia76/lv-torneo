@@ -288,6 +288,9 @@ class ImportPartidosController extends Controller
         // emparejado estuviera mal, movería fechas de partidos equivocados.
         $guardar  = (string) $request->get('guardar', '0') === '1';
         $refrescar = (string) $request->get('refrescar', '0') === '1';
+        // Las fechas de los partidos YA JUGADOS son un botón aparte, nunca parte
+        // de `refrescar`: ver `corregirFechasJugadas()`.
+        $corregirJugados = (string) $request->get('fechas_jugados', '0') === '1';
         $filtro  = trim((string) $request->get('estado', ''));
         $gameday = trim((string) $request->get('gameday', ''));
         // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
@@ -455,7 +458,7 @@ class ImportPartidosController extends Controller
                 . e($comp) . '</code>.</p>');
         }
 
-        $filas = $this->clasificarFixture($filas);
+        $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
 
         // Qué temporada vino DE VERDAD. Sin esto no hay forma de saber si TM
         // respetó el `seasonId` o te devolvió la edición en curso igual: los
@@ -536,6 +539,9 @@ class ImportPartidosController extends Controller
             if (!$fuenteHtml) $refrescadas = $this->refrescarHorarios($filas);
             $resultados = $this->completarResultados($filas);
         }
+
+        $jugadas = ['cargadas' => 0, 'salteadas' => 0, 'detalle' => ''];
+        if ($corregirJugados) $jugadas = $this->corregirFechasJugadas($filas);
 
         // La auditoría no escribe nada: se muestra siempre.
         $problemas = $this->auditarResultados($filas);
@@ -623,6 +629,22 @@ class ImportPartidosController extends Controller
             . '<a href="' . e($base . '&cache=1&estado=nuevo') . '">Ver solo nuevos</a>'
             . '</p>';
 
+        if ($corregirJugados) {
+            $html .= '<p class="ok-box">' . ($jugadas['cargadas']
+                    ? 'Corregí la fecha de <b>' . $jugadas['cargadas'] . '</b> partidos ya jugados.'
+                    : 'No corregí ninguna fecha.')
+                . ($jugadas['salteadas']
+                    ? ' Dejé <b>' . $jugadas['salteadas'] . '</b> sin tocar porque el corrimiento pasa los 10 días: '
+                      . 'ésos van de a uno, mirándolos.' : '')
+                . '</p>'
+                . ($jugadas['detalle']
+                    ? '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partido</th><th>Antes</th>'
+                      . '<th>Ahora</th><th>Partido</th></tr></thead><tbody>'
+                      . $jugadas['detalle'] . '</tbody></table></div>'
+                    : '');
+        }
+
+        $html .= $this->bloqueFechasCorridas($filas, $base . $fuente);
         $html .= $this->bloqueClubesSinResolver($filas, $request);
         $html .= $this->bloqueClubesMapeados($filas, $request);
 
@@ -1182,8 +1204,16 @@ class ImportPartidosController extends Controller
      * Nuevo / duplicado / conflicto. Más simple que la del DT: acá la localía
      * viene dada por homeClub/awayClub, así que no existe el caso
      * "no se pudo determinar si fue local o visitante".
+     *
+     * DOS PASADAS, y la segunda no es un lujo. `buscarPartido()` mira una
+     * ventana de ±1 día alrededor de la fecha de TM: a un partido que movieron
+     * más que eso NO lo encuentra, lo marca «nuevo» y el botón «Aplicar» te
+     * crea un DUPLICADO del que ya tenías, con su alineación y su resultado
+     * aparte. Pasó con la fecha 8 del Clausura 2026: los tres del viernes
+     * estaban guardados con la fecha del domingo y figuraban como nuevos.
+     * La segunda pasada los reconoce por par de equipos + número de fecha.
      */
-    private function clasificarFixture(array $filas)
+    private function clasificarFixture(array $filas, $torneoId = null)
     {
         $mapaTm = $this->mapaTm();
         $mapaNombres = $this->mapaNombres();
@@ -1203,11 +1233,28 @@ class ImportPartidosController extends Controller
                 continue;
             }
 
+            $filas[$i]['dia_base'] = null;
+            $filas[$i]['corrido']  = 0;
+
             $partido = $this->buscarPartido($localId, $visiId, $f['dia']);
+            $porRonda = false;
+            if (!$partido) {
+                $partido = $this->buscarPartidoPorRonda($localId, $visiId, $f['dia'],
+                    isset($f['ronda']) ? $f['ronda'] : null, $torneoId);
+                $porRonda = (bool) $partido;
+            }
+
             if ($partido) {
+                $corrido = (int) round((strtotime(substr((string) $partido->dia, 0, 10))
+                    - strtotime(substr((string) $f['dia'], 0, 10))) / 86400);
+
                 $filas[$i]['partido_id'] = $partido->id;
                 $filas[$i]['estado'] = 'duplicado';
-                $filas[$i]['motivo'] = 'ya cargado';
+                $filas[$i]['dia_base'] = substr((string) $partido->dia, 0, 19);
+                $filas[$i]['corrido'] = $corrido;
+                $filas[$i]['motivo'] = $porRonda
+                    ? 'ya cargado, con la fecha corrida ' . abs($corrido) . ' día(s)'
+                    : 'ya cargado';
             } else {
                 $filas[$i]['estado'] = 'nuevo';
             }
@@ -1274,6 +1321,112 @@ class ImportPartidosController extends Controller
             $n++;
         }
         return $n;
+    }
+
+    /**
+     * Corrige la fecha de los partidos YA JUGADOS que quedaron guardados otro día.
+     *
+     * Es lo que `refrescarHorarios()` no hace y a propósito: con el partido
+     * jugado, TM deja de ser la autoridad —a los postergados les conserva la
+     * fecha ORIGINAL— así que pisar todo sería cambiar un dato bueno por uno
+     * viejo. Por eso esto es un botón aparte, con la lista a la vista antes de
+     * apretarlo, y **sólo mueve corrimientos de hasta 10 días**: un partido que
+     * se corrió de un viernes a un domingo es una reprogramación de la misma
+     * ronda; uno que se corrió tres meses es el caso postergado, y ése se mira
+     * de a uno.
+     *
+     * Sin hora definida (viene así del calendario en HTML) se cambia sólo el
+     * día y se conserva la hora cargada: un 00:00 inventado es peor.
+     */
+    private function corregirFechasJugadas(array $filas, $limiteDias = 10)
+    {
+        $out = ['cargadas' => 0, 'salteadas' => 0, 'detalle' => ''];
+
+        foreach ($filas as $f) {
+            if (empty($f['terminado']) || empty($f['partido_id']) || empty($f['dia'])) continue;
+            if (empty($f['dia_base'])) continue;
+            if (substr((string) $f['dia_base'], 0, 10) === substr((string) $f['dia'], 0, 10)) continue;
+
+            $dias = abs((strtotime(substr((string) $f['dia'], 0, 10))
+                - strtotime(substr((string) $f['dia_base'], 0, 10))) / 86400);
+            if ($dias > $limiteDias) { $out['salteadas']++; continue; }
+
+            $p = \App\Partido::find($f['partido_id']);
+            if (!$p) continue;
+
+            $vieja = (string) $p->dia;
+            $nueva = !empty($f['hora_definida'])
+                ? substr((string) $f['dia'], 0, 19)
+                : substr((string) $f['dia'], 0, 10) . ' '
+                  . (strlen($vieja) >= 19 ? substr($vieja, 11, 8) : '00:00:00');
+
+            $p->forceFill(['dia' => $nueva])->save();
+
+            $out['detalle'] .= '<tr><td class="num">' . e((string) $f['ronda']) . '</td>'
+                . '<td>' . e($f['club_nombre'] . ' vs ' . $f['rival_nombre']) . '</td>'
+                . '<td class="num">' . e(substr($vieja, 0, 16)) . '</td>'
+                . '<td class="num"><b>' . e(substr($nueva, 0, 16)) . '</b></td>'
+                . '<td class="num">#' . (int) $f['partido_id'] . '</td></tr>';
+            $out['cargadas']++;
+        }
+        return $out;
+    }
+
+    /**
+     * Los ya jugados cuya fecha no coincide con la de TM. No escribe nada: es
+     * la lista que hay que mirar ANTES de apretar el botón de arriba.
+     *
+     * Cada fila linkea a `import_detalles.fecha`, que corrige ese partido solo.
+     */
+    private function bloqueFechasCorridas(array $filas, $urlBase, $limiteDias = 10)
+    {
+        $corridos = [];
+        foreach ($filas as $f) {
+            if (empty($f['terminado']) || empty($f['partido_id']) || empty($f['dia'])) continue;
+            if (empty($f['dia_base'])) continue;
+            if (substr((string) $f['dia_base'], 0, 10) === substr((string) $f['dia'], 0, 10)) continue;
+            $corridos[] = $f;
+        }
+        if (empty($corridos)) return '';
+
+        $lejos = 0;
+        $filasHtml = '';
+        foreach ($corridos as $f) {
+            $dias = (int) round((strtotime(substr((string) $f['dia'], 0, 10))
+                - strtotime(substr((string) $f['dia_base'], 0, 10))) / 86400);
+            if (abs($dias) > $limiteDias) $lejos++;
+
+            $nueva = !empty($f['hora_definida'])
+                ? substr((string) $f['dia'], 0, 19)
+                : substr((string) $f['dia'], 0, 10) . ' ' . substr((string) $f['dia_base'], 11, 8);
+
+            $filasHtml .= '<tr' . (abs($dias) > $limiteDias ? ' class="warn"' : '') . '>'
+                . '<td class="num">' . e((string) $f['ronda']) . '</td>'
+                . '<td>' . e($f['club_nombre'] . ' vs ' . $f['rival_nombre']) . '</td>'
+                . '<td class="num">' . e(substr((string) $f['dia_base'], 0, 16)) . '</td>'
+                . '<td class="num"><b>' . e(substr((string) $f['dia'], 0, 16)) . '</b></td>'
+                . '<td class="num">' . ($dias > 0 ? '+' : '') . $dias . '</td>'
+                . '<td class="num">#' . (int) $f['partido_id'] . '</td>'
+                . '<td><a href="' . e(route('import_detalles.fecha',
+                    ['partido_id' => (int) $f['partido_id'], 'dia' => $nueva]))
+                . '">Poner el ' . e(substr((string) $f['dia'], 0, 10)) . '</a></td></tr>';
+        }
+
+        return '<h2>Ya jugados con la fecha corrida <span class="sub">(' . count($corridos) . ')</span></h2>'
+            . '<p class="sub">Partidos que ya se jugaron y que tenés guardados <b>otro día</b> que el que dice '
+            . 'Transfermarkt. Los encontró la segunda pasada del emparejador (par de equipos + número de fecha), '
+            . 'así que <b>no</b> figuran como «nuevos» y no hay riesgo de duplicarlos. '
+            . '<b>Ojo antes de corregir</b>: a los partidos postergados TM les conserva la fecha original, y en '
+            . 'ésos el que está bien sos vos. Un corrimiento de pocos días es una reprogramación; uno de meses, '
+            . 'casi seguro un postergado.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partido</th><th>La tuya</th>'
+            . '<th>La de TM</th><th>Días</th><th>Partido</th><th></th></tr></thead><tbody>'
+            . $filasHtml . '</tbody></table></div>'
+            . '<p class="acciones"><a class="boton-sec" href="' . e($urlBase . '&fechas_jugados=1')
+            . '">Corregir las de hasta 10 días</a> <span class="sub">escribe <code>partidos.dia</code> de esos '
+            . 'partidos y nada más'
+            . ($lejos ? '; deja afuera ' . $lejos . ' que se corrieron más de 10 días, ésos de a uno' : '')
+            . '</span></p>';
     }
 
     /**
@@ -3280,6 +3433,63 @@ class ImportPartidosController extends Controller
             $cache[$id] = $e ? $e->nombre : ('#' . $id);
         }
         return $cache[$id];
+    }
+
+    /**
+     * Segunda pasada del fixture: el mismo par de equipos en el MISMO número de
+     * fecha, aunque el día no coincida.
+     *
+     * Por qué no sirve `buscarPartidoAplazado()` acá: ése exige que el
+     * resultado coincida, y el caso típico es justamente un partido que todavía
+     * no tiene marcador cargado. Y por qué el número de fecha alcanza como
+     * llave: en una liga, dos equipos se cruzan una sola vez por ronda. La
+     * ventana igual se acota a ±120 días para no llegar a la otra rueda ni a
+     * otra edición del torneo.
+     *
+     * Devuelve algo sólo si queda UN candidato. Con dos o más se prefiere que
+     * caiga en «nuevo» y lo mire una persona: un emparejado equivocado le pega
+     * los datos de un partido a otro y no se nota nunca más.
+     */
+    private function buscarPartidoPorRonda($equipoId, $rivalId, $dia, $ronda, $torneoId = null)
+    {
+        $ronda = trim((string) $ronda);
+        if ($ronda === '' || !$dia) return null;
+        $nRonda = preg_replace('/\D/', '', $ronda);
+        if ($nRonda === '') return null;
+
+        $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -120 days'));
+        $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +120 days'));
+
+        $q = DB::table('partidos')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->whereBetween('partidos.dia', [$d0, $d1])
+            ->where(function ($w) use ($equipoId, $rivalId) {
+                $w->where(function ($x) use ($equipoId, $rivalId) {
+                    $x->where('partidos.equipol_id', $equipoId)->where('partidos.equipov_id', $rivalId);
+                })->orWhere(function ($x) use ($equipoId, $rivalId) {
+                    $x->where('partidos.equipol_id', $rivalId)->where('partidos.equipov_id', $equipoId);
+                });
+            })
+            ->select('partidos.id', 'fechas.numero');
+
+        // Con el torneo elegido la llave es redonda. Sin él (se entró por
+        // `comp=` a mano) queda el número de fecha solo, que puede repetirse
+        // entre torneos: por eso se exige un único candidato.
+        if ($torneoId) $q->where('grupos.torneo_id', (int) $torneoId);
+
+        // COMPARAR COMO NÚMERO, NO COMO TEXTO: tus fechas se llaman «08» o
+        // «Fecha 08» y la ronda de TM viene «8». Como cadenas no coinciden
+        // nunca, y la segunda pasada no encontraría jamás un partido.
+        $cands = [];
+        foreach ($q->get() as $r) {
+            $suyo = preg_replace('/\D/', '', (string) $r->numero);
+            if ($suyo === '') continue;
+            if ((int) $suyo === (int) $nRonda) $cands[] = (int) $r->id;
+        }
+        $cands = array_values(array_unique($cands));
+
+        return count($cands) === 1 ? \App\Partido::find($cands[0]) : null;
     }
 
     private function buscarPartido($equipoId, $rivalId, $dia)
