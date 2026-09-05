@@ -1338,11 +1338,11 @@ class ImportPartidosController extends Controller
      * Sin hora definida (viene así del calendario en HTML) se cambia sólo el
      * día y se conserva la hora cargada: un 00:00 inventado es peor.
      */
-    private function corregirFechasJugadas(array $filas, $limiteDias = 10)
+    private function corregirFechasJugadas(array &$filas, $limiteDias = 10)
     {
         $out = ['cargadas' => 0, 'salteadas' => 0, 'detalle' => ''];
 
-        foreach ($filas as $f) {
+        foreach ($filas as $i => $f) {
             if (empty($f['terminado']) || empty($f['partido_id']) || empty($f['dia'])) continue;
             if (empty($f['dia_base'])) continue;
             if (substr((string) $f['dia_base'], 0, 10) === substr((string) $f['dia'], 0, 10)) continue;
@@ -1361,6 +1361,15 @@ class ImportPartidosController extends Controller
                   . (strlen($vieja) >= 19 ? substr($vieja, 11, 8) : '00:00:00');
 
             $p->forceFill(['dia' => $nueva])->save();
+
+            // `$filas` VIENE POR REFERENCIA A PROPÓSITO. El array se clasificó al
+            // principio del request, así que `dia_base` es la fecha que el partido
+            // tenía ANTES de esta corrección. Sin actualizarlo acá, el bloque
+            // "Ya jugados con la fecha corrida" —que se arma después— los volvía
+            // a listar como pendientes, con la fecha vieja, justo debajo del
+            // cartel que decía que los había corregido.
+            $filas[$i]['dia_base'] = substr($nueva, 0, 19);
+            $filas[$i]['corrido']  = 0;
 
             $out['detalle'] .= '<tr><td class="num">' . e((string) $f['ronda']) . '</td>'
                 . '<td>' . e($f['club_nombre'] . ' vs ' . $f['rival_nombre']) . '</td>'
