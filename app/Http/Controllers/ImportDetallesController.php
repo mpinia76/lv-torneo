@@ -1714,7 +1714,6 @@ class ImportDetallesController extends Controller
         $season   = trim((string) $request->get('season', ''));
         $copa     = (string) $request->get('copa', '0') === '1';
         $guardar  = (string) $request->get('guardar', '0') === '1';
-        $mapear   = (string) $request->get('mapear', '0') === '1';
         $crudo    = (string) $request->get('crudo', '0') === '1';
         $pais     = trim((string) $request->get('pais', ''));
         $atar     = (array) $request->get('atar', []);          // tm_club_id => equipo_id
@@ -1908,21 +1907,6 @@ class ImportDetallesController extends Controller
                 . '</tr>';
         }
 
-        // ── Aprender los mapeos de clubes ───────────────────────────────────
-        $aprendidos = 0;
-
-        if ($mapear && $porAtar) {
-            foreach ($porAtar as $tm => $d) {
-                $mapeo->guardar($tm, $d['equipo_id'], $d['nombre'], 'calendario html');
-                $aprendidos++;
-            }
-
-            $cuerpo .= '<div class="ok-box">Até <b>' . $aprendidos . '</b> clubes de Transfermarkt a equipos '
-                . 'tuyos en <code>equipo_tm</code>. Volvé a leer el calendario: ahora deberían aparear más '
-                . 'partidos.</div>';
-            $porAtar = [];
-        }
-
         $cuerpo .= '<div class="cards">'
             . $this->card($cont['leidos'], 'partidos del torneo')
             . $this->card($cont['ya'], 'ya tenían gameId', 'ok')
@@ -1931,7 +1915,7 @@ class ImportDetallesController extends Controller
             // Ya no es sólo «otra fecha»: acá caen todas las filas donde no elegí
             // solo y te dejé los candidatos a un clic.
             . $this->card($cont['otraFecha'], 'para elegir a mano', $cont['otraFecha'] ? 'err' : '')
-            . $this->card(count($porAtar), 'clubes por atar', count($porAtar) ? 'warn' : '')
+            . $this->card(count($porAtar), 'coinciden por nombre', count($porAtar) ? 'warn' : '')
             . $this->card(count($sinAtar), 'clubes desconocidos', count($sinAtar) ? 'err' : '')
             . ($guardar ? $this->card($cont['guardados'], 'guardados', 'ok') : '')
             . '</div>';
@@ -1942,36 +1926,30 @@ class ImportDetallesController extends Controller
                 . '<b>' . (int) $svc->sinClubes . '</b> sin los dos clubes.</p>';
         }
 
-        // ── Primero atar, después guardar ───────────────────────────────────
-        // El orden importa: cada club que se ata hace aparear más partidos, así
-        // que guardar antes de atar deja plata sobre la mesa.
-        if ($porAtar) {
-            $cuerpo .= '<h2>Clubes que reconocí por el nombre</h2>'
-                . '<p class="sub">Estos clubes de Transfermarkt no están en <code>equipo_tm</code>, pero su '
-                . 'nombre coincide sin ambigüedad con un equipo tuyo. <b>Revisalos antes de atarlos:</b> un club '
-                . 'mal atado carga partidos con el rival cambiado. Los homónimos no aparecen acá — cuando dos '
-                . 'equipos tuyos comparten nombre normalizado, el apareo por nombre se abstiene a propósito.</p>'
-                . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th>'
-                . '<th>Equipo tuyo</th></tr></thead><tbody>';
+        // ── Atar los clubes, de a uno ───────────────────────────────────────
+        // Antes eran dos listas y dos flujos: los que reconocí por el nombre se
+        // ataban todos de un saque con un botón, y los demás se elegían a mano.
+        // El atado en bloque metía errores —el apareo por nombre acierta casi
+        // siempre, pero «casi» no alcanza cuando un club mal atado carga los
+        // partidos con el rival cambiado—, así que ahora hay una sola lista: el
+        // reconocido viene con el equipo ya elegido en el select, y vos
+        // confirmás, cambiás, o lo dejás vacío y no se toca.
+        //
+        // El orden sigue importando: cada club atado hace aparear más partidos,
+        // así que atar va primero y guardar los gameId después.
+        $paraAtar = [];
 
-            foreach ($porAtar as $tm => $d) {
-                $nombreEq = $this->nombreEquipo($d['equipo_id']);
-                $cuerpo .= '<tr>'
-                    . '<td>' . e((string) $d['nombre']) . '</td>'
-                    . '<td class="num gris">' . e((string) $tm) . '</td>'
-                    . '<td>' . e((string) $nombreEq) . ' <span class="sub">#' . $d['equipo_id'] . '</span></td>'
-                    . '</tr>';
-            }
-
-            $cuerpo .= '</tbody></table></div>'
-                . '<p class="acciones"><a class="boton" href="'
-                . e(route('import_detalles.competencia_html',
-                    ['comp_id' => $compId, 'season' => $season, 'copa' => $copa ? 1 : 0, 'mapear' => 1]))
-                . '">Atar los ' . count($porAtar) . ' clubes</a> '
-                . '<span class="sub">hacelo antes de guardar los gameId: cada club atado aparea más partidos</span></p>';
+        foreach ($porAtar as $tm => $d) {
+            $paraAtar[$tm] = ['nombre' => $d['nombre'], 'sugerido' => (int) $d['equipo_id']];
         }
 
-        if ($sinAtar) {
+        foreach ($sinAtar as $tm => $nombre) {
+            if (!isset($paraAtar[$tm])) {
+                $paraAtar[$tm] = ['nombre' => $nombre, 'sugerido' => 0];
+            }
+        }
+
+        if ($paraAtar) {
             // Acá NO se manda a otra pantalla. La versión anterior linkeaba a
             // `import_partidos.fixture?mapear_tm=…`, pero ese parámetro sólo
             // hace algo cuando esa pantalla ya tiene un fixture cargado: el
@@ -1986,12 +1964,15 @@ class ImportDetallesController extends Controller
                     . ($eq->pais ? ' (' . e((string) $eq->pais) . ')' : '') . '</option>';
             }
 
-            $cuerpo .= '<h2>Clubes que no reconocí <span class="sub">(' . count($sinAtar) . ')</span></h2>'
-                . '<p class="sub">No están en <code>equipo_tm</code> y su nombre no coincide con ningún equipo '
-                . 'tuyo (o coincide con más de uno, y entonces me abstengo). Elegí el equipo y guardá: queda atado '
-                . 'por el id de Transfermarkt y no se vuelve a preguntar nunca más. Si el club <b>no existe</b> en '
-                . 'tu base, «Crear desde TM» lo da de alta con nombre, siglas, país y escudo y lo ata solo '
-                . '(cuesta 2 llamadas). Los que dejes vacíos quedan como están.</p>'
+            $cuerpo .= '<h2>Clubes para atar <span class="sub">(' . count($paraAtar) . ')</span></h2>'
+                . '<p class="sub">Ninguno de estos está en <code>equipo_tm</code>. Los <b>resaltados</b> vienen '
+                . 'con un equipo tuyo ya elegido porque el nombre coincide sin ambigüedad: es una propuesta, no '
+                . 'una certeza. <b>Revisala una por una</b> — un club mal atado carga los partidos con el rival '
+                . 'cambiado. El resto viene vacío. Elegí el equipo y guardá: cada uno queda atado por el id de '
+                . 'Transfermarkt y no se vuelve a preguntar nunca más. Si el club <b>no existe</b> en tu base, '
+                . '«Crear desde TM» lo da de alta con nombre, siglas, país y escudo y lo ata solo (cuesta 2 '
+                . 'llamadas). <b>Los que dejes vacíos quedan como están</b>: si una propuesta no te cierra, '
+                . 'borrala del select y seguí.</p>'
                 . '<form method="get">'
                 . '<input type="hidden" name="comp_id" value="' . e($compId) . '">'
                 . '<input type="hidden" name="season" value="' . e($season) . '">'
@@ -2000,16 +1981,26 @@ class ImportDetallesController extends Controller
                 . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th>'
                 . '<th>Equipo tuyo</th><th></th></tr></thead><tbody>';
 
-            foreach ($sinAtar as $tm => $nombre) {
-                $cuerpo .= '<tr>'
-                    . '<td>' . e((string) $nombre) . '</td>'
+            foreach ($paraAtar as $tm => $d) {
+                $sug = (int) $d['sugerido'];
+
+                // El sugerido va marcado sobre la misma lista de opciones. El id
+                // entre comillas no se confunde con otro: `value="12"` no es
+                // prefijo de `value="123"` con la comilla de cierre puesta.
+                $ops = $sug
+                    ? str_replace('value="' . $sug . '"', 'value="' . $sug . '" selected', $opciones)
+                    : $opciones;
+
+                $cuerpo .= '<tr' . ($sug ? ' class="warn"' : '') . '>'
+                    . '<td>' . e((string) $d['nombre'])
+                        . ($sug ? ' <span class="sub">coincide por nombre</span>' : '') . '</td>'
                     . '<td class="num gris"><a target="_blank" rel="noopener" href="'
                         . e('https://www.transfermarkt.es/-/startseite/verein/' . rawurlencode((string) $tm))
                         . '">' . e((string) $tm) . '</a></td>'
                     . '<td><input type="hidden" name="atar_nombre[' . e((string) $tm) . ']" value="'
-                        . e((string) $nombre) . '">'
+                        . e((string) $d['nombre']) . '">'
                         . '<select name="atar[' . e((string) $tm) . ']" class="s2" '
-                        . 'data-placeholder="buscar equipo tuyo…">' . $opciones . '</select></td>'
+                        . 'data-placeholder="buscar equipo tuyo…">' . $ops . '</select></td>'
                     . '<td><a class="boton-sec" target="_blank" rel="noopener" href="'
                         . e(route('import_partidos.crear_equipo',
                             ['tm_id' => $tm, 'volver' => $volverAca]))
@@ -2019,8 +2010,9 @@ class ImportDetallesController extends Controller
 
             $cuerpo .= '</tbody></table></div>'
                 . '<p class="acciones"><button class="boton" type="submit">Atar y volver a leer</button> '
-                . '<span class="sub">vuelve a leer la página, así que cuesta 1 crédito; los partidos de esos '
-                . 'clubes ya salen apareados en la misma corrida</span></p></form>';
+                . '<span class="sub">hacelo antes de guardar los gameId: cada club atado aparea más partidos. '
+                . 'Vuelve a leer la página, así que cuesta 1 crédito, y los partidos de esos clubes ya salen '
+                . 'apareados en la misma corrida</span></p></form>';
         }
 
         if ($guardar) {
