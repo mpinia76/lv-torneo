@@ -327,6 +327,20 @@ class ImportPartidosController extends Controller
             }
         }
 
+        // ── LAS CUATRO PERILLAS DEL CALENDARIO EN HTML ──────────────────────
+        // `import_detalles.competencia_html` funciona porque deja tipear las
+        // cuatro cosas que pueden estar mal: id de competencia, tipo (liga o
+        // copa), temporada y país de salida. Acá salían del torneo y no había
+        // forma de moverlas sin editar el torneo, así que un intento fallido
+        // era un callejón sin salida. Ahora se pisan por query string y
+        // `solo_html=1` va derecho al HTML sin pasar por la API.
+        $compForzado = trim((string) $request->get('comp_forzado', ''));
+        if ($compForzado !== '') $comp = $compForzado;
+        $tipoHtml = trim((string) $request->get('tipo', ''));
+        if ($tipoHtml !== 'liga' && $tipoHtml !== 'copa') $tipoHtml = '';
+        $pais     = trim((string) $request->get('pais', '')) ?: null;
+        $soloHtml = (string) $request->get('solo_html', '0') === '1';
+
         $conTm = \App\Torneo::whereNotNull('tm_competition_id')->where('tm_competition_id', '!=', '')
             ->orderBy('year', 'desc')->orderBy('nombre')->get();
 
@@ -358,7 +372,12 @@ class ImportPartidosController extends Controller
                 . 'acá. Hace falta porque el id de competencia es de la <b>copa</b>, no de la edición: tus cinco '
                 . 'Copas Argentina comparten <code>ARCA</code>, y sin temporada Transfermarkt manda la que está en '
                 . 'curso. Si un torneo del desplegable dice <b>SIN TEMPORADA</b>, cargásela primero o vas a bajar '
-                . 'el fixture de este año creyendo que bajás el suyo.</p>';
+                . 'el fixture de este año creyendo que bajás el suyo.</p>'
+                . ($torneoElegido ? '<p class="acciones"><a class="boton-sec" href="'
+                    . e(route('import_partidos.fixture', array_filter([
+                        'torneo_id' => $torneoElegido->id, 'season' => $season, 'solo_html' => 1])))
+                    . '">Leer el calendario en HTML</a> <span class="sub">para las temporadas cerradas: '
+                    . 'la API siempre contesta la edición en curso. 1 crédito</span></p>' : '');
         }
 
         $html .= '<details' . ($comp === '' ? ' open' : '') . '><summary>No sé el id de competencia de un torneo</summary>'
@@ -396,7 +415,23 @@ class ImportPartidosController extends Controller
         $fuenteHtml = false;
         $avisosHtml = [];
 
-        if (!$usarCache) {
+        if (!$usarCache && $soloHtml) {
+            // Derecho al calendario en HTML. El nombre de la competencia sale
+            // del torneo: pedírselo a la API costaría un crédito para nada.
+            $compNombre = $torneoElegido ? (string) $torneoElegido->nombre : $comp;
+            $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml, $pais, $tipoHtml);
+
+            if (is_array($porHtml) && !empty($porHtml)) {
+                $filas      = $porHtml;
+                $fuenteHtml = true;
+            } else {
+                return $this->pagina('Fixture', $html . $this->cajaFixtureHtml(
+                    $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
+                    'El calendario en HTML no trajo partidos.'));
+            }
+        }
+
+        if (!$usarCache && !$soloHtml) {
             $crudo = $this->traerFixture($comp, $season);
             if (is_string($crudo)) return $this->pagina('Fixture', $html . '<p class="err-box">' . $crudo . '</p>');
 
@@ -416,36 +451,18 @@ class ImportPartidosController extends Controller
                 // es la API: saliendo de Europa TM puede contestar el muro de
                 // consentimiento en vez de la página. Con `&pais=us` se prueba
                 // desde otro lado sin tocar el .env.
-                $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml,
-                    trim((string) $request->get('pais', '')) ?: null);
+                $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre,
+                    $avisosHtml, $pais, $tipoHtml);
 
                 if (is_array($porHtml) && !empty($porHtml)) {
                     $filas      = $porHtml;
                     $fuenteHtml = true;
                     $saltados   = 0;
                 } else {
-                    $urlPantalla = route('import_detalles.competencia_html', [
-                        'comp_id' => $comp, 'season' => $season,
-                        'copa' => ($torneoElegido && strcasecmp((string) $torneoElegido->tipo, 'Copa') === 0) ? 1 : 0,
-                    ]);
-                    $detalle = '';
-                    foreach ($avisosHtml as $a) $detalle .= '<div>• ' . e($a) . '</div>';
-
-                    return $this->pagina('Fixture', $html
-                        . '<p class="err-box"><b>No pude traer la temporada ' . e($season) . '.</b> '
-                        . 'La API devolvió la edición en curso (no sabe de temporadas) y el calendario en HTML '
-                        . 'tampoco trajo partidos.</p>'
-                        . ($detalle ? '<div class="diag">' . $detalle . '</div>' : '')
-                        . '<p class="sub">Abrí las URLs de arriba en el navegador: si la página existe y tiene '
-                        . 'partidos, el problema es por dónde sale la petición —Transfermarkt contesta el muro de '
-                        . 'consentimiento a algunos países—. Probá agregando <code>&amp;pais=us</code> a esta '
-                        . 'pantalla. Si la página viene vacía en el navegador también, revisá el <b>Id '
-                        . 'Competencia</b> y el <b>Id Temporada</b> del torneo.</p>'
-                        . '<p class="acciones">'
-                        . '<a class="boton-sec" href="' . e($request->fullUrl()
-                            . (strpos($request->fullUrl(), '?') === false ? '?' : '&') . 'pais=us') . '">Reintentar desde EE.UU.</a> '
-                        . '<a class="boton-sec" href="' . e($urlPantalla) . '">Abrir el calendario de la competencia</a>'
-                        . '</p>');
+                    return $this->pagina('Fixture', $html . $this->cajaFixtureHtml(
+                        $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
+                        'No pude traer la temporada ' . e($season) . '. La API devolvió la edición en curso '
+                        . '(no sabe de temporadas) y el calendario en HTML tampoco trajo partidos.'));
                 }
             }
 
@@ -877,7 +894,104 @@ class ImportPartidosController extends Controller
      *     importador de la API: el texto trae la tanda sumada y no hay con qué
      *     separarla, y un marcador inventado es peor que ninguno.
      */
-    private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [], $pais = null)
+    /**
+     * Qué contestó Transfermarkt cuando la página no trajo ningún partido.
+     *
+     * Sin esto, "0 partidos" es indistinguible entre el muro de consentimiento,
+     * un 404 con el maquetado de TM, una temporada que no existe y un id de
+     * competencia equivocado — y las cuatro se arreglan distinto. El HTML ya
+     * está en la mano, así que mirarlo no cuesta otra llamada.
+     */
+    private function queVino($html)
+    {
+        $html = (string) $html;
+        if ($html === '') return '';
+
+        $titulo = '';
+        if (preg_match('#<title[^>]*>(.*?)</title>#is', $html, $m)) {
+            $titulo = trim(html_entity_decode(strip_tags($m[1]), ENT_QUOTES, 'UTF-8'));
+        }
+
+        $texto = mb_strtolower($titulo . ' ' . mb_substr(strip_tags($html), 0, 3000));
+        $pista = '';
+        $pistas = ['consent' => 'el muro de consentimiento', 'zustimmung' => 'el muro de consentimiento',
+            'cookie' => 'el muro de cookies', 'captcha' => 'un captcha',
+            'attention required' => 'un bloqueo de Cloudflare', 'access denied' => 'un acceso denegado',
+            'no se encontr' => 'un 404 de TM', 'not found' => 'un 404'];
+        foreach ($pistas as $aguja => $que) {
+            if (mb_strpos($texto, $aguja) !== false) { $pista = ', parece ' . $que; break; }
+        }
+
+        return ' [vino una página de ' . strlen($html) . ' bytes'
+            . ($titulo !== '' ? ', título «' . mb_substr($titulo, 0, 90) . '»' : ', sin título')
+            . $pista . ']';
+    }
+
+    /**
+     * La caja de "el calendario no trajo partidos", CON las perillas a la vista.
+     *
+     * Cuatro cosas pueden estar mal y cada una se arregla distinto: el id de
+     * competencia, el tipo (las ligas van por `/wettbewerb/` y las copas por
+     * `/pokalwettbewerb/`), la temporada (el año de arranque, que en los
+     * torneos que cruzan años va uno atrás) y el país de salida (desde Europa
+     * TM contesta el muro de consentimiento en vez de la página). Antes había
+     * que adivinar cuál y editar el torneo para probar; ahora se cambia acá y
+     * se reintenta, que es lo que hace la pantalla del calendario suelto.
+     */
+    private function cajaFixtureHtml($comp, $season, $torneo, array $avisosHtml, $tipoHtml, $pais, $titulo)
+    {
+        $esCopa = $tipoHtml === 'copa'
+            || ($tipoHtml === '' && $torneo && strcasecmp((string) $torneo->tipo, 'Copa') === 0);
+
+        $detalle = '';
+        foreach ($avisosHtml as $a) $detalle .= '<div>• ' . e($a) . '</div>';
+
+        $base = ['solo_html' => 1];
+        if ($torneo) $base['torneo_id'] = (int) $torneo->id;
+
+        $ocultos = '';
+        foreach ($base as $k => $v) $ocultos .= '<input type="hidden" name="' . e($k) . '" value="' . e((string) $v) . '">';
+
+        $opts = '';
+        foreach (['' => 'tipo: como diga el torneo', 'copa' => 'copa (pokalwettbewerb)',
+                  'liga' => 'liga (wettbewerb)'] as $v => $t) {
+            $opts .= '<option value="' . e($v) . '"' . ($tipoHtml === $v ? ' selected' : '') . '>' . e($t) . '</option>';
+        }
+
+        $aEEUU = route('import_partidos.fixture', array_filter(array_merge($base, [
+            'comp_forzado' => $comp, 'season' => $season, 'tipo' => $tipoHtml, 'pais' => 'us'])));
+
+        $suelto = route('import_detalles.competencia_html', [
+            'comp_id' => $comp, 'season' => $season, 'copa' => $esCopa ? 1 : 0]);
+
+        // `?crudo=1` de la pantalla suelta es el diagnóstico bueno: bytes,
+        // marcas de consentimiento/captcha/créditos, los primeros 4 KB y qué ve
+        // el parser. Un muro de cookies, un bloqueo por IP, una respuesta
+        // recortada y un cambio de maquetado se ven todos iguales sin eso.
+        $crudo = route('import_detalles.competencia_html', array_filter([
+            'comp_id' => $comp, 'season' => $season, 'copa' => $esCopa ? 1 : 0,
+            'pais' => $pais, 'crudo' => 1]));
+
+        return '<p class="err-box"><b>' . $titulo . '</b></p>'
+            . ($detalle ? '<div class="diag">' . $detalle . '</div>' : '')
+            . '<p class="sub">Cambiá la perilla que sospeches y reintentá — cada intento es 1 crédito. '
+            . 'El <b>país</b> es por dónde sale la petición: saliendo de Europa, Transfermarkt contesta el muro '
+            . 'de consentimiento en vez de la página, y con <code>us</code> suele venir bien. La <b>temporada</b> '
+            . 'de TM es el año de arranque: en los torneos que cruzan años va uno atrás del que usás vos. '
+            . 'Y si el <b>tipo</b> está mal, la página existe pero viene sin un solo partido.</p>'
+            . '<form method="get" action="' . e(route('import_partidos.fixture')) . '">' . $ocultos
+            . '<input name="comp_forzado" value="' . e((string) $comp) . '" size="10" placeholder="id competencia"> '
+            . '<select name="tipo" class="s2" data-placeholder="tipo…">' . $opts . '</select> '
+            . '<input name="season" value="' . e((string) $season) . '" size="7" placeholder="temporada"> '
+            . '<input name="pais" value="' . e((string) $pais) . '" size="5" placeholder="país"> '
+            . '<button class="boton">Leer el calendario</button> <span class="sub">1 crédito</span></form>'
+            . '<p class="acciones">'
+            . '<a class="boton-sec" href="' . e($aEEUU) . '">Reintentar desde EE.UU.</a> '
+            . '<a class="boton-sec" href="' . e($suelto) . '">Abrir el calendario suelto</a> '
+            . '<a class="boton-sec" href="' . e($crudo) . '">Ver qué contestó Transfermarkt</a></p>';
+    }
+
+    private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [], $pais = null, $tipo = '')
     {
         // En TM las ligas van por `/wettbewerb/` y las copas por
         // `/pokalwettbewerb/`: es otra ruta, no un parámetro, y pedir la que no
@@ -889,7 +1003,11 @@ class ImportPartidosController extends Controller
         // le explica nada a nadie. Se prueba la que corresponde y, si vuelve
         // vacía, la otra. La segunda llamada sólo ocurre cuando la primera
         // falló, que es exactamente cuando vale la pena gastarla.
-        $esCopa = $torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : true;
+        // `$tipo` ('liga'/'copa') lo pisa a mano desde la pantalla: el campo
+        // `torneos.tipo` se carga a mano y puede estar mal.
+        $esCopa = $tipo === 'copa' ? true
+            : ($tipo === 'liga' ? false
+                : ($torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : true));
 
         $svc = new \App\Services\TmFixtureCompetenciaHtml;
         $leido = null;
@@ -897,10 +1015,13 @@ class ImportPartidosController extends Controller
 
         foreach ([$esCopa, !$esCopa] as $copa) {
             $url = \App\Services\TmFixtureCompetenciaHtml::urlComp($comp, $season, $copa);
-            $r   = $svc->leerComp($comp, $season, $copa, false, $pais);
+            // Se pide el crudo (no cuesta otra llamada: el HTML ya viaja) para
+            // poder decir QUÉ contestó TM cuando no hay partidos.
+            $r   = $svc->leerComp($comp, $season, $copa, true, $pais);
 
             $intentos[] = ($copa ? 'copa' : 'liga') . ': ' . $url
-                . ' → ' . (is_array($r) ? count($r) . ' partidos' : 'no vino la página');
+                . ' → ' . (is_array($r) ? count($r) . ' partidos' : 'no vino la página')
+                . ((is_array($r) && !empty($r)) ? '' : $this->queVino($svc->crudo));
 
             if (is_array($r) && !empty($r)) { $leido = $r; break; }
         }
