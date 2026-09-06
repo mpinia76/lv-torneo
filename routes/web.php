@@ -33,26 +33,6 @@ Route::group(['prefix' => 'admin'], function()
     });
     Route::get('/home', 'TorneoController@index')->name('index');
     Route::resource('torneos', 'TorneoController');
-    Route::get(
-        '/jugadores/name-completo-no-verificado',
-        'JugadorController@nameCompletoNoVerificado'
-    )->name('jugadores.nameCompletoNoVerificado');
-
-    Route::post(
-        'jugadores/verificar-nombre-apellido-simple',
-        'JugadorController@verificarNombreApellidoSimple'
-    )->name('jugadores.verificarNombreApellidoSimple');
-
-    Route::post(
-        '/jugadores/confirmar-nombre-largo/{persona}',
-        'JugadorController@confirmarNombreLargo'
-    )->name('jugadores.confirmarNombreLargo');
-
-    Route::post(
-        'jugadores/confirmar-nombres-largos',
-        'JugadorController@confirmarNombresLargos'
-    )->name('jugadores.confirmarNombresLargos');
-
 
     Route::get('/plantillas/{id}/reasignar-grupo', 'PlantillaController@reasignarGrupo')
         ->name('plantillas.reasignarGrupo');
