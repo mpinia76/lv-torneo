@@ -4282,6 +4282,13 @@ class TmDetallePartido
         $n = $this->rescatarPrimerApellido($n, $nacionalidad);
         $n = $this->apellidoDobleSinAncla($n, $nacionalidad, $p);
 
+        // Recién ACÁ se sabe el apellido de verdad: las dos funciones de arriba
+        // son las que descubren el apellido doble que TM no manda separado. El
+        // campo mostrado viene de `separarTM()`, o sea de ANTES, así que hay que
+        // recalcularlo o queda con el apellido viejo ("N. Schelotto" mientras la
+        // ficha decía "Barros Schelotto").
+        $n['name'] = NombreHelper::completarApellido($n['name'], $n['apellido']);
+
         $persona = ['name' => trim($n['name']), 'nombre' => trim($n['nombre']), 'apellido' => trim($n['apellido'])];
         if ($ciudad)        $persona['ciudad'] = $ciudad;
         if ($nacionalidad)  $persona['nacionalidad'] = $nacionalidad;

@@ -161,10 +161,96 @@ class NombreHelper
         if ($name === '') { $name = $shortName !== '' ? $shortName : $nameField; }
         if ($name === '') { $name = trim($nombre . ' ' . $apellido); }
 
+        // El shortName de TM puede haberse comido un apellido de adelante.
+        $name = self::completarApellido($name, $apellido);
+
         return [
             'name'     => $name,
             'nombre'   => $nombre,
             'apellido' => $apellido,
         ];
+    }
+
+    /**
+     * Repone en el campo MOSTRADO los apellidos que Transfermarkt salteó.
+     *
+     * TM arma el shortName con UN solo apellido, y no siempre es el primero:
+     *
+     *   Nicolás Barros Schelotto  ->  shortName "N. Schelotto"   ("Barros" desaparece)
+     *   Roberto Pereyra Legallais ->  shortName "R. Legallais"   ("Pereyra" desaparece)
+     *
+     * En las listas del sitio eso se lee como otra persona. Acá se completa el
+     * apellido tal como quedó separado en la ficha, conservando intacta la parte
+     * del nombre de pila que eligió TM (inicial o nombre de uso).
+     *
+     * NO toca el caso normal —"F. Calvo" con apellido "Calvo Quesada"—: ahí TM
+     * ya arranca por el PRIMER apellido, que es como se conoce a la persona, y
+     * alargarlo a "F. Calvo Quesada" empeoraría miles de fichas que hoy están
+     * bien. Sólo se repone lo que falta ADELANTE.
+     *
+     * Se llama dos veces a propósito: una acá, para los importadores que usan
+     * `separarTM()` directo, y otra en `TmDetallePartido::personaDesdePerfil()`
+     * DESPUÉS de `rescatarPrimerApellido()` / `apellidoDobleSinAncla()`, que son
+     * las que descubren el apellido doble cuando TM no lo manda separado. Sin esa
+     * segunda pasada el name se queda con el apellido viejo: es exactamente por
+     * eso que "Barros Schelotto" quedaba bien en la ficha y mal en el mostrado.
+     *
+     * @param  string $name      campo mostrado tal como viene de TM
+     * @param  string $apellido  apellido ya separado (el de la ficha)
+     * @return string            el mostrado, con el apellido completo
+     */
+    public static function completarApellido($name, $apellido)
+    {
+        $name     = trim((string) $name);
+        $apellido = trim((string) $apellido);
+        if ($name === '' || $apellido === '') return $name;
+
+        $tokensApe = preg_split('/\s+/', $apellido);
+        // Apellido simple: no hay nada que reponer.
+        if (count($tokensApe) < 2) return $name;
+
+        $tokensName = preg_split('/\s+/', $name);
+
+        $norm = function ($s) {
+            $s = mb_strtolower(trim((string) $s), 'UTF-8');
+            return strtr($s, [
+                'á'=>'a','à'=>'a','ä'=>'a','â'=>'a','ã'=>'a','å'=>'a',
+                'é'=>'e','è'=>'e','ë'=>'e','ê'=>'e',
+                'í'=>'i','ì'=>'i','ï'=>'i','î'=>'i',
+                'ó'=>'o','ò'=>'o','ö'=>'o','ô'=>'o','õ'=>'o',
+                'ú'=>'u','ù'=>'u','ü'=>'u','û'=>'u',
+                'ñ'=>'n','ç'=>'c','ý'=>'y','ÿ'=>'y',
+            ]);
+        };
+
+        // ¿Por qué palabra del apellido arranca lo que muestra TM?
+        $idxName = null;
+        $idxApe  = null;
+        foreach ($tokensName as $i => $t) {
+            foreach ($tokensApe as $j => $a) {
+                if ($norm($t) === $norm($a)) { $idxName = $i; $idxApe = $j; break 2; }
+            }
+        }
+
+        // El mostrado no contiene ninguna palabra del apellido (apodos tipo
+        // "Marcão", nombres artísticos): no es asunto nuestro.
+        if ($idxName === null) return $name;
+
+        // TM ya arranca por el primer apellido: está bien como está.
+        if ($idxApe === 0) return $name;
+
+        // De ahí al final el mostrado tiene que ser EXACTAMENTE la cola del
+        // apellido. Si no, es una forma que no entendemos y no la pisamos.
+        $cola     = array_slice($tokensName, $idxName);
+        $esperado = array_slice($tokensApe, $idxApe);
+        if (count($cola) !== count($esperado)) return $name;
+        foreach ($cola as $k => $t) {
+            if ($norm($t) !== $norm($esperado[$k])) return $name;
+        }
+
+        $pila   = array_slice($tokensName, 0, $idxName);
+        $faltan = array_slice($tokensApe, 0, $idxApe);
+
+        return trim(implode(' ', array_merge($pila, $faltan, $cola)));
     }
 }
