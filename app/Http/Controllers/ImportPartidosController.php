@@ -138,7 +138,9 @@ class ImportPartidosController extends Controller
             . '<p class="acciones"><a class="boton-sec" href="' . e(route('import_partidos.fixture')) . '">'
             . 'Fixture por competencia (torneos en curso)</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">'
-            . 'Detalle de los partidos (alineaciones, goles, tarjetas, cambios)</a></p>';
+            . 'Detalle de los partidos (alineaciones, goles, tarjetas, cambios)</a>'
+            . '<a class="boton-sec" href="' . e(route('import_partidos.fechas')) . '">'
+            . 'Reagrupar fechas de un grupo</a></p>';
 
         $html .= '<div class="cards">'
             . $this->card($c['total'], 'DTs en la base')
@@ -3071,6 +3073,264 @@ class ImportPartidosController extends Controller
         return $this->pagina('Aplicar partidos', $html . '</tbody></table></div>');
     }
 
+    /**
+     * REAGRUPAR LAS FECHAS DE UN GRUPO — reparación de lo ya cargado.
+     *
+     * Hasta sep-2026 el motor DT escribía `fechas.numero` con el `gameDay` de
+     * TM, así que un grupo de copa quedaba con fechas 6, 7, 9, 11... Acá se les
+     * pone el nombre que corresponde y se fusionan las que son la misma ronda
+     * (la ida y la vuelta de una llave).
+     *
+     * Toca `fechas.numero/url_nombre/orden` y `partidos.fecha_id`, nada más:
+     * `partidos.fecha_id` es la ÚNICA columna de la base que apunta a una
+     * fecha —goles, tarjetas, cambios y alineaciones cuelgan del partido—, así
+     * que mover un partido de fecha no arrastra ni pierde nada.
+     *
+     * Una fecha se borra sólo si se pidió fusionarla Y quedó sin partidos.
+     */
+    public function fechas(Request $request)
+    {
+        set_time_limit(0);
+
+        $volver = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Todos los DTs</a></p>';
+
+        $grupoId  = (int) $request->get('grupo_id');
+        $torneoId = (int) $request->get('torneo_id');
+
+        // ── Elegir el grupo ─────────────────────────────────────────────────
+        if (!$grupoId) {
+            $html = $volver . '<h1>Reagrupar fechas</h1>'
+                . '<p class="sub">Para los grupos donde las fechas quedaron con el número de Transfermarkt '
+                . '(6, 7, 9, 11...): les ponés el nombre que va y fusionás las que son la misma ronda. '
+                . 'Se muestra todo antes de escribir.</p>';
+
+            $opts = '<option value=""></option>';
+            foreach (\App\Torneo::orderBy('year', 'desc')->orderBy('nombre')->get() as $t) {
+                $opts .= '<option value="' . (int) $t->id . '"' . ($torneoId === (int) $t->id ? ' selected' : '') . '>'
+                    . e($t->nombre . ' ' . $t->year) . '</option>';
+            }
+
+            $html .= '<form method="get" action="' . e(route('import_partidos.fechas')) . '">'
+                . '<select name="torneo_id" class="s2" data-placeholder="elegí el torneo…">' . $opts . '</select> '
+                . '<button class="boton">Ver los grupos</button></form>';
+
+            if ($torneoId) {
+                $grupos = \App\Grupo::where('torneo_id', $torneoId)->orderBy('id')->get();
+                if ($grupos->isEmpty()) {
+                    $html .= '<p class="sub">Ese torneo no tiene grupos.</p>';
+                } else {
+                    $html .= '<div class="scroll"><table><thead><tr><th>Grupo</th><th>Llaves</th>'
+                        . '<th>Fechas</th><th>Partidos</th><th></th></tr></thead><tbody>';
+                    foreach ($grupos as $g) {
+                        $fs = \App\Fecha::where('grupo_id', $g->id)->pluck('id')->all();
+                        $np = $fs ? DB::table('partidos')->whereIn('fecha_id', $fs)->count() : 0;
+                        $html .= '<tr><td>' . e((string) $g->nombre) . ' <span class="id">#' . (int) $g->id . '</span></td>'
+                            . '<td class="num">' . ((int) $g->penales === 1 ? 'sí' : '—') . '</td>'
+                            . '<td class="num">' . count($fs) . '</td><td class="num">' . $np . '</td>'
+                            . '<td><a class="boton-sec" href="' . e(route('import_partidos.fechas', ['grupo_id' => $g->id])) . '">Reagrupar</a></td></tr>';
+                    }
+                    $html .= '</tbody></table></div>';
+                }
+            }
+
+            return $this->pagina('Reagrupar fechas', $html);
+        }
+
+        $grupo = \App\Grupo::find($grupoId);
+        if (!$grupo) return $this->pagina('Reagrupar fechas', $volver . '<p class="err">No existe el grupo #' . $grupoId . '</p>');
+        $torneo = \App\Torneo::find($grupo->torneo_id);
+
+        $fechas = \App\Fecha::where('grupo_id', $grupoId)->orderBy('orden')->orderBy('id')->get();
+        if ($fechas->isEmpty()) return $this->pagina('Reagrupar fechas', $volver . '<p class="sub">Ese grupo no tiene fechas.</p>');
+
+        $porId = $fechas->keyBy('id');
+        $ids   = $fechas->pluck('id')->all();
+
+        $porFecha = [];
+        foreach (DB::table('partidos')->whereIn('fecha_id', $ids)->orderBy('dia')->orderBy('id')->get() as $pt) {
+            $porFecha[(int) $pt->fecha_id][] = $pt;
+        }
+
+        $nom       = (array) $request->get('nom', []);
+        $mov       = (array) $request->get('mov', []);
+        $reordenar = (string) $request->get('reordenar', '0') === '1';
+        $paso      = (string) $request->get('paso', '');
+        $aplicar   = (string) $request->get('aplicar', '0') === '1';
+
+        $encabezado = $volver . '<h1>Reagrupar fechas</h1>'
+            . '<p class="sub">' . e(($torneo ? $torneo->nombre . ' ' . $torneo->year . ' · ' : '') . 'grupo ' . $grupo->nombre)
+            . ' <span class="id">#' . (int) $grupoId . '</span>'
+            . ((int) $grupo->penales === 1 ? ' · <b>grupo de llaves</b>' : '') . '</p>';
+
+        // ── Plan (previsualización y escritura comparten el armado) ─────────
+        if ($paso === 'ver' || $aplicar) {
+            $plan = []; $errores = [];
+
+            foreach ($fechas as $f) {
+                $destino = isset($mov[$f->id]) ? (int) $mov[$f->id] : 0;
+                $nombre  = isset($nom[$f->id]) ? trim((string) $nom[$f->id]) : (string) $f->numero;
+
+                if ($destino) {
+                    if ($destino === (int) $f->id || !in_array($destino, $ids)) {
+                        $errores[] = 'La fecha «' . $f->numero . '» apunta a una fecha que no es de este grupo.';
+                        continue;
+                    }
+                    if (!empty($mov[$destino])) {
+                        $errores[] = 'La fecha «' . $f->numero . '» se fusiona con «' . $porId[$destino]->numero
+                            . '», que a su vez se fusiona con otra. Hacelo en dos pasos.';
+                        continue;
+                    }
+                } elseif ($nombre === '') {
+                    $errores[] = 'La fecha «' . $f->numero . '» quedó sin nombre.';
+                    continue;
+                }
+
+                $plan[] = ['fecha' => $f, 'nombre' => $nombre, 'destino' => $destino];
+            }
+
+            // Dos fechas que se quedan y terminan con el mismo nombre: casi
+            // seguro se quiso fusionarlas. Se avisa en vez de dejar el grupo
+            // con dos fechas iguales.
+            $vistos = [];
+            foreach ($plan as $x) {
+                if ($x['destino']) continue;
+                $k = mb_strtolower($x['nombre']);
+                if (isset($vistos[$k])) {
+                    $errores[] = 'Dos fechas quedarían con el nombre «' . $x['nombre']
+                        . '». Si son la misma ronda, fusionalas con el select en vez de repetir el nombre.';
+                }
+                $vistos[$k] = true;
+            }
+
+            if (!empty($errores)) {
+                return $this->pagina('Reagrupar fechas', $encabezado
+                    . '<p class="err-box"><b>No cambié nada:</b><br>' . e(implode(' — ', $errores)) . '</p>'
+                    . '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fechas', ['grupo_id' => $grupoId])) . '">Volver</a></p>');
+            }
+
+            // ── Escribir ────────────────────────────────────────────────────
+            if ($aplicar) {
+                $renombradas = 0; $movidos = 0; $borradas = 0;
+
+                DB::transaction(function () use ($plan, &$renombradas, &$movidos, &$borradas) {
+                    foreach ($plan as $x) {                       // 1. renombrar las que se quedan
+                        if ($x['destino']) continue;
+                        if ((string) $x['fecha']->numero === $x['nombre']) continue;
+                        $f = $x['fecha'];
+                        $f->numero     = $x['nombre'];
+                        $f->url_nombre = Str::slug('fecha-' . $x['nombre']);
+                        $f->save();
+                        $renombradas++;
+                    }
+                    foreach ($plan as $x) {                       // 2. mover y borrar la vacía
+                        if (!$x['destino']) continue;
+                        $movidos += \App\Partido::where('fecha_id', $x['fecha']->id)
+                            ->update(['fecha_id' => (int) $x['destino']]);
+                        if (!\App\Partido::where('fecha_id', $x['fecha']->id)->exists()) {
+                            \App\Fecha::where('id', $x['fecha']->id)->delete();
+                            $borradas++;
+                        }
+                    }
+                });
+
+                if ($reordenar) {                                  // 3. ordenar por el primer partido
+                    $clave = [];
+                    foreach (\App\Fecha::where('grupo_id', $grupoId)->get() as $f) {
+                        $min = DB::table('partidos')->where('fecha_id', $f->id)->min('dia');
+                        $clave[(int) $f->id] = $min ? (string) $min : '9999-12-31';
+                    }
+                    asort($clave);
+                    $i = 1;
+                    foreach (array_keys($clave) as $fid) {
+                        \App\Fecha::where('id', $fid)->update(['orden' => $i]);
+                        $i++;
+                    }
+                }
+
+                $this->recontarEquipos($grupoId);
+
+                return $this->pagina('Reagrupar fechas', $encabezado
+                    . '<p class="ok-box"><b>Listo.</b> Renombré ' . $renombradas . ' fechas, moví ' . $movidos
+                    . ' partidos y borré ' . $borradas . ' fechas que quedaron vacías'
+                    . ($reordenar ? ', y reordené el grupo por el día del primer partido' : '') . '.</p>'
+                    . '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fechas', ['grupo_id' => $grupoId])) . '">Ver cómo quedó</a></p>');
+            }
+
+            // ── Previsualización ────────────────────────────────────────────
+            $lineas = '';
+            foreach ($plan as $x) {
+                $f = $x['fecha'];
+                $n = isset($porFecha[(int) $f->id]) ? count($porFecha[(int) $f->id]) : 0;
+
+                if ($x['destino']) {
+                    $lineas .= '<li><b>«' . e((string) $f->numero) . '»</b> → se fusiona con <b>«'
+                        . e((string) $porId[$x['destino']]->numero) . '»</b>: se mueven ' . $n . ' partidos'
+                        . ($n ? ' y la fecha vacía se borra' : ' y la fecha se borra') . '.</li>';
+                } elseif ((string) $f->numero !== $x['nombre']) {
+                    $lineas .= '<li><b>«' . e((string) $f->numero) . '»</b> pasa a llamarse <b>«'
+                        . e($x['nombre']) . '»</b> (' . $n . ' partidos, no se mueven).</li>';
+                }
+            }
+
+            if ($lineas === '') {
+                return $this->pagina('Reagrupar fechas', $encabezado
+                    . '<p class="sub">No pediste ningún cambio.</p>'
+                    . '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fechas', ['grupo_id' => $grupoId])) . '">Volver</a></p>');
+            }
+
+            $params = ['grupo_id' => $grupoId, 'nom' => $nom, 'mov' => $mov, 'aplicar' => 1];
+            if ($reordenar) $params['reordenar'] = 1;
+
+            return $this->pagina('Reagrupar fechas', $encabezado
+                . '<h2>Esto es lo que voy a hacer</h2><ul>' . $lineas . '</ul>'
+                . ($reordenar ? '<p class="sub">Y después reordeno las fechas del grupo por el día de su primer partido.</p>' : '')
+                . '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fechas', $params)) . '">Hacer los cambios</a> '
+                . '<a class="boton-sec" href="' . e(route('import_partidos.fechas', ['grupo_id' => $grupoId])) . '">Volver</a> '
+                . '<span class="sub">recién acá se escribe</span></p>');
+        }
+
+        // ── Pantalla ────────────────────────────────────────────────────────
+        $html = $encabezado
+            . '<p class="sub">Cambiale el nombre a la fecha, o fusionala con otra si son la misma ronda '
+            . '(la ida y la vuelta de una llave van juntas). Los partidos se mueven; nada se pierde, '
+            . 'porque los goles, las tarjetas y las alineaciones cuelgan del partido, no de la fecha.</p>'
+            . '<form method="get" action="' . e(route('import_partidos.fechas')) . '">'
+            . '<input type="hidden" name="grupo_id" value="' . (int) $grupoId . '">'
+            . '<input type="hidden" name="paso" value="ver">'
+            . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Partidos</th>'
+            . '<th>Se llama</th><th>…o se fusiona con</th></tr></thead><tbody>';
+
+        foreach ($fechas as $f) {
+            $lista = '';
+            foreach (isset($porFecha[(int) $f->id]) ? $porFecha[(int) $f->id] : [] as $pt) {
+                $lista .= e(substr((string) $pt->dia, 0, 10)) . ' · ' . e($this->nombreEquipo($pt->equipol_id))
+                    . ' ' . (($pt->golesl === null || $pt->golesv === null) ? '-' : ((int) $pt->golesl . ':' . (int) $pt->golesv))
+                    . ' ' . e($this->nombreEquipo($pt->equipov_id))
+                    . ' <span class="id">#' . (int) $pt->id . '</span><br>';
+            }
+            if ($lista === '') $lista = '<i>sin partidos</i>';
+
+            $opts = '<option value="">(queda como está)</option>';
+            foreach ($fechas as $o) {
+                if ((int) $o->id === (int) $f->id) continue;
+                $opts .= '<option value="' . (int) $o->id . '">' . e((string) $o->numero) . '</option>';
+            }
+
+            $html .= '<tr><td class="num">' . e((string) $f->numero) . '<br><span class="id">#' . (int) $f->id . '</span></td>'
+                . '<td><span class="sub">' . $lista . '</span></td>'
+                . '<td><input type="text" name="nom[' . (int) $f->id . ']" value="' . e((string) $f->numero) . '"></td>'
+                . '<td><select name="mov[' . (int) $f->id . ']" class="s2" data-placeholder="no se fusiona">' . $opts . '</select></td></tr>';
+        }
+
+        $html .= '</tbody></table></div>'
+            . '<p><label><input type="checkbox" name="reordenar" value="1" checked> '
+            . 'Reordenar las fechas del grupo por el día de su primer partido</label></p>'
+            . '<p class="acciones"><button class="boton">Previsualizar</button> '
+            . '<span class="sub">no se escribe nada hasta confirmar</span></p></form>';
+
+        return $this->pagina('Reagrupar fechas', $html);
+    }
+
     private function aplicarGrupo(Request $request, $tecnicoId, $nombreDT, $volver)
     {
         $comp = (string) $request->get('comp');
@@ -3131,21 +3391,34 @@ class ImportPartidosController extends Controller
             }
         }
 
-        // 2. Partidos
-        $creados = 0; $errores = []; $detalle = '';
+        // ── 2. LAS FECHAS ───────────────────────────────────────────────────
+        // `import_partidos.ronda` es el `gameDay` de la API de TM, y NO es el
+        // nombre de la fecha. En una liga suele coincidir; en una copa es un
+        // contador de la competencia (los octavos pueden ser el "12") y encima
+        // el motor DT trae SOLO los partidos de ese DT, así que llegan
+        // salteados: 6, 7, 9, 11, 12... Crear `fechas.numero = gameDay` sin
+        // preguntar dejaba fechas con nombres que no significan nada. Ahora la
+        // fecha destino se elige una vez por ronda y, sin decisión, no se crea.
+        $rondas = [];
+        foreach ($filas as $r) {
+            $k = ($r->ronda !== null && $r->ronda !== '') ? (string) $r->ronda : '—';
+            if (!isset($rondas[$k])) $rondas[$k] = [];
+            $rondas[$k][] = $r;
+        }
+
+        $destino = $this->fechasDestino($request, $rondas, $torneo, $grupoId, $tecnicoId, $comp, $temp, $volver);
+        if (!is_array($destino)) return $destino;   // falta elegir: se muestra la pantalla
+
+        $esLlave = (int) DB::table('grupos')->where('id', $grupoId)->value('penales') === 1;
+
+        // 3. Partidos
+        $creados = 0; $enganchados = 0; $saltados = 0; $errores = []; $avisos = []; $detalle = '';
         foreach ($filas as $r) {
             try {
-                $numero = $r->ronda !== null && $r->ronda !== '' ? $r->ronda : 'Importado';
-                $fecha = \App\Fecha::where('grupo_id', $grupoId)->where('numero', $numero)->first();
-                if (!$fecha) {
-                    $fecha = new \App\Fecha();
-                    $fecha->forceFill([
-                        'numero'     => $numero,
-                        'grupo_id'   => $grupoId,
-                        'orden'      => is_numeric($numero) ? (int) $numero : 999,
-                        'url_nombre' => Str::slug('fecha-' . $numero),
-                    ])->save();
-                }
+                $k = ($r->ronda !== null && $r->ronda !== '') ? (string) $r->ronda : '—';
+                if (empty($destino[$k])) { $saltados++; continue; }   // ronda dejada para después
+                $fecha  = $destino[$k];
+                $numero = $fecha->numero;
 
                 // La localía y el resultado se recalculan SIEMPRE desde el JSON crudo:
                 // las columnas pueden haberse guardado con una lógica vieja.
@@ -3165,17 +3438,59 @@ class ImportPartidosController extends Controller
                     continue;
                 }
 
-                // ¿Ya hay un partido de esos equipos en esa fecha? (índice único de partidos)
-                $ya = \App\Partido::where('fecha_id', $fecha->id)
+                // ¿ESTE partido ya está cargado? Pasa siempre que se haya
+                // aplicado primero el DT rival: es el MISMO partido, no un
+                // choque. Se engancha —queda listo para bajarle el detalle— en
+                // vez de contarlo como error.
+                $mismos = \App\Partido::where('fecha_id', $fecha->id)
                     ->where(function ($q) use ($equipolId, $equipovId) {
-                        $q->where('equipol_id', $equipolId)->orWhere('equipov_id', $equipolId)
-                            ->orWhere('equipol_id', $equipovId)->orWhere('equipov_id', $equipovId);
-                    })->first();
+                        $q->where(function ($x) use ($equipolId, $equipovId) {
+                            $x->where('equipol_id', $equipolId)->where('equipov_id', $equipovId);
+                        })->orWhere(function ($x) use ($equipolId, $equipovId) {
+                            $x->where('equipol_id', $equipovId)->where('equipov_id', $equipolId);
+                        });
+                    })->orderBy('id')->get();
+
+                $exacto = null; $invertido = null;
+                foreach ($mismos as $p) {
+                    if ((int) $p->equipol_id === $equipolId) { $exacto = $p; break; }
+                    if ($invertido === null) $invertido = $p;
+                }
+
+                // En un grupo de llaves la ida y la vuelta van en la MISMA fecha
+                // con la localía dada vuelta: ahí el invertido es el otro
+                // partido de la llave, no éste. Fuera de las llaves, el mismo
+                // par en la misma fecha es el mismo partido con la localía al
+                // revés (se avisa; el partido no se toca).
+                $ya = $exacto;
+                if (!$ya && $invertido && !$esLlave) {
+                    $ya = $invertido;
+                    $avisos[] = $this->nombreEquipo($equipolId) . ' vs ' . $this->nombreEquipo($equipovId)
+                        . ' ya estaba cargado con la localía al revés (partido #' . $invertido->id . ').';
+                }
 
                 if ($ya) {
-                    $errores[] = 'Choque en la fecha «' . $numero . '»: ya hay un partido de ' . $r->club_nombre
-                        . ' ahí (partido #' . $ya->id . '). Ese quedó sin crear.';
+                    $this->engancharPartido($r, $ya->id, $tecnicoId);
+                    $enganchados++;
                     continue;
+                }
+
+                // Un partido de uno de los dos equipos en la misma fecha, pero
+                // contra otro rival, es la red que atrapa un mapeo de club
+                // equivocado. En un grupo de llaves no aplica: ahí conviven la
+                // ida y la vuelta.
+                if (!$esLlave) {
+                    $otro = \App\Partido::where('fecha_id', $fecha->id)
+                        ->where(function ($q) use ($equipolId, $equipovId) {
+                            $q->where('equipol_id', $equipolId)->orWhere('equipov_id', $equipolId)
+                                ->orWhere('equipol_id', $equipovId)->orWhere('equipov_id', $equipovId);
+                        })->first();
+
+                    if ($otro) {
+                        $errores[] = 'Choque en la fecha «' . $numero . '»: ya hay otro partido de ' . $r->club_nombre
+                            . ' ahí contra otro rival (partido #' . $otro->id . '). Ese quedó sin crear.';
+                        continue;
+                    }
                 }
 
                 $partido = new \App\Partido();
@@ -3222,6 +3537,17 @@ class ImportPartidosController extends Controller
             . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · grupo #' . (int) $grupoId
             . ($torneo->parcial ? ' · <b>torneo parcial</b>' : '') . '</p>';
 
+        if ($enganchados) {
+            $html .= '<p class="ok-box"><b>' . $enganchados . ' ya estaban cargados</b> (los creó el DT rival, o una corrida anterior). '
+                . 'Los enganché con este DT: quedan listos para bajarles el detalle, y no se tocó ni el resultado ni la localía.</p>';
+        }
+        if ($saltados) {
+            $html .= '<p class="sub">Dejé <b>' . $saltados . '</b> partidos sin crear porque su ronda quedó sin fecha elegida. '
+                . 'Volvé a aplicar el grupo cuando sepas a qué fecha van.</p>';
+        }
+        if (!empty($avisos)) {
+            $html .= '<p class="sub">' . e(implode(' — ', $avisos)) . '</p>';
+        }
         if (!empty($errores)) {
             $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>' . e(implode(' — ', $errores)) . '</p>';
         }
@@ -3232,6 +3558,225 @@ class ImportPartidosController extends Controller
         $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.aplicar', ['tecnico_id' => $tecnicoId])) . '">Seguir con el resto →</a></p>';
 
         return $this->pagina('Aplicar partidos', $html);
+    }
+
+    /**
+     * A qué fecha del grupo va cada ronda de TM.
+     *
+     * Devuelve [ronda => \App\Fecha] cuando está todo decidido, o la pantalla
+     * para decidirlo. NUNCA inventa el nombre de una fecha: el `gameDay` se usa
+     * como número sólo si el usuario tilda "usar los números de TM", que está
+     * bien en una liga y es un disparate en una copa.
+     *
+     * Lo que se deja sin elegir no se crea. Es a propósito: una fecha con un
+     * nombre equivocado ensucia el torneo y hay que ir a borrarla a mano.
+     */
+    private function fechasDestino(Request $request, array $rondas, $torneo, $grupoId, $tecnicoId, $comp, $temp, $volver)
+    {
+        $claves  = array_keys($rondas);
+        $fechas  = \App\Fecha::where('grupo_id', $grupoId)->orderBy('orden')->orderBy('id')->get();
+        $usarTm  = (string) $request->get('usar_tm', '0') === '1';
+        $enviado = (string) $request->get('fechas_ok', '0') === '1';
+        $elegido = (array) $request->get('f', []);
+        $nuevos  = (array) $request->get('n', []);
+        $rondaOk = (array) $request->get('r', []);
+
+        // Si el staging cambió entre la pantalla y el envío, los índices ya no
+        // apuntan a la misma ronda. Antes que crear cualquier cosa, se vuelve
+        // a preguntar.
+        if ($enviado) {
+            foreach ($claves as $i => $k) {
+                if (isset($rondaOk[$i]) && (string) $rondaOk[$i] !== (string) $k) { $enviado = false; break; }
+            }
+        }
+
+        $destino = []; $faltan = []; $sinNombre = [];
+
+        foreach ($claves as $i => $k) {
+            if (!$enviado) { $faltan[] = $k; continue; }
+
+            $sel = isset($elegido[$i]) ? trim((string) $elegido[$i]) : '';
+            $nom = isset($nuevos[$i]) ? trim((string) $nuevos[$i]) : '';
+
+            if ($sel === '0') continue;   // "por ahora no"
+
+            if ($sel !== '' && $sel !== 'nueva') {
+                $f = $fechas->first(function ($x) use ($sel) { return (int) $x->id === (int) $sel; });
+                if ($f) { $destino[(string) $k] = $f; continue; }
+            }
+            if ($nom !== '') { $destino[(string) $k] = $this->fechaPorNombre($grupoId, $nom); continue; }
+            if ($sel === 'nueva') { $sinNombre[] = $k; $faltan[] = $k; continue; }
+            if ($sel === '' && $usarTm && (string) $k !== '—') {
+                $destino[(string) $k] = $this->fechaPorNombre($grupoId, (string) $k);
+                continue;
+            }
+            $faltan[] = $k;
+        }
+
+        if (empty($faltan)) return $destino;
+
+        // ── La pantalla ─────────────────────────────────────────────────────
+        $grupoNombre = (string) DB::table('grupos')->where('id', $grupoId)->value('nombre');
+
+        $html = $volver . '<h1>¿A qué fecha va cada ronda?</h1>'
+            . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · grupo '
+            . e($grupoNombre !== '' ? $grupoNombre : ('#' . (int) $grupoId)) . '</p>'
+            . '<p class="sub">Transfermarkt no manda el nombre de la ronda: manda un número de <code>gameDay</code>. '
+            . 'En una liga suele ser la fecha; en una copa no significa nada (los octavos pueden ser el «12»). '
+            . 'Y como acá vienen sólo los partidos de este DT, los números llegan salteados. '
+            . '<b>Lo que dejes sin elegir no se crea</b>: no se inventa ninguna fecha.</p>';
+
+        if (!empty($sinNombre)) {
+            $html .= '<p class="err-box">No creé nada: dijiste «crear una fecha nueva» y quedó sin nombre en la ronda '
+                . e(implode(', ', array_map('strval', $sinNombre))) . '.</p>';
+        }
+
+        $html .= '<form method="get" action="' . e(route('import_partidos.aplicar')) . '">'
+            . '<input type="hidden" name="tecnico_id" value="' . (int) $tecnicoId . '">'
+            . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+            . '<input type="hidden" name="temp" value="' . e($temp) . '">'
+            . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
+            . '<input type="hidden" name="grupo_id" value="' . (int) $grupoId . '">'
+            . '<input type="hidden" name="confirmar" value="1">'
+            . '<input type="hidden" name="fechas_ok" value="1">'
+            . '<div class="scroll"><table><thead><tr><th>TM</th><th>Partidos</th>'
+            . '<th>¿A qué fecha del grupo van?</th></tr></thead><tbody>';
+
+        foreach ($claves as $i => $k) {
+            $rs = $rondas[$k];
+
+            // Sugerencia, en orden: dónde cayó esta misma ronda cuando se
+            // aplicó otro DT, y si no, dónde cayeron estos mismos pares en un
+            // grupo de llaves. Las dos salen de lo ya cargado, no de adivinar.
+            $sug = $this->fechaDeLaRonda($comp, $temp, (string) $k, $torneo->id);
+            if (!$sug) {
+                $idLlave = $this->fechaDeLasLlaves($rs, $torneo->id);
+                if ($idLlave) $sug = \App\Fecha::find($idLlave);
+            }
+
+            $selId = ($sug && (int) $sug->grupo_id === (int) $grupoId) ? (int) $sug->id : 0;
+            if (!$selId) {
+                $igual = $fechas->first(function ($f) use ($k) { return (string) $f->numero === (string) $k; });
+                if ($igual) $selId = (int) $igual->id;
+            }
+
+            // Si esa ronda ya tiene nombre en OTRO grupo del torneo, se ofrece
+            // ese nombre en vez de un número que no dice nada.
+            $nomSug = ($sug && (int) $sug->grupo_id !== (int) $grupoId) ? (string) $sug->numero : '';
+
+            $lista = '';
+            foreach ($rs as $r) {
+                $lista .= e(substr((string) $r->dia, 0, 10)) . ' · ' . e((string) $r->club_nombre)
+                    . ' vs ' . e((string) $r->rival_nombre) . '<br>';
+            }
+
+            $opts = '<option value=""></option>';
+            foreach ($fechas as $f) {
+                $opts .= '<option value="' . (int) $f->id . '"' . ($selId === (int) $f->id ? ' selected' : '') . '>'
+                    . e((string) $f->numero) . '</option>';
+            }
+            $opts .= '<option value="nueva">crear una fecha nueva…</option>'
+                . '<option value="0">por ahora no</option>';
+
+            $html .= '<tr><td class="num">' . e((string) $k)
+                . '<input type="hidden" name="r[' . (int) $i . ']" value="' . e((string) $k) . '"></td>'
+                . '<td><span class="sub">' . $lista . '</span></td>'
+                . '<td><select name="f[' . (int) $i . ']" class="s2" data-placeholder="elegí la fecha…">' . $opts . '</select> '
+                . '<input type="text" name="n[' . (int) $i . ']" value="' . e($nomSug) . '" placeholder="…o el nombre de una fecha nueva">'
+                . '</td></tr>';
+        }
+
+        $html .= '</tbody></table></div>'
+            . '<p><label><input type="checkbox" name="usar_tm" value="1"' . ($usarTm ? ' checked' : '') . '> '
+            . 'Para las que deje sin elegir, usar el número de TM como número de fecha '
+            . '<span class="sub">(sirve en una liga; en una copa, no)</span></label></p>'
+            . '<p class="acciones"><button class="boton">Crear los partidos</button> '
+            . '<span class="sub">las fechas nuevas se crean recién acá</span></p>'
+            . '</form>';
+
+        return $this->pagina('Aplicar partidos', $html);
+    }
+
+    /** La fecha del grupo que se llama así, o una nueva con ese nombre. */
+    private function fechaPorNombre($grupoId, $nombre)
+    {
+        $nombre = trim((string) $nombre);
+        if ($nombre === '') return null;
+
+        $f = \App\Fecha::where('grupo_id', $grupoId)->where('numero', $nombre)->first();
+        if ($f) return $f;
+
+        $f = new \App\Fecha();
+        $f->forceFill([
+            'numero'     => $nombre,
+            'grupo_id'   => $grupoId,
+            'orden'      => is_numeric($nombre) ? (int) $nombre
+                : ((int) \App\Fecha::where('grupo_id', $grupoId)->max('orden')) + 1,
+            'url_nombre' => Str::slug('fecha-' . $nombre),
+        ])->save();
+
+        return $f;
+    }
+
+    /**
+     * Dónde cayó esta misma ronda de TM la última vez que se aplicó.
+     *
+     * `import_partidos` guarda `ronda` y `partido_id`, así que lo ya aplicado
+     * —por este DT o por el rival— dice a qué fecha corresponde ese gameday sin
+     * tener que adivinar ningún nombre.
+     */
+    private function fechaDeLaRonda($comp, $temp, $ronda, $torneoId)
+    {
+        $rows = DB::table('import_partidos')
+            ->join('partidos', 'partidos.id', '=', 'import_partidos.partido_id')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->where('grupos.torneo_id', (int) $torneoId)
+            ->where('import_partidos.competencia_external_id', (string) $comp)
+            ->where('import_partidos.temporada', (string) $temp)
+            ->where('import_partidos.ronda', (string) $ronda)
+            ->whereNotNull('import_partidos.partido_id')
+            ->select('fechas.id AS fecha_id')->get();
+
+        $cuenta = [];
+        foreach ($rows as $f) {
+            $id = (int) $f->fecha_id;
+            $cuenta[$id] = isset($cuenta[$id]) ? $cuenta[$id] + 1 : 1;
+        }
+        if (empty($cuenta)) return null;
+
+        arsort($cuenta);
+        return \App\Fecha::find((int) key($cuenta));
+    }
+
+    /**
+     * El partido ya existía: se engancha la fila del staging y se le agrega el
+     * DT si le falta. NO se toca el partido — el resultado y la localía de lo
+     * ya cargado mandan sobre lo que traiga TM.
+     */
+    private function engancharPartido($r, $partidoId, $tecnicoId)
+    {
+        if ((int) $r->equipo_id) {
+            $existe = DB::table('partido_tecnicos')
+                ->where('partido_id', (int) $partidoId)
+                ->where('equipo_id', (int) $r->equipo_id)->exists();
+
+            if (!$existe) {
+                DB::table('partido_tecnicos')->insert([
+                    'partido_id' => (int) $partidoId,
+                    'equipo_id'  => (int) $r->equipo_id,
+                    'tecnico_id' => (int) $tecnicoId,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        }
+
+        DB::table('import_partidos')->where('id', $r->id)->update([
+            'estado'     => 'duplicado',
+            'partido_id' => (int) $partidoId,
+            'motivo'     => 'ya estaba cargado',
+            'updated_at' => now(),
+        ]);
     }
 
     /** País del equipo dirigido en ese grupo (para saber de dónde es el torneo). */

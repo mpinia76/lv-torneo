@@ -254,6 +254,7 @@ Route::group(['prefix' => 'admin'], function()
     Route::get('/import-partidos/crear-equipo', 'ImportPartidosController@crearEquipo')->name('import_partidos.crear_equipo');
     Route::get('/import-partidos/fixture', 'ImportPartidosController@fixture')->name('import_partidos.fixture');
     Route::get('/import-partidos/fixture-aplicar', 'ImportPartidosController@fixtureAplicar')->name('import_partidos.fixture_aplicar');
+    Route::get('/import-partidos/fechas', 'ImportPartidosController@fechas')->name('import_partidos.fechas');
 
     // Segunda etapa: el detalle de cada partido (alineaciones, goles, tarjetas,
     // cambios, árbitros). Ver ImportDetallesController.
