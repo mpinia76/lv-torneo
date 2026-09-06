@@ -3103,10 +3103,20 @@ class ImportDetallesController extends Controller
         // Un arreglo nuevo no repara lo viejo: los partidos que se revisaron
         // ANTES de que existiera la marca ya están dados por revisados y no
         // vuelven a la cola, así que su aviso se perdió con la tanda. Éste los
-        // recupera **sin gastar una sola llamada**, por la vía de la base:
-        // tiene gameId, tiene goles cargados y NO tiene alineación → el detalle
-        // nunca se bajó. Es conservador: al que le cargaste la alineación a mano
-        // no lo caza (ése sólo sale del repaso), pero no marca ningún falso.
+        // recupera **sin gastar una sola llamada**, leyendo la base.
+        //
+        // LA SEÑAL: si el detalle se bajó alguna vez, `importar()` dejó
+        // mapeado en `jugador_tm` a CADA jugador de la alineación —el mapeo lo
+        // crea la bajada, no hay otra forma de que exista. Entonces un partido
+        // con gameId y goles cargados en el que NINGÚN jugador de su alineación
+        // está mapeado (o que directamente no tiene alineación) es un partido
+        // al que nunca se le bajó el detalle. Es la misma conclusión a la que
+        // llega el repaso pagando una llamada, pero deducida de la base.
+        //
+        // Al revés no puede fallar: un detalle bajado siempre deja mapeos, así
+        // que no marca partidos sanos. Y se queda corto —no se caza— con los
+        // que tienen la alineación cargada a mano pero con jugadores que la
+        // siembra de `jugador_tm` ya había mapeado por su URL de TM.
         $sembrados = 0;
         if ((string) $request->get('sembrar_sin_detalle', '0') === '1' && $this->columnaSinDetalle()) {
             $qs = DB::table('import_partidos')
@@ -3116,8 +3126,11 @@ class ImportDetallesController extends Controller
                 ->whereIn('partido_id', function ($sub) {
                     $sub->from('gols')->select('partido_id')->distinct();
                 })
-                ->whereNotIn('partido_id', function ($sub) {
-                    $sub->from('alineacions')->select('partido_id')->distinct();
+                ->whereNotExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('alineacions as al')
+                        ->join('jugador_tm as jt', 'jt.jugador_id', '=', 'al.jugador_id')
+                        ->whereColumn('al.partido_id', 'import_partidos.partido_id');
                 });
             if ($tecnicoId) $qs->where('tecnico_id', $tecnicoId);
             if ($comp !== '')  $qs->where('competencia_external_id', $comp);
@@ -3190,8 +3203,9 @@ class ImportDetallesController extends Controller
         // guardada, así que no depende de que hayas llegado a leerla.
         if ($sembrados) {
             $cuerpo .= '<div class="ok-box"><b>' . $sembrados . ' partido(s) entraron a la lista de sin '
-                . 'detalle.</b> Salen de la base, no de Transfermarkt: tienen gameId y goles cargados pero '
-                . 'ninguna alineación. No costó ninguna llamada.</div>';
+                . 'detalle.</b> Salen de la base, no de Transfermarkt: tienen gameId y goles cargados, y '
+                . 'ninguno de los jugadores de su alineación está mapeado en <code>jugador_tm</code> —ese mapeo '
+                . 'lo crea la bajada del detalle, así que si no está, nunca se bajó. No costó ninguna llamada.</div>';
         }
 
         if ($sinDetalleTotal) {
@@ -3200,8 +3214,8 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<p class="sub">No hay ningún partido marcado <b>sin detalle de Transfermarkt</b>. '
                 . 'El repaso los va marcando solo a medida que los encuentra, y '
                 . '<a href="' . e(route('import_detalles.tipos_gol', $filtros + ['sembrar_sin_detalle' => 1]))
-                . '">buscar en la base</a> —gratis— agrega los que tienen gameId y goles pero ninguna '
-                . 'alineación.</p>';
+                . '">buscar en la base</a> —gratis— agrega los que tienen gameId y goles pero ningún jugador '
+                . 'de su alineación mapeado en <code>jugador_tm</code>.</p>';
         }
 
         // ── De qué universo estamos hablando ──────────────────────────────
@@ -3756,9 +3770,10 @@ class ImportDetallesController extends Controller
 
         $out .= '<p class="acciones"><a class="boton-sec" href="'
             . e(route('import_detalles.tipos_gol', $filtros + ['sembrar_sin_detalle' => 1]))
-            . '">Buscar más en la base</a> <span class="sub">gratis: agrega a la lista los partidos con gameId y '
-            . 'goles que no tienen ninguna alineación. Los revisados antes del 06/09/2026 perdieron su aviso con '
-            . 'la tanda; éstos se recuperan sin gastar llamadas.</span></p>';
+            . '">Buscar más en la base</a> <span class="sub">gratis: agrega los partidos con gameId y goles en '
+            . 'los que ningún jugador de la alineación está mapeado en <code>jugador_tm</code> — el mapeo lo crea '
+            . 'la bajada del detalle, así que sin mapeo nunca se bajó. Es la forma de recuperar los avisos que se '
+            . 'perdieron en las tandas viejas, sin gastar llamadas.</span></p>';
 
         $out .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Competencia</th><th>Partido</th>'
             . '<th>gameId</th><th></th><th></th></tr></thead><tbody>';
