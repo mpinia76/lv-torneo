@@ -639,6 +639,11 @@ class TmDetallePartido
                 // queda revisado y no tiene que salir en el pase de penales.
                 self::marcarPenalesRevisados([(int) $partido->id]);
 
+                // Y con el detalle bajado el partido deja de estar «sin detalle»:
+                // la marca que le puso el repaso de tipos de gol se borra acá, que
+                // es lo único que arregla el caso.
+                self::marcarSinDetalle([(int) $partido->id], false);
+
                 // Los penales van FUERA de la transacción de arriba a propósito:
                 // el arquero se resuelve leyendo la alineación, los cambios y
                 // las rojas recién guardados.
@@ -1410,6 +1415,37 @@ class TmDetallePartido
 
         $this->mapaJugadores = $mapa;
         return $mapa;
+    }
+
+    /**
+     * La marca de «a este partido nunca se le bajó el detalle de Transfermarkt».
+     *
+     * La pone el repaso de tipos de gol, que lo detecta gratis: si ninguno de
+     * los goles apareó y de los dos lados había goles, los goles son los que
+     * cargaste a mano y el mapeo de jugadores nunca se creó. La saca esta misma
+     * clase cuando el detalle se baja de verdad — `$sin = false`.
+     *
+     * Por qué en la base y no sólo en el informe de la tanda: en el modo
+     * continuado (`seguir=1`) el informe se lo lleva la tanda siguiente ocho
+     * segundos después y el aviso pasa de largo. Anotada, la lista sobrevive a
+     * la cadena y al cierre de la pestaña.
+     *
+     * Silenciosa si la columna todavía no existe (migración
+     * `2026_09_06_100000_add_sin_detalle_a_import_partidos`): eso no es motivo
+     * para romper una importación.
+     */
+    public static function marcarSinDetalle(array $partidoIds, $sin = true)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        if (empty($ids)) return;
+        if (!Schema::hasColumn('import_partidos', 'sin_detalle_at')) return;
+
+        try {
+            DB::table('import_partidos')->whereIn('partido_id', $ids)
+                ->update(['sin_detalle_at' => $sin ? now() : null]);
+        } catch (\Exception $e) {
+            Log::error('marcarSinDetalle: ' . $e->getMessage());
+        }
     }
 
     /**

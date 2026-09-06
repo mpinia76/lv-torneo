@@ -2325,33 +2325,72 @@ class ImportDetallesController extends Controller
         $comp  = trim((string) $request->get('comp', ''));
         $ronda = trim((string) $request->get('ronda', ''));
 
-        $q = DB::table('import_partidos')
-            ->whereNotNull('partido_id')->whereNotNull('external_id')
-            ->whereIn('estado', ['aplicado', 'duplicado']);
-        if ($comp !== '')  $q->where('competencia_external_id', $comp);
-        if ($ronda !== '') $q->where('ronda', $ronda);
-        if ($rehacer) {
-            $q->whereIn('partido_id', function ($sub) {
-                $sub->from('alineacions')->select('partido_id')->distinct();
-            });
-        } else {
-            $q->whereNotIn('partido_id', function ($sub) {
-                $sub->from('alineacions')->select('partido_id')->distinct();
-            });
-        }
-        if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        // origen=sin_detalle: la cola son los partidos que el repaso de tipos de
+        // gol marcó como «nunca se le bajó el detalle». No hace falta offset —
+        // `importar()` le borra la marca a cada uno, así que la cola se vacía
+        // sola y la tanda siguiente agarra los que quedan.
+        $origen     = trim((string) $request->get('origen', ''));
+        $sinDetalle = $origen === 'sin_detalle' && $this->columnaSinDetalle();
+        // Encadenar tandas, igual que en el repaso de tipos de gol.
+        $seguir     = (string) $request->get('seguir', '0') === '1';
 
-        $filas = $q->orderBy('dia', 'desc')->offset($rehacer ? $desde : 0)->limit($n)->get();
+        if ($sinDetalle) {
+            $q = $this->sinDetalleQ($tecnicoId, $comp, $ronda);
+        } else {
+            $q = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado']);
+            if ($comp !== '')  $q->where('competencia_external_id', $comp);
+            if ($ronda !== '') $q->where('ronda', $ronda);
+            if ($rehacer) {
+                $q->whereIn('partido_id', function ($sub) {
+                    $sub->from('alineacions')->select('partido_id')->distinct();
+                });
+            } else {
+                $q->whereNotIn('partido_id', function ($sub) {
+                    $sub->from('alineacions')->select('partido_id')->distinct();
+                });
+            }
+            if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        }
+
+        // Con `sin_detalle` se piden de más y se deduplica en PHP: el staging
+        // tiene una fila por DT, así que el mismo partido puede venir dos veces
+        // y se bajaría dos veces (dos llamadas por el mismo dato).
+        $filas = $q->orderBy('dia', 'desc')
+            ->offset($rehacer && !$sinDetalle ? $desde : 0)
+            ->limit($sinDetalle ? $n * 3 : $n)->get();
+
+        if ($sinDetalle) {
+            $unicas = [];
+            foreach ($filas as $f) {
+                $id = (int) $f->partido_id;
+                if (!isset($unicas[$id]) && count($unicas) < $n) $unicas[$id] = $f;
+            }
+            $filas = collect(array_values($unicas));
+        }
 
         $fechas = $this->mapaFechas($filas->pluck('partido_id')->all());
+
+        // A los que ya tienen alineación hay que bajarles el detalle con
+        // `forzar`: sin eso `importar()` corta porque el partido «ya está
+        // cargado» y estos son justamente los que están cargados a mano.
+        $conAlineacion = [];
+        if ($sinDetalle && $filas->isNotEmpty()) {
+            foreach (DB::table('alineacions')->whereIn('partido_id', $filas->pluck('partido_id')->all())
+                         ->select('partido_id')->distinct()->get() as $a) {
+                $conAlineacion[(int) $a->partido_id] = true;
+            }
+        }
 
         $imp = new TmDetallePartido;
         $ok = 0; $fallaron = 0; $llamadas = 0; $nuevos = 0;
         $detalle = '';
 
         foreach ($filas as $f) {
+            $forzar = $rehacer || isset($conAlineacion[(int) $f->partido_id]);
             $r = $imp->importar((int) $f->partido_id, (string) $f->external_id,
-                ['escribir' => true, 'forzar' => $rehacer]);
+                ['escribir' => true, 'forzar' => $forzar]);
             $llamadas += (int) $r['llamadas'];
             $nuevos   += count($r['creados']['jugadores']);
 
@@ -2380,9 +2419,24 @@ class ImportDetallesController extends Controller
             }
         }
 
+        $filtrosTanda = array_filter(['tecnico_id' => $tecnicoId ?: null,
+            'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
+
+        // Se recuenta DESPUÉS de la tanda: los que salieron bien ya no están.
+        $quedanSinDetalle = $sinDetalle
+            ? (clone $this->sinDetalleQ($tecnicoId, $comp, $ronda))->distinct()->count('partido_id')
+            : 0;
+
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null,
                 'comp' => $comp ?: null, 'ronda' => $ronda ?: null]))) . '">← Detalle de los partidos</a></p>'
-            . '<h1>' . ($rehacer ? 'Rehacer detalles' : 'Tanda de detalles') . '</h1>'
+            . '<h1>' . ($sinDetalle ? 'Partidos sin detalle de Transfermarkt'
+                : ($rehacer ? 'Rehacer detalles' : 'Tanda de detalles')) . '</h1>'
+            . ($sinDetalle ? '<p class="sub">Son los que marcó el <a href="'
+                . e(route('import_detalles.tipos_gol', $filtrosTanda)) . '">repaso de lo ya cargado</a>: ninguno de '
+                . 'sus goles apareó con los de Transfermarkt, o sea que el detalle nunca se bajó y los goles son '
+                . 'los que cargaste a mano. Al que ya tenía alineación se le baja con <b>forzar</b> —se reemplaza '
+                . 'alineación, goles, tarjetas, cambios y árbitros— y al que no, de una. Cada uno que sale bien '
+                . '<b>se borra solo de la lista</b>.</p>' : '')
             . ($rehacer ? '<p class="sub">Se vuelve a bajar el detalle de partidos que <b>ya lo tenían</b>: '
                 . 'reemplaza alineación, goles, tarjetas, cambios y árbitros, y completa lo que el importador '
                 . 'no sabía hacer cuando los cargaste (plantillas, técnicos). Van del ' . ($desde + 1)
@@ -2392,16 +2446,51 @@ class ImportDetallesController extends Controller
             . $this->card($fallaron, 'Con problema', $fallaron ? 'err' : '')
             . $this->card($nuevos, 'Jugadores nuevos', $nuevos ? 'warn' : '')
             . $this->card($llamadas, 'Llamadas a la API')
+            . ($sinDetalle ? $this->card($quedanSinDetalle, 'Quedan sin detalle',
+                $quedanSinDetalle ? 'warn' : 'ok') : '')
             . '</div>';
 
+        // ── Encadenar, igual que el repaso de tipos de gol ─────────────────
+        // Mismo freno: si la tanda no pudo con NINGUNO, la siguiente haría lo
+        // mismo para siempre.
+        if ($sinDetalle && $seguir && $quedanSinDetalle > 0 && $ok > 0) {
+            $prox = $filtrosTanda; $prox['origen'] = 'sin_detalle'; $prox['n'] = $n; $prox['seguir'] = 1;
+            $urlProx = route('import_detalles.tanda', $prox);
+            $cuerpo .= '<div class="ok-box" id="seguir-caja"><b>Sigo solo.</b> Quedan <b>' . $quedanSinDetalle
+                . '</b> partidos sin detalle: arranco la próxima tanda de ' . min($n, $quedanSinDetalle)
+                . ' en <b id="seguir-seg">8</b> segundos. '
+                . '<a class="boton-sec" href="#" id="seguir-parar">Parar</a> '
+                . '<span class="sub">o cerrá la pestaña — lo que ya se bajó está guardado.</span></div>'
+                . '<script>(function(){var s=8,'
+                . 'c=document.getElementById("seguir-seg"),p=document.getElementById("seguir-parar"),'
+                . 't=setInterval(function(){s--;if(c){c.textContent=s;}'
+                . 'if(s<=0){clearInterval(t);location.href=' . json_encode($urlProx) . ';}},1000);'
+                . 'if(p){p.addEventListener("click",function(e){e.preventDefault();clearInterval(t);'
+                . 'document.getElementById("seguir-caja").innerHTML='
+                . json_encode('<b>Parado.</b> Quedan ' . $quedanSinDetalle . ' partidos sin detalle.') . ';});}})();</script>';
+        } elseif ($sinDetalle && $seguir && $quedanSinDetalle > 0 && $ok === 0) {
+            $cuerpo .= '<div class="err-box"><b>Corté la cadena.</b> Esta tanda no pudo con ninguno de los '
+                . 'partidos que intentó, así que la siguiente haría lo mismo. Mirá los errores de abajo antes '
+                . 'de volver a largarla.</div>';
+        } elseif ($sinDetalle && $quedanSinDetalle === 0) {
+            $cuerpo .= '<div class="ok-box"><b>Listo: no queda ningún partido marcado sin detalle</b>'
+                . (!empty($filtrosTanda) ? ' con este filtro' : '') . '.</div>';
+        }
+
         if ($filas->isEmpty()) {
-            $cuerpo .= '<div class="ok-box">No quedaban partidos sin detalle.</div>';
+            $cuerpo .= '<div class="ok-box">No quedaban partidos ' . ($sinDetalle ? 'marcados sin detalle'
+                : 'sin detalle') . '.</div>';
         } else {
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null, 'n' => $n,
                     'comp' => $comp ?: null, 'ronda' => $ronda ?: null,
-                    'rehacer' => $rehacer ? 1 : null, 'offset' => $rehacer ? ($desde + $n) : null])))
-                . '">' . ($rehacer ? 'Rehacer los ' . $n . ' siguientes' : 'Otra tanda de ' . $n) . '</a>'
+                    'origen' => $sinDetalle ? 'sin_detalle' : null,
+                    'rehacer' => $rehacer ? 1 : null,
+                    'offset' => ($rehacer && !$sinDetalle) ? ($desde + $n) : null])))
+                . '">' . ($sinDetalle ? 'Otra tanda de ' . min($n, max(1, $quedanSinDetalle))
+                    : ($rehacer ? 'Rehacer los ' . $n . ' siguientes' : 'Otra tanda de ' . $n)) . '</a>'
+                . ($sinDetalle ? '<a class="boton-sec" href="' . e(route('import_detalles.tipos_gol', $filtrosTanda))
+                    . '">Volver al repaso</a>' : '')
                 . '<a class="boton-sec" href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null,
                 'comp' => $comp ?: null, 'ronda' => $ronda ?: null]))) . '">Volver a la lista</a></p>'
                 . '<div class="diag">' . $detalle . '</div>';
@@ -2798,6 +2887,9 @@ class ImportDetallesController extends Controller
         // Control de TODOS los tipos de la tanda: qué decía la base y qué dice
         // Transfermarkt, gol por gol. Se acumula acá y se muestra abajo.
         $matriz = []; $sueltosTm = 0; $sueltosBase = 0; $sinDetalle = 0;
+        // Los que salen «sin detalle» y los que sí lo tienen, para dejarlo
+        // anotado en la base al final de la tanda. Ver `marcarSinDetalle()`.
+        $sinDetalleIds = []; $conDetalleIds = [];
 
         if ($correr && ($pendientes || $unPartido)) {
             $lote = $unPartido
@@ -2890,6 +2982,7 @@ class ImportDetallesController extends Controller
                 // por cada gol suelto.
                 if ($sinDetalleTm) {
                     $sinDetalle++;
+                    $sinDetalleIds[] = (int) $f->partido_id;
                     $rehacer = isset($conAlineacion[(int) $f->partido_id]);
                     $linkBajar = route('import_detalles.bajar', array_filter([
                         'partido_id' => (int) $f->partido_id, 'forzar' => $rehacer ? 1 : null]));
@@ -2904,6 +2997,9 @@ class ImportDetallesController extends Controller
                         . ', que por la misma llamada deja bien la alineación, los cambios, las tarjetas, los árbitros '
                         . 'y los tipos de gol, y encima mapea a los jugadores para siempre.</div>';
                 } else {
+                    // Apareó algún gol: el mapeo existe, o sea que el detalle se
+                    // bajó alguna vez. Si venía marcado, se le saca la marca.
+                    if ($r['escrito']) $conDetalleIds[] = (int) $f->partido_id;
                     foreach ((isset($r['avisos_apareo']) ? $r['avisos_apareo'] : []) as $a) {
                         $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
                     }
@@ -2913,6 +3009,13 @@ class ImportDetallesController extends Controller
                     $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
                 }
             }
+
+            // Que el aviso sobreviva a la tanda. En el continuado el informe se
+            // lo lleva la tanda siguiente ocho segundos después: sin esto los
+            // «rehacele el detalle» pasan de largo y no queda rastro de cuáles
+            // eran. Anotados, salen en la lista de abajo hasta que se arreglen.
+            TmDetallePartido::marcarSinDetalle($sinDetalleIds, true);
+            TmDetallePartido::marcarSinDetalle($conDetalleIds, false);
 
             $pendientes = (clone $base())->distinct()->count('partido_id');
         }
@@ -2996,6 +3099,42 @@ class ImportDetallesController extends Controller
             $yaBuscados = $this->sinGameIdPendientes()->distinct()->count('ipx.partido_id');
         }
 
+        // ── Sembrar la lista con lo ya revisado ───────────────────────────
+        // Un arreglo nuevo no repara lo viejo: los partidos que se revisaron
+        // ANTES de que existiera la marca ya están dados por revisados y no
+        // vuelven a la cola, así que su aviso se perdió con la tanda. Éste los
+        // recupera **sin gastar una sola llamada**, por la vía de la base:
+        // tiene gameId, tiene goles cargados y NO tiene alineación → el detalle
+        // nunca se bajó. Es conservador: al que le cargaste la alineación a mano
+        // no lo caza (ése sólo sale del repaso), pero no marca ningún falso.
+        $sembrados = 0;
+        if ((string) $request->get('sembrar_sin_detalle', '0') === '1' && $this->columnaSinDetalle()) {
+            $qs = DB::table('import_partidos')
+                ->whereNotNull('partido_id')->whereNotNull('external_id')
+                ->whereIn('estado', ['aplicado', 'duplicado'])
+                ->whereNull('sin_detalle_at')
+                ->whereIn('partido_id', function ($sub) {
+                    $sub->from('gols')->select('partido_id')->distinct();
+                })
+                ->whereNotIn('partido_id', function ($sub) {
+                    $sub->from('alineacions')->select('partido_id')->distinct();
+                });
+            if ($tecnicoId) $qs->where('tecnico_id', $tecnicoId);
+            if ($comp !== '')  $qs->where('competencia_external_id', $comp);
+            if ($ronda !== '') $qs->where('ronda', $ronda);
+
+            $ids = $qs->distinct()->pluck('partido_id')->all();
+
+            TmDetallePartido::marcarSinDetalle($ids, true);
+            $sembrados = count($ids);
+        }
+
+        // Todos los que quedaron marcados «sin detalle», no sólo los de esta
+        // tanda: ese número no se achica solo, hay que ir a rehacerlos.
+        $sinDetalleTotal = $this->columnaSinDetalle()
+            ? (clone $this->sinDetalleQ($tecnicoId, $comp, $ronda))->distinct()->count('partido_id')
+            : 0;
+
         $cuerpo .= '<div class="cards">'
             . $this->card($pendientes, 'Sin revisar', $pendientes ? 'warn' : 'ok')
             . $this->card($revisados + $hechos, 'Ya revisados', 'ok')
@@ -3003,7 +3142,7 @@ class ImportDetallesController extends Controller
             . ($correr ? $this->card($corregidos, 'Goles corregidos', $corregidos ? 'warn' : '') : '')
             . ($correr ? $this->card($olimpicos, 'Olímpicos', $olimpicos ? 'warn' : '') : '')
             . ($correr ? $this->card($minCorregidos, 'Minutos corregidos', $minCorregidos ? 'warn' : '') : '')
-            . ($correr && $sinDetalle ? $this->card($sinDetalle, 'Sin detalle de TM', 'warn') : '')
+            . ($sinDetalleTotal ? $this->card($sinDetalleTotal, 'Sin detalle de TM', 'warn') : '')
             . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
             . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
             . ($buscarIds ? $this->card($idsHallados, 'gameId encontrados', $idsHallados ? 'ok' : '') : '')
@@ -3043,6 +3182,26 @@ class ImportDetallesController extends Controller
                 . '—casi siempre es la API— antes de volver a largarla.</div>';
         } elseif ($seguir && $correr && $pendientes === 0) {
             $cuerpo .= '<div class="ok-box"><b>Listo: no queda ningún partido sin revisar.</b></div>';
+        }
+
+        // ── Los que nunca tuvieron detalle ────────────────────────────────
+        // Va ACÁ, arriba de todo y no en el informe de la tanda: en el modo
+        // continuado el informe dura ocho segundos. Esta lista sale de la marca
+        // guardada, así que no depende de que hayas llegado a leerla.
+        if ($sembrados) {
+            $cuerpo .= '<div class="ok-box"><b>' . $sembrados . ' partido(s) entraron a la lista de sin '
+                . 'detalle.</b> Salen de la base, no de Transfermarkt: tienen gameId y goles cargados pero '
+                . 'ninguna alineación. No costó ninguna llamada.</div>';
+        }
+
+        if ($sinDetalleTotal) {
+            $cuerpo .= $this->bloqueSinDetalle($sinDetalleTotal, $tecnicoId, $comp, $ronda, $sinDetalle);
+        } elseif ($this->columnaSinDetalle() && !$sembrados) {
+            $cuerpo .= '<p class="sub">No hay ningún partido marcado <b>sin detalle de Transfermarkt</b>. '
+                . 'El repaso los va marcando solo a medida que los encuentra, y '
+                . '<a href="' . e(route('import_detalles.tipos_gol', $filtros + ['sembrar_sin_detalle' => 1]))
+                . '">buscar en la base</a> —gratis— agrega los que tienen gameId y goles pero ninguna '
+                . 'alineación.</p>';
         }
 
         // ── De qué universo estamos hablando ──────────────────────────────
@@ -3504,6 +3663,132 @@ class ImportDetallesController extends Controller
     }
 
     /** Los próximos que se van a revisar, para saber por dónde va la cosa. */
+    /**
+     * ¿Está la columna de la marca? La migración
+     * `2026_09_06_100000_add_sin_detalle_a_import_partidos` puede no haber
+     * corrido, y eso no tiene que romper la pantalla: sin columna, no hay lista.
+     */
+    private function columnaSinDetalle()
+    {
+        return Schema::hasColumn('import_partidos', 'sin_detalle_at');
+    }
+
+    /** Los partidos marcados «nunca se le bajó el detalle», con los filtros puestos. */
+    private function sinDetalleQ($tecnicoId = 0, $comp = '', $ronda = '')
+    {
+        $q = DB::table('import_partidos')
+            ->whereNotNull('partido_id')->whereNotNull('external_id')
+            ->whereNotNull('sin_detalle_at')
+            ->whereIn('estado', ['aplicado', 'duplicado']);
+
+        if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        if ($comp !== '')  $q->where('competencia_external_id', $comp);
+        if ($ronda !== '') $q->where('ronda', $ronda);
+
+        return $q;
+    }
+
+    /**
+     * La lista de los partidos a los que nunca se les bajó el detalle.
+     *
+     * El repaso de tipos de gol los detecta sin pagar nada extra —ninguno de
+     * sus goles apareó con los de Transfermarkt y de los dos lados había goles—
+     * pero el aviso vivía sólo en el informe de la tanda. Con `seguir=1` ese
+     * informe se va ocho segundos después: los «rehacele el detalle» se pasaban
+     * de largo y no quedaba forma de saber cuáles eran. Ahora quedan marcados en
+     * `import_partidos.sin_detalle_at` y salen acá hasta que se arreglen.
+     *
+     * La marca la borra sola la bajada del detalle (`TmDetallePartido::importar`):
+     * la lista se vacía a medida que se trabajan, no hay que tildar nada.
+     */
+    private function bloqueSinDetalle($total, $tecnicoId = 0, $comp = '', $ronda = '', $enEstaTanda = 0)
+    {
+        $filtros = array_filter(['tecnico_id' => $tecnicoId ?: null,
+            'comp' => $comp ?: null, 'ronda' => $ronda ?: null]);
+
+        $filas = (clone $this->sinDetalleQ($tecnicoId, $comp, $ronda))
+            ->orderByDesc('dia')->limit(60)->get();
+
+        // Una fila por partido: el staging puede tener varias (aplicado y
+        // duplicado son el mismo partido visto desde los dos DTs).
+        $unicas = [];
+        foreach ($filas as $f) {
+            $id = (int) $f->partido_id;
+            if (!isset($unicas[$id])) $unicas[$id] = $f;
+        }
+
+        $conAlineacion = [];
+        if (!empty($unicas)) {
+            foreach (DB::table('alineacions')->whereIn('partido_id', array_keys($unicas))
+                         ->select('partido_id')->distinct()->get() as $a) {
+                $conAlineacion[(int) $a->partido_id] = true;
+            }
+        }
+        $fechas = $this->mapaFechas(array_keys($unicas));
+
+        $out = '<h2>Sin detalle de Transfermarkt <span class="sub">(' . (int) $total . ')</span></h2>'
+            . '<div class="err-box"><b>A estos partidos nunca se les bajó el detalle.</b> Los goles son los que '
+            . 'cargaste vos y los goleadores de Transfermarkt ni siquiera están mapeados, así que corregirles el '
+            . 'tipo de gol no alcanza: <b>hay que bajarles el detalle</b>, que por la misma llamada deja bien la '
+            . 'alineación, los cambios, las tarjetas, los árbitros y los tipos de gol, y de paso mapea a los '
+            . 'jugadores para siempre.'
+            . ($enEstaTanda ? ' <b>' . (int) $enEstaTanda . '</b> salieron en esta tanda.' : '')
+            . '</div>'
+            . '<p class="sub">El repaso los descubre gratis, pero antes el aviso vivía sólo en el informe de la '
+            . 'tanda y en el <b>continuado</b> se lo llevaba la tanda siguiente a los ocho segundos. Ahora quedan '
+            . '<b>anotados</b>: esta lista aguanta la cadena, el cierre de la pestaña y el 504, y se vacía sola a '
+            . 'medida que se les baja el detalle. Cuesta <b>1 llamada por partido</b> (más las fotos de los '
+            . 'jugadores que haya que crear).</p>';
+
+        $p = $filtros; $p['origen'] = 'sin_detalle'; $p['n'] = 10;
+        $out .= '<p class="acciones">'
+            . '<a class="boton" href="' . e(route('import_detalles.tanda', $p)) . '">Bajarles el detalle de a '
+            . min(10, (int) $total) . '</a>';
+        foreach ([25, 50] as $otro) {
+            if ($otro > $total) continue;
+            $p2 = $p; $p2['n'] = $otro;
+            $out .= ' <a class="boton-sec" href="' . e(route('import_detalles.tanda', $p2)) . '">de a '
+                . $otro . '</a>';
+        }
+        $pSeguir = $p; $pSeguir['seguir'] = 1;
+        $out .= ' <a class="boton-sec" href="' . e(route('import_detalles.tanda', $pSeguir))
+            . '">Seguir solo hasta terminar</a> <span class="sub">van del más nuevo al más viejo</span></p>';
+
+        $out .= '<p class="acciones"><a class="boton-sec" href="'
+            . e(route('import_detalles.tipos_gol', $filtros + ['sembrar_sin_detalle' => 1]))
+            . '">Buscar más en la base</a> <span class="sub">gratis: agrega a la lista los partidos con gameId y '
+            . 'goles que no tienen ninguna alineación. Los revisados antes del 06/09/2026 perdieron su aviso con '
+            . 'la tanda; éstos se recuperan sin gastar llamadas.</span></p>';
+
+        $out .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Competencia</th><th>Partido</th>'
+            . '<th>gameId</th><th></th><th></th></tr></thead><tbody>';
+
+        foreach ($unicas as $id => $f) {
+            $rehacer = isset($conAlineacion[$id]);
+            $link = route('import_detalles.bajar', array_filter([
+                'partido_id' => $id, 'forzar' => $rehacer ? 1 : null]));
+            $inc = $this->linkIncidencias(isset($fechas[$id]) ? $fechas[$id] : null);
+
+            $out .= '<tr>'
+                . '<td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
+                . '<td>' . e((string) $f->competencia_nombre) . '</td>'
+                . '<td>' . e($f->club_nombre . ' vs ' . $f->rival_nombre)
+                . ' <span class="id">#' . $id . '</span></td>'
+                . '<td class="num"><span class="id">' . e((string) $f->external_id) . '</span></td>'
+                . '<td><a href="' . e($link) . '"><b>' . ($rehacer ? 'Rehacer' : 'Bajar') . ' el detalle</b></a></td>'
+                . '<td>' . $inc . '</td>'
+                . '</tr>';
+        }
+
+        $out .= '</tbody></table></div>';
+
+        if ($total > count($unicas)) {
+            $out .= '<p class="sub">Se listan los ' . count($unicas) . ' más nuevos de ' . (int) $total . '.</p>';
+        }
+
+        return $out;
+    }
+
     private function bloquePendientesTiposGol($consulta)
     {
         $filas = (clone $consulta)->orderByDesc('dia')->limit(40)->get();

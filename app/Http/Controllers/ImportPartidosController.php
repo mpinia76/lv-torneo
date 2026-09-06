@@ -1936,8 +1936,34 @@ class ImportPartidosController extends Controller
             ->orderBy('dia')->get();
 
         if ($filas->isEmpty()) {
+            // ¿VACÍO PORQUE NO HAY NADA O PORQUE EL STAGING ESTÁ VIEJO? La
+            // pantalla del fixture cuenta los «nuevos» sobre lo que ACABA DE
+            // BAJAR de TM; este botón trabaja contra `import_partidos`. Las dos
+            // cosas se separan solas: si no guardaste, o si borraste los
+            // partidos que se habían creado, allá dice «Aplicar 2» y acá no hay
+            // ninguno. Contestar «no hay nada que crear» manda a buscar el
+            // problema donde no está.
+            $enStaging = DB::table('import_partidos')
+                ->whereNull('tecnico_id')
+                ->where('competencia_external_id', $comp)
+                ->where('ronda', $gameday)
+                ->select('estado', DB::raw('count(*) as n'))
+                ->groupBy('estado')->get();
+
+            $porEstado = [];
+            foreach ($enStaging as $e) $porEstado[] = $e->n . ' ' . $e->estado;
+
             return $this->pagina('Aplicar fecha', $volver
-                . '<p class="ok-box">La fecha ' . e($gameday) . ' no tiene partidos nuevos por crear.</p>');
+                . '<p class="' . (empty($porEstado) ? 'err-box' : 'ok-box') . '">'
+                . 'La fecha ' . e($gameday) . ' no tiene partidos nuevos <b>en el staging</b>'
+                . (empty($porEstado)
+                    ? ', que para esta competencia está vacío. Si la pantalla del fixture te muestra partidos '
+                      . 'nuevos, son los que acaba de bajar de TM y todavía no están guardados: apretá '
+                      . '<b>«Guardar en staging»</b> y volvé a intentar.'
+                    : ': ahí hay ' . e(implode(', ', $porEstado)) . '. Si la pantalla del fixture te muestra '
+                      . 'nuevos que acá no aparecen, el staging quedó viejo —pasa cuando borraste los partidos '
+                      . 'que se habían creado—. <b>«Guardar en staging»</b> los devuelve a «nuevo».')
+                . '</p>');
         }
 
         $html = $volver . '<h1>Fecha ' . e($gameday) . ' · ' . e($comp) . '</h1>';
@@ -2143,7 +2169,7 @@ class ImportPartidosController extends Controller
                         . '>' . e($fx->numero) . '</option>';
                 }
 
-                $html .= '<div class="ok-box"><b>Toda la fecha va a un solo grupo.</b> '
+                $html .= '<div class="ok-box"><div><b>Toda la fecha va a un solo grupo.</b> '
                     . ($unico !== null
                         ? 'Este torneo tiene un solo grupo, así que no hay nada que rutear: lo único que falta '
                           . 'decidir es a qué fecha van.'
@@ -2154,6 +2180,7 @@ class ImportPartidosController extends Controller
                               . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
                               . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
                             : 'Elegido a mano.'))
+                    . '</div>'
                     . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
                     . '<input type="hidden" name="comp" value="' . e($comp) . '">'
                     . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
@@ -2219,8 +2246,8 @@ class ImportPartidosController extends Controller
             $fechaLibre = trim((string) $request->get('fecha_nombre', ''));
             if (!$grupoDestino && $sinRonda) {
                 $html .= '<div class="' . ($fechaLibre === '' ? 'err-box' : 'ok-box') . '">'
-                    . '<b>Transfermarkt no trajo el nombre de la ronda</b> (quedó «—»). '
-                    . 'La fecha se crea con ese nombre en cada grupo, así que decime cómo se llama.'
+                    . '<div><b>Transfermarkt no trajo el nombre de la ronda</b> (quedó «—»). '
+                    . 'La fecha se crea con ese nombre en cada grupo, así que decime cómo se llama.</div>'
                     . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
                     . '<input type="hidden" name="comp" value="' . e($comp) . '">'
                     . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
