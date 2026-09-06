@@ -2026,6 +2026,25 @@ class ImportPartidosController extends Controller
             $grupoDestino = $playoffId;
         }
 
+        // ¿EL GAMEDAY SIRVE COMO NOMBRE DE FECHA? Cuando el fixture sale del
+        // calendario en HTML, TM puede no traer encabezado de ronda y
+        // `normalizarFixture()` guarda «—». Ese valor termina siendo el
+        // `numero` de la fecha que se crea: una fecha llamada «—» no es lo que
+        // quiso nadie, así que hay que preguntar cómo se llama.
+        $sinRonda = ($gameday === '' || $gameday === '—');
+
+        // UN SOLO GRUPO: SE PREGUNTA IGUAL POR LA FECHA. `$proponeLlaves` exige
+        // partidos CRUZANDO zonas, y en una copa internacional todas las rondas
+        // viven en el mismo grupo de llaves: no cruza nada, así que este bloque
+        // era inalcanzable y la fecha se creaba con el gameday de TM («—» en la
+        // Sudamericana 2015, con las fechas de verdad —Primera etapa, Octavos—
+        // ya cargadas al lado). Con un solo grupo, rutear por plantilla y
+        // mandar todo a ese grupo son lo mismo, así que `modo=plantilla` no lo
+        // apaga: lo único que cambia es que ahora se puede elegir la fecha.
+        if (!$grupoDestino && $unico !== null && ($playoffId === $unico || $sinRonda)) {
+            $grupoDestino = $unico;
+        }
+
         // En un grupo de llaves la plantilla no decide nada, así que un equipo
         // sin plantilla no es motivo para no crear el partido: los que se van
         // en la primera ronda nunca la tienen. Se avisa igual, porque que no
@@ -2105,7 +2124,11 @@ class ImportPartidosController extends Controller
                     // torneo, la vuelta va ahí. Sirve igual para reaplicar una
                     // fecha que quedó a medias.
                     $fechaDestino = (int) $this->fechaDeLasLlaves($filas, $torneo->id);
-                    if (!$fechaDestino) $fechaNombre = $this->nombreDeRonda(count($filas), $gameday);
+                    // `nombreDeRonda()` adivina por la CANTIDAD de partidos, y
+                    // sin ronda de TM eso miente: una llave sola —ida y
+                    // vuelta— son 2 partidos y propondría «Semifinal». Mejor
+                    // vacío: la pantalla lo pide y no crea nada hasta tenerlo.
+                    if (!$fechaDestino && !$sinRonda) $fechaNombre = $this->nombreDeRonda(count($filas), $gameday);
                 }
 
                 $optsG = '';
@@ -2121,11 +2144,16 @@ class ImportPartidosController extends Controller
                 }
 
                 $html .= '<div class="ok-box"><b>Toda la fecha va a un solo grupo.</b> '
-                    . ($grupoDestino === $playoffId
-                        ? 'Los dos equipos de cada partido están en zonas distintas: esto es una ronda de playoffs, '
-                          . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
-                          . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
-                        : 'Elegido a mano.')
+                    . ($unico !== null
+                        ? 'Este torneo tiene un solo grupo, así que no hay nada que rutear: lo único que falta '
+                          . 'decidir es a qué fecha van.'
+                          . ($sinRonda ? ' Transfermarkt no trajo el nombre de la ronda —quedó «—»—, '
+                              . 'así que tampoco se puede deducir.' : '')
+                        : ($grupoDestino === $playoffId
+                            ? 'Los dos equipos de cada partido están en zonas distintas: esto es una ronda de playoffs, '
+                              . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
+                              . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
+                            : 'Elegido a mano.'))
                     . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
                     . '<input type="hidden" name="comp" value="' . e($comp) . '">'
                     . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
@@ -2140,9 +2168,14 @@ class ImportPartidosController extends Controller
                         . 'name="sin_plantilla" value="1"' . ($sinPlantillaIgual ? ' checked' : '') . '> crear igual los '
                         . count($sinPlantilla) . ' partidos sin plantilla</label></div>' : '')
                     . '<p class="acciones"><button>Ver de nuevo con esto</button> '
-                    . '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar', ['comp' => $comp,
-                        'gameday' => $gameday, 'torneo_id' => $torneo->id, 'modo' => 'plantilla']))
-                    . '">Mejor rutear por plantilla</a></p></form></div>';
+                    // Con un solo grupo, rutear por plantilla lleva EXACTAMENTE
+                    // al mismo lugar: el botón sólo serviría para perder el
+                    // selector de fecha.
+                    . ($unico !== null ? '' : '<a class="boton-sec" href="'
+                        . e(route('import_partidos.fixture_aplicar', ['comp' => $comp,
+                            'gameday' => $gameday, 'torneo_id' => $torneo->id, 'modo' => 'plantilla']))
+                        . '">Mejor rutear por plantilla</a>')
+                    . '</p></form></div>';
 
                 if ($fechaDestino === 0 && $fechaNombre === '') {
                     $html .= '<p class="err-box">Falta decir a qué fecha del grupo van: elegí una de la lista o '
@@ -2179,6 +2212,26 @@ class ImportPartidosController extends Controller
                     . '</p>';
             }
 
+            // ── RUTEO POR PLANTILLA Y TM SIN NOMBRE DE RONDA ────────────────
+            // Acá la fecha se crea en CADA grupo con el gameday de TM como
+            // `numero`. Si TM no trajo ronda ese numero sería «—», que no es
+            // nombre de nada: se pide una vez y vale para todos los grupos.
+            $fechaLibre = trim((string) $request->get('fecha_nombre', ''));
+            if (!$grupoDestino && $sinRonda) {
+                $html .= '<div class="' . ($fechaLibre === '' ? 'err-box' : 'ok-box') . '">'
+                    . '<b>Transfermarkt no trajo el nombre de la ronda</b> (quedó «—»). '
+                    . 'La fecha se crea con ese nombre en cada grupo, así que decime cómo se llama.'
+                    . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
+                    . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+                    . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
+                    . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
+                    . '<input type="hidden" name="modo" value="plantilla">'
+                    . ($interzonales ? '<input type="hidden" name="interzonales" value="1">' : '')
+                    . 'Fecha: <input type="text" name="fecha_nombre" value="' . e($fechaLibre) . '" '
+                    . 'placeholder="Cuartos de final"> <button>Ver de nuevo con esto</button>'
+                    . '</form></div>';
+            }
+
             $html .= '<h2>Detalle</h2><div class="scroll"><table><thead><tr><th>Día</th><th>Local</th>'
                 . '<th>Res.</th><th>Visitante</th><th>Grupo destino</th><th></th></tr></thead><tbody>';
             foreach ($plan as $x) {
@@ -2200,6 +2253,9 @@ class ImportPartidosController extends Controller
             if ($grupoDestino && !$fechaDestino && $fechaNombre === '') {
                 return $this->pagina('Aplicar fecha', $html);
             }
+            if (!$grupoDestino && $sinRonda && $fechaLibre === '') {
+                return $this->pagina('Aplicar fecha', $html);
+            }
 
             $html .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_partidos.fixture_aplicar', array_filter([
@@ -2208,7 +2264,9 @@ class ImportPartidosController extends Controller
                     'modo'          => (!$grupoDestino && $playoffId) ? 'plantilla' : null,
                     'grupo_destino' => $grupoDestino ?: null,
                     'fecha_destino' => ($grupoDestino && $fechaDestino) ? $fechaDestino : null,
-                    'fecha_nombre'  => ($grupoDestino && !$fechaDestino) ? $fechaNombre : null,
+                    'fecha_nombre'  => $grupoDestino
+                        ? (!$fechaDestino ? $fechaNombre : null)
+                        : ($sinRonda ? $fechaLibre : null),
                     'sin_plantilla' => $sinPlantillaIgual ? 1 : null,
                     'confirmar' => 1])))
                 . '">Crear estos ' . count($plan) . ' partidos'
@@ -2251,21 +2309,33 @@ class ImportPartidosController extends Controller
             }
         }
 
+        // EL `numero` DE LA FECHA cuando se rutea por plantilla: el gameday de
+        // TM, salvo que TM no haya traído ronda y lo hayas escrito vos.
+        $numeroFecha = $gameday;
+        if (!$grupoDestino && $sinRonda) {
+            $numeroFecha = trim((string) $request->get('fecha_nombre', ''));
+            if ($numeroFecha === '') {
+                return $this->pagina('Aplicar fecha', $html
+                    . '<p class="err-box">No creé nada: Transfermarkt no trajo el nombre de la ronda y hace '
+                    . 'falta uno para crear la fecha. Volvé a la previsualización y escribilo.</p>');
+            }
+        }
+
         $creados = 0; $errores = []; $detalle = ''; $fechasTocadas = [];
         foreach ($plan as $x) {
             $r = $x['fila']; $gId = (int) $x['grupo_id'];
             try {
                 $fecha = $fechaFijada;
                 if (!$fecha) {
-                    $fecha = \App\Fecha::where('grupo_id', $gId)->where('numero', $gameday)->first();
+                    $fecha = \App\Fecha::where('grupo_id', $gId)->where('numero', $numeroFecha)->first();
                 }
                 if (!$fecha) {
                     $fecha = new \App\Fecha();
                     $fecha->forceFill([
-                        'numero'     => $gameday,
+                        'numero'     => $numeroFecha,
                         'grupo_id'   => $gId,
-                        'orden'      => is_numeric($gameday) ? (int) $gameday : 999,
-                        'url_nombre' => Str::slug('fecha-' . $gameday),
+                        'orden'      => is_numeric($numeroFecha) ? (int) $numeroFecha : 999,
+                        'url_nombre' => Str::slug('fecha-' . $numeroFecha),
                     ])->save();
                 }
                 $fechasTocadas[$gId] = true;
@@ -2294,7 +2364,7 @@ class ImportPartidosController extends Controller
                                 ->orWhere('equipol_id', $vId)->orWhere('equipov_id', $vId);
                         })->first();
                     if ($ya) {
-                        $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($lId) . ' en la fecha ' . $gameday
+                        $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($lId) . ' en la fecha ' . $numeroFecha
                             . ' del grupo ' . $grupos[$gId]->nombre . ' (#' . $ya->id . ').';
                         continue;
                     }
@@ -2331,8 +2401,9 @@ class ImportPartidosController extends Controller
 
         $html .= '<h1>Creados ' . $creados . ' partidos</h1>'
             . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · fecha ' . e($gameday)
-            . ($fechaFijada ? ' de TM → <b>' . e($fechaFijada->numero) . '</b> del grupo '
-                . e($grupos[$grupoDestino]->nombre) : '') . '</p>';
+            . ($fechaFijada
+                ? ' de TM → <b>' . e($fechaFijada->numero) . '</b> del grupo ' . e($grupos[$grupoDestino]->nombre)
+                : ($numeroFecha !== $gameday ? ' de TM → <b>' . e($numeroFecha) . '</b>' : '')) . '</p>';
 
         if (!empty($errores)) {
             $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>' . e(implode(' — ', $errores)) . '</p>';

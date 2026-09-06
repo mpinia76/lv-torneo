@@ -1243,6 +1243,23 @@ class TmDetallePartido
                         . $cambio['a'] . '. Si es de otra jugada, revisalo.');
                 }
 
+                // ── Red para la prórroga ──────────────────────────────────
+                // El minuto del reloj es lo único que dice en qué período pasó
+                // algo (91-105 es el 1º suplementario, 106-120 el 2º). Que TM
+                // mande esos minutos en ABSOLUTO y no reiniciando el reloj en
+                // cada tiempo suplementario está asumido, NO verificado contra
+                // un JSON crudo de un partido con alargue. Si estuviera al
+                // revés, un gol del 105 entraría como minuto 15 y nadie se
+                // daría cuenta. Así que cada minuto de prórroga que se escriba
+                // sale por pantalla hasta que esto esté confirmado.
+                if (MinutoHelper::esProrroga($mTm)) {
+                    $this->aviso('PRÓRROGA: el ' . $cfg['nombre'] . ' de ' . $cambio['nombre'] . ' queda en '
+                        . MinutoHelper::textoLargo($mTm, $aTm) . ' (la base decía ' . $cambio['de'] . '). '
+                        . 'Miralo contra Transfermarkt: es la primera vez que el repaso escribe un minuto '
+                        . 'de tiempo suplementario y todavía no está confirmado que TM los mande en '
+                        . 'minuto corrido y no reiniciando el reloj en cada suplementario.');
+                }
+
                 // Las «Convirtieron» viajan con su gol de penal.
                 if ($cfg['tabla'] === 'gols' && (string) $f->tipo === self::GOL_PENAL) {
                     $companeras = DB::table('penals')
