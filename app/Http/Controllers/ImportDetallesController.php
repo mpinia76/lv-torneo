@@ -417,6 +417,7 @@ class ImportDetallesController extends Controller
         // gastar créditos para volver a la misma pantalla. Se le dice qué pasó.
         $buscado    = null;
         $noGuardado = '';   // por qué el gameId encontrado no llegó a la base
+        $desatados  = [];   // gameId que dejaron de apuntar a este partido
         if ($partidoId && $gameId === '' && !$malPegado) {
             $buscador = new TmBuscarGameId;
             $buscado  = $buscador->buscar($partidoId);
@@ -435,6 +436,8 @@ class ImportDetallesController extends Controller
                         ? $buscador->ultimoError
                         : 'no sé por qué (anotar() devolvió false sin motivo)';
                 }
+
+                $desatados = array_merge($desatados, $buscador->desatados);
 
                 $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
                     ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
@@ -473,10 +476,13 @@ class ImportDetallesController extends Controller
                     : 'no sé por qué (anotar() devolvió false sin motivo)';
             }
 
-            if (!$fila) {
-                $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
-                    ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
-            }
+            $desatados = array_merge($desatados, $anotador->desatados);
+
+            // La fila que se relee tiene que ser la de DESPUÉS de anotar: si se
+            // reusa la que se leyó al principio, la pantalla sigue mostrando el
+            // gameId viejo en el encabezado y parece que no se guardó nada.
+            $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
+                ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
         }
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
@@ -540,6 +546,15 @@ class ImportDetallesController extends Controller
                 . 'y cada vez que entres acá se va a volver a pagar la búsqueda.</div>';
         }
 
+        // Desatar un gameId es un cambio de datos: si no se avisa, el partido
+        // dejó de apuntar a donde apuntaba y nadie se enteró.
+        if ($desatados) {
+            $cuerpo .= '<div class="ok-box">Este partido ahora es el gameId <b>' . e($gameId) . '</b>. '
+                . 'Le saqué el gameId ' . e(implode(', ', array_unique($desatados)))
+                . ' a la(s) otra(s) fila(s) del staging que también decían ser este partido, así que ya no lo '
+                . 'pueden volver a ganar (el número viejo queda escrito en su <code>motivo</code>).</div>';
+        }
+
         if ($r['error']) {
             $cuerpo .= '<div class="err-box">' . e($r['error']) . '</div>';
         } elseif ($escribir && $r['escrito']) {
@@ -551,9 +566,26 @@ class ImportDetallesController extends Controller
         } elseif (!$escribir) {
             // Si el partido ya tiene detalle, el único guardado posible es
             // rehacerlo: el botón lo dice y lleva forzar=1.
+            //
+            // EL BOTÓN LLEVA EL `game_id` QUE ESTÁS VIENDO. No lo llevaba, y el
+            // efecto era este: corregías un gameId equivocado pasándolo por la
+            // URL, la vista previa mostraba el partido correcto, apretabas el
+            // botón… y como el link no lo arrastraba, `bajar` volvía a sacar el
+            // gameId del staging —el equivocado— y te devolvía el mismo error,
+            // gastando una llamada. Es el mismo bug que el `cache=1` del
+            // fixture: la acción tiene que operar sobre los datos que la
+            // pantalla le mostró al usuario, no sobre otra fuente.
+            //
+            // `fotos` va por lo mismo: si mirás con &fotos=0 para no gastar,
+            // guardar no puede ponerse a bajar fotos por su cuenta.
             $yaTiene = DB::table('alineacions')->where('partido_id', $partidoId)->exists();
             $cuerpo .= '<p class="acciones"><a class="boton" href="'
-                . e(route('import_detalles.bajar', ['partido_id' => $partidoId, 'forzar' => ($yaTiene || $forzar) ? 1 : null]))
+                . e(route('import_detalles.bajar', [
+                    'partido_id' => $partidoId,
+                    'game_id'    => $gameId !== '' ? $gameId : null,
+                    'fotos'      => $fotos ? null : 0,
+                    'forzar'     => ($yaTiene || $forzar) ? 1 : null,
+                ]))
                 . '">' . ($yaTiene ? 'Rehacer y guardar' : 'Guardar esto') . '</a>'
                 . ($yaTiene ? ' <span class="sub">reemplaza alineación, goles, tarjetas, cambios, penales fallados '
                     . 'y árbitros de este partido (los penales «Convirtieron» no se tocan)</span>' : '')

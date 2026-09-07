@@ -124,6 +124,17 @@ class TmBuscarGameId
      */
     public $ultimoError = '';
 
+    /**
+     * Los gameId que `anotar()` le sacó al partido por quedarse con otro.
+     *
+     * Se expone para que la pantalla lo pueda decir: desatar un gameId es un
+     * cambio de datos silencioso, y el usuario tiene que enterarse de que el
+     * partido dejó de apuntar al que apuntaba.
+     *
+     * @var string[]
+     */
+    public $desatados = [];
+
     /** @var int */
     private $llamadas = 0;
 
@@ -232,6 +243,8 @@ class TmBuscarGameId
      * `partido_id`. A partir de ahí el partido tiene su link a TM en los
      * controles y su "Rehacer" va derecho a la vista previa.
      *
+     * Y deja al gameId anotado como el ÚNICO del partido: ver `desatarOtras()`.
+     *
      * Es un extra: si falla, quien llama sigue igual.
      */
     public function anotar($partidoId, $gameId, $motivo = 'encontrado en Transfermarkt')
@@ -239,6 +252,7 @@ class TmBuscarGameId
         $gameId          = trim((string) $gameId);
         $partidoId       = (int) $partidoId;
         $this->ultimoError = '';
+        $this->desatados   = [];
 
         if ($partidoId <= 0 || !preg_match('/^\d{1,20}$/', $gameId)) {
             $this->ultimoError = 'gameId o partido inválido (' . $gameId . ' / ' . $partidoId . ')';
@@ -279,6 +293,8 @@ class TmBuscarGameId
                     DB::table('import_partidos')->whereIn('id', $sinAtar)
                         ->update(['partido_id' => $partidoId, 'updated_at' => now()]);
 
+                    $this->desatarOtras($partidoId, $gameId);
+
                     return true;
                 }
 
@@ -289,6 +305,11 @@ class TmBuscarGameId
                     $this->ultimoError = 'el gameId ' . $gameId . ' ya está atado al partido #' . $ajeno;
                     return false;
                 }
+
+                // Ya estaba atado a este partido. Devolver `true` acá y no hacer
+                // nada más era el agujero: la fila existía, sí, pero podía NO ser
+                // la que el sistema lee. Ver `desatarOtras()`.
+                $this->desatarOtras($partidoId, $gameId);
 
                 return true;
             }
@@ -327,10 +348,62 @@ class TmBuscarGameId
                 'updated_at'   => now(),
             ]);
 
+            $this->desatarOtras($partidoId, $gameId);
+
             return true;
         } catch (\Throwable $e) {
             $this->ultimoError = get_class($e) . ': ' . $e->getMessage();
             return false;
+        }
+    }
+
+    /**
+     * Deja al gameId recién anotado como el único que apunta a este partido.
+     *
+     * EL AGUJERO QUE TAPA (visto el 2026-09-07 con el partido #3038):
+     * quien lee el gameId de un partido —`ImportDetallesController::correrUno()`
+     * y los pases de penales y de tipos de gol— hace
+     *
+     *     where partido_id = X and external_id is not null order by id desc
+     *
+     * o sea: **gana la fila más nueva**. Si la búsqueda automática ya había
+     * insertado una fila con un gameId equivocado, esa fila es la más nueva y
+     * seguía ganando aunque después se anotara el bueno: `anotar()` encontraba
+     * la fila del gameId correcto ya atada al partido, devolvía `true` sin
+     * tocar nada, y el sistema seguía bajando el partido de otro. El usuario
+     * corregía el gameId por URL, veía la vista previa correcta, apretaba
+     * guardar y volvía el error de siempre — sin un solo cartel que lo
+     * explicara, porque el guardado había "salido bien".
+     *
+     * Un guardado que no cambia lo que el sistema lee no es un guardado.
+     *
+     * Se le saca el `external_id` a las otras filas, NO el `partido_id`: así no
+     * se toca el estado de la fila ni los conteos por DT (que miran
+     * `estado = 'aplicado'` + `partido_id`), y lo único que se borra es la
+     * afirmación falsa —que este partido es ese gameId—. El gameId viejo queda
+     * escrito en `motivo`, que es donde hay que ir a buscarlo si algún día hace
+     * falta rastrearlo. `motivo` es varchar(191): se corta a mano, porque en
+     * MySQL no estricto un texto más largo se guarda cortado en silencio.
+     */
+    private function desatarOtras($partidoId, $gameId)
+    {
+        $otras = DB::table('import_partidos')
+            ->where('partido_id', (int) $partidoId)
+            ->whereNotNull('external_id')
+            ->where('external_id', '<>', (string) $gameId)
+            ->get(['id', 'external_id', 'motivo']);
+
+        foreach ($otras as $f) {
+            $nota = 'gameId ' . $f->external_id . ' desatado del partido #' . (int) $partidoId
+                . ': quedó con el ' . $gameId . '. ' . (string) $f->motivo;
+
+            DB::table('import_partidos')->where('id', $f->id)->update([
+                'external_id' => null,
+                'motivo'      => mb_substr(trim($nota), 0, 191),
+                'updated_at'  => now(),
+            ]);
+
+            $this->desatados[] = (string) $f->external_id;
         }
     }
 
