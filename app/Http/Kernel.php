@@ -37,6 +37,8 @@ class Kernel extends HttpKernel
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            // Temporal: mide consultas y tiempo con ?perf=1 y sesion iniciada.
+            \App\Http\Middleware\PerfDebug::class,
         ],
 
         'api' => [
