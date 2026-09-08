@@ -21,12 +21,14 @@ use Illuminate\Support\Facades\Log;
 
 
 
-Auth::routes();
+// Sin tabla de roles, cualquier usuario registrado tiene los mismos permisos
+// que el administrador. El alta se hace a mano en la base.
+Auth::routes(['register' => false]);
 
 
 
 
-Route::group(['prefix' => 'admin'], function()
+Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
 {
     Route::get('/', function () {
         return view('/home');
@@ -332,6 +334,9 @@ Route::get('titulosHistorico', 'TorneoController@titulos')->name('torneos.titulo
 Route::get('logout', 'Auth\LoginController@logout');
 
 
+// El token estaba escrito en el codigo y no caduca: alcanza con que la URL
+// aparezca una vez en un log o en el historial para quedar abierta para siempre.
+// Ahora ademas exige sesion iniciada. Si algun cron la llamaba por URL, avisar.
 Route::get('/ejecutar-actualizar-nombres', function (Request $request) {
     // Token de seguridad
     $token = $request->query('token');
@@ -343,6 +348,6 @@ Route::get('/ejecutar-actualizar-nombres', function (Request $request) {
     Artisan::call('personas:actualizar-nombres');
 
     return '✅ Comando ejecutado correctamente.';
-});
+})->middleware('auth');
 
 

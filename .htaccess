@@ -1,0 +1,33 @@
+# Raiz del proyecto Laravel.
+#
+# En el hosting actual el sitio se sirve como /~torneospinia/public/, o sea que
+# el docroot es ESTA carpeta y no public/. Sin estas reglas, un GET a
+# /~torneospinia/.env devuelve las credenciales de la base y la APP_KEY, y
+# /storage/logs/laravel.log entrega los stack traces enteros.
+#
+# Lo ideal es apuntar el docroot del dominio directo a public/ y borrar este
+# archivo. Mientras eso no pase, esto tapa el agujero.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Carpetas internas de la app: nada de esto se sirve por HTTP.
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|tools|scripts|vendor|node_modules)(/|$) - [F,L]
+
+    # Archivos sueltos de la raiz (.env, .env.bak, dumps, backups, zips, manifiestos).
+    RewriteRule ^\. - [F,L]
+    RewriteRule ^(artisan|server\.php|webpack\.mix\.js|phpunit\.xml|railway\.json)$ - [F,L]
+    RewriteRule \.(env|bak|sql|zip|log|lock|md|dist|ini|yml|yaml)$ - [F,L]
+    RewriteRule ^(composer|package|package-lock|composer-lock)\.(json|lock)$ - [F,L]
+</IfModule>
+
+# Segunda linea de defensa por si mod_rewrite no esta habilitado.
+<FilesMatch "^\.|\.(env|bak|sql|log|lock)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
