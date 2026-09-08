@@ -388,202 +388,191 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosJugadorCopa=0;
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
-        foreach ($torneosJugador as $torneo){
 
-            // GRUPOS
-            $arrgrupos = Grupo::where('torneo_id', $torneo->idTorneo)
-                ->pluck('id')
-                ->implode(',');
+        // ── Todos los torneos de una sola vez ────────────────────────────────
+        // Antes esto vivia adentro del foreach: por cada torneo se pedian los
+        // grupos, las fechas y los partidos para armar un IN(...) gigante, mas
+        // seis consultas de estadistica y dos por cada escudo. Un jugador con
+        // carrera larga se llevaba ~380 consultas y 1,9 s.
+        //
+        // El "grupos.id IN (todos los grupos del torneo)" que traian las
+        // consultas viejas era redundante: dice lo mismo que grupos.torneo_id,
+        // que ya estaba en el WHERE. Por eso ahora alcanza con agrupar por
+        // torneo_id y las listas de ids no hacen falta.
+        $idsTorneos = [];
+        foreach ($torneosJugador as $t) {
+            $idsTorneos[] = (int) $t->idTorneo;
+        }
 
-            // FECHAS
-            $arrfechas = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
-                ->pluck('id')
-                ->implode(',');
+        $posPorTorneo     = [];  // [torneo][equipo] = posicion
+        $campeonDe        = [];  // [torneo] = equipo_id del campeon
+        $alineadoEn       = [];  // [torneo][equipo] = true
+        $escudosPorTorneo = [];  // [torneo] = filas de escudo
+        $titularPor = [];
+        $entraPor   = [];
+        $golesPor   = [];
+        $tarjetasPor = [];
+        $penalsPor  = [];
+        $arqPor     = [];
 
-            $arrpartidos = Partido::whereIn('fecha_id', explode(',', $arrfechas))
-                ->pluck('id')
-                ->implode(',');
+        if (!empty($idsTorneos)) {
+            // Ya son enteros por el cast de arriba.
+            $inTorneos = implode(',', $idsTorneos);
 
-
-            $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
-
-            if(!empty($posicionTorneo)){
-                //if ($posicionTorneo->posicion == 1){
-
-                $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$posicionTorneo->equipo_id)->where('jugador_id','=',$id)->first();
-
-
-
-
-                //print_r($partidoTecnico);
-                if(!empty($alineacion)) {
-                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->ambito == 'Nacional'){
-                        if ($torneo->tipo == 'Copa') {
-                            $titulosJugadorCopa++;
-                        } else {
-                            $titulosJugadorLiga++;
-                        }
-                    }
-                    else{
-                        $titulosJugadorInternacional++;
-                    }
+            foreach (PosicionTorneo::whereIn('torneo_id', $idsTorneos)->get() as $pos) {
+                $tid = (int) $pos->torneo_id;
+                $posPorTorneo[$tid][(int) $pos->equipo_id] = $pos->posicion;
+                // Se queda con la primera fila de posicion 1, igual que el
+                // ->first() que habia antes.
+                if ($pos->posicion == 1 && !isset($campeonDe[$tid])) {
+                    $campeonDe[$tid] = (int) $pos->equipo_id;
                 }
-                //}
             }
 
-
-
-            $sqlEscudos='SELECT DISTINCT escudo, equipo_id, equipos.nombre
-FROM equipos
-INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
+            $join = '
 INNER JOIN partidos ON partidos.id = alineacions.partido_id
-WHERE alineacions.jugador_id = '.$id.' AND alineacions.partido_id IN ('.$arrpartidos.')
-ORDER BY partidos.dia ASC';
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id';
 
-
-
-            $escudos = DB::select(DB::raw($sqlEscudos));
-
-
-            foreach ($escudos as $escudo){
-                $strPosicion='';
-                $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('equipo_id', '=',$escudo->equipo_id)->first();
-
-                if(!empty($posicionTorneo)){
-
-                    $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$posicionTorneo->equipo_id)->where('jugador_id','=',$id)->first();
-
-
-
-
-                    //print_r($partidoTecnico);
-                    if(!empty($alineacion)) {
-                        $strPosicion = (!empty($posicionTorneo)) ? (
-                        ($posicionTorneo->posicion == 1) ?
-                            '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                            (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
-                        ) : '';
-                    }
-
-                }
-
-                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
-                //$torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.',';
+            // En que equipos estuvo alineado, por torneo. Reemplaza los dos
+            // Alineacion::whereIn(...)->first() que se hacian por vuelta.
+            foreach (DB::select('SELECT DISTINCT grupos.torneo_id, alineacions.equipo_id
+FROM alineacions'.$join.'
+WHERE alineacions.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')') as $f) {
+                $alineadoEn[(int) $f->torneo_id][(int) $f->equipo_id] = true;
             }
 
-            $sqlTitular="SELECT alineacions.jugador_id, COUNT(alineacions.jugador_id) as jugados
-FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
-INNER JOIN fechas ON fechas.grupo_id = g2.id
-INNER JOIN partidos ON partidos.fecha_id = fechas.id
-INNER JOIN alineacions ON alineacions.partido_id = partidos.id
+            // Escudos por torneo. El original hacia DISTINCT ... ORDER BY
+            // partidos.dia, que con DISTINCT deja el orden a criterio del motor;
+            // MIN(dia) ordena por el primer partido y es equivalente pero
+            // definido, y ademas no depende de ONLY_FULL_GROUP_BY.
+            foreach (DB::select('SELECT grupos.torneo_id, equipos.id AS equipo_id, equipos.escudo, equipos.nombre, MIN(partidos.dia) AS primer_dia
+FROM equipos
+INNER JOIN alineacions ON equipos.id = alineacions.equipo_id'.$join.'
+WHERE alineacions.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id, equipos.id, equipos.escudo, equipos.nombre
+ORDER BY grupos.torneo_id, primer_dia ASC') as $f) {
+                $escudosPorTorneo[(int) $f->torneo_id][] = $f;
+            }
+
+            foreach (DB::select('SELECT grupos.torneo_id, COUNT(*) AS jugados
+FROM alineacions'.$join.'
+WHERE alineacions.tipo = \'Titular\' AND alineacions.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id') as $f) {
+                $titularPor[(int) $f->torneo_id] = (int) $f->jugados;
+            }
+
+            foreach (DB::select('SELECT grupos.torneo_id, COUNT(*) AS jugados
+FROM cambios
+INNER JOIN partidos ON partidos.id = cambios.partido_id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
-WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND alineacions.jugador_id = ".$id. " GROUP BY alineacions.jugador_id";
-
-            //echo $sql3;
-
-            $jugados = DB::select(DB::raw($sqlTitular));
-
-
-            foreach ($jugados as $jugado){
-
-                $torneo->jugados += $jugado->jugados;
+WHERE cambios.tipo = \'Entra\' AND cambios.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id') as $f) {
+                $entraPor[(int) $f->torneo_id] = (int) $f->jugados;
             }
 
-            $sql4="SELECT cambios.jugador_id, COUNT(cambios.jugador_id)  as jugados
-FROM torneos t2 INNER JOIN grupos g2 ON t2.id = g2.torneo_id
-INNER JOIN fechas ON fechas.grupo_id = g2.id
-INNER JOIN partidos ON partidos.fecha_id = fechas.id
-INNER JOIN cambios ON cambios.partido_id = partidos.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND cambios.jugador_id = ".$id. " GROUP BY cambios.jugador_id";
-
-
-
-            $jugados = DB::select(DB::raw($sql4));
-
-
-            foreach ($jugados as $jugado){
-
-                $torneo->jugados += $jugado->jugados;
-            }
-
-            $sqlGoles = 'SELECT COUNT(gols.id) goles
+            foreach (DB::select('SELECT grupos.torneo_id, COUNT(gols.id) AS goles
 FROM gols
 INNER JOIN partidos ON gols.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
-
-WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND gols.jugador_id = '.$id;
-
-
-
-
-            $goleadores = DB::select(DB::raw($sqlGoles));
-
-            foreach ($goleadores as $gol){
-
-                $torneo->goles += $gol->goles;
+WHERE gols.tipo <> \'En contra\' AND gols.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id') as $f) {
+                $golesPor[(int) $f->torneo_id] = (int) $f->goles;
             }
 
-            $sqlTarjetas = 'SELECT count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas
+            foreach (DB::select('SELECT grupos.torneo_id,
+ count(case when tarjetas.tipo = \'Amarilla\' then 1 else NULL end) AS amarillas,
+ count(case when tarjetas.tipo = \'Roja\' or tarjetas.tipo = \'Doble Amarilla\' then 1 else NULL end) AS rojas
 FROM tarjetas
-
 INNER JOIN partidos ON tarjetas.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
-
-WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND tarjetas.jugador_id = '.$id;
-
-
-            $tarjetas = DB::select(DB::raw($sqlTarjetas));
-
-            foreach ($tarjetas as $tarjeta){
-                //Log::info('Tarjetas: '.$torneo->amarillas.' -> '.$tarjeta->amarillas);
-                $torneo->amarillas += $tarjeta->amarillas;
-                $torneo->rojas += $tarjeta->rojas;
+WHERE tarjetas.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id') as $f) {
+                $tarjetasPor[(int) $f->torneo_id] = $f;
             }
 
-            $sqlPenals = 'SELECT count( case when tipo=\'Atajó\' then 1 else NULL end) as  atajados
-, count( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados
+            foreach (DB::select('SELECT grupos.torneo_id,
+ count(case when penals.tipo = \'Atajó\' then 1 else NULL end) AS atajados,
+ count(case when penals.tipo = \'Errado\' or penals.tipo = \'Atajado\' then 1 else NULL end) AS errados
 FROM penals
-
 INNER JOIN partidos ON penals.partido_id = partidos.id
 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
-
-WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND penals.jugador_id = '.$id;
-
-
-            $penals = DB::select(DB::raw($sqlPenals));
-
-            foreach ($penals as $penal){
-                //Log::info('Penals: '.$torneo->amarillas.' -> '.$penal->amarillas);
-                $torneo->errados += $penal->errados;
-                $torneo->atajados += $penal->atajados;
+WHERE penals.jugador_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id') as $f) {
+                $penalsPor[(int) $f->torneo_id] = $f;
             }
 
-            $sqlArqueros = 'SELECT case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END AS recibidos,
-case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END AS invictas, personas.foto, "" escudo
+            // Arqueros: antes devolvia una fila por partido y PHP las sumaba.
+            // Se suma en SQL; el resultado es el mismo. Se conserva el join con
+            // personas del original aunque no se use ninguna columna suya, para
+            // no cambiar que filas entran.
+            foreach (DB::select('SELECT grupos.torneo_id,
+ SUM(case when alineacions.equipo_id = partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
+ SUM(case when alineacions.equipo_id = partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id = partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas
 FROM alineacions
 INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-INNER JOIN partidos ON alineacions.partido_id = partidos.id
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
+INNER JOIN personas ON jugadors.persona_id = personas.id'.$join.'
+WHERE alineacions.tipo = \'Titular\' AND jugadors.id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id') as $f) {
+                $arqPor[(int) $f->torneo_id] = $f;
+            }
+        }
 
-WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND jugadors.id = '.$id;
+        foreach ($torneosJugador as $torneo){
+            $tid = (int) $torneo->idTorneo;
 
-
-            $arqueros = DB::select(DB::raw($sqlArqueros));
-
-            foreach ($arqueros as $arquero){
-
-                $torneo->recibidos += $arquero->recibidos;
-                $torneo->invictas += $arquero->invictas;
+            // Titulo: estuvo alineado en el equipo que salio campeon del torneo.
+            if (isset($campeonDe[$tid]) && isset($alineadoEn[$tid][$campeonDe[$tid]])) {
+                if ($torneo->ambito == 'Nacional') {
+                    if ($torneo->tipo == 'Copa') {
+                        $titulosJugadorCopa++;
+                    } else {
+                        $titulosJugadorLiga++;
+                    }
+                } else {
+                    $titulosJugadorInternacional++;
+                }
             }
 
+            $escudosTorneo = isset($escudosPorTorneo[$tid]) ? $escudosPorTorneo[$tid] : [];
+            foreach ($escudosTorneo as $escudo) {
+                $strPosicion = '';
+                $eid = (int) $escudo->equipo_id;
+
+                if (isset($posPorTorneo[$tid][$eid]) && isset($alineadoEn[$tid][$eid])) {
+                    $posicion = $posPorTorneo[$tid][$eid];
+                    if ($posicion == 1) {
+                        $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón';
+                    } elseif ($posicion == 2) {
+                        $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón';
+                    } else {
+                        $strPosicion = $posicion;
+                    }
+                }
+
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
+            }
+
+            $torneo->jugados += (isset($titularPor[$tid]) ? $titularPor[$tid] : 0)
+                              + (isset($entraPor[$tid]) ? $entraPor[$tid] : 0);
+            $torneo->goles   += isset($golesPor[$tid]) ? $golesPor[$tid] : 0;
+
+            if (isset($tarjetasPor[$tid])) {
+                $torneo->amarillas += $tarjetasPor[$tid]->amarillas;
+                $torneo->rojas     += $tarjetasPor[$tid]->rojas;
+            }
+            if (isset($penalsPor[$tid])) {
+                $torneo->errados  += $penalsPor[$tid]->errados;
+                $torneo->atajados += $penalsPor[$tid]->atajados;
+            }
+            if (isset($arqPor[$tid])) {
+                $torneo->recibidos += $arqPor[$tid]->recibidos;
+                $torneo->invictas  += $arqPor[$tid]->invictas;
+            }
         }
 
         $estadisticasManuales = JugadorEstadisticaManual::where('jugador_id', $id)->get();
