@@ -285,96 +285,108 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
-        foreach ($torneosTecnico as $torneo){
 
+        // ── Todos los torneos de una sola vez ────────────────────────────────
+        // Mismo tratamiento que la ficha de jugador: lo que se pedia por cada
+        // torneo pasa a pedirse una vez para todos y se agrupa por torneo_id.
+        // El "grupos.id IN (todos los grupos del torneo)" era redundante con
+        // grupos.torneo_id, asi que las listas de grupos/fechas/partidos ya no
+        // hacen falta.
+        //
+        // El criterio de titulo NO cambia: el DT cuenta como campeon si estaba
+        // dirigiendo en el ULTIMO partido del equipo en ese torneo. Eso se
+        // resuelve trayendo los partidos ordenados por dia DESC y quedandose en
+        // PHP con el primero de cada par (torneo, equipo), que es exactamente lo
+        // que hacia el ->orderBy('dia','DESC')->first() de antes.
+        $idsTorneos = [];
+        foreach ($torneosTecnico as $t) {
+            $idsTorneos[] = (int) $t->idTorneo;
+        }
 
-            // GRUPOS
-            $arrgrupos = Grupo::where('torneo_id', $torneo->idTorneo)
-                ->pluck('id')
-                ->implode(',');
+        $posPorTorneo     = [];  // [torneo][equipo] = posicion
+        $campeonDe        = [];  // [torneo] = equipo_id del campeon
+        $escudosPorTorneo = [];  // [torneo] = filas de escudo
+        $ultimoDe         = [];  // [torneo][equipo] = partido_id del ultimo
+        $dirigio          = [];  // [partido_id][equipo] = true
+        $statsPor         = [];  // [torneo] = fila con jugados/ganados/...
 
-            // FECHAS
-            $arrfechas = Fecha::whereIn('grupo_id', explode(',', $arrgrupos))
-                ->pluck('id')
-                ->implode(',');
+        if (!empty($idsTorneos)) {
+            $inTorneos = implode(',', $idsTorneos);  // ya son enteros
 
-            $partidos = Partido::whereIn('fecha_id', explode(',', $arrfechas))->pluck('id')->toArray();
+            foreach (PosicionTorneo::whereIn('torneo_id', $idsTorneos)->get() as $pos) {
+                $tid = (int) $pos->torneo_id;
+                $posPorTorneo[$tid][(int) $pos->equipo_id] = $pos->posicion;
+                if ($pos->posicion == 1 && !isset($campeonDe[$tid])) {
+                    $campeonDe[$tid] = (int) $pos->equipo_id;
+                }
+            }
 
-            $arrpartidos = implode(',', $partidos);
+            // Escudos por torneo. MIN(dia) en vez de DISTINCT + ORDER BY dia:
+            // ordena por el primer partido dirigido en ese club y queda definido.
+            foreach (DB::select('SELECT grupos.torneo_id, equipos.id AS equipo_id, equipos.escudo, equipos.nombre, MIN(partidos.dia) AS primer_dia
+FROM equipos
+INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
+INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE partido_tecnicos.tecnico_id = '.$id.' AND grupos.torneo_id IN ('.$inTorneos.')
+GROUP BY grupos.torneo_id, equipos.id, equipos.escudo, equipos.nombre
+ORDER BY grupos.torneo_id, primer_dia ASC') as $f) {
+                $escudosPorTorneo[(int) $f->torneo_id][] = $f;
+            }
 
-            $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
+            // Equipos que hay que mirar: los campeones de cada torneo y los
+            // clubes que el DT dirigio ahi.
+            $equipos = [];
+            foreach ($campeonDe as $eq) {
+                $equipos[$eq] = true;
+            }
+            foreach ($escudosPorTorneo as $filas) {
+                foreach ($filas as $f) {
+                    $equipos[(int) $f->equipo_id] = true;
+                }
+            }
 
-            if(!empty($posicionTorneo)){
-                //if ($posicionTorneo->posicion == 1){
-                $ultimoPartido = Partido::whereIn('fecha_id', explode(',', $arrfechas))
-                    ->where(function ($query) use ($posicionTorneo) {
-                        $query->where('equipol_id', $posicionTorneo->equipo_id)
-                            ->orWhere('equipov_id', $posicionTorneo->equipo_id);
-                    })
-                    ->orderBy('dia', 'DESC')
-                    ->first();
+            if (!empty($equipos)) {
+                $inEquipos = implode(',', array_keys($equipos));  // enteros
 
-                $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$id)->first();
-                //print_r($partidoTecnico);
-                if(!empty($partidoTecnico)) {
-                    //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->ambito == 'Nacional') {
-                        if ($torneo->tipo == 'Copa') {
-                            $titulosTecnicoCopa++;
-                        } else {
-                            $titulosTecnicoLiga++;
+                foreach (DB::select('SELECT grupos.torneo_id, partidos.id AS partido_id, partidos.equipol_id, partidos.equipov_id
+FROM partidos
+INNER JOIN fechas ON partidos.fecha_id = fechas.id
+INNER JOIN grupos ON grupos.id = fechas.grupo_id
+WHERE grupos.torneo_id IN ('.$inTorneos.')
+  AND (partidos.equipol_id IN ('.$inEquipos.') OR partidos.equipov_id IN ('.$inEquipos.'))
+ORDER BY partidos.dia DESC') as $f) {
+                    $tid = (int) $f->torneo_id;
+                    foreach ([(int) $f->equipol_id, (int) $f->equipov_id] as $eq) {
+                        // El primero que aparece es el mas reciente: se queda ese.
+                        if (isset($equipos[$eq]) && !isset($ultimoDe[$tid][$eq])) {
+                            $ultimoDe[$tid][$eq] = (int) $f->partido_id;
                         }
-                    }else {
-                        $titulosTecnicoInternacional++;
                     }
                 }
-                //}
-            }
 
-
-
-
-            $sqlEscudos='SELECT DISTINCT escudo, equipo_id, equipos.nombre
-                FROM equipos
-                INNER JOIN partido_tecnicos ON equipos.id = partido_tecnicos.equipo_id
-                INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
-                WHERE partido_tecnicos.tecnico_id = '.$id.' AND partido_tecnicos.partido_id IN ('.$arrpartidos.') ORDER BY partidos.dia ASC';
-
-
-
-            $escudos = DB::select(DB::raw($sqlEscudos));
-
-
-            foreach ($escudos as $escudo){
-                $strPosicion='';
-                $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('equipo_id', '=',$escudo->equipo_id)->first();
-
-                if(!empty($posicionTorneo)){
-                    //if ($posicionTorneo->posicion == 1){
-                    $ultimoPartido = Partido::whereIn('fecha_id', explode(',', $arrfechas))
-                        ->where(function ($query) use ($posicionTorneo) {
-                            $query->where('equipol_id', $posicionTorneo->equipo_id)
-                                ->orWhere('equipov_id', $posicionTorneo->equipo_id);
-                        })
-                        ->orderBy('dia', 'DESC')
-                        ->first();
-
-                    $partidoTecnico = PartidoTecnico::where('partido_id','=',"$ultimoPartido->id")->where('equipo_id','=',$posicionTorneo->equipo_id)->where('tecnico_id','=',$id)->first();
-
-                    if(!empty($partidoTecnico)) {
-                        $strPosicion = (!empty($posicionTorneo)) ? (
-                        ($posicionTorneo->posicion == 1) ?
-                            '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                            (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
-                        ) : '';
+                $idsUltimos = [];
+                foreach ($ultimoDe as $porEquipo) {
+                    foreach ($porEquipo as $pid) {
+                        $idsUltimos[$pid] = true;
                     }
-
                 }
 
-                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
+                if (!empty($idsUltimos)) {
+                    $filas = PartidoTecnico::where('tecnico_id', $id)
+                        ->whereIn('partido_id', array_keys($idsUltimos))
+                        ->get();
+                    foreach ($filas as $pt) {
+                        $dirigio[(int) $pt->partido_id][(int) $pt->equipo_id] = true;
+                    }
+                }
             }
 
-            $sqlJugados="SELECT count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
+            // Estadistica por torneo. Es la consulta de antes con torneo_id
+            // agregado al SELECT y al GROUP BY; el DISTINCT interno se mantiene
+            // igual (torneo_id ya queda determinado por fecha_id).
+            $sqlStats = "SELECT torneo_id, count(*)  as jugados, count(case when golesl > golesv then 1 end) ganados,
                        count(case when golesv > golesl then 1 end) perdidos,
                        count(case when golesl = golesv then 1 end) empatados,
                        sum(golesl) golesl,
@@ -392,7 +404,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                       2
                     ), '%') porcentaje
                     from (
-                       select  DISTINCT tecnicos.id tecnico_id, golesl, golesv, fechas.id fecha_id
+                       select  DISTINCT grupos.torneo_id, tecnicos.id tecnico_id, golesl, golesv, fechas.id fecha_id
                          from partidos
                          INNER JOIN equipos ON partidos.equipol_id = equipos.id
                          INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
@@ -400,9 +412,9 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                          INNER JOIN grupos ON fechas.grupo_id = grupos.id
                          INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
                          INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
-                         WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
+                         WHERE golesl is not null AND golesv is not null AND grupos.torneo_id IN (".$inTorneos.") AND partido_tecnicos.tecnico_id = ".$id."
                      union all
-                       select DISTINCT tecnicos.id tecnico_id, golesv, golesl, fechas.id fecha_id
+                       select DISTINCT grupos.torneo_id, tecnicos.id tecnico_id, golesv, golesl, fechas.id fecha_id
                          from partidos
                          INNER JOIN equipos ON partidos.equipov_id = equipos.id
                          INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
@@ -410,27 +422,69 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                          INNER JOIN grupos ON fechas.grupo_id = grupos.id
                          INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
                          INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
-                         WHERE golesl is not null AND golesv is not null AND grupos.torneo_id=".$torneo->idTorneo." AND grupos.id IN (".$arrgrupos.") AND partido_tecnicos.tecnico_id = ".$id."
+                         WHERE golesl is not null AND golesv is not null AND grupos.torneo_id IN (".$inTorneos.") AND partido_tecnicos.tecnico_id = ".$id."
                 ) a
-                group by tecnico_id
+                group by torneo_id
                 ";
+            foreach (DB::select($sqlStats) as $f) {
+                $statsPor[(int) $f->torneo_id] = $f;
+            }
+        }
 
-            //echo $sql3;
+        foreach ($torneosTecnico as $torneo){
+            $tid = (int) $torneo->idTorneo;
 
-            $jugados = DB::select(DB::raw($sqlJugados));
+            // Titulo: dirigia al campeon en el ultimo partido de ese torneo.
+            if (isset($campeonDe[$tid])) {
+                $eqCampeon = $campeonDe[$tid];
+                $ultimo    = isset($ultimoDe[$tid][$eqCampeon]) ? $ultimoDe[$tid][$eqCampeon] : null;
 
+                if ($ultimo !== null && isset($dirigio[$ultimo][$eqCampeon])) {
+                    if ($torneo->ambito == 'Nacional') {
+                        if ($torneo->tipo == 'Copa') {
+                            $titulosTecnicoCopa++;
+                        } else {
+                            $titulosTecnicoLiga++;
+                        }
+                    } else {
+                        $titulosTecnicoInternacional++;
+                    }
+                }
+            }
 
-            foreach ($jugados as $jugado){
+            $escudosTorneo = isset($escudosPorTorneo[$tid]) ? $escudosPorTorneo[$tid] : [];
+            foreach ($escudosTorneo as $escudo) {
+                $strPosicion = '';
+                $eid = (int) $escudo->equipo_id;
 
-                $torneo->jugados = $jugado->jugados;
-                $torneo->ganados = $jugado->ganados;
-                $torneo->empatados = $jugado->empatados;
-                $torneo->perdidos = $jugado->perdidos;
-                $torneo->favor = $jugado->golesl;
-                $torneo->contra = $jugado->golesv;
-                $torneo->puntaje = $jugado->puntaje;
-                $torneo->porcentaje = $jugado->porcentaje;
+                if (isset($posPorTorneo[$tid][$eid])) {
+                    $ultimo = isset($ultimoDe[$tid][$eid]) ? $ultimoDe[$tid][$eid] : null;
 
+                    if ($ultimo !== null && isset($dirigio[$ultimo][$eid])) {
+                        $posicion = $posPorTorneo[$tid][$eid];
+                        if ($posicion == 1) {
+                            $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón';
+                        } elseif ($posicion == 2) {
+                            $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón';
+                        } else {
+                            $strPosicion = $posicion;
+                        }
+                    }
+                }
+
+                $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
+            }
+
+            if (isset($statsPor[$tid])) {
+                $s = $statsPor[$tid];
+                $torneo->jugados    = $s->jugados;
+                $torneo->ganados    = $s->ganados;
+                $torneo->empatados  = $s->empatados;
+                $torneo->perdidos   = $s->perdidos;
+                $torneo->favor      = $s->golesl;
+                $torneo->contra     = $s->golesv;
+                $torneo->puntaje    = $s->puntaje;
+                $torneo->porcentaje = $s->porcentaje;
             }
         }
 
