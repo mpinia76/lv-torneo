@@ -489,7 +489,7 @@ class TorneoController extends Controller
      */
     public function ver(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
 
         $torneo=Torneo::findOrFail($torneo_id);
         $request->session()->put('nombreTorneo', $torneo->nombre.' '.$torneo->year);
@@ -500,7 +500,7 @@ class TorneoController extends Controller
 
     public function promedios(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
 
@@ -581,7 +581,7 @@ order by promedio desc, puntaje desc, equipo ASC';
 
     public function promediosPublic(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
 
@@ -717,7 +717,7 @@ order by promedio desc, puntaje desc, equipo ASC';
 
     public function acumulado(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
 
@@ -1171,7 +1171,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
     public function historiales(Request $request)
     {
-        $equipo1= $request->query('equipo1');
+        $equipo1 = (int) $request->query('equipo1');
 
         if (!empty($equipo1)){
             $e1=Equipo::findOrFail($equipo1);
@@ -1180,7 +1180,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $e1 = new Equipo();
         }
 
-        $equipo2= $request->query('equipo2');
+        $equipo2 = (int) $request->query('equipo2');
 
         if (!empty($equipo2)){
             $e2=Equipo::findOrFail($equipo2);
@@ -1282,7 +1282,11 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $nombreFiltro  = '';
         $nombreFiltro2 = '';
         if ($nombre) {
-            $nombreEscaped = addslashes($nombre);
+            // addslashes no es el escapado del driver. quote() si lo es; devuelve
+            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
+            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
+            // se comeria la barra de un valor terminado en comilla escapada).
+            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
             $nombreFiltro  = " AND (personas.apellido LIKE '%$nombreEscaped%' OR personas.nombre LIKE '%$nombreEscaped%') ";
             $nombreFiltro2 = " AND (P2.apellido LIKE '%$nombreEscaped%' OR P2.nombre LIKE '%$nombreEscaped%') ";
         }
@@ -1666,7 +1670,11 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $nombreFiltro  = '';
         $nombreFiltro2 = '';
         if ($nombre) {
-            $nombreEscaped = addslashes($nombre);
+            // addslashes no es el escapado del driver. quote() si lo es; devuelve
+            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
+            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
+            // se comeria la barra de un valor terminado en comilla escapada).
+            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
             $nombreFiltro  = " AND (personas.apellido LIKE '%$nombreEscaped%' OR personas.nombre LIKE '%$nombreEscaped%') ";
             $nombreFiltro2 = " AND (P2.apellido LIKE '%$nombreEscaped%' OR P2.nombre LIKE '%$nombreEscaped%') ";
         }
@@ -2018,7 +2026,11 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         $nombreFiltro = '';
         if ($nombre) {
-            $nombreEscaped = addslashes($nombre);
+            // addslashes no es el escapado del driver. quote() si lo es; devuelve
+            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
+            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
+            // se comeria la barra de un valor terminado en comilla escapada).
+            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
             $nombreFiltro  = " AND (equipos.nombre LIKE '%$nombreEscaped%') ";
         }
 
@@ -2078,8 +2090,8 @@ from (
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
         INNER JOIN torneos ON grupos.torneo_id = torneos.id
         WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .= ($tipo) ? ' AND torneos.tipo = \''.$tipo.'\'' : '';
-        $sql .= ($ambito) ? ' AND torneos.ambito = \''.$ambito.'\'' : '';
+        $sql .= ($tipo) ? ' AND torneos.tipo = '.DB::connection()->getPdo()->quote($tipo) : '';
+        $sql .= ($ambito) ? ' AND torneos.ambito = '.DB::connection()->getPdo()->quote($ambito) : '';
         $sql .= ' union all
        select DISTINCT equipos.nombre equipo, equipos.pais pais, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id, 0 as puntos
 		 from partidos
@@ -2089,8 +2101,8 @@ from (
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		 INNER JOIN torneos ON grupos.torneo_id = torneos.id
 		 WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .= ($tipo) ? ' AND torneos.tipo = \''.$tipo.'\'' : '';
-        $sql .= ($ambito) ? ' AND torneos.ambito = \''.$ambito.'\'' : '';
+        $sql .= ($tipo) ? ' AND torneos.tipo = '.DB::connection()->getPdo()->quote($tipo) : '';
+        $sql .= ($ambito) ? ' AND torneos.ambito = '.DB::connection()->getPdo()->quote($ambito) : '';
         $sql .= ' UNION ALL
     SELECT
         equipos.nombre AS equipo,
@@ -2105,8 +2117,8 @@ from (
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     INNER JOIN torneos ON incidencias.torneo_id = torneos.id
     WHERE 1=1'.$nombreFiltro;
-        $sql .= ($tipo) ? ' AND torneos.tipo = \''.$tipo.'\'' : '';
-        $sql .= ($ambito) ? ' AND torneos.ambito = \''.$ambito.'\'' : '';
+        $sql .= ($tipo) ? ' AND torneos.tipo = '.DB::connection()->getPdo()->quote($tipo) : '';
+        $sql .= ($ambito) ? ' AND torneos.ambito = '.DB::connection()->getPdo()->quote($ambito) : '';
         $sql .= ' GROUP BY equipos.nombre, equipos.pais, equipos.escudo, equipos.id, incidencias.puntos';
         $sql .= ') a WHERE 1=1 ';
 
@@ -2331,7 +2343,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
     public function estadisticasTorneo(Request $request)
     {
-        $torneo_id = $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
 
         // Consulta general para las estadísticas básicas
         $estadisticas = DB::select(DB::raw("
@@ -4046,7 +4058,11 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         $nombreFiltro  = '';
         $nombreFiltro2 = '';
         if ($nombre) {
-            $nombreEscaped = addslashes($nombre);
+            // addslashes no es el escapado del driver. quote() si lo es; devuelve
+            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
+            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
+            // se comeria la barra de un valor terminado en comilla escapada).
+            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
             $nombreFiltro  = " AND (personas.apellido LIKE '%$nombreEscaped%' OR personas.nombre LIKE '%$nombreEscaped%') ";
             $nombreFiltro2 = " AND (P2.apellido LIKE '%$nombreEscaped%' OR P2.nombre LIKE '%$nombreEscaped%') ";
         }
@@ -4419,7 +4435,11 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         $nombreFiltro  = '';
         $nombreFiltro2 = '';
         if ($nombre) {
-            $nombreEscaped = addslashes($nombre);
+            // addslashes no es el escapado del driver. quote() si lo es; devuelve
+            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
+            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
+            // se comeria la barra de un valor terminado en comilla escapada).
+            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
             $nombreFiltro  = " AND (personas.apellido LIKE '%$nombreEscaped%' OR personas.nombre LIKE '%$nombreEscaped%') ";
             $nombreFiltro2 = " AND (P2.apellido LIKE '%$nombreEscaped%' OR P2.nombre LIKE '%$nombreEscaped%') ";
         }
@@ -4913,7 +4933,7 @@ group by jugador_id, jugador, foto, nacionalidad';
 
 
         $resto=0;
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
@@ -5243,7 +5263,11 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
         }
 
         if ($nombre) {
-            $nombreEscaped = addslashes($nombre);
+            // addslashes no es el escapado del driver. quote() si lo es; devuelve
+            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
+            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
+            // se comeria la barra de un valor terminado en comilla escapada).
+            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
             $sql .= " AND nombre LIKE '%$nombreEscaped%' ";
         }
 
@@ -5282,13 +5306,18 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
     public function plantillas(Request $request)
     {
 
-        $order= ($request->query('order'))?$request->query('order'):'dorsal';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'ASC';
-        $equipo1= $request->query('equipo1');
+        // Lista blanca: las claves son las del array $campos de la vista
+        // torneos/plantillas (las columnas clickeables del encabezado).
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['dorsal','jugador','nacimiento','tipoJugador','jugados','Goles','amarillas','rojas','recibidos','invictas'], true)
+            ? $orderRaw
+            : 'dorsal';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'DESC' ? 'DESC' : 'ASC';
+        $equipo1 = (int) $request->query('equipo1');
 
 
 
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
 
@@ -5523,11 +5552,11 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
     public function dorsal(Request $request)
     {
 
-        $equipo1= $request->query('equipo1');
+        $equipo1 = (int) $request->query('equipo1');
 
 
 
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
 
@@ -5590,11 +5619,11 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
         // Verifica si solo se está seleccionando el equipo
         if ($request->has('equipo1') && !$request->filled('jugador_id')) {
 
-            $equipo1= $request->get('equipo1');
+            $equipo1 = (int) $request->get('equipo1');
 
 
 
-            $torneo_id= $request->get('torneoId');
+            $torneo_id = (int) $request->get('torneoId');
 
             $torneo=Torneo::findOrFail($torneo_id);
 

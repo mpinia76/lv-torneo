@@ -368,7 +368,7 @@ class JugadorController extends Controller
      */
     public function ver(Request $request)
     {
-        $id= $request->query('jugadorId');
+        $id = (int) $request->query('jugadorId');
         $jugador=Jugador::findOrFail($id);
 
 
@@ -957,10 +957,10 @@ group by tecnico_id
 
     public function jugados(Request $request)
     {
-        $id = $request->query('jugadorId');
+        $id = (int) $request->query('jugadorId');
         $jugador = Jugador::findOrFail($id);
 
-        $idTorneo = $request->query('torneoId') ?? '';
+        $idTorneo = (int) $request->query('torneoId');
         $torneo = $idTorneo ? Torneo::findOrFail($idTorneo) : null;
 
         $tipo = $request->query('tipo') ?? '';
@@ -1086,10 +1086,10 @@ group by tecnico_id
 
     public function goles(Request $request)
     {
-        $id = $request->query('jugadorId');
+        $id = (int) $request->query('jugadorId');
         $jugador = Jugador::findOrFail($id);
 
-        $idTorneo = $request->query('torneoId') ?? '';
+        $idTorneo = (int) $request->query('torneoId');
         $torneo = $idTorneo ? Torneo::findOrFail($idTorneo) : null;
 
         $tipo = $request->query('tipo') ?? '';
@@ -1232,10 +1232,10 @@ group by tecnico_id
 
     public function tarjetas(Request $request)
     {
-        $id = $request->query('jugadorId');
+        $id = (int) $request->query('jugadorId');
         $jugador = Jugador::findOrFail($id);
 
-        $idTorneo = $request->query('torneoId') ?? '';
+        $idTorneo = (int) $request->query('torneoId');
         $torneo = $idTorneo ? Torneo::findOrFail($idTorneo) : null;
 
         $tipo = $request->query('tipo') ?? '';
@@ -1356,10 +1356,10 @@ group by tecnico_id
 
     public function penals(Request $request)
     {
-        $id = $request->query('jugadorId');
+        $id = (int) $request->query('jugadorId');
         $jugador = Jugador::findOrFail($id);
 
-        $idTorneo = $request->query('torneoId') ?? '';
+        $idTorneo = (int) $request->query('torneoId');
         $torneo = $idTorneo ? Torneo::findOrFail($idTorneo) : null;
 
         $tipo = $request->query('tipo') ?? '';
@@ -2625,7 +2625,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
     public function titulos(Request $request)
     {
-        $id = $request->query('jugadorId');
+        $id = (int) $request->query('jugadorId');
         $jugador = Jugador::findOrFail($id);
 
         // Títulos como jugador

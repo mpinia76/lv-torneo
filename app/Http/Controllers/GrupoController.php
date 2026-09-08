@@ -149,7 +149,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
     public function posicionesPublic(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
@@ -272,7 +272,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
 
     public function goleadores(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
@@ -364,11 +364,17 @@ WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN (
 
     public function goleadoresPublic(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
-        $order= ($request->query('order'))?$request->query('order'):'goles';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        // El campo de orden va derecho al ORDER BY, que no admite bindings: la
+        // unica defensa posible es lista blanca. Las claves son las mismas que
+        // ofrece la vista grupos/goleadoresPublic (las columnas clickeables).
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['goles', 'Jugada', 'Cabeza', 'Penal', 'Tiro_Libre', 'Olimpico', 'jugados'], true)
+            ? $orderRaw
+            : 'goles';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
         $arrgrupos='';
@@ -405,7 +411,13 @@ WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN (
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE '%$nombre%' OR personas.nombre LIKE '%$nombre%') ";
+            // $nombre viene de la URL y este fragmento se pega DENTRO de un literal
+            // del SQL, a veces mas de una vez en la misma consulta. Un binding con
+            // nombre no sirve aca: PDO sin emulacion no permite repetir el mismo
+            // placeholder. Se escapa con el quote() del driver, que ya devuelve el
+            // valor entre comillas.
+            $nombreLike = DB::connection()->getPdo()->quote('%'.$nombre.'%');
+            $nombreFiltro = " AND (personas.apellido LIKE $nombreLike OR personas.nombre LIKE $nombreLike) ";
 
         }
         $sql = 'SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, COUNT(gols.id) goles, count( case when tipo=\'Jugada\' then 1 else NULL end) as  Jugada, "" as escudo, personas.foto, personas.nacionalidad, "0" as jugados
@@ -509,7 +521,7 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
 
     public function tarjetas(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
@@ -547,7 +559,13 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE '%$nombre%' OR personas.nombre LIKE '%$nombre%') ";
+            // $nombre viene de la URL y este fragmento se pega DENTRO de un literal
+            // del SQL, a veces mas de una vez en la misma consulta. Un binding con
+            // nombre no sirve aca: PDO sin emulacion no permite repetir el mismo
+            // placeholder. Se escapa con el quote() del driver, que ya devuelve el
+            // valor entre comillas.
+            $nombreLike = DB::connection()->getPdo()->quote('%'.$nombre.'%');
+            $nombreFiltro = " AND (personas.apellido LIKE $nombreLike OR personas.nombre LIKE $nombreLike) ";
 
         }
         $tarjetas = DB::select(DB::raw('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
@@ -607,10 +625,16 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
     public function tarjetasPublic(Request $request)
     {
 
-        $order= ($request->query('order'))?$request->query('order'):'rojas';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        // El campo de orden va derecho al ORDER BY, que no admite bindings: la
+        // unica defensa posible es lista blanca. Las claves son las mismas que
+        // ofrece la vista grupos/tarjetasPublic (las columnas clickeables).
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['amarillas', 'rojas', 'jugados', 'prom_amarillas', 'prom_rojas'], true)
+            ? $orderRaw
+            : 'rojas';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
 
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
@@ -648,7 +672,13 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE '%$nombre%' OR personas.nombre LIKE '%$nombre%') ";
+            // $nombre viene de la URL y este fragmento se pega DENTRO de un literal
+            // del SQL, a veces mas de una vez en la misma consulta. Un binding con
+            // nombre no sirve aca: PDO sin emulacion no permite repetir el mismo
+            // placeholder. Se escapa con el quote() del driver, que ya devuelve el
+            // valor entre comillas.
+            $nombreLike = DB::connection()->getPdo()->quote('%'.$nombre.'%');
+            $nombreFiltro = " AND (personas.apellido LIKE $nombreLike OR personas.nombre LIKE $nombreLike) ";
 
         }
 
@@ -741,10 +771,16 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
 
     public function arqueros(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
-        $order= ($request->query('order'))?$request->query('order'):'jugados';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        // El campo de orden va derecho al ORDER BY, que no admite bindings: la
+        // unica defensa posible es lista blanca. Las claves son las mismas que
+        // ofrece la vista grupos/arqueros (las columnas clickeables).
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['jugados', 'recibidos', 'invictas'], true)
+            ? $orderRaw
+            : 'jugados';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
         $arrgrupos='';
         foreach ($grupos as $grupo){
@@ -780,7 +816,13 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE '%$nombre%' OR personas.nombre LIKE '%$nombre%') ";
+            // $nombre viene de la URL y este fragmento se pega DENTRO de un literal
+            // del SQL, a veces mas de una vez en la misma consulta. Un binding con
+            // nombre no sirve aca: PDO sin emulacion no permite repetir el mismo
+            // placeholder. Se escapa con el quote() del driver, que ya devuelve el
+            // valor entre comillas.
+            $nombreLike = DB::connection()->getPdo()->quote('%'.$nombre.'%');
+            $nombreFiltro = " AND (personas.apellido LIKE $nombreLike OR personas.nombre LIKE $nombreLike) ";
 
         }
 
@@ -842,7 +884,7 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
 
     public function metodo(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
@@ -856,7 +898,11 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
             $arrgrupos .=$grupo->id.',';
         }
 
-        $fechaNumero= $request->query('fechaNumero');
+        $fechaNumero = $request->query('fechaNumero');
+        // Entra a cuatro consultas dentro de un literal. No se castea a int
+        // porque fechas.numero puede venir como '01' o con letras: se acota a
+        // caracteres que no pueden cerrar la comilla ni escapar nada.
+        $fechaNumero = preg_replace('/[^0-9A-Za-z ]/', '', (string) $fechaNumero);
 
         if (empty($fechaNumero)){
             //$fechaNumero = '01';
@@ -969,11 +1015,17 @@ AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
 
     public function jugadores(Request $request)
     {
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
-        $order= ($request->query('order'))?$request->query('order'):'jugados';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        // El campo de orden va derecho al ORDER BY, que no admite bindings: la
+        // unica defensa posible es lista blanca. Las claves son las mismas que
+        // ofrece la vista grupos/jugadores (las columnas clickeables).
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['jugados', 'Goles', 'amarillas', 'rojas', 'errados', 'atajos', 'recibidos', 'invictas'], true)
+            ? $orderRaw
+            : 'jugados';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
 
         $grupos = Grupo::where('torneo_id', '=',$torneo_id)->get();
         $arrgrupos='';
@@ -1011,7 +1063,13 @@ AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.name LIKE '%$nombre%') ";
+            // $nombre viene de la URL y este fragmento se pega DENTRO de un literal
+            // del SQL, a veces mas de una vez en la misma consulta. Un binding con
+            // nombre no sirve aca: PDO sin emulacion no permite repetir el mismo
+            // placeholder. Se escapa con el quote() del driver, que ya devuelve el
+            // valor entre comillas.
+            $nombreLike = DB::connection()->getPdo()->quote('%'.$nombre.'%');
+            $nombreFiltro = " AND (personas.name LIKE $nombreLike) ";
 
         }
 
@@ -1160,11 +1218,17 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id.' AND alineacions.partido_
     public function tecnicos(Request $request)
     {
 
-        $torneo_id= $request->query('torneoId');
+        $torneo_id = (int) $request->query('torneoId');
         $torneo=Torneo::findOrFail($torneo_id);
 
-        $order= ($request->query('order'))?$request->query('order'):'puntaje';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        // El campo de orden va derecho al ORDER BY, que no admite bindings: la
+        // unica defensa posible es lista blanca. Las claves son las mismas que
+        // ofrece la vista grupos/tecnicos (las columnas clickeables).
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['puntaje', 'Jugados', 'Ganados', 'Empatados', 'Perdidos', 'golesl', 'golesv', 'diferencia', 'prom'], true)
+            ? $orderRaw
+            : 'puntaje';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
 
         if ($request->has('buscarpor')){
             $nombre = $request->get('buscarpor');
@@ -1179,7 +1243,13 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id.' AND alineacions.partido_
         $nombreFiltro='';
 
         if ($nombre) {
-            $nombreFiltro = " AND (personas.apellido LIKE '%$nombre%' OR personas.nombre LIKE '%$nombre%') ";
+            // $nombre viene de la URL y este fragmento se pega DENTRO de un literal
+            // del SQL, a veces mas de una vez en la misma consulta. Un binding con
+            // nombre no sirve aca: PDO sin emulacion no permite repetir el mismo
+            // placeholder. Se escapa con el quote() del driver, que ya devuelve el
+            // valor entre comillas.
+            $nombreLike = DB::connection()->getPdo()->quote('%'.$nombre.'%');
+            $nombreFiltro = " AND (personas.apellido LIKE $nombreLike OR personas.nombre LIKE $nombreLike) ";
 
         }
 

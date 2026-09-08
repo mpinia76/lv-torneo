@@ -266,7 +266,7 @@ class TecnicoController extends Controller
      */
     public function ver(Request $request)
     {
-        $id= $request->query('tecnicoId');
+        $id = (int) $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
         $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
@@ -820,10 +820,10 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
 
     public function jugados(Request $request)
     {
-        $id= $request->query('tecnicoId');
+        $id = (int) $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
-        $idTorneo = ($request->query('torneoId'))?$request->query('torneoId'):'';
+        $idTorneo = (int) $request->query('torneoId');
         $torneo='';
         if ($idTorneo){
             $torneo=Torneo::findOrFail($idTorneo);

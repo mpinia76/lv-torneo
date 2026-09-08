@@ -237,7 +237,7 @@ class EquipoController extends Controller
      */
     public function ver(Request $request)
     {
-        $id= $request->query('equipoId');
+        $id = (int) $request->query('equipoId');
         $equipo=Equipo::findOrFail($id);
 
 
@@ -505,8 +505,14 @@ class EquipoController extends Controller
         set_time_limit(0);
         //dd($request);
 
-        $order= ($request->query('order'))?$request->query('order'):'jugados';
-        $tipoOrder= ($request->query('tipoOrder'))?$request->query('tipoOrder'):'DESC';
+        // La vista equipos/ver no ofrece links de orden, asi que esto solo se
+        // alcanza escribiendo la URL a mano. Lista blanca igual: son los alias
+        // que devuelve el SELECT de abajo.
+        $orderRaw = (string) $request->query('order', '');
+        $order = in_array($orderRaw, ['jugados','goles','amarillas','rojas','recibidos','invictas','titulos','errados','atajos','jugador'], true)
+            ? $orderRaw
+            : 'jugados';
+        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
 
 
 
@@ -752,10 +758,10 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
     public function jugados(Request $request)
     {
-        $id= $request->query('equipoId');
+        $id = (int) $request->query('equipoId');
         $equipo=Equipo::findOrFail($id);
 
-        $idTorneo = ($request->query('torneoId'))?$request->query('torneoId'):'';
+        $idTorneo = (int) $request->query('torneoId');
         $torneo='';
         if ($idTorneo){
             $torneo=Torneo::findOrFail($idTorneo);

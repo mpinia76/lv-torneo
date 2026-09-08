@@ -10,3 +10,9 @@ Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
+.env.bak
+/public/pm_diag.php
+vendor.zip
+/public/images.zip
+/.idea
+/.settings
