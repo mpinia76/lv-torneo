@@ -1,28 +1,78 @@
-# Raiz del proyecto Laravel.
+# BEGIN cPanel-generated php ini directives, do not edit
+# Manual editing of this file may result in unexpected behavior.
+# To make changes to this file, use the cPanel MultiPHP INI Editor (Home >> Software >> MultiPHP INI Editor)
+# For more information, read our documentation (https://go.cpanel.net/EA4ModifyINI)
+<IfModule php7_module>
+   php_flag display_errors Off
+   php_value max_execution_time 120
+   php_value max_input_time 120
+   php_value max_input_vars 1000
+   php_value memory_limit 256M
+   php_value post_max_size 16M
+   php_value session.gc_maxlifetime 1440
+   php_value session.save_path "/var/cpanel/php/sessions/ea-php73"
+   php_value upload_max_filesize 16M
+   php_flag zlib.output_compression Off
+</IfModule>
+<IfModule lsapi_module>
+   php_flag display_errors Off
+   php_value max_execution_time 120
+   php_value max_input_time 120
+   php_value max_input_vars 1000
+   php_value memory_limit 256M
+   php_value post_max_size 16M
+   php_value session.gc_maxlifetime 1440
+   php_value session.save_path "/var/cpanel/php/sessions/ea-php73"
+   php_value upload_max_filesize 16M
+   php_flag zlib.output_compression Off
+</IfModule>
+# END cPanel-generated php ini directives, do not edit
+
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the "ea-php73" package as the default "PHP" programming language.
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php73 .php .php7 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Reglas de seguridad (agregadas 08-sep-2026). Todo lo de arriba lo genera
+# cPanel: NO editarlo a mano, se toca desde MultiPHP INI Editor. Si alguna
+# vez cPanel reescribe su bloque, el pull de git va a dar conflicto en este
+# archivo: hay que quedarse con el bloque nuevo de cPanel y conservar esto.
 #
-# En el hosting actual el sitio se sirve como /~torneospinia/public/, o sea que
-# el docroot es ESTA carpeta y no public/. Sin estas reglas, un GET a
-# /~torneospinia/.env devuelve las credenciales de la base y la APP_KEY, y
+# Por que hace falta: el docroot es /home/torneospinia/public_html, que es
+# la raiz de Laravel y no public/. Sin estas reglas, /~torneospinia/.env
+# devuelve las credenciales de la base y la APP_KEY, y
 # /storage/logs/laravel.log entrega los stack traces enteros.
 #
-# Lo ideal es apuntar el docroot del dominio directo a public/ y borrar este
-# archivo. Mientras eso no pase, esto tapa el agujero.
+# Arreglo de fondo: apuntar el docroot del dominio directo a public/.
+# ─────────────────────────────────────────────────────────────────────────
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Excepcion: AutoSSL / Let's Encrypt valida el dominio dejando un archivo
+    # en .well-known/acme-challenge. Si se bloquea, no hay certificado HTTPS.
+    RewriteRule ^\.well-known/ - [L]
+
     # Carpetas internas de la app: nada de esto se sirve por HTTP.
     RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|tools|scripts|vendor|node_modules)(/|$) - [F,L]
 
-    # Archivos sueltos de la raiz (.env, .env.bak, dumps, backups, zips, manifiestos).
+    # Archivos ocultos de la raiz (.env, .env.bak, .git, .idea).
     RewriteRule ^\. - [F,L]
+
+    # Ejecutables y manifiestos que no tienen por que ser publicos.
     RewriteRule ^(artisan|server\.php|webpack\.mix\.js|phpunit\.xml|railway\.json)$ - [F,L]
-    RewriteRule \.(env|bak|sql|zip|log|lock|md|dist|ini|yml|yaml)$ - [F,L]
-    RewriteRule ^(composer|package|package-lock|composer-lock)\.(json|lock)$ - [F,L]
+    RewriteRule ^(composer|package|package-lock)\.(json|lock)$ - [F,L]
+
+    # Dumps, backups y logs sueltos, esten donde esten.
+    RewriteRule \.(env|bak|sql|log|lock|dist)$ - [F,L]
 </IfModule>
 
-# Segunda linea de defensa por si mod_rewrite no esta habilitado.
-<FilesMatch "^\.|\.(env|bak|sql|log|lock)$">
+# Segunda linea de defensa por si mod_rewrite no estuviera habilitado.
+<FilesMatch "^\.env|\.(env|bak|sql|log|lock)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
