@@ -281,10 +281,15 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
 });
 
 
-Route::get('/', function () {
-    return view('/portada');
-});
-Route::get('portada', 'PortadaController@index')->name('portada');
+// La raiz sirve el fixture directamente. Antes renderizaba portada.blade.php,
+// que era solo un <script>window.location = '/fixture'</script>: la URL mas
+// importante del sitio devolvia una pagina vacia (mala para buscadores, y un
+// parpadeo en blanco para el visitante).
+Route::get('/', 'FechaController@fixture')->name('home');
+
+// Se conserva la URL vieja para los favoritos, pero ahora redirige de verdad,
+// del lado del servidor, en vez de por JavaScript.
+Route::redirect('portada', '/')->name('portada');
 
 Route::get('posiciones', 'GrupoController@posiciones')->name('grupos.posiciones');
 Route::get('tablaGoles', 'GrupoController@goleadores')->name('grupos.goleadores');
