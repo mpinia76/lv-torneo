@@ -59,12 +59,15 @@
     botón carga la incidencia con equipo y puntos vacíos (así no se publica en
     el front ni toca las posiciones) y el partido sale de todos los controles.
 
-    Sale solo en los chequeos que ya ofrecen "Incidencia": marcar una excepción
-    tiene sentido donde el error puede venir del origen, no en un gol repetido.
+    Sale solo en los chequeos marcados con `sin_datos` en `definiciones()`:
+    marcar la excepción POR FALTA DE DATOS tiene sentido donde el error puede
+    venir del origen, no en un gol repetido (ahí lo que sobra es una fila
+    nuestra, y TM no tiene nada que ver). El link gris "Incidencia" sí está en
+    todos los controles: ese abre el formulario y lo escribe una persona.
 
     Es un POST, no un link: la pantalla no escribe sola, igual que los penales.
 --}}
-@if(in_array('incidencia', $def['acciones']))
+@if(!empty($def['sin_datos']))
     @php
         // El texto del botón y el de la incidencia dependen del control que se
         // está mirando: los arma `Controles::motivoSinDatos()` y los manda el

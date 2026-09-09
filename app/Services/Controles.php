@@ -84,6 +84,7 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'titulares',
                     'acciones' => ['alineaciones', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'alineacionesFaltan',
                 ],
                 'alineaciones.sin_jugadores' => [
@@ -92,6 +93,7 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'titulares',
                     'acciones' => ['alineaciones', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'alineacionesSinJugadores',
                 ],
             ],
@@ -102,6 +104,7 @@ class Controles
                     'ayuda'    => 'El goleador no figura como titular ni entró desde el banco en ese partido.',
                     'jugador'  => true,
                     'acciones' => ['alineaciones', 'goles', 'cambios', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'golesSinJugar',
                 ],
                 'goles.repetidos' => [
@@ -109,7 +112,7 @@ class Controles
                     'ayuda'    => 'El mismo jugador con más de un gol en el mismo minuto: casi siempre es carga duplicada.',
                     'jugador'  => true,
                     'detalle'  => 'cantidad',
-                    'acciones' => ['goles'],
+                    'acciones' => ['goles', 'incidencia'],
                     'metodo'   => 'golesRepetidos',
                 ],
                 'goles.diferencia' => [
@@ -118,6 +121,7 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'goles',
                     'acciones' => ['goles', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'golesDiferencia',
                 ],
                 'goles.por_equipo' => [
@@ -126,6 +130,7 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'goles_equipo',
                     'acciones' => ['goles', 'alineaciones', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'golesPorEquipo',
                 ],
             ],
@@ -136,6 +141,7 @@ class Controles
                     'ayuda'    => 'La tarjeta es de un jugador que no figura en la alineación de ese partido.',
                     'jugador'  => true,
                     'acciones' => ['alineaciones', 'tarjetas', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'tarjetasSinJugar',
                 ],
                 'tarjetas.repetidas' => [
@@ -143,7 +149,7 @@ class Controles
                     'ayuda'    => 'El mismo jugador con la misma tarjeta más de una vez en el partido.',
                     'jugador'  => true,
                     'detalle'  => 'cantidad',
-                    'acciones' => ['tarjetas'],
+                    'acciones' => ['tarjetas', 'incidencia'],
                     'metodo'   => 'tarjetasRepetidas',
                 ],
             ],
@@ -154,6 +160,7 @@ class Controles
                     'ayuda'    => 'El cambio es de un jugador que no figura en la alineación de ese partido.',
                     'jugador'  => true,
                     'acciones' => ['alineaciones', 'cambios', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'cambiosSinJugar',
                 ],
                 'cambios.repetidos' => [
@@ -161,7 +168,7 @@ class Controles
                     'ayuda'    => 'El mismo jugador entra (o sale) más de una vez en el mismo partido.',
                     'jugador'  => true,
                     'detalle'  => 'cantidad',
-                    'acciones' => ['cambios'],
+                    'acciones' => ['cambios', 'incidencia'],
                     'metodo'   => 'cambiosRepetidos',
                 ],
                 'cambios.impares' => [
@@ -170,13 +177,14 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'minutos',
                     'acciones' => ['cambios', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'cambiosImpares',
                 ],
                 'cambios.titulares_entran' => [
                     'titulo'   => 'Titular que entra',
                     'ayuda'    => 'Un jugador figura como titular y además tiene un "Entra" en los cambios.',
                     'jugador'  => true,
-                    'acciones' => ['alineaciones', 'cambios'],
+                    'acciones' => ['alineaciones', 'cambios', 'incidencia'],
                     'metodo'   => 'cambiosTitularesQueEntran',
                 ],
             ],
@@ -188,6 +196,7 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'terna',
                     'acciones' => ['jueces', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'arbitrosTerna',
                     'roles'    => true, // habilita el filtro por rol faltante
                 ],
@@ -196,7 +205,7 @@ class Controles
                     'ayuda'    => 'El mismo rol cargado dos veces en el partido (dos principales, dos línea 1, etc.).',
                     'jugador'  => false,
                     'detalle'  => 'roles',
-                    'acciones' => ['jueces'],
+                    'acciones' => ['jueces', 'incidencia'],
                     'metodo'   => 'arbitrosRepetidos',
                 ],
             ],
@@ -208,6 +217,7 @@ class Controles
                     'jugador'  => false,
                     'detalle'  => 'tecnicos',
                     'acciones' => ['alineaciones', 'incidencia'],
+                    'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'tecnicosFaltan',
                 ],
             ],
@@ -219,7 +229,7 @@ class Controles
                     'jugador'   => true,
                     'columna_jugador' => 'Ejecutor',
                     'detalle'   => 'penal_faltante',
-                    'acciones'  => ['penales', 'goles'],
+                    'acciones'  => ['penales', 'goles', 'incidencia'],
                     'metodo'    => 'penalesFaltantes',
                     'aplicar'   => true,
                 ],
@@ -228,7 +238,7 @@ class Controles
                     'ayuda'     => 'Penales convertidos donde el arquero cargado no es el que estaba en cancha en ese minuto.',
                     'jugador'   => false,
                     'detalle'   => 'penal_mal',
-                    'acciones'  => ['penales'],
+                    'acciones'  => ['penales', 'incidencia'],
                     'metodo'    => 'penalesMalCargados',
                 ],
             ],

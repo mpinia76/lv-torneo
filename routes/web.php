@@ -289,7 +289,14 @@ Route::get('/', 'FechaController@fixture')->name('home');
 
 // Se conserva la URL vieja para los favoritos, pero ahora redirige de verdad,
 // del lado del servidor, en vez de por JavaScript.
-Route::redirect('portada', '/')->name('portada');
+//
+// El destino va por route('home') y NO como path literal '/': la app vive bajo
+// /~torneospinia/public, y Route::redirect con '/' resuelve contra la raiz del
+// dominio, que es la pagina por defecto de cPanel. Misma trampa del prefijo de
+// siempre: el destino lo pone route(), nunca una ruta escrita a mano.
+Route::get('portada', function () {
+    return redirect()->route('home');
+})->name('portada');
 
 Route::get('posiciones', 'GrupoController@posiciones')->name('grupos.posiciones');
 Route::get('tablaGoles', 'GrupoController@goleadores')->name('grupos.goleadores');
