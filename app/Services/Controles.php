@@ -763,7 +763,8 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.cantidad as cantidad', 't1.minuto as minuto', 't1.adicionado as adicionado']);
 
-        return $this->ordenar($this->conJugador($q, 't1.jugador_id'));
+        // Un partido con incidencia no aparece en ningun control, este incluido.
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 't1.jugador_id'));
     }
 
     /**
@@ -870,7 +871,8 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.cantidad as cantidad', 't1.tipo as tipo']);
 
-        return $this->ordenar($this->conJugador($q, 't1.jugador_id'));
+        // Un partido con incidencia no aparece en ningun control, este incluido.
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 't1.jugador_id'));
     }
 
     // ------------------------------------------------------------------
@@ -903,7 +905,8 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.cantidad as cantidad', 't1.tipo as tipo']);
 
-        return $this->ordenar($this->conJugador($q, 't1.jugador_id'));
+        // Un partido con incidencia no aparece en ningun control, este incluido.
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 't1.jugador_id'));
     }
 
     /**
