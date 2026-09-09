@@ -245,6 +245,24 @@ class CambiosPareja
     // Aplicarlo (esto sí toca la base)
     // ------------------------------------------------------------------
 
+    /**
+     * El mismo criterio que el control «Entra sin salir»: los partidos donde
+     * algún minuto tiene distinta cantidad de «Entra» que de «Sale».
+     *
+     * Devuelve SQL y no ids porque se usa adentro de un `whereIn`: la lista
+     * son miles de partidos y no tiene sentido traerlos para volver a
+     * mandarlos. El `partido_id` viene repetido —una fila por minuto
+     * descalzado—, que a un `IN` no le molesta.
+     */
+    public static function sqlPartidosImpares()
+    {
+        return "SELECT partido_id
+                FROM cambios
+                GROUP BY partido_id, minuto, adicionado
+                HAVING SUM(CASE WHEN tipo = 'Entra' THEN 1 ELSE 0 END)
+                     <> SUM(CASE WHEN tipo = 'Sale'  THEN 1 ELSE 0 END)";
+    }
+
     /** Junta las parejas de UN partido. Devuelve el plan que aplicó. */
     public function arreglarPartido($partidoId, $escribir = true)
     {

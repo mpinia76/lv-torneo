@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\CambiosPareja;
 use App\Services\TmBuscarGameId;
 use App\Services\TmDetallePartido;
 use App\Services\FusionPersonas;
@@ -2889,6 +2890,28 @@ class ImportDetallesController extends Controller
         if ($desmarcar === 'penal' || $desmarcar === 'todos') {
             $desmarcados = (clone $revisadosQ($desmarcar === 'penal'))->distinct()->count('partido_id');
             $revisadosQ($desmarcar === 'penal')->update(['tipos_gol_revisado_at' => null]);
+        } elseif ($desmarcar === 'cambios_impares') {
+            // Los que marca el control «Entra sin salir».
+            //
+            // Un cambio son dos filas —«Entra» y «Sale»— sin vínculo entre sí:
+            // lo único que las une es el minuto. Hasta el 09/09/2026 este
+            // repaso corregía protagonista por protagonista, así que cuando al
+            // compañero no lo podía aparear —no está en `jugador_tm`, o su
+            // fila quedó a más de un minuto y el jugador tiene dos filas en el
+            // partido— movía una sola y partía la pareja. Por eso el control
+            // saltó a 3299 partidos DESPUÉS del barrido, no antes.
+            //
+            // Ya está arreglado (ver App\Services\CambiosPareja: la pareja
+            // viaja pegada), pero eso no repara lo que quedó escrito: hay que
+            // volver a pasarlos. Son 1 llamada cada uno, y sólo esos — no hace
+            // falta desmarcar los 19203.
+            $q = $revisadosQ(false, 'minutos_revisado_at')
+                ->whereIn('partido_id', function ($s) {
+                    $s->fromRaw('(' . CambiosPareja::sqlPartidosImpares() . ') as ci')
+                        ->select('partido_id');
+                });
+            $desmarcados = (clone $q)->distinct()->count('partido_id');
+            $q->update(['minutos_revisado_at' => null]);
         } elseif ($desmarcar === 'minutos') {
             // Para cuando el repaso de minutos aprenda algo nuevo. Hoy no hace
             // falta para el barrido inicial: ningún partido tiene esa marca.
@@ -3404,6 +3427,16 @@ class ImportDetallesController extends Controller
                 . ' <a class="boton-sec" href="' . e(route('import_detalles.tipos_gol',
                     $filtros + ['desmarcar' => 'todos'])) . '">Todos los revisados (' . $reRevisables . ')</a>'
                 . '</p>'
+                . '<p class="sub"><b>Los cambios con la pareja partida.</b> Hasta el <b>09/09/2026</b> este '
+                . 'repaso corregía el minuto de a una fila, y un cambio son <b>dos</b> —el que entra y el que '
+                . 'sale— sin nada que las una salvo el minuto: cuando al compañero no lo podía aparear (no está '
+                . 'en <code>jugador_tm</code>, o su fila estaba a más de un minuto) movía una sola y partía la '
+                . 'pareja. Por eso el control <b>«Entra sin salir»</b> se llenó DESPUÉS del barrido. Ya está '
+                . 'arreglado —la pareja viaja pegada—, pero lo ya escrito hay que volver a pasarlo.</p>'
+                . '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.tipos_gol',
+                    $filtros + ['desmarcar' => 'cambios_impares']))
+                . '">Los que marca «Entra sin salir»</a> <span class="sub">vuelven a la cola sólo esos; '
+                . 'después, «Seguir solo hasta terminar» y listo</span></p>'
                 . (!empty($filtros) ? '<p class="sub">Ojo: respeta los filtros que tenés puestos.</p>' : '');
         }
 
