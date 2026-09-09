@@ -179,6 +179,10 @@ class Controles
                     'acciones' => ['cambios', 'incidencia'],
                     'sin_datos' => true, // el error puede venir del origen: ver motivoSinDatos()
                     'metodo'   => 'cambiosImpares',
+                    // Botón de la pasada gratis: une las parejas que se parten
+                    // por el descuento (90+4 contra 94, 90 contra 90+2) sin
+                    // gastar una llamada. Ver App\Services\CambiosPareja.
+                    'unir_cambios' => true,
                 ],
                 'cambios.titulares_entran' => [
                     'titulo'   => 'Titular que entra',

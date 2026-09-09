@@ -1177,6 +1177,11 @@ class TmDetallePartido
 
         $aEscribir = [];
 
+        // Para juntar después la pareja del cambio: las filas de `cambios`
+        // del partido y cuáles de ellas apareó TM. Ver CambiosPareja.
+        $cambiosFilas = [];
+        $cambiosTm    = [];
+
         foreach ($tablas as $clase => $cfg) {
             $filas = DB::table($cfg['tabla'])->where('partido_id', $partido->id)
                 ->orderBy('minuto')->orderBy('adicionado')->orderBy('id')->get();
@@ -1209,6 +1214,11 @@ class TmDetallePartido
                 if (empty($ev['opcional'])) $res['sueltos_tm']++;
             }
             $res['sueltos_base'] += count($libres);
+
+            if ($cfg['tabla'] === 'cambios') {
+                $cambiosFilas = $filas;
+                foreach ($pares as $p) $cambiosTm[] = (int) $p['fila']->id;
+            }
 
             foreach ($pares as $p) {
                 $f = $p['fila'];
@@ -1286,6 +1296,43 @@ class TmDetallePartido
                     }
                 }
             }
+        }
+
+        // ── La pareja del cambio viaja pegada ─────────────────────────────
+        // Un cambio son DOS filas —una «Entra» y una «Sale»— sin ningún
+        // vínculo entre sí: lo único que las une es el minuto. Este repaso
+        // corrige protagonista por protagonista, así que cuando al compañero
+        // no lo puede aparear —no está en `jugador_tm`, o su fila quedó a más
+        // de un minuto y el jugador tiene dos filas en el partido— movía una
+        // sola y partía la pareja: el control «Entra sin salir» la marcaba
+        // después, con razón. Acá se le arrima la otra, y sólo cuando no hay
+        // ninguna duda (ver App\Services\CambiosPareja).
+        if (!empty($cambiosFilas)) {
+            $yaCambios = isset($aEscribir['cambios']) ? $aEscribir['cambios'] : [];
+            $pareja    = app(CambiosPareja::class)->plan($cambiosFilas, $cambiosTm, $yaCambios);
+
+            foreach ($pareja['movidas'] as $m) {
+                $aEscribir['cambios'][(int) $m['id']] = $pareja['escribir'][(int) $m['id']];
+
+                $res['cambios'][] = [
+                    'tabla'      => 'cambios',
+                    'que'        => 'cambio',
+                    'fila_id'    => (int) $m['id'],
+                    'jugador_id' => (int) $m['jugador_id'],
+                    'nombre'     => $this->nombreJugador((int) $m['jugador_id']),
+                    'tipo'       => $m['tipo'],
+                    'de'         => $m['de'],
+                    'a'          => $m['a'],
+                    'flojo'      => true,   // no lo dijo TM: se dedujo de la pareja
+                ];
+                $res['por_tabla']['cambios'] = (isset($res['por_tabla']['cambios'])
+                    ? $res['por_tabla']['cambios'] : 0) + 1;
+                // Esa fila ya no es una fila cargada que TM no tenga: es la
+                // pareja de una que sí, y ahora está en el mismo minuto.
+                $res['sueltos_base'] = max(0, $res['sueltos_base'] - 1);
+            }
+
+            foreach ($pareja['avisos'] as $a) $this->aviso($a);
         }
 
         if ($escribir && !empty($aEscribir)) {

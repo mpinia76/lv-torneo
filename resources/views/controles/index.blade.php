@@ -172,6 +172,25 @@
                     </div>
                 @endif
 
+                @if(!empty($def['unir_cambios']))
+                    <div class="ctrl-aviso">
+                        <form method="POST" action="{{ route('controles.cambios.unir') }}"
+                              onsubmit="return confirm('Se van a juntar las parejas donde una fila tiene el descuento (90+4) y la otra es la misma jugada escrita a la vieja (90 o 94). Las separadas por un minuto de verdad no se tocan. ¿Seguimos?')">
+                            @csrf
+                            @foreach($filtros as $k => $v)
+                                @if($v)<input type="hidden" name="{{ $k }}" value="{{ $v }}">@endif
+                            @endforeach
+                            <button class="btn btn-warning btn-sm">Juntar las parejas del descuento</button>
+                            <span style="margin-left:.5rem">
+                                No gasta ninguna llamada a Transfermarkt: arregla los
+                                <code>90+4</code> contra <code>94</code> y los <code>90</code> contra
+                                <code>90+2</code>, que son la misma jugada escrita de dos formas.
+                                Un <code>63</code> contra un <code>64</code> queda como está.
+                            </span>
+                        </form>
+                    </div>
+                @endif
+
                 @include('controles._tabla')
 
             </div>

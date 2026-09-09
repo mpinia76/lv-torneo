@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Incidencia;
+use App\Services\CambiosPareja;
 use App\Services\ControlPenales;
 use App\Services\Controles;
 use Illuminate\Http\Request;
@@ -109,6 +110,43 @@ class ControlController extends Controller
 
         if ($resumen['restantes']) {
             $mensaje .= ' Quedan '.$resumen['restantes'].' para una próxima pasada.';
+        }
+
+        return back()->with('success', $mensaje);
+    }
+
+    /**
+     * Junta las parejas de cambios que quedaron partidas por el descuento.
+     *
+     * Un cambio son dos filas sin vínculo entre sí: si a una le corrigieron el
+     * minuto y a la otra no, el control las marca. Esta pasada las vuelve a
+     * juntar SIN llamar a Transfermarkt, y sólo donde no hay nada que adivinar:
+     * una fila con el descuento (90+4) y su pareja en una de las formas viejas
+     * de esa misma jugada (90, porque TM tiraba el descuento; o 94, porque
+     * promiedos lo sumaba). Las que están separadas por un minuto de verdad
+     * —un 63 contra un 64— no las toca: eso hay que preguntárselo a TM.
+     */
+    public function unirCambios(Request $request)
+    {
+        set_time_limit(0);
+
+        $filtros = $this->controles->filtrosDesde($request);
+        $r       = app(CambiosPareja::class)->aplicar($filtros);
+
+        if ($r['movidas'] === 0) {
+            $mensaje = 'Miré '.$r['mirados'].' partido(s) y no encontré ninguna pareja que se pueda '
+                .'juntar sin preguntarle a Transfermarkt.';
+        } else {
+            $mensaje = 'Listo: '.$r['movidas'].' fila(s) movidas en '.$r['partidos'].' partido(s), '
+                .'de los '.$r['mirados'].' que tenían un minuto con descuento descalzado.';
+        }
+
+        if ($r['dudosos']) {
+            $mensaje .= ' En '.$r['dudosos'].' partido(s) había más de una candidata y no toqué nada.';
+        }
+
+        if ($r['restantes'] !== 0) {
+            $mensaje .= ' Quedan más para otra pasada: apretá de nuevo.';
         }
 
         return back()->with('success', $mensaje);
