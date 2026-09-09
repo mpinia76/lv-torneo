@@ -37,9 +37,11 @@ class IncidenciaController extends Controller
 
         //$fecha=Fecha::findOrFail($fecha_id);
 
+        if ($torneo_id === null || $torneo_id === '') {
+            abort(404, 'Falta el torneo');
+        }
 
-
-        $incidencias=Incidencia::where('torneo_id','=',"$torneo_id")->paginate();
+        $incidencias=Incidencia::where('torneo_id','=',"$torneo_id")->paginate()->withQueryString();
 
 
 
