@@ -606,6 +606,12 @@ class ImportDetallesController extends Controller
             . $this->card(count($r['creados']['jugadores']), 'Jugadores nuevos', count($r['creados']['jugadores']) ? 'warn' : '')
             . '</div>';
 
+        // Las incidencias de `incidencias` (quitas de puntos). Van acá arriba,
+        // pegadas al resumen, porque la pregunta «¿este partido tiene alguna?»
+        // se contesta antes de tocar nada: hasta ahora había que salir al
+        // listado del torneo y buscarlo a ojo.
+        $cuerpo .= $this->bloqueIncidenciasPartido($partidoId);
+
         if (!empty($r['avisos'])) {
             $cuerpo .= '<h2>Avisos</h2><div class="diag">';
             foreach ($r['avisos'] as $a) $cuerpo .= '<div class="warn">• ' . $this->avisoHtml($a) . '</div>';
@@ -4546,6 +4552,76 @@ class ImportDetallesController extends Controller
             }
         }
         return $mapa;
+    }
+
+    /**
+     * Las filas de `incidencias` de este partido: quitas o sumas de puntos con
+     * observaciones (`IncidenciaController`), que se cargan **a mano** y que el
+     * importador no toca nunca — rehacer el detalle no las borra.
+     *
+     * Son dos consultas por página y ninguna llamada a la API.
+     */
+    private function bloqueIncidenciasPartido($partidoId)
+    {
+        $partidoId = (int) $partidoId;
+        if (!$partidoId) return '';
+
+        $filas = DB::table('incidencias')
+            ->leftJoin('equipos', 'equipos.id', '=', 'incidencias.equipo_id')
+            ->where('incidencias.partido_id', $partidoId)
+            ->select('incidencias.id', 'incidencias.puntos', 'incidencias.observaciones',
+                'incidencias.torneo_id', 'equipos.nombre AS equipo')
+            ->orderBy('incidencias.id')
+            ->get();
+
+        // El torneo sale del partido (partidos → fechas → grupos), no de la
+        // incidencia: hace falta también cuando NO hay ninguna, que es
+        // justamente el caso en que se quiere cargar la primera. El
+        // formulario lo pide sí o sí: `incidencias.create` sin `torneoId`
+        // muere en el findOrFail.
+        $torneoId = (int) DB::table('partidos')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->where('partidos.id', $partidoId)
+            ->value('grupos.torneo_id');
+
+        if (!$torneoId && $filas->count()) $torneoId = (int) $filas->first()->torneo_id;
+
+        $links = '';
+        if ($torneoId) {
+            $links = ' <a class="boton-sec" href="' . e(route('incidencias.create',
+                    ['torneoId' => $torneoId, 'partidoId' => $partidoId]))
+                . '" target="_blank">Nueva incidencia →</a>'
+                . ' <a class="boton-sec" href="' . e(route('incidencias.index', ['torneoId' => $torneoId]))
+                . '" target="_blank">Las del torneo →</a>';
+        }
+
+        if ($filas->isEmpty()) {
+            return '<h2>Incidencias</h2>'
+                . '<p class="sub">Este partido <b>no tiene ninguna incidencia cargada</b> '
+                . '(quitas o sumas de puntos).' . $links . '</p>';
+        }
+
+        $out = '<h2>Incidencias <span class="sub">(' . $filas->count() . ')</span></h2>'
+            . '<p class="sub">Se cargan a mano y el importador no las toca: rehacer el detalle '
+            . 'no las borra.' . $links . '</p>'
+            . '<div class="scroll"><table><thead><tr><th>Equipo</th><th>Puntos</th>'
+            . '<th>Observaciones</th><th></th></tr></thead><tbody>';
+
+        foreach ($filas as $f) {
+            $obs = trim((string) $f->observaciones);
+            $out .= '<tr>'
+                . '<td>' . e($f->equipo !== null && $f->equipo !== '' ? $f->equipo : '—') . '</td>'
+                . '<td class="num">' . e((string) $f->puntos) . '</td>'
+                // La observación es texto libre y puede ser un párrafo: es la
+                // única celda de estas pantallas que puede cortar renglón.
+                . '<td style="white-space:normal">' . e($obs !== '' ? $obs : '—') . '</td>'
+                . '<td><a href="' . e(route('incidencias.edit', (int) $f->id))
+                . '" target="_blank">Editar</a></td>'
+                . '</tr>';
+        }
+
+        return $out . '</tbody></table></div>';
     }
 
     /** Link a las incidencias del partido. Vacío si no sabemos la fecha. */
