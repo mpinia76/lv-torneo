@@ -264,7 +264,10 @@
     margin-bottom: .8em;
     font-size: .9em;
 }
+/* Las dos acciones van en forms separados (un solo tilde, dos destinos), así
+   que los forms tienen que quedar en la misma línea que la etiqueta. */
 .ctrl-lote form { margin: 0; }
+.ctrl-lote-form { display: inline-block; margin: 0 .3em 0 0; }
 .ctrl-lote-todos { font-weight: 600; margin: 0 .8em 0 0; cursor: pointer; }
 .ctrl-lote-nota { color: #6c757d; display: block; margin-top: .4em; }
 
@@ -284,13 +287,18 @@
 .ctrl-lote-boton:hover { opacity: .88; color: #fff; }
 .ctrl-lote-boton:disabled,
 .ctrl-lote-boton[disabled] { background: #adb5bd; cursor: not-allowed; opacity: 1; }
+/* El de la incidencia, con el verde petróleo del "Sin datos en TM" de la fila:
+   es la misma acción y no gasta llamadas. */
+.ctrl-lote-boton.sindatos { background: #0f766e; }
+.ctrl-lote-boton.sindatos:disabled,
+.ctrl-lote-boton.sindatos[disabled] { background: #adb5bd; }
 
-.ctrl-tilde-celda { width: 1.8em; text-align: center; }
+.ctrl-tilde-celda { width: 2.4em; text-align: center; white-space: nowrap; }
 .ctrl-tilde { width: 1.05em; height: 1.05em; vertical-align: middle; cursor: pointer; }
-/* El partido repetido en otra fila y el que no tiene gameId: se ven, pero no
-   piden atención. */
+/* El `*` del partido sin gameId (Rehacer lo saltea) y la `↑` del partido que ya
+   está tildado más arriba: se ven, pero no piden atención. */
 .ctrl-tilde-repe,
-.ctrl-tilde-no { color: #ced4da; font-weight: 700; cursor: help; }
+.ctrl-tilde-no { color: #adb5bd; font-weight: 700; cursor: help; }
 
 /* El informe de lo que hizo el lote, arriba de la lista. */
 .ctrl-informe {

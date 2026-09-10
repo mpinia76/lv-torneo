@@ -17,55 +17,92 @@
     </div>
 @else
     @php
-        // ── Qué filas pueden entrar en "Rehacer seleccionados" ─────────────
+        // ── La selección: un tilde por PARTIDO ─────────────────────────────
         //
-        // Sólo las que YA tienen gameId anotado: el lote escribe sin vista
-        // previa, y en un partido sin gameId "Rehacer" primero sale a buscarlo
-        // a Transfermarkt y puede terminar ofreciendo candidatos para elegir.
-        // Eso se decide de a uno, así que esas filas no llevan tilde y se
-        // quedan con su botón "Rehacer" de siempre.
+        // Uno por partido y no por fila: en los controles por jugador el mismo
+        // partido aparece varias veces (dos goleadores, dos amonestados) y
+        // hacerle dos veces lo mismo son dos llamadas por el mismo dato, o dos
+        // incidencias donde alcanza una. La segunda fila del mismo partido
+        // muestra «↑».
         //
-        // Y un tilde por PARTIDO, no por fila: en los controles por jugador el
-        // mismo partido aparece varias veces (dos goleadores, dos amonestados)
-        // y rehacerlo dos veces son dos llamadas por el mismo dato.
-        $conTilde  = [];
-        $sinGameId = 0;
+        // Tildan TODAS las filas, tengan gameId o no: de los dos botones del
+        // lote, uno lo necesita y el otro no. Lo que cada botón puede hacer con
+        // lo tildado lo decide él:
+        //
+        //   Rehacer     - necesita gameId anotado. Sin eso tendría que salir a
+        //                 buscarlo a Transfermarkt y puede terminar ofreciendo
+        //                 candidatos para elegir, y eso se decide de a uno: el
+        //                 lote se lo saltea y lo dice en el informe.
+        //   Sin datos   - no necesita nada: escribe una incidencia en nuestra
+        //                 base y no le pregunta nada a nadie.
+        $conTilde   = [];
+        $sinGameId  = 0;
         foreach ($filas as $filaTilde) {
-            if (!empty($filaTilde->tm_game_id)) {
-                $conTilde[$filaTilde->id] = true;
-            } else {
-                $sinGameId++;
-            }
+            if (isset($conTilde[$filaTilde->id])) continue;
+            $conTilde[$filaTilde->id] = !empty($filaTilde->tm_game_id);
+            if (empty($filaTilde->tm_game_id)) $sinGameId++;
         }
         $tildePuesto = [];
+        // El botón de la incidencia sale en los mismos controles que el de la
+        // fila: marcar la excepción POR FALTA DE DATOS tiene sentido donde el
+        // error puede venir del origen. Ver `Controles::definiciones()`.
+        $loteSinDatos = !empty($def['sin_datos']);
+        $sinDatos     = $sinDatos ?? ['boton' => 'Sin datos en TM', 'texto' => ''];
     @endphp
 
     @if(!empty($conTilde))
         <div class="ctrl-lote">
-            <form method="POST" action="{{ route('controles.rehacer') }}" id="ctrl-lote-form">
+            {{-- El "tildar todos" va afuera de los dos forms: no tiene `name`,
+                 no se envía, es sólo el interruptor de la columna. --}}
+            <label class="ctrl-lote-todos">
+                <input type="checkbox" id="ctrl-lote-todos">
+                Tildar los {{ count($conTilde) }} de esta página
+            </label>
+
+            {{-- Dos acciones, dos forms, un solo tilde.
+                 Los checkbox NO están adentro de ninguno de los dos: cada fila
+                 ya tiene su propio form (el "Sin datos en TM" de a uno) y un
+                 form adentro de otro form no existe en HTML — el navegador lo
+                 desarma y se pierde uno. Los ids los copia el JS al enviar. --}}
+            <form method="POST" action="{{ route('controles.rehacer') }}" class="ctrl-lote-form"
+                  data-confirm="Se le va a rehacer el detalle a %n partido(s) SIN vista previa: se reemplaza alineación, goles, tarjetas, cambios y árbitros con lo que diga Transfermarkt.&#10;&#10;Cuesta hasta %n llamada(s) a la API (más las fotos de los jugadores nuevos) y puede tardar un rato. No cierres la pestaña.&#10;&#10;¿Seguimos?"
+                  data-trabajando="Rehaciendo %n..."
+                  data-saltea-sin-gameid="1">
                 @csrf
-                {{-- Los ids los junta el JS al enviar: los checkbox NO pueden
-                     estar dentro de este form porque cada fila ya tiene el suyo
-                     ("Sin datos en TM") y un form adentro de otro form no
-                     existe en HTML — el navegador lo desarma y se pierde uno de
-                     los dos. --}}
-                <input type="hidden" name="ids" id="ctrl-lote-ids" value="">
-                <label class="ctrl-lote-todos">
-                    <input type="checkbox" id="ctrl-lote-todos">
-                    Tildar los {{ count($conTilde) }} de esta página
-                </label>
-                <button type="submit" class="ctrl-lote-boton" id="ctrl-lote-boton" disabled
+                <input type="hidden" name="ids" class="ctrl-lote-ids" value="">
+                <button type="submit" class="ctrl-lote-boton" disabled
+                        data-texto="Rehacer %n seleccionado(s)"
                         title="Vuelve a bajar el detalle de los partidos tildados desde Transfermarkt y lo escribe. Cuesta 1 llamada por partido.">Rehacer seleccionados</button>
-                <span class="ctrl-lote-nota">
-                    Baja y <b>escribe</b> el detalle de los tildados sin pasar por la vista previa: reemplaza
-                    alineación, goles, tarjetas, cambios y árbitros. <b>1 llamada por partido</b> (más las fotos
-                    de los jugadores nuevos), así que puede tardar un rato.
-                    @if($sinGameId)
-                        {{ $sinGameId === 1 ? 'Hay 1 fila sin gameId anotado' : 'Hay '.$sinGameId.' filas sin gameId anotado' }}:
-                        esas no se pueden tildar y van de a una con su botón «Rehacer», que lo busca en Transfermarkt.
-                    @endif
-                </span>
             </form>
+
+            @if($loteSinDatos)
+                <form method="POST" action="{{ route('controles.sinDatosLote') }}" class="ctrl-lote-form"
+                      data-motivo="{{ $sinDatos['texto'] }}"
+                      data-confirm="Se va a cargar esta incidencia en %n partido(s):&#10;&#10;{{ $sinDatos['texto'] }}&#10;&#10;Cada uno deja de aparecer en TODOS los controles. No gasta ninguna llamada a Transfermarkt. ¿Seguro?"
+                      data-trabajando="Marcando %n...">
+                    @csrf
+                    <input type="hidden" name="ids" class="ctrl-lote-ids" value="">
+                    <input type="hidden" name="check" value="{{ $clave }}">
+                    <button type="submit" class="ctrl-lote-boton sindatos" disabled
+                            data-texto="{{ $sinDatos['boton'] }} en %n"
+                            title="{{ $sinDatos['texto'] }} Se carga como incidencia en cada partido tildado y esos partidos salen de los controles. No gasta llamadas.">{{ $sinDatos['boton'] }} en los seleccionados</button>
+                </form>
+            @endif
+
+            <span class="ctrl-lote-nota">
+                <b>Rehacer</b> baja y <b>escribe</b> el detalle de los tildados sin pasar por la vista previa:
+                reemplaza alineación, goles, tarjetas, cambios y árbitros. <b>1 llamada por partido</b> (más las
+                fotos de los jugadores nuevos), así que puede tardar un rato.
+                @if($sinGameId)
+                    {{ $sinGameId === 1 ? 'Hay 1 partido sin gameId anotado (marcado con *)' : 'Hay '.$sinGameId.' partidos sin gameId anotado (marcados con *)' }}:
+                    a esos Rehacer los saltea, y van de a uno con el botón «Rehacer» de la fila, que lo busca en Transfermarkt.
+                @endif
+                @if($loteSinDatos)
+                    <br><b>{{ $sinDatos['boton'] }}</b> no gasta llamadas: carga la incidencia en cada tildado y esos
+                    partidos salen de todos los controles. Es para lo que no tiene arreglo posible, no para
+                    esconder un error nuestro.
+                @endif
+            </span>
         </div>
     @endif
 
@@ -94,14 +131,18 @@
                 <tr>
                     @if(!empty($conTilde))
                         <td class="ctrl-tilde-celda">
-                            @if(isset($conTilde[$fila->id]) && !isset($tildePuesto[$fila->id]))
+                            @if(!isset($tildePuesto[$fila->id]))
                                 @php $tildePuesto[$fila->id] = true; @endphp
                                 <input type="checkbox" class="ctrl-tilde" value="{{ $fila->id }}"
-                                       title="Rehacerle el detalle a este partido (gameId {{ $fila->tm_game_id }})">
-                            @elseif(isset($conTilde[$fila->id]))
-                                <span class="ctrl-tilde-repe" title="Este partido ya está tildado más arriba: se rehace una sola vez.">↑</span>
+                                       @if(!$fila->tm_game_id) data-sin-gameid="1" @endif
+                                       title="{{ $fila->tm_game_id
+                                            ? 'Este partido entra en las dos acciones de arriba (gameId '.$fila->tm_game_id.')'
+                                            : 'Sin gameId anotado: Rehacer lo saltea. Se puede marcar como incidencia, o rehacerlo de a uno con el botón «Rehacer» de la fila, que lo busca en Transfermarkt.' }}">
+                                @if(!$fila->tm_game_id)
+                                    <span class="ctrl-tilde-no" title="Sin gameId anotado: Rehacer lo saltea.">*</span>
+                                @endif
                             @else
-                                <span class="ctrl-tilde-no" title="Sin gameId anotado: rehacelo de a uno con el botón «Rehacer», que lo busca en Transfermarkt.">·</span>
+                                <span class="ctrl-tilde-repe" title="Este partido ya está tildado más arriba: se hace una sola vez.">↑</span>
                             @endif
                         </td>
                     @endif
@@ -160,27 +201,40 @@
              Se ejecuta después del <table>, así que los checkbox ya existen. --}}
         <script>
             (function () {
-                var form = document.getElementById('ctrl-lote-form');
-                if (!form) { return; }
+                var forms = Array.prototype.slice.call(document.querySelectorAll('.ctrl-lote-form'));
+                if (!forms.length) { return; }
 
-                var campo  = document.getElementById('ctrl-lote-ids');
-                var boton  = document.getElementById('ctrl-lote-boton');
                 var tildes = Array.prototype.slice.call(document.querySelectorAll('.ctrl-tilde'));
                 // Los dos "tildar todos": el de la barra y el del encabezado.
-                var todos  = [document.getElementById('ctrl-lote-todos'),
-                              document.getElementById('ctrl-lote-todos-th')].filter(Boolean);
+                var todos = [document.getElementById('ctrl-lote-todos'),
+                             document.getElementById('ctrl-lote-todos-th')].filter(Boolean);
 
                 function elegidos() {
                     return tildes.filter(function (t) { return t.checked; });
                 }
 
+                // Los textos vienen de la vista (data-texto, data-confirm,
+                // data-trabajando) con %n donde va la cantidad: así los
+                // castellanos largos quedan en el Blade y acá no hay ni una
+                // frase escrita.
+                function conN(texto, n) {
+                    return String(texto || '').split('%n').join(n);
+                }
+
                 function refrescar() {
                     var n = elegidos().length;
-                    boton.disabled = n === 0;
-                    boton.textContent = n === 0
-                        ? 'Rehacer seleccionados'
-                        : 'Rehacer ' + n + (n === 1 ? ' seleccionado' : ' seleccionados');
+
                     todos.forEach(function (t) { t.checked = n > 0 && n === tildes.length; });
+
+                    forms.forEach(function (form) {
+                        var boton = form.querySelector('button[type="submit"]');
+                        if (!boton) { return; }
+
+                        if (!boton.dataset.original) { boton.dataset.original = boton.textContent.trim(); }
+
+                        boton.disabled = n === 0;
+                        boton.textContent = n === 0 ? boton.dataset.original : conN(boton.dataset.texto, n);
+                    });
                 }
 
                 tildes.forEach(function (t) { t.addEventListener('change', refrescar); });
@@ -192,28 +246,43 @@
                     });
                 });
 
-                form.addEventListener('submit', function (e) {
-                    var ids = elegidos().map(function (t) { return t.value; });
+                forms.forEach(function (form) {
+                    form.addEventListener('submit', function (e) {
+                        var elegidas = elegidos();
+                        var ids = elegidas.map(function (t) { return t.value; });
 
-                    if (!ids.length) { e.preventDefault(); return; }
+                        if (!ids.length) { e.preventDefault(); return; }
 
-                    if (!confirm('Se le va a rehacer el detalle a ' + ids.length + ' partido(s) SIN vista previa: '
-                            + 'se reemplaza alineación, goles, tarjetas, cambios y árbitros con lo que diga '
-                            + 'Transfermarkt.\n\nCuesta ' + ids.length + ' llamada(s) a la API (más las fotos de los '
-                            + 'jugadores nuevos) y puede tardar un rato. No cierres la pestaña.\n\n¿Seguimos?')) {
-                        e.preventDefault();
-                        return;
-                    }
+                        var aviso = conN(form.dataset.confirm, ids.length);
 
-                    campo.value = ids.join(',');
+                        // Rehacer saltea los que no tienen gameId: se dice
+                        // ANTES, no después en el informe. El botón de la
+                        // incidencia no los saltea, así que no lo declara.
+                        if (form.dataset.salteaSinGameid) {
+                            var sin = elegidas.filter(function (t) { return t.dataset.sinGameid; }).length;
+                            if (sin) {
+                                aviso += '\n\nOjo: ' + sin + ' de los tildados no tiene(n) gameId anotado y los voy a '
+                                    + 'saltear (van a salir en el informe).';
+                            }
+                        }
 
-                    // Después del submit, no durante: deshabilitar el botón en
-                    // pleno envío puede quedar a mitad de camino en algún
-                    // navegador. Es sólo para que no se apriete dos veces.
-                    setTimeout(function () {
-                        boton.disabled = true;
-                        boton.textContent = 'Rehaciendo ' + ids.length + '...';
-                    }, 0);
+                        if (!confirm(aviso)) { e.preventDefault(); return; }
+
+                        var campo = form.querySelector('.ctrl-lote-ids');
+                        if (campo) { campo.value = ids.join(','); }
+
+                        // Después del submit, no durante: deshabilitar el botón
+                        // en pleno envío puede quedar a mitad de camino en algún
+                        // navegador. Es sólo para que no se apriete dos veces.
+                        setTimeout(function () {
+                            forms.forEach(function (f) {
+                                var b = f.querySelector('button[type="submit"]');
+                                if (!b) { return; }
+                                b.disabled = true;
+                                if (f === form) { b.textContent = conN(f.dataset.trabajando, ids.length); }
+                            });
+                        }, 0);
+                    });
                 });
 
                 refrescar();

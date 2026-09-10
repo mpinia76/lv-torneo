@@ -40,23 +40,28 @@
         @endif
 
         {{-- ---------------------------------------------------------------
-             Qué hizo el "Rehacer seleccionados", partido por partido.
+             Qué hizo el último lote, partido por partido. Sirve a las dos
+             acciones de la barra ("Rehacer seleccionados" y el de la
+             incidencia): las dos dejan el mismo `lote_informe` en la sesión,
+             con su propio título.
 
              Va acá arriba y no en una pantalla propia: el POST vuelve a esta
              misma página del mismo control —así no se pierde el lugar en la
-             lista— y los que se arreglaron ya no están en la tabla de abajo.
+             lista— y los que se resolvieron ya no están en la tabla de abajo.
              Sin este bloque, la única señal de que algo salió mal sería que el
              caso sigue apareciendo.
 
              El link va a "Datos complementarios" (`fechas.show`), que es
              gratis. El de la vista previa del importador se ofrece SÓLO en los
-             que fallaron, y avisando, porque vuelve a bajar el partido y eso
-             cuesta otra llamada.
+             que fallaron rehaciendo (`previa`), y avisando, porque vuelve a
+             bajar el partido y eso cuesta otra llamada. En el lote de
+             incidencias no aparece: ahí no falló Transfermarkt.
         ---------------------------------------------------------------- --}}
-        @if (\Session::has('rehacer_informe'))
+        @if (\Session::has('lote_informe'))
+            @php $lote = \Session::get('lote_informe'); @endphp
             <div class="ctrl-informe">
-                <div class="ctrl-informe-tit">Qué hizo el «Rehacer seleccionados»</div>
-                @foreach(\Session::get('rehacer_informe') as $hecho)
+                <div class="ctrl-informe-tit">Qué hizo «{{ $lote['titulo'] }}»</div>
+                @foreach($lote['filas'] as $hecho)
                     <div class="ctrl-informe-fila {{ $hecho['ok'] ? '' : 'mal' }}">
                         <span class="ctrl-informe-marca">{{ $hecho['ok'] ? '✔' : '✘' }}</span>
                         <b>{{ $hecho['partido'] }}</b>
@@ -65,7 +70,7 @@
                         @if($hecho['fecha_id'])
                             · <a href="{{ route('fechas.show', $hecho['fecha_id']) }}" target="_blank" rel="noopener">ver los datos</a>
                         @endif
-                        @if(!$hecho['ok'])
+                        @if(!$hecho['ok'] && !empty($hecho['previa']))
                             · <a href="{{ route('import_detalles.ver', ['partido_id' => $hecho['id']]) }}"
                                  target="_blank" rel="noopener"
                                  title="Abre la vista previa del importador. Vuelve a bajar el partido: cuesta otra llamada.">vista previa ↗</a>

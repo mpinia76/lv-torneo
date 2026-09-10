@@ -169,43 +169,130 @@ class ControlController extends Controller
      */
     public function marcarSinDatos(Request $request)
     {
-        $partidoId = (int) $request->input('partido_id');
+        // El motivo sale del control desde el que se apretó el botón, no es un
+        // texto único: en "Terna incompleta" lo que falta son los asistentes,
+        // no la alineación. `motivoSinDatos()` valida la clave.
+        $motivo = $this->controles->motivoSinDatos($request->input('check'));
+        $r      = $this->incidenciaSinDatos((int) $request->input('partido_id'), $motivo['texto']);
 
+        if ($r['creada']) {
+            $this->controles->invalidarConteos();
+        }
+
+        return back()->with('success', $r['texto']);
+    }
+
+    /**
+     * Lo mismo, pero en los partidos tildados en la página.
+     *
+     * Es el hermano gratis de "Rehacer seleccionados": no le pregunta nada a
+     * Transfermarkt, sólo escribe una incidencia por partido. Sirve para lo que
+     * viene mal DEL ORIGEN y en tandas —el caso que lo pidió es "Terna
+     * incompleta", donde TM publica sólo el árbitro principal y hay temporadas
+     * enteras así: de a un click son cientos, y el error no es nuestro.
+     *
+     * El motivo lo pone el control, igual que en el botón de la fila. Los que
+     * ya tenían una incidencia se informan y no se duplican.
+     */
+    public function marcarSinDatosSeleccionados(Request $request)
+    {
+        $ids = $this->idsDesde($request->input('ids'));
+
+        if (empty($ids)) {
+            return back()->with('error', 'No llegó ningún partido tildado.');
+        }
+
+        $tope      = Controles::POR_PAGINA;
+        $sobrantes = 0;
+        if (count($ids) > $tope) {
+            $sobrantes = count($ids) - $tope;
+            $ids = array_slice($ids, 0, $tope);
+        }
+
+        $motivo    = $this->controles->motivoSinDatos($request->input('check'));
+        $etiquetas = $this->etiquetasDe($ids);
+
+        $informe  = [];
+        $creadas  = 0;
+        $repetidas = 0;
+
+        foreach ($ids as $id) {
+            $r = $this->incidenciaSinDatos($id, $motivo['texto']);
+
+            if ($r['creada']) {
+                $creadas++;
+            } elseif ($r['ya_tenia']) {
+                $repetidas++;
+            }
+
+            $informe[] = [
+                'id'       => $id,
+                'partido'  => isset($etiquetas[$id]['texto']) ? $etiquetas[$id]['texto'] : 'Partido #'.$id,
+                'fecha_id' => isset($etiquetas[$id]['fecha_id']) ? $etiquetas[$id]['fecha_id'] : null,
+                'ok'       => $r['creada'],
+                'texto'    => $r['texto'],
+                'avisos'   => [],
+                // El link a la vista previa del importador no va acá: esto no
+                // falló por Transfermarkt, y bajar el partido cuesta plata.
+                'previa'   => false,
+            ];
+        }
+
+        if ($creadas) {
+            $this->controles->invalidarConteos();
+        }
+
+        $mensaje = 'Incidencias cargadas: '.$creadas.'.'
+            .($repetidas ? ' '.$repetidas.' ya tenía(n) una y no las dupliqué.' : '')
+            .($sobrantes ? ' Dejé '.$sobrantes.' afuera: por vez entran hasta '.$tope.'.' : '')
+            .($creadas ? ' Esos partidos salen de todos los controles.' : '');
+
+        return back()->with('success', $mensaje)->with('lote_informe', [
+            'titulo' => $motivo['boton'].' en los seleccionados',
+            'filas'  => $informe,
+        ]);
+    }
+
+    /**
+     * La incidencia de "no se puede arreglar" en un partido.
+     *
+     * Va con `equipo_id` y `puntos` en NULL a propósito: así no se publica en
+     * el front ni toca la tabla de posiciones (ver `posicionesPublic` y
+     * `GrupoController`, que filtran por `whereNotNull('equipo_id')`), y el
+     * partido desaparece de los dieciocho controles.
+     *
+     * Devuelve `['creada' => bool, 'ya_tenia' => bool, 'texto' => string]`. No
+     * invalida los conteos: eso lo hace quien llama, una sola vez, aunque haya
+     * escrito veinte.
+     */
+    private function incidenciaSinDatos($partidoId, $motivo)
+    {
         $partido = DB::table('partidos')
             ->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
             ->join('grupos', 'fechas.grupo_id', '=', 'grupos.id')
-            ->where('partidos.id', $partidoId)
+            ->where('partidos.id', (int) $partidoId)
             ->first(['partidos.id', 'grupos.torneo_id']);
 
         if (!$partido) {
-            return back()->with('success', 'No encontré ese partido.');
+            return ['creada' => false, 'ya_tenia' => false, 'texto' => 'No encontré ese partido.'];
         }
 
         // Si ya tenía una incidencia no se agrega otra: con una alcanza para
         // que el partido no aparezca en ningún control.
-        $yaTiene = Incidencia::where('partido_id', $partido->id)->exists();
-
-        if (!$yaTiene) {
-            // El motivo sale del control desde el que se apretó el botón, no
-            // es un texto único: en "Terna incompleta" lo que falta son los
-            // asistentes, no la alineación. `motivoSinDatos()` valida la clave.
-            $motivo = $this->controles->motivoSinDatos($request->input('check'));
-
-            Incidencia::create([
-                'partido_id'    => $partido->id,
-                'torneo_id'     => $partido->torneo_id,
-                'equipo_id'     => null,
-                'puntos'        => null,
-                'observaciones' => $motivo['texto']
-                    .' Marcado desde Controles de carga el '.date('d/m/Y').'.',
-            ]);
-
-            $this->controles->invalidarConteos();
+        if (Incidencia::where('partido_id', $partido->id)->exists()) {
+            return ['creada' => false, 'ya_tenia' => true, 'texto' => 'Ya tenía una incidencia cargada.'];
         }
 
-        return back()->with('success', $yaTiene
-            ? 'Ese partido ya tenía una incidencia cargada.'
-            : 'Listo: el partido quedó marcado como sin datos en TM y sale de todos los controles.');
+        Incidencia::create([
+            'partido_id'    => $partido->id,
+            'torneo_id'     => $partido->torneo_id,
+            'equipo_id'     => null,
+            'puntos'        => null,
+            'observaciones' => $motivo.' Marcado desde Controles de carga el '.date('d/m/Y').'.',
+        ]);
+
+        return ['creada' => true, 'ya_tenia' => false,
+            'texto' => 'Incidencia cargada: sale de todos los controles.'];
     }
 
     /**
@@ -225,8 +312,9 @@ class ControlController extends Controller
      *   usuario de a uno con el tilde, no los adivina el sistema.
      * - **Sólo los que YA tienen gameId anotado.** Sin gameId, "Rehacer" sale
      *   a buscarlo a TM y puede terminar ofreciendo candidatos para que elijas:
-     *   eso se decide de a uno. Esas filas no tienen tilde en la lista, y si
-     *   igual llega un id por la URL, acá se saltea con el motivo.
+     *   eso se decide de a uno. Esas filas SÍ se pueden tildar —el otro botón
+     *   del lote, el de la incidencia, no necesita gameId— así que acá se
+     *   saltean con el motivo, y la pantalla ya avisó cuántas eran.
      * - **Un partido, una llamada.** En los controles por jugador el mismo
      *   partido aparece en varias filas; los ids se deduplican para no pagar
      *   dos veces el mismo dato.
@@ -239,11 +327,7 @@ class ControlController extends Controller
     {
         set_time_limit(0);
 
-        $ids = [];
-        foreach (explode(',', (string) $request->input('ids')) as $crudo) {
-            $id = (int) trim($crudo);
-            if ($id > 0 && !in_array($id, $ids, true)) $ids[] = $id;
-        }
+        $ids = $this->idsDesde($request->input('ids'));
 
         if (empty($ids)) {
             return back()->with('error', 'No llegó ningún partido tildado.');
@@ -278,6 +362,9 @@ class ControlController extends Controller
                 'ok'      => false,
                 'texto'   => '',
                 'avisos'  => [],
+                // El que falló se puede mirar en la vista previa del
+                // importador, avisando que cuesta otra llamada.
+                'previa'  => true,
             ];
 
             if (!isset($gameIds[$id])) {
@@ -325,10 +412,31 @@ class ControlController extends Controller
             .($nuevos ? ' Jugadores nuevos: '.$nuevos.'.' : '')
             .($sobrantes ? ' Dejé '.$sobrantes.' afuera: por vez entran hasta '.$tope.'.' : '');
 
-        return back()->with('success', $mensaje)->with('rehacer_informe', $informe);
+        return back()->with('success', $mensaje)->with('lote_informe', [
+            'titulo' => 'Rehacer seleccionados',
+            'filas'  => $informe,
+        ]);
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Los ids del campo oculto del lote: "12,40,7".
+     *
+     * Deduplica —en los controles por jugador el mismo partido puede venir dos
+     * veces— y descarta cualquier cosa que no sea un id positivo.
+     */
+    private function idsDesde($crudo)
+    {
+        $ids = [];
+
+        foreach (explode(',', (string) $crudo) as $pedazo) {
+            $id = (int) trim($pedazo);
+            if ($id > 0 && !in_array($id, $ids, true)) $ids[] = $id;
+        }
+
+        return $ids;
+    }
 
     /**
      * partido_id => gameId, del staging.
