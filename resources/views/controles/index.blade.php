@@ -40,6 +40,45 @@
         @endif
 
         {{-- ---------------------------------------------------------------
+             Qué hizo el "Rehacer seleccionados", partido por partido.
+
+             Va acá arriba y no en una pantalla propia: el POST vuelve a esta
+             misma página del mismo control —así no se pierde el lugar en la
+             lista— y los que se arreglaron ya no están en la tabla de abajo.
+             Sin este bloque, la única señal de que algo salió mal sería que el
+             caso sigue apareciendo.
+
+             El link va a "Datos complementarios" (`fechas.show`), que es
+             gratis. El de la vista previa del importador se ofrece SÓLO en los
+             que fallaron, y avisando, porque vuelve a bajar el partido y eso
+             cuesta otra llamada.
+        ---------------------------------------------------------------- --}}
+        @if (\Session::has('rehacer_informe'))
+            <div class="ctrl-informe">
+                <div class="ctrl-informe-tit">Qué hizo el «Rehacer seleccionados»</div>
+                @foreach(\Session::get('rehacer_informe') as $hecho)
+                    <div class="ctrl-informe-fila {{ $hecho['ok'] ? '' : 'mal' }}">
+                        <span class="ctrl-informe-marca">{{ $hecho['ok'] ? '✔' : '✘' }}</span>
+                        <b>{{ $hecho['partido'] }}</b>
+                        <span class="ctrl-sub">#{{ $hecho['id'] }}</span> —
+                        {{ $hecho['texto'] }}
+                        @if($hecho['fecha_id'])
+                            · <a href="{{ route('fechas.show', $hecho['fecha_id']) }}" target="_blank" rel="noopener">ver los datos</a>
+                        @endif
+                        @if(!$hecho['ok'])
+                            · <a href="{{ route('import_detalles.ver', ['partido_id' => $hecho['id']]) }}"
+                                 target="_blank" rel="noopener"
+                                 title="Abre la vista previa del importador. Vuelve a bajar el partido: cuesta otra llamada.">vista previa ↗</a>
+                        @endif
+                        @foreach($hecho['avisos'] as $aviso)
+                            <div class="ctrl-informe-aviso">• {{ $aviso }}</div>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        {{-- ---------------------------------------------------------------
              Filtros. Aplican a todos los controles por igual y viajan en la
              URL, así que el total cacheado es el de ESE recorte.
         ---------------------------------------------------------------- --}}

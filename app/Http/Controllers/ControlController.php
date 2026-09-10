@@ -6,6 +6,7 @@ use App\Incidencia;
 use App\Services\CambiosPareja;
 use App\Services\ControlPenales;
 use App\Services\Controles;
+use App\Services\TmDetallePartido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -207,7 +208,186 @@ class ControlController extends Controller
             : 'Listo: el partido quedó marcado como sin datos en TM y sale de todos los controles.');
     }
 
+    /**
+     * Rehace el detalle de los partidos tildados en la página.
+     *
+     * Es el botón "Rehacer" de la fila, pero de a varios: para cada partido
+     * vuelve a bajar el detalle de Transfermarkt con `forzar`, o sea que
+     * reemplaza alineación, goles, tarjetas, cambios y árbitros por lo que diga
+     * TM. Cuesta UNA llamada por partido (más las fotos de los jugadores que
+     * haya que crear), así que la pantalla lo dice antes de largarlo.
+     *
+     * Tres decisiones que valen la pena explicar:
+     *
+     * - **Escribe sin vista previa.** El "Rehacer" de a uno abre la previa
+     *   porque ahí se puede mirar; veinticinco previas no se miran. Lo que
+     *   sustituye a la previa es la selección: los partidos los elige el
+     *   usuario de a uno con el tilde, no los adivina el sistema.
+     * - **Sólo los que YA tienen gameId anotado.** Sin gameId, "Rehacer" sale
+     *   a buscarlo a TM y puede terminar ofreciendo candidatos para que elijas:
+     *   eso se decide de a uno. Esas filas no tienen tilde en la lista, y si
+     *   igual llega un id por la URL, acá se saltea con el motivo.
+     * - **Un partido, una llamada.** En los controles por jugador el mismo
+     *   partido aparece en varias filas; los ids se deduplican para no pagar
+     *   dos veces el mismo dato.
+     *
+     * El informe va por sesión y se muestra ARRIBA DE LA LISTA, no en una
+     * pantalla propia: la vuelta es a la misma página del mismo control (los
+     * que se arreglaron ya no están) y así no se pierde el lugar.
+     */
+    public function rehacerSeleccionados(Request $request)
+    {
+        set_time_limit(0);
+
+        $ids = [];
+        foreach (explode(',', (string) $request->input('ids')) as $crudo) {
+            $id = (int) trim($crudo);
+            if ($id > 0 && !in_array($id, $ids, true)) $ids[] = $id;
+        }
+
+        if (empty($ids)) {
+            return back()->with('error', 'No llegó ningún partido tildado.');
+        }
+
+        // Tope: lo que entra en una página. Es el techo natural de la
+        // selección y de paso acota cuánto puede tardar el request — con una
+        // llamada por partido, una tanda más larga se come el tiempo del
+        // navegador y el informe se pierde en un 504.
+        $tope      = Controles::POR_PAGINA;
+        $sobrantes = 0;
+        if (count($ids) > $tope) {
+            $sobrantes = count($ids) - $tope;
+            $ids = array_slice($ids, 0, $tope);
+        }
+
+        $gameIds   = $this->gameIdsDe($ids);
+        $etiquetas = $this->etiquetasDe($ids);
+
+        $imp      = new TmDetallePartido;
+        $informe  = [];
+        $ok       = 0;
+        $fallaron = 0;
+        $llamadas = 0;
+        $nuevos   = 0;
+
+        foreach ($ids as $id) {
+            $fila = [
+                'id'      => $id,
+                'partido' => isset($etiquetas[$id]['texto']) ? $etiquetas[$id]['texto'] : 'Partido #'.$id,
+                'fecha_id' => isset($etiquetas[$id]['fecha_id']) ? $etiquetas[$id]['fecha_id'] : null,
+                'ok'      => false,
+                'texto'   => '',
+                'avisos'  => [],
+            ];
+
+            if (!isset($gameIds[$id])) {
+                $fallaron++;
+                $fila['texto'] = 'No tiene gameId anotado. Usá el botón "Rehacer" de la fila: '
+                    .'esa pantalla lo busca en Transfermarkt y, si hay más de un candidato, te los ofrece.';
+                $informe[] = $fila;
+                continue;
+            }
+
+            $r = $imp->importar($id, $gameIds[$id], ['escribir' => true, 'forzar' => true]);
+
+            $llamadas += (int) $r['llamadas'];
+            $nuevos   += count($r['creados']['jugadores']);
+
+            if (!empty($r['escrito'])) {
+                $ok++;
+                $fila['ok']    = true;
+                $fila['texto'] = count($r['plan']['alineacions']).' en la alineación, '
+                    .count($r['plan']['gols']).' goles, '
+                    .count($r['plan']['tarjetas']).' tarjetas, '
+                    .count($r['plan']['cambios']).' cambios'
+                    .(count($r['plan']['arbitros']) ? ', '.count($r['plan']['arbitros']).' árbitros' : '');
+            } else {
+                $fallaron++;
+                $fila['texto'] = (string) $r['error'] !== ''
+                    ? (string) $r['error']
+                    : 'No se escribió nada y el importador no dijo por qué.';
+            }
+
+            foreach ($r['avisos'] as $aviso) {
+                $fila['avisos'][] = $this->avisoTexto($aviso);
+            }
+
+            $informe[] = $fila;
+        }
+
+        if ($ok) {
+            $this->controles->invalidarConteos();
+        }
+
+        $mensaje = 'Rehice el detalle de '.$ok.' partido(s)'
+            .($fallaron ? ', '.$fallaron.' con problema' : '').'. '
+            .'Llamadas a la API: '.$llamadas.'.'
+            .($nuevos ? ' Jugadores nuevos: '.$nuevos.'.' : '')
+            .($sobrantes ? ' Dejé '.$sobrantes.' afuera: por vez entran hasta '.$tope.'.' : '');
+
+        return back()->with('success', $mensaje)->with('rehacer_informe', $informe);
+    }
+
     // ------------------------------------------------------------------
+
+    /**
+     * partido_id => gameId, del staging.
+     *
+     * Mismo criterio que la pantalla de un partido
+     * (`ImportDetallesController::correrUno`): la fila más nueva que tenga
+     * `external_id`. Se ordena ascendente y se sobreescribe, así la última que
+     * queda es la de id más alto.
+     */
+    private function gameIdsDe(array $ids)
+    {
+        $mapa = [];
+
+        foreach (DB::table('import_partidos')
+                     ->whereIn('partido_id', $ids)
+                     ->whereNotNull('external_id')
+                     ->orderBy('id')
+                     ->get(['partido_id', 'external_id']) as $f) {
+            $mapa[(int) $f->partido_id] = (string) $f->external_id;
+        }
+
+        return $mapa;
+    }
+
+    /** partido_id => ['texto' => 'Local vs Visita · 19/02/2015', 'fecha_id' => N]. */
+    private function etiquetasDe(array $ids)
+    {
+        $mapa = [];
+
+        foreach (DB::table('partidos')
+                     ->join('equipos as el', 'partidos.equipol_id', '=', 'el.id')
+                     ->join('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
+                     ->whereIn('partidos.id', $ids)
+                     ->get(['partidos.id', 'partidos.dia', 'partidos.fecha_id',
+                         'el.nombre as local', 'ev.nombre as visita']) as $p) {
+            $mapa[(int) $p->id] = [
+                'texto'    => $p->local.' vs '.$p->visita
+                    .($p->dia ? ' · '.date('d/m/Y', strtotime($p->dia)) : ''),
+                'fecha_id' => (int) $p->fecha_id,
+            ];
+        }
+
+        return $mapa;
+    }
+
+    /**
+     * El aviso del importador, en texto plano.
+     *
+     * `TmDetallePartido` mete tokens para que la pantalla del importador los
+     * convierta en links (`[[plantilla:12]]`, `[[repetidos]]`). Acá el informe
+     * es una lista corta arriba de la tabla: los tokens se reemplazan por su
+     * nombre y listo, así no aparecen corchetes crudos.
+     */
+    private function avisoTexto($texto)
+    {
+        $limpio = preg_replace('/\[\[plantilla:(\d+)\]\]/', 'plantilla #$1', (string) $texto);
+
+        return str_replace('[[repetidos]]', 'verificar personas', $limpio);
+    }
 
     /**
      * Las filas del chequeo activo, ya paginadas.

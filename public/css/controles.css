@@ -252,6 +252,69 @@
     font-size: .9em;
 }
 
+/* ------------------------------------- Rehacer los seleccionados (lote) --- */
+
+/* La barra arriba de la tabla. Naranja apagada, del mismo palo que el botón
+   "Rehacer" de las filas: es la misma acción, de a varios. */
+.ctrl-lote {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: .3em;
+    padding: .6em .8em;
+    margin-bottom: .8em;
+    font-size: .9em;
+}
+.ctrl-lote form { margin: 0; }
+.ctrl-lote-todos { font-weight: 600; margin: 0 .8em 0 0; cursor: pointer; }
+.ctrl-lote-nota { color: #6c757d; display: block; margin-top: .4em; }
+
+/* El botón no está dentro de `.ctrl-botones`, así que no hereda nada de los
+   botones de la fila: se declara entero acá (ver el comentario largo de
+   `.ctrl-b-rehacer` sobre la especificidad). */
+.ctrl-lote-boton {
+    background: #b45309;
+    color: #fff;
+    border: 0;
+    border-radius: .25em;
+    padding: .35em .9em;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+}
+.ctrl-lote-boton:hover { opacity: .88; color: #fff; }
+.ctrl-lote-boton:disabled,
+.ctrl-lote-boton[disabled] { background: #adb5bd; cursor: not-allowed; opacity: 1; }
+
+.ctrl-tilde-celda { width: 1.8em; text-align: center; }
+.ctrl-tilde { width: 1.05em; height: 1.05em; vertical-align: middle; cursor: pointer; }
+/* El partido repetido en otra fila y el que no tiene gameId: se ven, pero no
+   piden atención. */
+.ctrl-tilde-repe,
+.ctrl-tilde-no { color: #ced4da; font-weight: 700; cursor: help; }
+
+/* El informe de lo que hizo el lote, arriba de la lista. */
+.ctrl-informe {
+    background: #f6f8fa;
+    border: 1px solid #e3e6ea;
+    border-radius: .3em;
+    padding: .65em .8em;
+    margin-bottom: .8em;
+    font-size: .88em;
+}
+.ctrl-informe-tit {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    font-size: .8em;
+    color: #6c757d;
+    margin-bottom: .4em;
+}
+.ctrl-informe-fila { padding: .18em 0; line-height: 1.45; }
+.ctrl-informe-fila.mal { color: #842029; }
+.ctrl-informe-marca { font-weight: 700; color: #0f5132; }
+.ctrl-informe-fila.mal .ctrl-informe-marca { color: #842029; }
+.ctrl-informe-aviso { color: #664d03; margin-left: 1.4em; font-size: .95em; }
+
 .ctrl-filtro-rol { margin-bottom: .8em; font-size: .9em; }
 .ctrl-filtro-rol a {
     display: inline-block;

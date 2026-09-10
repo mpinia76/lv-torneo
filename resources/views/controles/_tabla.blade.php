@@ -16,10 +16,68 @@
         @endif
     </div>
 @else
+    @php
+        // ── Qué filas pueden entrar en "Rehacer seleccionados" ─────────────
+        //
+        // Sólo las que YA tienen gameId anotado: el lote escribe sin vista
+        // previa, y en un partido sin gameId "Rehacer" primero sale a buscarlo
+        // a Transfermarkt y puede terminar ofreciendo candidatos para elegir.
+        // Eso se decide de a uno, así que esas filas no llevan tilde y se
+        // quedan con su botón "Rehacer" de siempre.
+        //
+        // Y un tilde por PARTIDO, no por fila: en los controles por jugador el
+        // mismo partido aparece varias veces (dos goleadores, dos amonestados)
+        // y rehacerlo dos veces son dos llamadas por el mismo dato.
+        $conTilde  = [];
+        $sinGameId = 0;
+        foreach ($filas as $filaTilde) {
+            if (!empty($filaTilde->tm_game_id)) {
+                $conTilde[$filaTilde->id] = true;
+            } else {
+                $sinGameId++;
+            }
+        }
+        $tildePuesto = [];
+    @endphp
+
+    @if(!empty($conTilde))
+        <div class="ctrl-lote">
+            <form method="POST" action="{{ route('controles.rehacer') }}" id="ctrl-lote-form">
+                @csrf
+                {{-- Los ids los junta el JS al enviar: los checkbox NO pueden
+                     estar dentro de este form porque cada fila ya tiene el suyo
+                     ("Sin datos en TM") y un form adentro de otro form no
+                     existe en HTML — el navegador lo desarma y se pierde uno de
+                     los dos. --}}
+                <input type="hidden" name="ids" id="ctrl-lote-ids" value="">
+                <label class="ctrl-lote-todos">
+                    <input type="checkbox" id="ctrl-lote-todos">
+                    Tildar los {{ count($conTilde) }} de esta página
+                </label>
+                <button type="submit" class="ctrl-lote-boton" id="ctrl-lote-boton" disabled
+                        title="Vuelve a bajar el detalle de los partidos tildados desde Transfermarkt y lo escribe. Cuesta 1 llamada por partido.">Rehacer seleccionados</button>
+                <span class="ctrl-lote-nota">
+                    Baja y <b>escribe</b> el detalle de los tildados sin pasar por la vista previa: reemplaza
+                    alineación, goles, tarjetas, cambios y árbitros. <b>1 llamada por partido</b> (más las fotos
+                    de los jugadores nuevos), así que puede tardar un rato.
+                    @if($sinGameId)
+                        {{ $sinGameId === 1 ? 'Hay 1 fila sin gameId anotado' : 'Hay '.$sinGameId.' filas sin gameId anotado' }}:
+                        esas no se pueden tildar y van de a una con su botón «Rehacer», que lo busca en Transfermarkt.
+                    @endif
+                </span>
+            </form>
+        </div>
+    @endif
+
     <div style="overflow-x:auto">
         <table class="ctrl-tabla">
             <thead>
             <tr>
+                @if(!empty($conTilde))
+                    <th class="ctrl-tilde-celda">
+                        <input type="checkbox" id="ctrl-lote-todos-th" title="Tildar todos los de esta página">
+                    </th>
+                @endif
                 <th>Torneo</th>
                 <th style="text-align:center">Partido</th>
                 @if(!empty($def['jugador']))
@@ -34,6 +92,19 @@
             <tbody>
             @foreach($filas as $fila)
                 <tr>
+                    @if(!empty($conTilde))
+                        <td class="ctrl-tilde-celda">
+                            @if(isset($conTilde[$fila->id]) && !isset($tildePuesto[$fila->id]))
+                                @php $tildePuesto[$fila->id] = true; @endphp
+                                <input type="checkbox" class="ctrl-tilde" value="{{ $fila->id }}"
+                                       title="Rehacerle el detalle a este partido (gameId {{ $fila->tm_game_id }})">
+                            @elseif(isset($conTilde[$fila->id]))
+                                <span class="ctrl-tilde-repe" title="Este partido ya está tildado más arriba: se rehace una sola vez.">↑</span>
+                            @else
+                                <span class="ctrl-tilde-no" title="Sin gameId anotado: rehacelo de a uno con el botón «Rehacer», que lo busca en Transfermarkt.">·</span>
+                            @endif
+                        </td>
+                    @endif
                     <td>
                         <span class="ctrl-torneo">
                             <a href="{{ route('fechas.show', $fila->fecha_id) }}">{{ $fila->torneo }} {{ $fila->year }}</a>
@@ -82,6 +153,73 @@
             </tbody>
         </table>
     </div>
+
+    @if(!empty($conTilde))
+        {{-- Va acá y no en @section('bottom'): los elementos que maneja son los
+             de esta partial, y así la funcionalidad entera queda en un archivo.
+             Se ejecuta después del <table>, así que los checkbox ya existen. --}}
+        <script>
+            (function () {
+                var form = document.getElementById('ctrl-lote-form');
+                if (!form) { return; }
+
+                var campo  = document.getElementById('ctrl-lote-ids');
+                var boton  = document.getElementById('ctrl-lote-boton');
+                var tildes = Array.prototype.slice.call(document.querySelectorAll('.ctrl-tilde'));
+                // Los dos "tildar todos": el de la barra y el del encabezado.
+                var todos  = [document.getElementById('ctrl-lote-todos'),
+                              document.getElementById('ctrl-lote-todos-th')].filter(Boolean);
+
+                function elegidos() {
+                    return tildes.filter(function (t) { return t.checked; });
+                }
+
+                function refrescar() {
+                    var n = elegidos().length;
+                    boton.disabled = n === 0;
+                    boton.textContent = n === 0
+                        ? 'Rehacer seleccionados'
+                        : 'Rehacer ' + n + (n === 1 ? ' seleccionado' : ' seleccionados');
+                    todos.forEach(function (t) { t.checked = n > 0 && n === tildes.length; });
+                }
+
+                tildes.forEach(function (t) { t.addEventListener('change', refrescar); });
+
+                todos.forEach(function (maestro) {
+                    maestro.addEventListener('change', function () {
+                        tildes.forEach(function (t) { t.checked = maestro.checked; });
+                        refrescar();
+                    });
+                });
+
+                form.addEventListener('submit', function (e) {
+                    var ids = elegidos().map(function (t) { return t.value; });
+
+                    if (!ids.length) { e.preventDefault(); return; }
+
+                    if (!confirm('Se le va a rehacer el detalle a ' + ids.length + ' partido(s) SIN vista previa: '
+                            + 'se reemplaza alineación, goles, tarjetas, cambios y árbitros con lo que diga '
+                            + 'Transfermarkt.\n\nCuesta ' + ids.length + ' llamada(s) a la API (más las fotos de los '
+                            + 'jugadores nuevos) y puede tardar un rato. No cierres la pestaña.\n\n¿Seguimos?')) {
+                        e.preventDefault();
+                        return;
+                    }
+
+                    campo.value = ids.join(',');
+
+                    // Después del submit, no durante: deshabilitar el botón en
+                    // pleno envío puede quedar a mitad de camino en algún
+                    // navegador. Es sólo para que no se apriete dos veces.
+                    setTimeout(function () {
+                        boton.disabled = true;
+                        boton.textContent = 'Rehaciendo ' + ids.length + '...';
+                    }, 0);
+                });
+
+                refrescar();
+            })();
+        </script>
+    @endif
 
     <div class="row ctrl-pie">
         <div class="col-md-9">{{ $filas->links() }}</div>
