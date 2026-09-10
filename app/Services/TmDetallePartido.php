@@ -570,6 +570,39 @@ class TmDetallePartido
         $informe['ok']       = true;
         $informe['llamadas'] += $this->fotosBajadas;   // cada foto es una llamada más
 
+        // ── 5 bis) El freno: rehacer no puede vaciar lo que TM no publica ──
+        //
+        // Con `forzar` se borra la alineación entera antes de escribir la que
+        // vino. Si la ficha de Transfermarkt dice «no data available» para un
+        // lado —el caso para el que existe el botón "Sin datos en TM" de los
+        // controles— lo que vino no trae a nadie de ese equipo, y el rehacer
+        // deja el partido con media alineación, o sin ninguna. Cargada a mano,
+        // esa alineación no se recupera: hay que volver a una copia de la base.
+        //
+        // Se compara contra lo que YA hay, así que corta sólo cuando TM trae
+        // MENOS de lo que tenemos: un partido con un solo lado cargado al que
+        // TM le trae los dos pasa sin problema.
+        $seVaciarian = $forzar ? $this->ladosQueQuedarianVacios($plan, $partido, $lados) : [];
+
+        if (!empty($seVaciarian)) {
+            $queja = 'Transfermarkt no publica la alineación de ' . implode(' ni de ', $seVaciarian)
+                . ', y en la base este partido la tiene cargada. Rehacer la borraría y no se puede '
+                . 'recuperar, así que no toqué nada. Si en TM el partido está incompleto de verdad, '
+                . 'marcalo con "Sin datos en TM" en los controles; si igual querés reemplazar lo que '
+                . 'hay, borrale la alineación a mano y rehacelo.';
+
+            if ($escribir) {
+                $informe['error']  = $queja;
+                $informe['avisos'] = $this->avisos;
+                return $informe;
+            }
+
+            // En la vista previa no se corta nada: se muestra lo que haría, con
+            // el aviso arriba. Es la pantalla donde se mira antes de decidir.
+            $this->aviso($queja);
+            $informe['avisos'] = $this->avisos;
+        }
+
         // ── 6) Guardar ─────────────────────────────────────────────────────
         if ($escribir) {
             try {
@@ -591,7 +624,31 @@ class TmDetallePartido
                         Gol::where('partido_id', $partido->id)->delete();
                         Tarjeta::where('partido_id', $partido->id)->delete();
                         Cambio::where('partido_id', $partido->id)->delete();
-                        PartidoArbitro::where('partido_id', $partido->id)->delete();
+
+                        // De `partido_arbitros` se borran SOLO los roles que
+                        // este plan va a escribir.
+                        //
+                        // Borrar los tres y escribir lo que vino le comía la
+                        // terna a todo partido rehecho: **Transfermarkt publica
+                        // casi siempre nada más que el principal** (es el motivo
+                        // del botón "Sin asistentes" del control), y la Linea 1
+                        // y la Linea 2 son carga a mano. Un rehacer en tanda
+                        // dejaba cientos de partidos con la terna incompleta que
+                        // ya estaba completa, y eso no se recupera: hay que
+                        // volver a una copia de la base.
+                        //
+                        // Mismo criterio que `penals`, acá abajo: lo que este
+                        // importador no trae, no lo toca.
+                        $rolesQueVienen = [];
+                        foreach ($plan['arbitros'] as $filaArbitro) {
+                            if (!empty($filaArbitro['tipo'])) $rolesQueVienen[] = $filaArbitro['tipo'];
+                        }
+                        if (!empty($rolesQueVienen)) {
+                            PartidoArbitro::where('partido_id', $partido->id)
+                                ->whereIn('tipo', array_values(array_unique($rolesQueVienen)))
+                                ->delete();
+                        }
+
                         // De `penals` se borra SOLO lo que escribe este
                         // importador. Los «Convirtieron» quedan: los crea
                         // ControlPenales deduciendo el arquero, y ese arquero se
@@ -2465,6 +2522,45 @@ class TmDetallePartido
             ];
         }
         return $out;
+    }
+
+    /**
+     * Los equipos que quedarían sin un solo jugador si se rehace el partido.
+     *
+     * Devuelve los NOMBRES de los equipos para los que el plan no trae a nadie
+     * y que hoy tienen alineación cargada. Vacío quiere decir que rehacer no
+     * pierde nada: o TM trae a los dos lados, o del lado que no trae tampoco
+     * teníamos nada.
+     *
+     * Cuenta contra `alineacions` en vez de confiar en el `$yaCargado` de más
+     * arriba porque ahí lo que importa es OTRA cosa: ese cuenta el partido
+     * entero para el candado del "ya está cargado", y acá hace falta equipo por
+     * equipo — el caso malo es justamente el partido que tiene los dos lados y
+     * TM publica uno.
+     */
+    private function ladosQueQuedarianVacios(array $plan, Partido $partido, array $lados)
+    {
+        $vienen = [];
+        foreach ($plan['alineacions'] as $fila) {
+            $equipoId = (int) $fila['equipo_id'];
+            $vienen[$equipoId] = true;
+        }
+
+        $hay = [];
+        foreach (DB::table('alineacions')->where('partido_id', $partido->id)
+                     ->select('equipo_id')->distinct()->get() as $fila) {
+            $hay[(int) $fila->equipo_id] = true;
+        }
+
+        $vacios = [];
+        foreach ($lados as $lado) {
+            $equipoId = (int) $lado['equipo_id'];
+            if (empty($vienen[$equipoId]) && !empty($hay[$equipoId])) {
+                $vacios[] = $lado['equipo_nombre'];
+            }
+        }
+
+        return $vacios;
     }
 
     /**
