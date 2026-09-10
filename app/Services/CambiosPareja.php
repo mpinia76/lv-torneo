@@ -93,6 +93,13 @@ class CambiosPareja
             $a = (isset($f->adicionado) && $f->adicionado !== null && $f->adicionado !== '')
                 ? (int) $f->adicionado : null;
 
+            // De dónde viene: el minuto que la fila tenía en la base antes de
+            // esta pasada. Es la pista más fuerte que hay para encontrar a la
+            // pareja —hasta ayer las dos estaban en el MISMO minuto, aunque
+            // fuera el equivocado—, y no depende de que el error sea de un
+            // minuto ni de una forma vieja conocida.
+            $venia = ($m === null) ? null : MinutoHelper::orden($m, $a);
+
             $planeada = isset($yaEscrito[$id]);
             if ($planeada) {
                 $m = $yaEscrito[$id]['minuto'];
@@ -112,6 +119,7 @@ class CambiosPareja
                 // Fija = su minuto ya lo decidió TM en esta pasada. Puede
                 // recibir a la pareja, nunca moverse.
                 'fija'       => isset($fijos[$id]) || $planeada,
+                'venia'      => $venia,
                 'de'         => MinutoHelper::texto($m, ($a === null || (int) $a === 0) ? null : $a),
             ];
         }
@@ -124,18 +132,21 @@ class CambiosPareja
             $paso = $this->unMovimiento($estado, $avisos);
             if ($paso === null) break;
 
-            $id = $paso['id'];
-            $escribir[$id] = ['minuto' => $paso['minuto'], 'adicionado' => $paso['adicionado']];
-            $movidas[] = [
-                'id'         => $id,
-                'jugador_id' => $estado[$id]['jugador_id'],
-                'tipo'       => $estado[$id]['tipo'],
-                'de'         => $estado[$id]['de'],
-                'a'          => MinutoHelper::texto($paso['minuto'], $paso['adicionado']),
-            ];
+            // Un paso puede mover más de una fila: el cambio doble del
+            // descuento deja las dos «Entra» juntas en la forma vieja.
+            foreach ($paso['ids'] as $id) {
+                $escribir[$id] = ['minuto' => $paso['minuto'], 'adicionado' => $paso['adicionado']];
+                $movidas[] = [
+                    'id'         => $id,
+                    'jugador_id' => $estado[$id]['jugador_id'],
+                    'tipo'       => $estado[$id]['tipo'],
+                    'de'         => $estado[$id]['de'],
+                    'a'          => MinutoHelper::texto($paso['minuto'], $paso['adicionado']),
+                ];
 
-            $estado[$id]['minuto']     = $paso['minuto'];
-            $estado[$id]['adicionado'] = $paso['adicionado'];
+                $estado[$id]['minuto']     = $paso['minuto'];
+                $estado[$id]['adicionado'] = $paso['adicionado'];
+            }
         }
 
         return ['escribir' => $escribir, 'movidas' => $movidas, 'avisos' => $avisos];
@@ -159,55 +170,80 @@ class CambiosPareja
                     self::ENTRA  => [],
                     self::SALE   => [],
                     'fijo'       => false,
+                    // De qué minutos vinieron las filas que este grupo ya tiene
+                    // decididas. Ahí es donde estaba la pareja hasta hace un
+                    // rato, así que es el mejor lugar para buscarla.
+                    'venian'     => [],
                 ];
             }
             $grupos[$o][$e['tipo']][] = $id;
-            if ($e['fija']) $grupos[$o]['fijo'] = true;
+            if ($e['fija']) {
+                $grupos[$o]['fijo'] = true;
+                if ($e['venia'] !== null && $e['venia'] !== $o) $grupos[$o]['venian'][$e['venia']] = true;
+            }
         }
 
         foreach ($grupos as $oD => $destino) {
             $dif = count($destino[self::ENTRA]) - count($destino[self::SALE]);
+            if ($dif === 0) continue;
 
-            // Sólo el descalce de a uno. Dos o más no es una pareja partida:
-            // es otro problema y no lo arregla mover una fila.
-            if ($dif !== 1 && $dif !== -1) continue;
-            $falta = $dif > 0 ? self::SALE : self::ENTRA;
+            $falta   = $dif > 0 ? self::SALE : self::ENTRA;
+            $cuantas = abs($dif);
 
-            // El grupo que se queda con la fila tiene que ser el que sabemos
+            // El grupo que se queda con las filas tiene que ser el que sabemos
             // bueno: o lo acaba de decir TM, o tiene el descuento escrito —que
             // es lo único que escribe el repaso desde TM, porque ninguna de
             // las dos formas viejas lo tenía—.
             if (!$destino['fijo'] && $destino['adicionado'] === null) continue;
 
-            $candidatas = [];
+            // Los cambios dobles del descuento vienen de a dos: las dos filas
+            // «Sale» quedaron en 90+3 y las dos «Entra» en 93. Mover las dos
+            // es tan demostrable como mover una —van todas al MISMO minuto,
+            // así que cuál era pareja de cuál no cambia el resultado—, pero el
+            // grupo de origen tiene que quedar parejo también: se exige que le
+            // sobre exactamente esa cantidad y que las que sobran sean
+            // exactamente las que están libres. Si hay de más, elegir cuáles
+            // se mueven sí sería adivinar.
+            $candidatos = [];
             foreach ($grupos as $oS => $origen) {
                 if ($oS === $oD) continue;
 
                 $difS = count($origen[self::ENTRA]) - count($origen[self::SALE]);
-                // Al otro grupo le tiene que sobrar justo lo que a éste le
-                // falta: así los dos quedan parejos de una.
-                if ($falta === self::SALE  && $difS !== -1) continue;
-                if ($falta === self::ENTRA && $difS !== 1)  continue;
+                if ($difS !== -$dif) continue;
 
                 if (!$this->compatibles($destino, $origen, $oD, $oS)) continue;
 
+                $libres = [];
                 foreach ($origen[$falta] as $id) {
-                    if ($estado[$id]['fija']) continue;   // esa la dijo TM: no se toca
-                    $candidatas[] = $id;
+                    if ($estado[$id]['fija']) continue;   // ésa la dijo TM: no se toca
+                    $libres[] = $id;
                 }
+
+                if (count($libres) !== $cuantas) {
+                    if ($libres) {
+                        $avisos[] = 'Al minuto ' . MinutoHelper::texto($destino['minuto'], $destino['adicionado'])
+                            . ' le faltan ' . $cuantas . ' «' . $falta . '» y en el '
+                            . MinutoHelper::texto($origen['minuto'], $origen['adicionado']) . ' hay '
+                            . count($libres) . ' sin atar: no sé cuál mover, así que no toco ninguna.';
+                    }
+                    continue;
+                }
+
+                $candidatos[] = $libres;
             }
 
-            if (count($candidatas) === 0) continue;
+            if (count($candidatos) === 0) continue;
 
-            if (count($candidatas) > 1) {
+            if (count($candidatos) > 1) {
                 $avisos[] = 'El minuto ' . MinutoHelper::texto($destino['minuto'], $destino['adicionado'])
-                    . ' tiene un «' . ($falta === self::SALE ? self::ENTRA : self::SALE)
-                    . '» sin pareja, y hay ' . count($candidatas) . ' filas que podrían serlo: no muevo ninguna.';
+                    . ' tiene ' . $cuantas . ' «' . ($falta === self::SALE ? self::ENTRA : self::SALE)
+                    . '» sin pareja, y hay ' . count($candidatos) . ' minutos que podrían aportarla: '
+                    . 'no muevo ninguna.';
                 continue;
             }
 
             return [
-                'id'         => $candidatas[0],
+                'ids'        => $candidatos[0],
                 'minuto'     => $destino['minuto'],
                 'adicionado' => $destino['adicionado'],
             ];
@@ -225,9 +261,17 @@ class CambiosPareja
      *   · el importador de TM tiraba el descuento  → el 90+4 quedó como 90
      *   · el scraper de promiedos lo sumaba        → el 90+4 quedó como 94
      *
-     * Y, sólo cuando el destino lo acaba de decir Transfermarkt, se acepta
-     * además un minuto de diferencia: es la misma tolerancia con la que el
-     * repaso aparea sus eventos, ni un minuto más.
+     * Y, sólo cuando el destino lo acaba de decir Transfermarkt, dos casos
+     * más:
+     *
+     *   · **De dónde venía.** Si la fila que TM acaba de mover estaba en ese
+     *     mismo minuto hace un rato, ahí está su pareja: las dos filas de un
+     *     cambio se cargaron juntas y con el mismo número, por equivocado que
+     *     fuera. Esto es lo que cubre los descalces de 2, 5 o 10 minutos, que
+     *     ni son ±1 ni son una forma vieja del descuento.
+     *   · **±1 minuto**, la misma tolerancia con la que el repaso aparea sus
+     *     eventos, ni un minuto más. Sirve cuando la pareja NO se cargó junta
+     *     (el 63 contra el 64 de toda la vida).
      */
     private function compatibles(array $destino, array $origen, $oD, $oS)
     {
@@ -235,6 +279,8 @@ class CambiosPareja
             if ($origen['minuto'] === $destino['minuto']) return true;
             if ($origen['minuto'] === $destino['minuto'] + $destino['adicionado']) return true;
         }
+
+        if ($destino['fijo'] && isset($destino['venian'][$oS])) return true;
 
         if ($destino['fijo'] && abs($oD - $oS) <= 100) return true;
 
