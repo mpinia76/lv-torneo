@@ -3250,10 +3250,16 @@ class TmDetallePartido
         $cands = $this->candidatosPorNombre($tabla, $datos);
 
         $mejor = null; $puntaje = 0; $empatados = 0;
+        $vueltaMejor = false; $fechaMejor = null;
         foreach ($cands as $c) {
+            $vuelta = false;
             if (!empty($datos['nacimiento']) && !empty($c->nacimiento)
                 && substr((string) $c->nacimiento, 0, 10) !== $datos['nacimiento']) {
-                continue;   // fechas distintas: no es él
+                // Puede ser la misma fecha con el día y el mes cambiados de
+                // lugar (ver fechaDadaVuelta): eso no es otra persona, es un
+                // dato mal cargado. No lo descartamos, pero queda para revisar.
+                $vuelta = ($this->fechaDadaVuelta($datos['nacimiento']) === substr((string) $c->nacimiento, 0, 10));
+                if (!$vuelta) continue;   // fechas distintas: no es él
             }
 
             $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
@@ -3262,14 +3268,24 @@ class TmDetallePartido
             if (!$this->apellidosSeTocan($apeTm, $tokensTm, $apeBase, $tokensBase)) continue;
 
             $p = count(array_intersect($tokensTm, $tokensBase));
-            if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
+            if ($p > $puntaje) {
+                $puntaje = $p; $mejor = $c; $empatados = 1;
+                $vueltaMejor = $vuelta; $fechaMejor = $c->nacimiento;
+            }
             elseif ($p === $puntaje && $p > 0) { $empatados++; }
         }
 
         if (!$mejor || $puntaje < 2) return null;
 
+        if ($vueltaMejor) {
+            $this->aviso('Fecha de nacimiento dada vuelta: "' . trim($mejor->apellido . ', ' . $mejor->nombre)
+                . '" (#' . $mejor->id . ') está en la base como ' . substr((string) $fechaMejor, 0, 10)
+                . ' y Transfermarkt dice ' . $datos['nacimiento'] . ' — el mismo día y mes cambiados de lugar. '
+                . 'Lo tomo como la misma persona para no duplicarlo; la fecha corregila a mano.');
+        }
+
         return ['id' => (int) $mejor->id, 'base' => trim($mejor->apellido . ', ' . $mejor->nombre),
-            'revisar' => ($empatados > 1 || $puntaje < count($tokensTm))];
+            'revisar' => ($vueltaMejor || $empatados > 1 || $puntaje < count($tokensTm))];
     }
 
     /**
@@ -3341,6 +3357,26 @@ class TmDetallePartido
                 return ['id' => (int) $exacta->id,
                     'base' => trim($exacta->apellido . ', ' . $exacta->nombre),
                     'como' => 'misma clave nombre + apellido + fecha de nacimiento'];
+            }
+
+            // Mismo nombre y apellido exactos, con la fecha dada vuelta: es la
+            // misma persona con el dato mal cargado, no una nueva.
+            $alReves = $this->fechaDadaVuelta($nac);
+            if ($alReves) {
+                $vuelta = DB::table('personas')
+                    ->where('nombre', $nombre)
+                    ->where('apellido', $apellido)
+                    ->where('nacimiento', $alReves)
+                    ->select('id', 'nombre', 'apellido')->first();
+                if ($vuelta) {
+                    $this->aviso('Fecha de nacimiento dada vuelta: "' . trim($vuelta->apellido . ', ' . $vuelta->nombre)
+                        . '" (persona #' . $vuelta->id . ') está en la base como ' . $alReves
+                        . ' y Transfermarkt dice ' . $nac . ' — el mismo día y mes cambiados de lugar. '
+                        . 'Uso esa persona para no duplicarla; la fecha corregila a mano.');
+                    return ['id' => (int) $vuelta->id,
+                        'base' => trim($vuelta->apellido . ', ' . $vuelta->nombre),
+                        'como' => 'mismo nombre y apellido, con la fecha de nacimiento dada vuelta'];
+                }
             }
         }
 
@@ -3606,18 +3642,8 @@ class TmDetallePartido
 
         // ── 1) Mismo día de nacimiento ────────────────────────────────────
         if (!empty($datos['nacimiento'])) {
-            $cands = DB::table('jugadors')
-                ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
-                ->where('personas.nacimiento', $datos['nacimiento'])
-                ->select('jugadors.id', 'personas.apellido', 'personas.nombre')
-                ->limit(50)->get();
-
-            $mejor = null; $puntaje = 0; $empatados = 0;
-            foreach ($cands as $c) {
-                $p = count(array_intersect($tokensTm, $this->tokensNombre($c->apellido . ' ' . $c->nombre)));
-                if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
-                elseif ($p === $puntaje && $p > 0) { $empatados++; }
-            }
+            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm);
+            $mejor = $r['mejor']; $puntaje = $r['puntaje']; $empatados = $r['empatados'];
 
             // Hacen falta DOS palabras en común. Con una sola no alcanza: dos
             // personas distintas pueden haber nacido el mismo día y llamarse
@@ -3642,6 +3668,37 @@ class TmDetallePartido
                     . ' pero sólo comparten una palabra del nombre. NO los uní: si son la misma persona, '
                     . 'unificalos a mano.');
             }
+
+            // ── 1b) La misma fecha con el día y el mes al revés ────────────
+            // Facundo Sava (TM 3709): TM dice 1974-03-07 y la base lo tiene
+            // en 1974-07-03. Es la misma fecha con los dos números cambiados
+            // de lugar — la firma de una carga vieja donde un d/m/Y se parseó
+            // como m/d/Y. Sin esto la ficha no se encuentra y el importador
+            // ofrece CREARLA de nuevo, con foto y todo.
+            //
+            // Acá la fecha ya no sostiene el apareo como en (1), así que se
+            // pide además que los apellidos se toquen y que no haya empate.
+            // Siempre queda para revisar, y la fecha NO se corrige sola: la
+            // que está mal puede ser la nuestra o la de Transfermarkt (a los
+            // partidos postergados TM también les deja el dato viejo).
+            $alReves = $this->fechaDadaVuelta($datos['nacimiento']);
+            if ($alReves) {
+                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm);
+                $apeTm = $this->tokensNombre($datos['apellido']);
+                if ($r['mejor'] && $r['puntaje'] >= 2 && $r['empatados'] === 1
+                    && $this->apellidosSeTocan($apeTm, $tokensTm,
+                        $this->tokensNombre($r['mejor']->apellido),
+                        $this->tokensNombre($r['mejor']->apellido . ' ' . $r['mejor']->nombre))) {
+                    $base = trim($r['mejor']->apellido . ', ' . $r['mejor']->nombre);
+                    $this->aviso('Fecha de nacimiento dada vuelta: "' . $base . '" (#' . $r['mejor']->id
+                        . ') está en la base como ' . $alReves . ' y Transfermarkt dice ' . $datos['nacimiento']
+                        . ' — el mismo día y mes cambiados de lugar. Lo tomo como la misma persona para no '
+                        . 'duplicarlo, pero la fecha no la toco: corregila a mano si la que está bien es la de '
+                        . 'Transfermarkt. Confirmalo en "jugadores por revisar".');
+                    return ['jugador_id' => (int) $r['mejor']->id, 'base' => $base, 'revisar' => true,
+                        'como' => 'mismo nombre y la fecha de nacimiento con el día y el mes cambiados de lugar'];
+                }
+            }
         }
 
         // ── 2) En la base no tiene fecha cargada ──────────────────────────
@@ -3659,6 +3716,52 @@ class TmDetallePartido
         }
 
         return null;
+    }
+
+    /**
+     * El jugador de la base nacido en $fecha que más palabras del nombre
+     * comparte con $tokensTm. Quién es quién lo decide el que llama: acá sólo
+     * se cuenta.
+     *
+     * @return array ['mejor' => fila|null, 'puntaje' => int, 'empatados' => int]
+     */
+    private function mejorJugadorPorFecha($fecha, array $tokensTm)
+    {
+        $cands = DB::table('jugadors')
+            ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->where('personas.nacimiento', $fecha)
+            ->select('jugadors.id', 'personas.apellido', 'personas.nombre')
+            ->limit(50)->get();
+
+        $mejor = null; $puntaje = 0; $empatados = 0;
+        foreach ($cands as $c) {
+            $p = count(array_intersect($tokensTm, $this->tokensNombre($c->apellido . ' ' . $c->nombre)));
+            if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
+            elseif ($p === $puntaje && $p > 0) { $empatados++; }
+        }
+
+        return ['mejor' => $mejor, 'puntaje' => $puntaje, 'empatados' => $empatados];
+    }
+
+    /**
+     * La misma fecha con el día y el mes cambiados de lugar (1974-03-07 ->
+     * 1974-07-03), o null si no puede estar dada vuelta.
+     *
+     * Devuelve null cuando el día es mayor que 12 (no hay mes 13: la fecha no
+     * es ambigua y darla vuelta daría una fecha inexistente) y cuando día y
+     * mes son iguales (dada vuelta es la misma fecha, no hay nada que buscar).
+     *
+     * @param  string $fecha  'Y-m-d'
+     * @return string|null
+     */
+    private function fechaDadaVuelta($fecha)
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})/', (string) $fecha, $m)) return null;
+
+        $mes = (int) $m[2]; $dia = (int) $m[3];
+        if ($dia < 1 || $dia > 12 || $mes < 1 || $dia === $mes) return null;
+
+        return $m[1] . '-' . $m[3] . '-' . $m[2];
     }
 
     /**
