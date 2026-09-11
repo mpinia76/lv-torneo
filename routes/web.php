@@ -282,6 +282,11 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/competencia-html', 'ImportDetallesController@competenciaHtml')->name('import_detalles.competencia_html');
     Route::get('/import-detalles/nombres-alfabeto', 'ImportDetallesController@nombresAlfabeto')->name('import_detalles.nombres_alfabeto');
     Route::get('/import-detalles/clubes-tm', 'ImportDetallesController@clubesTm')->name('import_detalles.clubes_tm');
+    // Unificar dos equipos que son el mismo club. Va acá y no en `equipos`
+    // porque el caso lo destapa siempre el importador: TM renombra el verein
+    // cuando el club se muda y nos quedan dos equipos para un solo club.
+    Route::get('/import-detalles/fusionar-equipos', 'ImportDetallesController@fusionarEquipos')
+        ->name('import_detalles.fusionar_equipos');
 });
 
 

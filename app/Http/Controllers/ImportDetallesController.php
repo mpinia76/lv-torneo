@@ -3024,6 +3024,11 @@ class ImportDetallesController extends Controller
                 ->whereNotNull('partido_id')->whereNotNull('external_id')
                 ->whereIn('estado', ['aplicado', 'duplicado'])
                 ->whereNull('penales_revisado_at')
+                // Los de clubes cruzados no entran: este pase tampoco los puede
+                // escribir y la llamada se tira igual. Ver `marcarClubesMal()`.
+                ->when($this->columnaClubesMal(), function ($q) {
+                    return $q->whereNull('clubes_mal_at');
+                })
                 ->whereIn('partido_id', function ($sub) {
                     $sub->from('alineacions')->select('partido_id')->distinct();
                 });
@@ -3039,6 +3044,9 @@ class ImportDetallesController extends Controller
 
         $hechos = 0; $fallaron = 0; $llamadas = 0; $conPenales = 0; $filasNuevas = 0;
         $detalle = ''; $jugadoresNuevos = [];
+        // Los clubes cruzados se marcan también desde acá: la llamada la paga
+        // igual este pase, y el partido es el mismo.
+        $clubesMalIds = []; $clubesBienIds = [];
 
         if ($correr && ($pendientes || $unPartido)) {
             // De a uno y en orden: el más nuevo primero, que es lo que más
@@ -3062,9 +3070,26 @@ class ImportDetallesController extends Controller
 
                 if (!$r['escrito']) {
                     $fallaron++;
-                    $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
+                    // Mismo criterio que en el repaso de tipos de gol: si los
+                    // clubes no aparean, el renglón tiene que decir con qué
+                    // gameId y llevar a la pantalla donde se arregla, y el
+                    // partido queda marcado para que no vuelva a pagar la
+                    // llamada en cada tanda. Ver `marcarClubesMal()`.
+                    $salida = '';
+                    if (!empty($r['clubes_mal'])) {
+                        $clubesMalIds[] = (int) $f->partido_id;
+                        $salida = ' <span class="sub">· gameId <a target="_blank" rel="noopener" href="'
+                            . e('https://www.transfermarkt.es/-/index/spielbericht/'
+                                . rawurlencode((string) $f->external_id)) . '">'
+                            . e((string) $f->external_id) . '</a> · <a href="'
+                            . e(route('import_detalles.clubes_tm', ['partido_id' => (int) $f->partido_id]))
+                            . '"><b>arreglar los clubes del #' . (int) $f->partido_id . '</b></a></span>';
+                    }
+                    $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — '
+                        . e((string) $r['error']) . $salida . '</div>';
                 } else {
                     $hechos++;
+                    $clubesBienIds[] = (int) $f->partido_id;
                     $cuantas = count($r['penals']);
                     if ($cuantas) {
                         $conPenales++;
@@ -3087,6 +3112,9 @@ class ImportDetallesController extends Controller
                     $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
                 }
             }
+
+            TmDetallePartido::marcarClubesMal($clubesMalIds, true);
+            TmDetallePartido::marcarClubesMal($clubesBienIds, false);
 
             // Los recién revisados ya no están pendientes.
             $pendientes = (clone $base())->distinct()->count('partido_id');
@@ -3276,6 +3304,13 @@ class ImportDetallesController extends Controller
             $q = DB::table('import_partidos')
                 ->whereNotNull('partido_id')->whereNotNull('external_id')
                 ->whereIn('estado', ['aplicado', 'duplicado'])
+                // Afuera los que ya sabemos que tienen los clubes cruzados: el
+                // pase no los puede arreglar (el chequeo corre después de bajar
+                // el JSON) y volverlos a intentar es una llamada tirada por
+                // tanda, para siempre. Salen en su propia lista, más abajo.
+                ->when($this->columnaClubesMal(), function ($q) {
+                    return $q->whereNull('clubes_mal_at');
+                })
                 // Entra si le falta cualquiera de los dos repasos. Son marcas
                 // distintas a propósito: los 6323 que ya figuran revisados de
                 // tipo lo fueron cuando el descuento todavía se tiraba.
@@ -3378,6 +3413,9 @@ class ImportDetallesController extends Controller
         // Los que salen «sin detalle» y los que sí lo tienen, para dejarlo
         // anotado en la base al final de la tanda. Ver `marcarSinDetalle()`.
         $sinDetalleIds = []; $conDetalleIds = [];
+        // Lo mismo para los clubes cruzados: los que hay que marcar y los que
+        // aparearon bien (a esos se les saca la marca si la tenían).
+        $clubesMalIds = []; $clubesBienIds = []; $clubesMal = 0;
 
         if ($correr && ($pendientes || $unPartido)) {
             $lote = $unPartido
@@ -3407,9 +3445,26 @@ class ImportDetallesController extends Controller
 
                 if (!$r['escrito']) {
                     $fallaron++;
-                    $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
+                    // El renglón decía el problema y no daba ninguna salida: ni
+                    // el gameId para mirar la ficha en TM ni la pantalla donde
+                    // se arregla el club. Un error sin salida es un callejón, y
+                    // en el continuado encima dura ocho segundos.
+                    $salida = '';
+                    if (!empty($r['clubes_mal'])) {
+                        $clubesMal++;
+                        $clubesMalIds[] = (int) $f->partido_id;
+                        $salida = ' <span class="sub">· gameId <a target="_blank" rel="noopener" href="'
+                            . e('https://www.transfermarkt.es/-/index/spielbericht/'
+                                . rawurlencode((string) $f->external_id)) . '">'
+                            . e((string) $f->external_id) . '</a> · <a href="'
+                            . e(route('import_detalles.clubes_tm', ['partido_id' => (int) $f->partido_id]))
+                            . '"><b>arreglar los clubes del #' . (int) $f->partido_id . '</b></a></span>';
+                    }
+                    $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — '
+                        . e((string) $r['error']) . $salida . '</div>';
                 } else {
                     $hechos++;
+                    $clubesBienIds[] = (int) $f->partido_id;
                     $olimpicos += (int) $r['olimpicos'];
                     foreach ((isset($r['matriz']) ? $r['matriz'] : []) as $clave => $cuantos) {
                         $matriz[$clave] = (isset($matriz[$clave]) ? $matriz[$clave] : 0) + $cuantos;
@@ -3504,6 +3559,12 @@ class ImportDetallesController extends Controller
             // eran. Anotados, salen en la lista de abajo hasta que se arreglen.
             TmDetallePartido::marcarSinDetalle($sinDetalleIds, true);
             TmDetallePartido::marcarSinDetalle($conDetalleIds, false);
+
+            // Y que los de clubes cruzados salgan de la cola: el pase no los
+            // puede arreglar, así que reintentarlos es una llamada tirada por
+            // tanda. El que aparea bien pierde la marca en el acto.
+            TmDetallePartido::marcarClubesMal($clubesMalIds, true);
+            TmDetallePartido::marcarClubesMal($clubesBienIds, false);
 
             $pendientes = (clone $base())->distinct()->count('partido_id');
         }
@@ -3636,6 +3697,11 @@ class ImportDetallesController extends Controller
             ? (clone $this->sinDetalleQ($tecnicoId, $comp, $ronda))->distinct()->count('partido_id')
             : 0;
 
+        // Lo mismo para los clubes cruzados: el número no se achica solo.
+        $clubesMalTotal = $this->columnaClubesMal()
+            ? (clone $this->clubesMalQ($tecnicoId, $comp, $ronda))->distinct()->count('partido_id')
+            : 0;
+
         $cuerpo .= '<div class="cards">'
             . $this->card($pendientes, 'Sin revisar', $pendientes ? 'warn' : 'ok')
             . $this->card($revisados + $hechos, 'Ya revisados', 'ok')
@@ -3644,6 +3710,7 @@ class ImportDetallesController extends Controller
             . ($correr ? $this->card($olimpicos, 'Olímpicos', $olimpicos ? 'warn' : '') : '')
             . ($correr ? $this->card($minCorregidos, 'Minutos corregidos', $minCorregidos ? 'warn' : '') : '')
             . ($sinDetalleTotal ? $this->card($sinDetalleTotal, 'Sin detalle de TM', 'warn') : '')
+            . ($clubesMalTotal ? $this->card($clubesMalTotal, 'Clubes cruzados', 'err') : '')
             . ($correr && $fallaron ? $this->card($fallaron, 'Con problema', 'err') : '')
             . ($correr ? $this->card($llamadas, 'Llamadas a la API') : '')
             . ($buscarIds ? $this->card($idsHallados, 'gameId encontrados', $idsHallados ? 'ok' : '') : '')
@@ -3694,6 +3761,14 @@ class ImportDetallesController extends Controller
                 . 'detalle.</b> Salen de la base, no de Transfermarkt: tienen gameId y goles cargados, y '
                 . 'ninguno de los jugadores de su alineación está mapeado en <code>jugador_tm</code> —ese mapeo '
                 . 'lo crea la bajada del detalle, así que si no está, nunca se bajó. No costó ninguna llamada.</div>';
+        }
+
+        // ── Los que tienen los clubes cruzados ────────────────────────────
+        // Va antes que el resto por la misma razón que la lista de sin detalle:
+        // el informe de la tanda dura ocho segundos en el continuado, y estos
+        // son los únicos que ya no se arreglan solos pasándolos de nuevo.
+        if ($clubesMalTotal) {
+            $cuerpo .= $this->bloqueClubesMal($clubesMalTotal, $tecnicoId, $comp, $ronda, $clubesMal);
         }
 
         if ($sinDetalleTotal) {
@@ -4183,6 +4258,97 @@ class ImportDetallesController extends Controller
     private function columnaSinDetalle()
     {
         return Schema::hasColumn('import_partidos', 'sin_detalle_at');
+    }
+
+    /**
+     * Lo mismo para `clubes_mal_at` (migración
+     * `2026_09_11_100000_add_clubes_mal_a_import_partidos`): sin la columna no
+     * hay marca ni lista, y las dos pantallas siguen andando como antes.
+     */
+    private function columnaClubesMal()
+    {
+        static $hay = null;
+        if ($hay === null) $hay = Schema::hasColumn('import_partidos', 'clubes_mal_at');
+        return $hay;
+    }
+
+    /** Los partidos marcados «los clubes no coinciden», con los filtros puestos. */
+    private function clubesMalQ($tecnicoId = 0, $comp = '', $ronda = '')
+    {
+        $q = DB::table('import_partidos')
+            ->whereNotNull('partido_id')->whereNotNull('external_id')
+            ->whereNotNull('clubes_mal_at')
+            ->whereIn('estado', ['aplicado', 'duplicado']);
+
+        if ($tecnicoId) $q->where('tecnico_id', $tecnicoId);
+        if ($comp !== '')  $q->where('competencia_external_id', $comp);
+        if ($ronda !== '') $q->where('ronda', $ronda);
+
+        return $q;
+    }
+
+    /**
+     * La lista de los partidos cuyos clubes no aparean con los de Transfermarkt.
+     *
+     * No es un error de la tanda: es un dato que hay que arreglar a mano, y son
+     * las dos únicas causas posibles —un club nuestro partido en dos equipos, o
+     * un gameId que es de otro partido—. Mientras tanto el partido está fuera de
+     * la cola, así que no se lleva una llamada por tanda.
+     *
+     * La marca la borra sola el primer pase que consigue aparearlos: arreglado
+     * el club (o movido el gameId), se vuelve a pasar ese partido con
+     * `?partido_id=N&correr=1` y sale de esta lista sin tocar nada más.
+     */
+    private function bloqueClubesMal($total, $tecnicoId = 0, $comp = '', $ronda = '', $enEstaTanda = 0)
+    {
+        $filas = (clone $this->clubesMalQ($tecnicoId, $comp, $ronda))
+            ->orderByDesc('dia')->limit(60)->get();
+
+        // Una fila por partido: el staging puede tener dos (el mismo partido
+        // visto desde los dos DTs).
+        $unicas = [];
+        foreach ($filas as $f) {
+            $id = (int) $f->partido_id;
+            if (!isset($unicas[$id])) $unicas[$id] = $f;
+        }
+
+        $out = '<h2>Los clubes no coinciden <span class="sub">(' . (int) $total . ')</span></h2>'
+            . '<div class="err-box"><b>Para estos partidos, Transfermarkt dice otros clubes que los que los '
+            . 'juegan en tu base.</b> No se escribe nada —si el apareo estuviera mal, el pase les metería los '
+            . 'goles de otro partido— y están <b>fuera de la cola</b>: así no se llevan una llamada por tanda.'
+            . ($enEstaTanda ? ' <b>' . (int) $enEstaTanda . '</b> salieron en esta tanda.' : '')
+            . '</div>'
+            . '<p class="sub">Sólo hay dos causas. <b>1)</b> Un club tuyo quedó partido en <b>dos equipos</b>: '
+            . 'cuando un club se muda o se rebautiza, Transfermarkt <b>renombra el mismo verein</b> —al revés que '
+            . 'cuando se fusiona, que crea uno nuevo— y el partido viejo llega con el nombre nuevo, así que el '
+            . 'importador creó un equipo aparte (Cortuluá / Internacional de Palmira). Eso se arregla '
+            . '<a href="' . e(route('import_detalles.fusionar_equipos')) . '">unificando los dos equipos</a>, no '
+            . 'tocando el mapeo: un verein no puede apuntar a dos equipos. <b>2)</b> El <code>gameId</code> es de '
+            . '<b>otro partido</b>, y entonces el club que sobra no tiene nada que ver. De quién es un gameId lo '
+            . 'decide la ficha de Transfermarkt, no la base.</p>'
+            . '<p class="sub">Cada renglón abre la pantalla que contesta la pregunta entera: qué equipos juegan el '
+            . 'partido en tu base y qué clubes de TM apuntan a cada uno. <b>Ver no gasta llamadas.</b> Arreglado el '
+            . 'club, «Volver a pasarlo» lo rehace (1 llamada) y lo saca de esta lista solo.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Partido</th><th>Día</th><th>gameId</th>'
+            . '<th>Qué hacer</th></tr></thead><tbody>';
+
+        foreach ($unicas as $id => $f) {
+            $out .= '<tr><td>' . e((string) $f->club_nombre . ' vs ' . (string) $f->rival_nombre)
+                . ' <span class="sub">#' . $id . '</span></td>'
+                . '<td class="sub">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
+                . '<td class="num gris"><a target="_blank" rel="noopener" href="'
+                . e('https://www.transfermarkt.es/-/index/spielbericht/' . rawurlencode((string) $f->external_id))
+                . '">' . e((string) $f->external_id) . '</a></td>'
+                . '<td><a class="boton-sec" href="'
+                . e(route('import_detalles.clubes_tm', ['partido_id' => $id])) . '">Ver los clubes</a> '
+                . '<a class="boton-sec" href="'
+                . e(route('import_detalles.tipos_gol', ['partido_id' => $id, 'correr' => 1]))
+                . '">Volver a pasarlo</a></td></tr>';
+        }
+
+        return $out . '</tbody></table></div>'
+            . (count($unicas) < $total ? '<p class="sub">Se muestran los ' . count($unicas)
+                . ' más nuevos de ' . (int) $total . '.</p>' : '');
     }
 
     /** Los partidos marcados «nunca se le bajó el detalle», con los filtros puestos. */
@@ -5192,7 +5358,13 @@ class ImportDetallesController extends Controller
             . '<input type="text" name="partido_id" value="' . ($partidoId ?: '') . '" size="8" '
             . 'placeholder="o partido #"> '
             . '<button class="boton" type="submit">Ver</button> '
-            . '<span class="sub">no gasta ninguna llamada: es todo de tu base</span></form>';
+            . '<span class="sub">no gasta ninguna llamada: es todo de tu base</span></form>'
+            // El otro arreglo posible, que desde acá no se ve: cuando el club
+            // está bien atado pero el equipo tuyo está partido en dos.
+            . '<p class="sub">Si el problema es al revés —un club tuyo quedó <b>partido en dos equipos</b> porque '
+            . 'Transfermarkt le renombró el verein (Cortuluá / Internacional de Palmira)— el mapeo no se puede '
+            . 'arreglar: <code>tm_club_id</code> es único. Eso se resuelve '
+            . '<a href="' . e(route('import_detalles.fusionar_equipos')) . '"><b>unificando los dos equipos</b></a>.</p>';
 
         // ── Guardar un remapeo ──────────────────────────────────────────────
         if ($mapTm !== '' && $mapEquipo) {
@@ -5431,6 +5603,325 @@ class ImportDetallesController extends Controller
      * de administración (`resources/views/import/pagina.blade.php`), para tener
      * el menú de siempre. El CSS vive allá, prefijado con `.import-tm`.
      */
+    /**
+     * Las columnas de la base que apuntan a `equipos.id`.
+     *
+     * Se descubren solas —no hay lista escrita a mano que sobreviva a la
+     * próxima tabla— leyendo las foreign keys del esquema. A eso se le suman
+     * las que **no tienen** foreign key, que son las de siempre: los mapeos y
+     * el staging se crearon a mano y nunca la tuvieron (ver la memoria
+     * [[mapeos-tm-rotos]]: una tabla sin foreign key es una promesa que nadie
+     * cumple).
+     *
+     * Devuelve `[['tabla' => t, 'columna' => c, 'de' => 'fk'|'lista'], ...]`.
+     */
+    private function columnasDeEquipo()
+    {
+        $base = DB::getDatabaseName();
+
+        $cols = [];
+        $filas = DB::select(
+            'SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.KEY_COLUMN_USAGE '
+            . 'WHERE TABLE_SCHEMA = ? AND REFERENCED_TABLE_NAME = ? AND REFERENCED_COLUMN_NAME = ? '
+            . 'ORDER BY TABLE_NAME, COLUMN_NAME', [$base, 'equipos', 'id']);
+        foreach ($filas as $f) {
+            $cols[$f->t . '.' . $f->c] = ['tabla' => $f->t, 'columna' => $f->c, 'de' => 'fk'];
+        }
+
+        // Las que no tienen FK. Están verificadas una por una contra el código
+        // que las escribe: `equipo_tm.equipo_id` es el mapeo con Transfermarkt,
+        // y en `import_partidos` el club y el rival de la fila de staging son
+        // equipos nuestros (`TmDetallePartido::mapaDesdeStaging()` los usa así).
+        foreach ([['equipo_tm', 'equipo_id'], ['import_partidos', 'equipo_id'],
+                     ['import_partidos', 'rival_id']] as $par) {
+            list($t, $c) = $par;
+            if (isset($cols[$t . '.' . $c])) continue;
+            if (!Schema::hasTable($t) || !Schema::hasColumn($t, $c)) continue;
+            $cols[$t . '.' . $c] = ['tabla' => $t, 'columna' => $c, 'de' => 'lista'];
+        }
+
+        return array_values($cols);
+    }
+
+    /**
+     * Columnas que *parecen* apuntar a un equipo y no están cubiertas.
+     *
+     * No se tocan: se muestran. Es el único freno honesto contra el error que
+     * arruinaría una fusión —dejar filas apuntando a un equipo que ya no juega
+     * nada—, sin caer en el otro, que es pisar una columna que se llama igual
+     * y significa otra cosa.
+     */
+    private function columnasSospechosas(array $cubiertas)
+    {
+        $base = DB::getDatabaseName();
+        $ya = [];
+        foreach ($cubiertas as $c) $ya[$c['tabla'] . '.' . $c['columna']] = true;
+
+        $out = [];
+        $filas = DB::select(
+            'SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.COLUMNS '
+            . 'WHERE TABLE_SCHEMA = ? AND (COLUMN_NAME LIKE ? OR COLUMN_NAME = ?) '
+            . 'ORDER BY TABLE_NAME, COLUMN_NAME', [$base, 'equipo%\_id', 'rival_id']);
+        foreach ($filas as $f) {
+            if ($f->t === 'equipos') continue;
+            if (isset($ya[$f->t . '.' . $f->c])) continue;
+            $out[] = ['tabla' => $f->t, 'columna' => $f->c];
+        }
+        return $out;
+    }
+
+    /**
+     * Filas que chocarían contra un índice único al mover la columna.
+     *
+     * Sin esto la fusión se cae a la mitad con un 1062 y —dentro de la
+     * transacción— no pasa nada, pero no sabés por qué. Con esto se sabe antes
+     * y se ve exactamente cuántas filas hay que resolver a mano.
+     */
+    private function choquesAlMover($tabla, $columna, $origen, $destino)
+    {
+        $base = DB::getDatabaseName();
+        $filas = DB::select(
+            'SELECT INDEX_NAME AS i, COLUMN_NAME AS c FROM information_schema.STATISTICS '
+            . 'WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND NON_UNIQUE = 0 '
+            . 'ORDER BY INDEX_NAME, SEQ_IN_INDEX', [$base, $tabla]);
+
+        $indices = [];
+        foreach ($filas as $f) $indices[$f->i][] = $f->c;
+
+        $out = [];
+        foreach ($indices as $nombre => $cols) {
+            if (!in_array($columna, $cols, true)) continue;
+
+            $otras = array_values(array_diff($cols, [$columna]));
+            $sql = 'SELECT COUNT(*) AS n FROM `' . $tabla . '` a JOIN `' . $tabla . '` b ON b.`'
+                . $columna . '` = ?';
+            foreach ($otras as $o) $sql .= ' AND a.`' . $o . '` <=> b.`' . $o . '`';
+            $sql .= ' WHERE a.`' . $columna . '` = ?';
+
+            $n = (int) DB::select($sql, [$destino, $origen])[0]->n;
+            if ($n) $out[] = ['indice' => $nombre, 'columnas' => $cols, 'filas' => $n];
+        }
+        return $out;
+    }
+
+    /**
+     * Unificar dos equipos que son el mismo club.
+     *
+     * Por qué existe: Transfermarkt **renombra el verein** cuando un club se
+     * muda o se rebautiza —Cortuluá pasó a ser Internacional de Palmira y la
+     * ficha `verein/17467` sigue teniendo las temporadas desde 2002—, al revés
+     * que cuando se fusiona o se refunda, donde crea una entidad nueva y deja
+     * la vieja con el año entre paréntesis (ver [[clubes-fusionados-tm]]).
+     * Entonces el partido viejo llega con el nombre NUEVO y el importador creó
+     * un equipo aparte: quedan dos equipos nuestros para un solo club, y todos
+     * los partidos viejos fallan el chequeo de clubes.
+     *
+     * Eso NO se arregla con `equipo_tm`: `tm_club_id` es unique, así que atar el
+     * verein al equipo viejo rompe los partidos nuevos y al revés. Hay que
+     * unificar los dos equipos, y para equipos no había ninguna herramienta
+     * (`FusionPersonas` es de personas).
+     *
+     * Reglas de la pantalla, en el mismo espíritu que la fusión de personas:
+     * primero se mira y después se aplica (nada se escribe sin `aplicar=1`), la
+     * lista de tablas sale del esquema y no de la memoria, los choques contra
+     * índices únicos se cuentan ANTES y bloquean el botón, todo va en una
+     * transacción, y **no se borra nada**: el equipo que se vacía queda ahí para
+     * que lo mires y lo borres vos.
+     */
+    public function fusionarEquipos(Request $request)
+    {
+        set_time_limit(0);
+
+        $origen  = (int) $request->get('origen', 0);
+        $destino = (int) $request->get('destino', 0);
+        $aplicar = (string) $request->get('aplicar', '0') === '1';
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.clubes_tm')) . '">← Clubes de '
+            . 'Transfermarkt</a></p>'
+            . '<h1>Unificar dos equipos que son el mismo club</h1>'
+            . '<p class="sub">Para cuando un club tuyo quedó <b>partido en dos equipos</b>. Pasa porque '
+            . 'Transfermarkt <b>renombra el mismo verein</b> cuando el club se muda o se rebautiza —Cortuluá y '
+            . '«Internacional de Palmira» son la misma ficha, con las temporadas desde 2002 adentro—, así que el '
+            . 'partido viejo llega con el nombre nuevo y el importador creó un equipo aparte. Mientras estén '
+            . 'separados, <b>todos los partidos viejos fallan el chequeo de clubes</b> y no se les puede bajar ni '
+            . 'repasar nada.</p>'
+            . '<p class="sub">Atar el club de TM al equipo viejo no alcanza: <code>equipo_tm.tm_club_id</code> es '
+            . 'único, o sea que un verein apunta a <b>un</b> equipo. Arregla los partidos viejos y rompe los nuevos. '
+            . 'Hay que unificar.</p>'
+            . '<p class="sub"><b>No gasta ninguna llamada</b>: es todo de tu base. Mirar no escribe nada.</p>';
+
+        $opciones = $this->opcionesEquipos();
+
+        $cuerpo .= '<form method="get" class="acciones">'
+            . '<label class="sub">El que <b>se va</b> (sus registros se mudan)</label> '
+            . '<select name="origen" class="s2" data-placeholder="equipo que se va…" required>'
+            . $this->conSeleccion($opciones, $origen) . '</select> '
+            . '<label class="sub">El que <b>queda</b></label> '
+            . '<select name="destino" class="s2" data-placeholder="equipo que queda…" required>'
+            . $this->conSeleccion($opciones, $destino) . '</select> '
+            . '<button class="boton" type="submit">Ver qué se movería</button></form>';
+
+        if (!$origen || !$destino) {
+            $cuerpo .= '<p class="sub">Elegí los dos equipos. Conviene que <b>se vaya el que tiene menos</b> '
+                . 'registros —normalmente el que creó el importador con el nombre nuevo—, y que quede el que tiene '
+                . 'la historia. El nombre del que queda se cambia después, desde su ficha: unificar no lo toca.</p>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        if ($origen === $destino) {
+            $cuerpo .= '<div class="err-box">Son el mismo equipo.</div>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        $nOrigen  = $this->nombreEquipo($origen);
+        $nDestino = $this->nombreEquipo($destino);
+
+        $cols = $this->columnasDeEquipo();
+
+        $total = 0; $choques = []; $conteo = [];
+        foreach ($cols as $c) {
+            $n = DB::table($c['tabla'])->where($c['columna'], $origen)->count();
+            $conteo[] = $c + ['filas' => $n];
+            $total += $n;
+            if ($n) {
+                foreach ($this->choquesAlMover($c['tabla'], $c['columna'], $origen, $destino) as $ch) {
+                    $choques[] = $ch + ['tabla' => $c['tabla'], 'columna' => $c['columna']];
+                }
+            }
+        }
+
+        $cuerpo .= '<h2>' . e((string) $nOrigen) . ' <span class="sub">#' . $origen . '</span> → '
+            . e((string) $nDestino) . ' <span class="sub">#' . $destino . '</span></h2>';
+
+        // El freno contra el error grave: si los dos jugaron ENTRE SÍ, no son el
+        // mismo club. Unificarlos dejaría partidos de un equipo contra sí mismo,
+        // y eso no se deshace mirando la base después.
+        $entreSi = DB::table('partidos')
+            ->where(function ($w) use ($origen, $destino) {
+                $w->where(function ($x) use ($origen, $destino) {
+                    $x->where('equipol_id', $origen)->where('equipov_id', $destino);
+                })->orWhere(function ($x) use ($origen, $destino) {
+                    $x->where('equipol_id', $destino)->where('equipov_id', $origen);
+                });
+            })->count();
+
+        if ($entreSi) {
+            $cuerpo .= '<div class="err-box"><b>Estos dos equipos jugaron ' . (int) $entreSi . ' partido(s) '
+                . 'entre sí</b>, así que no son el mismo club —o uno de esos partidos está mal cargado—. '
+                . 'Unificarlos dejaría partidos de un equipo contra sí mismo. No sigo.</div>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th>Tabla</th><th>Columna</th>'
+            . '<th class="num">Filas que se mudan</th><th>Cómo se encontró</th></tr></thead><tbody>';
+        foreach ($conteo as $c) {
+            $cuerpo .= '<tr' . ($c['filas'] ? '' : ' class="sub"') . '><td>' . e($c['tabla']) . '</td>'
+                . '<td>' . e($c['columna']) . '</td>'
+                . '<td class="num">' . (int) $c['filas'] . '</td>'
+                . '<td class="sub">' . ($c['de'] === 'fk' ? 'foreign key' : 'lista (no tiene foreign key)')
+                . '</td></tr>';
+        }
+        $cuerpo .= '</tbody></table></div>';
+
+        // Lo que el esquema no explica solo: columnas que se llaman como para
+        // apuntar a un equipo y no están cubiertas.
+        $sosp = $this->columnasSospechosas($cols);
+        if (!empty($sosp)) {
+            $cuerpo .= '<div class="err-box"><b>Estas columnas se llaman como para apuntar a un equipo y '
+                . 'NO se van a tocar</b> (no tienen foreign key y no están en la lista verificada). Si alguna es '
+                . 'de verdad un equipo, avisá antes de unificar: si no, sus filas quedan apuntando al equipo que '
+                . 'se vacía.<br>';
+            foreach ($sosp as $s) {
+                $n = 0;
+                try { $n = DB::table($s['tabla'])->where($s['columna'], $origen)->count(); } catch (\Exception $e) {}
+                $cuerpo .= '• <code>' . e($s['tabla']) . '.' . e($s['columna']) . '</code> — ' . (int) $n
+                    . ' fila(s) con #' . $origen . '<br>';
+            }
+            $cuerpo .= '</div>';
+        }
+
+        if (!$total) {
+            $cuerpo .= '<div class="ok-box">El equipo #' . $origen . ' no tiene ninguna fila colgando: no hay '
+                . 'nada que mudar. Si además no lo usás, borralo desde su ficha.</div>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        if (!empty($choques)) {
+            $cuerpo .= '<div class="err-box"><b>Hay filas que chocarían contra un índice único.</b> Mudarlas '
+                . 'así las convierte en duplicados de las que ya tiene el #' . $destino . ', y la base rechaza la '
+                . 'operación entera. Hay que resolver esas filas primero —a mano, mirando cuál de las dos es la '
+                . 'buena—, y recién después unificar.<br>';
+            foreach ($choques as $ch) {
+                $cuerpo .= '• <code>' . e($ch['tabla']) . '</code> · índice <code>' . e($ch['indice'])
+                    . '</code> (' . e(implode(', ', $ch['columnas'])) . ') — <b>' . (int) $ch['filas']
+                    . '</b> fila(s)<br>';
+            }
+            $cuerpo .= '</div>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        if (!$aplicar) {
+            $url = route('import_detalles.fusionar_equipos',
+                ['origen' => $origen, 'destino' => $destino, 'aplicar' => 1]);
+            $cuerpo .= '<div class="ok-box">Se mudan <b>' . $total . '</b> fila(s) y ningún índice único choca. '
+                . 'Va todo en una transacción: o entra completo o no entra nada.</div>'
+                . '<p class="sub"><b>Qué NO hace:</b> no borra el equipo #' . $origen . ' —queda vacío, para que '
+                . 'lo mires y lo borres vos— y no le cambia el nombre al #' . $destino . '. Deshacer no hay: '
+                . 'volver atrás es unificar al revés, y las filas que ya estaban mezcladas no se pueden separar.</p>'
+                . '<p class="acciones"><a class="boton" href="' . e($url) . '">Unificar: mudar las ' . $total
+                . ' filas a #' . $destino . '</a></p>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        // ── Aplicar ────────────────────────────────────────────────────────
+        $movidas = [];
+        try {
+            DB::transaction(function () use ($conteo, $origen, $destino, &$movidas) {
+                foreach ($conteo as $c) {
+                    if (!$c['filas']) continue;
+                    $movidas[$c['tabla'] . '.' . $c['columna']] = DB::table($c['tabla'])
+                        ->where($c['columna'], $origen)->update([$c['columna'] => $destino]);
+                }
+            });
+        } catch (\Exception $e) {
+            $cuerpo .= '<div class="err-box"><b>No se unificó nada.</b> La transacción se cayó y volvió todo '
+                . 'atrás: ' . e($e->getMessage()) . '</div>';
+            return $this->pagina('Unificar equipos', $cuerpo);
+        }
+
+        $cuerpo .= '<div class="ok-box"><b>Unificado.</b> ';
+        foreach ($movidas as $donde => $n) $cuerpo .= '<br>• <code>' . e($donde) . '</code> — ' . (int) $n . ' fila(s)';
+        $cuerpo .= '</div>';
+
+        // Los partidos del equipo que queda vuelven a la cola: si estaban
+        // marcados «los clubes no coinciden» era justamente por esto.
+        if ($this->columnaClubesMal()) {
+            $ids = DB::table('partidos')
+                ->where(function ($w) use ($destino) {
+                    $w->where('equipol_id', $destino)->orWhere('equipov_id', $destino);
+                })->pluck('id')->all();
+            TmDetallePartido::marcarClubesMal($ids, false);
+            $cuerpo .= '<p class="sub">Les saqué la marca de «clubes cruzados» a los partidos del #' . $destino
+                . ': vuelven a la cola del repaso y ahí se confirma que aparean.</p>';
+        }
+
+        $cuerpo .= '<p class="sub">Quedó pendiente, a mano: <b>el nombre</b> del #' . $destino . ' (si el que '
+            . 'querés mostrar es el otro, cambiáselo en su ficha) y <b>borrar</b> el #' . $origen . ', que quedó '
+            . 'vacío. Y revisá <a href="' . e(route('import_detalles.clubes_tm',
+                ['buscar' => (string) $nDestino])) . '">los clubes de TM atados</a>: ahora tienen que apuntar '
+            . 'los dos al mismo equipo.</p>';
+
+        return $this->pagina('Unificar equipos', $cuerpo);
+    }
+
+    /** El mismo `<option>…` de siempre pero con uno ya elegido. */
+    private function conSeleccion($opciones, $id)
+    {
+        if (!$id) return $opciones;
+        return str_replace('<option value="' . (int) $id . '">',
+            '<option value="' . (int) $id . '" selected>', $opciones);
+    }
+
     private function pagina($titulo, $cuerpo)
     {
         return view('import.pagina', ['titulo' => $titulo, 'cuerpo' => $cuerpo]);

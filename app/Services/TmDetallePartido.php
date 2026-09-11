@@ -784,6 +784,10 @@ class TmDetallePartido
         if ($lados === null) {
             $informe['error'] = $this->ultimoAviso() ?: 'No pude aparear los clubes del partido con los de la base.';
             $informe['avisos'] = $this->avisos;
+            // Que el que llama lo pueda marcar: este partido no se arregla
+            // volviéndolo a pasar, y sin marca vuelve a salir en cada tanda y
+            // paga la llamada de nuevo. Ver `marcarClubesMal()`.
+            $informe['clubes_mal'] = true;
             return $informe;
         }
 
@@ -943,6 +947,10 @@ class TmDetallePartido
         if ($lados === null) {
             $informe['error'] = $this->ultimoAviso() ?: 'No pude aparear los clubes del partido con los de la base.';
             $informe['avisos'] = $this->avisos;
+            // Que el que llama lo pueda marcar: este partido no se arregla
+            // volviéndolo a pasar, y sin marca vuelve a salir en cada tanda y
+            // paga la llamada de nuevo. Ver `marcarClubesMal()`.
+            $informe['clubes_mal'] = true;
             return $informe;
         }
 
@@ -1549,6 +1557,40 @@ class TmDetallePartido
                 ->update(['sin_detalle_at' => $sin ? now() : null]);
         } catch (\Exception $e) {
             Log::error('marcarSinDetalle: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Deja anotado que a este partido **no le aparean los clubes** con los que
+     * dice Transfermarkt para su `external_id`.
+     *
+     * Por qué hace falta: los dos pases livianos (`soloTiposDeGol()` y
+     * `soloPenales()`) chequean los clubes DESPUÉS de bajar el JSON —no hay
+     * forma de saberlo antes— y, cuando no aparean, salen sin escribir y sin
+     * marcar el partido como revisado. O sea que el partido vuelve a salir
+     * primero en la tanda siguiente y **gasta una llamada por tanda, para
+     * siempre**. Nueve partidos rotos alcanzan para que toda tanda arranque
+     * tirando errores.
+     *
+     * La marca los saca de la cola —no de la base— y los junta en una lista
+     * propia con el link a `clubes-tm?partido_id=N`, que es la pantalla donde
+     * se arregla. La borra sola el primer pase que consigue aparearlos.
+     *
+     * Silenciosa si la columna todavía no existe (migración
+     * `2026_09_11_100000_add_clubes_mal_a_import_partidos`): que falte una
+     * migración no es motivo para romper una importación.
+     */
+    public static function marcarClubesMal(array $partidoIds, $mal = true)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
+        if (empty($ids)) return;
+        if (!Schema::hasColumn('import_partidos', 'clubes_mal_at')) return;
+
+        try {
+            DB::table('import_partidos')->whereIn('partido_id', $ids)
+                ->update(['clubes_mal_at' => $mal ? now() : null]);
+        } catch (\Exception $e) {
+            Log::error('marcarClubesMal: ' . $e->getMessage());
         }
     }
 
