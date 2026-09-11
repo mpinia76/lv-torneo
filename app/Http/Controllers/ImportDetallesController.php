@@ -461,6 +461,23 @@ class ImportDetallesController extends Controller
             return $this->pagina('Detalle', $this->sinGameId($partidoId, $buscado, $error));
         }
 
+        // ─────────────── El gameId tiene que ser de ESTE partido ───────────────
+        // Se pregunta ANTES de bajar nada. El orden era al revés —importar()
+        // primero, anotar() después— y eso dejaba una trampa: con un gameId que
+        // ya era de otro partido, la vista previa se dibujaba igual y el botón
+        // «Rehacer y guardar» quedaba ARRIBA del cartel rojo. Ese botón vuelve a
+        // entrar por este mismo camino con escribir=1, así que ESCRIBÍA la
+        // alineación, los goles y las tarjetas del otro partido y recién después
+        // fallaba al anotar, mostrando otra vez el mismo cartel. El único freno
+        // en el medio es que los clubes apareen, y en el caso típico —el mismo
+        // par de equipos una semana antes— aparean.
+        //
+        // Nada que escriba puede correr antes de esta pregunta.
+        $ajenos = $this->duenosDelGameId($gameId, $partidoId);
+        if ($ajenos) {
+            return $this->pagina('Detalle', $this->gameIdAjeno($partidoId, $gameId, $ajenos, $elegido));
+        }
+
         // &fotos=0 para no gastar una llamada por cada persona nueva.
         $fotos = (string) $request->get('fotos', '1') !== '0';
 
@@ -1006,6 +1023,315 @@ class ImportDetallesController extends Controller
             . '<p class="acciones"><a class="boton-sec" href="'
             . e(route('import_detalles.fecha', ['partido_id' => $partidoId, 'dia' => substr($vieja, 0, 19)]))
             . '">Deshacer (volver al ' . e(substr($vieja, 0, 10)) . ')</a></p>');
+    }
+
+    // ═════════════════════ EL gameId ES DE OTRO PARTIDO ═════════════════════
+
+    /**
+     * Los OTROS partidos que ya dicen ser este gameId en `import_partidos`.
+     *
+     * Devuelve la lista de `partido_id` distintos del que se está mirando.
+     * Vacía es el caso normal: el gameId está libre o ya es de este partido.
+     *
+     * Un gameId en dos partidos es SIEMPRE un error de datos: o uno de los dos
+     * está mal atado, o el partido está cargado dos veces en la base. Por eso
+     * esto no se resuelve solo, se muestra y se decide.
+     */
+    private function duenosDelGameId($gameId, $partidoId)
+    {
+        $gameId    = trim((string) $gameId);
+        $partidoId = (int) $partidoId;
+
+        if ($gameId === '' || !$partidoId || !preg_match('/^\d{1,20}$/', $gameId)) return [];
+        if (!Schema::hasTable('import_partidos')) return [];
+
+        $ids = DB::table('import_partidos')
+            ->where('fuente', 'transfermarkt')
+            ->where('external_id', $gameId)
+            ->whereNotNull('partido_id')
+            ->where('partido_id', '<>', $partidoId)
+            ->pluck('partido_id')
+            ->all();
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    /**
+     * La ficha corta de un partido, para poder comparar dos de un vistazo.
+     *
+     * `detalle` es lo que decide casi siempre: un partido con alineación
+     * cargada ya tiene escrito lo que bajó de SU gameId.
+     */
+    private function datosPartido($partidoId)
+    {
+        $partidoId = (int) $partidoId;
+
+        $p = DB::table('partidos')
+            ->leftJoin('equipos as el', 'partidos.equipol_id', '=', 'el.id')
+            ->leftJoin('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
+            ->leftJoin('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->leftJoin('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->leftJoin('torneos', 'torneos.id', '=', 'grupos.torneo_id')
+            ->where('partidos.id', $partidoId)
+            ->first(['partidos.dia', 'partidos.golesl', 'partidos.golesv',
+                'el.nombre as local', 'ev.nombre as visita',
+                'fechas.numero as fecha_numero', 'torneos.nombre as torneo', 'torneos.year as anio']);
+
+        if (!$p) return null;
+
+        return [
+            'id'      => $partidoId,
+            'partido' => trim((string) $p->local . ' vs ' . (string) $p->visita),
+            'dia'     => $p->dia ? substr((string) $p->dia, 0, 10) : '',
+            'torneo'  => trim((string) $p->torneo . ' ' . (string) $p->anio),
+            'fecha'   => (string) $p->fecha_numero,
+            'goles'   => ($p->golesl === null || $p->golesv === null)
+                ? '' : ((int) $p->golesl . '-' . (int) $p->golesv),
+            'detalle' => (int) DB::table('alineacions')->where('partido_id', $partidoId)->count(),
+        ];
+    }
+
+    /**
+     * La pantalla del choque: los dos partidos al lado y una decisión.
+     *
+     * No dibuja NINGÚN botón de guardar. Lo que había antes era el cartel rojo
+     * de `anotar()` debajo de una vista previa completa y de un botón verde que
+     * escribía el partido equivocado; el cartel explicaba el problema y no daba
+     * ninguna salida, así que el partido quedaba sin gameId para siempre.
+     */
+    private function gameIdAjeno($partidoId, $gameId, array $ajenos, $pegado = true)
+    {
+        $esteId = (int) $partidoId;
+
+        $filas = [['rol' => 'El que estás mirando', 'id' => $esteId, 'd' => $this->datosPartido($esteId)]];
+        foreach ($ajenos as $a) {
+            $filas[] = ['rol' => 'El que tiene el gameId', 'id' => (int) $a, 'd' => $this->datosPartido((int) $a)];
+        }
+
+        $conDetalle = [];
+        foreach ($filas as $f) {
+            if ($f['id'] !== $esteId && $f['d'] && $f['d']['detalle']) $conDetalle[] = '#' . $f['id'];
+        }
+
+        $lista = '#' . implode(', #', $ajenos);
+
+        $html = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Ese gameId ya es de otro partido</h1>'
+            . '<p class="sub">' . $this->resumenPartido($esteId) . '</p>'
+            . '<div class="err-box"><b>No bajé nada.</b> El gameId <b>' . e($gameId) . '</b> está anotado en el '
+            . 'staging como ' . (count($ajenos) > 1 ? 'los partidos <b>' : 'el partido <b>') . e($lista)
+            . '</b>, no como el #' . $esteId . '. Si lo escribiera acá, este partido quedaría con la alineación, '
+            . 'los goles y las tarjetas del otro: cuando los dos son del <b>mismo par de equipos</b> —el caso '
+            . 'típico, la ida y la vuelta o dos fechas seguidas— el chequeo de clubes del importador no lo frena.'
+            . '</div>';
+
+        $html .= '<div class="scroll"><table><thead><tr><th>Cuál</th><th>Partido</th><th>Día</th>'
+            . '<th>Torneo</th><th>Fecha</th><th>Res.</th><th>Detalle cargado</th><th></th></tr></thead><tbody>';
+
+        foreach ($filas as $f) {
+            $d = $f['d'];
+
+            if (!$d) {
+                $html .= '<tr class="warn"><td>' . e($f['rol']) . '</td>'
+                    . '<td colspan="6" class="err">El partido #' . (int) $f['id'] . ' no existe: la fila del '
+                    . 'staging apunta a un partido borrado.</td><td></td></tr>';
+                continue;
+            }
+
+            $html .= '<tr' . ($f['id'] === $esteId ? '' : ' class="warn"') . '>'
+                . '<td>' . e($f['rol']) . ' <span class="id">#' . (int) $f['id'] . '</span></td>'
+                . '<td>' . e($d['partido']) . '</td>'
+                . '<td class="num">' . e($d['dia']) . '</td>'
+                . '<td>' . e($d['torneo']) . '</td>'
+                . '<td class="num">' . e($d['fecha']) . '</td>'
+                . '<td class="num">' . e($d['goles']) . '</td>'
+                . '<td class="num">' . ($d['detalle']
+                    ? '<b>' . $d['detalle'] . '</b> en la alineación' : '<span class="gris">no</span>') . '</td>'
+                . '<td>' . ($f['id'] === $esteId ? '' : '<a href="'
+                    . e(route('import_detalles.ver', ['partido_id' => (int) $f['id']])) . '">ver el #'
+                    . (int) $f['id'] . '</a>') . '</td>'
+                . '</tr>';
+        }
+
+        $html .= '</tbody></table></div>'
+            . '<p class="sub">Abrí <a href="' . e(\App\Services\Controles::TM_PARTIDO . $gameId)
+            . '" target="_blank" rel="noopener">la ficha del ' . e($gameId) . ' en Transfermarkt</a> y mirá el día '
+            . 'y el resultado: eso dice cuál de los dos es.</p>';
+
+        $html .= '<h2>Qué hacer</h2>'
+            . '<div class="diag">'
+            . ($pegado
+                ? '<p><b>1. Te equivocaste de URL.</b> Es lo más común: la ficha que copiaste es la del partido '
+                    . e($lista) . '. No hay nada que arreglar — pegá abajo la que corresponde.</p>'
+                : '<p><b>1. Se equivocó el buscador.</b> Este gameId no lo pegaste vos: lo encontró la búsqueda '
+                    . 'automática, y da el partido ' . e($lista) . '. Si ese es el bueno, el #' . $esteId
+                    . ' hay que resolverlo a mano: buscalo en Transfermarkt y pegá su URL abajo.</p>')
+            . '<p><b>2. El gameId es de este partido y está mal atado al otro.</b> Ahí sí hay que moverlo, '
+            . 'con el botón de abajo. Le saca el gameId a ' . e($lista) . ' y se lo pone al #' . $esteId . '.</p>'
+            . '<p><b>3. Son el mismo partido cargado dos veces.</b> Si en la tabla de arriba los dos dicen lo '
+            . 'mismo, el problema no es el gameId: es que el partido está duplicado en la base. '
+            . '<b>No muevas nada</b> — eso se arregla borrando o fusionando el duplicado, y recién después '
+            . 'se baja el detalle.</p>'
+            . '</div>';
+
+        if ($conDetalle) {
+            $html .= '<div class="warn-box"><b>Ojo:</b> ' . e(implode(', ', $conDetalle)) . ' ya tiene detalle '
+                . 'cargado, y salió de este mismo gameId. Si el partido bueno resulta ser el #' . $esteId
+                . ', ese detalle quedó escrito donde no iba y hay que revisarlo aparte: mover el gameId no lo '
+                . 'borra.</div>';
+        }
+
+        $html .= '<p class="acciones"><a class="boton" href="'
+            . e(route('import_detalles.gameid', ['partido_id' => $esteId, 'game_id' => $gameId]))
+            . '">El ' . e($gameId) . ' es de este partido → movelo acá</a></p>'
+            . '<p class="sub">Mover no baja nada: deja el gameId anotado y te lleva a la vista previa, que es '
+            . 'donde se ve qué escribiría antes de tocar la base.</p>';
+
+        // El formulario va ACÁ y no un link de vuelta a `ver?partido_id=N`: sin
+        // `game_id` esa pantalla sale a buscar de nuevo y eso cuesta llamadas,
+        // para terminar casi siempre en este mismo choque. La otra URL es lo
+        // único que falta, así que se pide acá.
+        $html .= '<h2>Pegar la URL que corresponde</h2>'
+            . '<p class="sub">Abrí en Transfermarkt <b>la ficha del partido</b> que sí es el #' . $esteId
+            . ' y copiá acá la barra de direcciones (o el número pelado). No gasta ninguna llamada hasta que '
+            . 'apretes el botón.</p>'
+            . '<form method="get" action="' . e(route('import_detalles.ver')) . '" class="acciones">'
+            . '<input type="hidden" name="partido_id" value="' . $esteId . '">'
+            . '<input type="text" name="game_id" size="70" required '
+            . 'placeholder="pegá acá la URL del partido en Transfermarkt…"> '
+            . '<button class="boton" type="submit">Ver qué trae →</button>'
+            . '</form>';
+
+        return $html;
+    }
+
+    /**
+     * Mueve un gameId de un partido a otro. Se llega desde `gameIdAjeno()`,
+     * que antes muestra los dos partidos y qué se está pisando.
+     *
+     * A las filas que dicen que este gameId es el OTRO partido se les saca el
+     * `external_id`, NO el `partido_id` —mismo criterio que
+     * `TmBuscarGameId::desatarOtras()`: lo único falso es la afirmación «este
+     * gameId es ese partido», y el estado de la fila y los conteos por DT (que
+     * miran `estado` + `partido_id`) no tienen por qué cambiar—. El número
+     * viejo queda escrito en `motivo`.
+     *
+     * Las dos mitades van en una transacción: soltar el gameId del otro y que
+     * después falle el anotado dejaría al gameId sin dueño, que es peor que el
+     * choque que vinimos a arreglar.
+     */
+    public function gameIdMover(Request $request)
+    {
+        $partidoId = (int) $request->get('partido_id', 0);
+        $gameId    = trim((string) $request->get('game_id', ''));
+
+        $volver = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>';
+
+        if (!$partidoId || !preg_match('/^\d{1,20}$/', $gameId)) {
+            return $this->pagina('gameId del partido', $volver
+                . '<div class="err-box">Me falta el partido o el gameId viene mal escrito. A esta pantalla se '
+                . 'entra desde el aviso de «ese gameId ya es de otro partido», no a mano.</div>');
+        }
+
+        if (!DB::table('partidos')->where('id', $partidoId)->exists()) {
+            return $this->pagina('gameId del partido', $volver
+                . '<div class="err-box">No existe el partido #' . $partidoId . '.</div>');
+        }
+
+        $ajenos = $this->duenosDelGameId($gameId, $partidoId);
+
+        if (!$ajenos) {
+            return $this->pagina('gameId del partido', $volver
+                . '<div class="ok-box">No había nada que mover: el gameId <b>' . e($gameId) . '</b> no es de '
+                . 'ningún otro partido.</div>'
+                . '<p class="acciones"><a class="boton" href="'
+                . e(route('import_detalles.ver', ['partido_id' => $partidoId, 'game_id' => $gameId]))
+                . '">Ver qué trae el ' . e($gameId) . ' →</a></p>');
+        }
+
+        $anotador = new TmBuscarGameId;
+        $ok       = false;
+        $error    = '';
+        $movidas  = 0;
+
+        DB::beginTransaction();
+        try {
+            $filas = DB::table('import_partidos')
+                ->where('fuente', 'transfermarkt')
+                ->where('external_id', $gameId)
+                ->whereIn('partido_id', $ajenos)
+                ->get(['id', 'partido_id', 'motivo']);
+
+            foreach ($filas as $f) {
+                // `motivo` es varchar(191): se corta a mano, porque en MySQL no
+                // estricto un texto más largo se guarda cortado en silencio.
+                $nota = 'gameId ' . $gameId . ' movido del partido #' . (int) $f->partido_id . ' al #'
+                    . $partidoId . ' a mano. ' . (string) $f->motivo;
+
+                DB::table('import_partidos')->where('id', $f->id)->update([
+                    'external_id' => null,
+                    'motivo'      => mb_substr(trim($nota), 0, 191),
+                    'updated_at'  => now(),
+                ]);
+
+                $movidas++;
+            }
+
+            $ok = $anotador->anotar($partidoId, $gameId,
+                'movido a mano desde el partido #' . implode(', #', $ajenos));
+
+            if ($ok) {
+                DB::commit();
+            } else {
+                DB::rollBack();
+                $error = $anotador->ultimoError !== ''
+                    ? $anotador->ultimoError
+                    : 'no sé por qué (anotar() devolvió false sin motivo)';
+            }
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $error = get_class($e) . ': ' . $e->getMessage();
+        }
+
+        if (!$ok) {
+            return $this->pagina('gameId del partido', $volver
+                . '<div class="err-box"><b>No moví nada.</b> ' . e($error) . '<br>Se deshizo todo: el gameId '
+                . e($gameId) . ' sigue siendo del partido ' . e('#' . implode(', #', $ajenos)) . ', como estaba.</div>');
+        }
+
+        $cuerpo = $volver
+            . '<div class="ok-box">Listo: el gameId <b>' . e($gameId) . '</b> ahora es del partido <b>#'
+            . $partidoId . '</b>. Le saqué el <code>external_id</code> a ' . $movidas . ' fila(s) del staging que '
+            . 'lo daban como el partido ' . e('#' . implode(', #', $ajenos)) . ' (el número queda escrito en su '
+            . '<code>motivo</code>, por si hay que rastrearlo).</div>';
+
+        if ($anotador->desatados) {
+            $cuerpo .= '<div class="ok-box">De paso, este partido tenía anotado el gameId <b>'
+                . e(implode(', ', array_unique($anotador->desatados))) . '</b>: se lo saqué, porque el que lee '
+                . 'el gameId de un partido se queda con la fila más nueva y si no las dos seguirían peleando.</div>';
+        }
+
+        $huerfanos = [];
+        foreach ($ajenos as $a) {
+            $d = $this->datosPartido((int) $a);
+            if ($d && $d['detalle']) $huerfanos[] = '#' . (int) $a . ' (' . $d['detalle'] . ' en la alineación)';
+        }
+
+        if ($huerfanos) {
+            $cuerpo .= '<div class="warn-box"><b>Falta una cosa más.</b> ' . e(implode(', ', $huerfanos))
+                . ' tiene detalle cargado que salió de este mismo gameId, y mover el gameId no lo borra. '
+                . 'Si ese partido no era éste, lo que tiene escrito es de otro partido: hay que rehacerle el '
+                . 'detalle con el gameId que le corresponda, o borrárselo.</div>';
+        }
+
+        $cuerpo .= '<p class="acciones"><a class="boton" href="'
+            . e(route('import_detalles.ver', ['partido_id' => $partidoId, 'game_id' => $gameId]))
+            . '">Ver qué trae el ' . e($gameId) . ' →</a>'
+            . '<a class="boton-sec" href="'
+            . e(route('import_detalles.gameid', ['partido_id' => (int) $ajenos[0], 'game_id' => $gameId]))
+            . '">Deshacer (devolvérselo al #' . (int) $ajenos[0] . ')</a></p>';
+
+        return $this->pagina('gameId del partido', $cuerpo);
     }
 
     /**

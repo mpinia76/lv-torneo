@@ -267,6 +267,7 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/ver', 'ImportDetallesController@ver')->name('import_detalles.ver');
     Route::get('/import-detalles/bajar', 'ImportDetallesController@bajar')->name('import_detalles.bajar');
     Route::get('/import-detalles/fecha', 'ImportDetallesController@fecha')->name('import_detalles.fecha');
+    Route::get('/import-detalles/gameid', 'ImportDetallesController@gameIdMover')->name('import_detalles.gameid');
     Route::get('/import-detalles/tanda', 'ImportDetallesController@tanda')->name('import_detalles.tanda');
     Route::get('/import-detalles/penales', 'ImportDetallesController@penales')->name('import_detalles.penales');
     Route::get('/import-detalles/tipos-gol', 'ImportDetallesController@tiposGol')->name('import_detalles.tipos_gol');
