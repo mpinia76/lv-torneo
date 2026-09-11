@@ -1869,6 +1869,10 @@ class ImportDetallesController extends Controller
 
         foreach ($filas as $f) {
             $equipos = [];
+            // Cómo salió cada uno ('id' | 'nombre' | null). Se venía tirando
+            // apenas se usaba para proponer el mapeo, y es el dato que después
+            // distingue «falta el partido» de «este club es otro club».
+            $comoEq  = [];
 
             foreach ([['local_tm', 'local_nombre'], ['visita_tm', 'visita_nombre']] as $par) {
                 $tm     = $f[$par[0]];
@@ -1887,6 +1891,7 @@ class ImportDetallesController extends Controller
                 }
 
                 $equipos[] = (int) $eq;
+                $comoEq[]  = $eq ? $como : null;
             }
 
             $yaEsta    = array_key_exists($f['game_id'], $enStaging) && $enStaging[$f['game_id']];
@@ -1902,15 +1907,21 @@ class ImportDetallesController extends Controller
                 // el apareo exige un único candidato en la ventana, así que no
                 // se arriesga nada y se rescatan los partidos donde el rival
                 // todavía no está mapeado.
-                $eqA = $equipos[0];
-                $eqB = $equipos[1];
+                $eqA   = $equipos[0];
+                $eqB   = $equipos[1];
+                $comoA = $comoEq[0];
+                $comoB = $comoEq[1];
 
                 if (!$eqA && $eqB) {
-                    $eqA = $eqB;
-                    $eqB = 0;
+                    $eqA   = $eqB;
+                    $eqB   = 0;
+                    // El «cómo» viaja con el equipo, no con la posición: si se
+                    // queda pegado al lado, el que sigue mira el dato del otro.
+                    $comoA = $comoB;
+                    $comoB = null;
                 }
 
-                list($partidoId, $motivo, $sospecha) = $this->partidoDeFila($f, $eqA, $eqB);
+                list($partidoId, $motivo, $sospecha) = $this->partidoDeFila($f, $eqA, $eqB, [$comoA, $comoB]);
 
                 if ($partidoId) {
                     $cont['nuevos']++;
@@ -2131,12 +2142,31 @@ class ImportDetallesController extends Controller
             $links[] = '<a href="' . e(route('import_detalles.ver',
                     ['partido_id' => $c['id'], 'game_id' => $gameId]))
                 . '"><b>¿es el #' . $c['id'] . '?</b> <span class="sub">' . e($c['dia']) . '</span></a>';
+
+            // Cuando el candidato salió de «ese día jugó contra otro equipo», el
+            // arreglo de fondo no es el gameId: es el club mal atado. El link a
+            // los clubes del partido va al lado, porque atar por id arregla
+            // TODAS las filas de ese club y no sólo ésta.
+            if (!empty($c['clubes_tm'])) {
+                $links[] = '<a href="' . e(route('import_detalles.clubes_tm', ['partido_id' => $c['id']]))
+                    . '"><b>arreglar los clubes del #' . $c['id'] . '</b></a>';
+            }
         }
 
         return ' ' . implode(' · ', $links);
     }
 
-    private function partidoDeFila(array $f, $equipoId, $rivalId)
+    /**
+     * El partido tuyo que le corresponde a una fila del calendario de TM.
+     *
+     * `$como` dice CÓMO se resolvió cada club —`'id'` si salió de `equipo_tm`,
+     * `'nombre'` si lo apareó el nombre normalizado— en el mismo orden que
+     * `$equipoId` y `$rivalId`. No es un adorno: el que salió por id es un dato
+     * tuyo y el que salió por nombre es una conjetura, así que cuando el par no
+     * encuentra nada la conjetura es la primera sospechosa. Quien no lo sepa
+     * puede no pasarlo: sin `$como` el comportamiento es exactamente el de antes.
+     */
+    private function partidoDeFila(array $f, $equipoId, $rivalId, array $como = [null, null])
     {
         if (empty($f['dia'])) {
             return [0, 'no pude leerle la fecha', []];
@@ -2238,6 +2268,85 @@ class ImportDetallesController extends Controller
                     . 'y vos la de la reanudación) o una reprogramación: en los dos casos es el mismo '
                     . 'partido y el mismo gameId. Si al abrirlo ves que es éste, atalo igual: la fecha '
                     . 'es un dato tuyo y no cambia qué trae el gameId', $this->candidatos($lejos)];
+            }
+        }
+
+        // EL CLUB QUE SALIÓ POR NOMBRE PUEDE SER OTRO CLUB. Con los dos equipos
+        // atados por id, cero partidos en ±150 días quiere decir que el partido
+        // falta. Pero si uno de los dos lo resolvió el NOMBRE, lo que falta
+        // puede ser el mapeo: el nombre corto de TM —«Sport Boys»— matchea sin
+        // ambigüedad contra otro equipo tuyo —«Sport Boys» de Perú, no «Sport
+        // Boys Warnes» de Bolivia— y entonces el par que se busca no existió
+        // nunca. El guard de homónimos no lo ve: las claves no son iguales.
+        //
+        // La llave es el equipo que SÍ salió por id, que es un dato tuyo: se
+        // mira con quién jugó ESE día y se dice el nombre, que es lo que delata
+        // al club cambiado. No ata nada —el gameId sigue sin escribirse solo—,
+        // pero deja el arreglo a un clic. Una query, cero llamadas a la API.
+        $ancla        = 0;   // el resuelto por id
+        $dudoso       = 0;   // el resuelto por nombre
+        $anclaEsLocal = false;
+
+        if ($rivalId && isset($como[0]) && isset($como[1])) {
+            if ($como[0] === 'id' && $como[1] === 'nombre') {
+                $ancla        = (int) $equipoId;
+                $dudoso       = (int) $rivalId;
+                $anclaEsLocal = true;
+            } elseif ($como[1] === 'id' && $como[0] === 'nombre') {
+                $ancla        = (int) $rivalId;
+                $dudoso       = (int) $equipoId;
+                $anclaEsLocal = false;
+            }
+        }
+
+        if ($ancla) {
+            // La misma ventana chica del apareo normal: un club juega una vez
+            // por semana, así que a ±3 días lo normal es que haya uno solo. Con
+            // dos o más no se dice nada, como en todo el resto de la pantalla.
+            $eseDia = DB::table('partidos')
+                ->whereDate('dia', '>=', $desde)->whereDate('dia', '<=', $hasta)
+                ->where(function ($w) use ($ancla) {
+                    $w->where('equipol_id', $ancla)->orWhere('equipov_id', $ancla);
+                })
+                ->get(['id', 'dia', 'equipol_id', 'equipov_id', 'golesl', 'golesv']);
+
+            if (count($eseDia) === 1) {
+                $p       = $eseDia[0];
+                $esLocal = (int) $p->equipol_id === $ancla;
+                $otro    = $esLocal ? (int) $p->equipov_id : (int) $p->equipol_id;
+
+                // El resultado acá no desempata —hay un solo candidato— pero
+                // decirlo ahorra abrir la ficha: si coincide, es éste.
+                $coincide = null;
+
+                if (preg_match('/(\d+)\s*:\s*(\d+)/', isset($f['resultado']) ? (string) $f['resultado'] : '', $mr)
+                    && $p->golesl !== null && $p->golesv !== null) {
+                    $suyoAncla = $esLocal ? (int) $p->golesl : (int) $p->golesv;
+                    $suyoOtro  = $esLocal ? (int) $p->golesv : (int) $p->golesl;
+                    $tmAncla   = $anclaEsLocal ? (int) $mr[1] : (int) $mr[2];
+                    $tmOtro    = $anclaEsLocal ? (int) $mr[2] : (int) $mr[1];
+                    $coincide  = ($suyoAncla === $tmAncla && $suyoOtro === $tmOtro);
+                }
+
+                // El club de TM sospechoso es el del lado que salió por nombre,
+                // y su id es lo que hay que pegar en «Atar un club a mano».
+                $ladoDudoso = ($como[0] === 'nombre') ? 'local' : 'visita';
+                $tmNombre   = isset($f[$ladoDudoso . '_nombre']) ? (string) $f[$ladoDudoso . '_nombre'] : '';
+                $tmId       = isset($f[$ladoDudoso . '_tm']) ? (string) $f[$ladoDudoso . '_tm'] : '';
+
+                $cands = $this->candidatos($eseDia);
+                if (isset($cands[0])) $cands[0]['clubes_tm'] = true;
+
+                return [0, 'ese día ' . $this->nombreEquipo($ancla) . ' jugó contra «'
+                    . $this->nombreEquipo($otro) . '» #' . $otro . ', no contra «'
+                    . $this->nombreEquipo($dudoso) . '» #' . $dudoso
+                    . ($coincide === true ? ', y el resultado coincide' : '')
+                    . ($coincide === false ? ' (ojo: el resultado NO coincide con el de TM)' : '')
+                    . '. El club de TM' . ($tmNombre !== '' ? ' «' . $tmNombre . '»' : '')
+                    . ($tmId !== '' ? ' (id ' . $tmId . ')' : '')
+                    . ' no está en equipo_tm: lo resolvió el nombre, y en tu base ese nombre es '
+                    . 'otro club. Atalo por id al equipo que jugó de verdad y volvé a leer el calendario: '
+                    . 'se arreglan todas las filas de ese club de una', $cands];
             }
         }
 
