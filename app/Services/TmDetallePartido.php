@@ -134,6 +134,27 @@ class TmDetallePartido
     private $proximoPreview = -1;
     /** tm_club_id -> equipo_id sacado de la fila de import_partidos del partido. */
     private $mapaStaging = [];
+    /**
+     * ¿Se puede DEDUCIR a qué equipo corresponde un club de TM sin mapear?
+     *
+     * Es el «2do rescate» de `orientar()`: si un lado apareó y es uno de los dos
+     * equipos del partido, el club que sobra de TM tiene que ser el otro. Eso
+     * vale cuando YA se sabe que el gameId es de este partido —lo trajo el
+     * staging, lo dejó el sondeo del DT—, y es **circular** cuando lo que se
+     * está probando es justamente si el gameId es de este partido: la deducción
+     * da por cierto lo que hay que demostrar, y así cualquier partido del mismo
+     * club "aparea".
+     *
+     * Costó el caso #4652 (12-sep-2026): se eligió un candidato equivocado —el
+     * partido de Copa Argentina dos días antes—, Godoy Cruz apareó, Sportivo
+     * Italiano no estaba mapeado, se dedujo que "era Boca", `orientar()` dijo
+     * que los clubes coincidían, y el gameId de la copa quedó atado al partido
+     * de liga; de paso `desatarOtras()` le borró el gameId bueno que el sondeo
+     * del DT ya había dejado guardado.
+     *
+     * Quien prueba un gameId todavía sin confirmar pasa `inferir_clubes => false`.
+     */
+    private $inferirClubes = true;
     /** Bajar la foto de perfil de cada persona nueva (una llamada más por cabeza). */
     private $conFotos = true;
     private $fotosBajadas = 0;
@@ -193,6 +214,10 @@ class TmDetallePartido
         $forzar   = !empty($opts['forzar']);
         $crear    = array_key_exists('crear_jugadores', $opts) ? (bool) $opts['crear_jugadores'] : true;
         $this->conFotos = array_key_exists('fotos', $opts) ? (bool) $opts['fotos'] : true;
+        // Ver `$inferirClubes`: con un gameId sin confirmar la deducción del club
+        // que falta es circular y valida cualquier partido del mismo club.
+        $this->inferirClubes = array_key_exists('inferir_clubes', $opts)
+            ? (bool) $opts['inferir_clubes'] : true;
 
         $this->avisos = [];
         $this->fotosBajadas = 0;
@@ -1925,9 +1950,19 @@ class TmDetallePartido
 
         // 2do rescate: si un lado quedó resuelto y coincide con uno de los dos
         // equipos del partido, el otro lado es necesariamente el que sobra.
+        //
+        // OJO: «necesariamente» sólo si el gameId ya es de este partido. Con un
+        // gameId a prueba la deducción es circular y hace aparear cualquier otro
+        // partido del mismo club (ver `$inferirClubes` y el caso #4652), así que
+        // quien lo está probando la apaga con `inferir_clubes => false` y el
+        // apareo tiene que salir de `equipo_tm` o del staging.
         $pl0 = (int) $partido->equipol_id;
         $pv0 = (int) $partido->equipov_id;
-        if ($idLocal && !$idVisit && ($idLocal === $pl0 || $idLocal === $pv0) && $tmVisit !== null) {
+        if (!$this->inferirClubes && (!$idLocal || !$idVisit)) {
+            $this->aviso('No deduzco a qué equipo tuyo corresponde el club de Transfermarkt que falta: '
+                . 'este gameId todavía no está confirmado como de este partido, y deducirlo haría aparear '
+                . 'cualquier otro partido del mismo club. Atá el club en equipo_tm y volvé a probar.');
+        } elseif ($idLocal && !$idVisit && ($idLocal === $pl0 || $idLocal === $pv0) && $tmVisit !== null) {
             $idVisit = ($idLocal === $pl0) ? $pv0 : $pl0;
             $this->aprenderClub($tmVisit, $idVisit, 'inferido', $escribir);
             $this->aviso('Deduje que el club de Transfermarkt #' . $tmVisit . ' es '

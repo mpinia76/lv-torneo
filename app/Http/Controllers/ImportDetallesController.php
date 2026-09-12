@@ -481,12 +481,25 @@ class ImportDetallesController extends Controller
         // &fotos=0 para no gastar una llamada por cada persona nueva.
         $fotos = (string) $request->get('fotos', '1') !== '0';
 
+        // `inferir_clubes => false` cuando el gameId lo eligió el usuario y todavía
+        // no está atado a este partido: ahí el apareo de clubes es lo ÚNICO que
+        // dice si el gameId es el correcto, y el «2do rescate» de `orientar()`
+        // —deducir el club que falta— lo daba por bueno siempre. Ver el caso
+        // #4652 en `TmDetallePartido::$inferirClubes`.
+        $gameIdSinAtar = $elegido && !($fila && (string) $fila->external_id === (string) $gameId);
+
         $r = (new TmDetallePartido)->importar($partidoId, $gameId,
-            ['escribir' => $escribir, 'forzar' => $forzar, 'fotos' => $fotos]);
+            ['escribir' => $escribir, 'forzar' => $forzar, 'fotos' => $fotos,
+                'inferir_clubes' => !$gameIdSinAtar]);
 
         // El importador aborta si los clubes no aparean, así que llegar hasta acá
         // sin error es la confirmación de que el gameId elegido era el correcto.
-        if ($elegido && empty($r['error'])) {
+        //
+        // Pero SÓLO al guardar. Anotar desde la vista previa era el segundo
+        // agujero del caso #4652: mirar un candidato ya lo dejaba atado al
+        // partido —y `desatarOtras()` le borraba el gameId bueno que ya estaba
+        // guardado— sin que el usuario hubiera confirmado nada. Mirar no escribe.
+        if ($elegido && $escribir && empty($r['error'])) {
             $anotador = new TmBuscarGameId;
             if (!$anotador->anotar($partidoId, $gameId, 'elegido entre los candidatos de Transfermarkt')) {
                 $noGuardado = $anotador->ultimoError !== ''
@@ -608,6 +621,16 @@ class ImportDetallesController extends Controller
                 . ($yaTiene ? ' <span class="sub">reemplaza alineación, goles, tarjetas, cambios, penales fallados '
                     . 'y árbitros de este partido (los penales «Convirtieron» no se tocan)</span>' : '')
                 . '</p>';
+
+            // Mirar no ata. Antes la vista previa anotaba el gameId sola, y eso
+            // desataba el que el partido ya tenía: si el candidato estaba mal,
+            // el bueno se perdía sin que nadie hubiera confirmado nada. Ahora se
+            // ata al guardar, y hay que decirlo o parece que no se guardó.
+            if ($gameIdSinAtar && empty($r['error'])) {
+                $cuerpo .= '<p class="sub">El gameId <b>' . e($gameId) . '</b> todavía <b>no quedó atado</b> a '
+                    . 'este partido: se ata recién cuando guardás, y ahí deja de apuntar el que tuviera antes. '
+                    . 'Mirar no escribe nada.</p>';
+            }
         }
 
         $p = $r['plan'];
