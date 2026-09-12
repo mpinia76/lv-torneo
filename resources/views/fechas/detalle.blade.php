@@ -853,6 +853,58 @@
 
         </div>
             </div>
+            @php
+                /*
+                 * Los eventos (goles, penales, tarjetas, cambios) se traen por
+                 * partido, pero el dorsal, el nombre, la foto y el escudo se les
+                 * agregan mas arriba recorriendo las alineaciones. Si un jugador
+                 * quedo sin fila en la alineacion del partido, su evento llegaba
+                 * a las solapas sin esas claves y la vista reventaba con
+                 * "Undefined index: escudo".
+                 *
+                 * Completamos aca lo que haya quedado suelto: una sola consulta
+                 * para todos los jugadores faltantes, y escudo en null para que
+                 * la solapa no dibuje una imagen rota (el equipo no se puede
+                 * deducir: los eventos no guardan equipo_id).
+                 */
+                $idsSueltos = [];
+                foreach ([$arrayGoles, $arrayPenales, $arrayTarjetas, $arrayCambios] as $listaEventos) {
+                    foreach ($listaEventos as $evento) {
+                        if (!array_key_exists('escudo', $evento) && !empty($evento['jugador_id'])) {
+                            $idsSueltos[] = $evento['jugador_id'];
+                        }
+                    }
+                }
+
+                $jugadoresSueltos = collect();
+                if (!empty($idsSueltos)) {
+                    $jugadoresSueltos = \App\Jugador::with('persona')
+                        ->findMany(array_unique($idsSueltos))
+                        ->keyBy('id');
+                }
+
+                $completarSueltos = function (array $eventos) use ($jugadoresSueltos) {
+                    foreach ($eventos as &$evento) {
+                        if (array_key_exists('escudo', $evento)) {
+                            continue;
+                        }
+                        $persona = optional($jugadoresSueltos->get($evento['jugador_id'] ?? null))->persona;
+                        $evento['dorsal'] = $evento['dorsal'] ?? '';
+                        $evento['jugador'] = $persona ? $persona->full_name : 'Jugador sin alineacion';
+                        $evento['foto'] = ($persona && $persona->foto) ? $persona->foto : 'sin_foto.png';
+                        $evento['escudo'] = null;
+                    }
+                    unset($evento);
+
+                    return $eventos;
+                };
+
+                $arrayGoles = $completarSueltos($arrayGoles);
+                $arrayPenales = $completarSueltos($arrayPenales);
+                $arrayTarjetas = $completarSueltos($arrayTarjetas);
+                $arrayCambios = $completarSueltos($arrayCambios);
+            @endphp
+
             <div role="tabpanel" class="tab-pane" id="goles">
                 <div class="row">
 
@@ -860,7 +912,9 @@
                         @foreach($arrayGoles ?? '' as $arrGol)
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
-                            <img id="original" height="20" src="{{ url('images/'.$arrGol['escudo']) }}" >
+                            @if($arrGol['escudo'])
+                                <img id="original" height="20" src="{{ url('images/'.$arrGol['escudo']) }}" >
+                            @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrGol['minuto'], $arrGol['adicionado'] ?? null, '') }}'
                                     <a href="{{route('jugadores.ver', array('jugadorId' => $arrGol['jugador_id']))}}" >
@@ -883,7 +937,9 @@
                     @foreach($arrayTarjetas ?? '' as $arrTarjeta)
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
-                            <img id="original" height="20" src="{{ url('images/'.$arrTarjeta['escudo']) }}" >
+                            @if($arrTarjeta['escudo'])
+                                <img id="original" height="20" src="{{ url('images/'.$arrTarjeta['escudo']) }}" >
+                            @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrTarjeta['minuto'], $arrTarjeta['adicionado'] ?? null, '') }}'
                             @if( $arrTarjeta['tipo']=='Amarilla')
@@ -918,7 +974,9 @@
                     @foreach($arrayCambios ?? '' as $arrCambio)
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
-                            <img id="original" height="20" src="{{ url('images/'.$arrCambio['escudo']) }}" >
+                            @if($arrCambio['escudo'])
+                                <img id="original" height="20" src="{{ url('images/'.$arrCambio['escudo']) }}" >
+                            @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrCambio['minuto'], $arrCambio['adicionado'] ?? null, '') }}'
                             @if($arrCambio['tipo']=='Sale')
@@ -966,7 +1024,9 @@
                     @foreach($arrayPenales ?? '' as $arrPenal)
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
-                            <img id="original" height="20" src="{{ url('images/'.$arrPenal['escudo']) }}" >
+                            @if($arrPenal['escudo'])
+                                <img id="original" height="20" src="{{ url('images/'.$arrPenal['escudo']) }}" >
+                            @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrPenal['minuto'], $arrPenal['adicionado'] ?? null, '') }}'
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrPenal['jugador_id']))}}" >
