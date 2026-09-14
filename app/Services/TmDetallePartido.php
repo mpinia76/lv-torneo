@@ -1815,6 +1815,105 @@ class TmDetallePartido
     }
 
     /**
+     * Trae de Transfermarkt SOLO el marcador de un partido. Nada más.
+     *
+     * Por qué existe, y por qué no alcanzaba con lo que ya había:
+     *   · el listado del fixture NO sirve para los partidos definidos por
+     *     penales —publica 90' + tanda en un solo número (1:1 con tanda 4:2 lo
+     *     publica 5:3) y no trae los penales pateados—, así que
+     *     `completarResultados()` y `marcadorDesdeStaging()` los saltean a
+     *     propósito: cargar el 5:3 sería inventar un partido.
+     *   · `importar()` sí los resuelve (el detalle trae `actions.shootout`),
+     *     pero se planta si el partido YA tiene alineación cargada, que es el
+     *     caso normal de un partido cargado a mano; y «Rehacer» ahí es un
+     *     martillo: borra la alineación y las incidencias que cargaste vos.
+     *
+     * Esto es el camino del medio: una llamada a `/game/{id}`, se resta la
+     * tanda y se escriben ÚNICAMENTE `golesl/golesv` (+ `penalesl/penalesv`).
+     * No toca alineación, goles, tarjetas, cambios, árbitros ni técnicos, y
+     * nunca pisa un resultado ya cargado.
+     */
+    public function soloMarcador($partidoId, $gameId = null, $escribir = true)
+    {
+        $this->avisos = [];
+        $this->inferirClubes = true;
+
+        $informe = [
+            'ok' => false, 'escrito' => false, 'error' => null,
+            'partido_id' => (int) $partidoId, 'game_id' => (string) $gameId,
+            'avisos' => [], 'llamadas' => 0, 'marcador' => null, 'tanda' => null,
+        ];
+
+        $partido = Partido::find($partidoId);
+        if (!$partido) {
+            $informe['error'] = 'No existe el partido #' . (int) $partidoId . '.';
+            return $informe;
+        }
+
+        // El candado de siempre, y acá es el único que hace falta: este método
+        // no escribe nada más que el marcador.
+        if ($partido->golesl !== null && $partido->golesv !== null) {
+            $informe['error'] = 'El partido #' . $partido->id . ' ya tiene resultado ('
+                . $partido->golesl . ':' . $partido->golesv . '). Esto nunca pisa un resultado cargado.';
+            return $informe;
+        }
+
+        $gameId = trim((string) $gameId);
+        if ($gameId === '') {
+            $fila = DB::table('import_partidos')->where('partido_id', $partido->id)
+                ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+            if ($fila) $gameId = (string) $fila->external_id;
+        }
+        if ($gameId === '') {
+            $informe['error'] = 'No sé el gameId de este partido: no hay fila de staging con '
+                . '`partido_id=' . $partido->id . '`. Pasalo a mano con `?game_id=`.';
+            return $informe;
+        }
+        $informe['game_id'] = $gameId;
+
+        $json = HttpHelper::getJson(self::TMAPI . '/game/' . rawurlencode($gameId));
+        $informe['llamadas']++;
+        if (!is_array($json) || empty($json)) {
+            $err = method_exists('App\Services\HttpHelper', 'getLastJsonError') ? HttpHelper::getLastJsonError() : null;
+            $informe['error'] = 'La API no devolvió el partido ' . $gameId
+                . (is_array($err) ? ' — ' . json_encode($err, JSON_UNESCAPED_UNICODE) : '');
+            return $informe;
+        }
+        $game = isset($json['data']) ? $json['data'] : $json;
+        $informe['crudo'] = $game;
+
+        // La orientación NO es opcional: `buscarPartido()` empareja en los dos
+        // órdenes, así que el local de TM puede ser tu visitante. Sin esto el
+        // marcador se carga dado vuelta.
+        $this->mapaStaging = $this->mapaDesdeStaging($partido->id);
+        $lados = $this->orientar($game, $partido, false);
+        if (!$lados) {
+            $informe['error'] = 'No pude decidir qué equipo tuyo es cada club de Transfermarkt, '
+                . 'así que no cargué nada: el marcador podría quedar dado vuelta.';
+            $informe['avisos'] = $this->avisos;
+            return $informe;
+        }
+
+        if (!$escribir) {
+            $informe['ok'] = true;
+            $informe['avisos'] = $this->avisos;
+            return $informe;
+        }
+
+        $puesto = $this->completarMarcador($game, $partido, $lados);
+        $informe['ok'] = true;
+        $informe['escrito'] = (bool) $puesto;
+        if ($puesto) {
+            $informe['marcador'] = $partido->golesl . ':' . $partido->golesv;
+            if ($partido->penalesl !== null && $partido->penalesv !== null) {
+                $informe['tanda'] = $partido->penalesl . '-' . $partido->penalesv;
+            }
+        }
+        $informe['avisos'] = $this->avisos;
+        return $informe;
+    }
+
+    /**
      * Carga el marcador si el partido está SIN resultado.
      *
      * El detalle traía goles, tarjetas y cambios pero nunca tocaba

@@ -662,7 +662,12 @@ class ImportPartidosController extends Controller
             . '<a class="boton-sec" href="' . e($base . $fuente . '&refrescar=1') . '">Guardar, corregir horarios y cargar resultados</a>' . $costo
             . ' <span class="sub"><b>esto sí escribe en tus partidos</b>: pisa día y hora de los que todavía no se '
             . 'jugaron, y carga el marcador en los que estén <b>sin resultado</b>. Nunca pisa un resultado que ya '
-            . 'tengas cargado. Usalo cuando hayas comprobado que el emparejado es correcto.</span>'
+            . 'tengas cargado. Usalo cuando hayas comprobado que el emparejado es correcto. '
+            // El botón prometía "carga el marcador en los que estén sin resultado"
+            // a secas, y con los de penales no puede: el listado del fixture no
+            // trae la tanda separada. Decirlo acá, que es donde se lee.
+            . '<b>Excepción:</b> los definidos por <b>penales</b> no los puede cargar —el marcador del listado '
+            . 'del fixture viene con la tanda sumada—; ésos van con «Traer solo el marcador», en Revisar.</span>'
             . '</p>'
             . '<p class="acciones">'
             . '<a href="' . e($base) . '">Volver a bajar de TM</a> · '
@@ -736,9 +741,11 @@ class ImportPartidosController extends Controller
                     ? '<p class="warn-box"><b>' . $sinMarcador . '</b> partidos <b>jugados y sin resultado</b> que el '
                       . 'botón de arriba NO puede cargar: TM los dio por penales y el marcador del listado del '
                       . 'fixture viene con la tanda sumada (1:1 con tanda 4:2 lo publica 5:3). Los 90\' reales salen '
-                      . 'del <b>detalle</b> del partido, que trae la tanda y la puede restar: el link «Bajar el '
-                      . 'detalle» de cada fila hace eso y de paso trae alineación e incidencias. '
-                      . '<b>Gasta 1 crédito por partido.</b></p>'
+                      . 'del <b>detalle</b> del partido, que trae la tanda y la puede restar. En cada fila: '
+                      . '<b>«Traer solo el marcador»</b> escribe el resultado y la tanda y nada más —no toca '
+                      . 'alineación ni incidencias, así que sirve también en los partidos que cargaste a mano—, y '
+                      . '«Bajar el detalle» trae además alineación e incidencias, pero se planta si el partido ya '
+                      . 'las tiene. <b>Cualquiera de los dos gasta 1 crédito por partido.</b></p>'
                     : '')
                 . '<p class="acciones">' . $chips . '</p>'
                 . '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido</th><th>Qué pasa</th>'
@@ -761,11 +768,23 @@ class ImportPartidosController extends Controller
                             . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
                     // El detalle es el ÚNICO lugar donde está la tanda separada del
                     // marcador, así que para estos partidos es el arreglo, no un extra.
+                    // Se ofrecen los dos caminos, y primero el que no puede romper
+                    // nada: «solo el marcador» escribe goles y tanda y nada más.
+                    // «Bajar el detalle» trae además alineación e incidencias, pero
+                    // se planta si el partido ya las tiene cargadas a mano.
                     . ((isset($pr['tipo']) && $pr['tipo'] === 'sin_marcador')
-                        ? ' · <a href="' . e(route('import_detalles.bajar',
+                        ? ' · <a href="' . e(route('import_detalles.marcador',
+                                array_filter(['partido_id' => (int) $pr['partido_id'],
+                                    'game_id' => $pr['external_id'],
+                                    'comp' => $comp,
+                                    'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null])))
+                            . '" title="Baja el detalle, le resta la tanda al marcador de TM y escribe SOLO el '
+                            . 'resultado y la tanda. No toca alineación ni incidencias. Gasta 1 crédito.">'
+                            . '<b>Traer solo el marcador →</b></a>'
+                          . ' · <a href="' . e(route('import_detalles.bajar',
                                 ['partido_id' => (int) $pr['partido_id']]))
-                            . '" title="Baja el detalle del partido: resta la tanda, carga el marcador de los 90\' '
-                            . 'y trae alineación e incidencias. Gasta 1 crédito."><b>Bajar el detalle →</b></a>'
+                            . '" title="Además del marcador trae alineación e incidencias. Se planta si el '
+                            . 'partido ya tiene alineación cargada. Gasta 1 crédito.">Bajar el detalle</a>'
                         : '')
                     . '</td></tr>';
             }
@@ -1818,10 +1837,12 @@ class ImportPartidosController extends Controller
             } elseif (!empty($f['terminado']) && $f['goles_favor'] === null
                 && !empty($f['marcador_tm'])
                 && ($p->golesl === null || $p->golesv === null)) {
+                // Corto A PROPÓSITO: el texto largo empujaba la columna de
+                // acciones fuera del scroll horizontal y el link para arreglarlo
+                // quedaba invisible. La explicación va en la caja de arriba.
                 $problema = !empty($f['por_penales'])
-                    ? 'lo tenés sin resultado y TM lo dio por penales: el marcador del fixture trae la '
-                      . 'tanda sumada, así que hay que bajar el detalle del partido'
-                    : 'lo tenés sin resultado y del fixture no sale un marcador usable';
+                    ? 'sin resultado · TM lo dio por penales'
+                    : 'sin resultado · el fixture no trae marcador usable';
                 $tipo = 'sin_marcador';
                 $tuyo = 'sin resultado';
                 $deTm = $f['marcador_tm'] . (!empty($f['por_penales']) ? ' (con la tanda sumada)' : '');
@@ -1933,7 +1954,8 @@ class ImportPartidosController extends Controller
                 ? (!empty($f['terminado']) && !empty($f['marcador_tm'])
                     ? '<span class="sub" title="Marcador de TM con la tanda sumada: el de los 90\' sale del '
                       . 'detalle del partido">' . e((string) $f['marcador_tm'])
-                      . (!empty($f['por_penales']) ? ' p' : '') . '</span>'
+                      . (!empty($f['por_penales']) && stripos((string) $f['marcador_tm'], 'pen') === false
+                            ? ' pen.' : '') . '</span>'
                     : '<span class="sub">—</span>')
                 : (e($f['goles_favor']) . ':' . e($f['goles_contra']));
 

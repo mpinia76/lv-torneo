@@ -385,6 +385,72 @@ class ImportDetallesController extends Controller
         return $this->correrUno($request, true);
     }
 
+    /**
+     * SOLO el marcador, sin tocar nada más.
+     *
+     * Para los partidos que Transfermarkt definió por penales: el listado del
+     * fixture publica 90' + tanda en un solo número y no trae los penales
+     * pateados, así que ni «Guardar, corregir horarios y cargar resultados» ni
+     * «Resultados de lo ya cargado» pueden con ellos —los saltean a propósito,
+     * porque cargar ese número sería inventar un partido—. La tanda separada
+     * está únicamente en el detalle.
+     *
+     * «Bajar» tampoco alcanza cuando el partido ya tiene alineación cargada: se
+     * planta, y «Rehacer» borraría lo que cargaste a mano. Esto baja el detalle
+     * y escribe nada más que `golesl/golesv` (+ `penalesl/penalesv`).
+     *
+     * Cuesta 1 llamada.
+     */
+    public function marcador(Request $request)
+    {
+        set_time_limit(0);
+
+        $partidoId = (int) $request->get('partido_id', 0);
+        $gameId    = trim((string) $request->get('game_id', ''));
+        $comp      = trim((string) $request->get('comp', ''));
+        $torneoId  = (int) $request->get('torneo_id', 0);
+
+        // El link de vuelta lleva `cache=1`: volver al fixture no tiene por qué
+        // costar otra bajada de TM.
+        $volver = $comp === '' ? ''
+            : '<p class="sub"><a href="' . e(route('import_partidos.fixture',
+                    array_filter(['comp' => $comp, 'torneo_id' => $torneoId ?: null, 'cache' => 1])))
+                . '">← Volver al fixture</a></p>';
+
+        if (!$partidoId) {
+            return $this->pagina('Solo el marcador',
+                $volver . '<p class="err-box">Falta <code>?partido_id=</code>.</p>');
+        }
+
+        $r = (new TmDetallePartido)->soloMarcador($partidoId, $gameId);
+
+        $cuerpo = $volver
+            . '<h1>Solo el marcador · partido #' . $partidoId . '</h1>'
+            . '<p class="sub">Una llamada a <code>/game/' . e((string) $r['game_id']) . '</code>. '
+            . 'Escribe únicamente el resultado y la tanda: no toca alineación, goles, tarjetas, cambios, '
+            . 'árbitros ni técnicos, y nunca pisa un resultado que ya tengas cargado.</p>';
+
+        if (!empty($r['error'])) {
+            $cuerpo .= '<p class="err-box">' . e($r['error']) . '</p>';
+        } elseif (!empty($r['escrito'])) {
+            $cuerpo .= '<p class="ok-box">Cargado: <b>' . e((string) $r['marcador']) . '</b>'
+                . (!empty($r['tanda']) ? ' y la tanda <b>' . e((string) $r['tanda']) . '</b>' : '')
+                . '.</p>';
+        } else {
+            $cuerpo .= '<p class="warn-box">No le cargué el marcador. El motivo está abajo.</p>';
+        }
+
+        foreach ((array) $r['avisos'] as $a) {
+            $cuerpo .= '<p class="sub">· ' . e($a) . '</p>';
+        }
+
+        $cuerpo .= '<p class="acciones"><a href="' . e(route('import_detalles.ver',
+                ['partido_id' => $partidoId])) . '">Ver el detalle completo de este partido</a> '
+            . '<span class="sub">(alineación e incidencias; gasta otra llamada)</span></p>';
+
+        return $this->pagina('Solo el marcador', $cuerpo);
+    }
+
     private function correrUno(Request $request, $escribir)
     {
         set_time_limit(0);

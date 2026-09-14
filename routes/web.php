@@ -266,6 +266,9 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles', 'ImportDetallesController@index')->name('import_detalles.index');
     Route::get('/import-detalles/ver', 'ImportDetallesController@ver')->name('import_detalles.ver');
     Route::get('/import-detalles/bajar', 'ImportDetallesController@bajar')->name('import_detalles.bajar');
+    // Solo el marcador de UN partido, sin tocar el resto: es el único camino
+    // para los definidos por penales (el fixture publica 90'+tanda junto).
+    Route::get('/import-detalles/marcador', 'ImportDetallesController@marcador')->name('import_detalles.marcador');
     Route::get('/import-detalles/fecha', 'ImportDetallesController@fecha')->name('import_detalles.fecha');
     Route::get('/import-detalles/gameid', 'ImportDetallesController@gameIdMover')->name('import_detalles.gameid');
     Route::get('/import-detalles/tanda', 'ImportDetallesController@tanda')->name('import_detalles.tanda');
