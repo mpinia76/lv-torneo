@@ -571,6 +571,8 @@ class ImportPartidosController extends Controller
             $porTipo[$t] = (isset($porTipo[$t]) ? $porTipo[$t] : 0) + 1;
         }
         $sinResultado = isset($porTipo['sin_resultado']) ? $porTipo['sin_resultado'] : 0;
+        // Los que están sin resultado y el fixture no puede cargar solo (penales).
+        $sinMarcador  = isset($porTipo['sin_marcador'])  ? $porTipo['sin_marcador']  : 0;
 
         $html .= '<div class="cards">'
             . $this->card($cont['total'], 'partidos con fecha')
@@ -579,6 +581,7 @@ class ImportPartidosController extends Controller
             . $this->card($cont['pendientes'], 'por jugarse')
             . $this->card($cont['duplicado'], 'ya cargados', 'ok')
             . $this->card($sinResultado, 'cargados sin resultado', $sinResultado ? 'warn' : 'ok')
+            . $this->card($sinMarcador, 'por penales, a mano', $sinMarcador ? 'warn' : 'ok')
             . $this->card($cont['nuevo'], 'nuevos a crear', $cont['nuevo'] ? 'warn' : 'ok')
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
             . '</div>';
@@ -602,7 +605,15 @@ class ImportPartidosController extends Controller
                             : ' Ningún horario necesitaba corrección.'))
                       . ($resultados['cargados']
                         ? ' Cargué el resultado de <b>' . $resultados['cargados'] . '</b> partidos que estaban sin marcador.'
-                        : ' Ningún partido estaba sin resultado.')
+                        // «Ningún partido estaba sin resultado» era mentira cuando los
+                        // que faltaban eran los definidos por penales: el botón no los
+                        // puede cargar y decía que no había nada. Se cuentan aparte.
+                        : ($sinMarcador ? '' : ' Ningún partido estaba sin resultado.'))
+                      . ($sinMarcador
+                        ? ' <b>' . $sinMarcador . '</b> partidos siguen sin resultado y este botón no los puede'
+                          . ' cargar: TM los dio por penales y el marcador del fixture viene con la tanda sumada.'
+                          . ' Están abajo, en «Revisar».'
+                        : '')
                     : '')
                 . '</p>';
             if ($resultados['detalle']) {
@@ -697,7 +708,8 @@ class ImportPartidosController extends Controller
                 }));
             }
 
-            $etiquetas = ['sin_resultado' => 'sin resultado', 'distinto' => 'resultado distinto',
+            $etiquetas = ['sin_resultado' => 'sin resultado', 'sin_marcador' => 'sin resultado (por penales)',
+                'distinto' => 'resultado distinto',
                 'penales' => 'penales', 'goles' => 'goles cargados', 'localia' => 'localía',
                 'otro' => 'otros'];
             $chips = ($revisar === '' ? '<b>Todos (' . count($problemas) . ')</b>'
@@ -720,6 +732,14 @@ class ImportPartidosController extends Controller
                       . 'Esos los carga solos <b>«Guardar, corregir horarios y cargar resultados»</b>. '
                       . 'Las vueltas de llave no entran acá: van al bloque «Llaves de ida y vuelta» y se cargan a mano.</p>'
                     : '')
+                . ($sinMarcador
+                    ? '<p class="warn-box"><b>' . $sinMarcador . '</b> partidos <b>jugados y sin resultado</b> que el '
+                      . 'botón de arriba NO puede cargar: TM los dio por penales y el marcador del listado del '
+                      . 'fixture viene con la tanda sumada (1:1 con tanda 4:2 lo publica 5:3). Los 90\' reales salen '
+                      . 'del <b>detalle</b> del partido, que trae la tanda y la puede restar: el link «Bajar el '
+                      . 'detalle» de cada fila hace eso y de paso trae alineación e incidencias. '
+                      . '<b>Gasta 1 crédito por partido.</b></p>'
+                    : '')
                 . '<p class="acciones">' . $chips . '</p>'
                 . '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido</th><th>Qué pasa</th>'
                 . '<th>Tenés</th><th>TM / contado</th><th></th></tr></thead><tbody>';
@@ -739,6 +759,14 @@ class ImportPartidosController extends Controller
                         : ' · <a href="' . e(route('import_partidos.partido',
                                 ['game_id' => $pr['external_id']]))
                             . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
+                    // El detalle es el ÚNICO lugar donde está la tanda separada del
+                    // marcador, así que para estos partidos es el arreglo, no un extra.
+                    . ((isset($pr['tipo']) && $pr['tipo'] === 'sin_marcador')
+                        ? ' · <a href="' . e(route('import_detalles.bajar',
+                                ['partido_id' => (int) $pr['partido_id']]))
+                            . '" title="Baja el detalle del partido: resta la tanda, carga el marcador de los 90\' '
+                            . 'y trae alineación e incidencias. Gasta 1 crédito."><b>Bajar el detalle →</b></a>'
+                        : '')
                     . '</td></tr>';
             }
             $html .= '</tbody></table></div>';
@@ -1771,6 +1799,32 @@ class ImportPartidosController extends Controller
                 $tipo = 'sin_resultado';
                 $tuyo = 'sin resultado';
                 $deTm = $tmL . ':' . $tmV;
+
+            // TM LO JUGÓ, VOS LO TENÉS VACÍO Y EL FIXTURE NO TRAE UN MARCADOR
+            // USABLE. Es el agujero que dejaba la pantalla muda: el caso de
+            // arriba pide `goles_favor !== null`, y `normalizarFixture()` lo
+            // pone en null a propósito cuando el partido se definió por penales
+            // (el `score` del listado viene con la tanda sumada: 1:1 con tanda
+            // 4:2 lo publica 5:3). Resultado: el partido no entraba en ninguna
+            // rama, `completarResultados()` lo salteaba y la pantalla decía
+            // «nada para revisar» y «ningún partido estaba sin resultado» con
+            // varios partidos vacíos. En una copa —donde media ronda se define
+            // por penales— eso es la mitad de la fecha.
+            //
+            // Esto NO lo arregla «Guardar, corregir horarios y cargar
+            // resultados»: el marcador de los 90' sale del DETALLE del partido,
+            // que sí trae `actions.shootout` y lo puede restar.
+            // Las vueltas de llave no llegan acá: las corta la primera rama.
+            } elseif (!empty($f['terminado']) && $f['goles_favor'] === null
+                && !empty($f['marcador_tm'])
+                && ($p->golesl === null || $p->golesv === null)) {
+                $problema = !empty($f['por_penales'])
+                    ? 'lo tenés sin resultado y TM lo dio por penales: el marcador del fixture trae la '
+                      . 'tanda sumada, así que hay que bajar el detalle del partido'
+                    : 'lo tenés sin resultado y del fixture no sale un marcador usable';
+                $tipo = 'sin_marcador';
+                $tuyo = 'sin resultado';
+                $deTm = $f['marcador_tm'] . (!empty($f['por_penales']) ? ' (con la tanda sumada)' : '');
             }
 
             // Los goles cargados tienen que dar el marcador.
@@ -1872,7 +1926,15 @@ class ImportPartidosController extends Controller
             if ($n++ >= 400) break;
 
             $clase = $f['estado'] === 'nuevo' ? 'ok' : ($f['estado'] === 'conflicto' ? 'err' : '');
-            $res = ($f['goles_favor'] === null) ? '<span class="sub">—</span>'
+            // Con «—» pelado, un partido definido por penales parecía no jugado.
+            // Se muestra el marcador crudo de TM en gris, avisando que trae la
+            // tanda sumada y que por eso no se carga solo.
+            $res = ($f['goles_favor'] === null)
+                ? (!empty($f['terminado']) && !empty($f['marcador_tm'])
+                    ? '<span class="sub" title="Marcador de TM con la tanda sumada: el de los 90\' sale del '
+                      . 'detalle del partido">' . e((string) $f['marcador_tm'])
+                      . (!empty($f['por_penales']) ? ' p' : '') . '</span>'
+                    : '<span class="sub">—</span>')
                 : (e($f['goles_favor']) . ':' . e($f['goles_contra']));
 
             $out .= '<tr class="' . $clase . '">'
