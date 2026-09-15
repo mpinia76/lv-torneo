@@ -2640,17 +2640,7 @@ class ImportPartidosController extends Controller
                     . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a>');
         }
 
-        $json = HttpHelper::getJson(self::TMAPI . '/clubs?ids[]=' . urlencode($tmId));
-        $club = null;
-        if (is_array($json)) {
-            $data = isset($json['data']) ? $json['data'] : $json;
-            if (isset($data['clubs']) && is_array($data['clubs'])) $data = $data['clubs'];
-            foreach ((array) $data as $item) {
-                if (!is_array($item)) continue;
-                if ((string) (isset($item['id']) ? $item['id'] : '') === (string) $tmId) { $club = $item; break; }
-            }
-            if ($club === null && isset($data['id']) && (string) $data['id'] === (string) $tmId) $club = $data;
-        }
+        $club = $this->clubDeTm($tmId);
 
         if (!is_array($club)) {
             $err = HttpHelper::getLastJsonError();
@@ -2676,8 +2666,14 @@ class ImportPartidosController extends Controller
                 ->with('error', 'El club ' . e($tmId) . ' vino sin nombre. No lo creé.');
         }
 
-        $siglas = trim((string) (isset($club['preferences']['clubCode']) ? $club['preferences']['clubCode'] : ''));
-        if ($siglas === '') $siglas = trim((string) (isset($base['abbreviation']) ? $base['abbreviation'] : ''));
+        // Siglas: SÓLO `abbreviation`, que es una abreviatura de verdad.
+        //
+        // Antes se usaba primero `preferences.clubCode`, que es un código
+        // interno de Transfermarkt y no las siglas del club: de ahí salieron
+        // "JAE" para Real Jaén y "96" para Hannover 96, que después hay que
+        // borrar a mano. Si el club no tiene siglas, el campo va en blanco: una
+        // sigla inventada es peor que ninguna, porque no se nota.
+        $siglas = trim((string) (isset($base['abbreviation']) ? $base['abbreviation'] : ''));
 
         $pais = null;
         $paisId = (int) (isset($base['countryId']) ? $base['countryId'] : 0);
@@ -2853,6 +2849,32 @@ class ImportPartidosController extends Controller
     }
 
     // ═══════════════ FUNDACIÓN / ESTADIO / SOCIOS DESDE EL SITIO ═══════════════
+
+    /**
+     * La ficha de un club en tmapi, o null. Cuesta 1 llamada.
+     *
+     * La respuesta viene de varias formas según el endpoint (`data`, `clubs`,
+     * o el objeto pelado), así que se busca el id en todas y no se confía en
+     * el orden: pedir un id y quedarse con "el primero que venga" es cómo se
+     * carga un club con los datos de otro.
+     */
+    private function clubDeTm($tmId)
+    {
+        $json = HttpHelper::getJson(self::TMAPI . '/clubs?ids[]=' . urlencode($tmId));
+        if (!is_array($json)) return null;
+
+        $data = isset($json['data']) ? $json['data'] : $json;
+        if (isset($data['clubs']) && is_array($data['clubs'])) $data = $data['clubs'];
+
+        foreach ((array) $data as $item) {
+            if (!is_array($item)) continue;
+            if ((string) (isset($item['id']) ? $item['id'] : '') === (string) $tmId) return $item;
+        }
+
+        if (isset($data['id']) && (string) $data['id'] === (string) $tmId) return $data;
+
+        return null;
+    }
 
     /** La forma del resultado de `datosClubDelSitio()`, sin nada adentro. */
     private function sitioVacio()
@@ -3094,8 +3116,9 @@ class ImportPartidosController extends Controller
 
         $html = '<h1>Datos y hechos · club ' . e($tmId) . '</h1>'
             . '<p class="sub">Esto es lo que leería «Crear desde TM». No crea ni modifica nada. '
-            . 'Gasta 1 crédito por carga.</p>'
-            . '<p class="acciones"><a href="' . e($d['url']) . '" target="_blank">Abrir la página en TM ↗</a></p>';
+            . 'Gasta 2 créditos por carga (la API y la página).</p>'
+            . '<p class="acciones"><a href="' . e($d['url']) . '" target="_blank">Abrir la página en TM ↗</a></p>'
+            . $this->bloqueClubApi($tmId, $fila);
 
         if (!$d['leido']) {
             $html .= '<p class="err-box">No pude bajar la página. Si el resto de las pantallas de TM andan, '
