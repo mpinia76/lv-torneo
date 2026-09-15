@@ -1113,6 +1113,9 @@ class Controles
      * ese payload no se puede separar, así que los ya cargados quedan mal y hay
      * que rehacerles el marcador de a uno desde el detalle.
      *
+     * Dos partidos por penales NO son lo mismo: el que tiene `penalesl` cargado
+     * ya está bien (marcador de los 90' + tanda aparte) y no entra acá.
+     *
      * El filtro va por LIKE sobre el payload y no por JSON_EXTRACT a propósito:
      * la columna es texto y esto anda igual en cualquier MySQL. El JSON se
      * guarda con `json_encode`, sin espacios, así que la cadena es estable.
@@ -1130,6 +1133,18 @@ class Controles
             ->whereNotNull('ip.tecnico_id')
             ->where('grupo.penales', 1)
             ->where('ip.payload', 'like', '%"gameState":"penalty_shootout"%')
+            // Y SIN la tanda cargada. Que el partido se haya definido por
+            // penales no lo hace un error: si `penalesl/penalesv` tienen algo,
+            // el marcador ya está separado —lo escribió el detalle, o lo
+            // arreglaste a mano— y el 2:2 (4-3) es correcto. Sin esto el
+            // control listaba todos los partidos por penales de la base.
+            //
+            // El caso que se escapa —tanda cargada y marcador igual mal, que
+            // sólo pasa cargando la tanda a mano sin tocar los goles— lo agarra
+            // `goles.diferencia`, que compara los goles contra el resultado.
+            ->where(function ($w) {
+                $w->whereNull('partidos.penalesl')->orWhereNull('partidos.penalesv');
+            })
             ->select($this->columnas())
             ->distinct();
 
