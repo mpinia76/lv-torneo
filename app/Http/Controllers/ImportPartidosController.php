@@ -2747,12 +2747,8 @@ class ImportPartidosController extends Controller
             // Los socios son el campo que puede traer un valor raro del sitio,
             // y también el único que va en NULL. Se los saca y se guarda el
             // resto: el club ya está creado, no se pierde nada más por esto.
-            $error = $e->getMessage();
-            $avisoNulos = (stripos($error, 'null') !== false)
-                ? 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no acepta vacío: '
-                    . 'falta correr <code>php artisan migrate</code> (<code>equipos_datos_nullable</code>).<br>'
-                : 'Los socios quedaron en <b>0</b>: la base rechazó lo que leí del sitio — '
-                    . e($error) . '<br>';
+            $avisoNulos = 'Los socios quedaron en <b>0</b>: la base rechazó lo que leí del sitio — '
+                . e($e->getMessage()) . '<br>';
 
             unset($completar['socios']);
             $sitio['socios'] = null;
@@ -2918,7 +2914,9 @@ class ImportPartidosController extends Controller
         // línea ("La Victoria 12.569 espectadores"): se corta ahí.
         $estadio = $this->valorDeEtiqueta($out['texto'], ['estadio', 'nombre del estadio']);
         if ($estadio !== null) {
-            $estadio = trim(preg_replace('/\s*\d[\d.,]*\s*(espectadores|asientos|plazas|butacas).*$/iu', '', $estadio));
+            // "Parken - connected by 3 38.065 Aforo" → "Parken - connected by 3".
+            $estadio = trim(preg_replace(
+                '/\s*\d[\d.,]*\s*(aforo|espectadores|asientos|plazas|butacas|capacidad).*$/iu', '', $estadio));
             // Un "estadio" que es sólo un número es la capacidad, no el nombre.
             if ($estadio !== '' && !preg_match('/^[\d.,\s]+$/u', $estadio)) {
                 $out['estadio'] = mb_substr($estadio, 0, 150);
@@ -3013,12 +3011,37 @@ class ImportPartidosController extends Controller
         return null;
     }
 
-    /** Minúsculas, sin acentos y sin puntuación de borde, para comparar. */
+    /**
+     * Minúsculas y sin acentos, para comparar etiquetas.
+     *
+     * **NO se usa `iconv('ASCII//TRANSLIT')`**, que es lo que parecía obvio:
+     * depende del locale, y con el locale `C` —el que suele tener PHP en el
+     * hosting— la ó no se convierte en o sino en `?`. "Fundación:" quedaba
+     * como "fundaci?n:" y la etiqueta no matcheaba nunca, mientras que
+     * "Estadio:" y "Socios:", que no llevan acento, andaban perfecto. Un bug
+     * que sólo aparece en el servidor y sólo en las palabras acentuadas.
+     *
+     * El reemplazo es explícito, y después se tira TODO lo que no sea letra
+     * ASCII, número, espacio o dos puntos. Eso cubre de paso el caso en que el
+     * HTML llegue con la codificación cambiada: sea `?`, `'o` o `Ã³`, lo que
+     * queda es "fundacion".
+     */
     private function aplanar($str)
     {
-        $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $str);
-        if ($s === false) $s = (string) $str;
-        return trim(mb_strtolower(preg_replace('/\s+/u', ' ', $s)));
+        $s = mb_strtolower((string) $str);
+
+        $s = strtr($s, [
+            'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
+            'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
+            'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i',
+            'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o', 'õ' => 'o', 'ø' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u',
+            'ñ' => 'n', 'ç' => 'c', 'ß' => 'ss', 'ý' => 'y',
+        ]);
+
+        $s = preg_replace('/[^a-z0-9 :]+/', '', $s);
+
+        return trim(preg_replace('/\s+/', ' ', $s));
     }
 
     /**
