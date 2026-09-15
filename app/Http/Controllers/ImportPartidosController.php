@@ -2732,21 +2732,33 @@ class ImportPartidosController extends Controller
 
         $avisoNulos = '';
 
+        // Se escribe por query builder y NO con `$equipo->update()`: el modelo
+        // se queda con los atributos sucios aunque el guardado falle, así que
+        // el reintento volvía a mandar el mismo valor que lo había volteado y
+        // se perdían también los campos que sí estaban bien.
+        $guardar = function (array $campos) use ($equipo) {
+            if (!$campos) return;
+            \App\Equipo::where('id', $equipo->id)->update($campos);
+        };
+
         try {
-            $equipo->update($completar);
+            $guardar($completar);
         } catch (\Exception $e) {
-            // Caso típico: el código subió pero todavía no corrió la migración
-            // que hace nulables socios/fundación/estadio. Se guarda lo que sí
-            // entra y se avisa qué falta correr — el club ya está creado.
-            $avisoNulos = 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no acepta '
-                . 'vacío: falta correr <code>php artisan migrate</code> '
-                . '(<code>equipos_datos_nullable</code>).<br>';
+            // Los socios son el campo que puede traer un valor raro del sitio,
+            // y también el único que va en NULL. Se los saca y se guarda el
+            // resto: el club ya está creado, no se pierde nada más por esto.
+            $error = $e->getMessage();
+            $avisoNulos = (stripos($error, 'null') !== false)
+                ? 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no acepta vacío: '
+                    . 'falta correr <code>php artisan migrate</code> (<code>equipos_datos_nullable</code>).<br>'
+                : 'Los socios quedaron en <b>0</b>: la base rechazó lo que leí del sitio — '
+                    . e($error) . '<br>';
 
             unset($completar['socios']);
             $sitio['socios'] = null;
 
             try {
-                if ($completar) $equipo->update($completar);
+                $guardar($completar);
             } catch (\Exception $e2) {
                 Log::error('crearEquipo: no pude completar el club ' . $equipo->id . ': ' . $e2->getMessage());
                 $avisoNulos .= 'Tampoco pude guardar fundación y estadio: ' . e($e2->getMessage()) . '<br>';
@@ -2892,7 +2904,11 @@ class ImportPartidosController extends Controller
 
         // Fundación. Se guarda sólo si sale una fecha COMPLETA; el texto crudo
         // vuelve igual para poder avisar qué fue lo que no se pudo interpretar.
-        $crudo = $this->valorDeEtiqueta($out['texto'], ['fecha de fundacion', 'fundacion', 'fundado en', 'fundado']);
+        // Las variantes van de la más específica a la más suelta: la etiqueta
+        // tiene que terminar donde termina el nombre, así que "Fundación" NO
+        // matchea "Fundación del club:" y hay que listar las dos.
+        $crudo = $this->valorDeEtiqueta($out['texto'], ['fecha de fundacion', 'fundacion del club',
+            'ano de fundacion', 'fundacion', 'fundado el', 'fundado en', 'fundado']);
         if ($crudo !== null) {
             $out['fundacion_crudo'] = mb_substr($crudo, 0, 60);
             $out['fundacion'] = $this->fechaDelTexto($crudo);
@@ -2910,10 +2926,18 @@ class ImportPartidosController extends Controller
         }
 
         // Socios. TM los llama "Miembros" en la versión en español.
-        $socios = $this->valorDeEtiqueta($out['texto'], ['miembros', 'socios', 'numero de socios', 'cantidad de socios']);
-        if ($socios !== null) {
-            $n = (int) preg_replace('/[^\d]/', '', $socios);
-            if ($n > 0) $out['socios'] = $n;    // 0 es "no lo sé", no "no tiene"
+        //
+        // Se toma SÓLO el primer número del renglón. Sacarle los no-dígitos a
+        // todo lo que venga pega números que no tienen nada que ver: "18.200
+        // 26.03.2009" salía como 1820026032009, que además de ser falso no
+        // entra en la columna y voltea el guardado entero.
+        $socios = $this->valorDeEtiqueta($out['texto'], ['miembros', 'socios',
+            'numero de socios', 'cantidad de socios', 'numero de miembros']);
+        if ($socios !== null && preg_match('/\d[\d.,]*/u', $socios, $m)) {
+            $n = (int) preg_replace('/[^\d]/', '', $m[0]);
+            // 0 es "no lo sé", no "no tiene". Y ningún club del mundo pasa el
+            // millón de socios: arriba de eso leí cualquier cosa, no un socio.
+            if ($n > 0 && $n <= 1000000) $out['socios'] = $n;
         }
 
         return $out;
