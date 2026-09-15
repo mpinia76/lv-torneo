@@ -52,7 +52,11 @@
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('fundacion', 'Fundación')}}
-                {{Form::date('fundacion', date('Y-m-d', strtotime($equipo->fundacion)), ['class' => 'form-control'])}}
+                {{-- Sin fundación cargada el campo va VACÍO. Antes entraba el
+                     null a strtotime(), que devuelve false, y el date() de ahí
+                     mostraba 31/12/1969 como si fuera un dato del club: a un
+                     guardado de distancia de quedar en la base. --}}
+                {{Form::date('fundacion', ($equipo->fundacion && substr($equipo->fundacion, 0, 4) !== '0000') ? date('Y-m-d', strtotime($equipo->fundacion)) : null, ['class' => 'form-control'])}}
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">

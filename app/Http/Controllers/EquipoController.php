@@ -27,6 +27,18 @@ class EquipoController extends Controller
     }
 
     /**
+     * El campo que vino vacío se guarda como NULL.
+     *
+     * Un formulario manda '' cuando el usuario no puso nada, y MySQL lo
+     * convierte en 0 (o en 0000-00-00): a partir de ahí "no lo sé" y "cero
+     * socios" son el mismo valor y el dato faltante no se ve más.
+     */
+    private function vacioEsNulo($valor)
+    {
+        return (is_string($valor) && trim($valor) === '') ? null : $valor;
+    }
+
+    /**
      * Lista de equipos (id, nombre) en JSON. La usa el scraper para refrescar
      * los desplegables de "Equipo" sin recargar la página, después de dar de
      * alta un club nuevo en el ABM. Mismo orden que el select maestro.
@@ -115,8 +127,11 @@ class EquipoController extends Controller
 
         $insert['nombre'] = $request->get('nombre');
         $insert['siglas'] = $request->get('siglas');
-        $insert['socios'] = $request->get('socios');
-        $insert['fundacion'] = $request->get('fundacion');
+        // Un campo vacío es "no lo sé", y así tiene que quedar en la base. Si
+        // entra el '' del formulario, socios termina en 0 y la fundación en
+        // 0000-00-00, que ya no se distinguen de un dato cargado a propósito.
+        $insert['socios'] = $this->vacioEsNulo($request->get('socios'));
+        $insert['fundacion'] = $this->vacioEsNulo($request->get('fundacion'));
         $insert['estadio'] = $request->get('estadio');
         $insert['historia'] = $request->get('historia');
         $insert['pais'] = $request->get('pais');
@@ -187,8 +202,9 @@ class EquipoController extends Controller
 
         $update['nombre'] = $request->get('nombre');
         $update['siglas'] = $request->get('siglas');
-        $update['socios'] = $request->get('socios');
-        $update['fundacion'] = $request->get('fundacion');
+        // Ver el comentario de store(): vacío es null, no 0 ni 0000-00-00.
+        $update['socios'] = $this->vacioEsNulo($request->get('socios'));
+        $update['fundacion'] = $this->vacioEsNulo($request->get('fundacion'));
         $update['estadio'] = $request->get('estadio');
         $update['historia'] = $request->get('historia');
         $update['pais'] = $request->get('pais');

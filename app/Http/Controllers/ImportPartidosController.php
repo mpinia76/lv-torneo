@@ -2602,10 +2602,13 @@ class ImportPartidosController extends Controller
      * nada y te lleva al equipo existente. Nunca pisa datos cargados a mano.
      *
      * De `/clubs?ids[]=` salen: nombre, siglas (clubCode), país (countryId) y
-     * escudo (crestUrl). NO vienen fundación, estadio, socios ni historia:
-     * ésos se completan a mano en la pantalla a la que caés.
+     * escudo (crestUrl). La API NO trae fundación, estadio ni socios, pero el
+     * SITIO sí los tiene en «Datos y hechos», así que se leen de ahí — ver
+     * `datosClubDelSitio()`. La historia no existe en Transfermarkt en ninguna
+     * parte: ésa es la única que queda siempre a mano.
      *
-     * Cuesta 2 llamadas: una por los datos y otra por el escudo.
+     * Cuesta 3 llamadas: datos, escudo y la página de «Datos y hechos»
+     * (esta última se puede saltear con `&sitio=0`).
      */
     public function crearEquipo(Request $request)
     {
@@ -2616,6 +2619,14 @@ class ImportPartidosController extends Controller
 
         if ($tmId === '') {
             return redirect()->route('import_partidos.index')->with('error', 'Falta el id de Transfermarkt.');
+        }
+
+        // Diagnóstico: mirar qué se lee de «Datos y hechos» SIN crear nada.
+        // Esto es HTML, así que el día que TM cambie el maquetado el síntoma va
+        // a ser «me creó el club con el estadio vacío»; sin esta pantalla no hay
+        // forma de saber si falló la bajada o el parseo.
+        if ((string) $request->get('ver_datos', '0') === '1') {
+            return $this->verDatosClubTm($tmId);
         }
 
         // ¿Ya está mapeado? Entonces no hay nada que crear.
@@ -2650,10 +2661,16 @@ class ImportPartidosController extends Controller
 
         $base = isset($club['baseDetails']) && is_array($club['baseDetails']) ? $club['baseDetails'] : [];
 
-        // Nombre: el largo oficial del club "superior" suele ser el bueno
-        // ("Club Atlético Vélez Sársfield"); si no está, el corto de la ficha.
-        $nombre = trim((string) (isset($base['superiorClub']['name']) ? $base['superiorClub']['name'] : ''));
-        if ($nombre === '') $nombre = trim((string) (isset($club['name']) ? $club['name'] : ''));
+        // Nombre: el MISMO que se ve en el sondeo ("Real Jaén CF"), que es el
+        // `name` de la ficha —`resolverNombres()` toma ese campo—. Antes mandaba
+        // el oficial largo del club superior ("Real Jaén Club De Fútbol S.A.D.")
+        // y había que renombrar a mano cada club recién creado: es más completo,
+        // pero no es el nombre con el que el usuario reconoce al club ni el que
+        // figura en la pantalla desde la que apretó el botón. El largo queda de
+        // respaldo para cuando la ficha venga sin `name`.
+        $nombre = trim((string) (isset($club['name']) ? $club['name'] : ''));
+        if ($nombre === '') $nombre = trim((string) (isset($base['superiorClub']['name']) ? $base['superiorClub']['name'] : ''));
+        if ($nombre === '') $nombre = trim((string) (isset($base['officialName']) ? $base['officialName'] : ''));
         if ($nombre === '') {
             return redirect()->to($volverA ?: route('import_partidos.index'))
                 ->with('error', 'El club ' . e($tmId) . ' vino sin nombre. No lo creé.');
@@ -2671,39 +2688,93 @@ class ImportPartidosController extends Controller
 
         $escudo = $this->bajarEscudo(isset($club['crestUrl']) ? $club['crestUrl'] : null);
 
+        // Fundación, estadio y socios: la API no los tiene, el sitio sí.
+        $sitio = ((string) $request->get('sitio', '1') === '0')
+            ? $this->sitioVacio()
+            : $this->datosClubDelSitio($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
+
+        // Lo que no se pudo conseguir se deja VACÍO, no en cero ni en una fecha
+        // inventada: un campo en blanco se ve y se completa, un 0 parece un dato
+        // cargado y nadie lo vuelve a mirar. Las claves se arman de a una para
+        // no mandar NULL donde la columna todavía no lo acepte.
+        $alta = [
+            'nombre'     => $nombre,
+            'siglas'     => $siglas !== '' ? $siglas : null,
+            'pais'       => $pais,
+            'escudo'     => $escudo,
+            'socios'     => $sitio['socios'],       // null si no vino
+            'url_nombre' => Str::slug($nombre),
+        ];
+        if ($sitio['fundacion'] !== null) $alta['fundacion'] = $sitio['fundacion'];
+        if ($sitio['estadio']   !== null) $alta['estadio']   = $sitio['estadio'];
+
+        $avisoNulos = '';
+
         try {
-            $equipo = \App\Equipo::create([
-                'nombre'     => $nombre,
-                'siglas'     => $siglas !== '' ? $siglas : null,
-                'pais'       => $pais,
-                'escudo'     => $escudo,
-                'socios'     => 0,        // la columna es NOT NULL; se completa a mano
-                'url_nombre' => Str::slug($nombre),
-            ]);
+            $equipo = \App\Equipo::create($alta);
         } catch (\Exception $e) {
-            return redirect()->to($volverA ?: route('import_partidos.index'))
-                ->with('error', 'No pude crear el equipo: ' . e($e->getMessage()));
+            // Si el deploy subió el código pero todavía no corrió la migración
+            // que hace nulables socios/fundación/estadio, el alta muere acá. No
+            // hay razón para perder el club por eso: se crea con el 0 de antes y
+            // se avisa qué falta correr.
+            if ($alta['socios'] === null) {
+                $alta['socios'] = 0;
+                try {
+                    $equipo = \App\Equipo::create($alta);
+                    $avisoNulos = 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no '
+                        . 'acepta vacío: falta correr <code>php artisan migrate</code> '
+                        . '(<code>equipos_datos_nullable</code>).<br>';
+                } catch (\Exception $e2) {
+                    return redirect()->to($volverA ?: route('import_partidos.index'))
+                        ->with('error', 'No pude crear el equipo: ' . e($e2->getMessage()));
+                }
+            } else {
+                return redirect()->to($volverA ?: route('import_partidos.index'))
+                    ->with('error', 'No pude crear el equipo: ' . e($e->getMessage()));
+            }
         }
 
         $this->guardarMapeo($tmId, $equipo->id, $nombre, 'club_tm');
 
+        // Lo que sí se consiguió se dice tal cual quedó, para que se pueda
+        // desconfiar de un dato raro sin tener que abrir TM.
+        $trajo = [];
+        if (isset($alta['fundacion'])) $trajo[] = 'fundación ' . $alta['fundacion'];
+        if (isset($alta['estadio']))   $trajo[] = 'estadio «' . $alta['estadio'] . '»';
+        if ($sitio['socios'] !== null) $trajo[] = 'socios ' . number_format($sitio['socios'], 0, ',', '.');
+
         $falta = [];
-        if (!$pais)   $falta[] = 'país';
-        if (!$escudo) $falta[] = 'escudo';
-        $falta[] = 'fundación';
-        $falta[] = 'estadio';
-        $falta[] = 'socios';
-        $falta[] = 'historia';
+        if (!$pais)                      $falta[] = 'país';
+        if (!$escudo)                    $falta[] = 'escudo';
+        if (!isset($alta['fundacion']))  $falta[] = 'fundación';
+        if (!isset($alta['estadio']))    $falta[] = 'estadio';
+        if ($sitio['socios'] === null)   $falta[] = 'socios';
+        $falta[] = 'historia';   // ésta no está en Transfermarkt en ningún lado
 
         $links = $this->urlsClubTm($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
 
         $msg = 'Creé <b>' . e($nombre) . '</b> desde Transfermarkt y lo dejé mapeado al club ' . e($tmId)
-            . ', así que en el sondeo ya no va a figurar como conflicto (refrescá esa pestaña).<br>'
-            . 'Transfermarkt <b>no</b> trae estos datos por la API: <b>' . e(implode(', ', $falta)) . '</b>.<br>'
-            . 'Los tenés en la página del club — abrila al lado y completá a mano:<br>'
+            . ', así que en el sondeo ya no va a figurar como conflicto (refrescá esa pestaña).<br>';
+
+        if ($trajo) {
+            $msg .= 'De «Datos y hechos» saqué: <b>' . e(implode(' · ', $trajo)) . '</b>.<br>';
+        }
+
+        // Si el sitio trajo la fundación pero sin día y mes, se avisa y NO se
+        // guarda: un 1º de enero inventado no se distingue de uno real.
+        if (!isset($alta['fundacion']) && $sitio['fundacion_crudo'] !== '') {
+            $msg .= 'La fundación no la pude guardar porque el sitio la trae como <b>'
+                . e($sitio['fundacion_crudo']) . '</b> y de ahí no sale una fecha completa.<br>';
+        }
+
+        $msg .= $avisoNulos
+            . 'Queda para completar a mano: <b>' . e(implode(', ', $falta)) . '</b>'
+            . ($sitio['leido'] ? '' : ' <span style="opacity:.7">(no pude leer la página del club)</span>') . '.<br>'
             . '<a href="' . e($links['datos']) . '" target="_blank"><b>Datos y hechos ↗</b></a> '
             . '<span style="opacity:.7">(fundación, estadio, socios)</span> · '
-            . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a>';
+            . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a> · '
+            . '<a href="' . e(route('import_partidos.crear_equipo', ['tm_id' => $tmId, 'ver_datos' => 1]))
+            . '" target="_blank">Ver qué leí del sitio ↗</a>';
 
         return redirect()->route('equipos.edit', $equipo->id)->with('success', $msg);
     }
@@ -2753,6 +2824,232 @@ class ImportPartidosController extends Controller
             Log::error('bajarEscudo: ' . $e->getMessage());
             return null;
         }
+    }
+
+    // ═══════════════ FUNDACIÓN / ESTADIO / SOCIOS DESDE EL SITIO ═══════════════
+
+    /** La forma del resultado de `datosClubDelSitio()`, sin nada adentro. */
+    private function sitioVacio()
+    {
+        return ['fundacion' => null, 'fundacion_crudo' => '', 'estadio' => null,
+            'socios' => null, 'leido' => false, 'url' => null, 'texto' => ''];
+    }
+
+    /**
+     * Fundación, estadio y socios leídos de «Datos y hechos» del club.
+     *
+     * La API de clubes no los trae (confirmado: por eso el mensaje viejo decía
+     * "completá a mano"). El sitio sí, en `datenfakten/verein/{id}`, y ya
+     * sabemos bajar HTML de TM por ScraperAPI — el mismo camino del calendario
+     * por club. Una llamada = un crédito = los tres datos.
+     *
+     * **Es HTML, no JSON: se rompe si TM cambia el maquetado.** Por eso no se
+     * lee por posición sino por la etiqueta que tiene al lado ("Estadio:",
+     * "Fecha de fundación:"), se usa el sitio en español —que es de donde salen
+     * esas etiquetas— y todo lo que no se entiende vuelve en `null` en vez de
+     * inventarse. Lo que queda vacío se ve en la pantalla de edición; un dato
+     * mal leído no se nota nunca.
+     */
+    private function datosClubDelSitio($tmId, $relativeUrl)
+    {
+        $out = $this->sitioVacio();
+        $urls = $this->urlsClubTm($tmId, $relativeUrl);
+        $out['url'] = $urls['datos'];
+
+        try {
+            // `getHtmlTm` es el camino nuevo; si el deploy todavía no lo subió,
+            // el viejo enruta igual los hosts de transfermarkt por ScraperAPI.
+            $html = method_exists(HttpHelper::class, 'getHtmlTm')
+                ? HttpHelper::getHtmlTm($urls['datos'])
+                : HttpHelper::getHtmlContent($urls['datos']);
+        } catch (\Exception $e) {
+            Log::error('datosClubDelSitio: ' . $e->getMessage());
+            return $out;
+        }
+
+        if (!is_string($html) || trim($html) === '') return $out;
+
+        $out['texto'] = $this->htmlATexto($html);
+        $out['leido'] = true;
+
+        // Fundación. Se guarda sólo si sale una fecha COMPLETA; el texto crudo
+        // vuelve igual para poder avisar qué fue lo que no se pudo interpretar.
+        $crudo = $this->valorDeEtiqueta($out['texto'], ['fecha de fundacion', 'fundacion', 'fundado en', 'fundado']);
+        if ($crudo !== null) {
+            $out['fundacion_crudo'] = mb_substr($crudo, 0, 60);
+            $out['fundacion'] = $this->fechaDelTexto($crudo);
+        }
+
+        // Estadio. El nombre puede venir seguido de la capacidad en la misma
+        // línea ("La Victoria 12.569 espectadores"): se corta ahí.
+        $estadio = $this->valorDeEtiqueta($out['texto'], ['estadio', 'nombre del estadio']);
+        if ($estadio !== null) {
+            $estadio = trim(preg_replace('/\s*\d[\d.,]*\s*(espectadores|asientos|plazas|butacas).*$/iu', '', $estadio));
+            // Un "estadio" que es sólo un número es la capacidad, no el nombre.
+            if ($estadio !== '' && !preg_match('/^[\d.,\s]+$/u', $estadio)) {
+                $out['estadio'] = mb_substr($estadio, 0, 150);
+            }
+        }
+
+        // Socios. TM los llama "Miembros" en la versión en español.
+        $socios = $this->valorDeEtiqueta($out['texto'], ['miembros', 'socios', 'numero de socios', 'cantidad de socios']);
+        if ($socios !== null) {
+            $n = (int) preg_replace('/[^\d]/', '', $socios);
+            if ($n > 0) $out['socios'] = $n;    // 0 es "no lo sé", no "no tiene"
+        }
+
+        return $out;
+    }
+
+    /**
+     * El HTML como texto, un renglón por celda o bloque.
+     *
+     * Trabajar sobre el texto y no sobre el DOM es a propósito: las etiquetas
+     * ("Estadio:") sobreviven a los rediseños mucho más que las clases CSS.
+     */
+    private function htmlATexto($html)
+    {
+        $html = preg_replace('#<(script|style|noscript)\b[^>]*>.*?</\1>#is', ' ', (string) $html);
+        $html = preg_replace('#<br\s*/?>#i', "\n", $html);
+        $html = preg_replace('#</(td|th|tr|li|p|div|h1|h2|h3|h4|span|dt|dd|a)\s*>#i', "\n", $html);
+
+        $txt = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $txt = str_replace(["\xc2\xa0", "\xe2\x80\x8b"], ' ', $txt);   // &nbsp; y el ancho cero
+
+        $lineas = [];
+        foreach (preg_split('/\R+/u', $txt) as $l) {
+            $l = trim(preg_replace('/[ \t]+/u', ' ', $l));
+            if ($l !== '') $lineas[] = $l;
+        }
+
+        return implode("\n", $lineas);
+    }
+
+    /**
+     * El valor que va con una etiqueta: lo que sigue a los dos puntos, o el
+     * renglón de abajo si la etiqueta quedó sola (el caso de `<th>` / `<td>`).
+     *
+     * La etiqueta tiene que ARRANCAR el renglón: si no, "Estadio del rival"
+     * matchea con "Estadio" y devuelve cualquier cosa.
+     */
+    private function valorDeEtiqueta($texto, array $etiquetas)
+    {
+        $lineas = explode("\n", (string) $texto);
+        $planas = [];
+        foreach ($lineas as $i => $l) $planas[$i] = $this->aplanar($l);
+
+        foreach ($etiquetas as $etiqueta) {
+            $et = $this->aplanar($etiqueta);
+            if ($et === '') continue;
+
+            foreach ($planas as $i => $plana) {
+                if (strpos($plana, $et) !== 0) continue;
+
+                // Arrancar con la etiqueta no alcanza: después tiene que venir
+                // el ":" o terminarse el renglón. Sin esto, "Estadio del rival:
+                // Monumental" entra por "estadio" y devuelve el estadio de otro.
+                $cola = ltrim(mb_substr($plana, mb_strlen($et)));
+                if ($cola !== '' && strpos($cola, ':') !== 0) continue;
+
+                // Lo que sobra del renglón después del ":" — se corta por el
+                // separador y no por la longitud de la etiqueta, así los
+                // acentos no corren el índice.
+                $pos = mb_strpos($lineas[$i], ':');
+                if ($pos !== false) {
+                    $resto = trim(mb_substr($lineas[$i], $pos + 1));
+                    if ($resto !== '') return $resto;
+                }
+
+                if (isset($lineas[$i + 1])) {
+                    $sig = trim($lineas[$i + 1]);
+                    // Si abajo hay otra etiqueta, esta venía vacía.
+                    if ($sig !== '' && mb_substr($sig, -1) !== ':') return $sig;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Minúsculas, sin acentos y sin puntuación de borde, para comparar. */
+    private function aplanar($str)
+    {
+        $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $str);
+        if ($s === false) $s = (string) $str;
+        return trim(mb_strtolower(preg_replace('/\s+/u', ' ', $s)));
+    }
+
+    /**
+     * Una fecha `Y-m-d` de un texto de TM, o null.
+     *
+     * Acepta 15/01/1922 y "15 ene 1922". **Un año suelto NO alcanza**: poner
+     * 1 de enero para completar es inventar un dato que después nadie puede
+     * distinguir de uno real. En ese caso vuelve null y el mensaje lo avisa.
+     */
+    private function fechaDelTexto($str)
+    {
+        $str = trim((string) $str);
+
+        if (preg_match('/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})\b/', $str, $m)) {
+            return $this->armarFecha($m[3], $m[2], $m[1]);
+        }
+        if (preg_match('/\b(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})\b/', $str, $m)) {
+            return $this->armarFecha($m[1], $m[2], $m[3]);
+        }
+
+        $meses = ['ene' => 1, 'feb' => 2, 'mar' => 3, 'abr' => 4, 'may' => 5, 'jun' => 6,
+            'jul' => 7, 'ago' => 8, 'sep' => 9, 'set' => 9, 'oct' => 10, 'nov' => 11, 'dic' => 12];
+
+        if (preg_match('/\b(\d{1,2})\s*(?:de\s+)?([a-zA-ZñÑáéíóúÁÉÍÓÚ]{3,12})\.?\s*(?:de\s+)?(\d{4})\b/u', $str, $m)) {
+            $k = mb_substr($this->aplanar($m[2]), 0, 3);
+            if (isset($meses[$k])) return $this->armarFecha($m[3], $meses[$k], $m[1]);
+        }
+
+        return null;
+    }
+
+    /** `Y-m-d` si la fecha existe de verdad; null si no (30 de febrero y demás). */
+    private function armarFecha($anio, $mes, $dia)
+    {
+        $anio = (int) $anio; $mes = (int) $mes; $dia = (int) $dia;
+        if ($anio < 1800 || $anio > (int) date('Y') || !checkdate($mes, $dia, $anio)) return null;
+        return sprintf('%04d-%02d-%02d', $anio, $mes, $dia);
+    }
+
+    /** Qué se lee de «Datos y hechos», sin crear ni tocar nada. */
+    private function verDatosClubTm($tmId)
+    {
+        $d = $this->datosClubDelSitio($tmId, null);
+
+        $fila = function ($k, $v) {
+            return '<tr><th style="text-align:left;padding-right:1em">' . e($k) . '</th><td>'
+                . ($v === null || $v === '' ? '<span class="sub">— no lo encontré —</span>' : '<b>' . e($v) . '</b>')
+                . '</td></tr>';
+        };
+
+        $html = '<h1>Datos y hechos · club ' . e($tmId) . '</h1>'
+            . '<p class="sub">Esto es lo que leería «Crear desde TM». No crea ni modifica nada. '
+            . 'Gasta 1 crédito por carga.</p>'
+            . '<p class="acciones"><a href="' . e($d['url']) . '" target="_blank">Abrir la página en TM ↗</a></p>';
+
+        if (!$d['leido']) {
+            $html .= '<p class="err-box">No pude bajar la página. Si el resto de las pantallas de TM andan, '
+                . 'es la página: miralá en el navegador con el link de arriba.</p>';
+            return $this->pagina('Datos y hechos', $html);
+        }
+
+        $html .= '<table>'
+            . $fila('Fundación', $d['fundacion'])
+            . $fila('Fundación (como vino)', $d['fundacion_crudo'])
+            . $fila('Estadio', $d['estadio'])
+            . $fila('Socios', $d['socios'] === null ? null : (string) $d['socios'])
+            . '</table>'
+            . '<h2>Texto de la página</h2>'
+            . '<p class="sub">Si arriba falta algo, la etiqueta que hay que agregar en '
+            . '<code>datosClubDelSitio()</code> está acá abajo.</p>'
+            . '<pre>' . e(mb_substr($d['texto'], 0, 12000)) . '</pre>';
+
+        return $this->pagina('Datos y hechos', $html);
     }
 
     // ═══════════════════ SONDEO DE UN PARTIDO (descubrimiento) ═══════════════════
@@ -5204,9 +5501,10 @@ class ImportPartidosController extends Controller
 
         $out = '<h2>Clubes sin mapear <span class="sub">(' . count($pend) . ')</span></h2>'
             . '<p class="sub">Elegí el equipo y guardá: queda mapeado por su id de Transfermarkt y no se vuelve a preguntar nunca más. '
-            . 'Si el club <b>no existe</b> en tu base, «Crear desde TM» lo da de alta con nombre, siglas, país y escudo, '
-            . 'lo mapea solo y te deja en la edición para completar fundación, estadio, socios e historia '
-            . '(eso Transfermarkt no lo tiene). Cuesta 2 llamadas. «En blanco» abre el alta de siempre. '
+            . 'Si el club <b>no existe</b> en tu base, «Crear desde TM» lo da de alta con el nombre que ves acá, '
+            . 'siglas, país, escudo y —leídos de «Datos y hechos»— fundación, estadio y socios; '
+            . 'lo mapea solo y te deja en la edición para completar la historia, que Transfermarkt no tiene. '
+            . 'Cuesta 3 llamadas. «En blanco» abre el alta de siempre. '
             . 'Cuando volvés acá y refrescás, el club ya aparece resuelto '
             . '<b>sin volver a bajar nada de Transfermarkt</b>.</p>'
             . '<div class="scroll"><table><thead><tr><th>Club en TM</th><th>id TM</th><th>Partidos</th><th>Nuestro equipo</th></tr></thead><tbody>';
