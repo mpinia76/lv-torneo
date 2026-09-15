@@ -1359,9 +1359,9 @@ class ImportDetallesController extends Controller
                 . '<td>' . e((string) $f->ronda) . '</td>'
                 // `aplicado` quiere decir que ESTA fila creó el partido: ahí el
                 // gameId es de este partido casi seguro, y el que sobra es el otro.
-                . '<td class="sub">' . ((string) $f->estado === 'aplicado'
-                    ? '<b>creó este partido</b> · ' : '')
-                . e(mb_substr((string) $f->motivo, 0, 90)) . '</td>'
+                . '<td class="sub">' . ((string) $f->estado === 'aplicado' ? '<b>creó este partido</b>' : '')
+                . (((string) $f->estado === 'aplicado' && trim((string) $f->motivo) !== '') ? ' · ' : '')
+                . e(mb_substr(trim((string) $f->motivo), 0, 90)) . '</td>'
                 . '<td><a class="err" href="' . e(route('import_detalles.desatar',
                     ['partido_id' => $partidoId, 'game_id' => $id]))
                 . '">no es este partido →</a></td>'

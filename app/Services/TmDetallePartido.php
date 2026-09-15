@@ -4377,6 +4377,27 @@ class TmDetallePartido
                             ['grupo_id' => $f['grupo_id'], 'equipo_id' => $f['equipo_id']]
                         );
                         $existente = $p->id;
+
+                        // LA PLANTILLA NACE EN EL GRUPO DEL PARTIDO, y la tabla de
+                        // posiciones lista a los equipos que tienen plantilla EN EL
+                        // GRUPO QUE SE MIRA (`GrupoController@posiciones`: el EXISTS
+                        // contra `p2.grupo_id`). Entonces, si el primer partido con
+                        // detalle de un torneo es una llave —el caso normal cuando el
+                        // DT agarró el equipo a mitad de camino y sólo dirigió los
+                        // playoffs—, la plantilla queda en el grupo de playoffs y la
+                        // tabla de la fase de grupos se queda sin el equipo, sin que
+                        // nada lo diga.
+                        //
+                        // A qué grupo va no se puede adivinar (puede haber varias
+                        // zonas y la fase de grupos puede no estar cargada todavía),
+                        // así que se avisa y se deja el link para reasignarla.
+                        if (!empty($f['torneo_id']) && !$this->grupoSuma($f['grupo_id'])
+                            && $this->torneoTieneTabla($f['torneo_id'])) {
+                            $this->aviso('Creé la plantilla de ' . $this->nombreEquipo($f['equipo_id'])
+                                . ' en el grupo del partido, que no arma tabla de posiciones. Este torneo sí tiene '
+                                . 'grupos con tabla: si el equipo juega ahí, reasignale el grupo a la plantilla o no '
+                                . 'va a aparecer en las posiciones. [[plantilla:' . (int) $existente . ']]');
+                        }
                     }
                     $plantillas[$clave] = $existente;
                 }
@@ -5175,6 +5196,31 @@ class TmDetallePartido
     {
         $e = DB::table('equipos')->where('id', $id)->select('nombre')->first();
         return $e ? $e->nombre : ('equipo #' . $id);
+    }
+
+    /** ¿Este grupo arma tabla de posiciones? (`grupos.posiciones`) */
+    private function grupoSuma($grupoId)
+    {
+        static $cache = [];
+        $grupoId = (int) $grupoId;
+        if (!$grupoId) return false;
+        if (!isset($cache[$grupoId])) {
+            $cache[$grupoId] = (int) DB::table('grupos')->where('id', $grupoId)->value('posiciones') === 1;
+        }
+        return $cache[$grupoId];
+    }
+
+    /** ¿El torneo tiene algún grupo con tabla de posiciones? */
+    private function torneoTieneTabla($torneoId)
+    {
+        static $cache = [];
+        $torneoId = (int) $torneoId;
+        if (!$torneoId) return false;
+        if (!isset($cache[$torneoId])) {
+            $cache[$torneoId] = DB::table('grupos')->where('torneo_id', $torneoId)
+                ->where('posiciones', 1)->exists();
+        }
+        return $cache[$torneoId];
     }
 
     private function aviso($txt)

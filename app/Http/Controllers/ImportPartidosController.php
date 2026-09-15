@@ -3765,11 +3765,37 @@ class ImportPartidosController extends Controller
                 // partido de la llave, no éste. Fuera de las llaves, el mismo
                 // par en la misma fecha es el mismo partido con la localía al
                 // revés (se avisa; el partido no se toca).
+                //
+                // Y el invertido es el mismo partido sólo si es el MISMO DÍA. Un
+                // partido cargado con local y visitante al revés sigue siendo el
+                // de esa fecha; la vuelta de una llave es el mismo par, la
+                // localía dada vuelta y una semana después. Sin esta condición,
+                // un grupo de llaves al que le falta el flag `penales` engancha
+                // la vuelta al partido de la ida: la fila del staging queda
+                // apuntando ahí (con `motivo = 'ya estaba cargado'`) y después el
+                // detalle de la vuelta se escribe adentro de la ida. Es lo que
+                // pasó con Atlético–Valencia 2012, partido #25379 — y volvía a
+                // pasar cada vez que se apretaba Aplicar, aunque se desatara la
+                // fila a mano. Acá no se engancha ni se crea: el que decide es
+                // el flag del grupo, y eso lo pone una persona.
                 $ya = $exacto;
                 if (!$ya && $invertido && !$esLlave) {
-                    $ya = $invertido;
-                    $avisos[] = $this->nombreEquipo($equipolId) . ' vs ' . $this->nombreEquipo($equipovId)
-                        . ' ya estaba cargado con la localía al revés (partido #' . $invertido->id . ').';
+                    $dias = abs((int) round((strtotime(substr((string) $invertido->dia, 0, 10))
+                        - strtotime(substr((string) $r->dia, 0, 10))) / 86400));
+
+                    if ($dias <= 1) {
+                        $ya = $invertido;
+                        $avisos[] = $this->nombreEquipo($equipolId) . ' vs ' . $this->nombreEquipo($equipovId)
+                            . ' ya estaba cargado con la localía al revés (partido #' . $invertido->id . ').';
+                    } else {
+                        $errores[] = $this->nombreEquipo($equipolId) . ' vs ' . $this->nombreEquipo($equipovId)
+                            . ' (' . substr((string) $r->dia, 0, 10) . '): el mismo par ya está cargado con la '
+                            . 'localía al revés, pero ' . $dias . ' días ' . ($invertido->dia < $r->dia ? 'antes' : 'después')
+                            . ' (partido #' . (int) $invertido->id . '). Eso no es una localía mal cargada: es la '
+                            . 'OTRA mitad de una llave. No lo enganché ni lo creé. Si este grupo es de ida y '
+                            . 'vuelta, marcalo como llave y volvé a aplicar — ahí se crea el partido que falta.';
+                        continue;
+                    }
                 }
 
                 if ($ya) {
