@@ -12,6 +12,19 @@
          body/h1/a/table/th,td pisaban los estilos del sitio entero. --}}
 
     <div class="import-tm">
+
+        {{-- Los mensajes flash de las pantallas del importador.
+             Sin esto, todo `redirect()->with('error', ...)` que vuelve al sondeo
+             se perdía en el camino: la pantalla se dibujaba igual que siempre y
+             el error no aparecía en ningún lado, así que un alta que fallaba se
+             veía como "apreté el botón y no hizo nada". --}}
+        @if (session('error'))
+            <div class="err-box">{!! session('error') !!}</div>
+        @endif
+        @if (session('success'))
+            <div class="ok-box">{!! session('success') !!}</div>
+        @endif
+
         {!! $cuerpo !!}
     </div>
 

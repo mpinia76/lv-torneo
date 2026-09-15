@@ -2688,67 +2688,85 @@ class ImportPartidosController extends Controller
 
         $escudo = $this->bajarEscudo(isset($club['crestUrl']) ? $club['crestUrl'] : null);
 
-        // Fundación, estadio y socios: la API no los tiene, el sitio sí.
-        $sitio = ((string) $request->get('sitio', '1') === '0')
-            ? $this->sitioVacio()
-            : $this->datosClubDelSitio($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
-
-        // Lo que no se pudo conseguir se deja VACÍO, no en cero ni en una fecha
-        // inventada: un campo en blanco se ve y se completa, un 0 parece un dato
-        // cargado y nadie lo vuelve a mirar. Las claves se arman de a una para
-        // no mandar NULL donde la columna todavía no lo acepte.
+        // ── 1. El alta, con lo que trajo la API y nada más ──────────────────
+        //
+        // PRIMERO se crea el club y recién DESPUÉS se va a buscar lo que falta.
+        // Al revés —que es como estaba— cualquier problema del paso opcional
+        // (la página del club, una columna que no acepta vacío) se llevaba
+        // puesta el alta entera y el botón terminaba volviendo al sondeo sin
+        // crear nada. Lo que se puede conseguir de más nunca puede costar lo
+        // que ya se tenía.
         $alta = [
             'nombre'     => $nombre,
             'siglas'     => $siglas !== '' ? $siglas : null,
             'pais'       => $pais,
             'escudo'     => $escudo,
-            'socios'     => $sitio['socios'],       // null si no vino
+            'socios'     => 0,
             'url_nombre' => Str::slug($nombre),
         ];
-        if ($sitio['fundacion'] !== null) $alta['fundacion'] = $sitio['fundacion'];
-        if ($sitio['estadio']   !== null) $alta['estadio']   = $sitio['estadio'];
-
-        $avisoNulos = '';
 
         try {
             $equipo = \App\Equipo::create($alta);
         } catch (\Exception $e) {
-            // Si el deploy subió el código pero todavía no corrió la migración
-            // que hace nulables socios/fundación/estadio, el alta muere acá. No
-            // hay razón para perder el club por eso: se crea con el 0 de antes y
-            // se avisa qué falta correr.
-            if ($alta['socios'] === null) {
-                $alta['socios'] = 0;
-                try {
-                    $equipo = \App\Equipo::create($alta);
-                    $avisoNulos = 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no '
-                        . 'acepta vacío: falta correr <code>php artisan migrate</code> '
-                        . '(<code>equipos_datos_nullable</code>).<br>';
-                } catch (\Exception $e2) {
-                    return redirect()->to($volverA ?: route('import_partidos.index'))
-                        ->with('error', 'No pude crear el equipo: ' . e($e2->getMessage()));
-                }
-            } else {
-                return redirect()->to($volverA ?: route('import_partidos.index'))
-                    ->with('error', 'No pude crear el equipo: ' . e($e->getMessage()));
-            }
+            return redirect()->to($volverA ?: route('import_partidos.index'))
+                ->with('error', 'No pude crear el equipo: ' . e($e->getMessage()));
         }
 
         $this->guardarMapeo($tmId, $equipo->id, $nombre, 'club_tm');
 
+        // ── 2. Fundación, estadio y socios, que la API no tiene ─────────────
+        //
+        // Salen de «Datos y hechos» del sitio. De acá para abajo el club YA
+        // está creado y mapeado: todo lo que falle se cuenta en el cartel y
+        // se completa a mano, pero nadie vuelve al sondeo con las manos vacías.
+        $sitio = ((string) $request->get('sitio', '1') === '0')
+            ? $this->sitioVacio()
+            : $this->datosClubDelSitio($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
+
+        // Lo que no se consiguió queda VACÍO, no en cero ni en una fecha
+        // inventada: un campo en blanco se ve y se completa, un 0 parece un
+        // dato cargado y nadie lo vuelve a mirar.
+        $completar = ['socios' => $sitio['socios']];
+        if ($sitio['fundacion'] !== null) $completar['fundacion'] = $sitio['fundacion'];
+        if ($sitio['estadio']   !== null) $completar['estadio']   = $sitio['estadio'];
+
+        $avisoNulos = '';
+
+        try {
+            $equipo->update($completar);
+        } catch (\Exception $e) {
+            // Caso típico: el código subió pero todavía no corrió la migración
+            // que hace nulables socios/fundación/estadio. Se guarda lo que sí
+            // entra y se avisa qué falta correr — el club ya está creado.
+            $avisoNulos = 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no acepta '
+                . 'vacío: falta correr <code>php artisan migrate</code> '
+                . '(<code>equipos_datos_nullable</code>).<br>';
+
+            unset($completar['socios']);
+            $sitio['socios'] = null;
+
+            try {
+                if ($completar) $equipo->update($completar);
+            } catch (\Exception $e2) {
+                Log::error('crearEquipo: no pude completar el club ' . $equipo->id . ': ' . $e2->getMessage());
+                $avisoNulos .= 'Tampoco pude guardar fundación y estadio: ' . e($e2->getMessage()) . '<br>';
+                $completar = [];
+            }
+        }
+
         // Lo que sí se consiguió se dice tal cual quedó, para que se pueda
         // desconfiar de un dato raro sin tener que abrir TM.
         $trajo = [];
-        if (isset($alta['fundacion'])) $trajo[] = 'fundación ' . $alta['fundacion'];
-        if (isset($alta['estadio']))   $trajo[] = 'estadio «' . $alta['estadio'] . '»';
-        if ($sitio['socios'] !== null) $trajo[] = 'socios ' . number_format($sitio['socios'], 0, ',', '.');
+        if (isset($completar['fundacion'])) $trajo[] = 'fundación ' . $completar['fundacion'];
+        if (isset($completar['estadio']))   $trajo[] = 'estadio «' . $completar['estadio'] . '»';
+        if ($sitio['socios'] !== null)      $trajo[] = 'socios ' . number_format($sitio['socios'], 0, ',', '.');
 
         $falta = [];
-        if (!$pais)                      $falta[] = 'país';
-        if (!$escudo)                    $falta[] = 'escudo';
-        if (!isset($alta['fundacion']))  $falta[] = 'fundación';
-        if (!isset($alta['estadio']))    $falta[] = 'estadio';
-        if ($sitio['socios'] === null)   $falta[] = 'socios';
+        if (!$pais)                          $falta[] = 'país';
+        if (!$escudo)                        $falta[] = 'escudo';
+        if (!isset($completar['fundacion'])) $falta[] = 'fundación';
+        if (!isset($completar['estadio']))   $falta[] = 'estadio';
+        if ($sitio['socios'] === null)       $falta[] = 'socios';
         $falta[] = 'historia';   // ésta no está en Transfermarkt en ningún lado
 
         $links = $this->urlsClubTm($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
@@ -2762,7 +2780,7 @@ class ImportPartidosController extends Controller
 
         // Si el sitio trajo la fundación pero sin día y mes, se avisa y NO se
         // guarda: un 1º de enero inventado no se distingue de uno real.
-        if (!isset($alta['fundacion']) && $sitio['fundacion_crudo'] !== '') {
+        if (!isset($completar['fundacion']) && $sitio['fundacion_crudo'] !== '') {
             $msg .= 'La fundación no la pude guardar porque el sitio la trae como <b>'
                 . e($sitio['fundacion_crudo']) . '</b> y de ahí no sale una fecha completa.<br>';
         }
