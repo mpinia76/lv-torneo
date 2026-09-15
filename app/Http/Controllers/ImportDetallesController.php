@@ -451,7 +451,32 @@ class ImportDetallesController extends Controller
                 $volver . '<p class="err-box">Falta <code>?partido_id=</code>.</p>');
         }
 
+        // `forzar=1`: reemplazar un marcador que YA esta cargado. Lo usa el
+        // control "Marcador con la tanda sumada", donde el resultado guardado se
+        // sabe mal (entro con los penales sumados). Sin esto `soloMarcador()` no
+        // hace nada: por diseno no pisa un resultado cargado.
+        //
+        // Se blanquea antes de llamar y, si TM no llega a escribir, se repone lo
+        // que habia: un boton que deja el partido peor que como estaba no sirve.
+        $forzar  = (string) $request->get('forzar', '0') === '1';
+        $previo  = null;
+        if ($forzar) {
+            $previo = \App\Partido::find($partidoId);
+            if ($previo) {
+                $guardado = ['golesl' => $previo->golesl, 'golesv' => $previo->golesv,
+                    'penalesl' => $previo->penalesl, 'penalesv' => $previo->penalesv];
+                $previo->forceFill(['golesl' => null, 'golesv' => null,
+                    'penalesl' => null, 'penalesv' => null])->save();
+            } else {
+                $forzar = false;
+            }
+        }
+
         $r = (new TmDetallePartido)->soloMarcador($partidoId, $gameId);
+
+        if ($forzar && empty($r['escrito'])) {
+            $previo->forceFill($guardado)->save();
+        }
 
         $cuerpo = $volver
             . '<h1>Solo el marcador · partido #' . $partidoId . '</h1>'
@@ -465,8 +490,19 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<p class="ok-box">Cargado: <b>' . e((string) $r['marcador']) . '</b>'
                 . (!empty($r['tanda']) ? ' y la tanda <b>' . e((string) $r['tanda']) . '</b>' : '')
                 . '.</p>';
+            if ($forzar) {
+                $cuerpo .= '<p class="sub">Reemplacé lo que tenías cargado: <b>'
+                    . e($guardado['golesl'] . ':' . $guardado['golesv']) . '</b>'
+                    . ($guardado['penalesl'] !== null
+                        ? ' (tanda ' . e($guardado['penalesl'] . '-' . $guardado['penalesv']) . ')' : '')
+                    . '.</p>';
+            }
         } else {
             $cuerpo .= '<p class="warn-box">No le cargué el marcador. El motivo está abajo.</p>';
+            if ($forzar) {
+                $cuerpo .= '<p class="sub">Dejé el que tenías: <b>'
+                    . e($guardado['golesl'] . ':' . $guardado['golesv']) . '</b>.</p>';
+            }
         }
 
         foreach ((array) $r['avisos'] as $a) {

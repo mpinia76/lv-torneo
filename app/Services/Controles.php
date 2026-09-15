@@ -238,6 +238,18 @@ class Controles
             ],
 
             'Penales' => [
+                'partidos.penales_sumados' => [
+                    'titulo'   => 'Marcador con la tanda sumada',
+                    'ayuda'    => 'Partidos que entraron por el motor DT y cuyo payload de Transfermarkt dice '
+                        . '«gameState: penalty_shootout». En esos, el goalsTotal de TM viene con los penales '
+                        . 'SUMADOS: la final de la Champions 2015/16 quedó cargada 6:4 en vez de 1:1 con tanda 5-3. '
+                        . 'Sólo aparecen los de grupos marcados como definición por penales. Se arreglan de a uno '
+                        . 'con «Marcador»: baja el detalle del partido, que sí trae la tanda, y la separa.',
+                    'jugador'  => false,
+                    'detalle'  => 'penales_sumados',
+                    'acciones' => ['marcador', 'penales', 'incidencia'],
+                    'metodo'   => 'partidosPenalesSumados',
+                ],
                 'penales.faltantes' => [
                     'titulo'    => 'Penales sin cargar',
                     'ayuda'     => 'Goles de penal que todavía no tienen su registro de penal convertido con el arquero que lo recibió.',
@@ -1088,6 +1100,38 @@ class Controles
                 $w->whereNull('el.id')->orWhereNull('ev.id');
             })
             ->select($this->columnas());
+
+        return $this->ordenar($this->sinIncidencia($q));
+    }
+
+    /**
+     * Partidos por penales cuyo marcador entró con la tanda sumada.
+     *
+     * El motor DT lee `goalsTotal` del payload de coach/performance-game, y con
+     * `gameState = penalty_shootout` ese número es goles + penales convertidos
+     * (Real Madrid-Atlético 2016: 1:1 y tanda 5-3, TM lo publica 6:4). Desde
+     * ese payload no se puede separar, así que los ya cargados quedan mal y hay
+     * que rehacerles el marcador de a uno desde el detalle.
+     *
+     * El filtro va por LIKE sobre el payload y no por JSON_EXTRACT a propósito:
+     * la columna es texto y esto anda igual en cualquier MySQL. El JSON se
+     * guarda con `json_encode`, sin espacios, así que la cadena es estable.
+     *
+     * Dos recortes, pedidos: SÓLO lo que entró DT por DT (`tecnico_id` cargado)
+     * y SÓLO grupos con la definición por penales tildada (`grupos.penales`).
+     * `base()` ya exige que el partido tenga marcador: uno sin resultado no
+     * tiene nada mal cargado.
+     */
+    private function partidosPenalesSumados(array $filtros)
+    {
+        $q = $this->base($filtros)
+            ->join('import_partidos as ip', 'ip.partido_id', '=', 'partidos.id')
+            ->where('ip.fuente', 'transfermarkt')
+            ->whereNotNull('ip.tecnico_id')
+            ->where('grupo.penales', 1)
+            ->where('ip.payload', 'like', '%"gameState":"penalty_shootout"%')
+            ->select($this->columnas())
+            ->distinct();
 
         return $this->ordenar($this->sinIncidencia($q));
     }

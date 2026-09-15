@@ -27,6 +27,10 @@
         'tarjetas'     => ['Tarjetas',     'ctrl-b-azul',  route('tarjetas.index', ['partidoId' => $partido])],
         'cambios'      => ['Cambios',      'ctrl-b-azul',  route('cambios.index', ['partidoId' => $partido])],
         'penales'      => ['Penales',      'ctrl-b-azul',  route('penales.index', ['partidoId' => $partido])],
+        // Rehace SOLO el resultado desde el detalle de TM, separando la tanda.
+        // Va con `forzar=1` porque el partido ya tiene marcador cargado (mal) y
+        // sin eso `soloMarcador()` no lo pisa. No toca alineación ni incidencias.
+        'marcador'     => ['Marcador',     'ctrl-b-verde', route('import_detalles.marcador', ['partido_id' => $partido, 'forzar' => 1])],
         'jueces'       => ['Jueces',       'ctrl-b-azul',  route('partidos.arbitros', ['partidoId' => $partido])],
         // Marcar el partido como excepción: con incidencia deja de aparecer
         // en los controles.

@@ -4582,12 +4582,19 @@ class ImportPartidosController extends Controller
         $g = $r->payload ? json_decode($r->payload, true) : null;
         if (is_array($g) && !empty($g)) {
             $f = $this->normalizar($g, $r->coach_external_id);
-            return ['local' => $f['local'], 'gf' => (int) $f['goles_favor'], 'gc' => (int) $f['goles_contra']];
+            // Sin casteo a int: `goles_favor` en null significa "TM no da un
+            // marcador que se pueda cargar" (partido por penales), y `(int) null`
+            // lo convertia en un 0:0 falso.
+            return [
+                'local' => $f['local'],
+                'gf'    => $f['goles_favor'] === null ? null : (int) $f['goles_favor'],
+                'gc'    => $f['goles_contra'] === null ? null : (int) $f['goles_contra'],
+            ];
         }
         return [
             'local' => $r->local === null ? null : ((int) $r->local === 1),
-            'gf'    => (int) $r->goles_favor,
-            'gc'    => (int) $r->goles_contra,
+            'gf'    => $r->goles_favor === null ? null : (int) $r->goles_favor,
+            'gc'    => $r->goles_contra === null ? null : (int) $r->goles_contra,
         ];
     }
 
@@ -4638,20 +4645,37 @@ class ImportPartidosController extends Controller
             $golesl    = $datos['local'] ? $datos['gf'] : $datos['gc'];
             $golesv    = $datos['local'] ? $datos['gc'] : $datos['gf'];
 
-            if ((int) $partido->equipol_id === $equipolId && (int) $partido->equipov_id === $equipovId
-                && (int) $partido->golesl === $golesl && (int) $partido->golesv === $golesv) {
+            // Un partido por penales viene sin marcador de TM (ver `normalizar()`).
+            // Esta pantalla arregla la LOCALIA: no tiene por que borrar un
+            // resultado ya cargado. Si hay que dar vuelta los equipos, se dan
+            // vuelta tambien los goles y la tanda que ya estaban.
+            $conMarcador   = $golesl !== null && $golesv !== null;
+            $mismosEquipos = (int) $partido->equipol_id === $equipolId
+                && (int) $partido->equipov_id === $equipovId;
+            $mismoMarcador = !$conMarcador
+                || ((int) $partido->golesl === (int) $golesl && (int) $partido->golesv === (int) $golesv);
+
+            if ($mismosEquipos && $mismoMarcador) {
                 continue;   // ya estaba bien
             }
 
             $antes = $this->nombreEquipo($partido->equipol_id) . ' ' . $partido->golesl . ':' . $partido->golesv
                 . ' ' . $this->nombreEquipo($partido->equipov_id);
 
-            $partido->forceFill([
-                'equipol_id' => $equipolId,
-                'equipov_id' => $equipovId,
-                'golesl'     => $golesl,
-                'golesv'     => $golesv,
-            ])->save();
+            $campos = ['equipol_id' => $equipolId, 'equipov_id' => $equipovId];
+            if ($conMarcador) {
+                $campos['golesl'] = $golesl;
+                $campos['golesv'] = $golesv;
+            } elseif (!$mismosEquipos) {
+                $campos['golesl']   = $partido->golesv;
+                $campos['golesv']   = $partido->golesl;
+                $campos['penalesl'] = $partido->penalesv;
+                $campos['penalesv'] = $partido->penalesl;
+            }
+            $golesl = array_key_exists('golesl', $campos) ? $campos['golesl'] : $partido->golesl;
+            $golesv = array_key_exists('golesv', $campos) ? $campos['golesv'] : $partido->golesv;
+
+            $partido->forceFill($campos)->save();
 
             DB::table('import_partidos')->where('id', $r->id)
                 ->update(['local' => $datos['local'] ? 1 : 0, 'updated_at' => now()]);
@@ -5394,6 +5418,28 @@ class ImportPartidosController extends Controller
         $gf = $this->valor($club, ['goalsTotal']);
         $gc = $this->valor($club, ['opponentGoalsTotal']);
         if ($gc === null) $gc = $this->valor($rival, ['goalsTotal']);
+
+        // OJO CON LOS PENALES. Con `gameInformation.gameState = penalty_shootout`
+        // el `goalsTotal` de TM NO es el marcador del partido: viene con la tanda
+        // sumada. Verificado en el JSON de `/coach/2868/performance-game`
+        // (Simeone): la final de la Champions 2015/16 --1:1 y tanda 3-5-- llega
+        // como `goalsTotal: 4 / opponentGoalsTotal: 6`, que es lo que entraba a
+        // `partidos.golesl/golesv` como si fuera el resultado.
+        //
+        // Y de este payload NO se puede separar: `clubsInformation.club` trae
+        // solo `venue, clubId, coachId, goalsTotal, opponentGoalsTotal,
+        // clubRank, tacticId, points`. Sin el desglose de la tanda, cargar el
+        // 6:4 seria escribir un partido que no existio, asi que se deja SIN
+        // marcador y se arregla de a uno con "Solo el marcador", que baja el
+        // detalle (`/game/{id}`, ahi si viene `actions.shootout`) y lo separa.
+        //
+        // `extra_time` es otra cosa y su `goalsTotal` SI vale: es el de los 120'.
+        // En la carrera de Simeone (1011 partidos): 994 `regularly_terminated`,
+        // 8 `extra_time`, 9 `penalty_shootout`.
+        if ((string) $this->valor($gi, ['gameState']) === 'penalty_shootout') {
+            $gf = null;
+            $gc = null;
+        }
 
         return [
             'external_id'             => $this->texto($this->valor($gi, ['gameId']) ?: $this->valor($g, ['gameId', 'id'])),
