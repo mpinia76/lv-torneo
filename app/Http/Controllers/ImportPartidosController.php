@@ -24,6 +24,15 @@ class ImportPartidosController extends Controller
 {
     const TMAPI = 'https://tmapi.transfermarkt.technology';
 
+    /**
+     * Corrimiento de fecha que se acepta a ciegas como "el mismo partido, otro
+     * día": la misma ventana que usa el buscador de gameId (TmBuscarGameId::DIAS).
+     * Más que esto ya no alcanza el resultado para reconocerlo — hace falta
+     * confirmar el torneo o el número de fecha. Ver el caso de los tres
+     * partidos que quedaron con dos gameId (15-sep-2026).
+     */
+    const CORRIMIENTO_SEGURO = 3;
+
     // ═══════════════════════════════ ÍNDICE ═══════════════════════════════
 
     public function index(Request $request)
@@ -3484,11 +3493,12 @@ class ImportPartidosController extends Controller
         }
 
         $cont = ['total' => count($filas), 'excluido' => 0, 'duplicado' => 0,
-            'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0];
+            'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0, 'cerca' => 0];
         foreach ($filas as $f) {
             if (isset($cont[$f['estado']])) $cont[$f['estado']]++;
             if ($f['estado'] === 'duplicado' && strpos((string) $f['motivo'], 'falta el DT') !== false) $cont['falta_dt']++;
             if (isset($f['corrido'])) $cont['corridos']++;
+            if (!empty($f['cerca'])) $cont['cerca']++;
         }
 
         $guardadas = 0;
@@ -3530,7 +3540,16 @@ class ImportPartidosController extends Controller
             . $this->card($cont['falta_dt'], 'sin el DT', 'warn')
             . $this->card($cont['nuevo'], 'nuevos a crear', 'ok')
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
+            . $this->card($cont['cerca'], 'parecidos no atados', $cont['cerca'] ? 'warn' : '')
             . '</div>';
+
+        // PARECIDOS NO ATADOS — mirar antes de apretar «Aplicar».
+        // Son filas con los mismos equipos y el mismo resultado que un partido
+        // que ya tenés, descartado porque es de otra competencia o porque la
+        // fecha está lejos y no se pudo confirmar el torneo. Se van a CREAR:
+        // si alguno era en realidad el mismo partido, se arregla acá y no
+        // después, cuando ya haya dos partidos con la misma alineación.
+        $html .= $this->avisoParecidos($filas);
 
         if ($usarCache) {
             $html .= '<p class="sub">Datos tomados de <code>import_partidos</code>: no se volvió a bajar nada de Transfermarkt.</p>';
@@ -4856,15 +4875,19 @@ class ImportPartidosController extends Controller
 
             $partido = ($equipoId && $rivalId) ? $this->buscarPartido($equipoId, $rivalId, $f['dia']) : null;
             $corrido = null;
+            $cerca   = [];
 
             // Partidos postergados: TM guarda la fecha original y vos la fecha real.
-            // Se buscan por par de equipos + localía + resultado exacto en una ventana amplia.
+            // Se buscan por par de equipos + localía + resultado exacto, pero con
+            // la competencia y el número de fecha como segunda llave: equipos +
+            // resultado SOLOS no alcanzan (ver buscarPartidoAplazado()).
             if (!$partido && $equipoId && $rivalId) {
-                $partido = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
-                    (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda']);
-                if ($partido) {
-                    $corrido = (int) round((strtotime(substr($partido->dia, 0, 10)) - strtotime(substr($f['dia'], 0, 10))) / 86400);
-                }
+                $r = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
+                    (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda'],
+                    $f['competencia_external_id']);
+                $partido = $r['partido'];
+                $corrido = $r['corrido'];
+                $cerca   = $r['cerca'];
             }
 
             if ($partido) {
@@ -4904,19 +4927,51 @@ class ImportPartidosController extends Controller
                     $filas[$i]['estado'] = 'nuevo';
                 }
             }
+
+            // Había un partido parecido y NO se lo colgó: que se vea por qué.
+            // Antes esto no existía porque nunca se descartaba un candidato.
+            $filas[$i]['cerca'] = $cerca;
+            if ($filas[$i]['estado'] === 'nuevo' && $cerca) {
+                $filas[$i]['motivo'] = 'se crea nuevo · OJO: ' . implode(' · ', $cerca);
+            }
         }
         return $filas;
     }
 
     /**
      * Busca un partido postergado: mismo par de equipos, misma localía y el
-     * MISMO resultado, dentro de una ventana amplia (±150 días).
+     * MISMO resultado, en una ventana de ±150 días.
      *
-     * Si hay más de un candidato, desempata por el número de fecha. Si sigue
-     * habiendo empate, no devuelve nada: mejor que quede como conflicto.
+     * EQUIPOS + RESULTADO NO ALCANZAN. Los mismos dos equipos, con el mismo
+     * resultado, a un par de meses de distancia, suelen ser DOS partidos
+     * distintos de dos competencias distintas: el Clausura y los Playoffs
+     * uruguayos, la liga y la copa nacional. Sin más llave que ésa, este método
+     * colgaba el gameId del segundo partido del primero: el partido de la copa
+     * no se creaba nunca (el torneo queda con un partido de menos) y el partido
+     * de la liga terminaba con DOS gameId. Pasó tres veces (Nacional 3-2
+     * Torque, Boston River 0-1 Atenas, Atlético 0-0 Getafe) y se limpió a mano
+     * el 15-sep-2026.
+     *
+     * Ahora, para aceptar un candidato, hace falta una de estas tres:
+     *   1. que la fecha caiga dentro de ±CORRIMIENTO_SEGURO días (una
+     *      reprogramación de la misma ronda: ahí el resultado sí identifica);
+     *   2. que el torneo del candidato apunte a la MISMA competencia de TM
+     *      (`torneos.tm_competition_id`);
+     *   3. que el número de fecha del candidato sea el mismo que la ronda de TM.
+     * Y se descarta de entrada el candidato cuyo torneo apunta a OTRA
+     * competencia de TM, esté donde esté la fecha.
+     *
+     * Si no queda ninguno, no se empareja: la fila cae en «nuevo» —el partido
+     * se crea, que es lo que corresponde— con el aviso de qué partido parecido
+     * había y por qué no se usó. Nunca se cuelga del existente.
+     *
+     * Devuelve ['partido' => Partido|null, 'corrido' => int|null, 'cerca' => [avisos]].
      */
-    private function buscarPartidoAplazado($equipoId, $rivalId, $dia, $local, $gf, $gc, $ronda)
+    private function buscarPartidoAplazado($equipoId, $rivalId, $dia, $local, $gf, $gc, $ronda, $compTm = null)
     {
+        $vacio = ['partido' => null, 'corrido' => null, 'cerca' => []];
+        if (!$dia) return $vacio;
+
         $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -150 days'));
         $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +150 days'));
 
@@ -4940,20 +4995,97 @@ class ImportPartidosController extends Controller
             });
         }
         $cands = $q->get();
+        if ($cands->isEmpty()) return $vacio;
 
-        if ($cands->count() === 1) return $cands->first();
-        if ($cands->isEmpty()) return null;
+        $nRonda = preg_replace('/\D/', '', trim((string) $ronda));
+        $comp   = trim((string) $compTm);
 
-        // Desempate por número de fecha
-        if ($ronda !== null && $ronda !== '') {
-            $porRonda = $cands->filter(function ($p) use ($ronda) {
-                $fecha = \App\Fecha::find($p->fecha_id);
-                if (!$fecha) return false;
-                return (int) preg_replace('/\D/', '', (string) $fecha->numero) === (int) $ronda;
-            });
-            if ($porRonda->count() === 1) return $porRonda->first();
+        $ok = [];
+        $cerca = [];
+        foreach ($cands as $p) {
+            $ctx = $this->contextoPartido($p->id);
+            $corrido = (int) round((strtotime(substr((string) $p->dia, 0, 10))
+                - strtotime(substr((string) $dia, 0, 10))) / 86400);
+            $donde = 'partido #' . $p->id . ' del ' . substr((string) $p->dia, 0, 10)
+                . ($ctx['torneo'] !== '' ? ' (' . $ctx['torneo'] . ')' : '');
+
+            $mismaComp  = ($comp !== '' && $ctx['comp'] !== '' && $ctx['comp'] === $comp);
+            $otraComp   = ($comp !== '' && $ctx['comp'] !== '' && $ctx['comp'] !== $comp);
+            $mismaRonda = ($nRonda !== '' && $ctx['ronda'] !== '' && (int) $ctx['ronda'] === (int) $nRonda);
+
+            if ($otraComp) {
+                $cerca[] = 'el ' . $donde . ' tiene el mismo resultado pero es de otra competencia de TM ('
+                    . $ctx['comp'] . ' ≠ ' . $comp . ')';
+                continue;
+            }
+            if (abs($corrido) <= self::CORRIMIENTO_SEGURO || $mismaComp || $mismaRonda) {
+                $ok[] = ['p' => $p, 'corrido' => $corrido, 'ronda' => $mismaRonda];
+                continue;
+            }
+            $cerca[] = 'el ' . $donde . ' tiene el mismo resultado pero está a ' . abs($corrido)
+                . ' días y no puedo confirmar que sea del mismo torneo'
+                . ($ctx['torneo'] === '' ? ' (no tiene torneo)' : ($ctx['comp'] === '' ? ' (a ese torneo le falta el id de competencia de TM)' : ''));
         }
-        return null;
+
+        if (count($ok) === 1) {
+            return ['partido' => $ok[0]['p'], 'corrido' => $ok[0]['corrido'], 'cerca' => $cerca];
+        }
+
+        // Varios candidatos: desempata el número de fecha, como antes. Si sigue
+        // el empate no se elige ninguno — atarlo al equivocado no se nota nunca más.
+        if (count($ok) > 1) {
+            $porRonda = [];
+            foreach ($ok as $o) if ($o['ronda']) $porRonda[] = $o;
+            if (count($porRonda) === 1) {
+                return ['partido' => $porRonda[0]['p'], 'corrido' => $porRonda[0]['corrido'], 'cerca' => $cerca];
+            }
+            $ids = [];
+            foreach ($ok as $o) $ids[] = '#' . $o['p']->id;
+            $cerca[] = 'hay ' . count($ok) . ' partidos que calzan (' . implode(', ', $ids)
+                . ') y ninguno se distingue por número de fecha: no elijo yo';
+        }
+
+        return ['partido' => null, 'corrido' => null, 'cerca' => $cerca];
+    }
+
+    /**
+     * Torneo, competencia de TM y número de fecha de un partido ya cargado.
+     * El torneo no cuelga del partido: partidos → fechas → grupos → torneos.
+     *
+     * `tm_competition_id` se chequea con Schema porque es una columna nueva
+     * (ago-2026): si la migración todavía no corrió en el servidor, esto
+     * devuelve comp vacía y el emparejador se queda en el criterio de la fecha,
+     * en lugar de tirar un 500 en blanco.
+     */
+    private function contextoPartido($partidoId)
+    {
+        static $cache = [];
+        static $hayComp = null;
+
+        $id = (int) $partidoId;
+        if (isset($cache[$id])) return $cache[$id];
+        if ($hayComp === null) {
+            $hayComp = Schema::hasTable('torneos') && Schema::hasColumn('torneos', 'tm_competition_id');
+        }
+
+        $cols = ['torneos.id as torneo_id', 'torneos.nombre as torneo', 'torneos.year as anio',
+            'fechas.numero as ronda'];
+        $cols[] = $hayComp ? 'torneos.tm_competition_id as comp' : DB::raw("'' as comp");
+
+        $r = DB::table('partidos')
+            ->leftJoin('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->leftJoin('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->leftJoin('torneos', 'torneos.id', '=', 'grupos.torneo_id')
+            ->where('partidos.id', $id)
+            ->select($cols)->first();
+
+        $cache[$id] = [
+            'torneo_id' => $r && $r->torneo_id ? (int) $r->torneo_id : 0,
+            'torneo'    => $r && $r->torneo ? trim($r->torneo . ' ' . $r->anio) : '',
+            'comp'      => $r ? trim((string) $r->comp) : '',
+            'ronda'     => $r ? preg_replace('/\D/', '', (string) $r->ronda) : '',
+        ];
+        return $cache[$id];
     }
 
     /** Cualquier partido de ese equipo ese día, sin importar el rival. */
@@ -5803,6 +5935,35 @@ class ImportPartidosController extends Controller
     {
         if (!$fechaId) return '';
         return '<a href="' . e(route('fechas.show', (int) $fechaId)) . '" target="_blank">' . e($texto) . '</a>';
+    }
+
+    /**
+     * El bloque de «parecidos no atados» del sondeo. Vacío si no hay ninguno.
+     *
+     * Existe porque el emparejador ahora DESCARTA candidatos (antes se colgaba
+     * del primero que calzaba equipos + resultado). Un descarte silencioso es
+     * tan malo como un emparejado silencioso: si no se muestra, el duplicado
+     * aparece meses después y ya no se sabe de dónde salió.
+     */
+    private function avisoParecidos(array $filas)
+    {
+        $items = [];
+        foreach ($filas as $f) {
+            if (empty($f['cerca'])) continue;
+            $items[] = '<li><b>' . e(substr((string) $f['dia'], 0, 10)) . '</b> · '
+                . e($f['club_nombre'] . ' ' . $f['goles_favor'] . ':' . $f['goles_contra'] . ' ' . $f['rival_nombre'])
+                . ' · ' . e($f['competencia_nombre'] ?: ('#' . $f['competencia_external_id']))
+                . ' <span class="sub">' . e(implode(' · ', $f['cerca'])) . '</span>'
+                . ' <span class="id">' . e($f['estado']) . '</span></li>';
+        }
+        if (empty($items)) return '';
+
+        return '<div class="warn-box"><b>' . count($items) . ' partido(s) parecido(s) que NO se ataron.</b><br>'
+            . 'Mismos equipos y mismo resultado que uno que ya tenés, pero de otra competencia o con la fecha '
+            . 'lejos y sin poder confirmar el torneo. Se van a crear como partidos nuevos — que es lo correcto '
+            . 'cuando son dos partidos distintos. Si alguno es el mismo partido, arreglale la fecha o el torneo '
+            . 'antes de aplicar.'
+            . '<ul>' . implode('', $items) . '</ul></div>';
     }
 
     private function tabla(array $filas, $limite, $filtro = '')

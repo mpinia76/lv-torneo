@@ -153,6 +153,10 @@ class ImportDetallesController extends Controller
                 ->distinct()->count('partido_id');
         }
 
+        // Partidos con un equipo vacío: el 0 de «Los clubes no coinciden.
+        // Base: #0 vs #429». No depende de los filtros: es de toda la base.
+        $sinEquipo = $this->partidosSinEquipoCount();
+
         $cuerpo = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Detalle de los partidos</h1>'
             . '<p class="sub">Alineaciones, goles, tarjetas, cambios y árbitros. Cada partido es <b>una</b> llamada a la API, '
@@ -202,6 +206,7 @@ class ImportDetallesController extends Controller
             . $this->card($porRevisar, 'Por revisar', $porRevisar ? 'warn' : '')
             . $this->card($nRotos, 'Mapeos rotos', $nRotos ? 'warn' : '')
             . $this->card($sinResultado, 'Sin resultado', $sinResultado ? 'warn' : '')
+            . ($sinEquipo ? $this->card($sinEquipo, 'Con un equipo vacío', 'err') : '')
             . '</div>'
 
             . '<form method="get" style="margin:12px 0">'
@@ -227,6 +232,10 @@ class ImportDetallesController extends Controller
             . '<a class="boton-sec" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm desde las URLs</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar (' . $porRevisar . ')</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.clubes_tm')) . '">Clubes de Transfermarkt</a>'
+            . ($sinEquipo
+                ? '<a class="boton-sec" href="' . e(route('import_detalles.equipos_vacios'))
+                . '">Partidos con un equipo vacío (' . $sinEquipo . ')</a>'
+                : '')
             . ($nRotos
                 ? '<a class="boton-sec" href="' . e(route('import_detalles.mapeos')) . '">Mapeos rotos (' . $nRotos . ')</a>'
                 : '')
@@ -3368,7 +3377,10 @@ class ImportDetallesController extends Controller
                     . ($inc !== '' ? ' · ' . $inc : '') . '</div>';
             } else {
                 $fallaron++;
-                $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
+                $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error'])
+                    . (strpos((string) $r['error'], 'Los clubes no coinciden') !== false
+                        ? $this->linkEquipoVacio((int) $f->partido_id) : '')
+                    . '</div>';
             }
             foreach ($r['avisos'] as $a) {
                 $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
@@ -3574,6 +3586,7 @@ class ImportDetallesController extends Controller
                             . e((string) $f->external_id) . '</a> · <a href="'
                             . e(route('import_detalles.clubes_tm', ['partido_id' => (int) $f->partido_id]))
                             . '"><b>arreglar los clubes del #' . (int) $f->partido_id . '</b></a></span>';
+                        $salida .= $this->linkEquipoVacio((int) $f->partido_id);
                     }
                     $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — '
                         . e((string) $r['error']) . $salida . '</div>';
@@ -3949,6 +3962,7 @@ class ImportDetallesController extends Controller
                             . e((string) $f->external_id) . '</a> · <a href="'
                             . e(route('import_detalles.clubes_tm', ['partido_id' => (int) $f->partido_id]))
                             . '"><b>arreglar los clubes del #' . (int) $f->partido_id . '</b></a></span>';
+                        $salida .= $this->linkEquipoVacio((int) $f->partido_id);
                     }
                     $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — '
                         . e((string) $r['error']) . $salida . '</div>';
@@ -5716,6 +5730,23 @@ class ImportDetallesController extends Controller
     }
 
     /** Link a las incidencias del partido. Vacío si no sabemos la fecha. */
+    /**
+     * El renglón «Los clubes no coinciden» con un #0 del lado «Base» no es un
+     * mapeo mal aprendido: es un partido cargado sin equipo. Sin este link el
+     * cartel es un callejón sin salida, porque la pantalla de clubes de TM no
+     * puede arreglarlo.
+     */
+    private function linkEquipoVacio($partidoId)
+    {
+        $p = DB::table('partidos')->where('id', (int) $partidoId)
+            ->select('equipol_id', 'equipov_id')->first();
+        if (!$p) return '';
+        if ($this->existeEquipo($p->equipol_id) && $this->existeEquipo($p->equipov_id)) return '';
+
+        return ' <span class="sub">· <a href="' . e(route('import_detalles.equipos_vacios'))
+            . '"><b>este partido está cargado sin un equipo: completalo acá</b></a></span>';
+    }
+
     private function linkIncidencias($fechaId, $texto = 'Incidencias')
     {
         if (!$fechaId) return '';
@@ -6402,6 +6433,320 @@ class ImportDetallesController extends Controller
             . 'los dos al mismo equipo.</p>';
 
         return $this->pagina('Unificar equipos', $cuerpo);
+    }
+
+
+    /**
+     * Partidos con un equipo vacío.
+     *
+     * El síntoma que lo destapó: en la tanda de detalles salían seis partidos
+     * de Atlético de Madrid 2012 con «Los clubes no coinciden. Base: #0 vs
+     * #429 · Transfermarkt: #760 vs #429». Ese **#0 no es de Transfermarkt**:
+     * `orientar()` imprime del lado «Base» el `equipol_id`/`equipov_id` del
+     * partido, así que un 0 ahí significa que el partido quedó cargado **sin
+     * rival**. Ni atar clubes en `equipo_tm` ni unificar equipos lo arregla:
+     * hay que escribirle el equipo al partido.
+     *
+     * De dónde salen: el alta de fecha a mano (`FechaController::store`) guarda
+     * `$request->equipol[$item]` sin validar, así que una fila con el select
+     * sin elegir entra como 0 y nadie la frena. También entra acá el id que
+     * quedó colgando de un equipo borrado — por eso la detección no pregunta
+     * por «0» sino por «no está en `equipos`».
+     *
+     * La propuesta sale de lo que YA está guardado (`import_partidos`: los
+     * equipos que resolvió el importador y, si no, los clubes de TM pasados por
+     * `equipo_tm`), así que **no gasta ninguna llamada a la API**. Y se aplica
+     * de a uno, con el tilde puesto donde hay propuesta pero la decisión del
+     * lado del usuario: nada de "aplicar todo lo que reconocí solo".
+     */
+    public function equiposVacios(Request $request)
+    {
+        set_time_limit(0);
+
+        $guardando = $request->isMethod('post');
+        $escritos  = [];
+        $rechazos  = [];
+
+        if ($guardando) {
+            list($escritos, $rechazos) = $this->equiposVaciosGuardar($request);
+        }
+
+        $total = $this->partidosSinEquipoCount();
+        $filas = $this->partidosSinEquipo(300);
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Partidos con un equipo vacío</h1>'
+            . '<p class="sub">Cuando la tanda de detalles dice <b>«Los clubes no coinciden. Base: #0 vs #429»</b>, '
+            . 'ese <b>0 no viene de Transfermarkt</b>: el aviso imprime del lado «Base» los equipos del partido tal '
+            . 'como están en tu tabla, así que un 0 quiere decir que el partido <b>quedó cargado sin ese equipo</b>. '
+            . 'Atar clubes en <a href="' . e(route('import_detalles.clubes_tm')) . '">equipo_tm</a> o '
+            . '<a href="' . e(route('import_detalles.fusionar_equipos')) . '">unificar equipos</a> no lo arregla: '
+            . 'hay que escribirle el equipo al partido, que es lo que se hace acá.</p>'
+            . '<p class="sub">Entran también los partidos cuyo <code>equipol_id</code>/<code>equipov_id</code> apunta '
+            . 'a un equipo que <b>ya no existe</b> (lo borraste después de cargarlo). La propuesta sale de lo que ya '
+            . 'está guardado en <code>import_partidos</code> —el equipo que resolvió el importador, y si no, el club '
+            . 'de TM pasado por <code>equipo_tm</code>—: <b>no gasta ninguna llamada a la API</b>, y mirar no escribe '
+            . 'nada.</p>';
+
+        if ($guardando) {
+            $cuerpo .= count($escritos)
+                ? '<div class="ok-box"><b>Listo: ' . count($escritos) . ' partido(s) con el equipo cargado.</b><br>'
+                    . implode('<br>', array_map(function ($t) { return '• ' . $t; }, $escritos))
+                    . '<br><span class="sub">Ahora les podés volver a pasar el detalle: el chequeo de clubes tiene '
+                    . 'que dar bien.</span></div>'
+                : '<div class="diag">No se escribió nada: no viniste con ningún partido tildado.</div>';
+
+            if (!empty($rechazos)) {
+                $cuerpo .= '<div class="err-box"><b>' . count($rechazos) . ' no se tocaron:</b><br>'
+                    . implode('<br>', array_map(function ($t) { return '• ' . $t; }, $rechazos)) . '</div>';
+            }
+        }
+
+        $cuerpo .= '<div class="cards">'
+            . $this->card($total, 'Partidos con un equipo vacío', $total ? 'warn' : 'ok')
+            . '</div>';
+
+        if (!$total) {
+            $cuerpo .= '<div class="ok-box">No hay ningún partido con un equipo vacío: los dos lados de todos los '
+                . 'partidos apuntan a un equipo que existe.</div>';
+            return $this->pagina('Equipos vacíos', $cuerpo);
+        }
+
+        // ── Armado de la tabla ──────────────────────────────────────────────
+        $opciones = $this->opcionesEquipos();
+        $fechas   = $this->mapaFechas(array_map(function ($f) { return (int) $f->id; }, $filas));
+        $conProp  = 0;
+
+        $cuerpo .= '<form method="post" action="' . e(route('import_detalles.equipos_vacios')) . '">'
+            . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">';
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr>'
+            . '<th></th><th>Fecha</th><th>Local</th><th>Visitante</th><th>Partido</th>'
+            . '<th>Qué dice el fixture guardado</th><th></th>'
+            . '</tr></thead><tbody>';
+
+        foreach ($filas as $f) {
+            $id  = (int) $f->id;
+            $pro = $this->propuestaEquipos($id, $f->hay_l !== null, $f->hay_v !== null,
+                (int) $f->equipol_id, (int) $f->equipov_id);
+
+            $listo = ($f->hay_l !== null || $pro['l']) && ($f->hay_v !== null || $pro['v']);
+            if ($listo) $conProp++;
+
+            $cuerpo .= '<tr>'
+                . '<td><input type="checkbox" name="sel[]" value="' . $id . '"' . ($listo ? ' checked' : '') . '></td>'
+                . '<td class="num">' . e($f->dia ? substr($f->dia, 0, 10) : '—') . '</td>'
+                . '<td>' . $this->celdaEquipo('l', $id, $f->hay_l !== null, (int) $f->equipol_id, $pro['l'], $opciones) . '</td>'
+                . '<td>' . $this->celdaEquipo('v', $id, $f->hay_v !== null, (int) $f->equipov_id, $pro['v'], $opciones) . '</td>'
+                . '<td class="num"><span class="id">#' . $id . '</span></td>'
+                . '<td class="sub">' . ($pro['dice'] !== '' ? $pro['dice'] : '—')
+                . ($pro['motivo'] ? '<br><span class="warn">' . e($pro['motivo']) . '</span>' : '') . '</td>'
+                . '<td>' . $this->linkIncidencias(isset($fechas[$id]) ? $fechas[$id] : null) . '</td>'
+                . '</tr>';
+        }
+
+        $cuerpo .= '</tbody></table></div>'
+            . '<p class="acciones"><button class="boton" type="submit">Guardar los tildados</button> '
+            . '<span class="sub">recién acá se escribe · sólo se toca el lado que está vacío, nunca el que ya '
+            . 'tenía equipo</span></p></form>';
+
+        if ($total > count($filas)) {
+            $cuerpo .= '<p class="sub">Se muestran ' . count($filas) . ' de ' . $total . '. '
+                . 'Guardá estos y volvé a entrar para ver los que siguen.</p>';
+        }
+        if ($conProp < count($filas)) {
+            $cuerpo .= '<p class="sub">Los que vienen sin propuesta salen destildados: o no tienen fixture guardado '
+                . '(se cargaron a mano) o el club de TM no está atado a ningún equipo tuyo. Para esos, elegí el '
+                . 'equipo en el desplegable o atá el club desde '
+                . '<a href="' . e(route('import_detalles.clubes_tm')) . '">Clubes de Transfermarkt</a>.</p>';
+        }
+
+        return $this->pagina('Equipos vacíos', $cuerpo);
+    }
+
+    /** Una celda de equipo: el nombre si está bien, el desplegable si está vacío. */
+    private function celdaEquipo($lado, $partidoId, $hay, $idActual, $propuesto, $opciones)
+    {
+        if ($hay) {
+            return e((string) $this->nombreEquipo($idActual))
+                . ' <span class="sub">#' . (int) $idActual . '</span>';
+        }
+
+        $campo = $lado . '[' . (int) $partidoId . ']';
+        return '<span class="warn">vacío' . ($idActual ? ' (#' . (int) $idActual . ' no existe)' : '') . '</span><br>'
+            . '<select name="' . e($campo) . '" class="s2" data-placeholder="elegí el equipo…" style="min-width:200px">'
+            . $this->conSeleccion($opciones, (int) $propuesto) . '</select>';
+    }
+
+    /** Los partidos cuyo equipo local o visitante no está en `equipos`. */
+    private function partidosSinEquipo($limite = 300)
+    {
+        return DB::table('partidos as p')
+            ->leftJoin('equipos as el', 'el.id', '=', 'p.equipol_id')
+            ->leftJoin('equipos as ev', 'ev.id', '=', 'p.equipov_id')
+            ->where(function ($w) { $w->whereNull('el.id')->orWhereNull('ev.id'); })
+            ->select('p.id', 'p.dia', 'p.equipol_id', 'p.equipov_id',
+                'el.id as hay_l', 'ev.id as hay_v')
+            ->orderBy('p.dia', 'desc')->orderBy('p.id', 'desc')
+            ->limit($limite)->get()->all();
+    }
+
+    private function partidosSinEquipoCount()
+    {
+        return (int) DB::table('partidos as p')
+            ->leftJoin('equipos as el', 'el.id', '=', 'p.equipol_id')
+            ->leftJoin('equipos as ev', 'ev.id', '=', 'p.equipov_id')
+            ->where(function ($w) { $w->whereNull('el.id')->orWhereNull('ev.id'); })
+            ->count();
+    }
+
+    /**
+     * Qué equipo debería ir en el lado que falta, sin gastar una llamada.
+     *
+     * Primero la fila de staging, que ya resolvió los dos equipos cuando bajó
+     * el partido (`equipo_id`/`rival_id`, orientados por `local`); si eso no
+     * está, los clubes de TM pasados por `equipo_tm`.
+     *
+     * La orientación se decide con el lado que YA está bien: el equipo cargado
+     * tiene que ser uno de los dos que dice el fixture, y el que sobra es el
+     * que falta. Si no es ninguno de los dos, no se propone nada y se avisa:
+     * ahí el problema no es el equipo vacío sino un gameId ajeno.
+     */
+    private function propuestaEquipos($partidoId, $hayL, $hayV, $equipolId, $equipovId)
+    {
+        $out = ['l' => null, 'v' => null, 'dice' => '', 'motivo' => null];
+
+        $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
+            ->orderBy('id', 'desc')->first();
+        if (!$fila) {
+            $out['motivo'] = 'no hay fixture guardado: este partido se cargó a mano';
+            return $out;
+        }
+
+        // El "club" de la fila es el del DT: de qué lado jugaba lo dice `local`.
+        $local = !empty($fila->local);
+        $tmL   = $local ? $fila->club_external_id : $fila->rival_external_id;
+        $tmV   = $local ? $fila->rival_external_id : $fila->club_external_id;
+        $nomL  = $local ? $fila->club_nombre : $fila->rival_nombre;
+        $nomV  = $local ? $fila->rival_nombre : $fila->club_nombre;
+        $eqL   = (int) ($local ? $fila->equipo_id : $fila->rival_id);
+        $eqV   = (int) ($local ? $fila->rival_id : $fila->equipo_id);
+
+        // Rescate: el equipo que la fila no resolvió puede estar en `equipo_tm`.
+        $mapa = $this->mapaEquipoTm();
+        if (!$eqL && $tmL !== null && isset($mapa[(string) $tmL])) $eqL = (int) $mapa[(string) $tmL];
+        if (!$eqV && $tmV !== null && isset($mapa[(string) $tmV])) $eqV = (int) $mapa[(string) $tmV];
+
+        // Un equipo propuesto que ya no existe no sirve de propuesta.
+        if ($eqL && !$this->existeEquipo($eqL)) $eqL = 0;
+        if ($eqV && !$this->existeEquipo($eqV)) $eqV = 0;
+
+        $out['dice'] = trim(($nomL !== null && $nomL !== '' ? e((string) $nomL) : ($tmL !== null ? 'TM #' . e((string) $tmL) : '?'))
+            . ' vs ' . ($nomV !== null && $nomV !== '' ? e((string) $nomV) : ($tmV !== null ? 'TM #' . e((string) $tmV) : '?')));
+
+        // Los dos vacíos: se toma la orientación del fixture tal cual.
+        if (!$hayL && !$hayV) {
+            if ($eqL && $eqV && $eqL !== $eqV) { $out['l'] = $eqL; $out['v'] = $eqV; }
+            else $out['motivo'] = 'el fixture no resuelve los dos equipos: atá los clubes en equipo_tm';
+            return $out;
+        }
+
+        $ancla = $hayL ? (int) $equipolId : (int) $equipovId;   // el lado que está bien
+        $falta = $hayL ? 'v' : 'l';
+
+        if ($ancla === $eqL && $eqV)      $propuesto = $eqV;    // el ancla es el local del fixture
+        elseif ($ancla === $eqV && $eqL)  $propuesto = $eqL;    // el partido está con la localía al revés
+        else {
+            $out['motivo'] = ($eqL || $eqV)
+                ? 'el equipo que ya tiene cargado no es ninguno de los dos del fixture: revisá el gameId antes de '
+                    . 'completar el que falta'
+                : 'el club de Transfermarkt del lado que falta no está atado a ningún equipo tuyo';
+            return $out;
+        }
+
+        if ($propuesto === $ancla) {
+            $out['motivo'] = 'la propuesta sería el mismo equipo que ya está cargado del otro lado';
+            return $out;
+        }
+
+        $out[$falta] = $propuesto;
+        return $out;
+    }
+
+    /** tm_club_id -> equipo_id, leído una sola vez por request. */
+    private function mapaEquipoTm()
+    {
+        static $mapa = null;
+        if ($mapa !== null) return $mapa;
+        $mapa = [];
+        foreach (DB::table('equipo_tm')->select('tm_club_id', 'equipo_id')->get() as $r) {
+            $mapa[(string) $r->tm_club_id] = (int) $r->equipo_id;
+        }
+        return $mapa;
+    }
+
+    private function existeEquipo($id)
+    {
+        static $cache = [];
+        $id = (int) $id;
+        if (!$id) return false;
+        if (!isset($cache[$id])) {
+            $cache[$id] = DB::table('equipos')->where('id', $id)->exists();
+        }
+        return $cache[$id];
+    }
+
+    /**
+     * Escribe los equipos elegidos. Los frenos, que son la mitad de esto:
+     * sólo se toca el lado que está vacío (el que ya tenía equipo no se pisa
+     * nunca, aunque venga en el POST), el equipo tiene que existir, y no puede
+     * quedar un partido de un equipo contra sí mismo.
+     */
+    private function equiposVaciosGuardar(Request $request)
+    {
+        $sel = (array) $request->get('sel', []);
+        $pl  = (array) $request->get('l', []);
+        $pv  = (array) $request->get('v', []);
+
+        $escritos = []; $rechazos = [];
+
+        foreach ($sel as $sid) {
+            $id = (int) $sid;
+            if (!$id) continue;
+
+            $p = \App\Partido::find($id);
+            if (!$p) { $rechazos[] = '#' . $id . ': ya no existe'; continue; }
+
+            $hayL = $this->existeEquipo($p->equipol_id);
+            $hayV = $this->existeEquipo($p->equipov_id);
+            if ($hayL && $hayV) { $rechazos[] = '#' . $id . ': ya tenía los dos equipos, no lo toqué'; continue; }
+
+            $nuevoL = $hayL ? (int) $p->equipol_id : (int) (isset($pl[$id]) ? $pl[$id] : 0);
+            $nuevoV = $hayV ? (int) $p->equipov_id : (int) (isset($pv[$id]) ? $pv[$id] : 0);
+
+            if (!$nuevoL || !$nuevoV) { $rechazos[] = '#' . $id . ': no elegiste el equipo que falta'; continue; }
+            if ($nuevoL === $nuevoV)  { $rechazos[] = '#' . $id . ': quedaría el mismo equipo de los dos lados'; continue; }
+            if (!$hayL && !$this->existeEquipo($nuevoL)) { $rechazos[] = '#' . $id . ': el equipo local elegido no existe'; continue; }
+            if (!$hayV && !$this->existeEquipo($nuevoV)) { $rechazos[] = '#' . $id . ': el equipo visitante elegido no existe'; continue; }
+
+            DB::beginTransaction();
+            try {
+                if (!$hayL) $p->equipol_id = $nuevoL;
+                if (!$hayV) $p->equipov_id = $nuevoV;
+                $p->save();
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                $rechazos[] = '#' . $id . ': ' . $e->getMessage();
+                continue;
+            }
+
+            $escritos[] = '#' . $id . ' — ' . e((string) $this->nombreEquipo($nuevoL))
+                . ' vs ' . e((string) $this->nombreEquipo($nuevoV))
+                . ' <span class="sub">(se completó el ' . ($hayL ? 'visitante' : 'local') . ')</span>';
+        }
+
+        return [$escritos, $rechazos];
     }
 
     /** El mismo `<option>…` de siempre pero con uno ya elegido. */

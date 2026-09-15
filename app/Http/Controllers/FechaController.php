@@ -104,10 +104,86 @@ class FechaController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+
+    /**
+     * Qué hacer con una fila del formulario de fecha, antes de escribir nada.
+     *
+     * El formulario dibuja `equipos/2` filas FIJAS y en blanco, así que una
+     * fecha con menos partidos que esos deja renglones sin tocar. Hasta ahora
+     * esos renglones entraban igual: `equipol_id` llegaba vacío, MySQL lo
+     * guardaba como **0** y quedaba un partido fantasma sin equipos. Ese es el
+     * «Base: #0 vs #429» que después frena la tanda de detalles, y encima el
+     * partido se volvía invisible para los controles (todos hacen INNER JOIN
+     * con `equipos`).
+     *
+     * Devuelve:
+     *   'saltear' — la fila está vacía entera: no es un partido, no se crea;
+     *   'frenar'  — tiene un equipo y no el otro, o es un partido que ya existe
+     *               al que le vaciaron un lado: eso es un error de carga y se
+     *               avisa, no se adivina;
+     *   'ok'      — se guarda.
+     */
+    private function estadoFilaPartido($request, $item, $existente = false)
+    {
+        $valor = function ($campo) use ($request, $item) {
+            $arr = $request->$campo;
+            if (!is_array($arr) || !isset($arr[$item])) return '';
+            return trim((string) $arr[$item]);
+        };
+
+        $local   = $valor('equipol');
+        $visita  = $valor('equipov');
+        $hayL    = ($local !== '' && $local !== '0');
+        $hayV    = ($visita !== '' && $visita !== '0');
+
+        if ($hayL && $hayV) return 'ok';
+
+        // Un partido que YA existe nunca se "saltea": vaciarle un equipo es un
+        // error, y dejarlo pasar en silencio sería pisar lo que estaba bien.
+        if ($existente) return 'frenar';
+
+        $vacia = !$hayL && !$hayV
+            && $valor('fecha') === '' && $valor('hora') === ''
+            && $valor('golesl') === '' && $valor('golesv') === ''
+            && $valor('penalesl') === '' && $valor('penalesv') === '';
+
+        return $vacia ? 'saltear' : 'frenar';
+    }
+
+    /**
+     * Las filas a las que les falta un equipo, con el número de renglón tal
+     * como lo ve el usuario. Si devuelve algo, no se escribe nada.
+     */
+    private function filasSinEquipo($request)
+    {
+        $malas = [];
+        if (!is_array($request->fecha)) return $malas;
+
+        foreach ($request->fecha as $item => $v) {
+            $existente = is_array($request->partido_id) && !empty($request->partido_id[$item]);
+            if ($this->estadoFilaPartido($request, $item, $existente) === 'frenar') {
+                $malas[] = (int) $item + 1;
+            }
+        }
+
+        return $malas;
+    }
+
     public function store(Request $request)
     {
         //
         $this->validate($request,[ 'numero'=>'required',  'grupo_id'=>'required']);
+
+        // Ningún partido a medio cargar: se avisa y no se escribe nada. Ver
+        // `estadoFilaPartido()`.
+        $malas = $this->filasSinEquipo($request);
+        if ($malas) {
+            return redirect()->back()->withInput()->withErrors(['equipos' =>
+                'Falta elegir un equipo en la fila ' . implode(', ', $malas) . '. '
+                . 'Un partido no se puede guardar con un solo equipo: completalo o borrale '
+                . 'la fecha, la hora y los goles para que el renglón quede vacío.']);
+        }
+
         DB::beginTransaction();
         $ok=1;
         try {
@@ -117,6 +193,9 @@ class FechaController extends Controller
             if(count($request->fecha) > 0)
             {
                 foreach($request->fecha as $item=>$v){
+                    // El renglón en blanco del formulario no es un partido.
+                    if ($this->estadoFilaPartido($request, $item) === 'saltear') continue;
+
                     $esNeutral = 0;
                     if (isset($request->neutral[$item]) ) {
                         $esNeutral=1;
@@ -242,6 +321,17 @@ class FechaController extends Controller
         //dd($request);
         //
         $this->validate($request,[ 'numero'=>'required',  'grupo_id'=>'required']);
+
+        // Igual que en el alta, y antes del `delete()` de abajo: si hay una
+        // fila a medio cargar no se toca nada.
+        $malas = $this->filasSinEquipo($request);
+        if ($malas) {
+            return redirect()->back()->withInput()->withErrors(['equipos' =>
+                'Falta elegir un equipo en la fila ' . implode(', ', $malas) . '. '
+                . 'Un partido no se puede guardar con un solo equipo: completalo o borrale '
+                . 'la fecha, la hora y los goles para que el renglón quede vacío.']);
+        }
+
         DB::beginTransaction();
 
         if($request->partido_id){
@@ -261,6 +351,8 @@ class FechaController extends Controller
             if (is_array($request->fecha) && count($request->fecha) > 0)
             {
                 foreach($request->fecha as $item=>$v){
+                    // El renglón en blanco del formulario no es un partido.
+                    if ($this->estadoFilaPartido($request, $item) === 'saltear') continue;
 
                     $esNeutral = 0;
                     if (isset($request->neutral[$item]) ) {

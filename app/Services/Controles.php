@@ -226,6 +226,17 @@ class Controles
                 ],
             ],
 
+            'Partidos' => [
+                'partidos.sin_equipo' => [
+                    'titulo'   => 'Sin uno de los equipos',
+                    'ayuda'    => 'El partido quedó cargado con un equipo vacío, o apuntando a un equipo que se borró. Es el «Base: #0 vs #429» de la tanda de detalles, y mientras esté así el partido no aparece en ningún otro control.',
+                    'jugador'  => false,
+                    'detalle'  => 'equipo_vacio',
+                    'acciones' => ['incidencia'],
+                    'metodo'   => 'partidosSinEquipo',
+                ],
+            ],
+
             'Penales' => [
                 'penales.faltantes' => [
                     'titulo'    => 'Penales sin cargar',
@@ -506,7 +517,7 @@ class Controles
      *   ['tabla' => 'gols', 'partido' => 'gols.partido_id']
      *   ['raw' => 'SELECT ...', 'alias' => 't1', 'partido' => 't1.partido_id']
      */
-    public function base(array $filtros, array $origen = null)
+    public function base(array $filtros, array $origen = null, bool $equiposOpcionales = false)
     {
         if ($origen === null) {
             $q = DB::table('partidos');
@@ -519,13 +530,30 @@ class Controles
                 ->join('partidos', $origen['partido'], '=', 'partidos.id');
         }
 
-        $q->join('equipos as el', 'partidos.equipol_id', '=', 'el.id')
-            ->join('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
-            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
+        // Los equipos van por INNER JOIN, y eso tiene una consecuencia que no
+        // se ve: un partido cargado SIN uno de los dos equipos —`equipol_id`
+        // en 0, o apuntando a un equipo que se borró— no aparece en NINGÚN
+        // control. Es invisible para todo el panel, justo el partido que más
+        // roto está. Por eso el chequeo `partidos.sin_equipo` pide
+        // `$equiposOpcionales` y mira con LEFT JOIN.
+        if ($equiposOpcionales) {
+            $q->leftJoin('equipos as el', 'partidos.equipol_id', '=', 'el.id')
+                ->leftJoin('equipos as ev', 'partidos.equipov_id', '=', 'ev.id');
+        } else {
+            $q->join('equipos as el', 'partidos.equipol_id', '=', 'el.id')
+                ->join('equipos as ev', 'partidos.equipov_id', '=', 'ev.id');
+        }
+
+        $q->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
-            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id')
-            ->whereNotNull('partidos.golesl')
-            ->whereNotNull('partidos.golesv');
+            ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id');
+
+        // El filtro de "partido jugado" tampoco corre para ese chequeo: un
+        // partido al que le falta un equipo puede no tener resultado todavía y
+        // hay que verlo igual.
+        if (!$equiposOpcionales) {
+            $q->whereNotNull('partidos.golesl')->whereNotNull('partidos.golesv');
+        }
 
         // Filtrar por un partido puntual no lo usa la pantalla: lo usa el
         // importador de detalle, que después de rehacer un partido crea los
@@ -1043,6 +1071,26 @@ class Controles
     // ------------------------------------------------------------------
     // Penales (los arma ControlPenales, que necesita resolver el arquero)
     // ------------------------------------------------------------------
+
+    /**
+     * Partidos con un lado sin equipo: `equipol_id`/`equipov_id` en 0, en null
+     * o apuntando a un id que ya no está en `equipos`.
+     *
+     * No pregunta por «0» sino por «no está en equipos», así entra también el
+     * id que quedó colgando de un equipo borrado. Se arregla desde
+     * `/admin/import-detalles/equipos-vacios`, que propone el equipo con lo que
+     * ya está guardado del fixture.
+     */
+    private function partidosSinEquipo(array $filtros)
+    {
+        $q = $this->base($filtros, null, true)
+            ->where(function ($w) {
+                $w->whereNull('el.id')->orWhereNull('ev.id');
+            })
+            ->select($this->columnas());
+
+        return $this->ordenar($this->sinIncidencia($q));
+    }
 
     private function penalesFaltantes(array $filtros)
     {

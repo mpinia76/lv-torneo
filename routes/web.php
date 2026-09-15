@@ -289,6 +289,14 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/competencia-html', 'ImportDetallesController@competenciaHtml')->name('import_detalles.competencia_html');
     Route::get('/import-detalles/nombres-alfabeto', 'ImportDetallesController@nombresAlfabeto')->name('import_detalles.nombres_alfabeto');
     Route::get('/import-detalles/clubes-tm', 'ImportDetallesController@clubesTm')->name('import_detalles.clubes_tm');
+    // Partidos con un equipo vacío (`equipol_id`/`equipov_id` en 0, en null o
+    // apuntando a un equipo borrado). Va acá porque lo destapa la tanda de
+    // detalles: «Los clubes no coinciden. Base: #0 vs #429». El POST es el que
+    // escribe; el GET sólo muestra.
+    Route::get('/import-detalles/equipos-vacios', 'ImportDetallesController@equiposVacios')
+        ->name('import_detalles.equipos_vacios');
+    Route::post('/import-detalles/equipos-vacios', 'ImportDetallesController@equiposVacios');
+
     // Unificar dos equipos que son el mismo club. Va acá y no en `equipos`
     // porque el caso lo destapa siempre el importador: TM renombra el verein
     // cuando el club se muda y nos quedan dos equipos para un solo club.
