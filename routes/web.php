@@ -271,6 +271,10 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/marcador', 'ImportDetallesController@marcador')->name('import_detalles.marcador');
     Route::get('/import-detalles/fecha', 'ImportDetallesController@fecha')->name('import_detalles.fecha');
     Route::get('/import-detalles/gameid', 'ImportDetallesController@gameIdMover')->name('import_detalles.gameid');
+    // Un partido con más de un gameId (la ida y la vuelta atadas al mismo) y el
+    // botón que le saca a una fila del staging el partido al que apuntaba.
+    Route::get('/import-detalles/gameids', 'ImportDetallesController@gameIds')->name('import_detalles.gameids');
+    Route::get('/import-detalles/desatar', 'ImportDetallesController@desatar')->name('import_detalles.desatar');
     Route::get('/import-detalles/tanda', 'ImportDetallesController@tanda')->name('import_detalles.tanda');
     Route::get('/import-detalles/penales', 'ImportDetallesController@penales')->name('import_detalles.penales');
     Route::get('/import-detalles/tipos-gol', 'ImportDetallesController@tiposGol')->name('import_detalles.tipos_gol');
