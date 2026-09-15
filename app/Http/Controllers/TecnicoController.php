@@ -556,18 +556,22 @@ ORDER BY partidos.dia DESC') as $f) {
                 }
 
 
+                // La misma persona puede haber ganado ese título como JUGADOR.
+                // Los partidos salen del torneo que estamos mirando ($torneoRelacionado),
+                // no de $arrpartidos, que se arma recién en el bucle de torneosJugador de más abajo.
                 $consultarJugador = Jugador::where('persona_id', '=', $tecnico->persona_id)->first();
                 if (!empty($consultarJugador)) {
-                    $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$equipoId)->where('jugador_id','=',$consultarJugador->id)->first();
+                    $jugoEnEseTorneo = Alineacion::where('equipo_id', '=', $equipoId)
+                        ->where('jugador_id', '=', $consultarJugador->id)
+                        ->whereHas('partido.fecha.grupo', function ($q) use ($torneoRelacionado) {
+                            $q->where('torneo_id', $torneoRelacionado->id);
+                        })
+                        ->exists();
 
-
-
-
-                    //print_r($partidoTecnico);
-                    if(!empty($alineacion)) {
-                        //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                        if ($torneo->ambito == 'Nacional') {
-                            if ($torneo->tipo == 'Copa') {
+                    if ($jugoEnEseTorneo) {
+                        // ambito/tipo del torneo del título, no del último $torneo del bucle anterior
+                        if ($torneoRelacionado->ambito == 'Nacional') {
+                            if ($torneoRelacionado->tipo == 'Copa') {
                                 $titulosJugadorCopa++;
                             } else {
                                 $titulosJugadorLiga++;
