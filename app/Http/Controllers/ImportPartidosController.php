@@ -5620,6 +5620,39 @@ class ImportPartidosController extends Controller
                 ->update(['estado' => 'nuevo', 'partido_id' => null, 'motivo' => null, 'updated_at' => now()]);
         }
 
+        // EL PARTIDO YA ES DE OTRA FILA (fixture u otro DT con el mismo gameId).
+        // `uq_partido_gameid` (partido_id, external_id) no deja repetir el par, y
+        // está bien que no: una segunda fila con gameId haría que la tanda de
+        // detalles (que exige external_id) bajara el mismo partido otra vez.
+        // Lo único que este DT le aporta al partido es su nombre en
+        // partido_tecnicos, así que:
+        //   · si el DT ya está → no se guarda nada;
+        //   · si falta → se guarda la fila SIN gameId: sirve para «Agregar el
+        //     DT» (completarTecnicos) y los conteos, y el detalle no la ve.
+        if ($f['external_id'] && $f['partido_id']) {
+            $duena = DB::table('import_partidos')
+                ->where('partido_id', (int) $f['partido_id'])
+                ->where('external_id', (string) $f['external_id'])
+                ->where(function ($q) use ($tecnicoId) {
+                    $tecnicoId ? $q->whereNull('tecnico_id')->orWhere('tecnico_id', '<>', (int) $tecnicoId)
+                               : $q->whereNotNull('tecnico_id');
+                })
+                ->first(['id']);
+
+            if ($duena) {
+                $clave = ['fuente' => 'transfermarkt', 'tecnico_id' => $tecnicoId ?: null,
+                    'partido_id' => (int) $f['partido_id'], 'external_id' => null];
+
+                if (strpos((string) $f['motivo'], 'falta el DT') === false) {
+                    // Nada que hacer. Si quedó una fila vieja sin gameId de este DT, se la deja.
+                    return false;
+                }
+
+                $f['external_id'] = null;
+                $f['motivo'] = mb_substr($f['motivo'] . ' · gameId en la fila #' . $duena->id, 0, 191);
+            }
+        }
+
         DB::table('import_partidos')->updateOrInsert($clave, [
             'coach_external_id'       => $coachId,
             'competencia_external_id' => $f['competencia_external_id'],
