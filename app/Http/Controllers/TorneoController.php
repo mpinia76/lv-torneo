@@ -130,10 +130,20 @@ class TorneoController extends Controller
 
 
 
+                // Nombre en letras (A, B, ..., Z, AA, AB...) y solo Posiciones tildado por defecto
+                $letra = '';
+                for ($n = $i; $n > 0; $n = intdiv($n - 1, 26)) {
+                    $letra = chr(65 + ($n - 1) % 26) . $letra;
+                }
+
                 $grupo = new Grupo([
-                    'nombre' => $i,
+                    'nombre' => $letra,
                     'torneo_id' => $torneo->id,
-                    'equipos' => $equipos
+                    'equipos' => $equipos,
+                    'posiciones' => 1,
+                    'promedios' => 0,
+                    'acumulado' => 0,
+                    'penales' => 0,
                 ]);
 
                 try {
