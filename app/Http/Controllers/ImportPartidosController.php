@@ -4274,7 +4274,7 @@ class ImportPartidosController extends Controller
                 // hacía parecer que todos los partidos eran de local.
                 $detalle .= '<tr><td class="num">' . e(substr($r->dia, 0, 10)) . '</td><td class="num">' . e($numero) . '</td>'
                     . '<td>' . e($this->nombreEquipo($equipolId)) . '</td>'
-                    . '<td class="num">' . $golesl . ':' . $golesv . '</td>'
+                    . '<td class="num">' . ($golesl === null ? '<span class="sub">sin resultado</span>' : ($golesl . ':' . $golesv)) . '</td>'
                     . '<td>' . e($this->nombreEquipo($equipovId)) . '</td>'
                     . '<td class="num">' . ($local ? 'L' : 'V') . '</td>'
                     . '<td class="num"><span class="id">#' . $partido->id . '</span> '
@@ -4903,7 +4903,15 @@ class ImportPartidosController extends Controller
                 $filas[$i]['motivo'] = 'temporada < ' . $desde;
                 continue;
             }
-            if ($f['goles_favor'] === null || $f['goles_contra'] === null) {
+            // Sin marcador por penales NO es «sin resultado»: el partido se
+            // jugó y hay que crearlo (sin goles; el marcador se completa con
+            // «Solo el marcador», que baja /game/{id} y separa la tanda).
+            // Excluirlo dejaba la llave sin la vuelta: Atlético–Inter, octavos
+            // de la Champions 2023/24 (13/03/2024, 2:1 y 3:2 por penales), no
+            // aparecía en «¿A qué fecha va cada ronda?».
+            $porPenales = !empty($f['por_penales']);
+            $sinGoles = $f['goles_favor'] === null || $f['goles_contra'] === null;
+            if ($sinGoles && !$porPenales) {
                 $filas[$i]['estado'] = 'excluido';
                 $filas[$i]['motivo'] = 'sin resultado';
                 continue;
@@ -4928,7 +4936,8 @@ class ImportPartidosController extends Controller
             // Se buscan por par de equipos + localía + resultado exacto, pero con
             // la competencia y el número de fecha como segunda llave: equipos +
             // resultado SOLOS no alcanzan (ver buscarPartidoAplazado()).
-            if (!$partido && $equipoId && $rivalId) {
+            // El aplazado se reconoce por el resultado: sin marcador no hay con qué.
+            if (!$partido && $equipoId && $rivalId && !$sinGoles) {
                 $r = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
                     (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda'],
                     $f['competencia_external_id']);
@@ -4980,6 +4989,10 @@ class ImportPartidosController extends Controller
             $filas[$i]['cerca'] = $cerca;
             if ($filas[$i]['estado'] === 'nuevo' && $cerca) {
                 $filas[$i]['motivo'] = 'se crea nuevo · OJO: ' . implode(' · ', $cerca);
+            }
+            if ($filas[$i]['estado'] === 'nuevo' && $sinGoles) {
+                $filas[$i]['motivo'] = trim('se crea SIN resultado (se definió por penales): completalo con «Solo el marcador»'
+                    . ($filas[$i]['motivo'] ? ' · ' . $filas[$i]['motivo'] : ''));
             }
         }
         return $filas;
@@ -5459,7 +5472,8 @@ class ImportPartidosController extends Controller
         // `extra_time` es otra cosa y su `goalsTotal` SI vale: es el de los 120'.
         // En la carrera de Simeone (1011 partidos): 994 `regularly_terminated`,
         // 8 `extra_time`, 9 `penalty_shootout`.
-        if ((string) $this->valor($gi, ['gameState']) === 'penalty_shootout') {
+        $porPenales = (string) $this->valor($gi, ['gameState']) === 'penalty_shootout';
+        if ($porPenales) {
             $gf = null;
             $gc = null;
         }
@@ -5479,6 +5493,8 @@ class ImportPartidosController extends Controller
             'dia'                     => $dia,
             'goles_favor'             => $gf === null ? null : (int) $gf,
             'goles_contra'            => $gc === null ? null : (int) $gc,
+            // No es columna de import_partidos: sólo lo usa clasificar().
+            'por_penales'             => $porPenales,
             'anio'                    => $dia ? substr($dia, 0, 4) : null,
             'equipo_id'               => null,
             'rival_id'                => null,
