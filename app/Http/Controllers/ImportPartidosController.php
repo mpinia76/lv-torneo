@@ -207,7 +207,7 @@ class ImportPartidosController extends Controller
                                             $estado = '<span class="gris"' . $cuando . '>'
                                                 . (((int) $f->sd->partidos === 0)
                                                     ? 'sondeado · TM no le da partidos'
-                                                    : 'sondeado · nada de 1ra (' . (int) $f->sd->fuera_1ra . ' afuera)')
+                                                    : 'sondeado · nada para cargar (' . (int) $f->sd->fuera_1ra . ' excluidos)')
                                                 . '</span>';
                 elseif ($f->conflicto)      $estado = '<span class="err">' . $f->conflicto . ' conflicto(s)</span>';
                 elseif ($f->nuevo)          $estado = '<span class="warn">' . $f->nuevo . ' por aplicar</span>';
@@ -3373,7 +3373,7 @@ class ImportPartidosController extends Controller
             }
         }
 
-        // ── Marcar una competencia como fuera / dentro de 1ra división ──────
+        // ── Excluir / incluir una competencia en el sondeo ──────────────────
         // «Excluir» guarda una regla en `competencias_excluidas`: la misma tabla
         // del ABM de siempre, así que vale para todos los DTs y para el scraper.
         $excluirComp = trim((string) $request->get('excluir_comp', ''));
@@ -3391,7 +3391,7 @@ class ImportPartidosController extends Controller
             if ($r['patron'] === '') {
                 $avisos[] = '<span class="err">No pude armar el patrón de «' . e($incluirComp) . '».</span>';
             } else {
-                $avisos[] = 'Competencia <b>' . e($incluirComp) . '</b> marcada como de <b>1ra división</b>: sus partidos vuelven al sondeo.'
+                $avisos[] = 'Competencia <b>' . e($incluirComp) . '</b> <b>incluida</b>: sus partidos vuelven al sondeo.'
                     . (empty($r['apagadas']) ? ''
                         : '<br><span class="err">Ojo:</span> para eso apagué la(s) regla(s) <code>'
                           . implode('</code>, <code>', array_map('e', $r['apagadas'])) . '</code>, que también tapaban otras competencias. '
@@ -3475,7 +3475,7 @@ class ImportPartidosController extends Controller
                     ->where('estado', '!=', 'aplicado')
                     ->delete();
                 if ($borradas) {
-                    $avisos[] = 'Saqué <b>' . $borradas . '</b> filas del staging que eran de competencias fuera de 1ra.';
+                    $avisos[] = 'Saqué <b>' . $borradas . '</b> filas del staging que eran de competencias excluidas.';
                 }
             }
         }
@@ -3534,7 +3534,7 @@ class ImportPartidosController extends Controller
         $html .= '<div class="cards">'
             . $this->card($cont['total'], 'partidos')
             . $this->card($cont['excluido'], 'fuera de alcance', 'gris')
-            . $this->card($fueraTotal, 'fuera de 1ra', 'gris')
+            . $this->card($fueraTotal, 'excluidos', 'gris')
             . $this->card($cont['duplicado'], 'ya cargados', 'ok')
             . $this->card($cont['corridos'], 'con fecha corrida', $cont['corridos'] ? 'warn' : '')
             . $this->card($cont['falta_dt'], 'sin el DT', 'warn')
@@ -3580,9 +3580,9 @@ class ImportPartidosController extends Controller
 
         if ($cont['total'] === 0 && $fueraTotal > 0) {
             $html .= '<div class="ok-box"><b>Este DT no tiene nada para cargar.</b><br>'
-                . 'Los ' . $fueraTotal . ' partidos que trae Transfermarkt son de competencias que no son de primera '
-                . 'división (las de abajo). No es un sondeo fallido: no hay nada que guardar. En la lista de DTs '
-                . 'queda como <b>sondeado · nada de 1ra</b>, así no se le vuelve a gastar una llamada.</div>';
+                . 'Los ' . $fueraTotal . ' partidos que trae Transfermarkt son de competencias excluidas '
+                . '(las de abajo: no son de 1ra división o tienen una regla guardada). No es un sondeo fallido: no hay nada que guardar. En la lista de DTs '
+                . 'queda como <b>sondeado · nada para cargar</b>, así no se le vuelve a gastar una llamada.</div>';
         }
 
         $html .= $this->bloqueCompetencias($filas, $fuera, $request);
@@ -3676,8 +3676,8 @@ class ImportPartidosController extends Controller
         }
 
         if ($fueraDe1ra) {
-            $html .= '<p class="sub">Dejo afuera <b>' . $fueraDe1ra . '</b> partidos de competencias que no son de '
-                . '1ra división (reserva, juveniles, ascenso). Se limpian del staging la próxima vez que sondees.</p>';
+            $html .= '<p class="sub">Dejo afuera <b>' . $fueraDe1ra . '</b> partidos de competencias excluidas '
+                . '(reserva, juveniles, ascenso o regla guardada). Se limpian del staging la próxima vez que sondees.</p>';
         }
 
         if ($pendientes->isEmpty()) {
@@ -3690,7 +3690,7 @@ class ImportPartidosController extends Controller
             $motivo = ($sd && (int) $sd->guardadas === 0 && (int) $sd->fuera_1ra > 0)
                 ? '<div class="ok-box"><b>No hay nada para aplicar, y está bien.</b><br>'
                     . 'Este DT ya se sondeó el ' . e(substr((string) $sd->sondeado_at, 0, 16)) . ': sus '
-                    . (int) $sd->fuera_1ra . ' partidos son de competencias que no son de primera división. '
+                    . (int) $sd->fuera_1ra . ' partidos son de competencias excluidas. '
                     . 'No hace falta volver a sondearlo.</div>'
                 : '<p class="sub">No hay partidos nuevos en staging. Corré el sondeo con <code>&guardar=1</code> primero.</p>';
 
@@ -5874,11 +5874,12 @@ class ImportPartidosController extends Controller
     }
 
     /**
-     * Qué competencias entraron y cuáles quedaron afuera por no ser de 1ra.
+     * Qué competencias entraron y cuáles quedaron afuera (automático por no ser
+     * de 1ra, o por una regla guardada en competencias_excluidas).
      *
      * «Excluir» guarda una regla `contiene` en `competencias_excluidas` (sin el
      * año, así sirve para todas las temporadas) y vale para todo el sistema.
-     * «Sí es de 1ra» apaga las reglas que la tapaban y deja una regla APAGADA
+     * «Incluir» apaga las reglas que la tapaban y deja una regla APAGADA
      * con su nombre: esa marca le gana a la lista automática del servicio.
      */
     private function bloqueCompetencias(array $filas, array $fuera, Request $request)
@@ -5921,11 +5922,12 @@ class ImportPartidosController extends Controller
         foreach ($fuera as $g) $nFuera += $g['n'];
 
         $out = '<details' . (empty($fuera) ? '' : ' open') . '>'
-            . '<summary>Competencias del sondeo <span class="sub">(' . count($dentro) . ' de 1ra'
-            . (empty($fuera) ? '' : ' · ' . count($fuera) . ' afuera, ' . $nFuera . ' partidos') . ')</span></summary>'
+            . '<summary>Competencias del sondeo <span class="sub">(' . count($dentro) . ' se cargan'
+            . (empty($fuera) ? '' : ' · ' . count($fuera) . ' excluidas, ' . $nFuera . ' partidos') . ')</span></summary>'
             . '<p class="sub">Solo se cargan los torneos de <b>primera división</b>. Reserva, Proyección, juveniles y '
             . 'ascenso quedan afuera: no se listan abajo, no se guardan en staging y sus clubes no piden mapeo. '
-            . 'Si me equivoqué con alguna, dale al botón: la decisión queda guardada en '
+            . 'Además quedan afuera las competencias con una regla guardada. Para cambiar cualquiera, dale al botón: '
+            . 'la decisión queda guardada en '
             . '<a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a> '
             . 'y vale para todos los DTs.</p>'
             . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Partidos</th><th>Estado</th>'
@@ -5936,7 +5938,7 @@ class ImportPartidosController extends Controller
                 . '<td>' . e($d['nombre']) . ' <span class="id">' . e($k) . '</span></td>'
                 . '<td class="num">' . $d['n'] . '</td>'
                 . '<td class="ok">se carga</td>'
-                . '<td><a class="boton-sec" href="' . e($urlExcluir($d['nombre'])) . '">No es de 1ra ✕</a></td>'
+                . '<td><a class="boton-sec" href="' . e($urlExcluir($d['nombre'])) . '">Excluir ✕</a></td>'
                 . '</tr>';
         }
         foreach ($fuera as $k => $d) {
@@ -5944,13 +5946,13 @@ class ImportPartidosController extends Controller
             $out .= '<tr class="gris">'
                 . '<td>' . e($d['nombre']) . ' <span class="id">' . e($k) . '</span></td>'
                 . '<td class="num">' . $d['n'] . '</td>'
-                . '<td>fuera: ' . e($d['motivo']) . ' <span class="id">(' . e($origen) . ')</span></td>'
-                . '<td><a class="boton-sec" href="' . e($urlIncluir($d['nombre'])) . '">Sí es de 1ra ✓</a></td>'
+                . '<td>excluida: ' . e($d['motivo']) . ' <span class="id">(' . e($origen) . ')</span></td>'
+                . '<td><a class="boton-sec" href="' . e($urlIncluir($d['nombre'])) . '">Incluir ✓</a></td>'
                 . '</tr>';
         }
 
         return $out . '</tbody></table></div>'
-            . '<p class="sub"><b>«Sí es de 1ra» vuelve a bajar los partidos de Transfermarkt</b> (1 llamada): '
+            . '<p class="sub"><b>«Incluir» vuelve a bajar los partidos de Transfermarkt</b> (1 llamada): '
             . 'los de esa competencia ya no están en el staging.</p></details>';
     }
 

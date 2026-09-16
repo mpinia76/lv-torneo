@@ -162,7 +162,7 @@ class NivelCompetencia
 
         $item = CompetenciaExcluida::firstOrCreate(
             ['patron' => $patron],
-            ['tipo_match' => 'contiene', 'motivo' => 'Marcada como de 1ra división desde el sondeo', 'activo' => false]
+            ['tipo_match' => 'contiene', 'motivo' => 'Incluida desde el sondeo', 'activo' => false]
         );
         if ($item->activo) {
             $item->activo = false;
