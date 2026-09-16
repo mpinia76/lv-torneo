@@ -1486,6 +1486,25 @@ class ImportPartidosController extends Controller
                 ->update(['estado' => 'nuevo', 'partido_id' => null, 'motivo' => null, 'updated_at' => now()]);
         }
 
+        // EL PAR (partido, gameId) YA ES DE UNA FILA DE DT. `uq_partido_gameid`
+        // no deja repetirlo (ver `persistir()`), y el insert reventaba con un
+        // 500 al refrescar el fixture. La fila del fixture se guarda igual —la
+        // pantalla la relee del staging— pero SIN partido_id: queda «duplicado»,
+        // así «Aplicar» (que sólo toma «nuevo») no la crea otra vez, y al
+        // releerla `clasificarFixture()` la vuelve a emparejar sola.
+        if ($f['partido_id']) {
+            $duena = DB::table('import_partidos')
+                ->where('partido_id', (int) $f['partido_id'])
+                ->where('external_id', (string) $f['external_id'])
+                ->whereNotNull('tecnico_id')
+                ->first(['id']);
+            if ($duena) {
+                $f['partido_id'] = null;
+                $f['estado'] = 'duplicado';
+                $f['motivo'] = mb_substr(trim($f['motivo'] . ' · gameId en la fila #' . $duena->id, ' ·'), 0, 191);
+            }
+        }
+
         DB::table('import_partidos')->updateOrInsert($clave, [
             'competencia_external_id' => $f['competencia_external_id'],
             'competencia_nombre'      => $f['competencia_nombre'],
