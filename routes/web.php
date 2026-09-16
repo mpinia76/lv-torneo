@@ -70,6 +70,11 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::post('personas/duplicados/fusionar', 'PersonaDuplicadoController@fusionar')->name('personas.duplicados.fusionar');
     Route::post('personas/duplicados/lote', 'PersonaDuplicadoController@lote')->name('personas.duplicados.lote');
 
+    // Árbitros con el apellido doble partido al medio (el JSON de /referees no
+    // trae shortName). El GET sólo muestra; el POST guarda lo tildado.
+    Route::get('personas/apellidos', 'ApellidosPartidosController@index')->name('personas.apellidos');
+    Route::post('personas/apellidos', 'ApellidosPartidosController@aplicar')->name('personas.apellidos.aplicar');
+
     // Traspaso PARCIAL de carrera entre dos personas DISTINTAS: mover un tramo
     // (un club y sus temporadas) de una ficha a la otra sin fusionar nada. El GET
     // solo previsualiza; el POST vuelve a calcular la lista y se queda con la

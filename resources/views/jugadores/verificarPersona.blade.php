@@ -143,6 +143,9 @@
                     Problema en nacionalidad <span class="badge badge-light">{{ $conteos['sinBandera'] }}</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('personas.apellidos') }}">Apellidos partidos &rarr;</a>
+            </li>
         </ul>
 
         {{-- ================================================================

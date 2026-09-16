@@ -24,15 +24,6 @@ class ImportPartidosController extends Controller
 {
     const TMAPI = 'https://tmapi.transfermarkt.technology';
 
-    /**
-     * Corrimiento de fecha que se acepta a ciegas como "el mismo partido, otro
-     * día": la misma ventana que usa el buscador de gameId (TmBuscarGameId::DIAS).
-     * Más que esto ya no alcanza el resultado para reconocerlo — hace falta
-     * confirmar el torneo o el número de fecha. Ver el caso de los tres
-     * partidos que quedaron con dos gameId (15-sep-2026).
-     */
-    const CORRIMIENTO_SEGURO = 3;
-
     // ═══════════════════════════════ ÍNDICE ═══════════════════════════════
 
     public function index(Request $request)
@@ -207,7 +198,7 @@ class ImportPartidosController extends Controller
                                             $estado = '<span class="gris"' . $cuando . '>'
                                                 . (((int) $f->sd->partidos === 0)
                                                     ? 'sondeado · TM no le da partidos'
-                                                    : 'sondeado · nada para cargar (' . (int) $f->sd->fuera_1ra . ' excluidos)')
+                                                    : 'sondeado · nada de 1ra (' . (int) $f->sd->fuera_1ra . ' afuera)')
                                                 . '</span>';
                 elseif ($f->conflicto)      $estado = '<span class="err">' . $f->conflicto . ' conflicto(s)</span>';
                 elseif ($f->nuevo)          $estado = '<span class="warn">' . $f->nuevo . ' por aplicar</span>';
@@ -258,20 +249,11 @@ class ImportPartidosController extends Controller
      *
      * Si la tabla todavía no está creada, no pasa nada: se sigue como antes.
      */
-    private function registrarSondeo($tecnicoId, array $datos, $esSondeo = true)
+    private function registrarSondeo($tecnicoId, array $datos)
     {
         if (!Schema::hasTable('tecnico_sondeos')) return;
 
-        // $esSondeo = false: solo se actualizan columnas sueltas (la lista de
-        // excluidas), sin marcar al DT como sondeado.
-        $fila = $datos + ['updated_at' => now()];
-        if ($esSondeo) $fila['sondeado_at'] = now();
-        if (!$esSondeo && !DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->exists()) {
-            // Sin fila previa no hay sondeo registrado: no se inventa uno.
-            // (Si la columna sondeado_at es nullable se podría insertar, pero
-            // no hace falta: la próxima bajada con guardar=1 la crea.)
-            return;
-        }
+        $fila = $datos + ['sondeado_at' => now(), 'updated_at' => now()];
 
         $afectadas = DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->update($fila);
         if (!$afectadas && !DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->exists()) {
@@ -2486,8 +2468,6 @@ class ImportPartidosController extends Controller
                             . $this->nombreEquipo($vId) . ' en ' . $fecha->numero . ' (#' . $ya->id . ').';
                         continue;
                     }
-                    $choque = $this->choqueLocalia($fecha, $lId, $vId, $r->dia);
-                    if ($choque !== null) { $errores[] = $choque; continue; }
                 } else {
                     $ya = \App\Partido::where('fecha_id', $fecha->id)
                         ->where(function ($q) use ($lId, $vId) {
@@ -2660,7 +2640,17 @@ class ImportPartidosController extends Controller
                     . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a>');
         }
 
-        $club = $this->clubDeTm($tmId);
+        $json = HttpHelper::getJson(self::TMAPI . '/clubs?ids[]=' . urlencode($tmId));
+        $club = null;
+        if (is_array($json)) {
+            $data = isset($json['data']) ? $json['data'] : $json;
+            if (isset($data['clubs']) && is_array($data['clubs'])) $data = $data['clubs'];
+            foreach ((array) $data as $item) {
+                if (!is_array($item)) continue;
+                if ((string) (isset($item['id']) ? $item['id'] : '') === (string) $tmId) { $club = $item; break; }
+            }
+            if ($club === null && isset($data['id']) && (string) $data['id'] === (string) $tmId) $club = $data;
+        }
 
         if (!is_array($club)) {
             $err = HttpHelper::getLastJsonError();
@@ -2686,14 +2676,8 @@ class ImportPartidosController extends Controller
                 ->with('error', 'El club ' . e($tmId) . ' vino sin nombre. No lo creé.');
         }
 
-        // Siglas: SÓLO `abbreviation`, que es una abreviatura de verdad.
-        //
-        // Antes se usaba primero `preferences.clubCode`, que es un código
-        // interno de Transfermarkt y no las siglas del club: de ahí salieron
-        // "JAE" para Real Jaén y "96" para Hannover 96, que después hay que
-        // borrar a mano. Si el club no tiene siglas, el campo va en blanco: una
-        // sigla inventada es peor que ninguna, porque no se nota.
-        $siglas = trim((string) (isset($base['abbreviation']) ? $base['abbreviation'] : ''));
+        $siglas = trim((string) (isset($club['preferences']['clubCode']) ? $club['preferences']['clubCode'] : ''));
+        if ($siglas === '') $siglas = trim((string) (isset($base['abbreviation']) ? $base['abbreviation'] : ''));
 
         $pais = null;
         $paisId = (int) (isset($base['countryId']) ? $base['countryId'] : 0);
@@ -2748,29 +2732,21 @@ class ImportPartidosController extends Controller
 
         $avisoNulos = '';
 
-        // Se escribe por query builder y NO con `$equipo->update()`: el modelo
-        // se queda con los atributos sucios aunque el guardado falle, así que
-        // el reintento volvía a mandar el mismo valor que lo había volteado y
-        // se perdían también los campos que sí estaban bien.
-        $guardar = function (array $campos) use ($equipo) {
-            if (!$campos) return;
-            \App\Equipo::where('id', $equipo->id)->update($campos);
-        };
-
         try {
-            $guardar($completar);
+            $equipo->update($completar);
         } catch (\Exception $e) {
-            // Los socios son el campo que puede traer un valor raro del sitio,
-            // y también el único que va en NULL. Se los saca y se guarda el
-            // resto: el club ya está creado, no se pierde nada más por esto.
-            $avisoNulos = 'Los socios quedaron en <b>0</b>: la base rechazó lo que leí del sitio — '
-                . e($e->getMessage()) . '<br>';
+            // Caso típico: el código subió pero todavía no corrió la migración
+            // que hace nulables socios/fundación/estadio. Se guarda lo que sí
+            // entra y se avisa qué falta correr — el club ya está creado.
+            $avisoNulos = 'Los socios quedaron en <b>0</b> y no en blanco porque la columna todavía no acepta '
+                . 'vacío: falta correr <code>php artisan migrate</code> '
+                . '(<code>equipos_datos_nullable</code>).<br>';
 
             unset($completar['socios']);
             $sitio['socios'] = null;
 
             try {
-                $guardar($completar);
+                if ($completar) $equipo->update($completar);
             } catch (\Exception $e2) {
                 Log::error('crearEquipo: no pude completar el club ' . $equipo->id . ': ' . $e2->getMessage());
                 $avisoNulos .= 'Tampoco pude guardar fundación y estadio: ' . e($e2->getMessage()) . '<br>';
@@ -2781,16 +2757,16 @@ class ImportPartidosController extends Controller
         // Lo que sí se consiguió se dice tal cual quedó, para que se pueda
         // desconfiar de un dato raro sin tener que abrir TM.
         $trajo = [];
-        if (isset($completar['fundacion'])) $trajo[] = 'fundación ' . $completar['fundacion'];
-        if (isset($completar['estadio']))   $trajo[] = 'estadio «' . $completar['estadio'] . '»';
-        if ($sitio['socios'] !== null)      $trajo[] = 'socios ' . number_format($sitio['socios'], 0, ',', '.');
+        if (isset($alta['fundacion'])) $trajo[] = 'fundación ' . $alta['fundacion'];
+        if (isset($alta['estadio']))   $trajo[] = 'estadio «' . $alta['estadio'] . '»';
+        if ($sitio['socios'] !== null) $trajo[] = 'socios ' . number_format($sitio['socios'], 0, ',', '.');
 
         $falta = [];
-        if (!$pais)                          $falta[] = 'país';
-        if (!$escudo)                        $falta[] = 'escudo';
-        if (!isset($completar['fundacion'])) $falta[] = 'fundación';
-        if (!isset($completar['estadio']))   $falta[] = 'estadio';
-        if ($sitio['socios'] === null)       $falta[] = 'socios';
+        if (!$pais)                      $falta[] = 'país';
+        if (!$escudo)                    $falta[] = 'escudo';
+        if (!isset($alta['fundacion']))  $falta[] = 'fundación';
+        if (!isset($alta['estadio']))    $falta[] = 'estadio';
+        if ($sitio['socios'] === null)   $falta[] = 'socios';
         $falta[] = 'historia';   // ésta no está en Transfermarkt en ningún lado
 
         $links = $this->urlsClubTm($tmId, isset($club['relativeUrl']) ? $club['relativeUrl'] : null);
@@ -2804,7 +2780,7 @@ class ImportPartidosController extends Controller
 
         // Si el sitio trajo la fundación pero sin día y mes, se avisa y NO se
         // guarda: un 1º de enero inventado no se distingue de uno real.
-        if (!isset($completar['fundacion']) && $sitio['fundacion_crudo'] !== '') {
+        if (!isset($alta['fundacion']) && $sitio['fundacion_crudo'] !== '') {
             $msg .= 'La fundación no la pude guardar porque el sitio la trae como <b>'
                 . e($sitio['fundacion_crudo']) . '</b> y de ahí no sale una fecha completa.<br>';
         }
@@ -2870,32 +2846,6 @@ class ImportPartidosController extends Controller
 
     // ═══════════════ FUNDACIÓN / ESTADIO / SOCIOS DESDE EL SITIO ═══════════════
 
-    /**
-     * La ficha de un club en tmapi, o null. Cuesta 1 llamada.
-     *
-     * La respuesta viene de varias formas según el endpoint (`data`, `clubs`,
-     * o el objeto pelado), así que se busca el id en todas y no se confía en
-     * el orden: pedir un id y quedarse con "el primero que venga" es cómo se
-     * carga un club con los datos de otro.
-     */
-    private function clubDeTm($tmId)
-    {
-        $json = HttpHelper::getJson(self::TMAPI . '/clubs?ids[]=' . urlencode($tmId));
-        if (!is_array($json)) return null;
-
-        $data = isset($json['data']) ? $json['data'] : $json;
-        if (isset($data['clubs']) && is_array($data['clubs'])) $data = $data['clubs'];
-
-        foreach ((array) $data as $item) {
-            if (!is_array($item)) continue;
-            if ((string) (isset($item['id']) ? $item['id'] : '') === (string) $tmId) return $item;
-        }
-
-        if (isset($data['id']) && (string) $data['id'] === (string) $tmId) return $data;
-
-        return null;
-    }
-
     /** La forma del resultado de `datosClubDelSitio()`, sin nada adentro. */
     private function sitioVacio()
     {
@@ -2942,11 +2892,7 @@ class ImportPartidosController extends Controller
 
         // Fundación. Se guarda sólo si sale una fecha COMPLETA; el texto crudo
         // vuelve igual para poder avisar qué fue lo que no se pudo interpretar.
-        // Las variantes van de la más específica a la más suelta: la etiqueta
-        // tiene que terminar donde termina el nombre, así que "Fundación" NO
-        // matchea "Fundación del club:" y hay que listar las dos.
-        $crudo = $this->valorDeEtiqueta($out['texto'], ['fecha de fundacion', 'fundacion del club',
-            'ano de fundacion', 'fundacion', 'fundado el', 'fundado en', 'fundado']);
+        $crudo = $this->valorDeEtiqueta($out['texto'], ['fecha de fundacion', 'fundacion', 'fundado en', 'fundado']);
         if ($crudo !== null) {
             $out['fundacion_crudo'] = mb_substr($crudo, 0, 60);
             $out['fundacion'] = $this->fechaDelTexto($crudo);
@@ -2956,9 +2902,7 @@ class ImportPartidosController extends Controller
         // línea ("La Victoria 12.569 espectadores"): se corta ahí.
         $estadio = $this->valorDeEtiqueta($out['texto'], ['estadio', 'nombre del estadio']);
         if ($estadio !== null) {
-            // "Parken - connected by 3 38.065 Aforo" → "Parken - connected by 3".
-            $estadio = trim(preg_replace(
-                '/\s*\d[\d.,]*\s*(aforo|espectadores|asientos|plazas|butacas|capacidad).*$/iu', '', $estadio));
+            $estadio = trim(preg_replace('/\s*\d[\d.,]*\s*(espectadores|asientos|plazas|butacas).*$/iu', '', $estadio));
             // Un "estadio" que es sólo un número es la capacidad, no el nombre.
             if ($estadio !== '' && !preg_match('/^[\d.,\s]+$/u', $estadio)) {
                 $out['estadio'] = mb_substr($estadio, 0, 150);
@@ -2966,18 +2910,10 @@ class ImportPartidosController extends Controller
         }
 
         // Socios. TM los llama "Miembros" en la versión en español.
-        //
-        // Se toma SÓLO el primer número del renglón. Sacarle los no-dígitos a
-        // todo lo que venga pega números que no tienen nada que ver: "18.200
-        // 26.03.2009" salía como 1820026032009, que además de ser falso no
-        // entra en la columna y voltea el guardado entero.
-        $socios = $this->valorDeEtiqueta($out['texto'], ['miembros', 'socios',
-            'numero de socios', 'cantidad de socios', 'numero de miembros']);
-        if ($socios !== null && preg_match('/\d[\d.,]*/u', $socios, $m)) {
-            $n = (int) preg_replace('/[^\d]/', '', $m[0]);
-            // 0 es "no lo sé", no "no tiene". Y ningún club del mundo pasa el
-            // millón de socios: arriba de eso leí cualquier cosa, no un socio.
-            if ($n > 0 && $n <= 1000000) $out['socios'] = $n;
+        $socios = $this->valorDeEtiqueta($out['texto'], ['miembros', 'socios', 'numero de socios', 'cantidad de socios']);
+        if ($socios !== null) {
+            $n = (int) preg_replace('/[^\d]/', '', $socios);
+            if ($n > 0) $out['socios'] = $n;    // 0 es "no lo sé", no "no tiene"
         }
 
         return $out;
@@ -3053,37 +2989,12 @@ class ImportPartidosController extends Controller
         return null;
     }
 
-    /**
-     * Minúsculas y sin acentos, para comparar etiquetas.
-     *
-     * **NO se usa `iconv('ASCII//TRANSLIT')`**, que es lo que parecía obvio:
-     * depende del locale, y con el locale `C` —el que suele tener PHP en el
-     * hosting— la ó no se convierte en o sino en `?`. "Fundación:" quedaba
-     * como "fundaci?n:" y la etiqueta no matcheaba nunca, mientras que
-     * "Estadio:" y "Socios:", que no llevan acento, andaban perfecto. Un bug
-     * que sólo aparece en el servidor y sólo en las palabras acentuadas.
-     *
-     * El reemplazo es explícito, y después se tira TODO lo que no sea letra
-     * ASCII, número, espacio o dos puntos. Eso cubre de paso el caso en que el
-     * HTML llegue con la codificación cambiada: sea `?`, `'o` o `Ã³`, lo que
-     * queda es "fundacion".
-     */
+    /** Minúsculas, sin acentos y sin puntuación de borde, para comparar. */
     private function aplanar($str)
     {
-        $s = mb_strtolower((string) $str);
-
-        $s = strtr($s, [
-            'á' => 'a', 'à' => 'a', 'ä' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
-            'é' => 'e', 'è' => 'e', 'ë' => 'e', 'ê' => 'e',
-            'í' => 'i', 'ì' => 'i', 'ï' => 'i', 'î' => 'i',
-            'ó' => 'o', 'ò' => 'o', 'ö' => 'o', 'ô' => 'o', 'õ' => 'o', 'ø' => 'o',
-            'ú' => 'u', 'ù' => 'u', 'ü' => 'u', 'û' => 'u',
-            'ñ' => 'n', 'ç' => 'c', 'ß' => 'ss', 'ý' => 'y',
-        ]);
-
-        $s = preg_replace('/[^a-z0-9 :]+/', '', $s);
-
-        return trim(preg_replace('/\s+/', ' ', $s));
+        $s = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $str);
+        if ($s === false) $s = (string) $str;
+        return trim(mb_strtolower(preg_replace('/\s+/u', ' ', $s)));
     }
 
     /**
@@ -3136,9 +3047,8 @@ class ImportPartidosController extends Controller
 
         $html = '<h1>Datos y hechos · club ' . e($tmId) . '</h1>'
             . '<p class="sub">Esto es lo que leería «Crear desde TM». No crea ni modifica nada. '
-            . 'Gasta 2 créditos por carga (la API y la página).</p>'
-            . '<p class="acciones"><a href="' . e($d['url']) . '" target="_blank">Abrir la página en TM ↗</a></p>'
-            . $this->bloqueClubApi($tmId, $fila);
+            . 'Gasta 1 crédito por carga.</p>'
+            . '<p class="acciones"><a href="' . e($d['url']) . '" target="_blank">Abrir la página en TM ↗</a></p>';
 
         if (!$d['leido']) {
             $html .= '<p class="err-box">No pude bajar la página. Si el resto de las pantallas de TM andan, '
@@ -3384,7 +3294,7 @@ class ImportPartidosController extends Controller
             }
         }
 
-        // ── Excluir / incluir una competencia en el sondeo ──────────────────
+        // ── Marcar una competencia como fuera / dentro de 1ra división ──────
         // «Excluir» guarda una regla en `competencias_excluidas`: la misma tabla
         // del ABM de siempre, así que vale para todos los DTs y para el scraper.
         $excluirComp = trim((string) $request->get('excluir_comp', ''));
@@ -3402,7 +3312,7 @@ class ImportPartidosController extends Controller
             if ($r['patron'] === '') {
                 $avisos[] = '<span class="err">No pude armar el patrón de «' . e($incluirComp) . '».</span>';
             } else {
-                $avisos[] = 'Competencia <b>' . e($incluirComp) . '</b> <b>incluida</b>: sus partidos vuelven al sondeo.'
+                $avisos[] = 'Competencia <b>' . e($incluirComp) . '</b> marcada como de <b>1ra división</b>: sus partidos vuelven al sondeo.'
                     . (empty($r['apagadas']) ? ''
                         : '<br><span class="err">Ojo:</span> para eso apagué la(s) regla(s) <code>'
                           . implode('</code>, <code>', array_map('e', $r['apagadas'])) . '</code>, que también tapaban otras competencias. '
@@ -3470,16 +3380,6 @@ class ImportPartidosController extends Controller
         // no se guardan en staging y —sobre todo— sus clubes («... II») no
         // aparecen pidiendo mapeo.
         list($filas, $fuera) = $this->separarPorNivel($filas);
-
-        // Con cache=1 las filas salen del staging, y lo excluido en sondeos
-        // anteriores ya se borró de ahí: sin esto, la tabla de competencias solo
-        // mostraba la recién excluida y las demás no se podían volver a incluir.
-        if ($tecnicoId) {
-            $compsDentro = [];
-            foreach ($filas as $f) $compsDentro[(string) $f['competencia_external_id']] = true;
-            $fuera = $this->fueraRecordado($tecnicoId, $fuera, $compsDentro, !$usarCache);
-        }
-
         $fueraTotal = 0;
         foreach ($fuera as $g) $fueraTotal += $g['n'];
 
@@ -3496,7 +3396,7 @@ class ImportPartidosController extends Controller
                     ->where('estado', '!=', 'aplicado')
                     ->delete();
                 if ($borradas) {
-                    $avisos[] = 'Saqué <b>' . $borradas . '</b> filas del staging que eran de competencias excluidas.';
+                    $avisos[] = 'Saqué <b>' . $borradas . '</b> filas del staging que eran de competencias fuera de 1ra.';
                 }
             }
         }
@@ -3514,12 +3414,11 @@ class ImportPartidosController extends Controller
         }
 
         $cont = ['total' => count($filas), 'excluido' => 0, 'duplicado' => 0,
-            'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0, 'cerca' => 0];
+            'falta_dt' => 0, 'nuevo' => 0, 'conflicto' => 0, 'corridos' => 0];
         foreach ($filas as $f) {
             if (isset($cont[$f['estado']])) $cont[$f['estado']]++;
             if ($f['estado'] === 'duplicado' && strpos((string) $f['motivo'], 'falta el DT') !== false) $cont['falta_dt']++;
             if (isset($f['corrido'])) $cont['corridos']++;
-            if (!empty($f['cerca'])) $cont['cerca']++;
         }
 
         $guardadas = 0;
@@ -3540,11 +3439,7 @@ class ImportPartidosController extends Controller
                 'nuevos'        => $cont['nuevo'],
                 'conflictos'    => $cont['conflicto'],
                 'guardadas'     => $guardadas,
-            ] + (Schema::hasColumn('tecnico_sondeos', 'fuera_detalle')
-                ? ['fuera_detalle' => json_encode(array_map(function ($g) {
-                        return ['nombre' => $g['nombre'], 'n' => (int) $g['n'], 'motivo' => $g['motivo'], 'origen' => $g['origen']];
-                    }, $fuera), JSON_UNESCAPED_UNICODE)]
-                : []));
+            ]);
         }
 
         sort($temporadas);
@@ -3559,22 +3454,13 @@ class ImportPartidosController extends Controller
         $html .= '<div class="cards">'
             . $this->card($cont['total'], 'partidos')
             . $this->card($cont['excluido'], 'fuera de alcance', 'gris')
-            . $this->card($fueraTotal, 'excluidos', 'gris')
+            . $this->card($fueraTotal, 'fuera de 1ra', 'gris')
             . $this->card($cont['duplicado'], 'ya cargados', 'ok')
             . $this->card($cont['corridos'], 'con fecha corrida', $cont['corridos'] ? 'warn' : '')
             . $this->card($cont['falta_dt'], 'sin el DT', 'warn')
             . $this->card($cont['nuevo'], 'nuevos a crear', 'ok')
             . $this->card($cont['conflicto'], 'conflictos', $cont['conflicto'] ? 'err' : 'ok')
-            . $this->card($cont['cerca'], 'parecidos no atados', $cont['cerca'] ? 'warn' : '')
             . '</div>';
-
-        // PARECIDOS NO ATADOS — mirar antes de apretar «Aplicar».
-        // Son filas con los mismos equipos y el mismo resultado que un partido
-        // que ya tenés, descartado porque es de otra competencia o porque la
-        // fecha está lejos y no se pudo confirmar el torneo. Se van a CREAR:
-        // si alguno era en realidad el mismo partido, se arregla acá y no
-        // después, cuando ya haya dos partidos con la misma alineación.
-        $html .= $this->avisoParecidos($filas);
 
         if ($usarCache) {
             $html .= '<p class="sub">Datos tomados de <code>import_partidos</code>: no se volvió a bajar nada de Transfermarkt.</p>';
@@ -3605,9 +3491,9 @@ class ImportPartidosController extends Controller
 
         if ($cont['total'] === 0 && $fueraTotal > 0) {
             $html .= '<div class="ok-box"><b>Este DT no tiene nada para cargar.</b><br>'
-                . 'Los ' . $fueraTotal . ' partidos que trae Transfermarkt son de competencias excluidas '
-                . '(las de abajo: no son de 1ra división o tienen una regla guardada). No es un sondeo fallido: no hay nada que guardar. En la lista de DTs '
-                . 'queda como <b>sondeado · nada para cargar</b>, así no se le vuelve a gastar una llamada.</div>';
+                . 'Los ' . $fueraTotal . ' partidos que trae Transfermarkt son de competencias que no son de primera '
+                . 'división (las de abajo). No es un sondeo fallido: no hay nada que guardar. En la lista de DTs '
+                . 'queda como <b>sondeado · nada de 1ra</b>, así no se le vuelve a gastar una llamada.</div>';
         }
 
         $html .= $this->bloqueCompetencias($filas, $fuera, $request);
@@ -3701,8 +3587,8 @@ class ImportPartidosController extends Controller
         }
 
         if ($fueraDe1ra) {
-            $html .= '<p class="sub">Dejo afuera <b>' . $fueraDe1ra . '</b> partidos de competencias excluidas '
-                . '(reserva, juveniles, ascenso o regla guardada). Se limpian del staging la próxima vez que sondees.</p>';
+            $html .= '<p class="sub">Dejo afuera <b>' . $fueraDe1ra . '</b> partidos de competencias que no son de '
+                . '1ra división (reserva, juveniles, ascenso). Se limpian del staging la próxima vez que sondees.</p>';
         }
 
         if ($pendientes->isEmpty()) {
@@ -3715,7 +3601,7 @@ class ImportPartidosController extends Controller
             $motivo = ($sd && (int) $sd->guardadas === 0 && (int) $sd->fuera_1ra > 0)
                 ? '<div class="ok-box"><b>No hay nada para aplicar, y está bien.</b><br>'
                     . 'Este DT ya se sondeó el ' . e(substr((string) $sd->sondeado_at, 0, 16)) . ': sus '
-                    . (int) $sd->fuera_1ra . ' partidos son de competencias excluidas. '
+                    . (int) $sd->fuera_1ra . ' partidos son de competencias que no son de primera división. '
                     . 'No hace falta volver a sondearlo.</div>'
                 : '<p class="sub">No hay partidos nuevos en staging. Corré el sondeo con <code>&guardar=1</code> primero.</p>';
 
@@ -4251,11 +4137,6 @@ class ImportPartidosController extends Controller
                     }
                 }
 
-                // En los grupos de llaves el control de arriba no corre, y el
-                // choque contra los índices únicos llegaba como SQLSTATE crudo.
-                $choque = $this->choqueLocalia($fecha, $equipolId, $equipovId, $r->dia);
-                if ($choque !== null) { $errores[] = $choque; continue; }
-
                 $partido = new \App\Partido();
                 $partido->forceFill([
                     'fecha_id'   => $fecha->id,
@@ -4281,7 +4162,7 @@ class ImportPartidosController extends Controller
                 // hacía parecer que todos los partidos eran de local.
                 $detalle .= '<tr><td class="num">' . e(substr($r->dia, 0, 10)) . '</td><td class="num">' . e($numero) . '</td>'
                     . '<td>' . e($this->nombreEquipo($equipolId)) . '</td>'
-                    . '<td class="num">' . ($golesl === null ? '<span class="sub">sin resultado</span>' : ($golesl . ':' . $golesv)) . '</td>'
+                    . '<td class="num">' . $golesl . ':' . $golesv . '</td>'
                     . '<td>' . e($this->nombreEquipo($equipovId)) . '</td>'
                     . '<td class="num">' . ($local ? 'L' : 'V') . '</td>'
                     . '<td class="num"><span class="id">#' . $partido->id . '</span> '
@@ -4353,12 +4234,7 @@ class ImportPartidosController extends Controller
             }
         }
 
-        $mismaOk = (string) $request->get('misma_ok', '0') === '1';
-
-        // Primero se decide TODO sin crear nada: `plan` guarda la fecha
-        // existente o el nombre de la nueva. Las fechas nuevas se crean recién
-        // cuando no falta nada y no hay rondas repetidas sin confirmar.
-        $plan = []; $faltan = []; $sinNombre = [];
+        $destino = []; $faltan = []; $sinNombre = [];
 
         foreach ($claves as $i => $k) {
             if (!$enviado) { $faltan[] = $k; continue; }
@@ -4370,44 +4246,18 @@ class ImportPartidosController extends Controller
 
             if ($sel !== '' && $sel !== 'nueva') {
                 $f = $fechas->first(function ($x) use ($sel) { return (int) $x->id === (int) $sel; });
-                if ($f) { $plan[(string) $k] = ['fecha' => $f, 'nombre' => null]; continue; }
+                if ($f) { $destino[(string) $k] = $f; continue; }
             }
-            if ($nom === '' && $sel === 'nueva') { $sinNombre[] = $k; $faltan[] = $k; continue; }
-            if ($nom === '' && $sel === '' && $usarTm && (string) $k !== '—') $nom = (string) $k;
-
-            if ($nom !== '') {
-                $f = $fechas->first(function ($x) use ($nom) { return (string) $x->numero === $nom; });
-                $plan[(string) $k] = $f ? ['fecha' => $f, 'nombre' => null] : ['fecha' => null, 'nombre' => $nom];
+            if ($nom !== '') { $destino[(string) $k] = $this->fechaPorNombre($grupoId, $nom); continue; }
+            if ($sel === 'nueva') { $sinNombre[] = $k; $faltan[] = $k; continue; }
+            if ($sel === '' && $usarTm && (string) $k !== '—') {
+                $destino[(string) $k] = $this->fechaPorNombre($grupoId, (string) $k);
                 continue;
             }
             $faltan[] = $k;
         }
 
-        // DOS RONDAS DE TM EN LA MISMA FECHA. En una liga no pasa nunca (cada
-        // gameDay es su fecha), y en una copa casi siempre es un error: en la
-        // Supercopa de España 2020 las semis (ronda 1) y la final (ronda 2)
-        // fueron las dos a «Final», la semi se creó ahí y la final reventó
-        // contra el índice único. No se prohíbe —puede ser a propósito—, pero
-        // se pide confirmación.
-        $repetidas = [];
-        if (empty($faltan) && !$mismaOk) {
-            $porFecha = [];
-            foreach ($plan as $k => $p) {
-                $clave = $p['fecha'] ? ('id:' . (int) $p['fecha']->id) : ('n:' . mb_strtolower($p['nombre']));
-                $porFecha[$clave][] = (string) $k;
-            }
-            foreach ($porFecha as $ks) {
-                if (count($ks) > 1) $repetidas[] = $ks;
-            }
-        }
-
-        if (empty($faltan) && empty($repetidas)) {
-            $destino = [];
-            foreach ($plan as $k => $p) {
-                $destino[(string) $k] = $p['fecha'] ?: $this->fechaPorNombre($grupoId, $p['nombre']);
-            }
-            return $destino;
-        }
+        if (empty($faltan)) return $destino;
 
         // ── La pantalla ─────────────────────────────────────────────────────
         $grupoNombre = (string) DB::table('grupos')->where('id', $grupoId)->value('nombre');
@@ -4423,17 +4273,6 @@ class ImportPartidosController extends Controller
         if (!empty($sinNombre)) {
             $html .= '<p class="err-box">No creé nada: dijiste «crear una fecha nueva» y quedó sin nombre en la ronda '
                 . e(implode(', ', array_map('strval', $sinNombre))) . '.</p>';
-        }
-        if (!empty($repetidas)) {
-            $txt = [];
-            foreach ($repetidas as $ks) {
-                $p = $plan[$ks[0]];
-                $txt[] = 'las rondas ' . implode(', ', $ks) . ' van todas a «'
-                    . ($p['fecha'] ? (string) $p['fecha']->numero : $p['nombre']) . '»';
-            }
-            $html .= '<p class="err-box"><b>No creé nada:</b> ' . e(implode('; ', $txt)) . '. '
-                . 'Cada ronda de TM suele ser una fecha distinta (semis y final, por ejemplo). '
-                . 'Revisalo abajo; si de verdad van juntas, tildá la confirmación.</p>';
         }
 
         $html .= '<form method="get" action="' . e(route('import_partidos.aplicar')) . '">'
@@ -4469,15 +4308,6 @@ class ImportPartidosController extends Controller
             // ese nombre en vez de un número que no dice nada.
             $nomSug = ($sug && (int) $sug->grupo_id !== (int) $grupoId) ? (string) $sug->numero : '';
 
-            // Si la pantalla vuelve después de un envío, se muestra lo que se
-            // eligió y no la sugerencia: si no, habría que elegir todo de nuevo.
-            $selTxt = '';
-            if ($enviado) {
-                $selTxt = isset($elegido[$i]) ? trim((string) $elegido[$i]) : '';
-                $selId  = ctype_digit($selTxt) ? (int) $selTxt : 0;
-                $nomSug = isset($nuevos[$i]) ? trim((string) $nuevos[$i]) : '';
-            }
-
             $lista = '';
             foreach ($rs as $r) {
                 $lista .= e(substr((string) $r->dia, 0, 10)) . ' · ' . e((string) $r->club_nombre)
@@ -4489,8 +4319,8 @@ class ImportPartidosController extends Controller
                 $opts .= '<option value="' . (int) $f->id . '"' . ($selId === (int) $f->id ? ' selected' : '') . '>'
                     . e((string) $f->numero) . '</option>';
             }
-            $opts .= '<option value="nueva"' . ($selTxt === 'nueva' ? ' selected' : '') . '>crear una fecha nueva…</option>'
-                . '<option value="0"' . ($selTxt === '0' ? ' selected' : '') . '>por ahora no</option>';
+            $opts .= '<option value="nueva">crear una fecha nueva…</option>'
+                . '<option value="0">por ahora no</option>';
 
             $html .= '<tr><td class="num">' . e((string) $k)
                 . '<input type="hidden" name="r[' . (int) $i . ']" value="' . e((string) $k) . '"></td>'
@@ -4504,49 +4334,11 @@ class ImportPartidosController extends Controller
             . '<p><label><input type="checkbox" name="usar_tm" value="1"' . ($usarTm ? ' checked' : '') . '> '
             . 'Para las que deje sin elegir, usar el número de TM como número de fecha '
             . '<span class="sub">(sirve en una liga; en una copa, no)</span></label></p>'
-            . (!empty($repetidas)
-                ? '<p><label><input type="checkbox" name="misma_ok" value="1"> '
-                    . '<b>Sí, esas rondas van a la misma fecha</b> <span class="sub">(crear igual)</span></label></p>'
-                : '')
             . '<p class="acciones"><button class="boton">Crear los partidos</button> '
             . '<span class="sub">las fechas nuevas se crean recién acá</span></p>'
             . '</form>';
 
         return $this->pagina('Aplicar partidos', $html);
-    }
-
-    /**
-     * ¿Chocaría este partido contra los índices únicos de `partidos`?
-     *
-     * La tabla no deja que un equipo sea local —ni visitante— dos veces en la
-     * misma fecha (`fecha_id_equipov_id` y su par del local). En un grupo común
-     * eso ya lo frena el control de «otro partido del equipo en la fecha», pero
-     * en un grupo de llaves ese control no corre (la ida y la vuelta conviven)
-     * y el insert reventaba con un SQLSTATE 23000. Pasó con la Supercopa de
-     * España 2020: las semis y la final habían ido a la misma fecha «Final».
-     *
-     * Devuelve el mensaje para la pantalla, o null si se puede crear.
-     */
-    private function choqueLocalia($fecha, $equipolId, $equipovId, $dia)
-    {
-        $equipolId = (int) $equipolId; $equipovId = (int) $equipovId;
-
-        $ocupado = \App\Partido::where('fecha_id', $fecha->id)
-            ->where(function ($q) use ($equipolId, $equipovId) {
-                $q->where('equipol_id', $equipolId)->orWhere('equipov_id', $equipovId);
-            })->orderBy('id')->first();
-
-        if (!$ocupado) return null;
-
-        $quien = (int) $ocupado->equipol_id === $equipolId
-            ? $this->nombreEquipo($equipolId) . ' ya juega de local'
-            : $this->nombreEquipo($equipovId) . ' ya juega de visitante';
-
-        return $this->nombreEquipo($equipolId) . ' vs ' . $this->nombreEquipo($equipovId)
-            . ' (' . substr((string) $dia, 0, 10) . '): en la fecha «' . $fecha->numero . '» ' . $quien
-            . ' (partido #' . (int) $ocupado->id . ', ' . $this->nombreEquipo($ocupado->equipol_id)
-            . ' vs ' . $this->nombreEquipo($ocupado->equipov_id) . ' del ' . substr((string) $ocupado->dia, 0, 10) . '). '
-            . 'Un equipo no puede repetir localía en la misma fecha: casi seguro esta ronda va a otra fecha. No lo creé.';
     }
 
     /** La fecha del grupo que se llama así, o una nueva con ese nombre. */
@@ -4701,19 +4493,12 @@ class ImportPartidosController extends Controller
         $g = $r->payload ? json_decode($r->payload, true) : null;
         if (is_array($g) && !empty($g)) {
             $f = $this->normalizar($g, $r->coach_external_id);
-            // Sin casteo a int: `goles_favor` en null significa "TM no da un
-            // marcador que se pueda cargar" (partido por penales), y `(int) null`
-            // lo convertia en un 0:0 falso.
-            return [
-                'local' => $f['local'],
-                'gf'    => $f['goles_favor'] === null ? null : (int) $f['goles_favor'],
-                'gc'    => $f['goles_contra'] === null ? null : (int) $f['goles_contra'],
-            ];
+            return ['local' => $f['local'], 'gf' => (int) $f['goles_favor'], 'gc' => (int) $f['goles_contra']];
         }
         return [
             'local' => $r->local === null ? null : ((int) $r->local === 1),
-            'gf'    => $r->goles_favor === null ? null : (int) $r->goles_favor,
-            'gc'    => $r->goles_contra === null ? null : (int) $r->goles_contra,
+            'gf'    => (int) $r->goles_favor,
+            'gc'    => (int) $r->goles_contra,
         ];
     }
 
@@ -4764,37 +4549,20 @@ class ImportPartidosController extends Controller
             $golesl    = $datos['local'] ? $datos['gf'] : $datos['gc'];
             $golesv    = $datos['local'] ? $datos['gc'] : $datos['gf'];
 
-            // Un partido por penales viene sin marcador de TM (ver `normalizar()`).
-            // Esta pantalla arregla la LOCALIA: no tiene por que borrar un
-            // resultado ya cargado. Si hay que dar vuelta los equipos, se dan
-            // vuelta tambien los goles y la tanda que ya estaban.
-            $conMarcador   = $golesl !== null && $golesv !== null;
-            $mismosEquipos = (int) $partido->equipol_id === $equipolId
-                && (int) $partido->equipov_id === $equipovId;
-            $mismoMarcador = !$conMarcador
-                || ((int) $partido->golesl === (int) $golesl && (int) $partido->golesv === (int) $golesv);
-
-            if ($mismosEquipos && $mismoMarcador) {
+            if ((int) $partido->equipol_id === $equipolId && (int) $partido->equipov_id === $equipovId
+                && (int) $partido->golesl === $golesl && (int) $partido->golesv === $golesv) {
                 continue;   // ya estaba bien
             }
 
             $antes = $this->nombreEquipo($partido->equipol_id) . ' ' . $partido->golesl . ':' . $partido->golesv
                 . ' ' . $this->nombreEquipo($partido->equipov_id);
 
-            $campos = ['equipol_id' => $equipolId, 'equipov_id' => $equipovId];
-            if ($conMarcador) {
-                $campos['golesl'] = $golesl;
-                $campos['golesv'] = $golesv;
-            } elseif (!$mismosEquipos) {
-                $campos['golesl']   = $partido->golesv;
-                $campos['golesv']   = $partido->golesl;
-                $campos['penalesl'] = $partido->penalesv;
-                $campos['penalesv'] = $partido->penalesl;
-            }
-            $golesl = array_key_exists('golesl', $campos) ? $campos['golesl'] : $partido->golesl;
-            $golesv = array_key_exists('golesv', $campos) ? $campos['golesv'] : $partido->golesv;
-
-            $partido->forceFill($campos)->save();
+            $partido->forceFill([
+                'equipol_id' => $equipolId,
+                'equipov_id' => $equipovId,
+                'golesl'     => $golesl,
+                'golesv'     => $golesv,
+            ])->save();
 
             DB::table('import_partidos')->where('id', $r->id)
                 ->update(['local' => $datos['local'] ? 1 : 0, 'updated_at' => now()]);
@@ -4999,15 +4767,7 @@ class ImportPartidosController extends Controller
                 $filas[$i]['motivo'] = 'temporada < ' . $desde;
                 continue;
             }
-            // Sin marcador por penales NO es «sin resultado»: el partido se
-            // jugó y hay que crearlo (sin goles; el marcador se completa con
-            // «Solo el marcador», que baja /game/{id} y separa la tanda).
-            // Excluirlo dejaba la llave sin la vuelta: Atlético–Inter, octavos
-            // de la Champions 2023/24 (13/03/2024, 2:1 y 3:2 por penales), no
-            // aparecía en «¿A qué fecha va cada ronda?».
-            $porPenales = !empty($f['por_penales']);
-            $sinGoles = $f['goles_favor'] === null || $f['goles_contra'] === null;
-            if ($sinGoles && !$porPenales) {
+            if ($f['goles_favor'] === null || $f['goles_contra'] === null) {
                 $filas[$i]['estado'] = 'excluido';
                 $filas[$i]['motivo'] = 'sin resultado';
                 continue;
@@ -5026,20 +4786,15 @@ class ImportPartidosController extends Controller
 
             $partido = ($equipoId && $rivalId) ? $this->buscarPartido($equipoId, $rivalId, $f['dia']) : null;
             $corrido = null;
-            $cerca   = [];
 
             // Partidos postergados: TM guarda la fecha original y vos la fecha real.
-            // Se buscan por par de equipos + localía + resultado exacto, pero con
-            // la competencia y el número de fecha como segunda llave: equipos +
-            // resultado SOLOS no alcanzan (ver buscarPartidoAplazado()).
-            // El aplazado se reconoce por el resultado: sin marcador no hay con qué.
-            if (!$partido && $equipoId && $rivalId && !$sinGoles) {
-                $r = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
-                    (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda'],
-                    $f['competencia_external_id']);
-                $partido = $r['partido'];
-                $corrido = $r['corrido'];
-                $cerca   = $r['cerca'];
+            // Se buscan por par de equipos + localía + resultado exacto en una ventana amplia.
+            if (!$partido && $equipoId && $rivalId) {
+                $partido = $this->buscarPartidoAplazado($equipoId, $rivalId, $f['dia'], $f['local'],
+                    (int) $f['goles_favor'], (int) $f['goles_contra'], $f['ronda']);
+                if ($partido) {
+                    $corrido = (int) round((strtotime(substr($partido->dia, 0, 10)) - strtotime(substr($f['dia'], 0, 10))) / 86400);
+                }
             }
 
             if ($partido) {
@@ -5079,55 +4834,19 @@ class ImportPartidosController extends Controller
                     $filas[$i]['estado'] = 'nuevo';
                 }
             }
-
-            // Había un partido parecido y NO se lo colgó: que se vea por qué.
-            // Antes esto no existía porque nunca se descartaba un candidato.
-            $filas[$i]['cerca'] = $cerca;
-            if ($filas[$i]['estado'] === 'nuevo' && $cerca) {
-                $filas[$i]['motivo'] = 'se crea nuevo · OJO: ' . implode(' · ', $cerca);
-            }
-            if ($filas[$i]['estado'] === 'nuevo' && $sinGoles) {
-                $filas[$i]['motivo'] = trim('se crea SIN resultado (se definió por penales): completalo con «Solo el marcador»'
-                    . ($filas[$i]['motivo'] ? ' · ' . $filas[$i]['motivo'] : ''));
-            }
         }
         return $filas;
     }
 
     /**
      * Busca un partido postergado: mismo par de equipos, misma localía y el
-     * MISMO resultado, en una ventana de ±150 días.
+     * MISMO resultado, dentro de una ventana amplia (±150 días).
      *
-     * EQUIPOS + RESULTADO NO ALCANZAN. Los mismos dos equipos, con el mismo
-     * resultado, a un par de meses de distancia, suelen ser DOS partidos
-     * distintos de dos competencias distintas: el Clausura y los Playoffs
-     * uruguayos, la liga y la copa nacional. Sin más llave que ésa, este método
-     * colgaba el gameId del segundo partido del primero: el partido de la copa
-     * no se creaba nunca (el torneo queda con un partido de menos) y el partido
-     * de la liga terminaba con DOS gameId. Pasó tres veces (Nacional 3-2
-     * Torque, Boston River 0-1 Atenas, Atlético 0-0 Getafe) y se limpió a mano
-     * el 15-sep-2026.
-     *
-     * Ahora, para aceptar un candidato, hace falta una de estas tres:
-     *   1. que la fecha caiga dentro de ±CORRIMIENTO_SEGURO días (una
-     *      reprogramación de la misma ronda: ahí el resultado sí identifica);
-     *   2. que el torneo del candidato apunte a la MISMA competencia de TM
-     *      (`torneos.tm_competition_id`);
-     *   3. que el número de fecha del candidato sea el mismo que la ronda de TM.
-     * Y se descarta de entrada el candidato cuyo torneo apunta a OTRA
-     * competencia de TM, esté donde esté la fecha.
-     *
-     * Si no queda ninguno, no se empareja: la fila cae en «nuevo» —el partido
-     * se crea, que es lo que corresponde— con el aviso de qué partido parecido
-     * había y por qué no se usó. Nunca se cuelga del existente.
-     *
-     * Devuelve ['partido' => Partido|null, 'corrido' => int|null, 'cerca' => [avisos]].
+     * Si hay más de un candidato, desempata por el número de fecha. Si sigue
+     * habiendo empate, no devuelve nada: mejor que quede como conflicto.
      */
-    private function buscarPartidoAplazado($equipoId, $rivalId, $dia, $local, $gf, $gc, $ronda, $compTm = null)
+    private function buscarPartidoAplazado($equipoId, $rivalId, $dia, $local, $gf, $gc, $ronda)
     {
-        $vacio = ['partido' => null, 'corrido' => null, 'cerca' => []];
-        if (!$dia) return $vacio;
-
         $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -150 days'));
         $d1 = date('Y-m-d 23:59:59', strtotime($dia . ' +150 days'));
 
@@ -5151,97 +4870,20 @@ class ImportPartidosController extends Controller
             });
         }
         $cands = $q->get();
-        if ($cands->isEmpty()) return $vacio;
 
-        $nRonda = preg_replace('/\D/', '', trim((string) $ronda));
-        $comp   = trim((string) $compTm);
+        if ($cands->count() === 1) return $cands->first();
+        if ($cands->isEmpty()) return null;
 
-        $ok = [];
-        $cerca = [];
-        foreach ($cands as $p) {
-            $ctx = $this->contextoPartido($p->id);
-            $corrido = (int) round((strtotime(substr((string) $p->dia, 0, 10))
-                - strtotime(substr((string) $dia, 0, 10))) / 86400);
-            $donde = 'partido #' . $p->id . ' del ' . substr((string) $p->dia, 0, 10)
-                . ($ctx['torneo'] !== '' ? ' (' . $ctx['torneo'] . ')' : '');
-
-            $mismaComp  = ($comp !== '' && $ctx['comp'] !== '' && $ctx['comp'] === $comp);
-            $otraComp   = ($comp !== '' && $ctx['comp'] !== '' && $ctx['comp'] !== $comp);
-            $mismaRonda = ($nRonda !== '' && $ctx['ronda'] !== '' && (int) $ctx['ronda'] === (int) $nRonda);
-
-            if ($otraComp) {
-                $cerca[] = 'el ' . $donde . ' tiene el mismo resultado pero es de otra competencia de TM ('
-                    . $ctx['comp'] . ' ≠ ' . $comp . ')';
-                continue;
-            }
-            if (abs($corrido) <= self::CORRIMIENTO_SEGURO || $mismaComp || $mismaRonda) {
-                $ok[] = ['p' => $p, 'corrido' => $corrido, 'ronda' => $mismaRonda];
-                continue;
-            }
-            $cerca[] = 'el ' . $donde . ' tiene el mismo resultado pero está a ' . abs($corrido)
-                . ' días y no puedo confirmar que sea del mismo torneo'
-                . ($ctx['torneo'] === '' ? ' (no tiene torneo)' : ($ctx['comp'] === '' ? ' (a ese torneo le falta el id de competencia de TM)' : ''));
+        // Desempate por número de fecha
+        if ($ronda !== null && $ronda !== '') {
+            $porRonda = $cands->filter(function ($p) use ($ronda) {
+                $fecha = \App\Fecha::find($p->fecha_id);
+                if (!$fecha) return false;
+                return (int) preg_replace('/\D/', '', (string) $fecha->numero) === (int) $ronda;
+            });
+            if ($porRonda->count() === 1) return $porRonda->first();
         }
-
-        if (count($ok) === 1) {
-            return ['partido' => $ok[0]['p'], 'corrido' => $ok[0]['corrido'], 'cerca' => $cerca];
-        }
-
-        // Varios candidatos: desempata el número de fecha, como antes. Si sigue
-        // el empate no se elige ninguno — atarlo al equivocado no se nota nunca más.
-        if (count($ok) > 1) {
-            $porRonda = [];
-            foreach ($ok as $o) if ($o['ronda']) $porRonda[] = $o;
-            if (count($porRonda) === 1) {
-                return ['partido' => $porRonda[0]['p'], 'corrido' => $porRonda[0]['corrido'], 'cerca' => $cerca];
-            }
-            $ids = [];
-            foreach ($ok as $o) $ids[] = '#' . $o['p']->id;
-            $cerca[] = 'hay ' . count($ok) . ' partidos que calzan (' . implode(', ', $ids)
-                . ') y ninguno se distingue por número de fecha: no elijo yo';
-        }
-
-        return ['partido' => null, 'corrido' => null, 'cerca' => $cerca];
-    }
-
-    /**
-     * Torneo, competencia de TM y número de fecha de un partido ya cargado.
-     * El torneo no cuelga del partido: partidos → fechas → grupos → torneos.
-     *
-     * `tm_competition_id` se chequea con Schema porque es una columna nueva
-     * (ago-2026): si la migración todavía no corrió en el servidor, esto
-     * devuelve comp vacía y el emparejador se queda en el criterio de la fecha,
-     * en lugar de tirar un 500 en blanco.
-     */
-    private function contextoPartido($partidoId)
-    {
-        static $cache = [];
-        static $hayComp = null;
-
-        $id = (int) $partidoId;
-        if (isset($cache[$id])) return $cache[$id];
-        if ($hayComp === null) {
-            $hayComp = Schema::hasTable('torneos') && Schema::hasColumn('torneos', 'tm_competition_id');
-        }
-
-        $cols = ['torneos.id as torneo_id', 'torneos.nombre as torneo', 'torneos.year as anio',
-            'fechas.numero as ronda'];
-        $cols[] = $hayComp ? 'torneos.tm_competition_id as comp' : DB::raw("'' as comp");
-
-        $r = DB::table('partidos')
-            ->leftJoin('fechas', 'fechas.id', '=', 'partidos.fecha_id')
-            ->leftJoin('grupos', 'grupos.id', '=', 'fechas.grupo_id')
-            ->leftJoin('torneos', 'torneos.id', '=', 'grupos.torneo_id')
-            ->where('partidos.id', $id)
-            ->select($cols)->first();
-
-        $cache[$id] = [
-            'torneo_id' => $r && $r->torneo_id ? (int) $r->torneo_id : 0,
-            'torneo'    => $r && $r->torneo ? trim($r->torneo . ' ' . $r->anio) : '',
-            'comp'      => $r ? trim((string) $r->comp) : '',
-            'ronda'     => $r ? preg_replace('/\D/', '', (string) $r->ronda) : '',
-        ];
-        return $cache[$id];
+        return null;
     }
 
     /** Cualquier partido de ese equipo ese día, sin importar el rival. */
@@ -5551,29 +5193,6 @@ class ImportPartidosController extends Controller
         $gc = $this->valor($club, ['opponentGoalsTotal']);
         if ($gc === null) $gc = $this->valor($rival, ['goalsTotal']);
 
-        // OJO CON LOS PENALES. Con `gameInformation.gameState = penalty_shootout`
-        // el `goalsTotal` de TM NO es el marcador del partido: viene con la tanda
-        // sumada. Verificado en el JSON de `/coach/2868/performance-game`
-        // (Simeone): la final de la Champions 2015/16 --1:1 y tanda 3-5-- llega
-        // como `goalsTotal: 4 / opponentGoalsTotal: 6`, que es lo que entraba a
-        // `partidos.golesl/golesv` como si fuera el resultado.
-        //
-        // Y de este payload NO se puede separar: `clubsInformation.club` trae
-        // solo `venue, clubId, coachId, goalsTotal, opponentGoalsTotal,
-        // clubRank, tacticId, points`. Sin el desglose de la tanda, cargar el
-        // 6:4 seria escribir un partido que no existio, asi que se deja SIN
-        // marcador y se arregla de a uno con "Solo el marcador", que baja el
-        // detalle (`/game/{id}`, ahi si viene `actions.shootout`) y lo separa.
-        //
-        // `extra_time` es otra cosa y su `goalsTotal` SI vale: es el de los 120'.
-        // En la carrera de Simeone (1011 partidos): 994 `regularly_terminated`,
-        // 8 `extra_time`, 9 `penalty_shootout`.
-        $porPenales = (string) $this->valor($gi, ['gameState']) === 'penalty_shootout';
-        if ($porPenales) {
-            $gf = null;
-            $gc = null;
-        }
-
         return [
             'external_id'             => $this->texto($this->valor($gi, ['gameId']) ?: $this->valor($g, ['gameId', 'id'])),
             'competencia_external_id' => $this->texto($this->valor($gi, ['competitionId'])),
@@ -5589,8 +5208,6 @@ class ImportPartidosController extends Controller
             'dia'                     => $dia,
             'goles_favor'             => $gf === null ? null : (int) $gf,
             'goles_contra'            => $gc === null ? null : (int) $gc,
-            // No es columna de import_partidos: sólo lo usa clasificar().
-            'por_penales'             => $porPenales,
             'anio'                    => $dia ? substr($dia, 0, 4) : null,
             'equipo_id'               => null,
             'rival_id'                => null,
@@ -6009,60 +5626,11 @@ class ImportPartidosController extends Controller
     }
 
     /**
-     * Las competencias excluidas de un DT, recordadas en
-     * `tecnico_sondeos.fuera_detalle` (JSON: id TM => nombre y cantidad).
-     *
-     * - Bajada fresca de TM: lo que dio `separarPorNivel()` es la verdad y
-     *   reemplaza lo guardado.
-     * - Leyendo del staging: a lo recién excluido se le suma lo recordado, con
-     *   la decisión recalculada (si una se incluyó mientras tanto, no se lista:
-     *   «Incluir» vuelve a bajar de TM y ahí entra sola).
-     *
-     * Sin la columna, devuelve `$fuera` tal cual: todo sigue como antes.
-     */
-    private function fueraRecordado($tecnicoId, array $fuera, array $compsDentro, $bajadaFresca)
-    {
-        if (!Schema::hasTable('tecnico_sondeos') || !Schema::hasColumn('tecnico_sondeos', 'fuera_detalle')) {
-            return $fuera;
-        }
-
-        if (!$bajadaFresca) {
-            $json = DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->value('fuera_detalle');
-            $previo = $json ? json_decode($json, true) : [];
-            foreach ((array) $previo as $k => $g) {
-                $k = (string) $k;
-                if (isset($fuera[$k]) || isset($compsDentro[$k]) || !is_array($g)) continue;
-                $nombre = (string) ($g['nombre'] ?? '');
-                $d = NivelCompetencia::decidir($nombre);
-                // Las que salieron por "equipo alternativo" no tienen regla por
-                // nombre: se conservan con el motivo con que se guardaron.
-                if (!$d['excluida'] && $d['origen'] !== 'manual' && ($g['origen'] ?? '') === 'auto'
-                    && strpos((string) ($g['motivo'] ?? ''), 'alternativo') !== false) {
-                    $d = ['excluida' => true, 'motivo' => $g['motivo'], 'origen' => 'auto'];
-                }
-                if (!$d['excluida']) continue;
-                $fuera[$k] = ['nombre' => $nombre ?: ('#' . $k), 'n' => (int) ($g['n'] ?? 0),
-                    'motivo' => $d['motivo'], 'origen' => $d['origen']];
-            }
-        }
-
-        $guardar = [];
-        foreach ($fuera as $k => $g) {
-            $guardar[(string) $k] = ['nombre' => $g['nombre'], 'n' => (int) $g['n'],
-                'motivo' => $g['motivo'], 'origen' => $g['origen']];
-        }
-        $this->registrarSondeo($tecnicoId, ['fuera_detalle' => json_encode($guardar, JSON_UNESCAPED_UNICODE)], false);
-
-        return $fuera;
-    }
-
-    /**
-     * Qué competencias entraron y cuáles quedaron afuera (automático por no ser
-     * de 1ra, o por una regla guardada en competencias_excluidas).
+     * Qué competencias entraron y cuáles quedaron afuera por no ser de 1ra.
      *
      * «Excluir» guarda una regla `contiene` en `competencias_excluidas` (sin el
      * año, así sirve para todas las temporadas) y vale para todo el sistema.
-     * «Incluir» apaga las reglas que la tapaban y deja una regla APAGADA
+     * «Sí es de 1ra» apaga las reglas que la tapaban y deja una regla APAGADA
      * con su nombre: esa marca le gana a la lista automática del servicio.
      */
     private function bloqueCompetencias(array $filas, array $fuera, Request $request)
@@ -6105,12 +5673,11 @@ class ImportPartidosController extends Controller
         foreach ($fuera as $g) $nFuera += $g['n'];
 
         $out = '<details' . (empty($fuera) ? '' : ' open') . '>'
-            . '<summary>Competencias del sondeo <span class="sub">(' . count($dentro) . ' se cargan'
-            . (empty($fuera) ? '' : ' · ' . count($fuera) . ' excluidas, ' . $nFuera . ' partidos') . ')</span></summary>'
+            . '<summary>Competencias del sondeo <span class="sub">(' . count($dentro) . ' de 1ra'
+            . (empty($fuera) ? '' : ' · ' . count($fuera) . ' afuera, ' . $nFuera . ' partidos') . ')</span></summary>'
             . '<p class="sub">Solo se cargan los torneos de <b>primera división</b>. Reserva, Proyección, juveniles y '
             . 'ascenso quedan afuera: no se listan abajo, no se guardan en staging y sus clubes no piden mapeo. '
-            . 'Además quedan afuera las competencias con una regla guardada. Para cambiar cualquiera, dale al botón: '
-            . 'la decisión queda guardada en '
+            . 'Si me equivoqué con alguna, dale al botón: la decisión queda guardada en '
             . '<a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a> '
             . 'y vale para todos los DTs.</p>'
             . '<div class="scroll"><table><thead><tr><th>Competencia</th><th>Partidos</th><th>Estado</th>'
@@ -6121,7 +5688,7 @@ class ImportPartidosController extends Controller
                 . '<td>' . e($d['nombre']) . ' <span class="id">' . e($k) . '</span></td>'
                 . '<td class="num">' . $d['n'] . '</td>'
                 . '<td class="ok">se carga</td>'
-                . '<td><a class="boton-sec" href="' . e($urlExcluir($d['nombre'])) . '">Excluir ✕</a></td>'
+                . '<td><a class="boton-sec" href="' . e($urlExcluir($d['nombre'])) . '">No es de 1ra ✕</a></td>'
                 . '</tr>';
         }
         foreach ($fuera as $k => $d) {
@@ -6129,13 +5696,13 @@ class ImportPartidosController extends Controller
             $out .= '<tr class="gris">'
                 . '<td>' . e($d['nombre']) . ' <span class="id">' . e($k) . '</span></td>'
                 . '<td class="num">' . $d['n'] . '</td>'
-                . '<td>excluida: ' . e($d['motivo']) . ' <span class="id">(' . e($origen) . ')</span></td>'
-                . '<td><a class="boton-sec" href="' . e($urlIncluir($d['nombre'])) . '">Incluir ✓</a></td>'
+                . '<td>fuera: ' . e($d['motivo']) . ' <span class="id">(' . e($origen) . ')</span></td>'
+                . '<td><a class="boton-sec" href="' . e($urlIncluir($d['nombre'])) . '">Sí es de 1ra ✓</a></td>'
                 . '</tr>';
         }
 
         return $out . '</tbody></table></div>'
-            . '<p class="sub"><b>«Incluir» vuelve a bajar los partidos de Transfermarkt</b> (1 llamada): '
+            . '<p class="sub"><b>«Sí es de 1ra» vuelve a bajar los partidos de Transfermarkt</b> (1 llamada): '
             . 'los de esa competencia ya no están en el staging.</p></details>';
     }
 
@@ -6166,35 +5733,6 @@ class ImportPartidosController extends Controller
     {
         if (!$fechaId) return '';
         return '<a href="' . e(route('fechas.show', (int) $fechaId)) . '" target="_blank">' . e($texto) . '</a>';
-    }
-
-    /**
-     * El bloque de «parecidos no atados» del sondeo. Vacío si no hay ninguno.
-     *
-     * Existe porque el emparejador ahora DESCARTA candidatos (antes se colgaba
-     * del primero que calzaba equipos + resultado). Un descarte silencioso es
-     * tan malo como un emparejado silencioso: si no se muestra, el duplicado
-     * aparece meses después y ya no se sabe de dónde salió.
-     */
-    private function avisoParecidos(array $filas)
-    {
-        $items = [];
-        foreach ($filas as $f) {
-            if (empty($f['cerca'])) continue;
-            $items[] = '<li><b>' . e(substr((string) $f['dia'], 0, 10)) . '</b> · '
-                . e($f['club_nombre'] . ' ' . $f['goles_favor'] . ':' . $f['goles_contra'] . ' ' . $f['rival_nombre'])
-                . ' · ' . e($f['competencia_nombre'] ?: ('#' . $f['competencia_external_id']))
-                . ' <span class="sub">' . e(implode(' · ', $f['cerca'])) . '</span>'
-                . ' <span class="id">' . e($f['estado']) . '</span></li>';
-        }
-        if (empty($items)) return '';
-
-        return '<div class="warn-box"><b>' . count($items) . ' partido(s) parecido(s) que NO se ataron.</b><br>'
-            . 'Mismos equipos y mismo resultado que uno que ya tenés, pero de otra competencia o con la fecha '
-            . 'lejos y sin poder confirmar el torneo. Se van a crear como partidos nuevos — que es lo correcto '
-            . 'cuando son dos partidos distintos. Si alguno es el mismo partido, arreglale la fecha o el torneo '
-            . 'antes de aplicar.'
-            . '<ul>' . implode('', $items) . '</ul></div>';
     }
 
     private function tabla(array $filas, $limite, $filtro = '')

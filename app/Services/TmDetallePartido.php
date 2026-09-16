@@ -4636,10 +4636,15 @@ class TmDetallePartido
         $palabra   = end($nombres);
         $veredicto = $this->tokenEsApellido($palabra);
 
-        if ($veredicto === true) {
+        if ($veredicto === true || $veredicto === 'probable') {
             array_pop($nombres);
             $n['nombre']   = implode(' ', $nombres);
             $n['apellido'] = $palabra . ' ' . $n['apellido'];
+            if ($veredicto === 'probable') {
+                $this->aviso('"' . trim($n['name']) . '": tomé "' . $palabra . '" como primer apellido porque '
+                    . 'nadie en la base lo tiene como nombre de pila. Quedó "' . $n['apellido'] . ', '
+                    . $n['nombre'] . '" — si está mal, corregilo en la ficha.');
+            }
             return $n;
         }
 
@@ -4660,6 +4665,7 @@ class TmDetallePartido
      *
      *   true  = es apellido
      *   false = es nombre de pila
+     *   'probable' = nadie lo tiene como nombre de pila -> se trata como apellido, con aviso
      *   null  = no sé (o la tabla no está)
      *
      * Se exige una diferencia clara —el doble y al menos 3 fichas— porque hay
@@ -4698,6 +4704,13 @@ class TmDetallePartido
 
         if ($comoApellido >= 3 && $comoApellido >= 2 * $comoNombre) return $cache[$tok] = true;
         if ($comoNombre   >= 3 && $comoNombre   >= 2 * $comoApellido) return $cache[$tok] = false;
+
+        // Apellidos poco comunes ("Carbajales", "Escriche", "Etayo", "Becerril")
+        // no llegan nunca a las 3 fichas y caían siempre en "no sé", o sea en el
+        // split malo. Pero los nombres de pila se repiten muchísimo: si en toda
+        // la base NADIE lo tiene como nombre, casi seguro no es un segundo
+        // nombre. Se marca 'probable' para que el llamador avise (2026-09-16).
+        if ($comoNombre === 0) return $cache[$tok] = 'probable';
 
         return $cache[$tok] = null;
     }
