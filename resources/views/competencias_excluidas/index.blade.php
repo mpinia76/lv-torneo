@@ -105,7 +105,10 @@
             </div>
         </div>
     </div>
+@endsection
 
+{{-- jQuery se carga en el footer: el script tiene que ir después (yield 'scripts'). --}}
+@section('scripts')
     <script>
         $(function () {
             var URL_BASE = "{{ url('admin/competencias-excluidas') }}";

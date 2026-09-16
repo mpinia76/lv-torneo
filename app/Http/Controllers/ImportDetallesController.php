@@ -278,7 +278,11 @@ class ImportDetallesController extends Controller
             . '<a class="boton" href="' . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null,
                 'n' => $paraTanda, 'comp' => $comp ?: null, 'ronda' => $ronda ?: null])))
             . '">Bajar los primeros ' . $paraTanda . '</a>'
-            . ' <span class="sub">≈ ' . $paraTanda . ' llamadas + las de jugadores nuevos</span></p>';
+            . ' <span class="sub">≈ ' . $paraTanda . ' llamadas + las de jugadores nuevos</span> '
+            . '<a class="boton-sec" href="' . e(route('import_detalles.tanda', array_filter(['tecnico_id' => $tecnicoId ?: null,
+                'n' => 10, 'comp' => $comp ?: null, 'ronda' => $ronda ?: null, 'seguir' => 1])))
+            . '">Bajar todos de a 10, solo</a>'
+            . ' <span class="sub">encadena tandas hasta vaciar la lista; se puede parar</span></p>';
 
         if ($dobles) {
             $cuerpo .= '<div class="err-box"><b>Hay ' . count($dobles) . ' partido(s) con más de un gameId.</b><br>'
@@ -3316,6 +3320,13 @@ class ImportDetallesController extends Controller
         $sinDetalle = $origen === 'sin_detalle' && $this->columnaSinDetalle();
         // Encadenar tandas, igual que en el repaso de tipos de gol.
         $seguir     = (string) $request->get('seguir', '0') === '1';
+        // saltar: en la tanda común, cuántos del principio de la cola ya
+        // fallaron en tandas anteriores de la cadena. Los que fallan NO salen
+        // de la cola (siguen sin alineación) y, como la cola va en orden y
+        // los que salen bien desaparecen, los fallidos quedan siempre adelante:
+        // saltearlos por offset evita pagar la misma llamada tanda tras tanda.
+        $normal     = !$sinDetalle && !$rehacer;
+        $saltar     = $normal ? max(0, (int) $request->get('saltar', 0)) : 0;
 
         if ($sinDetalle) {
             $q = $this->sinDetalleQ($tecnicoId, $comp, $ronda);
@@ -3340,8 +3351,9 @@ class ImportDetallesController extends Controller
         // Con `sin_detalle` se piden de más y se deduplica en PHP: el staging
         // tiene una fila por DT, así que el mismo partido puede venir dos veces
         // y se bajaría dos veces (dos llamadas por el mismo dato).
-        $filas = $q->orderBy('dia', 'desc')
-            ->offset($rehacer && !$sinDetalle ? $desde : 0)
+        $colaBase = clone $q;
+        $filas = $q->orderBy('dia', 'desc')->orderBy('id')
+            ->offset($rehacer && !$sinDetalle ? $desde : $saltar)
             ->limit($sinDetalle ? $n * 3 : $n)->get();
 
         if ($sinDetalle) {
@@ -3430,6 +3442,9 @@ class ImportDetallesController extends Controller
         $quedanSinDetalle = $sinDetalle
             ? (clone $this->sinDetalleQ($tecnicoId, $comp, $ronda))->distinct()->count('partido_id')
             : 0;
+        // Tanda común: lo que sigue sin detalle, menos los ya fallidos de la cadena.
+        $saltarProx   = $saltar + $fallaron;
+        $quedanNormal = $normal ? max(0, $colaBase->distinct()->count('partido_id') - $saltarProx) : 0;
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null,
                 'comp' => $comp ?: null, 'ronda' => $ronda ?: null]))) . '">← Detalle de los partidos</a></p>'
@@ -3452,16 +3467,21 @@ class ImportDetallesController extends Controller
             . $this->card($llamadas, 'Llamadas a la API')
             . ($sinDetalle ? $this->card($quedanSinDetalle, 'Quedan sin detalle',
                 $quedanSinDetalle ? 'warn' : 'ok') : '')
+            . ($normal ? $this->card($quedanNormal, 'Quedan en la cola', $quedanNormal ? 'warn' : 'ok') : '')
+            . ($normal && $saltarProx ? $this->card($saltarProx, 'Salteados por error', 'err') : '')
             . '</div>';
 
         // ── Encadenar, igual que el repaso de tipos de gol ─────────────────
         // Mismo freno: si la tanda no pudo con NINGUNO, la siguiente haría lo
         // mismo para siempre.
-        if ($sinDetalle && $seguir && $quedanSinDetalle > 0 && $ok > 0) {
-            $prox = $filtrosTanda; $prox['origen'] = 'sin_detalle'; $prox['n'] = $n; $prox['seguir'] = 1;
+        $quedanCadena = $sinDetalle ? $quedanSinDetalle : $quedanNormal;
+        if (($sinDetalle || $normal) && $seguir && $quedanCadena > 0 && $ok > 0) {
+            $prox = $filtrosTanda; $prox['n'] = $n; $prox['seguir'] = 1;
+            if ($sinDetalle) $prox['origen'] = 'sin_detalle';
+            if ($normal && $saltarProx) $prox['saltar'] = $saltarProx;
             $urlProx = route('import_detalles.tanda', $prox);
-            $cuerpo .= '<div class="ok-box" id="seguir-caja"><b>Sigo solo.</b> Quedan <b>' . $quedanSinDetalle
-                . '</b> partidos sin detalle: arranco la próxima tanda de ' . min($n, $quedanSinDetalle)
+            $cuerpo .= '<div class="ok-box" id="seguir-caja"><b>Sigo solo.</b> Quedan <b>' . $quedanCadena
+                . '</b> partidos sin detalle: arranco la próxima tanda de ' . min($n, $quedanCadena)
                 . ' en <b id="seguir-seg">8</b> segundos. '
                 . '<a class="boton-sec" href="#" id="seguir-parar">Parar</a> '
                 . '<span class="sub">o cerrá la pestaña — lo que ya se bajó está guardado.</span></div>'
@@ -3471,11 +3491,18 @@ class ImportDetallesController extends Controller
                 . 'if(s<=0){clearInterval(t);location.href=' . json_encode($urlProx) . ';}},1000);'
                 . 'if(p){p.addEventListener("click",function(e){e.preventDefault();clearInterval(t);'
                 . 'document.getElementById("seguir-caja").innerHTML='
-                . json_encode('<b>Parado.</b> Quedan ' . $quedanSinDetalle . ' partidos sin detalle.') . ';});}})();</script>';
-        } elseif ($sinDetalle && $seguir && $quedanSinDetalle > 0 && $ok === 0) {
+                . json_encode('<b>Parado.</b> Quedan ' . $quedanCadena . ' partidos sin detalle.') . ';});}})();</script>';
+        } elseif (($sinDetalle || $normal) && $seguir && $quedanCadena > 0 && $ok === 0) {
             $cuerpo .= '<div class="err-box"><b>Corté la cadena.</b> Esta tanda no pudo con ninguno de los '
                 . 'partidos que intentó, así que la siguiente haría lo mismo. Mirá los errores de abajo antes '
-                . 'de volver a largarla.</div>';
+                . 'de volver a largarla.'
+                . ($normal ? ' Si son casos sueltos, <a href="' . e(route('import_detalles.tanda', $filtrosTanda
+                    + ['n' => $n, 'seguir' => 1, 'saltar' => $saltarProx])) . '">seguir salteándolos</a>.' : '')
+                . '</div>';
+        } elseif ($normal && $seguir && $quedanNormal === 0) {
+            $cuerpo .= '<div class="ok-box"><b>Listo: no queda ningún partido sin detalle</b>'
+                . (!empty($filtrosTanda) ? ' con este filtro' : '')
+                . ($saltarProx ? ' salvo los ' . $saltarProx . ' que fallaron' : '') . '.</div>';
         } elseif ($sinDetalle && $quedanSinDetalle === 0) {
             $cuerpo .= '<div class="ok-box"><b>Listo: no queda ningún partido marcado sin detalle</b>'
                 . (!empty($filtrosTanda) ? ' con este filtro' : '') . '.</div>';
@@ -3490,7 +3517,8 @@ class ImportDetallesController extends Controller
                     'comp' => $comp ?: null, 'ronda' => $ronda ?: null,
                     'origen' => $sinDetalle ? 'sin_detalle' : null,
                     'rehacer' => $rehacer ? 1 : null,
-                    'offset' => ($rehacer && !$sinDetalle) ? ($desde + $n) : null])))
+                    'offset' => ($rehacer && !$sinDetalle) ? ($desde + $n) : null,
+                    'saltar' => ($normal && $saltarProx) ? $saltarProx : null])))
                 . '">' . ($sinDetalle ? 'Otra tanda de ' . min($n, max(1, $quedanSinDetalle))
                     : ($rehacer ? 'Rehacer los ' . $n . ' siguientes' : 'Otra tanda de ' . $n)) . '</a>'
                 . ($sinDetalle ? '<a class="boton-sec" href="' . e(route('import_detalles.tipos_gol', $filtrosTanda))
