@@ -656,7 +656,7 @@ class TmDetallePartido
                         // Borrar los tres y escribir lo que vino le comía la
                         // terna a todo partido rehecho: **Transfermarkt publica
                         // casi siempre nada más que el principal** (es el motivo
-                        // del botón "Sin asistentes" del control), y la Linea 1
+                        // del botón "Terna incompleta en TM" del control), y la Linea 1
                         // y la Linea 2 son carga a mano. Un rehacer en tanda
                         // dejaba cientos de partidos con la terna incompleta que
                         // ya estaba completa, y eso no se recupera: hay que

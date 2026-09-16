@@ -448,7 +448,7 @@ class Controles
      *
      * El agujero casi nunca es "el partido entero": es una parte, y cuál es
      * depende del control que estás mirando. En "Terna incompleta" lo que
-     * falta son los asistentes —la ficha de TM trae solo el principal— y
+     * falta es algún asistente —la ficha de TM no trae la terna entera— y
      * escribir "no publica el detalle completo" ahí es mentira a medias, que
      * dentro de dos años no le va a explicar nada a nadie.
      *
@@ -459,8 +459,8 @@ class Controles
     {
         $motivos = [
             'arbitros.terna' => [
-                'boton' => 'Sin asistentes',
-                'texto' => 'Sin asistentes: la ficha de Transfermarkt de este partido publica solo el árbitro principal.',
+                'boton' => 'Terna incompleta en TM',
+                'texto' => 'Terna incompleta en TM: la ficha de Transfermarkt de este partido no publica la terna completa (falta algún asistente).',
             ],
             'alineaciones.sin_jugadores' => [
                 'boton' => 'Sin datos en TM',
