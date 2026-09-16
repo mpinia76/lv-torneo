@@ -247,7 +247,7 @@ class Controles
                         . 'con «Marcador»: baja el detalle del partido, que sí trae la tanda, y la separa.',
                     'jugador'  => false,
                     'detalle'  => 'penales_sumados',
-                    'acciones' => ['marcador', 'penales', 'incidencia'],
+                    'acciones' => ['marcador', 'goles', 'penales', 'incidencia'],
                     'metodo'   => 'partidosPenalesSumados',
                 ],
                 'penales.faltantes' => [
