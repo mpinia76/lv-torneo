@@ -258,11 +258,20 @@ class ImportPartidosController extends Controller
      *
      * Si la tabla todavía no está creada, no pasa nada: se sigue como antes.
      */
-    private function registrarSondeo($tecnicoId, array $datos)
+    private function registrarSondeo($tecnicoId, array $datos, $esSondeo = true)
     {
         if (!Schema::hasTable('tecnico_sondeos')) return;
 
-        $fila = $datos + ['sondeado_at' => now(), 'updated_at' => now()];
+        // $esSondeo = false: solo se actualizan columnas sueltas (la lista de
+        // excluidas), sin marcar al DT como sondeado.
+        $fila = $datos + ['updated_at' => now()];
+        if ($esSondeo) $fila['sondeado_at'] = now();
+        if (!$esSondeo && !DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->exists()) {
+            // Sin fila previa no hay sondeo registrado: no se inventa uno.
+            // (Si la columna sondeado_at es nullable se podría insertar, pero
+            // no hace falta: la próxima bajada con guardar=1 la crea.)
+            return;
+        }
 
         $afectadas = DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->update($fila);
         if (!$afectadas && !DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->exists()) {
@@ -3459,6 +3468,16 @@ class ImportPartidosController extends Controller
         // no se guardan en staging y —sobre todo— sus clubes («... II») no
         // aparecen pidiendo mapeo.
         list($filas, $fuera) = $this->separarPorNivel($filas);
+
+        // Con cache=1 las filas salen del staging, y lo excluido en sondeos
+        // anteriores ya se borró de ahí: sin esto, la tabla de competencias solo
+        // mostraba la recién excluida y las demás no se podían volver a incluir.
+        if ($tecnicoId) {
+            $compsDentro = [];
+            foreach ($filas as $f) $compsDentro[(string) $f['competencia_external_id']] = true;
+            $fuera = $this->fueraRecordado($tecnicoId, $fuera, $compsDentro, !$usarCache);
+        }
+
         $fueraTotal = 0;
         foreach ($fuera as $g) $fueraTotal += $g['n'];
 
@@ -3519,7 +3538,11 @@ class ImportPartidosController extends Controller
                 'nuevos'        => $cont['nuevo'],
                 'conflictos'    => $cont['conflicto'],
                 'guardadas'     => $guardadas,
-            ]);
+            ] + (Schema::hasColumn('tecnico_sondeos', 'fuera_detalle')
+                ? ['fuera_detalle' => json_encode(array_map(function ($g) {
+                        return ['nombre' => $g['nombre'], 'n' => (int) $g['n'], 'motivo' => $g['motivo'], 'origen' => $g['origen']];
+                    }, $fuera), JSON_UNESCAPED_UNICODE)]
+                : []));
         }
 
         sort($temporadas);
@@ -5871,6 +5894,54 @@ class ImportPartidosController extends Controller
         }
 
         return [$dentro, $fuera];
+    }
+
+    /**
+     * Las competencias excluidas de un DT, recordadas en
+     * `tecnico_sondeos.fuera_detalle` (JSON: id TM => nombre y cantidad).
+     *
+     * - Bajada fresca de TM: lo que dio `separarPorNivel()` es la verdad y
+     *   reemplaza lo guardado.
+     * - Leyendo del staging: a lo recién excluido se le suma lo recordado, con
+     *   la decisión recalculada (si una se incluyó mientras tanto, no se lista:
+     *   «Incluir» vuelve a bajar de TM y ahí entra sola).
+     *
+     * Sin la columna, devuelve `$fuera` tal cual: todo sigue como antes.
+     */
+    private function fueraRecordado($tecnicoId, array $fuera, array $compsDentro, $bajadaFresca)
+    {
+        if (!Schema::hasTable('tecnico_sondeos') || !Schema::hasColumn('tecnico_sondeos', 'fuera_detalle')) {
+            return $fuera;
+        }
+
+        if (!$bajadaFresca) {
+            $json = DB::table('tecnico_sondeos')->where('tecnico_id', (int) $tecnicoId)->value('fuera_detalle');
+            $previo = $json ? json_decode($json, true) : [];
+            foreach ((array) $previo as $k => $g) {
+                $k = (string) $k;
+                if (isset($fuera[$k]) || isset($compsDentro[$k]) || !is_array($g)) continue;
+                $nombre = (string) ($g['nombre'] ?? '');
+                $d = NivelCompetencia::decidir($nombre);
+                // Las que salieron por "equipo alternativo" no tienen regla por
+                // nombre: se conservan con el motivo con que se guardaron.
+                if (!$d['excluida'] && $d['origen'] !== 'manual' && ($g['origen'] ?? '') === 'auto'
+                    && strpos((string) ($g['motivo'] ?? ''), 'alternativo') !== false) {
+                    $d = ['excluida' => true, 'motivo' => $g['motivo'], 'origen' => 'auto'];
+                }
+                if (!$d['excluida']) continue;
+                $fuera[$k] = ['nombre' => $nombre ?: ('#' . $k), 'n' => (int) ($g['n'] ?? 0),
+                    'motivo' => $d['motivo'], 'origen' => $d['origen']];
+            }
+        }
+
+        $guardar = [];
+        foreach ($fuera as $k => $g) {
+            $guardar[(string) $k] = ['nombre' => $g['nombre'], 'n' => (int) $g['n'],
+                'motivo' => $g['motivo'], 'origen' => $g['origen']];
+        }
+        $this->registrarSondeo($tecnicoId, ['fuera_detalle' => json_encode($guardar, JSON_UNESCAPED_UNICODE)], false);
+
+        return $fuera;
     }
 
     /**
