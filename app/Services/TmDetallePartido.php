@@ -341,6 +341,11 @@ class TmDetallePartido
                 }
             }
         }
+
+        // Dos ids de TM del MISMO partido sobre la misma ficha = dos personas
+        // (mellizos). Ver separarMapeosCruzados().
+        $mapa = $this->separarMapeosCruzados($idsTm, $mapa, $escribir, $crear, $informe, $nuevos);
+
         $informe['creados']['jugadores'] = $nuevos;
         $this->mapaJugadores = $mapa;
 
@@ -3442,6 +3447,8 @@ class TmDetallePartido
             $apeBase    = $this->tokensNombre($c->apellido);
 
             if (!$this->apellidosSeTocan($apeTm, $tokensTm, $apeBase, $tokensBase)) continue;
+            // Hermanos con el mismo apellido (y, si hay, la misma fecha).
+            if ($this->nombresDePilaChocan($datos['nombre'], $tokensTm, $c->nombre, $tokensBase)) continue;
 
             $p = count(array_intersect($tokensTm, $tokensBase));
             if ($p > $puntaje) {
@@ -3570,6 +3577,8 @@ class TmDetallePartido
             $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
             $apeBase    = $this->tokensNombre($c->apellido);
             if (!$this->apellidosSeTocan($apeTm, $tokensTm, $apeBase, $tokensBase)) continue;
+            // Mellizos: mismo apellido y fecha, otro nombre de pila.
+            if ($this->nombresDePilaChocan($datos['nombre'], $tokensTm, $c->nombre, $tokensBase)) continue;
 
             $p = count(array_intersect($tokensTm, $tokensBase));
             if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
@@ -3818,8 +3827,9 @@ class TmDetallePartido
 
         // ── 1) Mismo día de nacimiento ────────────────────────────────────
         if (!empty($datos['nacimiento'])) {
-            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm);
+            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm, $datos['nombre']);
             $mejor = $r['mejor']; $puntaje = $r['puntaje']; $empatados = $r['empatados'];
+            $this->avisarMellizos($datos, $r['mellizos']);
 
             // Hacen falta DOS palabras en común. Con una sola no alcanza: dos
             // personas distintas pueden haber nacido el mismo día y llamarse
@@ -3859,7 +3869,7 @@ class TmDetallePartido
             // partidos postergados TM también les deja el dato viejo).
             $alReves = $this->fechaDadaVuelta($datos['nacimiento']);
             if ($alReves) {
-                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm);
+                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm, $datos['nombre']);
                 $apeTm = $this->tokensNombre($datos['apellido']);
                 if ($r['mejor'] && $r['puntaje'] >= 2 && $r['empatados'] === 1
                     && $this->apellidosSeTocan($apeTm, $tokensTm,
@@ -3899,9 +3909,13 @@ class TmDetallePartido
      * comparte con $tokensTm. Quién es quién lo decide el que llama: acá sólo
      * se cuenta.
      *
-     * @return array ['mejor' => fila|null, 'puntaje' => int, 'empatados' => int]
+     * Los que comparten el apellido pero tienen OTRO nombre de pila no
+     * compiten: son mellizos (ver nombresDePilaChocan) y vuelven aparte en
+     * 'mellizos' para avisar.
+     *
+     * @return array ['mejor' => fila|null, 'puntaje' => int, 'empatados' => int, 'mellizos' => fila[]]
      */
-    private function mejorJugadorPorFecha($fecha, array $tokensTm)
+    private function mejorJugadorPorFecha($fecha, array $tokensTm, $nombreTm = null)
     {
         $cands = DB::table('jugadors')
             ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
@@ -3909,14 +3923,176 @@ class TmDetallePartido
             ->select('jugadors.id', 'personas.apellido', 'personas.nombre')
             ->limit(50)->get();
 
-        $mejor = null; $puntaje = 0; $empatados = 0;
+        $mejor = null; $puntaje = 0; $empatados = 0; $mellizos = [];
         foreach ($cands as $c) {
-            $p = count(array_intersect($tokensTm, $this->tokensNombre($c->apellido . ' ' . $c->nombre)));
+            $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
+            $p = count(array_intersect($tokensTm, $tokensBase));
+            if ($p > 0 && $nombreTm !== null
+                && $this->nombresDePilaChocan($nombreTm, $tokensTm, $c->nombre, $tokensBase)) {
+                $mellizos[] = $c;
+                continue;
+            }
             if ($p > $puntaje) { $puntaje = $p; $mejor = $c; $empatados = 1; }
             elseif ($p === $puntaje && $p > 0) { $empatados++; }
         }
 
-        return ['mejor' => $mejor, 'puntaje' => $puntaje, 'empatados' => $empatados];
+        return ['mejor' => $mejor, 'puntaje' => $puntaje, 'empatados' => $empatados, 'mellizos' => $mellizos];
+    }
+
+    /**
+     * ¿Los nombres de pila dicen que son DOS personas? (sep-2026)
+     *
+     * Mellizos: Miguel y Javier Flaño (Osasuna) nacieron el mismo día y se
+     * llaman los dos "Flaño Bezunartea". El apareo por fecha + 2 palabras en
+     * común los daba por la misma persona — las dos palabras eran el
+     * apellido —, el id de TM de Javier quedaba atado a la ficha de Miguel y
+     * en cada partido que jugaron juntos Javier desaparecía de la alineación
+     * y su "Entra" se le pegaba a Miguel (control "Titular que entra").
+     *
+     * Chocan cuando NINGUNA palabra del nombre de pila de un lado aparece en
+     * el nombre completo del otro, en las dos direcciones. Se mira contra el
+     * nombre completo, no nombre contra nombre, porque TM a veces manda un
+     * apellido dentro del nombre (Biskupović: "Marko Andrés Biskupović") y
+     * ahí "marko" igual aparece del otro lado.
+     *
+     * Si de algún lado no hay nombre de pila, no se puede decir nada: false.
+     * Un apodo cargado como nombre ("Kun" / "Sergio") también choca y termina
+     * en una ficha nueva — un duplicado se ve y se fusiona; un apareo
+     * equivocado le pega la carrera de uno al otro en silencio.
+     */
+    private function nombresDePilaChocan($nombreTm, array $tokensTm, $nombreBase, array $tokensBase)
+    {
+        $pilaTm   = $this->tokensNombre($nombreTm);
+        $pilaBase = $this->tokensNombre($nombreBase);
+        if (empty($pilaTm) || empty($pilaBase)) return false;
+
+        return count(array_intersect($pilaTm, $tokensBase)) === 0
+            && count(array_intersect($pilaBase, $tokensTm)) === 0;
+    }
+
+    /** Avisa, una vez, que hay un posible mellizo al que NO se aparejó. */
+    private function avisarMellizos(array $datos, array $mellizos)
+    {
+        foreach ($mellizos as $c) {
+            $this->aviso('Posibles mellizos: ' . trim($datos['apellido'] . ', ' . $datos['nombre'])
+                . ' nació el mismo día (' . $datos['nacimiento'] . ') y comparte apellido con "'
+                . trim($c->apellido . ', ' . $c->nombre) . '" (#' . $c->id . '), pero el nombre de pila es otro. '
+                . 'Los trato como DOS personas. Si en realidad es el mismo, fusionalos en Verificar personas.');
+        }
+    }
+
+    /**
+     * Dos ids de Transfermarkt que juegan el MISMO partido no pueden ser la
+     * misma persona. Si están atados a la misma ficha, uno de los dos mapeos
+     * está mal (caso Flaño: mellizos; ver nombresDePilaChocan).
+     *
+     * Antes la alineación se quedaba con el primero y salteaba al segundo; sus
+     * cambios, goles y tarjetas igual se cargaban, pero sobre la ficha del
+     * otro. Ahora se decide quién es el dueño de la ficha:
+     *
+     *   1. el id que figura en `jugadors.transfermarkt_url` de la ficha;
+     *   2. si no, el único cuyo nombre de pila no choca con el de la ficha.
+     *
+     * Los demás se sueltan de la ficha (se borra su fila de `jugador_tm`) y se
+     * aparejan de nuevo desde el perfil — con el freno de mellizos puesto, eso
+     * termina en su propia ficha. Si no se puede decidir, sólo se avisa y queda
+     * como antes.
+     *
+     * Lo que ya estaba cargado de partidos viejos NO se mueve: queda en la
+     * ficha del dueño y se pasa con Mover registros.
+     */
+    private function separarMapeosCruzados(array $idsTm, array $mapa, $escribir, $crear, array &$informe, array &$nuevos)
+    {
+        $porFicha = [];
+        foreach ($idsTm as $id) {
+            $id = (string) $id;
+            if (isset($mapa[$id]) && (int) $mapa[$id] > 0) $porFicha[(int) $mapa[$id]][] = $id;
+        }
+        $porFicha = array_filter($porFicha, function ($ids) { return count($ids) > 1; });
+        if (empty($porFicha)) return $mapa;
+
+        $fichas = DB::table('jugadors')
+            ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->whereIn('jugadors.id', array_keys($porFicha))
+            ->select('jugadors.id', 'jugadors.transfermarkt_url', 'personas.apellido', 'personas.nombre')
+            ->get()->keyBy('id');
+
+        $perfiles = null;
+        foreach ($porFicha as $jid => $ids) {
+            $f = isset($fichas[$jid]) ? $fichas[$jid] : null;
+            if (!$f) continue;
+            $base = trim($f->apellido . ', ' . $f->nombre);
+
+            // 1) El id que la ficha dice tener.
+            $dueno = null;
+            if ($f->transfermarkt_url && preg_match('~/spieler/(\d+)~', $f->transfermarkt_url, $m)
+                && in_array($m[1], $ids, true)) {
+                $dueno = $m[1];
+            }
+
+            // 2) El único cuyo nombre de pila cuadra con el de la ficha.
+            if ($perfiles === null) {
+                $todos = [];
+                foreach ($porFicha as $lista) foreach ($lista as $x) $todos[] = $x;
+                $perfiles = $this->traerPerfiles($todos, $informe);
+            }
+            $tokensBase = $this->tokensNombre($f->apellido . ' ' . $f->nombre);
+            $datosDe = [];
+            foreach ($ids as $id) {
+                if (isset($perfiles[$id])) $datosDe[$id] = $this->personaDesdePerfil($perfiles[$id]);
+            }
+            if ($dueno === null) {
+                $cuadran = [];
+                foreach ($datosDe as $id => $d) {
+                    $tokensTm = $this->tokensNombre($d['apellido'] . ' ' . $d['nombre']);
+                    if (!$this->nombresDePilaChocan($d['nombre'], $tokensTm, $f->nombre, $tokensBase)) $cuadran[] = $id;
+                }
+                if (count($cuadran) === 1 && count($datosDe) === count($ids)) $dueno = $cuadran[0];
+            }
+
+            if ($dueno === null) {
+                $this->aviso('Los jugadores TM ' . implode(' y ', $ids) . ' juegan este partido y están atados a la '
+                    . 'misma ficha #' . $jid . ' ("' . $base . '"): son personas distintas, pero no pude decidir cuál '
+                    . 'es el dueño de la ficha. Cargo sólo al primero; corregí el mapeo en Jugadores por revisar.');
+                continue;
+            }
+
+            foreach ($ids as $id) {
+                if ($id === $dueno) continue;
+                $quien = isset($datosDe[$id]) ? trim($datosDe[$id]['apellido'] . ', ' . $datosDe[$id]['nombre']) : 'TM ' . $id;
+
+                if (!isset($perfiles[$id]) || !$crear) {
+                    $this->aviso('"' . $quien . '" (TM ' . $id . ') está atado a la ficha de "' . $base . '" (#' . $jid
+                        . ', TM ' . $dueno . ') y los dos juegan este partido: son dos personas. '
+                        . (!$crear ? 'La creación automática está apagada, ' : 'No pude bajar su perfil, ')
+                        . 'así que no lo separo: queda afuera de la alineación.');
+                    continue;
+                }
+
+                unset($mapa[$id]);
+                if ($escribir) {
+                    DB::table('jugador_tm')->where('tm_player_id', $id)->where('jugador_id', $jid)->delete();
+                    if ($this->mapaJugadores !== null) unset($this->mapaJugadores[$id]);
+                }
+
+                $res = $this->resolverJugador($id, $perfiles[$id], $escribir);
+                if (!$res['jugador_id'] || (int) $res['jugador_id'] === (int) $jid) {
+                    $this->aviso('No pude separar a "' . $quien . '" (TM ' . $id . ') de la ficha #' . $jid
+                        . ' ("' . $base . '"): queda afuera de la alineación. Crealo a mano.');
+                    continue;
+                }
+                $mapa[$id] = (int) $res['jugador_id'];
+                if ($res['creado']) $nuevos[] = $res['descripcion'];
+
+                $this->aviso('Mellizos / mapeo cruzado: "' . $quien . '" (TM ' . $id . ') estaba atado a la ficha #'
+                    . $jid . ' ("' . $base . '", que es TM ' . $dueno . ') y los dos juegan este partido. '
+                    . ($escribir ? 'Lo solté de esa ficha y quedó en: ' : 'Al guardar lo suelto de esa ficha: ')
+                    . $res['descripcion'] . '. Sus partidos anteriores siguen en la ficha #' . $jid
+                    . ': pasalos con Mover registros.');
+            }
+        }
+
+        return $mapa;
     }
 
     /**
