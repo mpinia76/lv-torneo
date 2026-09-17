@@ -116,6 +116,14 @@ class TorneoController extends Controller
 
             $request->merge(['escudo' => $name]);
         }
+        // Banderas para los grupos que se crean con el torneo. El hidden
+        // `banderas_grupos` dice que vinieron del formulario nuevo; si no esta
+        // (alta vieja, o un POST armado a mano), vale el default de siempre:
+        // Posiciones si, Penales no.
+        $delFormulario = $request->has('banderas_grupos');
+        $posicionesGrupos = $delFormulario ? (int) $request->has('posiciones_grupos') : 1;
+        $penalesGrupos    = $delFormulario ? (int) $request->has('penales_grupos')    : 0;
+
         DB::beginTransaction();
         $ok=1;
         try {
@@ -130,7 +138,8 @@ class TorneoController extends Controller
 
 
 
-                // Nombre en letras (A, B, ..., Z, AA, AB...) y solo Posiciones tildado por defecto
+                // Nombre en letras (A, B, ..., Z, AA, AB...). Posiciones y Penales
+                // salen de lo que se tildo en el alta, iguales para todos los grupos.
                 $letra = '';
                 for ($n = $i; $n > 0; $n = intdiv($n - 1, 26)) {
                     $letra = chr(65 + ($n - 1) % 26) . $letra;
@@ -140,10 +149,10 @@ class TorneoController extends Controller
                     'nombre' => $letra,
                     'torneo_id' => $torneo->id,
                     'equipos' => $equipos,
-                    'posiciones' => 1,
+                    'posiciones' => $posicionesGrupos,
                     'promedios' => 0,
                     'acumulado' => 0,
-                    'penales' => 0,
+                    'penales' => $penalesGrupos,
                 ]);
 
                 try {

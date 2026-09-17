@@ -3,6 +3,21 @@
 @section('pageTitle', 'Nuevo torneo')
 
 @section('content')
+
+    @php
+        // Banderas de los grupos que se van a crear.
+        // Default segun el Tipo: una Copa se define por penales y no lleva tabla
+        // de posiciones; una Liga, al reves. `banderas_grupos` es el hidden que
+        // distingue "vengo de un POST que fallo la validacion" (respeto lo que
+        // el usuario habia tildado) de "me precargaron por la URL" (aplico el
+        // default del Tipo).
+        $tipoPrecargado = old('tipo');
+        $esCopa         = $tipoPrecargado === 'Copa';
+        $vuelveDelPost  = old('banderas_grupos') !== null;
+
+        $posicionesChk = $vuelveDelPost ? old('posiciones_grupos') !== null : !$esCopa;
+        $penalesChk    = $vuelveDelPost ? old('penales_grupos')    !== null :  $esCopa;
+    @endphp
     <div class="container">
     <h1 class="display-6">Nuevo torneo</h1>
 
@@ -50,7 +65,7 @@
         </div>
         <div class="form-group col-xs-12 col-sm-6 col-md-2">
             {{Form::label('tipo', 'Tipo')}}
-            {{ Form::select('tipo',[''=>'Seleccionar...','Liga'=>'Liga','Copa'=>'Copa'],'', ['class' => 'form-control']) }}
+            {{ Form::select('tipo',[''=>'Seleccionar...','Liga'=>'Liga','Copa'=>'Copa'],'', ['class' => 'form-control', 'id' => 'tipo']) }}
         </div>
         <div class="form-group col-xs-12 col-sm-6 col-md-3">
             {{Form::label('ambito', 'Ambito')}}
@@ -73,6 +88,28 @@
                         {{ Form::checkbox('neutral', 1, false) }}
                     </label>
                 </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('posiciones_grupos', 'Posiciones', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" name="posiciones_grupos" id="posiciones_grupos" value="1" {{ $posicionesChk ? 'checked' : '' }}>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('penales_grupos', 'Penales', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" name="penales_grupos" id="penales_grupos" value="1" {{ $penalesChk ? 'checked' : '' }}>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-md-12">
+                <input type="hidden" name="banderas_grupos" value="1">
+                <small class="text-muted">Posiciones y Penales se aplican a <b>todos</b> los grupos que se creen.
+                    Se proponen según el Tipo (Copa: penales; Liga: posiciones) y después se ajustan
+                    grupo por grupo en <b>Editar torneo</b>.</small>
             </div>
         </div>
         <fieldset>
@@ -176,4 +213,23 @@
         <a href="{{route('torneos.index')}}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}
     </div>
+@endsection
+
+@section('scripts')
+<script>
+    // Cambiar el Tipo vuelve a proponer el par de banderas. Es una propuesta:
+    // el usuario puede destildar despues, y eso se respeta hasta que toque Tipo.
+    document.addEventListener('DOMContentLoaded', function () {
+        var tipo = document.getElementById('tipo');
+        var pos  = document.getElementById('posiciones_grupos');
+        var pen  = document.getElementById('penales_grupos');
+        if (!tipo || !pos || !pen) return;
+
+        tipo.addEventListener('change', function () {
+            var copa = tipo.value === 'Copa';
+            pos.checked = !copa;
+            pen.checked = copa;
+        });
+    });
+</script>
 @endsection

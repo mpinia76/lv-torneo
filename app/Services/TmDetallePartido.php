@@ -2956,7 +2956,7 @@ class TmDetallePartido
                 if ($informe !== null) $informe['creados']['tecnicos'][] = $datos['apellido'] . ', ' . $datos['nombre']
                     . ' (TM ' . $tmId . ')' . ($libre ? ' — rol de DT agregado a la persona #' . $libre['id'] : ' — creado')
                     . ' #' . $tecnico->id;
-                if (!$libre) $this->avisarApellidoParecido($datos, 'tecnico');
+                if (!$libre) $this->avisarApellidoParecido($datos, 'tecnico', (int) $persona->id);
             } catch (\Exception $e) {
                 $this->aviso('No pude crear al DT TM ' . $tmId . ': ' . $e->getMessage());
             }
@@ -3286,7 +3286,7 @@ class TmDetallePartido
                 }
                 if ($informe !== null) $informe['creados']['arbitros'][] = $datos['apellido'] . ', ' . $datos['nombre'] . ' (TM ' . $tmId . ')'
                     . ($libre ? ' — rol agregado a la persona #' . $libre['id'] : '');
-                if (!$libre) $this->avisarApellidoParecido($datos, 'arbitro');
+                if (!$libre) $this->avisarApellidoParecido($datos, 'arbitro', (int) $persona->id);
             } catch (\Exception $e) {
                 $this->aviso('No pude crear al árbitro TM ' . $tmId . ': ' . $e->getMessage());
             }
@@ -3298,6 +3298,12 @@ class TmDetallePartido
     /**
      * Avisa cuando la persona que se acaba de crear tiene un apellido a una o
      * dos letras de una que YA estaba en la base.
+     *
+     * OJO (sep-2026): corre DESPUÉS de `Persona::create()`, así que la ficha
+     * recién creada también está en la tabla y matchea consigo misma (mismo
+     * apellido, mismo nombre, misma fecha). Por eso hay que pasarle `$idNuevo`
+     * y saltearla: si no, el aviso dice "ya había una ficha muy parecida" y
+     * muestra la que se acaba de crear, con los datos idénticos.
      *
      * El caso real: Transfermarkt trae al árbitro **Aliende** e Iván **Alliende**
      * ya estaba cargado. El apareo automático compara los apellidos letra por
@@ -3315,7 +3321,7 @@ class TmDetallePartido
      * va acotada con sus dos condiciones previas (misma inicial, largo a ±3),
      * así se comparan unas pocas fichas y no la tabla entera.
      */
-    private function avisarApellidoParecido(array $datos, $rol)
+    private function avisarApellidoParecido(array $datos, $rol, $idNuevo = null)
     {
         $tablas = ['jugador' => 'jugadors', 'arbitro' => 'arbitros', 'tecnico' => 'tecnicos'];
         if (!isset($tablas[$rol])) return;
@@ -3355,7 +3361,13 @@ class TmDetallePartido
         }
 
         $parecidos = []; $porFecha = false;
+        $huboContenido = false; $huboCasi = false; $huboSinFecha = false;
         foreach ($filas as $f) {
+            // La persona ya está creada cuando corre este aviso, así que su
+            // propia fila entra en $filas y matchearía con todo igual: apellido,
+            // nombre y fecha. Sin este filtro el aviso se avisa a sí mismo.
+            if ($idNuevo !== null && (int) $f->id === (int) $idNuevo) continue;
+
             $otro = \App\Services\DuplicadosPersonas::normalizar((string) $f->apellido);
             if ($otro === '') continue;
 
@@ -3381,11 +3393,42 @@ class TmDetallePartido
                 if (!$comparte && !$mismaF && !$mismoAnio) continue;
             }
 
-            if (!$mismaF) $porFecha = true;
+            // "Fecha distinta" sólo si las DOS fechas existen. Un árbitro o un DT
+            // sin fecha cargada no es un problema de fechas: ahí la causa es el
+            // apellido (era el caso Aliende/Alliende, que avisaba mal).
+            if ($nac !== '' && $suNac !== '' && !$mismaF) $porFecha = true;
+            if ($nac === '' || $suNac === '')             $huboSinFecha = true;
+            if ($contenido)   $huboContenido = true;
+            elseif ($casi)    $huboCasi = true;
             $parecidos[] = $f->apellido . ', ' . $f->nombre . ' (persona #' . (int) $f->id . ''
                 . ($suNac !== '' ? ', ' . $suNac : ', sin fecha') . ')';
         }
         if (empty($parecidos)) return;
+
+        // Por qué el apareo no lo encontró. El orden importa: la fecha distinta
+        // es la causa más fuerte, y "escrito distinto" sólo vale cuando el
+        // apellido de verdad difiere en alguna letra ($casi).
+        // El apareo por fecha es el de jugadores: árbitros y DTs se aparean
+        // comparando las palabras del nombre completo (ver apellidosSeTocan),
+        // así que para ellos la fecha nunca es la explicación.
+        if ($porFecha && $rol === 'jugador') {
+            $porQue = 'El apareo automático exige apellido Y fecha de nacimiento iguales, así que con la fecha '
+                . 'distinta no lo encuentra y crea una ficha nueva. Fijate cuál de las dos fechas es la buena.';
+        } elseif ($huboCasi) {
+            $porQue = 'El apellido está escrito distinto y el apareo lo compara letra por letra, por eso no lo encontró.';
+        } elseif ($huboContenido) {
+            $porQue = 'Uno de los dos apellidos es compuesto y el otro no, y el apareo exige el apellido entero igual, '
+                . 'por eso no lo encontró.';
+        } elseif ($huboSinFecha && $rol === 'jugador') {
+            $porQue = 'Una de las dos fichas no tiene fecha de nacimiento cargada y el apareo de jugadores exige '
+                . 'apellido Y fecha, por eso no lo encontró.';
+        } else {
+            // Sólo quedaron matches con el apellido normalizado idéntico: la
+            // diferencia está en los acentos, los espacios o la puntuación, que
+            // normalizar() borra y el apareo no.
+            $porQue = 'El apellido es el mismo salvo acentos, espacios o puntuación, y el apareo lo compara letra por '
+                . 'letra, por eso no lo encontró.';
+        }
 
         $comoSeLlama = ['jugador' => 'jugador', 'arbitro' => 'árbitro', 'tecnico' => 'DT'];
         $this->aviso('Creé al ' . $comoSeLlama[$rol] . ' ' . $apellido . ', ' . $nombre
@@ -3393,10 +3436,7 @@ class TmDetallePartido
             . ' — pero OJO: ya había ' . (count($parecidos) === 1 ? 'una ficha muy parecida' : count($parecidos) . ' fichas muy parecidas')
             . ': ' . implode(' · ', array_slice($parecidos, 0, 5))
             . (count($parecidos) > 5 ? ' y ' . (count($parecidos) - 5) . ' más' : '') . '. '
-            . ($porFecha
-                ? 'El apareo automático exige apellido Y fecha de nacimiento iguales, así que con la fecha '
-                  . 'distinta no lo encuentra y crea una ficha nueva. Fijate cuál de las dos fechas es la buena.'
-                : 'El apellido está escrito distinto y el apareo lo compara letra por letra, por eso no lo encontró.')
+            . $porQue
             . ' Si es la misma persona, fusionalas en Verificar personas; si no, ignorá este aviso.');
     }
 
@@ -3788,7 +3828,7 @@ class TmDetallePartido
                     . $libre['como'] . '): le agregué el rol de jugador (#' . $jugador->id . ') en vez de duplicarlo. '
                     . 'Confirmalo en "jugadores por revisar".');
             }
-            if (!$libre) $this->avisarApellidoParecido($datos, 'jugador');
+            if (!$libre) $this->avisarApellidoParecido($datos, 'jugador', (int) $persona->id);
 
             return ['jugador_id' => (int) $jugador->id, 'creado' => true, 'descripcion' => $etiqueta
                 . ($libre ? ' — rol de jugador agregado a la persona #' . $libre['id'] : ' — creado') . ' #' . $jugador->id];
