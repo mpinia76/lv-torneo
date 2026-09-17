@@ -186,16 +186,13 @@ class NivelCompetencia
         return false;
     }
 
-    /** Mismo criterio que CompetenciaExcluida::debeExcluir(). */
+    /**
+     * Mismo criterio que el scraper y el ABM: una sola implementacion, en
+     * CompetenciaExcluida::matcheaPatron(). 'contiene' va por palabra completa.
+     */
     protected static function matchea($nombre, $patron, $tipo)
     {
-        $n = self::normalizar($nombre);
-        $p = mb_strtolower(trim((string) $patron));
-        if ($p === '') return false;
-
-        if ($tipo === 'exacto') return $n === $p;
-        if ($tipo === 'regex')  return @preg_match('/' . $patron . '/i', $nombre) === 1;
-        return strpos($n, $p) !== false;
+        return CompetenciaExcluida::matcheaPatron($nombre, $patron, $tipo);
     }
 
     /**

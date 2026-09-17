@@ -39,34 +39,53 @@ class CompetenciaExcluida extends Model
             return false;
         }
 
-        $nombre = (string) Str::of($nombreCompetencia)
-            ->lower()
-            ->ascii()
-            ->replaceMatches('/\s+/', ' ')
-            ->trim();
-
-        $reglas = self::activas();
-
-        foreach ($reglas as $regla) {
-            $patron = mb_strtolower(trim($regla['patron']));
-            $tipo   = $regla['tipo_match'];
-            $match  = false;
-
-            if ($tipo === 'exacto') {
-                $match = ($nombre === $patron);
-            } elseif ($tipo === 'regex') {
-                $match = (@preg_match('/' . $regla['patron'] . '/i', $nombreCompetencia) === 1);
-            } else {
-                // 'contiene' por default
-                $match = (strpos($nombre, $patron) !== false);
-            }
-
-            if ($match) {
+        foreach (self::activas() as $regla) {
+            if (self::matcheaPatron($nombreCompetencia, $regla['patron'], $regla['tipo_match'])) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** Minusculas, sin acentos y con los espacios colapsados. */
+    public static function normalizarNombre($s)
+    {
+        return (string) Str::of((string) $s)->lower()->ascii()->replaceMatches('/\s+/', ' ')->trim();
+    }
+
+    /**
+     * Unico lugar donde se decide si un nombre matchea un patron, para que el
+     * scraper viejo, el ABM y el sondeo de partidos usen el mismo criterio.
+     *
+     * OJO con 'contiene': es por PALABRA COMPLETA, no por substring. El patron
+     * «uefa euro» (guardado al excluir la Eurocopa desde el sondeo) estaba
+     * adentro de «uefa europa league» con strpos(), asi que la regla del Euro
+     * se comia tambien a la Europa League y a su fase previa. Mismo criterio
+     * que NivelCompetencia::contiene() para las listas automaticas.
+     *
+     * El ano sigue entrando: «uefa euro» matchea «uefa euro 2024», porque
+     * despues de "euro" hay un espacio.
+     */
+    public static function matcheaPatron($nombre, $patron, $tipo = 'contiene')
+    {
+        $n = self::normalizarNombre($nombre);
+        $p = self::normalizarNombre($patron);
+
+        if ($n === '' || $p === '') {
+            return false;
+        }
+
+        if ($tipo === 'exacto') {
+            return $n === $p;
+        }
+
+        if ($tipo === 'regex') {
+            return @preg_match('/' . $patron . '/i', $nombre) === 1;
+        }
+
+        // 'contiene' por default, por palabra completa.
+        return preg_match('/(?<![a-z0-9])' . preg_quote($p, '/') . '(?![a-z0-9])/', $n) === 1;
     }
 
     /**
