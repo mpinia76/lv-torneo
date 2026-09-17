@@ -99,6 +99,7 @@
                         Recalcular totales
                     </button>
                 </form>
+                <a href="{{ route('controles.torneos') }}" class="btn btn-info btn-sm">Control de torneos</a>
                 <a href="{{ route('torneos.index') }}" class="btn btn-success btn-sm">Volver a torneos</a>
             </div>
 

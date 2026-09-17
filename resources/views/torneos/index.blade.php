@@ -26,6 +26,7 @@
         {{-- Los siete botones "Controlar ..." son ahora un solo panel: cada
              control es un link adentro, asi se ejecuta una consulta por vez. --}}
         <a class="btn btn-info m-1" href="{{route('controles.index')}}">Controles de carga</a>
+        <a class="btn btn-info m-1" href="{{route('controles.torneos')}}">Control de torneos</a>
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
 

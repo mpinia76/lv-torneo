@@ -129,6 +129,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     // se ejecuta solo la consulta del que se esta mirando.
     Route::get('controles', 'ControlController@index')->name('controles.index');
     Route::get('controles/conteo', 'ControlController@conteo')->name('controles.conteo');
+    // Control de torneos: equipos de más / de menos y completos sin posiciones.
+    Route::get('controles/torneos', 'ControlTorneoController@index')->name('controles.torneos');
     Route::post('controles/recalcular', 'ControlController@recalcular')->name('controles.recalcular');
     Route::post('controles/penales/aplicar', 'ControlController@aplicarPenales')->name('controles.penales.aplicar');
     Route::post('controles/cambios/unir', 'ControlController@unirCambios')->name('controles.cambios.unir');
