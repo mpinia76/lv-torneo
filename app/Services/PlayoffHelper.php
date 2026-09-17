@@ -45,40 +45,105 @@ class PlayoffHelper
             ], [
                 'url_nombre' => strtolower(str_replace(' ', '-', $cruce->fase))
             ]);
-            $partidoExistente = Partido::where('fecha_id', $fecha->id)
-                ->where('orden', $cruce->orden)
-                ->first();
-
-            if (!$partidoExistente || !$partidoExistente->bloquear) {
-                // Eliminar partidos previos que involucren a estos equipos en esta fecha
-                Partido::where('fecha_id', $fecha->id)
-                    ->where(function ($query) use ($equipo1, $equipo2) {
-                        $query->where('equipol_id', $equipo1)
-                            ->orWhere('equipov_id', $equipo1)
-                            ->orWhere('equipol_id', $equipo2)
-                            ->orWhere('equipov_id', $equipo2);
-                    })
-                    ->delete();
-
-                // Crear o actualizar partido
-                Partido::updateOrCreate([
-                    'fecha_id' => $fecha->id,
-                    'orden' => $cruce->orden
-                ], [
-                    'equipol_id' => $equipo1,
-                    'equipov_id' => $equipo2,
-                    'dia' => $cruce->dia,
-                    'neutral' => $cruce->neutral,
-                ]);
-            } else {
-                // Ya hay resultados, no modificar ese partido para no perder datos
-                Log::info("Resultados cargados, no se recalcula ni borra para fecha $fecha->id");
+            // Todo lo de un cruce va en un try: esto corre DESPUÉS del commit de
+            // la fecha, así que una excepción acá daba un 500 con la fecha ya
+            // guardada (17-sep-2026, fecha 3963).
+            try {
+                self::aplicarCruce($fecha, $cruce, (int) $equipo1, (int) $equipo2);
+            } catch (\Throwable $ex) {
+                Log::error("actualizarCruces: fecha {$fecha->id}, orden {$cruce->orden}: " . $ex->getMessage());
             }
         }
 
 
 
 
+    }
+
+    /**
+     * Arma o actualiza el partido de UN cruce sin borrar nunca un partido con
+     * datos.
+     *
+     * Antes se borraba todo partido de la fecha donde jugara cualquiera de los
+     * dos equipos y después se hacía updateOrCreate por `orden`. Un partido
+     * cargado por el importador (orden NULL, con alineación) no calzaba por
+     * orden, así que el DELETE iba contra él: la FK de `alineacions` lo frenaba
+     * con un 1451; sin FK se habría llevado el detalle puesto.
+     */
+    private static function aplicarCruce(Fecha $fecha, $cruce, int $equipo1, int $equipo2)
+    {
+        $porOrden = Partido::where('fecha_id', $fecha->id)
+            ->where('orden', $cruce->orden)->first();
+
+        if ($porOrden && ($porOrden->bloquear || self::tieneDatos($porOrden))) {
+            Log::info("Resultados cargados, no se recalcula ni borra para fecha {$fecha->id}");
+            return;
+        }
+
+        // ¿Este par ya tiene partido en la fecha (con cualquier localía)?
+        // Es el mismo cruce cargado por otro lado (importador, a mano): se le
+        // pone el orden y no se toca nada más.
+        $mismoPar = Partido::where('fecha_id', $fecha->id)
+            ->where(function ($q) use ($equipo1, $equipo2) {
+                $q->where(function ($x) use ($equipo1, $equipo2) {
+                    $x->where('equipol_id', $equipo1)->where('equipov_id', $equipo2);
+                })->orWhere(function ($x) use ($equipo1, $equipo2) {
+                    $x->where('equipol_id', $equipo2)->where('equipov_id', $equipo1);
+                });
+            })->orderBy('id')->first();
+
+        if ($mismoPar && (!$porOrden || $porOrden->id !== $mismoPar->id)) {
+            if ($mismoPar->orden === null) {
+                // El partido vacío que ocupaba este orden sobra: ahora lo
+                // representa el que ya existía.
+                if ($porOrden) $porOrden->delete();
+                $mismoPar->orden = $cruce->orden;
+                $mismoPar->save();
+            } else {
+                Log::warning("actualizarCruces: fecha {$fecha->id}: el par {$equipo1}-{$equipo2} ya está "
+                    . "como partido #{$mismoPar->id} con orden {$mismoPar->orden}, no el {$cruce->orden}. No toco nada.");
+            }
+            return;
+        }
+
+        // Partidos de la fecha donde juega alguno de los dos contra OTRO rival
+        // (un cruce viejo que cambió). Se borran sólo si están vacíos.
+        $viejos = Partido::where('fecha_id', $fecha->id)
+            ->where(function ($q) use ($equipo1, $equipo2) {
+                $q->whereIn('equipol_id', [$equipo1, $equipo2])
+                  ->orWhereIn('equipov_id', [$equipo1, $equipo2]);
+            })
+            ->when($porOrden, function ($q) use ($porOrden) { $q->where('id', '!=', $porOrden->id); })
+            ->get();
+
+        foreach ($viejos as $v) {
+            if ($v->bloquear || self::tieneDatos($v)) {
+                Log::warning("actualizarCruces: fecha {$fecha->id}: el partido #{$v->id} tiene datos y choca "
+                    . "con el cruce {$equipo1}-{$equipo2} (orden {$cruce->orden}). No lo borro ni armo el cruce.");
+                return;
+            }
+        }
+        foreach ($viejos as $v) $v->delete();
+
+        Partido::updateOrCreate([
+            'fecha_id' => $fecha->id,
+            'orden'    => $cruce->orden,
+        ], [
+            'equipol_id' => $equipo1,
+            'equipov_id' => $equipo2,
+            'dia'        => $cruce->dia,
+            'neutral'    => $cruce->neutral,
+        ]);
+    }
+
+    /** Resultado o cualquier fila colgada (lo que la FK no deja borrar). */
+    private static function tieneDatos(Partido $p): bool
+    {
+        if ($p->golesl !== null || $p->golesv !== null) return true;
+        foreach (['alineacions', 'gols', 'tarjetas', 'cambios', 'penals', 'partido_tecnicos', 'partido_arbitros'] as $t) {
+            if (DB::table($t)->where('partido_id', $p->id)->exists()) return true;
+        }
+        return false;
     }
 
     private static function posiciones($grupo_id)
