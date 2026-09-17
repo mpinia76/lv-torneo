@@ -780,6 +780,7 @@ class ImportPartidosController extends Controller
                     . '<td class="num">' . e((string) $pr['tm']) . '</td>'
                     . '<td><span class="id">#' . (int) $pr['partido_id'] . '</span> '
                     . $this->linkIncidencias(isset($mapaF[$pr['partido_id']]) ? $mapaF[$pr['partido_id']] : null)
+                    . $this->linkTm($pr['external_id'] ?? null)
                     . (empty($pr['external_id']) ? ''
                         : ' · <a href="' . e(route('import_partidos.partido',
                                 ['game_id' => $pr['external_id']]))
@@ -1267,6 +1268,7 @@ class ImportPartidosController extends Controller
                 . '<td class="num">' . e((string) (isset($f['ida_marcador']) ? $f['ida_marcador'] : '—')) . '</td>'
                 . '<td><span class="id">#' . $pid . '</span> '
                 . $this->linkIncidencias(isset($mapaF[$pid]) ? $mapaF[$pid] : null)
+                . $this->linkTm($f['external_id'] ?? null)
                 . (empty($f['external_id']) ? ''
                     : ' · <a href="' . e(route('import_partidos.partido',
                             ['game_id' => $f['external_id']]))
@@ -1274,6 +1276,19 @@ class ImportPartidosController extends Controller
                 . '</td></tr>';
         }
         return $html . '</tbody></table></div>';
+    }
+
+    /**
+     * « · Ver en TM ↗» a la ficha del partido en Transfermarkt. Es un link
+     * común (no gasta crédito); vacío si la fila no tiene gameId.
+     */
+    private function linkTm($gameId)
+    {
+        $gameId = trim((string) $gameId);
+        if ($gameId === '') return '';
+        return ' · <a href="' . e(\App\Services\Controles::TM_PARTIDO . rawurlencode($gameId))
+            . '" target="_blank" rel="noopener" title="Ficha del partido en Transfermarkt (gameId '
+            . e($gameId) . '). No gasta crédito.">Ver en TM ↗</a>';
     }
 
     private function normalizarFixture(array $g, $compId, $compNombre)
