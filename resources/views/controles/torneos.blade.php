@@ -9,7 +9,8 @@
         $ayudas = [
             'sobran'         => 'Tienen más equipos con plantilla que los que dice el torneo (campo «Nro. de equipos»). Abajo de cada uno: los equipos con plantilla que no jugaron ningún partido, que suelen ser los que sobran.',
             'faltan'         => 'Tienen menos equipos con plantilla que los que dice el torneo. Abajo de cada uno: los equipos que juegan partidos pero no tienen plantilla, que suelen explicar el faltante.',
-            'sin_posiciones' => 'La cantidad de equipos coincide y no hay ninguna posición guardada («Finalizar»). Los que todavía tienen partidos sin resultado salen marcados «en curso».',
+            'partidos_faltan' => 'La cantidad de equipos coincide, pero hay fechas con menos partidos que la mitad de los equipos de su grupo (o el torneo no tiene partidos). Suele ser un torneo cargado DT por DT que no quedó marcado como parcial. Las fechas de playoffs no se miran.',
+            'sin_posiciones' => 'Equipos y fechas completos, y no hay ninguna posición guardada («Finalizar»). Los que todavía tienen partidos sin resultado salen marcados «en curso».',
         ];
     @endphp
     <link href="{{ asset('css/controles.css').($cssVersion ? '?v='.$cssVersion : '') }}" rel="stylesheet">
@@ -127,7 +128,7 @@
                             <th>Torneo</th>
                             <th class="ctrl-num">Declarados</th>
                             <th class="ctrl-num">Con plantilla</th>
-                            @if($lista !== 'sin_posiciones')
+                            @if(in_array($lista, ['sobran', 'faltan'], true))
                                 <th class="ctrl-num">Diferencia</th>
                             @endif
                             <th class="ctrl-num">Partidos</th>
@@ -144,6 +145,9 @@
                                     <span class="ctrl-sub">#{{ $filaTorneo->id }} · {{ $filaTorneo->tipo }} · {{ $filaTorneo->ambito }}</span>
                                     @if($filaTorneo->parcial)
                                         <span class="ctrl-chip neutro">parcial</span>
+                                    @endif
+                                    @if($filaTorneo->fechas_incompletas > 0)
+                                        <span class="ctrl-chip mal" title="Fechas con menos partidos que la mitad de los equipos del grupo">{{ $filaTorneo->fechas_incompletas }} de {{ $filaTorneo->fechas_tabla }} fechas a medias</span>
                                     @endif
                                     @if($filaTorneo->partidos == 0)
                                         <span class="ctrl-chip neutro">sin partidos</span>
@@ -181,7 +185,7 @@
                                 </td>
                                 <td class="ctrl-num">{{ $filaTorneo->esperados }}</td>
                                 <td class="ctrl-num">{{ $filaTorneo->cargados }}</td>
-                                @if($lista !== 'sin_posiciones')
+                                @if(in_array($lista, ['sobran', 'faltan'], true))
                                     <td class="ctrl-num">
                                         <span class="ctrl-chip {{ $filaTorneo->diferencia > 0 ? 'mal' : 'aviso' }}">{{ $filaTorneo->diferencia > 0 ? '+' : '' }}{{ $filaTorneo->diferencia }}</span>
                                     </td>

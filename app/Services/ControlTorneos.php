@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\DB;
  * Tres listas:
  *   - sobran     → más equipos con plantilla que los declarados.
  *   - faltan     → menos equipos con plantilla que los declarados.
- *   - sin_posiciones → la cantidad coincide y no hay ninguna fila en
+ *   - partidos_faltan → la cantidad coincide pero hay fechas de tabla con
+ *                  menos partidos de los que corresponden (o ningún partido).
+ *   - sin_posiciones → equipos y fechas completos, y no hay ninguna fila en
  *                  posicion_torneos.
  *
  * "Equipo del torneo" = equipo con plantilla en algún grupo del torneo
@@ -29,8 +31,25 @@ class ControlTorneos
     const LISTAS = [
         'sobran'         => 'Le sobran equipos',
         'faltan'         => 'Le faltan equipos',
+        'partidos_faltan' => 'Equipos bien, faltan partidos',
         'sin_posiciones' => 'Completos sin posiciones',
     ];
+
+    /**
+     * Fechas "de tabla" (número puro, fuera del grupo Playoffs) de un torneo.
+     * Una fecha está a medias si tiene menos partidos que la mitad de los
+     * equipos con plantilla de SU grupo: en una liga de 20, cada fecha lleva
+     * 10. Es lo que delata a un torneo importado DT por DT sin la marca de
+     * parcial (LaLiga con 38 partidos: 1 por fecha).
+     * Las fechas de playoffs ('Final', 'Cuartos de final'...) no se miran:
+     * ahí la cantidad de partidos no sale de los equipos del grupo.
+     */
+    const SQL_FECHAS_TABLA = "FROM fechas fe
+                  INNER JOIN grupos g ON g.id = fe.grupo_id
+                 WHERE g.torneo_id = t.id
+                   AND fe.numero REGEXP '^[0-9]+$'
+                   AND g.nombre <> 'Playoffs'";
+
 
     /**
      * Una fila por torneo con los contadores. Filtros: year, tipo, q,
@@ -53,7 +72,12 @@ class ControlTorneos
                             INNER JOIN fechas fe ON fe.id = pa.fecha_id
                             INNER JOIN grupos g ON g.id = fe.grupo_id
                            WHERE g.torneo_id = t.id
-                             AND (pa.golesl IS NULL OR pa.golesv IS NULL)) AS sin_resultado');
+                             AND (pa.golesl IS NULL OR pa.golesv IS NULL)) AS sin_resultado')
+            ->selectRaw('(SELECT COUNT(*) ' . self::SQL_FECHAS_TABLA . ') AS fechas_tabla')
+            ->selectRaw('(SELECT COUNT(*) ' . self::SQL_FECHAS_TABLA . '
+                   AND (SELECT COUNT(*) FROM partidos pa WHERE pa.fecha_id = fe.id)
+                       < FLOOR((SELECT COUNT(DISTINCT p.equipo_id) FROM plantillas p WHERE p.grupo_id = g.id) / 2)
+                ) AS fechas_incompletas');
 
         if (!empty($f['year'])) {
             $q->where('t.year', $f['year']);
@@ -85,6 +109,10 @@ class ControlTorneos
                 $listas['sobran'][] = $fila;
             } elseif ($cargados < $esperados) {
                 $listas['faltan'][] = $fila;
+            } elseif ((int) $fila->partidos === 0 || (int) $fila->fechas_incompletas > 0) {
+                // La cantidad de equipos da, pero los partidos no: no está
+                // completo, así que no va a la lista de posiciones.
+                $listas['partidos_faltan'][] = $fila;
             } elseif ((int) $fila->posiciones === 0) {
                 $listas['sin_posiciones'][] = $fila;
             }

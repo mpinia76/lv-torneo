@@ -53,7 +53,7 @@ class ControlTorneoController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        $detalle = $lista === 'sin_posiciones'
+        $detalle = in_array($lista, ['sin_posiciones', 'partidos_faltan'], true)
             ? []
             : $servicio->detalle(array_map(function ($t) { return $t->id; }, $filas->items()));
 
