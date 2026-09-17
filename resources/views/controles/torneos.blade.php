@@ -9,7 +9,7 @@
         $ayudas = [
             'sobran'         => 'Tienen más equipos con plantilla que los que dice el torneo (campo «Nro. de equipos»). Abajo de cada uno: los equipos con plantilla que no jugaron ningún partido, que suelen ser los que sobran.',
             'faltan'         => 'Tienen menos equipos con plantilla que los que dice el torneo. Abajo de cada uno: los equipos que juegan partidos pero no tienen plantilla, que suelen explicar el faltante.',
-            'partidos_faltan' => 'La cantidad de equipos coincide, pero hay fechas con menos partidos que la mitad de los equipos de su grupo (o el torneo no tiene partidos). Suele ser un torneo cargado DT por DT que no quedó marcado como parcial. Las fechas de playoffs no se miran.',
+            'partidos_faltan' => 'La cantidad de equipos coincide, pero hay fechas con menos partidos que la mitad de los equipos (sumando todas las zonas que tienen esa fecha) (o el torneo no tiene partidos). Suele ser un torneo cargado DT por DT que no quedó marcado como parcial. Las fechas de playoffs no se miran.',
             'sin_posiciones' => 'Equipos y fechas completos, y no hay ninguna posición guardada («Finalizar»). Los que todavía tienen partidos sin resultado salen marcados «en curso».',
         ];
     @endphp
@@ -147,7 +147,7 @@
                                         <span class="ctrl-chip neutro">parcial</span>
                                     @endif
                                     @if($filaTorneo->fechas_incompletas > 0)
-                                        <span class="ctrl-chip mal" title="Fechas con menos partidos que la mitad de los equipos del grupo">{{ $filaTorneo->fechas_incompletas }} de {{ $filaTorneo->fechas_tabla }} fechas a medias</span>
+                                        <span class="ctrl-chip mal" title="Números de fecha con menos partidos que la mitad de los equipos, sumando las zonas">{{ $filaTorneo->fechas_incompletas }} de {{ $filaTorneo->fechas_tabla }} fechas a medias</span>
                                     @endif
                                     @if($filaTorneo->partidos == 0)
                                         <span class="ctrl-chip neutro">sin partidos</span>

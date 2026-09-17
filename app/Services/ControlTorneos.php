@@ -35,20 +35,6 @@ class ControlTorneos
         'sin_posiciones' => 'Completos sin posiciones',
     ];
 
-    /**
-     * Fechas "de tabla" (número puro, fuera del grupo Playoffs) de un torneo.
-     * Una fecha está a medias si tiene menos partidos que la mitad de los
-     * equipos con plantilla de SU grupo: en una liga de 20, cada fecha lleva
-     * 10. Es lo que delata a un torneo importado DT por DT sin la marca de
-     * parcial (LaLiga con 38 partidos: 1 por fecha).
-     * Las fechas de playoffs ('Final', 'Cuartos de final'...) no se miran:
-     * ahí la cantidad de partidos no sale de los equipos del grupo.
-     */
-    const SQL_FECHAS_TABLA = "FROM fechas fe
-                  INNER JOIN grupos g ON g.id = fe.grupo_id
-                 WHERE g.torneo_id = t.id
-                   AND fe.numero REGEXP '^[0-9]+$'
-                   AND g.nombre <> 'Playoffs'";
 
 
     /**
@@ -72,12 +58,7 @@ class ControlTorneos
                             INNER JOIN fechas fe ON fe.id = pa.fecha_id
                             INNER JOIN grupos g ON g.id = fe.grupo_id
                            WHERE g.torneo_id = t.id
-                             AND (pa.golesl IS NULL OR pa.golesv IS NULL)) AS sin_resultado')
-            ->selectRaw('(SELECT COUNT(*) ' . self::SQL_FECHAS_TABLA . ') AS fechas_tabla')
-            ->selectRaw('(SELECT COUNT(*) ' . self::SQL_FECHAS_TABLA . '
-                   AND (SELECT COUNT(*) FROM partidos pa WHERE pa.fecha_id = fe.id)
-                       < FLOOR((SELECT COUNT(DISTINCT p.equipo_id) FROM plantillas p WHERE p.grupo_id = g.id) / 2)
-                ) AS fechas_incompletas');
+                             AND (pa.golesl IS NULL OR pa.golesv IS NULL)) AS sin_resultado');
 
         if (!empty($f['year'])) {
             $q->where('t.year', $f['year']);
@@ -92,7 +73,72 @@ class ControlTorneos
             $q->whereRaw('COALESCE(t.parcial, 0) = 0');
         }
 
-        return $q->orderByDesc('t.year')->orderBy('t.nombre')->get()->all();
+        $filas = $q->orderByDesc('t.year')->orderBy('t.nombre')->get()->all();
+
+        $fechas = $this->fechasPorTorneo(array_map(function ($t) { return $t->id; }, $filas));
+        foreach ($filas as $fila) {
+            $fila->fechas_tabla       = $fechas[$fila->id]['total'] ?? 0;
+            $fila->fechas_incompletas = $fechas[$fila->id]['incompletas'] ?? 0;
+        }
+
+        return $filas;
+    }
+
+    /**
+     * Fechas "de tabla" (número puro, fuera del grupo Playoffs) de cada torneo,
+     * contadas por NÚMERO de fecha en todo el torneo, no por grupo.
+     *
+     * La fecha N está a medias si la suma de sus partidos en todas las zonas
+     * es menor que la suma de la mitad de los equipos con plantilla de cada
+     * zona que tiene esa fecha. En una liga de 20 lleva 10: LaLiga cargada DT
+     * por DT tiene 1 y cae.
+     *
+     * Por qué sumando zonas: en el Transición 2016 (dos zonas de 15) el
+     * interzonal de cada fecha está cargado en una sola zona, así que la
+     * fecha de la otra zona queda con menos (o ninguno) y por grupo parecía
+     * incompleta. Sumando: 15 partidos contra 7 + 7 esperados, completa.
+     *
+     * Las fechas de playoffs ('Final', 'Cuartos de final'...) no se miran:
+     * ahí la cantidad de partidos no sale de los equipos del grupo.
+     * Se resuelve en PHP y con una sola consulta (sin derivadas correlacionadas,
+     * que MySQL viejo no acepta).
+     *
+     * @return array [torneo_id => ['total' => n, 'incompletas' => n]]
+     */
+    private function fechasPorTorneo(array $ids): array
+    {
+        $out = [];
+        if (!$ids) {
+            return $out;
+        }
+
+        $filas = DB::select(
+            "SELECT g.torneo_id, fe.numero,
+                    SUM(COALESCE(pc.cant, 0))             AS jugados,
+                    SUM(FLOOR(COALESCE(ec.cant, 0) / 2))  AS esperados
+               FROM fechas fe
+               INNER JOIN grupos g ON g.id = fe.grupo_id
+               LEFT JOIN (SELECT fecha_id, COUNT(*) AS cant FROM partidos GROUP BY fecha_id) pc
+                      ON pc.fecha_id = fe.id
+               LEFT JOIN (SELECT grupo_id, COUNT(DISTINCT equipo_id) AS cant FROM plantillas GROUP BY grupo_id) ec
+                      ON ec.grupo_id = g.id
+              WHERE g.torneo_id IN (" . implode(',', array_map('intval', $ids)) . ")
+                AND fe.numero REGEXP '^[0-9]+$'
+                AND g.nombre <> 'Playoffs'
+              GROUP BY g.torneo_id, fe.numero"
+        );
+
+        foreach ($filas as $f) {
+            if (!isset($out[$f->torneo_id])) {
+                $out[$f->torneo_id] = ['total' => 0, 'incompletas' => 0];
+            }
+            $out[$f->torneo_id]['total']++;
+            if ((int) $f->jugados < (int) $f->esperados) {
+                $out[$f->torneo_id]['incompletas']++;
+            }
+        }
+
+        return $out;
     }
 
     /** Reparte las filas en las tres listas. */
