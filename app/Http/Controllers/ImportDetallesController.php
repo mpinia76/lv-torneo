@@ -3934,7 +3934,9 @@ class ImportDetallesController extends Controller
             $desmarcados = (clone $revisadosQ($desmarcar === 'penal'))->distinct()->count('partido_id');
             $revisadosQ($desmarcar === 'penal')->update(['tipos_gol_revisado_at' => null]);
         } elseif ($desmarcar === 'cambios_impares') {
-            // Los que marca el control «Entra sin salir».
+            // Los que marcan los controles «Entra sin salir» y «Sale sin entrar»
+            // (sqlPartidosImpares() barre las dos direcciones a propósito: una
+            // pareja partida por el descuento deja un minuto de cada lado).
             //
             // Un cambio son dos filas —«Entra» y «Sale»— sin vínculo entre sí:
             // lo único que las une es el minuto. Hasta el 09/09/2026 este
@@ -4519,7 +4521,7 @@ class ImportDetallesController extends Controller
                 . 'arreglado —la pareja viaja pegada—, pero lo ya escrito hay que volver a pasarlo.</p>'
                 . '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.tipos_gol',
                     $filtros + ['desmarcar' => 'cambios_impares']))
-                . '">Los que marca «Entra sin salir»</a> <span class="sub">vuelven a la cola sólo esos; '
+                . '">Los que marca «Entra sin salir» / «Sale sin entrar»</a> <span class="sub">vuelven a la cola sólo esos; '
                 . 'después, «Seguir solo hasta terminar» y listo</span></p>'
                 . (!empty($filtros) ? '<p class="sub">Ojo: respeta los filtros que tenés puestos.</p>' : '');
         }

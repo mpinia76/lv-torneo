@@ -171,9 +171,13 @@ class Controles
                     'acciones' => ['cambios', 'incidencia'],
                     'metodo'   => 'cambiosRepetidos',
                 ],
+                // Los dos controles de abajo eran UNO solo hasta el 17/09/2026
+                // ('<>' en el HAVING). Ver cambiosDescalzados(): una dirección
+                // es error seguro y la otra casi siempre es dato bueno, así que
+                // mezclados los legítimos tapaban a los que hay que arreglar.
                 'cambios.impares' => [
                     'titulo'   => 'Entra sin salir',
-                    'ayuda'    => 'Minutos donde la cantidad de "Entra" no coincide con la de "Sale".',
+                    'ayuda'    => 'Minutos donde entran más de los que salen: falta la fila del que salió. Nadie entra solo, así que acá siempre hay algo para arreglar.',
                     'jugador'  => false,
                     'detalle'  => 'minutos',
                     'acciones' => ['cambios', 'incidencia'],
@@ -182,6 +186,19 @@ class Controles
                     // Botón de la pasada gratis: une las parejas que se parten
                     // por el descuento (90+4 contra 94, 90 contra 90+2) sin
                     // gastar una llamada. Ver App\Services\CambiosPareja.
+                    'unir_cambios' => true,
+                ],
+                'cambios.sale_solo' => [
+                    'titulo'   => 'Sale sin entrar',
+                    'ayuda'    => 'Minutos donde sale alguien y no entra nadie. Suele ser dato bueno: una salida sin reemplazo con los cambios agotados. Mirarlo en TM antes de tocar nada.',
+                    'jugador'  => false,
+                    'detalle'  => 'minutos',
+                    'acciones' => ['cambios', 'incidencia'],
+                    'sin_datos' => true, // acá el botón dice "Salida sin reemplazo": ver motivoSinDatos()
+                    'metodo'   => 'cambiosSaleSolo',
+                    // Una pareja partida por el descuento deja un minuto de cada
+                    // lado, así que el partido aparece en los dos controles y el
+                    // botón tiene que estar en los dos.
                     'unir_cambios' => true,
                 ],
                 'cambios.titulares_entran' => [
@@ -496,7 +513,15 @@ class Controles
             ],
             'cambios.impares' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'Los cambios que publica Transfermarkt no cierran: hay un movimiento sin su contraparte.',
+                'texto' => 'La ficha de Transfermarkt no dice quién salió en ese cambio: publica al que entra y no a su contraparte.',
+            ],
+            // Acá el dato NO falta: TM lo publica bien y nosotros lo guardamos
+            // bien. El que se equivoca es el control, que cuenta cuántos entran
+            // contra cuántos salen. Por eso el botón no dice "sin datos" —
+            // dentro de dos años esa observación mentiría.
+            'cambios.sale_solo' => [
+                'boton' => 'Salida sin reemplazo',
+                'texto' => 'Salida sin reemplazo: Transfermarkt publica el movimiento como "Substitution without replacement" (el jugador sale y no entra nadie, con los cambios agotados). El dato está bien cargado; el control lo marca porque compara cuántos entran contra cuántos salen.',
             ],
         ];
 
@@ -954,12 +979,37 @@ class Controles
     }
 
     /**
-     * Minutos donde entran y salen distinta cantidad de jugadores.
+     * Minutos donde no coincide la cantidad de "Entra" con la de "Sale".
+     *
      * Se agrupa por partido (antes el mismo partido aparecía una vez por cada
      * minuto descalzado) y se listan los minutos en una columna.
+     *
+     * Hasta el 17/09/2026 esto era UN solo control, con `<>` en el HAVING, y
+     * por eso comparaba en las dos direcciones. Pero sólo una es un error:
+     *
+     *  - **Entra > Sale** → falta la fila del que salió. Nadie entra solo.
+     *  - **Sale > Entra** → casi siempre es dato bueno: TM lo publica como
+     *    *Substitution without replacement* (alguien sale lesionado cuando el
+     *    equipo ya agotó los cambios) y el importador lo escribe así a
+     *    propósito — `direccionCambio()` con un solo jugador informado
+     *    devuelve `entra => null`. Caso testigo: Manchester City 3-0 Arsenal,
+     *    Premier League 2019/20 fecha 28, Eric García al 89' con los cinco
+     *    cambios ya hechos (`spielbericht/3219130`).
+     *
+     * Mezclados, los legítimos tapaban a los que sí hay que arreglar y la
+     * única salida era la incidencia de a uno. Separados, "Entra sin salir"
+     * es una lista de errores y "Sale sin entrar" una lista para mirar.
+     *
+     * Ojo: una pareja partida por el descuento (90+4 contra 94) deja un minuto
+     * de cada lado, así que ese partido sale en los DOS controles hasta que se
+     * aprieta "Juntar las parejas del descuento" (que por eso está en los dos).
      */
-    private function cambiosImpares(array $filtros)
+    private function cambiosDescalzados(array $filtros, string $comparador)
     {
+        // Va interpolado en el SQL, así que no se confía en el que llega:
+        // los dos únicos valores posibles son '>' y '<'.
+        $comparador = $comparador === '<' ? '<' : '>';
+
         // Se agrupa por minuto Y descuento, y se muestra «90+3»: el que entra y
         // el que sale de un mismo cambio comparten los dos números. Agrupando
         // sólo por el reloj, un cambio del 90+3 y otro del 90 se compensaban
@@ -972,7 +1022,7 @@ class Controles
                          FROM cambios
                          GROUP BY partido_id, minuto, adicionado
                          HAVING SUM(CASE WHEN tipo = 'Entra' THEN 1 ELSE 0 END)
-                              <> SUM(CASE WHEN tipo = 'Sale'  THEN 1 ELSE 0 END)
+                              {$comparador} SUM(CASE WHEN tipo = 'Sale'  THEN 1 ELSE 0 END)
                      ) AS x
                      GROUP BY partido_id";
 
@@ -981,6 +1031,18 @@ class Controles
             ->addSelect(['t1.minutos as minutos']);
 
         return $this->ordenar($this->sinIncidencia($q));
+    }
+
+    /** "Entra sin salir": entran más de los que salen. Falta una fila nuestra. */
+    private function cambiosImpares(array $filtros)
+    {
+        return $this->cambiosDescalzados($filtros, '>');
+    }
+
+    /** "Sale sin entrar": salen más de los que entran. Suele ser legítimo. */
+    private function cambiosSaleSolo(array $filtros)
+    {
+        return $this->cambiosDescalzados($filtros, '<');
     }
 
     private function cambiosTitularesQueEntran(array $filtros)
