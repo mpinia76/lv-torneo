@@ -132,6 +132,11 @@ class EquipoController extends Controller
         // 0000-00-00, que ya no se distinguen de un dato cargado a propósito.
         $insert['socios'] = $this->vacioEsNulo($request->get('socios'));
         $insert['fundacion'] = $this->vacioEsNulo($request->get('fundacion'));
+        // La columna llega por SQL después del deploy (database/sql/desaparicion_equipos.sql):
+        // hasta que esté, el formulario se guarda igual sin este campo.
+        if (\Schema::hasColumn('equipos', 'desaparicion')) {
+            $insert['desaparicion'] = $this->vacioEsNulo($request->get('desaparicion'));
+        }
         $insert['estadio'] = $request->get('estadio');
         $insert['historia'] = $request->get('historia');
         $insert['pais'] = $request->get('pais');
@@ -205,6 +210,9 @@ class EquipoController extends Controller
         // Ver el comentario de store(): vacío es null, no 0 ni 0000-00-00.
         $update['socios'] = $this->vacioEsNulo($request->get('socios'));
         $update['fundacion'] = $this->vacioEsNulo($request->get('fundacion'));
+        if (\Schema::hasColumn('equipos', 'desaparicion')) {
+            $update['desaparicion'] = $this->vacioEsNulo($request->get('desaparicion'));
+        }
         $update['estadio'] = $request->get('estadio');
         $update['historia'] = $request->get('historia');
         $update['pais'] = $request->get('pais');

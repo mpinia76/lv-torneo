@@ -60,6 +60,14 @@
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
+                {{Form::label('desaparicion', 'Desaparición')}}
+                {{-- Sólo para clubes que ya no existen. Desde Transfermarkt llega
+                     el año del paréntesis "(- 2019)" como 1º de enero: el día real
+                     va a mano. Vacío = el club sigue. --}}
+                {{Form::date('desaparicion', ($equipo->desaparicion && substr($equipo->desaparicion, 0, 4) !== '0000') ? date('Y-m-d', strtotime($equipo->desaparicion)) : null, ['class' => 'form-control'])}}
+            </div>
+
+            <div class="form-group col-xs-12 col-sm-6 col-md-3">
                 {{Form::label('estadio', 'Estadio')}}
                 {{Form::text('estadio', $equipo->estadio, ['class' => 'form-control'])}}
             </div>

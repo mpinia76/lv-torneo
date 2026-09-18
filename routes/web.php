@@ -309,6 +309,13 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     // cuando el club se muda y nos quedan dos equipos para un solo club.
     Route::get('/import-detalles/fusionar-equipos', 'ImportDetallesController@fusionarEquipos')
         ->name('import_detalles.fusionar_equipos');
+
+    // Clubes que TM marca como desaparecidos con "(- 2019)" / "(1981-2019)" al
+    // final del nombre: nombre limpio + año a equipos.desaparicion. El GET sólo
+    // muestra; el POST escribe los tildados.
+    Route::get('/import-detalles/clubes-desaparecidos', 'ImportDetallesController@clubesDesaparecidos')
+        ->name('import_detalles.clubes_desaparecidos');
+    Route::post('/import-detalles/clubes-desaparecidos', 'ImportDetallesController@clubesDesaparecidos');
 });
 
 

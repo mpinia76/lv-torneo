@@ -2720,6 +2720,15 @@ class ImportPartidosController extends Controller
                 ->with('error', 'El club ' . e($tmId) . ' vino sin nombre. No lo creé.');
         }
 
+        // Club desaparecido: TM le cuelga el año de cierre al nombre, "(- 2019)"
+        // o "(1981-2019)". El nombre del equipo va limpio y el año pasa a
+        // `desaparicion` (1º de enero: TM no da más que el año). El mapeo en
+        // `equipo_tm` guarda el nombre TAL CUAL lo manda TM, que es con lo que
+        // se lo reconoce en el sondeo. Ver App\Services\ClubDesaparecido.
+        $nombreTm = $nombre;
+        $cierre = \App\Services\ClubDesaparecido::partir($nombre);
+        if ($cierre) $nombre = $cierre['nombre'];
+
         // Siglas: SÓLO `abbreviation`, que es una abreviatura de verdad.
         //
         // Antes se usaba primero `preferences.clubCode`, que es un código
@@ -2754,6 +2763,10 @@ class ImportPartidosController extends Controller
             'socios'     => 0,
             'url_nombre' => Str::slug($nombre),
         ];
+        $conColumnaCierre = Schema::hasColumn('equipos', 'desaparicion');
+        if ($cierre && $conColumnaCierre) {
+            $alta['desaparicion'] = \App\Services\ClubDesaparecido::fechaDeCierre($cierre);
+        }
 
         try {
             $equipo = \App\Equipo::create($alta);
@@ -2762,7 +2775,7 @@ class ImportPartidosController extends Controller
                 ->with('error', 'No pude crear el equipo: ' . e($e->getMessage()));
         }
 
-        $this->guardarMapeo($tmId, $equipo->id, $nombre, 'club_tm');
+        $this->guardarMapeo($tmId, $equipo->id, $nombreTm, 'club_tm');
 
         // ── 2. Fundación, estadio y socios, que la API no tiene ─────────────
         //
@@ -2834,6 +2847,28 @@ class ImportPartidosController extends Controller
 
         if ($trajo) {
             $msg .= 'De «Datos y hechos» saqué: <b>' . e(implode(' · ', $trajo)) . '</b>.<br>';
+        }
+
+        if ($cierre) {
+            $msg .= 'En TM figura como <b>' . e($nombreTm) . '</b>: es un club desaparecido. '
+                . ($conColumnaCierre
+                    ? 'Le saqué el paréntesis al nombre y cargué la desaparición en <b>01/01/' . (int) $cierre['hasta']
+                        . '</b> (TM sólo da el año: corregí el día si lo sabés).'
+                    : 'Le saqué el paréntesis al nombre, pero <b>no guardé el año de cierre</b>: falta correr '
+                        . '<code>database/sql/desaparicion_equipos.sql</code>.')
+                . '<br>';
+
+            // Un nombre limpio puede ser el mismo de otro equipo nuestro —el club
+            // actual, si éste es el verein viejo de una fusión o refundación—.
+            // Eso deja el apareo por nombre ambiguo (que es lo seguro), pero
+            // puede ser un duplicado para unificar: se avisa y no se decide.
+            $homonimo = \App\Equipo::where('nombre', $nombre)->where('id', '<>', $equipo->id)->value('id');
+            if ($homonimo) {
+                $msg .= '<b>Ojo:</b> ya tenés otro equipo con ese nombre, '
+                    . '<a href="' . e(route('equipos.edit', $homonimo)) . '" target="_blank">#' . (int) $homonimo . ' ↗</a>. '
+                    . 'Si es el mismo club (fusión o refundación), unificalos en '
+                    . '<a href="' . e(route('import_detalles.fusionar_equipos')) . '" target="_blank">Unificar equipos ↗</a>.<br>';
+            }
         }
 
         // Si el sitio trajo la fundación pero sin día y mes, se avisa y NO se
@@ -5528,6 +5563,18 @@ class ImportPartidosController extends Controller
             $this->soloLetras($base),
             $this->soloLetras($this->quitarPrefijos($base)),
         ];
+
+        // Club desaparecido: TM manda "Sarayköy 1926 FK (1981-2019)" y nuestro
+        // equipo se llama sin el paréntesis (el año de cierre vive en
+        // `equipos.desaparicion`). Sin estas claves el club dejaría de
+        // reconocerse por nombre. Si tenemos DOS equipos con el nombre limpio
+        // —el desaparecido y otro homónimo—, la clave queda ambigua en
+        // mapaNombres() y sale como conflicto, que es lo seguro.
+        $cierre = \App\Services\ClubDesaparecido::partir($nombre);
+        if ($cierre) {
+            foreach ($this->clavesNombre($cierre['nombre']) as $k) $claves[] = $k;
+        }
+
         return array_values(array_unique(array_filter($claves)));
     }
 

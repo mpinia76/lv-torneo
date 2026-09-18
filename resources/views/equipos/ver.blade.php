@@ -24,6 +24,10 @@
         $veFundado = $equipo->fundacion && $equipo->fundacion != '0000-00-00'
             ? \Carbon\Carbon::parse($equipo->fundacion)
             : null;
+        // Club desaparecido: la columna puede no estar todavía (se agrega por SQL
+        // después del deploy), por eso se lee con getAttribute y no rompe.
+        $veDesap = $equipo->getAttribute('desaparicion');
+        $veDesap = ($veDesap && substr($veDesap, 0, 4) !== '0000') ? \Carbon\Carbon::parse($veDesap) : null;
 
         $veCero = function ($v) {
             return $v > 0 ? e($v) : '<span class="t-cero">0</span>';
@@ -79,7 +83,12 @@
                 @php
                     $veDatos = [
                         'País'      => $equipo->pais,
-                        'Fundación' => $veFundado ? $veFundado->format('d/m/Y').' · '.$veFundado->age.' años' : '',
+                        // Con el club desaparecido la edad de hoy no dice nada: se muestran
+                        // los años que existió, en el renglón de la desaparición.
+                        'Fundación' => $veFundado ? $veFundado->format('d/m/Y').($veDesap ? '' : ' · '.$veFundado->age.' años') : '',
+                        'Desaparición' => $veDesap
+                            ? $veDesap->format('d/m/Y').($veFundado && $veFundado->lte($veDesap) ? ' · '.$veFundado->diffInYears($veDesap).' años de historia' : '')
+                            : '',
                         'Estadio'   => $equipo->estadio,
                         'Socios'    => $equipo->socios ? number_format($equipo->socios, 0, ',', '.') : '',
                     ];

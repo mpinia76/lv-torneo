@@ -6762,6 +6762,265 @@ class ImportDetallesController extends Controller
         return $cache[$id];
     }
 
+    // ═══════════════════════════ CLUBES DESAPARECIDOS ═══════════════════════════
+
+    /**
+     * Repaso de los equipos que son clubes desaparecidos según Transfermarkt.
+     *
+     * TM le cuelga el año de cierre al nombre —"(- 2019)" o "(1981-2019)"— y
+     * hasta el 18-sep-2026 ese paréntesis entraba tal cual a `equipos.nombre`.
+     * Ahora el alta lo separa (`ImportPartidosController::crearEquipo`); esta
+     * pantalla hace lo mismo con lo que ya estaba cargado: nombre limpio y el
+     * año a `equipos.desaparicion` (1º de enero, que es lo que da TM).
+     *
+     * Entra un equipo si su NOMBRE trae el paréntesis, o si todos los clubes de
+     * TM atados a él lo traen (el caso del equipo que ya se llamaba limpio).
+     *
+     * Regla de la casa ([[feedback-atar-de-a-uno]]): nada se aplica en bloque.
+     * Una lista, lo seguro viene tildado, lo dudoso destildado con el motivo, y
+     * sólo el POST con lo tildado escribe. No gasta ninguna llamada a TM.
+     *
+     * Dudoso = alguna de estas tres:
+     *   · otro club de TM atado al mismo equipo NO tiene el paréntesis → es el
+     *     verein viejo de una fusión o refundación y el club sigue vivo
+     *     ([[clubes-fusionados-tm]]);
+     *   · ya hay otro equipo con el nombre limpio → posible duplicado, se unifica
+     *     antes de renombrar;
+     *   · el equipo tiene partidos cargados DESPUÉS del año de cierre.
+     */
+    public function clubesDesaparecidos(Request $request)
+    {
+        if (!Schema::hasColumn('equipos', 'desaparicion')) {
+            return $this->pagina('Clubes desaparecidos',
+                '<h1>Clubes desaparecidos</h1><div class="err-box">Falta la columna <code>equipos.desaparicion</code>. '
+                . 'Corré <code>database/sql/desaparicion_equipos.sql</code> en phpMyAdmin (o la migración '
+                . '<code>2026_09_18_100000_add_desaparicion_a_equipos</code>) y volvé a entrar.</div>');
+        }
+
+        $guardando = $request->isMethod('post');
+        $escritos = []; $rechazos = [];
+        if ($guardando) {
+            list($escritos, $rechazos) = $this->clubesDesaparecidosGuardar($request);
+        }
+
+        $filas = $this->clubesDesaparecidosFilas();
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
+            . '<h1>Clubes desaparecidos</h1>'
+            . '<p class="sub">Transfermarkt marca un club que ya no existe con el año de cierre al final del nombre: '
+            . '<b>«Al-Ahli Dubai Club (- 2017)»</b>, <b>«Sarayköy 1926 FK (1981-2019)»</b>. Acá se le saca ese '
+            . 'paréntesis al nombre y el año pasa a <b>Desaparición</b> (como 1º de enero: TM no da el día). '
+            . 'Mirar no escribe nada ni gasta llamadas a la API; sólo se guardan los tildados.</p>'
+            . '<p class="sub">Vienen <b>destildados</b> los dudosos, con el motivo al lado. El más común: un club '
+            . 'fusionado o refundado, que en TM tiene un verein viejo «(- AAAA)» y otro vivo atados al mismo equipo '
+            . 'tuyo — ése <b>no desapareció</b>.</p>';
+
+        if ($guardando) {
+            $cuerpo .= count($escritos)
+                ? '<div class="ok-box"><b>Listo: ' . count($escritos) . ' equipo(s) actualizados.</b><br>'
+                    . implode('<br>', array_map(function ($t) { return '• ' . $t; }, $escritos)) . '</div>'
+                : '<div class="diag">No se escribió nada: no viniste con ningún equipo tildado.</div>';
+            if ($rechazos) {
+                $cuerpo .= '<div class="err-box"><b>' . count($rechazos) . ' no se tocaron:</b><br>'
+                    . implode('<br>', array_map(function ($t) { return '• ' . $t; }, $rechazos)) . '</div>';
+            }
+        }
+
+        $seguros = count(array_filter($filas, function ($f) { return !$f['dudas']; }));
+        $cuerpo .= '<div class="cards">'
+            . $this->card(count($filas), 'Para repasar', count($filas) ? 'warn' : 'ok')
+            . $this->card($seguros, 'Tildados')
+            . $this->card(count($filas) - $seguros, 'Dudosos', (count($filas) - $seguros) ? 'warn' : '')
+            . '</div>';
+
+        if (!$filas) {
+            $cuerpo .= '<div class="ok-box">No queda ningún equipo con el año de cierre de TM en el nombre ni sin '
+                . 'su fecha de desaparición.</div>';
+            return $this->pagina('Clubes desaparecidos', $cuerpo);
+        }
+
+        $cuerpo .= '<form method="post" action="' . e(route('import_detalles.clubes_desaparecidos')) . '">'
+            . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+            . '<div class="scroll"><table><thead><tr>'
+            . '<th></th><th>Equipo</th><th>Nombre queda</th><th>Desaparición</th><th>Fundación</th>'
+            . '<th>Último partido</th><th>En Transfermarkt</th><th>Motivo para mirar</th>'
+            . '</tr></thead><tbody>';
+
+        foreach ($filas as $f) {
+            $id = $f['id'];
+            $tms = array_map(function ($t) {
+                return '<a href="https://www.transfermarkt.es/-/startseite/verein/' . rawurlencode($t->tm_club_id)
+                    . '" target="_blank">' . e($t->nombre_tm !== null && $t->nombre_tm !== '' ? $t->nombre_tm : '(sin nombre)')
+                    . ' ↗</a> <span class="id">' . e($t->tm_club_id) . '</span>';
+            }, $f['tm']);
+
+            $cuerpo .= '<tr' . ($f['dudas'] ? ' class="warn"' : '') . '>'
+                . '<td><input type="checkbox" name="sel[]" value="' . $id . '"' . ($f['dudas'] ? '' : ' checked') . '></td>'
+                . '<td><a href="' . e(route('equipos.edit', $id)) . '" target="_blank">' . e($f['nombre']) . '</a>'
+                . ' <span class="id">#' . $id . '</span></td>'
+                . '<td><input type="text" name="nombre[' . $id . ']" value="' . e($f['limpio']) . '" style="min-width:220px"></td>'
+                . '<td><input type="date" name="desap[' . $id . ']" value="' . e($f['desap']) . '">'
+                . ($f['desap_actual'] ? '<br><span class="sub">cargada: ' . e($f['desap_actual']) . '</span>' : '') . '</td>'
+                . '<td class="num">' . e($f['fundacion'] ?: '—')
+                . ($f['desde'] ? '<br><span class="sub">TM: ' . (int) $f['desde'] . '</span>' : '') . '</td>'
+                . '<td class="num">' . e($f['ultimo'] ?: '—') . '</td>'
+                . '<td>' . ($tms ? implode('<br>', $tms) : '<span class="gris">sin atar</span>') . '</td>'
+                . '<td>' . ($f['dudas'] ? '<span class="warn">' . implode('<br>', $f['dudas']) . '</span>' : '') . '</td>'
+                . '</tr>';
+        }
+
+        $cuerpo .= '</tbody></table></div>'
+            . '<p class="acciones"><button class="boton" type="submit">Guardar los tildados</button> '
+            . '<span class="sub">escribe el nombre y la desaparición de cada tildado tal como quedaron en la fila · '
+            . 'la fecha vacía no pisa la que ya estaba</span></p></form>';
+
+        return $this->pagina('Clubes desaparecidos', $cuerpo);
+    }
+
+    /** Los equipos para repasar, con la propuesta y los motivos de duda. */
+    private function clubesDesaparecidosFilas()
+    {
+        $partir = function ($n) { return \App\Services\ClubDesaparecido::partir($n); };
+
+        // Clubes de TM atados, agrupados por equipo.
+        $tmPorEquipo = [];
+        foreach (DB::table('equipo_tm')->select('equipo_id', 'tm_club_id', 'nombre_tm')->get() as $t) {
+            $tmPorEquipo[(int) $t->equipo_id][] = $t;
+        }
+
+        $equipos = DB::table('equipos')->select('id', 'nombre', 'fundacion', 'desaparicion')->get();
+
+        // Nombres ocupados, para avisar de homónimos al renombrar.
+        $porNombre = [];
+        foreach ($equipos as $e) $porNombre[mb_strtolower(trim($e->nombre))][] = (int) $e->id;
+
+        $filas = [];
+        foreach ($equipos as $e) {
+            $id  = (int) $e->id;
+            $tms = isset($tmPorEquipo[$id]) ? $tmPorEquipo[$id] : [];
+
+            $delNombre = $partir($e->nombre);
+
+            // Clubes de TM atados: cuáles traen el paréntesis y cuáles no.
+            $tmCierre = null; $vivos = [];
+            foreach ($tms as $t) {
+                if ($t->nombre_tm === null || trim($t->nombre_tm) === '') continue;
+                $p = $partir($t->nombre_tm);
+                if ($p) { if (!$tmCierre || $p['hasta'] > $tmCierre['hasta']) $tmCierre = $p; }
+                else $vivos[] = $t->nombre_tm;
+            }
+
+            $sinFecha = !$e->desaparicion || substr($e->desaparicion, 0, 4) === '0000';
+
+            // Entra si el nombre trae el paréntesis, o si ya se llama limpio pero
+            // falta la fecha y TODO lo atado de TM dice que cerró.
+            if ($delNombre) {
+                $p = $delNombre;
+            } elseif ($sinFecha && $tmCierre && !$vivos) {
+                $p = $tmCierre;
+            } else {
+                continue;
+            }
+
+            $dudas = [];
+            if ($vivos) {
+                $dudas[] = 'También está atado a un club vivo de TM («' . e(implode('», «', $vivos))
+                    . '»): parece fusión o refundación, el club sigue';
+            }
+            $otros = array_diff(isset($porNombre[mb_strtolower($p['nombre'])]) ? $porNombre[mb_strtolower($p['nombre'])] : [], [$id]);
+            if ($otros) {
+                $dudas[] = 'Ya hay otro equipo llamado «' . e($p['nombre']) . '» (#' . implode(', #', $otros)
+                    . '): si es el mismo club, <a href="' . e(route('import_detalles.fusionar_equipos'))
+                    . '" target="_blank">unificalos</a> antes';
+            }
+
+            $filas[$id] = [
+                'id' => $id, 'nombre' => $e->nombre, 'limpio' => $p['nombre'],
+                'desde' => $p['desde'], 'hasta' => $p['hasta'],
+                'desap' => $sinFecha ? \App\Services\ClubDesaparecido::fechaDeCierre($p) : substr($e->desaparicion, 0, 10),
+                'desap_actual' => $sinFecha ? '' : substr($e->desaparicion, 0, 10),
+                'fundacion' => ($e->fundacion && substr($e->fundacion, 0, 4) !== '0000') ? substr($e->fundacion, 0, 10) : '',
+                'tm' => $tms, 'dudas' => $dudas, 'ultimo' => '',
+            ];
+        }
+
+        if (!$filas) return [];
+
+        // Último partido cargado de cada uno: uno jugado después del cierre
+        // quiere decir que el club no desapareció (o que el año está mal).
+        $ids = array_keys($filas);
+        $ult = DB::query()->fromSub(
+            DB::table('partidos')->select('equipol_id as eq', 'dia')->whereIn('equipol_id', $ids)
+                ->unionAll(DB::table('partidos')->select('equipov_id as eq', 'dia')->whereIn('equipov_id', $ids)),
+            'x')->select('eq', DB::raw('MAX(dia) as ultimo'))->groupBy('eq')->get();
+
+        foreach ($ult as $u) {
+            $id = (int) $u->eq;
+            if (!isset($filas[$id]) || !$u->ultimo) continue;
+            $filas[$id]['ultimo'] = substr($u->ultimo, 0, 10);
+            if ((int) substr($u->ultimo, 0, 4) > $filas[$id]['hasta']) {
+                $filas[$id]['dudas'][] = 'Tiene partidos cargados después de ' . $filas[$id]['hasta'];
+            }
+        }
+
+        // Primero los tildados, después los dudosos; dentro, por nombre.
+        uasort($filas, function ($a, $b) {
+            $d = (count($a['dudas']) ? 1 : 0) - (count($b['dudas']) ? 1 : 0);
+            return $d ?: strcasecmp($a['limpio'], $b['limpio']);
+        });
+
+        return array_values($filas);
+    }
+
+    /** Escribe nombre y desaparición de los tildados. Devuelve [escritos, rechazos]. */
+    private function clubesDesaparecidosGuardar(Request $request)
+    {
+        $sel    = (array) $request->get('sel', []);
+        $nombre = (array) $request->get('nombre', []);
+        $desap  = (array) $request->get('desap', []);
+
+        $escritos = []; $rechazos = [];
+
+        foreach ($sel as $sid) {
+            $id = (int) $sid;
+            if (!$id) continue;
+
+            $e = DB::table('equipos')->where('id', $id)->first();
+            if (!$e) { $rechazos[] = '#' . $id . ': ya no existe'; continue; }
+
+            $nuevo = trim((string) (isset($nombre[$id]) ? $nombre[$id] : ''));
+            if ($nuevo === '') { $rechazos[] = e($e->nombre) . ' (#' . $id . '): el nombre quedó vacío'; continue; }
+
+            $fecha = trim((string) (isset($desap[$id]) ? $desap[$id] : ''));
+            if ($fecha !== '') {
+                $d = \DateTime::createFromFormat('Y-m-d', $fecha);
+                if (!$d || $d->format('Y-m-d') !== $fecha || (int) $d->format('Y') > (int) date('Y')) {
+                    $rechazos[] = e($e->nombre) . ' (#' . $id . '): la fecha «' . e($fecha) . '» no es válida';
+                    continue;
+                }
+                if ($e->fundacion && substr($e->fundacion, 0, 4) !== '0000' && $fecha < substr($e->fundacion, 0, 10)) {
+                    $rechazos[] = e($e->nombre) . ' (#' . $id . '): la desaparición quedaría antes de la fundación';
+                    continue;
+                }
+            }
+
+            $cambios = [];
+            if ($nuevo !== $e->nombre) $cambios['nombre'] = $nuevo;
+            // Vacío no pisa: borrar una fecha cargada se hace en la edición del equipo.
+            if ($fecha !== '' && $fecha !== substr((string) $e->desaparicion, 0, 10)) $cambios['desaparicion'] = $fecha;
+
+            if (!$cambios) { $rechazos[] = e($e->nombre) . ' (#' . $id . '): no había nada que cambiar'; continue; }
+
+            DB::table('equipos')->where('id', $id)->update($cambios + ['updated_at' => now()]);
+
+            $escritos[] = '<a href="' . e(route('equipos.edit', $id)) . '" target="_blank">' . e($nuevo) . '</a>'
+                . (isset($cambios['nombre']) ? ' <span class="sub">(era «' . e($e->nombre) . '»)</span>' : '')
+                . (isset($cambios['desaparicion']) ? ' · desaparición ' . e(date('d/m/Y', strtotime($fecha))) : '');
+        }
+
+        return [$escritos, $rechazos];
+    }
+
     /**
      * Escribe los equipos elegidos. Los frenos, que son la mitad de esto:
      * sólo se toca el lado que está vacío (el que ya tenía equipo no se pisa
