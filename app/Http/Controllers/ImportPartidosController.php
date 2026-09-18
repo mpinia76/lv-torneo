@@ -2791,6 +2791,18 @@ class ImportPartidosController extends Controller
         // dato cargado y nadie lo vuelve a mirar.
         $completar = ['socios' => $sitio['socios']];
         if ($sitio['fundacion'] !== null) $completar['fundacion'] = $sitio['fundacion'];
+
+        // TM a veces tiene en «Datos y hechos» del verein viejo una fundación
+        // POSTERIOR a su propio cierre (Benidorm CF "(-2011)" con 13/10/2020,
+        // Ciudad Murcia "(- 2007)" con 25/10/2010): el dato está mal en TM, no
+        // en la lectura. Una de las dos fechas es falsa y no hay cómo saber
+        // cuál, así que la fundación no se guarda y se avisa.
+        $fundContradice = null;
+        if ($cierre && isset($completar['fundacion'])
+            && $completar['fundacion'] > \App\Services\ClubDesaparecido::fechaDeCierre($cierre)) {
+            $fundContradice = $completar['fundacion'];
+            unset($completar['fundacion']);
+        }
         if ($sitio['estadio']   !== null) $completar['estadio']   = $sitio['estadio'];
 
         $avisoNulos = '';
@@ -2847,6 +2859,12 @@ class ImportPartidosController extends Controller
 
         if ($trajo) {
             $msg .= 'De «Datos y hechos» saqué: <b>' . e(implode(' · ', $trajo)) . '</b>.<br>';
+        }
+
+        if ($fundContradice) {
+            $msg .= '<b>No guardé la fundación:</b> TM dice <b>' . e($fundContradice) . '</b>, que es posterior a su '
+                . 'propio año de cierre (' . (int) $cierre['hasta'] . '). El dato está mal en Transfermarkt; '
+                . 'cargala a mano si la sabés.<br>';
         }
 
         if ($cierre) {

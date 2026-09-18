@@ -6862,7 +6862,10 @@ class ImportDetallesController extends Controller
                 . '<td><input type="date" name="desap[' . $id . ']" value="' . e($f['desap']) . '">'
                 . ($f['desap_actual'] ? '<br><span class="sub">cargada: ' . e($f['desap_actual']) . '</span>' : '') . '</td>'
                 . '<td class="num">' . e($f['fundacion'] ?: '—')
-                . ($f['desde'] ? '<br><span class="sub">TM: ' . (int) $f['desde'] . '</span>' : '') . '</td>'
+                . ($f['desde'] ? '<br><span class="sub">TM: ' . (int) $f['desde'] . '</span>' : '')
+                . ($f['fundacion'] ? '<br><label class="sub" style="font-weight:normal"><input type="checkbox" name="vaciar_fund['
+                    . $id . ']" value="1"' . ($f['fund_despues'] ? ' checked' : '') . '> vaciar</label>' : '')
+                . '</td>'
                 . '<td class="num">' . e($f['ultimo'] ?: '—') . '</td>'
                 . '<td>' . ($tms ? implode('<br>', $tms) : '<span class="gris">sin atar</span>') . '</td>'
                 . '<td>' . ($f['dudas'] ? '<span class="warn">' . implode('<br>', $f['dudas']) . '</span>' : '') . '</td>'
@@ -6934,8 +6937,21 @@ class ImportDetallesController extends Controller
                     . '" target="_blank">unificalos</a> antes';
             }
 
+            // Fundación POSTERIOR al cierre: viene así de TM mismo («Datos y
+            // hechos» del verein viejo: Benidorm CF 13/10/2020, Ciudad Murcia
+            // 25/10/2010). Una de las dos fechas es falsa. El guardado la
+            // rechaza, así que se ofrece vaciarla en la misma fila y la fila sale
+            // destildada: la decisión es tuya.
+            $fundOk = $e->fundacion && substr($e->fundacion, 0, 4) !== '0000';
+            $fechaCierre = $sinFecha ? \App\Services\ClubDesaparecido::fechaDeCierre($p) : substr($e->desaparicion, 0, 10);
+            $fundDespues = $fundOk && substr($e->fundacion, 0, 10) > $fechaCierre;
+            if ($fundDespues) {
+                $dudas[] = 'La fundación cargada (' . e(substr($e->fundacion, 0, 10)) . ') es posterior al cierre: '
+                    . 'TM tiene las dos fechas y se contradicen. Para guardar, vaciala (tilde en la columna Fundación) o corregila en la ficha';
+            }
+
             $filas[$id] = [
-                'id' => $id, 'nombre' => $e->nombre, 'limpio' => $p['nombre'],
+                'id' => $id, 'nombre' => $e->nombre, 'limpio' => $p['nombre'], 'fund_despues' => $fundDespues,
                 'desde' => $p['desde'], 'hasta' => $p['hasta'],
                 'desap' => $sinFecha ? \App\Services\ClubDesaparecido::fechaDeCierre($p) : substr($e->desaparicion, 0, 10),
                 'desap_actual' => $sinFecha ? '' : substr($e->desaparicion, 0, 10),
@@ -6978,6 +6994,7 @@ class ImportDetallesController extends Controller
         $sel    = (array) $request->get('sel', []);
         $nombre = (array) $request->get('nombre', []);
         $desap  = (array) $request->get('desap', []);
+        $vaciar = (array) $request->get('vaciar_fund', []);
 
         $escritos = []; $rechazos = [];
 
@@ -6992,6 +7009,12 @@ class ImportDetallesController extends Controller
             if ($nuevo === '') { $rechazos[] = e($e->nombre) . ' (#' . $id . '): el nombre quedó vacío'; continue; }
 
             $fecha = trim((string) (isset($desap[$id]) ? $desap[$id] : ''));
+
+            // «vaciar» la fundación: se da por no sabida ANTES del control de
+            // fechas, así la desaparición deja de chocar con ella.
+            $vaciarFund = !empty($vaciar[$id]) && $e->fundacion && substr($e->fundacion, 0, 4) !== '0000';
+            if ($vaciarFund) $e->fundacion = null;
+
             if ($fecha !== '') {
                 $d = \DateTime::createFromFormat('Y-m-d', $fecha);
                 if (!$d || $d->format('Y-m-d') !== $fecha || (int) $d->format('Y') > (int) date('Y')) {
@@ -6999,7 +7022,7 @@ class ImportDetallesController extends Controller
                     continue;
                 }
                 if ($e->fundacion && substr($e->fundacion, 0, 4) !== '0000' && $fecha < substr($e->fundacion, 0, 10)) {
-                    $rechazos[] = e($e->nombre) . ' (#' . $id . '): la desaparición quedaría antes de la fundación';
+                    $rechazos[] = e($e->nombre) . ' (#' . $id . '): la desaparición quedaría antes de la fundación (tildá «vaciar» en la fundación o corregila en la ficha)';
                     continue;
                 }
             }
@@ -7008,6 +7031,7 @@ class ImportDetallesController extends Controller
             if ($nuevo !== $e->nombre) $cambios['nombre'] = $nuevo;
             // Vacío no pisa: borrar una fecha cargada se hace en la edición del equipo.
             if ($fecha !== '' && $fecha !== substr((string) $e->desaparicion, 0, 10)) $cambios['desaparicion'] = $fecha;
+            if ($vaciarFund) $cambios['fundacion'] = null;
 
             if (!$cambios) { $rechazos[] = e($e->nombre) . ' (#' . $id . '): no había nada que cambiar'; continue; }
 
@@ -7015,7 +7039,8 @@ class ImportDetallesController extends Controller
 
             $escritos[] = '<a href="' . e(route('equipos.edit', $id)) . '" target="_blank">' . e($nuevo) . '</a>'
                 . (isset($cambios['nombre']) ? ' <span class="sub">(era «' . e($e->nombre) . '»)</span>' : '')
-                . (isset($cambios['desaparicion']) ? ' · desaparición ' . e(date('d/m/Y', strtotime($fecha))) : '');
+                . (isset($cambios['desaparicion']) ? ' · desaparición ' . e(date('d/m/Y', strtotime($fecha))) : '')
+                . ($vaciarFund ? ' · fundación vaciada' : '');
         }
 
         return [$escritos, $rechazos];
