@@ -236,6 +236,20 @@
                     </div>
                 @endif
 
+                @if(!empty($def['marcadores_staging']))
+                    <div class="ctrl-aviso">
+                        Antes de cargar nada a mano:
+                        <a href="{{ route('import_detalles.resultados') }}" target="_blank" rel="noopener"
+                           class="btn btn-warning btn-sm">Resultados de lo ya cargado</a>
+                        <span style="margin-left:.5rem">
+                            Le pone el marcador a los partidos que bajaste antes de que el detalle lo escribiera,
+                            leyendo el fixture que ya está guardado en <code>import_partidos</code>.
+                            <b>No gasta ninguna llamada a Transfermarkt</b> y nunca pisa un resultado cargado.
+                            Los que quedan acá después de esa pasada son los que no tienen el dato en ningún lado.
+                        </span>
+                    </div>
+                @endif
+
                 @include('controles._tabla')
 
             </div>

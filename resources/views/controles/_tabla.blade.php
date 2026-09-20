@@ -164,7 +164,15 @@
                             @endif
                         </span>
                         <span class="ctrl-marcador">
-                            {{ $fila->golesl }}-{{ $fila->golesv }}
+                            {{-- Un partido sin resultado imprimía un guion
+                                 suelto, que se lee como un error de la propia
+                                 pantalla. El control "Sin resultado" muestra
+                                 justamente partidos así. --}}
+                            @if(is_null($fila->golesl) && is_null($fila->golesv))
+                                <span class="ctrl-sin-marcador">vs</span>
+                            @else
+                                {{ $fila->golesl }}-{{ $fila->golesv }}
+                            @endif
                             @if($fila->penalesl || $fila->penalesv)
                                 <span class="ctrl-penales">({{ $fila->penalesl }}-{{ $fila->penalesv }})</span>
                             @endif

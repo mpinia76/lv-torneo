@@ -159,6 +159,9 @@
     font-size: 1em;
 }
 .ctrl-penales { color: #adb5bd; font-weight: 400; }
+/* El "vs" del partido sin resultado: mismo lugar que el marcador, pero apagado
+   para que no se lea como un 0-0 cargado. */
+.ctrl-sin-marcador { color: #adb5bd; font-weight: 400; font-style: italic; }
 
 .ctrl-jugador img {
     height: 1.8em; width: 1.8em;

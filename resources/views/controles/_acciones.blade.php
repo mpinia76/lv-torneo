@@ -32,6 +32,18 @@
         // sin eso `soloMarcador()` no lo pisa. No toca alineación ni incidencias.
         'marcador'     => ['Marcador',     'ctrl-b-verde', route('import_detalles.marcador', ['partido_id' => $partido, 'forzar' => 1])],
         'jueces'       => ['Jueces',       'ctrl-b-azul',  route('partidos.arbitros', ['partidoId' => $partido])],
+        // Los dos del control "Sin resultado".
+        //
+        // `resultado` abre la fecha entera: ahí se tipea el marcador a mano y,
+        // si el partido se postergó, se corrige el día —que es el otro motivo
+        // por el que un partido aparece en ese control.
+        //
+        // `marcador_vacio` es el mismo «Marcador» de arriba pero SIN `forzar`:
+        // acá el partido no tiene resultado cargado, así que no hay nada que
+        // pisar. Con `forzar` la pantalla lo blanquea ANTES de llamar a TM, y
+        // eso en un partido vacío no aporta nada y puede dejarlo peor.
+        'resultado'      => ['Resultado', 'ctrl-b-verde', route('fechas.edit', $fila->fecha_id)],
+        'marcador_vacio' => ['Marcador',  'ctrl-b-verde', route('import_detalles.marcador', ['partido_id' => $partido])],
         // Marcar el partido como excepción: con incidencia deja de aparecer
         // en los controles.
         'incidencia'   => ['Incidencia',   'ctrl-b-gris',  route('incidencias.create', ['torneoId' => $fila->torneo_id, 'partidoId' => $partido])],

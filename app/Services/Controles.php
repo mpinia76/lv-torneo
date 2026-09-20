@@ -37,6 +37,13 @@ class Controles
     private const TTL_CONTEO = 900;
 
     /**
+     * Cuántos días se le perdonan a un partido antes de marcarlo "sin
+     * resultado". El de anoche no es un error todavía: TM tarda en publicar y
+     * el importador se corre cuando se corre.
+     */
+    private const DIAS_GRACIA = 1;
+
+    /**
      * Los totales se invalidan subiendo este número, no borrando clave por
      * clave: el driver de cache es `file` y no soporta tags.
      */
@@ -251,6 +258,21 @@ class Controles
                     'detalle'  => 'equipo_vacio',
                     'acciones' => ['incidencia'],
                     'metodo'   => 'partidosSinEquipo',
+                ],
+                'partidos.sin_resultado' => [
+                    'titulo'   => 'Sin resultado',
+                    'ayuda'    => 'El día del partido ya pasó y sigue sin marcador cargado. Es el agujero '
+                        . 'típico del fixture: la fecha entró entera con sus días y el resultado nunca se '
+                        . 'cargó. Ojo con el postergado: si el partido se movió y el día quedó viejo, lo que '
+                        . 'hay que corregir es la fecha, no el resultado.',
+                    'jugador'  => false,
+                    'detalle'  => 'sin_resultado',
+                    'acciones' => ['resultado', 'marcador_vacio', 'incidencia'],
+                    'sin_datos' => true, // acá el botón dice "No se jugó": ver motivoSinDatos()
+                    'metodo'   => 'partidosSinResultado',
+                    // Muestra el link a la pasada gratis del importador, que
+                    // completa marcadores desde el fixture ya guardado.
+                    'marcadores_staging' => true,
                 ],
             ],
 
@@ -523,6 +545,15 @@ class Controles
                 'boton' => 'Salida sin reemplazo',
                 'texto' => 'Salida sin reemplazo: Transfermarkt publica el movimiento como "Substitution without replacement" (el jugador sale y no entra nadie, con los cambios agotados). El dato está bien cargado; el control lo marca porque compara cuántos entran contra cuántos salen.',
             ],
+            // Tampoco es "sin datos": lo más probable es que el partido no se
+            // haya jugado (postergado, suspendido, anulado). Escribir "TM no
+            // publica el detalle" sería mentira, y dentro de dos años esa
+            // observación no le iba a explicar nada a nadie.
+            'partidos.sin_resultado' => [
+                'boton' => 'No se jugó',
+                'texto' => 'Sin resultado a propósito: el partido no se disputó (postergado, suspendido o '
+                    . 'anulado) o no hay ninguna fuente que publique el marcador.',
+            ],
         ];
 
         return $motivos[$clave] ?? [
@@ -553,8 +584,13 @@ class Controles
      * desde una derivada, en vez de arrancar desde partidos:
      *   ['tabla' => 'gols', 'partido' => 'gols.partido_id']
      *   ['raw' => 'SELECT ...', 'alias' => 't1', 'partido' => 't1.partido_id']
+     *
+     * Los dos últimos parámetros son para el grupo "Partidos", que mira lo que
+     * al partido le falta antes de tener detalle:
+     *   $equiposOpcionales - LEFT JOIN de equipos, para ver al que quedó sin uno;
+     *   $soloJugados       - en false, entran también los que no tienen marcador.
      */
-    public function base(array $filtros, array $origen = null, bool $equiposOpcionales = false)
+    public function base(array $filtros, array $origen = null, bool $equiposOpcionales = false, bool $soloJugados = true)
     {
         if ($origen === null) {
             $q = DB::table('partidos');
@@ -585,10 +621,18 @@ class Controles
             ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('torneos as torneo', 'grupo.torneo_id', '=', 'torneo.id');
 
-        // El filtro de "partido jugado" tampoco corre para ese chequeo: un
-        // partido al que le falta un equipo puede no tener resultado todavía y
-        // hay que verlo igual.
-        if (!$equiposOpcionales) {
+        // Todos los controles miran partidos JUGADOS: sin resultado no hay con
+        // qué comparar lo cargado, y los partidos futuros del fixture
+        // inundarían cualquier lista. Los dos chequeos del grupo "Partidos" son
+        // la excepción y lo piden explícito con `$soloJugados = false`: uno
+        // busca al que le falta un equipo (puede no haberse jugado todavía) y
+        // el otro busca justamente a los que NO tienen marcador.
+        //
+        // Hasta el 20/09/2026 este filtro colgaba de `$equiposOpcionales`, que
+        // es otra cosa: el primero que necesitó las dos por separado —INNER
+        // JOIN de equipos y sin filtro de jugado— se encontró con que no se
+        // podían pedir sueltas.
+        if ($soloJugados) {
             $q->whereNotNull('partidos.golesl')->whereNotNull('partidos.golesv');
         }
 
@@ -1157,11 +1201,55 @@ class Controles
      */
     private function partidosSinEquipo(array $filtros)
     {
-        $q = $this->base($filtros, null, true)
+        $q = $this->base($filtros, null, true, false)
             ->where(function ($w) {
                 $w->whereNull('el.id')->orWhereNull('ev.id');
             })
             ->select($this->columnas());
+
+        return $this->ordenar($this->sinIncidencia($q));
+    }
+
+    /**
+     * Partidos cuyo día ya pasó y siguen sin marcador cargado.
+     *
+     * Es el único control que mira lo que NO está en vez de lo que está mal, y
+     * el único que no puede pasar por el filtro de "partido jugado" de
+     * `base()`: justamente busca a los que no lo tienen (de ahí el
+     * `$soloJugados = false`).
+     *
+     * Tres decisiones:
+     *
+     * - **Sin `conAlineacion()`.** Un partido sin resultado casi nunca tiene
+     *   detalle: pedirlo dejaría afuera el caso más común, la fecha del fixture
+     *   que entró con sus días y a la que nunca le cargaron los resultados.
+     * - **Sólo con `dia` cargado.** Sin día no se puede saber si ya pasó, y
+     *   meter a los partidos viejos sin fecha taparía todo lo demás. Ese hueco
+     *   queda: un partido sin día y sin resultado no lo ve nadie.
+     * - **Un día de gracia.** El partido de anoche todavía no es un error: TM
+     *   tarda en publicar y el importador se corre cuando se corre. Por eso se
+     *   pide `dia` anterior a ayer y no a hoy.
+     *
+     * Las columnas de más son para leer la fila de un vistazo: cuánto hace que
+     * pasó, y si el partido tiene algo cargado. Con goles cargados y sin
+     * marcador el resultado ya está en la base —lo que falta es escribirlo en
+     * el partido— y eso es bien distinto de un partido vacío, que puede no
+     * haberse jugado nunca.
+     */
+    private function partidosSinResultado(array $filtros)
+    {
+        $q = $this->base($filtros, null, false, false)
+            ->whereNotNull('partidos.dia')
+            ->whereRaw('partidos.dia < DATE_SUB(CURDATE(), INTERVAL '.self::DIAS_GRACIA.' DAY)')
+            ->where(function ($w) {
+                $w->whereNull('partidos.golesl')->orWhereNull('partidos.golesv');
+            })
+            ->select($this->columnas())
+            ->addSelect([
+                DB::raw('DATEDIFF(CURDATE(), partidos.dia) as dias_pasados'),
+                DB::raw('(SELECT COUNT(*) FROM alineacions a WHERE a.partido_id = partidos.id) as filas_alineacion'),
+                DB::raw('(SELECT COUNT(*) FROM gols g WHERE g.partido_id = partidos.id) as filas_goles'),
+            ]);
 
         return $this->ordenar($this->sinIncidencia($q));
     }

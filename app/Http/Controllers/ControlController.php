@@ -15,8 +15,8 @@ use Illuminate\Support\Arr;
 /**
  * Panel de controles de carga.
  *
- * Una sola pantalla para los dieciocho chequeos que antes estaban repartidos
- * en siete pantallas. Cada chequeo es un link, así que en cada carga se
+ * Una sola pantalla para todos los chequeos, que antes estaban repartidos en
+ * siete. Cada chequeo es un link, así que en cada carga se
  * ejecuta UNA consulta: la del chequeo que se está mirando. Los totales del
  * menú los pide el navegador aparte, contra `conteo()`, y quedan cacheados.
  */
@@ -165,7 +165,7 @@ class ControlController extends Controller
      * `equipo_id` y `puntos` en NULL a propósito: así no se publica en el
      * front ni toca la tabla de posiciones (ver `posicionesPublic` y
      * `GrupoController`, que filtran por `whereNotNull('equipo_id')`), y el
-     * partido desaparece de los dieciocho controles.
+     * partido desaparece de TODOS los controles.
      */
     public function marcarSinDatos(Request $request)
     {
@@ -259,7 +259,7 @@ class ControlController extends Controller
      * Va con `equipo_id` y `puntos` en NULL a propósito: así no se publica en
      * el front ni toca la tabla de posiciones (ver `posicionesPublic` y
      * `GrupoController`, que filtran por `whereNotNull('equipo_id')`), y el
-     * partido desaparece de los dieciocho controles.
+     * partido desaparece de TODOS los controles.
      *
      * Devuelve `['creada' => bool, 'ya_tenia' => bool, 'texto' => string]`. No
      * invalida los conteos: eso lo hace quien llama, una sola vez, aunque haya
