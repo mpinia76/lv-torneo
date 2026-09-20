@@ -635,6 +635,31 @@ class PersonaDuplicadoController extends Controller
         ]);
     }
 
+    /**
+     * Guarda en `persona_duplicados` únicamente los pares de la contención
+     * cruzada, sin pasar por el recálculo completo.
+     */
+    public function contencionGuardar(Request $request)
+    {
+        set_time_limit(0);
+
+        $umbral = max(1, min(100, (int) $request->input('umbral', DuplicadosPersonas::UMBRAL)));
+
+        try {
+            $r = DuplicadosPersonas::guardarSimulados($umbral);
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors([
+                'error' => 'No se pudieron guardar los pares: ' . $e->getMessage(),
+            ]);
+        }
+
+        return redirect()
+            ->route('jugadores.verificarPersonas', ['umbral' => $umbral])
+            ->with('success', "Se guardaron {$r['guardados']} pares de contención cruzada"
+                . " (umbral {$umbral}). Los que ya estaban marcados como personas distintas"
+                . ' conservan ese estado y no reaparecen.');
+    }
+
     /** Marca un par como "no son la misma persona". No vuelve a aparecer. */
     public function descartar(Request $request)
     {

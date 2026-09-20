@@ -66,6 +66,7 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('verificarPersonas', 'PersonaDuplicadoController@index')->name('jugadores.verificarPersonas');
     Route::post('personas/duplicados/recalcular', 'PersonaDuplicadoController@recalcular')->name('personas.duplicados.recalcular');
     Route::get('personas/duplicados/contencion', 'PersonaDuplicadoController@contencion')->name('personas.duplicados.contencion');
+    Route::post('personas/duplicados/contencion', 'PersonaDuplicadoController@contencionGuardar')->name('personas.duplicados.contencion.guardar');
     Route::post('personas/duplicados/descartar', 'PersonaDuplicadoController@descartar')->name('personas.duplicados.descartar');
     Route::post('personas/duplicados/reabrir', 'PersonaDuplicadoController@reabrir')->name('personas.duplicados.reabrir');
     Route::post('personas/duplicados/fusionar', 'PersonaDuplicadoController@fusionar')->name('personas.duplicados.fusionar');

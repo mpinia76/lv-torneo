@@ -646,6 +646,38 @@ class DuplicadosPersonas
         return ['pares' => $pares, 'sobre_umbral' => $sobre, 'umbral' => $umbral];
     }
 
+    /**
+     * Guarda SOLO los pares de la contención cruzada, sin recalcular la base
+     * entera. Es el atajo para cuando el recálculo completo no es viable (en
+     * un hosting sin consola y con max_execution_time corto, el bloque D es lo
+     * último que corre y es lo primero que se pierde si el script se corta).
+     *
+     * Usa el mismo guardarPares() que recalcular(), así que respeta todo:
+     * persona_id es el id menor, y un par ya marcado "personas distintas"
+     * conserva su estado y NO revive.
+     */
+    public static function guardarSimulados(int $umbral = self::UMBRAL): array
+    {
+        $r     = self::simularContencion($umbral);
+        $pares = [];
+
+        foreach ($r['pares'] as $p) {
+            if ($p['puntaje'] < $umbral) {
+                continue;
+            }
+            $pares[$p['a'] . '-' . $p['b']] = [
+                'puntaje' => $p['puntaje'],
+                'motivo'  => $p['motivo'],
+            ];
+        }
+
+        return [
+            'guardados' => $pares ? self::guardarPares($pares) : 0,
+            'candidatos' => count($r['pares']),
+            'umbral'    => $umbral,
+        ];
+    }
+
     /** Trae a memoria lo mínimo de cada persona para poder puntuar sin ir a la base. */
     private static function cargarPersonas(): array
     {

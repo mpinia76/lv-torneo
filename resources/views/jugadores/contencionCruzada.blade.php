@@ -81,14 +81,22 @@
                 </tbody>
             </table>
 
-            <form method="POST" action="{{ route('personas.duplicados.recalcular') }}"
-                  onsubmit="return confirm('Se van a recalcular los pares candidatos. ¿Seguir?');">
+            <form method="POST" action="{{ route('personas.duplicados.contencion.guardar') }}" class="mb-2">
                 @csrf
                 <input type="hidden" name="umbral" value="{{ $umbral }}">
-                <button class="btn btn-primary">Aplicar: recalcular pares (sin reindexar)</button>
+                <button class="btn btn-primary">Guardar solo estos pares</button>
                 <span class="small text-muted">
-                    La regla no agrega tokens nuevos, así que no hace falta reconstruir el índice.
+                    Los agrega a Posibles repetidos sin recalcular toda la base: son unas pocas
+                    filas, no depende de que el recálculo completo llegue al final.
+                    Un par ya marcado como "personas distintas" conserva ese estado.
                 </span>
+            </form>
+
+            <form method="POST" action="{{ route('personas.duplicados.recalcular') }}"
+                  onsubmit="return confirm('Se van a recalcular TODOS los pares candidatos. Puede tardar. ¿Seguir?');">
+                @csrf
+                <input type="hidden" name="umbral" value="{{ $umbral }}">
+                <button class="btn btn-outline-secondary btn-sm">Recalcular todo (sin reindexar)</button>
             </form>
         @endif
     </div>
