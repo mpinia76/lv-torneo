@@ -1865,8 +1865,12 @@ class TmDetallePartido
 
         $gameId = trim((string) $gameId);
         if ($gameId === '') {
+            // Sólo `aplicado`/`duplicado`: una fila en `conflicto` guarda el
+            // partido con el que CHOCÓ, no el que es. Ver
+            // ImportDetallesController::ESTADOS_ATADOS.
             $fila = DB::table('import_partidos')->where('partido_id', $partido->id)
-                ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+                ->whereNotNull('external_id')->whereIn('estado', ['aplicado', 'duplicado'])
+                ->orderBy('id', 'desc')->first();
             if ($fila) $gameId = (string) $fila->external_id;
         }
         if ($gameId === '') {

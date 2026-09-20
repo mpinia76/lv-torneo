@@ -31,6 +31,18 @@ use App\Services\FusionPersonas;
  */
 class ImportDetallesController extends Controller
 {
+    /**
+     * Los únicos estados en los que una fila de `import_partidos` AFIRMA que
+     * ese gameId es ese partido.
+     *
+     * Una fila en `conflicto` también guarda `partido_id`, pero ahí el número
+     * significa «choqué con ese partido», no «soy ese partido». Leyendo sin
+     * filtrar, el gameId de un partido que NO se creó se le cuela al partido
+     * que lo bloqueó: pasa a contar como «más de un gameId» y, por ser la fila
+     * más nueva, pasa a ser «el que lee el sistema». Caso real: el Athletic–
+     * Austria Viena (30995) mandando sobre el Athletic–Getafe #28275.
+     */
+    const ESTADOS_ATADOS = ['aplicado', 'duplicado'];
     // ═══════════════════════════════ LISTA ═══════════════════════════════
 
     public function index(Request $request)
@@ -538,7 +550,7 @@ class ImportDetallesController extends Controller
         $fila = null;
         if ($partidoId) {
             $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
-                ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+                ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)->orderBy('id', 'desc')->first();
             if ($fila && $gameId === '') $gameId = (string) $fila->external_id;
         }
 
@@ -657,7 +669,7 @@ class ImportDetallesController extends Controller
             // reusa la que se leyó al principio, la pantalla sigue mostrando el
             // gameId viejo en el encabezado y parece que no se guardó nada.
             $fila = DB::table('import_partidos')->where('partido_id', $partidoId)
-                ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+                ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)->orderBy('id', 'desc')->first();
         }
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
@@ -1255,7 +1267,7 @@ class ImportDetallesController extends Controller
         $filas = DB::table('import_partidos')
             ->where('fuente', 'transfermarkt')
             ->where('partido_id', $partidoId)
-            ->whereNotNull('external_id')
+            ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)
             ->orderBy('id', 'desc')
             ->get(['id', 'external_id', 'dia', 'local', 'club_nombre', 'rival_nombre',
                 'goles_favor', 'goles_contra', 'ronda', 'estado', 'motivo', 'tecnico_id']);
@@ -1333,7 +1345,7 @@ class ImportDetallesController extends Controller
         foreach (DB::table('import_partidos')
                      ->where('fuente', 'transfermarkt')
                      ->whereIn('partido_id', $partidoIds)
-                     ->whereNotNull('external_id')
+                     ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)
                      ->get(['partido_id', 'external_id']) as $f) {
             $id = trim((string) $f->external_id);
             if ($id === '') continue;
@@ -1368,7 +1380,7 @@ class ImportDetallesController extends Controller
         // El que el sistema lee hoy es la fila MÁS NUEVA con external_id: el
         // mismo criterio que `correrUno()`. Ver `TmBuscarGameId::desatarOtras()`.
         $fila   = DB::table('import_partidos')->where('partido_id', $partidoId)
-            ->whereNotNull('external_id')->orderBy('id', 'desc')->first();
+            ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)->orderBy('id', 'desc')->first();
         $gameId = $fila ? trim((string) $fila->external_id) : '';
         $otros  = $this->gameIdsDelPartido($partidoId, $gameId);
 
@@ -3662,7 +3674,7 @@ class ImportDetallesController extends Controller
             // mirás. Si algo se cae, los demás siguen.
             $lote = $unPartido
                 ? DB::table('import_partidos')->where('partido_id', $unPartido)
-                    ->whereNotNull('external_id')->orderByDesc('id')->limit(1)->get()
+                    ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)->orderByDesc('id')->limit(1)->get()
                 : (clone $base())->orderByDesc('dia')->limit($n)->get();
             $imp  = new TmDetallePartido;
             $fechasLote = $this->mapaFechas($lote->pluck('partido_id')->all());
@@ -4032,7 +4044,7 @@ class ImportDetallesController extends Controller
         if ($correr && ($pendientes || $unPartido)) {
             $lote = $unPartido
                 ? DB::table('import_partidos')->where('partido_id', $unPartido)
-                    ->whereNotNull('external_id')->orderByDesc('id')->limit(1)->get()
+                    ->whereNotNull('external_id')->whereIn('estado', self::ESTADOS_ATADOS)->orderByDesc('id')->limit(1)->get()
                 : (clone $base())->orderByDesc('dia')->limit($n)->get();
             $imp = new TmDetallePartido;
             $fechasLote = $this->mapaFechas($lote->pluck('partido_id')->all());
