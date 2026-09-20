@@ -146,6 +146,9 @@
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('personas.apellidos') }}">Apellidos partidos &rarr;</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('personas.duplicados.contencion', ['umbral' => $umbral]) }}">Contención cruzada (simulación) &rarr;</a>
+            </li>
         </ul>
 
         {{-- ================================================================

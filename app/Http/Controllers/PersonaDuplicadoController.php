@@ -596,6 +596,45 @@ class PersonaDuplicadoController extends Controller
         return redirect()->back()->with('success', $mensaje);
     }
 
+    /**
+     * Simulación de la regla de contención cruzada del bloque D: muestra los
+     * pares que la regla agregaría y NO escribe nada.
+     *
+     * Existe porque el hosting no tiene consola: es el equivalente en pantalla
+     * de "php artisan personas:contencion". Se mira acá, y recién si el ruido
+     * cierra se aprieta Recalcular.
+     */
+    public function contencion(Request $request)
+    {
+        set_time_limit(0);
+
+        $umbral = max(1, min(100, (int) $request->input('umbral', DuplicadosPersonas::UMBRAL)));
+        $todos  = $request->boolean('todos');
+
+        try {
+            $r = DuplicadosPersonas::simularContencion($umbral);
+        } catch (\Exception $e) {
+            return redirect()->route('jugadores.verificarPersonas')->withErrors([
+                'error' => 'No se pudo simular: ' . $e->getMessage(),
+            ]);
+        }
+
+        $pares = $r['pares'];
+        if (!$todos) {
+            $pares = array_values(array_filter($pares, function ($p) use ($umbral) {
+                return $p['puntaje'] >= $umbral;
+            }));
+        }
+
+        return view('jugadores.contencionCruzada', [
+            'pares'       => $pares,
+            'total'       => count($r['pares']),
+            'sobreUmbral' => $r['sobre_umbral'],
+            'umbral'      => $umbral,
+            'todos'       => $todos,
+        ]);
+    }
+
     /** Marca un par como "no son la misma persona". No vuelve a aparecer. */
     public function descartar(Request $request)
     {

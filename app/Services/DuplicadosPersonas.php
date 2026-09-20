@@ -19,7 +19,11 @@ use Illuminate\Support\Facades\Schema;
  *      junta "Petruchi" con "Petrucchi" y "Perez" con "Peres". Sin este
  *      bloque esos pares no dan bajo puntaje — no se generan nunca.
  *   D) misma fecha de nacimiento exacta, y solo si además el apellido es casi
- *      igual: cubre los tipeos que la clave reducida no llega a juntar.
+ *      igual O todos los tokens de una ficha están en la otra ignorando en qué
+ *      campo cayeron: cubre los tipeos que la clave reducida no llega a juntar
+ *      y el nombre de pila cargado como apellido ("Luis / Enrique" contra
+ *      "Luis Enrique / Martínez García", que son la misma persona y no
+ *      comparten ningún token de apellido). Ver contencionCruzada().
  *
  * Todo el trabajo pesado pasa acá, una vez, fuera de la pantalla.
  */
@@ -526,6 +530,122 @@ class DuplicadosPersonas
         ];
     }
 
+    /**
+     * Dry-run de la regla de contención cruzada: NO escribe nada.
+     *
+     * Recorre el mismo bloque D (personas con la misma fecha de nacimiento) y
+     * devuelve solo los pares que aparecen por la regla nueva, es decir los
+     * que hoy el sistema no arma: sin apellido en común, sin apellido casi
+     * igual, y con una ficha contenida en la otra.
+     *
+     * Sirve para medir el impacto antes de reindexar y recalcular de verdad.
+     *
+     * @return array ['pares' => [...], 'sobre_umbral' => int, 'umbral' => int]
+     */
+    public static function simularContencion(int $umbral = self::UMBRAL): array
+    {
+        $personas = self::cargarPersonas();
+        $pares    = [];
+
+        $fechas = DB::table('personas')
+            ->select('nacimiento', DB::raw('GROUP_CONCAT(id) as ids'), DB::raw('COUNT(*) as n'))
+            ->whereNotNull('nacimiento')
+            ->groupBy('nacimiento')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        foreach ($fechas as $f) {
+            if ($f->n > self::MAX_POR_TOKEN_R) {
+                continue;
+            }
+
+            $ids = array_map('intval', explode(',', $f->ids));
+            sort($ids);
+            $n = count($ids);
+
+            for ($i = 0; $i < $n; $i++) {
+                $a = $ids[$i];
+                if (!isset($personas[$a])) {
+                    continue;
+                }
+                for ($j = $i + 1; $j < $n; $j++) {
+                    $b = $ids[$j];
+                    if (!isset($personas[$b])) {
+                        continue;
+                    }
+
+                    // Lo que ya ve el bloque B: apellido exacto en común.
+                    if (array_intersect($personas[$a]['a'], $personas[$b]['a'])) {
+                        continue;
+                    }
+                    // Lo que ya ve la regla vieja del bloque D.
+                    if (self::apellidosCasiIguales($personas[$a]['a'], $personas[$b]['a'])) {
+                        continue;
+                    }
+                    if (!self::contencionCruzada($personas[$a], $personas[$b])) {
+                        continue;
+                    }
+
+                    $r = self::puntuar($personas[$a], $personas[$b]);
+
+                    $pares[] = [
+                        'a'        => $a,
+                        'b'        => $b,
+                        'puntaje'  => $r['puntaje'],
+                        'motivo'   => $r['motivo'],
+                        'fecha'    => $personas[$a]['nacimiento'],
+                        'tm_a'     => $personas[$a]['tm'],
+                        'tm_b'     => $personas[$b]['tm'],
+                        'roles_a'  => implode('/', array_keys($personas[$a]['roles'])),
+                        'roles_b'  => implode('/', array_keys($personas[$b]['roles'])),
+                    ];
+                }
+            }
+        }
+
+        if (!$pares) {
+            return ['pares' => [], 'sobre_umbral' => 0, 'umbral' => $umbral];
+        }
+
+        // Nombres para mostrar y estado actual del par (puede estar descartado).
+        $ids = [];
+        foreach ($pares as $par) {
+            $ids[$par['a']] = true;
+            $ids[$par['b']] = true;
+        }
+        $nombres = [];
+        foreach (DB::table('personas')
+                     ->whereIn('id', array_keys($ids))
+                     ->get(['id', 'nombre', 'apellido']) as $f) {
+            $nombres[(int) $f->id] = trim($f->apellido . ', ' . $f->nombre, ', ');
+        }
+
+        $estados = [];
+        foreach (DB::table('persona_duplicados')
+                     ->whereIn('persona_id', array_keys($ids))
+                     ->whereIn('simil_id', array_keys($ids))
+                     ->get(['persona_id', 'simil_id', 'estado']) as $d) {
+            $estados[$d->persona_id . '-' . $d->simil_id] = $d->estado;
+        }
+
+        $sobre = 0;
+        foreach ($pares as $k => $par) {
+            $pares[$k]['nombre_a'] = isset($nombres[$par['a']]) ? $nombres[$par['a']] : '?';
+            $pares[$k]['nombre_b'] = isset($nombres[$par['b']]) ? $nombres[$par['b']] : '?';
+            $clave = $par['a'] . '-' . $par['b'];
+            $pares[$k]['estado_actual'] = isset($estados[$clave]) ? $estados[$clave] : null;
+            if ($par['puntaje'] >= $umbral) {
+                $sobre++;
+            }
+        }
+
+        usort($pares, function ($x, $y) {
+            return $y['puntaje'] - $x['puntaje'];
+        });
+
+        return ['pares' => $pares, 'sobre_umbral' => $sobre, 'umbral' => $umbral];
+    }
+
     /** Trae a memoria lo mínimo de cada persona para poder puntuar sin ir a la base. */
     private static function cargarPersonas(): array
     {
@@ -593,7 +713,8 @@ class DuplicadosPersonas
      * @param bool $soloDistintoApellido saltear los pares que comparten un
      *        apellido exacto: ya se compararon en el bloque de apellido.
      * @param bool $exigirApellidoParecido puntuar solo si además los apellidos
-     *        son casi iguales (bloque de fecha de nacimiento).
+     *        son casi iguales, o si una ficha está contenida en la otra
+     *        ignorando el campo (bloque de fecha de nacimiento).
      */
     private static function acumularPares(
         array $ids,
@@ -629,7 +750,8 @@ class DuplicadosPersonas
                 }
 
                 if ($exigirApellidoParecido
-                    && !self::apellidosCasiIguales($personas[$a]['a'], $personas[$b]['a'])) {
+                    && !self::apellidosCasiIguales($personas[$a]['a'], $personas[$b]['a'])
+                    && !self::contencionCruzada($personas[$a], $personas[$b])) {
                     continue;
                 }
 
@@ -693,7 +815,34 @@ class DuplicadosPersonas
             $jaccard   = $ni / $union;
             $contenido = ($ni === count($tokA) || $ni === count($tokB));
 
-            if (!$apeComun) {
+            // Contención completa SIN ningún apellido en común. Pasa cuando el
+            // nombre de pila quedó cargado como apellido: "Luis / Enrique"
+            // contra "Luis Enrique / Martínez García". Por los campos no hay
+            // apellido que compartir, pero todos los tokens de una ficha están
+            // en la otra.
+            //
+            // El ancla es la fecha de nacimiento EXACTAMENTE igual. Sin ella
+            // cualquier "Luis Enrique" entraría en cualquier "Luis Enrique
+            // <apellidos>" y la pantalla se llenaría. Por eso el par lo arma
+            // solo el bloque D (contencionCruzada()), que ya agrupa por fecha.
+            //
+            // 88 es la misma base que la contención dentro del mismo campo.
+            // Con el +12 de la fecha llega a 100, así que sobrevive al -30 de
+            // "fichas de Transfermarkt distintas" (queda justo en 70): es
+            // deliberado, porque este error de carga sale casi siempre de dos
+            // fichas de TM distintas de la misma persona (la de jugador y la
+            // de técnico, típicamente).
+            $contencionCruzada = !$apeComun
+                && $contenido
+                && min(count($tokA), count($tokB)) >= 2
+                && $p1['nacimiento'] && $p2['nacimiento']
+                && $p1['nacimiento'] === $p2['nacimiento'];
+
+            if ($contencionCruzada) {
+                $base   = 88;
+                $motivo = 'una ficha contenida en la otra, con el apellido cargado como nombre';
+                $nombreFuerte = true;
+            } elseif (!$apeComun) {
                 // Comparten nombres de pila pero ningún apellido: casi nunca es lo mismo.
                 $base   = (int) round(55 * $jaccard);
                 $motivo = 'coinciden nombres, no el apellido';
@@ -806,6 +955,35 @@ class DuplicadosPersonas
         }
 
         return ['puntaje' => $puntaje, 'motivo' => mb_substr($motivo, 0, 150)];
+    }
+
+    /**
+     * ¿Están todos los tokens de una ficha en la otra, sin mirar si cayeron en
+     * nombre o en apellido?
+     *
+     * Es el caso del nombre de pila cargado como apellido: "Luis / Enrique" y
+     * "Luis Enrique / Martínez García" son la misma persona, pero no comparten
+     * ningún token de apellido, así que no los junta el bloque de apellido, ni
+     * la clave reducida, ni apellidosCasiIguales().
+     *
+     * Se exige contención COMPLETA y al menos dos tokens del lado corto: con
+     * uno solo ("Luis" adentro de cualquier Luis) sería puro ruido. Quien
+     * llama —el bloque D— ya exige además la misma fecha de nacimiento exacta
+     * y que las dos fichas no compartan ningún apellido.
+     */
+    public static function contencionCruzada(array $p1, array $p2): bool
+    {
+        $a = isset($p1['t']) ? $p1['t'] : array_values(array_unique(array_merge($p1['n'], $p1['a'])));
+        $b = isset($p2['t']) ? $p2['t'] : array_values(array_unique(array_merge($p2['n'], $p2['a'])));
+
+        $corto = count($a) <= count($b) ? $a : $b;
+        $largo = count($a) <= count($b) ? $b : $a;
+
+        if (count($corto) < 2) {
+            return false;
+        }
+
+        return count(array_intersect($corto, $largo)) === count($corto);
     }
 
     /**
