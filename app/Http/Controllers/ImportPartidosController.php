@@ -5148,9 +5148,56 @@ class ImportPartidosController extends Controller
                 $filas[$i]['motivo'] = 'sin mapear: ' . implode(' / ', $faltan);
             } else {
                 // Antes de darlo por nuevo: ¿ese día el club ya jugó contra OTRO equipo?
-                // Si sí, el partido existe y el que está mal es el mapeo del rival.
+                // Si sí, el partido PUEDE ser el mismo y el que está mal ser el mapeo
+                // del rival. Pero esa deducción sólo vale si los dos pueden ser el
+                // mismo partido, y dos partidos de competencias distintas no lo son
+                // nunca. La ventana de `partidoDelDia()` es de ±1 día, y liga el
+                // domingo + copa el jueves es la semana normal de cualquier equipo:
+                // así se perdió la vuelta de Copa del Rey Athletic 6:0 UD Lanzarote
+                // (17/01/2005), acusada de ser el Athletic–Espanyol del 16/01.
+                // Mismo criterio de competencia que ya usa `buscarPartidoAplazado()`.
                 $otro = $this->partidoDelDia($equipoId, $f['dia']);
-                if ($otro) {
+                $ctxOtro  = $otro ? $this->contextoPartido($otro->id) : null;
+                $compTm   = trim((string) $f['competencia_external_id']);
+                $otraComp = $ctxOtro && $compTm !== '' && $ctxOtro['comp'] !== ''
+                    && $ctxOtro['comp'] !== $compTm;
+                $mismoDia = $otro && substr((string) $otro->dia, 0, 10) === substr((string) $f['dia'], 0, 10);
+
+                if ($otro && $otraComp) {
+                    // No puede ser el mismo partido. NO se toca el mapeo del rival y
+                    // NO se escribe `partido_id`: la fila no es de ese partido, sólo
+                    // chocó con él.
+                    $rivalOtro = ((int) $otro->equipol_id === (int) $equipoId) ? $otro->equipov_id : $otro->equipol_id;
+                    $donde = 'el partido #' . $otro->id . ' contra ' . $this->nombreEquipo($rivalOtro)
+                        . ' (' . $ctxOtro['comp'] . ' ≠ ' . $compTm . ')';
+
+                    if ($mismoDia) {
+                        // Un club no juega dos veces el mismo día: una de las dos
+                        // fechas está mal, casi siempre la de Transfermarkt. Hay que
+                        // mirarlo antes de crear nada. Caso real: Athletic–Austria
+                        // Viena (UEFA) fechado el mismo día que Athletic–Getafe (ES1).
+                        $filas[$i]['estado'] = 'conflicto';
+                        $filas[$i]['motivo'] = 'ese día ya tenés ' . $donde . ': no es este partido, es de '
+                            . 'otra competencia. Un club no juega dos veces el mismo día, así que una de las dos '
+                            . 'fechas está mal — revisá la de TM antes de crearlo';
+                    } else {
+                        // Días distintos y competencias distintas: fútbol normal.
+                        $filas[$i]['estado'] = 'nuevo';
+                        $cerca[] = 'el ' . substr((string) $otro->dia, 0, 10) . ' tenés ' . $donde
+                            . ', de otra competencia: por eso este se crea igual';
+                    }
+                } elseif ($otro && !$mismoDia) {
+                    // Misma competencia —o no se puede saber— pero otro día. No
+                    // alcanza para acusar al mapeo, y tampoco para crearlo de una.
+                    $rivalOtro = ((int) $otro->equipol_id === (int) $equipoId) ? $otro->equipov_id : $otro->equipol_id;
+                    $filas[$i]['estado'] = 'conflicto';
+                    $filas[$i]['partido_id'] = $otro->id;
+                    $filas[$i]['rival_real_id'] = $rivalOtro;
+                    $filas[$i]['motivo'] = 'el ' . substr((string) $otro->dia, 0, 10) . ' tenés el partido #'
+                        . $otro->id . ' contra ' . $this->nombreEquipo($rivalOtro) . ' (#' . $rivalOtro . '), '
+                        . 'a un día de éste y sin poder confirmar que sean de competencias distintas: '
+                        . 'mirá si no es el mismo partido con el rival mal mapeado';
+                } elseif ($otro) {
                     $rivalReal = ((int) $otro->equipol_id === (int) $equipoId) ? $otro->equipov_id : $otro->equipol_id;
                     $filas[$i]['estado'] = 'conflicto';
                     $filas[$i]['partido_id'] = $otro->id;
@@ -5331,7 +5378,14 @@ class ImportPartidosController extends Controller
         return $cache[$id];
     }
 
-    /** Cualquier partido de ese equipo ese día, sin importar el rival. */
+    /**
+     * Cualquier partido de ese equipo ese día, sin importar el rival.
+     *
+     * La ventana sigue siendo de ±1 día, pero gana el del MISMO día cuando hay
+     * más de uno: quien llama distingue «mismo día» (un club no juega dos veces)
+     * de «a un día» (liga el domingo, copa el jueves), y con `first()` a secas se
+     * comía el del día exacto por puro orden de tabla.
+     */
     private function partidoDelDia($equipoId, $dia)
     {
         $d0 = date('Y-m-d 00:00:00', strtotime($dia . ' -1 day'));
@@ -5339,7 +5393,9 @@ class ImportPartidosController extends Controller
         return \App\Partido::whereBetween('dia', [$d0, $d1])
             ->where(function ($q) use ($equipoId) {
                 $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
-            })->first();
+            })
+            ->orderByRaw('ABS(DATEDIFF(dia, ?))', [substr((string) $dia, 0, 10)])
+            ->first();
     }
 
     private function nombreEquipo($id)
