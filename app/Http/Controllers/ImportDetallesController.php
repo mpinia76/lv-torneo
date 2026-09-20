@@ -268,6 +268,10 @@ class ImportDetallesController extends Controller
                 . '(' . $paraRehacer . ' llamadas)</span></p>';
         }
 
+        if ($dobles) {
+            $cuerpo .= $this->cartelDobles($dobles, $filas, $marcadores);
+        }
+
         if (empty($pendientes)) {
             $cuerpo .= '<div class="ok-box">No queda ningún partido sin detalle' . ($tecnicoId ? ' para este DT' : '') . '.</div>';
             return $this->pagina('Detalle de partidos', $cuerpo);
@@ -283,14 +287,6 @@ class ImportDetallesController extends Controller
                 'n' => 10, 'comp' => $comp ?: null, 'ronda' => $ronda ?: null, 'seguir' => 1])))
             . '">Bajar todos de a 10, solo</a>'
             . ' <span class="sub">encadena tandas hasta vaciar la lista; se puede parar</span></p>';
-
-        if ($dobles) {
-            $cuerpo .= '<div class="err-box"><b>Hay ' . count($dobles) . ' partido(s) con más de un gameId.</b><br>'
-                . 'Dos fichas distintas de Transfermarkt dicen ser el mismo partido tuyo. Casi siempre es una '
-                . '<b>llave de ida y vuelta</b> con una sola mitad cargada en la base: el mismo par de equipos a '
-                . 'pocos días, que ningún chequeo de clubes distingue. Al que baje primero le queda la alineación '
-                . 'del otro. Están marcados abajo con <b class="err">×N</b>.</div>';
-        }
 
         $cuerpo .= '<div class="scroll"><table><thead><tr>'
             . '<th>Fecha</th><th>Competencia</th><th>Local</th><th></th><th>Visitante</th><th>Res.</th>'
@@ -1279,6 +1275,53 @@ class ImportDetallesController extends Controller
      * marcarlos en la lista. Una sola consulta para todos; devuelve nada más
      * que los que tienen más de uno.
      */
+    /**
+     * El cartel de «más de un gameId», con los partidos NOMBRADOS.
+     *
+     * Antes sólo decía cuántos eran y mandaba a buscar la marca ×N «abajo». Pero
+     * la tabla de abajo lista los partidos SIN detalle, y el caso típico —una
+     * llave con una sola mitad cargada— ya tiene el detalle bajado: el cartel
+     * contaba 2 y en la tabla no había ninguna ×N que mirar. Tampoco salía el
+     * cartel cuando no quedaba nada pendiente, porque el listado retornaba
+     * antes. Ahora el cartel nombra cada partido con su link, no depende de que
+     * la fila se esté mostrando, y se dibuja aunque la lista esté vacía.
+     *
+     * $filas trae una fila por gameId, así que se toma la primera de cada
+     * partido para los nombres.
+     */
+    private function cartelDobles(array $dobles, $filas, array $marcadores)
+    {
+        $datos = [];
+        foreach ($filas as $f) {
+            $pid = (int) $f->partido_id;
+            if (!isset($dobles[$pid]) || isset($datos[$pid])) continue;
+            $datos[$pid] = $f;
+        }
+
+        $html = '<div class="err-box"><b>Hay ' . count($dobles) . ' partido(s) con más de un gameId.</b><br>'
+            . 'Dos fichas distintas de Transfermarkt dicen ser el mismo partido tuyo. Casi siempre es una '
+            . '<b>llave de ida y vuelta</b> con una sola mitad cargada en la base: el mismo par de equipos a '
+            . 'pocos días, que ningún chequeo de clubes distingue. Al que baje primero le queda la alineación '
+            . 'del otro.<ul style="margin:8px 0 0 18px">';
+
+        foreach ($dobles as $pid => $n) {
+            $pid = (int) $pid;
+            $f = isset($datos[$pid]) ? $datos[$pid] : null;
+            $m = isset($marcadores[$pid]) ? $marcadores[$pid] : null;
+            $texto = $f
+                ? $this->diaDelPartido($f, $m) . ' · ' . e($f->competencia_nombre) . ' · '
+                  . e($f->local ? $f->club_nombre : $f->rival_nombre) . ' vs '
+                  . e($f->local ? $f->rival_nombre : $f->club_nombre)
+                  . ' (' . $this->resultado($f, $m) . ')'
+                : 'partido';
+            $html .= '<li>' . $texto . ' <span class="id">#' . $pid . '</span> — '
+                . '<a class="err" href="' . e(route('import_detalles.gameids', ['partido_id' => $pid]))
+                . '"><b>×' . (int) $n . ' gameId: resolver</b></a></li>';
+        }
+
+        return $html . '</ul></div>';
+    }
+
     private function partidosConVariosGameId(array $partidoIds)
     {
         $partidoIds = array_values(array_unique(array_filter(array_map('intval', $partidoIds))));
