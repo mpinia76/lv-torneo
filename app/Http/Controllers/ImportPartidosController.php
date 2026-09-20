@@ -5187,16 +5187,22 @@ class ImportPartidosController extends Controller
                             . ', de otra competencia: por eso este se crea igual';
                     }
                 } elseif ($otro && !$mismoDia) {
-                    // Misma competencia —o no se puede saber— pero otro día. No
-                    // alcanza para acusar al mapeo, y tampoco para crearlo de una.
+                    // Misma competencia —o, lo más común, sin poder saberlo porque al
+                    // torneo le falta `tm_competition_id`— pero otro día. Queda
+                    // frenado para que lo mire una persona, pero SIN `rival_real_id`:
+                    // esa columna es la que arma el botón «Corregir» de «Mapeos que no
+                    // cierran», y ofrecer un remapeo de club exige estar seguro de que
+                    // los dos son el mismo partido. A un día de distancia y sin la
+                    // competencia, eso es una corazonada, y un remapeo equivocado no se
+                    // nota nunca más.
                     $rivalOtro = ((int) $otro->equipol_id === (int) $equipoId) ? $otro->equipov_id : $otro->equipol_id;
                     $filas[$i]['estado'] = 'conflicto';
                     $filas[$i]['partido_id'] = $otro->id;
-                    $filas[$i]['rival_real_id'] = $rivalOtro;
                     $filas[$i]['motivo'] = 'el ' . substr((string) $otro->dia, 0, 10) . ' tenés el partido #'
                         . $otro->id . ' contra ' . $this->nombreEquipo($rivalOtro) . ' (#' . $rivalOtro . '), '
-                        . 'a un día de éste y sin poder confirmar que sean de competencias distintas: '
-                        . 'mirá si no es el mismo partido con el rival mal mapeado';
+                        . 'a un día de éste. No puedo confirmar si son de la misma competencia'
+                        . ($ctxOtro && $ctxOtro['comp'] === '' ? ' (a ese torneo le falta el id de competencia de TM)' : '')
+                        . ': si son dos partidos distintos, cargá ese id y volvé a sondear';
                 } elseif ($otro) {
                     $rivalReal = ((int) $otro->equipol_id === (int) $equipoId) ? $otro->equipov_id : $otro->equipol_id;
                     $filas[$i]['estado'] = 'conflicto';
