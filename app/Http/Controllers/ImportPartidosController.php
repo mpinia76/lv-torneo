@@ -4032,6 +4032,34 @@ class ImportPartidosController extends Controller
                 $renombradas = 0; $movidos = 0; $borradas = 0;
 
                 DB::transaction(function () use ($plan, &$renombradas, &$movidos, &$borradas) {
+                    // 0. Nombres temporales para TODAS las que cambian.
+                    //
+                    // En producción `fechas` tiene un índice único que la
+                    // migración no muestra (la tabla se tocó a mano), así que
+                    // dos fechas del mismo grupo no pueden llamarse igual ni
+                    // por un instante. Al correr las rondas de lugar —«Octavos»
+                    // pasa a «Cuartos» y «Cuartos» a «Semifinal»— el primer
+                    // UPDATE chocaba contra el nombre que la segunda todavía no
+                    // había soltado, y salía un **500 en blanco**: el chequeo de
+                    // arriba mira los nombres FINALES, que no se repiten, así
+                    // que la pantalla dejaba pasar algo que la base rechazaba.
+                    // Pasó de verdad con la Champions 2012/13, grupo Playoffs
+                    // #968, el 20/09/2026; se resolvió a mano en dos pasadas.
+                    //
+                    // Con el nombre temporal, el intercambio entra de una. Va
+                    // adentro de la misma transacción: si algo falla después,
+                    // ninguna fecha queda llamándose «~tmp».
+                    foreach ($plan as $x) {
+                        if ($x['destino']) continue;
+                        if ((string) $x['fecha']->numero === $x['nombre']) continue;
+
+                        $tmp = ['numero' => '~tmp' . (int) $x['fecha']->id];
+                        if (Schema::hasColumn('fechas', 'url_nombre')) {
+                            $tmp['url_nombre'] = 'tmp-' . (int) $x['fecha']->id;
+                        }
+                        DB::table('fechas')->where('id', $x['fecha']->id)->update($tmp);
+                    }
+
                     foreach ($plan as $x) {                       // 1. renombrar las que se quedan
                         if ($x['destino']) continue;
                         if ((string) $x['fecha']->numero === $x['nombre']) continue;
