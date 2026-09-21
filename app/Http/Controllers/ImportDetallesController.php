@@ -6575,7 +6575,7 @@ class ImportDetallesController extends Controller
      *
      * No escribe nada: es todo de tu base y mirar no gasta ninguna llamada.
      */
-    public function equiposRepetidos(Request $request)
+    public function equiposRepetidos(Request $request, $aviso = '')
     {
         set_time_limit(0);
 
@@ -6594,9 +6594,13 @@ class ImportDetallesController extends Controller
             . '<p class="sub"><b>Fijate primero la columna «Registros».</b> Si una de las dos fichas está vacía no '
             . 'hay nada que unificar: se borra. Unificar es para cuando las dos tienen historia.</p>'
             . '<p class="sub">Un par donde los dos equipos <b>jugaron entre sí</b> no se lista: si se enfrentaron '
-            . 'no son el mismo club. <b>No gasta ninguna llamada</b> y mirar no escribe nada.</p>';
+            . 'no son el mismo club. <b>No gasta ninguna llamada</b> y mirar no escribe nada.</p>'
+            . $aviso;
 
-        $cuerpo .= '<form method="get" class="acciones">'
+        // El action explícito no es adorno: después de borrar, la URL es la del
+        // POST y un form sin action mandaría el filtro ahí, que no acepta GET.
+        $cuerpo .= '<form method="get" class="acciones" action="'
+            . e(route('import_detalles.equipos_repetidos')) . '">'
             . '<label class="sub">Umbral</label> '
             . '<input type="number" name="umbral" value="' . $umbral . '" min="50" max="100" size="4"> '
             . '<label class="sub">Buscar</label> '
@@ -6661,6 +6665,26 @@ class ImportDetallesController extends Controller
             return $txt;
         };
 
+        // El botón de borrar. La pregunta viaja por `data-` y no interpolada
+        // adentro del string de JavaScript: un apóstrofo en el nombre del club
+        // («Newell's») partiría el confirm al medio.
+        $volver = ['umbral' => $umbral, 'buscar' => $buscar, 'cruzar_pais' => $cruzar ? 1 : 0];
+        $borrar = function ($id, $nombre) use ($volver) {
+            $campos = '';
+            foreach ($volver as $k => $v) {
+                $campos .= '<input type="hidden" name="' . $k . '" value="' . e((string) $v) . '">';
+            }
+            return '<form method="post" style="display:inline" action="'
+                . e(route('import_detalles.equipos_repetidos_borrar')) . '"'
+                . ' data-pregunta="' . e('Borrar la ficha #' . $id . ' «' . $nombre . '»? No tiene ningún '
+                    . 'registro, pero el borrado no se puede deshacer.') . '"'
+                . ' onsubmit="return confirm(this.getAttribute(\'data-pregunta\'))">'
+                . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                . '<input type="hidden" name="equipo_id" value="' . (int) $id . '">'
+                . $campos
+                . '<button class="boton" type="submit">Borrar el #' . (int) $id . '</button></form> ';
+        };
+
         $cuerpo .= '<div class="scroll"><table><thead><tr><th class="num">Puntaje</th><th>Un equipo</th>'
             . '<th>El otro</th><th>Por qué aparece</th><th>Qué hacer</th></tr></thead><tbody>';
 
@@ -6668,18 +6692,21 @@ class ImportDetallesController extends Controller
             $a = $p['a']; $b = $p['b'];
 
             if ($p['vacia']) {
-                $vac  = $p['vacia'];
+                $vac   = $p['vacia'];
                 $lleno = $vac === $a ? $b : $a;
                 $nombreVacia = $p['equipos'][$vac]['nombre'];
-                $accion = '<b>Borrar el #' . $vac . '</b><br><span class="sub">No tiene ninguna fila colgando: '
-                    . 'unificar no movería nada. Toda la historia está en el #' . $lleno . '.</span><br>'
-                    . '<a class="boton-sec" href="' . e(route('equipos.index', ['buscarpor' => $nombreVacia]))
-                    . '" target="_blank">Buscarlo en Equipos</a>';
+
                 if (!$p['reg'][$a] && !$p['reg'][$b]) {
                     $accion = '<b>Las dos fichas están vacías</b><br><span class="sub">Ninguna se usa en ningún '
-                        . 'lado: quedate con la que tenga mejor nombre y borrá la otra.</span><br>'
-                        . '<a class="boton-sec" href="' . e(route('equipos.index', ['buscarpor' => $nombreVacia]))
-                        . '" target="_blank">Buscarlas en Equipos</a>';
+                        . 'lado: quedate con la que tenga mejor nombre y borrá la otra.</span>'
+                        . $borrar($a, $p['equipos'][$a]['nombre'])
+                        . $borrar($b, $p['equipos'][$b]['nombre']);
+                } else {
+                    $accion = '<span class="sub">No tiene ninguna fila colgando: unificar no movería nada. '
+                        . 'Toda la historia está en el #' . $lleno . '.</span>'
+                        . $borrar($vac, $nombreVacia)
+                        . '<br><a class="boton-sec" href="' . e(route('equipos.index', ['buscarpor' => $nombreVacia]))
+                        . '" target="_blank">Verlo en Equipos</a>';
                 }
             } else {
                 $accion = '<a class="boton" href="' . e(route('import_detalles.fusionar_equipos',
@@ -6703,6 +6730,74 @@ class ImportDetallesController extends Controller
             . 'antes de tocarlas.</p>';
 
         return $this->pagina('Equipos repetidos', $cuerpo);
+    }
+
+    /**
+     * Borra una ficha de equipo que no tiene NADA colgando.
+     *
+     * Es la otra mitad de «Equipos que parecen el mismo club»: cuando una de
+     * las dos fichas está vacía no hay nada que unificar, y mandar al usuario a
+     * buscarla al listado de Equipos para apretar Eliminar es hacerle repetir a
+     * mano lo que la pantalla ya sabe.
+     *
+     * Las tres reglas, que son las mismas que el borrado de personas huérfanas:
+     *
+     * 1. **No se confía en lo que vio el navegador.** El conteo se rehace acá
+     *    adentro de la transacción, con la fila de `equipos` tomada con
+     *    `lockForUpdate()`. Entre que se dibujó la pantalla y se apretó el
+     *    botón pudo entrar una alineación.
+     * 2. **Un solo criterio de "vacía".** Las tablas salen de
+     *    `DuplicadosEquipos::columnasDeEquipo()`, la misma lista que usa la
+     *    pantalla para mostrar «ficha vacía» y la fusión para mudar filas. Con
+     *    dos listas aparecería un botón que el servidor rechaza siempre.
+     * 3. **Si hay una sola fila, no se borra nada** y se dice dónde está. El
+     *    borrado a lo bruto que hacen `JugadorController@destroy` y sus hermanos
+     *    —`delete()` sin contar— es justo lo que tira el 500 por foreign key.
+     *
+     * No tiene vuelta atrás: por eso el botón pregunta antes y el nombre del
+     * equipo viaja por `data-`, no interpolado adentro del string de JavaScript
+     * (un apóstrofo en el nombre parte el `confirm` al medio).
+     */
+    public function borrarEquipoVacio(Request $request)
+    {
+        $id = (int) $request->get('equipo_id', 0);
+
+        $aviso = '';
+        if (!$id) {
+            $aviso = '<div class="err-box">No vino ningún equipo para borrar.</div>';
+            return $this->equiposRepetidos($request, $aviso);
+        }
+
+        $nombre = $this->nombreEquipo($id);
+        $problema = '';
+
+        try {
+            DB::transaction(function () use ($id, &$problema) {
+                $eq = DB::table('equipos')->where('id', $id)->lockForUpdate()->first();
+                if (!$eq) { $problema = 'El equipo #' . $id . ' ya no está en la base.'; return; }
+
+                foreach (\App\Services\DuplicadosEquipos::columnasDeEquipo() as $c) {
+                    $n = DB::table($c['tabla'])->where($c['columna'], $id)->count();
+                    if ($n) {
+                        $problema = 'El equipo #' . $id . ' tiene ' . $n . ' fila(s) en <code>'
+                            . e($c['tabla']) . '.' . e($c['columna']) . '</code>: no está vacío y no se borró '
+                            . 'nada. Si de verdad es el mismo club, unificalo en vez de borrarlo.';
+                        return;
+                    }
+                }
+
+                DB::table('equipos')->where('id', $id)->delete();
+            });
+        } catch (\Exception $e) {
+            $problema = 'La base no dejó borrarlo y volvió todo atrás: ' . e($e->getMessage());
+        }
+
+        $aviso = $problema
+            ? '<div class="err-box">' . $problema . '</div>'
+            : '<div class="ok-box"><b>Borrado el equipo #' . $id . '</b> («' . e((string) $nombre) . '»). '
+                . 'No tenía ninguna fila colgando.</div>';
+
+        return $this->equiposRepetidos($request, $aviso);
     }
 
     /**

@@ -318,6 +318,12 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     // vacía, que es el otro final posible.
     Route::get('/import-detalles/equipos-repetidos', 'ImportDetallesController@equiposRepetidos')
         ->name('import_detalles.equipos_repetidos');
+    // Lo único que escribe esa pantalla: borrar una ficha de equipo que no
+    // tiene nada colgando (el otro final posible del par, cuando unificar no
+    // movería ninguna fila). Re-cuenta adentro de la transacción antes de
+    // borrar: no confía en lo que vio el navegador.
+    Route::post('/import-detalles/equipos-repetidos/borrar', 'ImportDetallesController@borrarEquipoVacio')
+        ->name('import_detalles.equipos_repetidos_borrar');
 
     // Clubes que TM marca como desaparecidos con "(- 2019)" / "(1981-2019)" al
     // final del nombre: nombre limpio + año a equipos.desaparicion. El GET sólo
