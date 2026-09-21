@@ -60,6 +60,59 @@ class DuplicadosEquipos
     ];
 
     /**
+     * Los pares que alguien ya miró y marcó «no son el mismo club».
+     *
+     * Devuelve ['menor-mayor' => fila]. Si la tabla todavía no existe —la
+     * migración no se corrió— devuelve vacío en vez de romper: la pantalla
+     * sigue sirviendo, sólo que sin memoria, y el aviso lo dice.
+     */
+    public static function descartados(): array
+    {
+        if (!Schema::hasTable('equipo_descartados')) return [];
+
+        $out = [];
+        foreach (DB::table('equipo_descartados')->get() as $d) {
+            $out[(int) $d->equipo_id . '-' . (int) $d->equipo2_id] = $d;
+        }
+        return $out;
+    }
+
+    /** ¿Está la tabla? La pantalla necesita saberlo para avisar. */
+    public static function hayTablaDescartados(): bool
+    {
+        return Schema::hasTable('equipo_descartados');
+    }
+
+    /**
+     * Marca un par como «no son el mismo club».
+     *
+     * El par se guarda siempre menor-mayor, y se usa `updateOrInsert` para que
+     * marcar dos veces no explote contra el índice único (pasa: se aprieta el
+     * botón, se vuelve atrás con el navegador y se aprieta otra vez).
+     */
+    public static function descartar(int $a, int $b, string $motivo = '', $userId = null): void
+    {
+        if (!$a || !$b || $a === $b || !Schema::hasTable('equipo_descartados')) return;
+
+        $par = ['equipo_id' => min($a, $b), 'equipo2_id' => max($a, $b)];
+        DB::table('equipo_descartados')->updateOrInsert($par, $par + [
+            'motivo'     => ($motivo !== '' ? mb_substr($motivo, 0, 255) : null),
+            'user_id'    => $userId,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ]);
+    }
+
+    /** Lo vuelve a poner en la lista. */
+    public static function reabrir(int $a, int $b): void
+    {
+        if (!$a || !$b || !Schema::hasTable('equipo_descartados')) return;
+
+        DB::table('equipo_descartados')
+            ->where('equipo_id', min($a, $b))->where('equipo2_id', max($a, $b))->delete();
+    }
+
+    /**
      * Todas las columnas que apuntan a `equipos.id`.
      *
      * Vive acá y no en el controlador porque la usan los dos: la pantalla de
@@ -103,6 +156,8 @@ class DuplicadosEquipos
      */
     public static function pares(int $umbral = self::UMBRAL, bool $cruzarPais = false): array
     {
+        $descartados = self::descartados();
+
         $equipos = [];
         foreach (DB::table('equipos')
                      ->select('id', 'nombre', 'pais', 'estadio', 'escudo', 'fundacion')
@@ -113,7 +168,8 @@ class DuplicadosEquipos
         $candidatos = self::generar($equipos, $cruzarPais);
 
         if (!$candidatos) {
-            return ['pares' => [], 'equipos' => count($equipos), 'jugaron' => 0, 'tope' => false];
+            return ['pares' => [], 'equipos' => count($equipos), 'jugaron' => 0,
+                'marcados' => count($descartados), 'tope' => false];
         }
 
         // Los datos que necesitan consulta se piden UNA vez para todos los ids
@@ -128,10 +184,14 @@ class DuplicadosEquipos
         $entreSi   = self::jugaronEntreSi($ids);
         $torneos   = self::torneosPorEquipo($ids);
 
-        $pares = []; $jugaron = 0;
+        $pares = []; $jugaron = 0; $marcados = 0;
         foreach ($candidatos as $c) {
             $a = $c['a']; $b = $c['b'];
             $clave = $a . '-' . $b;
+
+            // La decisión humana manda sobre cualquier puntaje: si alguien ya
+            // dijo que no son el mismo club, el par no vuelve a aparecer.
+            if (isset($descartados[$clave])) { $marcados++; continue; }
 
             // Freno duro: si se enfrentaron, no son el mismo club. No es una
             // conjetura ni un puntaje bajo — es un partido cargado.
@@ -154,8 +214,19 @@ class DuplicadosEquipos
 
             $ra = isset($registros[$a]) ? $registros[$a] : 0;
             $rb = isset($registros[$b]) ? $registros[$b] : 0;
-            if (!$ra || !$rb) {
-                $puntaje += 5; $motivos[] = 'una de las dos fichas está vacía';
+
+            // La fundación es lo que mejor separa el duplicado del homónimo: los
+            // duplicados de verdad tienen las dos el MISMO año (LA Galaxy 1994,
+            // Dinamo Zagreb 1911, Sunderland 1879) y los homónimos, años
+            // distintos (Ferro 1904/1934, Huracán 1908/1923). Pero acá se dice,
+            // no se descuenta: descontar lo suficiente como para esconderlos
+            // los sacaría de la lista ANTES de que alguien pueda marcarlos, y
+            // un duplicado real con un año mal cargado desaparecería sin que
+            // nadie se entere. Esconder para siempre es decisión de una
+            // persona, y para eso está «No son el mismo club».
+            if ($ra && $rb && $ea['fundacion'] && $eb['fundacion']
+                && $ea['fundacion'] !== $eb['fundacion']) {
+                $motivos[] = 'ojo: fundaciones distintas (' . $ea['fundacion'] . ' / ' . $eb['fundacion'] . ')';
             }
 
             // Compartir torneo no prueba nada solo —dos clubes distintos juegan
@@ -201,7 +272,8 @@ class DuplicadosEquipos
         $tope = count($pares) > self::TOPE;
         if ($tope) $pares = array_slice($pares, 0, self::TOPE);
 
-        return ['pares' => $pares, 'equipos' => count($equipos), 'jugaron' => $jugaron, 'tope' => $tope];
+        return ['pares' => $pares, 'equipos' => count($equipos), 'jugaron' => $jugaron,
+            'marcados' => $marcados, 'tope' => $tope];
     }
 
     /** Las claves de comparación de un equipo, calculadas una sola vez. */

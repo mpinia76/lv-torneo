@@ -325,6 +325,11 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::post('/import-detalles/equipos-repetidos/borrar', 'ImportDetallesController@borrarEquipoVacio')
         ->name('import_detalles.equipos_repetidos_borrar');
 
+    // «No son el mismo club» y su vuelta atrás. Lo único que se guarda de la
+    // decisión humana: los candidatos se recalculan solos, esto no.
+    Route::post('/import-detalles/equipos-repetidos/marcar', 'ImportDetallesController@marcarEquiposDistintos')
+        ->name('import_detalles.equipos_repetidos_marcar');
+
     // Clubes que TM marca como desaparecidos con "(- 2019)" / "(1981-2019)" al
     // final del nombre: nombre limpio + año a equipos.desaparicion. El GET sólo
     // muestra; el POST escribe los tildados.

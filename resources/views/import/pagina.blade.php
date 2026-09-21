@@ -66,6 +66,14 @@
         .import-tm th,.import-tm td{padding:6px 10px;border-bottom:1px solid #eceee9;text-align:left;white-space:nowrap}
         .import-tm thead th{position:sticky;top:0;background:#eef1ec;font-size:11px;text-transform:uppercase;letter-spacing:.05em;z-index:1}
         .import-tm td.num{font-variant-numeric:tabular-nums}
+        /* Celdas que SÍ cortan línea. Las tablas del importador van con
+           `nowrap` para que las filas de datos no se deformen, pero una celda
+           con texto largo (el motivo de un candidato, una botonera) empuja la
+           tabla más ancha que la pantalla y manda la última columna fuera de
+           vista: el usuario ve una tabla y no ve el botón. */
+        .import-tm td.wrap{white-space:normal;max-width:34ch}
+        .import-tm td.hacer{white-space:normal;max-width:26ch}
+        .import-tm td.hacer form{margin:4px 4px 0 0}
         .import-tm .id{color:#9aa69f;font-size:11px}
         .import-tm input,.import-tm button,.import-tm select{font:13px inherit;padding:3px 6px;border:1px solid #c7cec7;background:#fff}
         .import-tm button{cursor:pointer;background:#eef1ec}

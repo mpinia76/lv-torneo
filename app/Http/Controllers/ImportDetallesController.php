@@ -6583,6 +6583,11 @@ class ImportDetallesController extends Controller
         $umbral = max(50, min(100, $umbral));
         $cruzar = (string) $request->get('cruzar_pais', '0') === '1';
         $buscar = trim((string) $request->get('buscar', ''));
+        $ver    = (string) $request->get('ver', '');
+
+        // Los filtros viajan en cada POST para volver a la misma vista.
+        $volver = ['umbral' => $umbral, 'buscar' => $buscar, 'cruzar_pais' => $cruzar ? 1 : 0];
+        $hayTabla = \App\Services\DuplicadosEquipos::hayTablaDescartados();
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a>'
             . ' · <a href="' . e(route('import_detalles.fusionar_equipos')) . '">Unificar dos equipos</a></p>'
@@ -6610,10 +6615,26 @@ class ImportDetallesController extends Controller
             . '<button class="boton" type="submit">Ver</button>'
             . '</form>'
             . '<p class="sub">El umbral es qué tan parecidos tienen que ser los nombres: 100 es idéntico, 95 «suena '
-            . 'igual», 86 uno adentro del otro, 78 a dos letras de distancia. Bajalo para ver más y peores.</p>';
+            . 'igual», 86 uno adentro del otro, 78 a dos letras de distancia. Después suma o resta lo que dice la '
+            . 'ficha: mismo estadio, mismo escudo y misma fundación suman, y jugar torneos en común sin '
+            . 'cruzarse resta 15. Bajá el umbral para ver los que quedaron abajo.</p>';
+
+        if (!$hayTabla) {
+            $cuerpo .= '<div class="warn-box">Falta la tabla <code>equipo_descartados</code>: hasta que corras '
+                . '<code>php artisan migrate</code>, el botón «No son el mismo club» no puede guardar nada y los '
+                . 'pares que ya miraste van a volver a salir.</div>';
+        }
 
         $r     = \App\Services\DuplicadosEquipos::pares($umbral, $cruzar);
         $pares = $r['pares'];
+
+        if ($ver === 'descartados') {
+            $cuerpo .= '<h2>Pares que marcaste «no son el mismo club»</h2>'
+                . '<p class="sub"><a href="' . e(route('import_detalles.equipos_repetidos', $volver))
+                . '">← volver a los candidatos</a></p>'
+                . $this->equiposDescartadosHtml($volver);
+            return $this->pagina('Equipos repetidos', $cuerpo);
+        }
 
         if ($buscar !== '') {
             $b = mb_strtolower($buscar, 'UTF-8');
@@ -6631,6 +6652,9 @@ class ImportDetallesController extends Controller
                 . 'jugaron entre sí' : '')
             . ($r['tope'] ? ' · <b>la lista se cortó en ' . \App\Services\DuplicadosEquipos::TOPE
                 . '</b>: subí el umbral' : '')
+            . (!empty($r['marcados']) ? ' · <b>' . (int) $r['marcados'] . '</b> que ya marcaste como '
+                . '<a href="' . e(route('import_detalles.equipos_repetidos', $volver + ['ver' => 'descartados']))
+                . '">clubes distintos</a>' : '')
             . '.</p>';
 
         if (!$pares) {
@@ -6668,7 +6692,6 @@ class ImportDetallesController extends Controller
         // El botón de borrar. La pregunta viaja por `data-` y no interpolada
         // adentro del string de JavaScript: un apóstrofo en el nombre del club
         // («Newell's») partiría el confirm al medio.
-        $volver = ['umbral' => $umbral, 'buscar' => $buscar, 'cruzar_pais' => $cruzar ? 1 : 0];
         $borrar = function ($id, $nombre) use ($volver) {
             $campos = '';
             foreach ($volver as $k => $v) {
@@ -6685,8 +6708,29 @@ class ImportDetallesController extends Controller
                 . '<button class="boton" type="submit">Borrar el #' . (int) $id . '</button></form> ';
         };
 
+        // «No son el mismo club»: la única forma de que un par deje de salir
+        // para siempre. Va en TODAS las filas, incluidas las de ficha vacía:
+        // una ficha vacía puede ser igual un club distinto que nunca se usó.
+        $distintos = function ($x, $y) use ($volver, $hayTabla) {
+            if (!$hayTabla) return '';
+
+            $campos = '';
+            foreach ($volver as $k => $v) {
+                $campos .= '<input type="hidden" name="' . $k . '" value="' . e((string) $v) . '">';
+            }
+            return '<form method="post" style="display:inline" action="'
+                . e(route('import_detalles.equipos_repetidos_marcar')) . '">'
+                . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                . '<input type="hidden" name="equipo_a" value="' . (int) $x . '">'
+                . '<input type="hidden" name="equipo_b" value="' . (int) $y . '">'
+                . '<input type="text" name="motivo" size="14" placeholder="por qué (opcional)"> '
+                . '<button class="boton-sec" type="submit">No son el mismo club</button></form>';
+        };
+
+        // «Qué hacer» va ANTES del motivo: es la columna que se usa, y si queda
+        // última se la come el ancho de la tabla y el botón no se ve.
         $cuerpo .= '<div class="scroll"><table><thead><tr><th class="num">Puntaje</th><th>Un equipo</th>'
-            . '<th>El otro</th><th>Por qué aparece</th><th>Qué hacer</th></tr></thead><tbody>';
+            . '<th>El otro</th><th>Qué hacer</th><th>Por qué aparece</th></tr></thead><tbody>';
 
         foreach ($pares as $p) {
             $a = $p['a']; $b = $p['b'];
@@ -6720,8 +6764,8 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<tr' . $clase . '><td class="num"><b>' . (int) $p['puntaje'] . '</b></td>'
                 . '<td>' . $ficha($a, $p) . '</td>'
                 . '<td>' . $ficha($b, $p) . '</td>'
-                . '<td class="sub">' . e(implode(' · ', $p['motivos'])) . '</td>'
-                . '<td>' . $accion . '</td></tr>';
+                . '<td class="hacer">' . $accion . '<br>' . $distintos($a, $b) . '</td>'
+                . '<td class="sub wrap">' . e(implode(' · ', $p['motivos'])) . '</td></tr>';
         }
 
         $cuerpo .= '</tbody></table></div>'
@@ -6798,6 +6842,96 @@ class ImportDetallesController extends Controller
                 . 'No tenía ninguna fila colgando.</div>';
 
         return $this->equiposRepetidos($request, $aviso);
+    }
+
+    /**
+     * «No son el mismo club» / «volver a mirarlo».
+     *
+     * El otro final de un par, y el más común de todos: dos clubes que se
+     * llaman casi igual y se van a llamar casi igual para siempre (Ferro y
+     * Ferro de General Pico, Huracán y Huracán de Tres Arroyos). Sin esto
+     * vuelven a salir en cada carga, y una lista que siempre muestra lo mismo
+     * deja de mirarse — que es exactamente como se pierden los duplicados de
+     * verdad.
+     *
+     * Es lo único que la pantalla guarda además del borrado, y es una decisión
+     * de una persona: por eso se marca de a uno, con su motivo, y se puede
+     * volver atrás desde la solapa «Ya marcados» (a diferencia del borrado,
+     * que no tiene vuelta).
+     */
+    public function marcarEquiposDistintos(Request $request)
+    {
+        $a = (int) $request->get('equipo_a', 0);
+        $b = (int) $request->get('equipo_b', 0);
+        $accion = (string) $request->get('accion', 'descartar');
+
+        if (!$a || !$b || $a === $b) {
+            return $this->equiposRepetidos($request, '<div class="err-box">No vino ningún par.</div>');
+        }
+
+        if (!\App\Services\DuplicadosEquipos::hayTablaDescartados()) {
+            return $this->equiposRepetidos($request, '<div class="err-box">Falta la tabla '
+                . '<code>equipo_descartados</code>: corré <code>php artisan migrate</code> y volvé.</div>');
+        }
+
+        $na = $this->nombreEquipo($a);
+        $nb = $this->nombreEquipo($b);
+
+        if ($accion === 'reabrir') {
+            \App\Services\DuplicadosEquipos::reabrir($a, $b);
+            $aviso = '<div class="ok-box">«' . e((string) $na) . '» #' . $a . ' y «' . e((string) $nb) . '» #' . $b
+                . ' vuelven a la lista.</div>';
+        } else {
+            \App\Services\DuplicadosEquipos::descartar($a, $b, trim((string) $request->get('motivo', '')),
+                optional($request->user())->id);
+            $aviso = '<div class="ok-box">Anotado: «' . e((string) $na) . '» #' . $a . ' y «' . e((string) $nb)
+                . '» #' . $b . ' <b>no son el mismo club</b>. No vuelven a aparecer.</div>';
+        }
+
+        return $this->equiposRepetidos($request, $aviso);
+    }
+
+    /** La solapa de los pares ya marcados, para revisarlos o deshacerlos. */
+    private function equiposDescartadosHtml($volver)
+    {
+        $filas = \App\Services\DuplicadosEquipos::descartados();
+
+        if (!$filas) {
+            return '<div class="diag">Todavía no marcaste ningún par como «no son el mismo club».</div>';
+        }
+
+        $ids = [];
+        foreach ($filas as $d) { $ids[] = (int) $d->equipo_id; $ids[] = (int) $d->equipo2_id; }
+        $nombres = DB::table('equipos')->whereIn('id', array_unique($ids))->pluck('nombre', 'id');
+
+        $nombre = function ($id) use ($nombres) {
+            return isset($nombres[$id]) ? $nombres[$id] : '(borrado)';
+        };
+
+        $out = '<div class="scroll"><table><thead><tr><th>Un equipo</th><th>El otro</th><th>Motivo</th>'
+            . '<th>Cuándo</th><th>Qué hacer</th></tr></thead><tbody>';
+
+        foreach ($filas as $d) {
+            $a = (int) $d->equipo_id; $b = (int) $d->equipo2_id;
+            $campos = '';
+            foreach ($volver as $k => $v) {
+                $campos .= '<input type="hidden" name="' . $k . '" value="' . e((string) $v) . '">';
+            }
+            $out .= '<tr><td>' . e((string) $nombre($a)) . ' <span class="sub">#' . $a . '</span></td>'
+                . '<td>' . e((string) $nombre($b)) . ' <span class="sub">#' . $b . '</span></td>'
+                . '<td class="sub wrap">' . e((string) ($d->motivo ?: '—')) . '</td>'
+                . '<td class="sub">' . e(substr((string) $d->created_at, 0, 10)) . '</td>'
+                . '<td class="hacer"><form method="post" style="display:inline" action="'
+                . e(route('import_detalles.equipos_repetidos_marcar')) . '">'
+                . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                . '<input type="hidden" name="accion" value="reabrir">'
+                . '<input type="hidden" name="equipo_a" value="' . $a . '">'
+                . '<input type="hidden" name="equipo_b" value="' . $b . '">'
+                . $campos
+                . '<button class="boton-sec" type="submit">Volver a mirarlo</button></form></td></tr>';
+        }
+
+        return $out . '</tbody></table></div>';
     }
 
     /**
