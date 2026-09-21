@@ -20,6 +20,27 @@ if (!function_exists('removeAccents')) {
 }
 
 
+if (!function_exists('partirEscudo')) {
+    /**
+     * Separa el escudo del resto en una cadena "escudo_id_...".
+     * El archivo puede traer guiones bajos (escudo_tm_683.png), así que se
+     * corta en la extensión de imagen y no en el primer "_".
+     * Devuelve [escudo, resto], con resto = "id_...".
+     */
+    function partirEscudo($cadena)
+    {
+        $cadena = (string) $cadena;
+
+        if (preg_match('/^(.*?\.(?:png|jpe?g|gif|svg|webp))_(.*)$/is', $cadena, $m)) {
+            return [$m[1], $m[2]];
+        }
+
+        // Sin escudo ("_769_...") o una extensión desconocida: como antes
+        $partes = explode('_', $cadena, 2);
+        return [$partes[0], isset($partes[1]) ? $partes[1] : ''];
+    }
+}
+
 if (!function_exists('clubesDesdeCadena')) {
     /**
      * Lee las cadenas "escudo_equipoId_[datos...]_nombre[_titulos]" que arma
@@ -45,9 +66,10 @@ if (!function_exists('clubesDesdeCadena')) {
                 continue;
             }
 
-            $partes = explode('_', $item);
+            [$escudo, $resto] = partirEscudo($item);
+            $partes = explode('_', $resto);
             $club   = [
-                'escudo'  => array_shift($partes),
+                'escudo'  => $escudo,
                 'id'      => array_shift($partes),
                 'titulos' => '',
             ];
