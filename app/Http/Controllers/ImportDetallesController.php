@@ -244,6 +244,8 @@ class ImportDetallesController extends Controller
             . '<a class="boton-sec" href="' . e(route('import_detalles.sembrar')) . '">Sembrar jugador_tm desde las URLs</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.revisar')) . '">Jugadores por revisar (' . $porRevisar . ')</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.clubes_tm')) . '">Clubes de Transfermarkt</a>'
+            . '<a class="boton-sec" href="' . e(route('import_detalles.equipos_repetidos'))
+            . '">Equipos repetidos</a>'
             . ($sinEquipo
                 ? '<a class="boton-sec" href="' . e(route('import_detalles.equipos_vacios'))
                 . '">Partidos con un equipo vacío (' . $sinEquipo . ')</a>'
@@ -6257,32 +6259,17 @@ class ImportDetallesController extends Controller
      *
      * Devuelve `[['tabla' => t, 'columna' => c, 'de' => 'fk'|'lista'], ...]`.
      */
+    /**
+     * Todas las columnas que apuntan a `equipos.id`.
+     *
+     * La lista vive en `DuplicadosEquipos` porque la usan las dos pantallas: la
+     * de unificar (para mudar las filas) y la de equipos repetidos (para contar
+     * cuánto tiene cada ficha). Con dos listas, un día una diría «ficha vacía»
+     * de una ficha que la otra todavía muda.
+     */
     private function columnasDeEquipo()
     {
-        $base = DB::getDatabaseName();
-
-        $cols = [];
-        $filas = DB::select(
-            'SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.KEY_COLUMN_USAGE '
-            . 'WHERE TABLE_SCHEMA = ? AND REFERENCED_TABLE_NAME = ? AND REFERENCED_COLUMN_NAME = ? '
-            . 'ORDER BY TABLE_NAME, COLUMN_NAME', [$base, 'equipos', 'id']);
-        foreach ($filas as $f) {
-            $cols[$f->t . '.' . $f->c] = ['tabla' => $f->t, 'columna' => $f->c, 'de' => 'fk'];
-        }
-
-        // Las que no tienen FK. Están verificadas una por una contra el código
-        // que las escribe: `equipo_tm.equipo_id` es el mapeo con Transfermarkt,
-        // y en `import_partidos` el club y el rival de la fila de staging son
-        // equipos nuestros (`TmDetallePartido::mapaDesdeStaging()` los usa así).
-        foreach ([['equipo_tm', 'equipo_id'], ['import_partidos', 'equipo_id'],
-                     ['import_partidos', 'rival_id']] as $par) {
-            list($t, $c) = $par;
-            if (isset($cols[$t . '.' . $c])) continue;
-            if (!Schema::hasTable($t) || !Schema::hasColumn($t, $c)) continue;
-            $cols[$t . '.' . $c] = ['tabla' => $t, 'columna' => $c, 'de' => 'lista'];
-        }
-
-        return array_values($cols);
+        return \App\Services\DuplicadosEquipos::columnasDeEquipo();
     }
 
     /**
@@ -6379,7 +6366,8 @@ class ImportDetallesController extends Controller
         $aplicar = (string) $request->get('aplicar', '0') === '1';
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.clubes_tm')) . '">← Clubes de '
-            . 'Transfermarkt</a></p>'
+            . 'Transfermarkt</a> · <a href="' . e(route('import_detalles.equipos_repetidos'))
+            . '">Equipos que parecen el mismo club</a></p>'
             . '<h1>Unificar dos equipos que son el mismo club</h1>'
             . '<p class="sub">Para cuando un club tuyo quedó <b>partido en dos equipos</b>. Pasa porque '
             . 'Transfermarkt <b>renombra el mismo verein</b> cuando el club se muda o se rebautiza —Cortuluá y '
@@ -6404,7 +6392,10 @@ class ImportDetallesController extends Controller
             . '<button class="boton" type="submit">Ver qué se movería</button></form>';
 
         if (!$origen || !$destino) {
-            $cuerpo .= '<p class="sub">Elegí los dos equipos. Conviene que <b>se vaya el que tiene menos</b> '
+            $cuerpo .= '<p class="sub">Si no sabés cuáles están partidos en dos, la lista la arma sola '
+                . '<a href="' . e(route('import_detalles.equipos_repetidos')) . '">Equipos que parecen el mismo '
+                . 'club</a>.</p>'
+                . '<p class="sub">Elegí los dos equipos. Conviene que <b>se vaya el que tiene menos</b> '
                 . 'registros —normalmente el que creó el importador con el nombre nuevo—, y que quede el que tiene '
                 . 'la historia. El nombre del que queda se cambia después, desde su ficha: unificar no lo toca.</p>';
             return $this->pagina('Unificar equipos', $cuerpo);
@@ -6556,6 +6547,163 @@ class ImportDetallesController extends Controller
         return $this->pagina('Unificar equipos', $cuerpo);
     }
 
+
+    /**
+     * Equipos que parecen ser el mismo club.
+     *
+     * La pantalla de al lado —«Unificar dos equipos»— arregla un club partido
+     * en dos, pero hay que saber de antemano CUÁL está partido. Acá aparece la
+     * lista sola: los pares de equipos cuyos nombres se parecen tanto que casi
+     * seguro son la misma ficha cargada dos veces («Olympiacos Piraeus» y
+     * «Olympiakos Piraeus», «Olympique Lyon» y «Olympique Lyonnais»).
+     *
+     * Dos cosas que conviene entender antes de mirar la lista:
+     *
+     * 1. **No todo par se arregla unificando.** En la mitad de los casos una de
+     *    las dos fichas está VACÍA —el importador la creó, o quedó de una carga
+     *    a mano— y ahí unificar no mueve nada: lo que corresponde es borrar la
+     *    ficha de más. La columna «Registros» es la que lo dice, y la fila
+     *    ofrece el camino que corresponde, no los dos.
+     * 2. **La lista no es una sentencia.** Dos clubes distintos del mismo país
+     *    se llaman parecido todo el tiempo. Por eso cada fila dice POR QUÉ entró
+     *    y muestra las señales (estadio, fundación, escudo, años con partidos,
+     *    clubes de TM atados): la decisión es de quien mira.
+     *
+     * El único descarte automático es el par que **jugó entre sí**: eso no es
+     * un puntaje bajo, es la prueba de que son dos clubes. Esos no se listan y
+     * se cuentan aparte, para que no parezca que la pantalla no los vio.
+     *
+     * No escribe nada: es todo de tu base y mirar no gasta ninguna llamada.
+     */
+    public function equiposRepetidos(Request $request)
+    {
+        set_time_limit(0);
+
+        $umbral = (int) $request->get('umbral', \App\Services\DuplicadosEquipos::UMBRAL);
+        $umbral = max(50, min(100, $umbral));
+        $cruzar = (string) $request->get('cruzar_pais', '0') === '1';
+        $buscar = trim((string) $request->get('buscar', ''));
+
+        $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a>'
+            . ' · <a href="' . e(route('import_detalles.fusionar_equipos')) . '">Unificar dos equipos</a></p>'
+            . '<h1>Equipos que parecen el mismo club</h1>'
+            . '<p class="sub">Transfermarkt nombra al mismo club de dos maneras según el partido, y el importador '
+            . '—que aparea por nombre— crea un equipo aparte. Desde ahí el club queda <b>partido en dos</b>: la '
+            . 'mitad de los partidos cuelga de una ficha y la mitad de la otra, y ninguno de los dos lados se ve '
+            . 'entero en el sitio.</p>'
+            . '<p class="sub"><b>Fijate primero la columna «Registros».</b> Si una de las dos fichas está vacía no '
+            . 'hay nada que unificar: se borra. Unificar es para cuando las dos tienen historia.</p>'
+            . '<p class="sub">Un par donde los dos equipos <b>jugaron entre sí</b> no se lista: si se enfrentaron '
+            . 'no son el mismo club. <b>No gasta ninguna llamada</b> y mirar no escribe nada.</p>';
+
+        $cuerpo .= '<form method="get" class="acciones">'
+            . '<label class="sub">Umbral</label> '
+            . '<input type="number" name="umbral" value="' . $umbral . '" min="50" max="100" size="4"> '
+            . '<label class="sub">Buscar</label> '
+            . '<input type="text" name="buscar" value="' . e($buscar) . '" size="18" placeholder="parte del nombre"> '
+            . '<label class="sub"><input type="checkbox" name="cruzar_pais" value="1"'
+            . ($cruzar ? ' checked' : '') . '> incluir los de distinto país</label> '
+            . '<button class="boton" type="submit">Ver</button>'
+            . '</form>'
+            . '<p class="sub">El umbral es qué tan parecidos tienen que ser los nombres: 100 es idéntico, 95 «suena '
+            . 'igual», 86 uno adentro del otro, 78 a dos letras de distancia. Bajalo para ver más y peores.</p>';
+
+        $r     = \App\Services\DuplicadosEquipos::pares($umbral, $cruzar);
+        $pares = $r['pares'];
+
+        if ($buscar !== '') {
+            $b = mb_strtolower($buscar, 'UTF-8');
+            $pares = array_values(array_filter($pares, function ($p) use ($b) {
+                foreach ($p['equipos'] as $e) {
+                    if (mb_strpos(mb_strtolower($e['nombre'], 'UTF-8'), $b) !== false) return true;
+                }
+                return false;
+            }));
+        }
+
+        $cuerpo .= '<p class="sub">Mirados <b>' . (int) $r['equipos'] . '</b> equipos · <b>' . count($pares)
+            . '</b> par(es) por revisar'
+            . ($r['jugaron'] ? ' · <b>' . (int) $r['jugaron'] . '</b> descartado(s) solos porque los dos equipos '
+                . 'jugaron entre sí' : '')
+            . ($r['tope'] ? ' · <b>la lista se cortó en ' . \App\Services\DuplicadosEquipos::TOPE
+                . '</b>: subí el umbral' : '')
+            . '.</p>';
+
+        if (!$pares) {
+            $cuerpo .= '<div class="ok-box">No hay ningún par de equipos que se parezca tanto'
+                . ($buscar !== '' ? ' entre los que tienen «' . e($buscar) . '» en el nombre' : '')
+                . ' con umbral ' . $umbral . '.</div>';
+            return $this->pagina('Equipos repetidos', $cuerpo);
+        }
+
+        // Una ficha: nombre, país, registros, años con partidos y clubes de TM.
+        $ficha = function ($id, $par) {
+            $e   = $par['equipos'][$id];
+            $reg = (int) $par['reg'][$id];
+            $an  = $par['anios'][$id];
+            $tm  = $par['tm'][$id];
+
+            $txt = '<a href="' . e(route('equipos.ver', ['equipoId' => $id])) . '" target="_blank"><b>'
+                . e($e['nombre']) . '</b></a> <span class="sub">#' . $id . '</span>';
+            $txt .= '<br><span class="sub">' . e($e['pais_txt'] ?: 'sin país');
+            if ($e['estadio'] !== '') $txt .= ' · ' . e($e['estadio']);
+            if ($e['fundacion']) $txt .= ' · fund. ' . e($e['fundacion']);
+            $txt .= '</span>';
+            $txt .= '<br>' . ($reg
+                ? '<b>' . $reg . '</b> registro(s)'
+                : '<b class="err">ficha vacía</b>');
+            if ($an) $txt .= ' <span class="sub">· partidos ' . e($an['desde'])
+                . ($an['hasta'] !== $an['desde'] ? '-' . e($an['hasta']) : '') . '</span>';
+            foreach ($tm as $t) {
+                $txt .= '<br><span class="sub">TM ' . (int) $t->tm_club_id
+                    . ($t->nombre_tm ? ' «' . e((string) $t->nombre_tm) . '»' : '') . '</span>';
+            }
+            return $txt;
+        };
+
+        $cuerpo .= '<div class="scroll"><table><thead><tr><th class="num">Puntaje</th><th>Un equipo</th>'
+            . '<th>El otro</th><th>Por qué aparece</th><th>Qué hacer</th></tr></thead><tbody>';
+
+        foreach ($pares as $p) {
+            $a = $p['a']; $b = $p['b'];
+
+            if ($p['vacia']) {
+                $vac  = $p['vacia'];
+                $lleno = $vac === $a ? $b : $a;
+                $nombreVacia = $p['equipos'][$vac]['nombre'];
+                $accion = '<b>Borrar el #' . $vac . '</b><br><span class="sub">No tiene ninguna fila colgando: '
+                    . 'unificar no movería nada. Toda la historia está en el #' . $lleno . '.</span><br>'
+                    . '<a class="boton-sec" href="' . e(route('equipos.index', ['buscarpor' => $nombreVacia]))
+                    . '" target="_blank">Buscarlo en Equipos</a>';
+                if (!$p['reg'][$a] && !$p['reg'][$b]) {
+                    $accion = '<b>Las dos fichas están vacías</b><br><span class="sub">Ninguna se usa en ningún '
+                        . 'lado: quedate con la que tenga mejor nombre y borrá la otra.</span><br>'
+                        . '<a class="boton-sec" href="' . e(route('equipos.index', ['buscarpor' => $nombreVacia]))
+                        . '" target="_blank">Buscarlas en Equipos</a>';
+                }
+            } else {
+                $accion = '<a class="boton" href="' . e(route('import_detalles.fusionar_equipos',
+                        ['origen' => $p['origen'], 'destino' => $p['destino']])) . '" target="_blank">'
+                    . 'Ver qué se movería</a><br><span class="sub">Se iría el #' . $p['origen'] . ' (el de menos '
+                    . 'registros) y quedaría el #' . $p['destino'] . '. Mirar no escribe nada.</span>';
+            }
+
+            $clase = $p['comunes'] ? ' class="warn"' : '';
+
+            $cuerpo .= '<tr' . $clase . '><td class="num"><b>' . (int) $p['puntaje'] . '</b></td>'
+                . '<td>' . $ficha($a, $p) . '</td>'
+                . '<td>' . $ficha($b, $p) . '</td>'
+                . '<td class="sub">' . e(implode(' · ', $p['motivos'])) . '</td>'
+                . '<td>' . $accion . '</td></tr>';
+        }
+
+        $cuerpo .= '</tbody></table></div>'
+            . '<p class="sub">Las filas resaltadas son las que jugaron <b>torneos en común</b> sin enfrentarse: '
+            . 'sospechosas de ser dos clubes distintos de verdad, aunque se llamen parecido. Mirá el país y los años '
+            . 'antes de tocarlas.</p>';
+
+        return $this->pagina('Equipos repetidos', $cuerpo);
+    }
 
     /**
      * Partidos con un equipo vacío.

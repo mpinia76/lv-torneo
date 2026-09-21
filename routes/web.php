@@ -312,6 +312,13 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/fusionar-equipos', 'ImportDetallesController@fusionarEquipos')
         ->name('import_detalles.fusionar_equipos');
 
+    // Los pares de equipos que parecen el mismo club (la lista que le falta a
+    // «Unificar equipos»: primero hay que saber cuál está partido en dos).
+    // Sólo GET: no escribe nada, ofrece el link a unificar o a borrar la ficha
+    // vacía, que es el otro final posible.
+    Route::get('/import-detalles/equipos-repetidos', 'ImportDetallesController@equiposRepetidos')
+        ->name('import_detalles.equipos_repetidos');
+
     // Clubes que TM marca como desaparecidos con "(- 2019)" / "(1981-2019)" al
     // final del nombre: nombre limpio + año a equipos.desaparicion. El GET sólo
     // muestra; el POST escribe los tildados.

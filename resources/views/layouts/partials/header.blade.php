@@ -34,6 +34,10 @@
                                 {{ __('Equipos') }}
                             </a>
                         </li>
+                        <li><a class="dropdown-item" href="{{ route('import_detalles.equipos_repetidos') }}">
+                                {{ __('Equipos repetidos') }}
+                            </a>
+                        </li>
                         <li><a class="dropdown-item" href="{{ route('import_detalles.clubes_desaparecidos') }}">
                                 {{ __('Clubes desaparecidos (TM)') }}
                             </a>
