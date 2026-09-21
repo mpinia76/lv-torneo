@@ -4246,9 +4246,15 @@ class ImportPartidosController extends Controller
         // salteados: 6, 7, 9, 11, 12... Crear `fechas.numero = gameDay` sin
         // preguntar dejaba fechas con nombres que no significan nada. Ahora la
         // fecha destino se elige una vez por ronda y, sin decisión, no se crea.
+        $esLlave = (int) DB::table('grupos')->where('id', $grupoId)->value('penales') === 1;
+
+        // La clave de cada fila: el gameDay, salvo que TM le haya puesto el
+        // MISMO gameDay a dos partidos de este DT (ver claveRondaPorFila).
+        $claveFila = $this->claveRondaPorFila($filas, $esLlave);
+
         $rondas = [];
         foreach ($filas as $r) {
-            $k = ($r->ronda !== null && $r->ronda !== '') ? (string) $r->ronda : '—';
+            $k = $claveFila[$r->id];
             if (!isset($rondas[$k])) $rondas[$k] = [];
             $rondas[$k][] = $r;
         }
@@ -4256,13 +4262,11 @@ class ImportPartidosController extends Controller
         $destino = $this->fechasDestino($request, $rondas, $torneo, $grupoId, $tecnicoId, $comp, $temp, $volver);
         if (!is_array($destino)) return $destino;   // falta elegir: se muestra la pantalla
 
-        $esLlave = (int) DB::table('grupos')->where('id', $grupoId)->value('penales') === 1;
-
         // 3. Partidos
         $creados = 0; $enganchados = 0; $saltados = 0; $errores = []; $avisos = []; $detalle = '';
         foreach ($filas as $r) {
             try {
-                $k = ($r->ronda !== null && $r->ronda !== '') ? (string) $r->ronda : '—';
+                $k = $claveFila[$r->id];
                 if (empty($destino[$k])) { $saltados++; continue; }   // ronda dejada para después
                 $fecha  = $destino[$k];
                 $numero = $fecha->numero;
@@ -4439,6 +4443,42 @@ class ImportPartidosController extends Controller
     }
 
     /**
+     * La clave de ronda de cada fila del staging: [import_partidos.id => clave].
+     *
+     * Normalmente es el gameDay de TM. Pero TM a veces le pone el MISMO gameDay
+     * a dos partidos del mismo equipo —un partido reprogramado o jugado entre
+     * semana hereda el número de otra ronda—. Pasó con Vitesse en la Eredivisie
+     * 2000/01: el 11-nov vs Groningen y el 17-nov vs RBC vinieron los dos como
+     * «12», y el 12-dic vs AZ y el 15-dic vs NAC como «17». Agrupados por ronda,
+     * los dos iban a la misma fecha y el segundo reventaba en «Choque en la
+     * fecha». En una liga un equipo juega UNA vez por fecha, así que el
+     * segundo (y siguientes, por día) sale en su propia fila, «12 · 2º», sin
+     * sugerencia: la fecha la elige una persona.
+     *
+     * En un grupo de llaves no se parte: ahí la ida y la vuelta pueden
+     * compartir número y van juntas a propósito.
+     */
+    private function claveRondaPorFila($filas, $esLlave)
+    {
+        $claves = []; $vistos = [];
+        foreach ($filas as $r) {           // $filas viene ordenado por día
+            $k = ($r->ronda !== null && $r->ronda !== '') ? (string) $r->ronda : '—';
+            if (!$esLlave && $k !== '—') {
+                $vistos[$k] = isset($vistos[$k]) ? $vistos[$k] + 1 : 1;
+                if ($vistos[$k] > 1) $k = $k . ' · ' . $vistos[$k] . 'º';
+            }
+            $claves[$r->id] = $k;
+        }
+        return $claves;
+    }
+
+    /** ¿Es una ronda partida por claveRondaPorFila()? ("12 · 2º") */
+    private function esRondaRepetida($k)
+    {
+        return strpos((string) $k, ' · ') !== false;
+    }
+
+    /**
      * A qué fecha del grupo va cada ronda de TM.
      *
      * Devuelve [ronda => \App\Fecha] cuando está todo decidido, o la pantalla
@@ -4488,7 +4528,7 @@ class ImportPartidosController extends Controller
                 if ($f) { $plan[(string) $k] = ['fecha' => $f, 'nombre' => null]; continue; }
             }
             if ($nom === '' && $sel === 'nueva') { $sinNombre[] = $k; $faltan[] = $k; continue; }
-            if ($nom === '' && $sel === '' && $usarTm && (string) $k !== '—') $nom = (string) $k;
+            if ($nom === '' && $sel === '' && $usarTm && (string) $k !== '—' && !$this->esRondaRepetida($k)) $nom = (string) $k;
 
             if ($nom !== '') {
                 $f = $fechas->first(function ($x) use ($nom) { return (string) $x->numero === $nom; });
@@ -4526,6 +4566,7 @@ class ImportPartidosController extends Controller
 
         // ── La pantalla ─────────────────────────────────────────────────────
         $grupoNombre = (string) DB::table('grupos')->where('id', $grupoId)->value('nombre');
+        $esLlaveG = (int) DB::table('grupos')->where('id', $grupoId)->value('penales') === 1;
 
         $html = $volver . '<h1>¿A qué fecha va cada ronda?</h1>'
             . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · grupo '
@@ -4568,16 +4609,34 @@ class ImportPartidosController extends Controller
             // Sugerencia, en orden: dónde cayó esta misma ronda cuando se
             // aplicó otro DT, y si no, dónde cayeron estos mismos pares en un
             // grupo de llaves. Las dos salen de lo ya cargado, no de adivinar.
-            $sug = $this->fechaDeLaRonda($comp, $temp, (string) $k, $torneo->id);
-            if (!$sug) {
+            $repetida = $this->esRondaRepetida($k);
+            $sug = $repetida ? null : $this->fechaDeLaRonda($comp, $temp, (string) $k, $torneo->id);
+            if (!$sug && !$repetida) {
                 $idLlave = $this->fechaDeLasLlaves($rs, $torneo->id);
                 if ($idLlave) $sug = \App\Fecha::find($idLlave);
             }
 
             $selId = ($sug && (int) $sug->grupo_id === (int) $grupoId) ? (int) $sug->id : 0;
-            if (!$selId) {
+            if (!$selId && !$repetida) {
                 $igual = $fechas->first(function ($f) use ($k) { return (string) $f->numero === (string) $k; });
                 if ($igual) $selId = (int) $igual->id;
+            }
+
+            // La sugerencia no vale si en esa fecha el equipo del DT YA juega
+            // (fuera de las llaves): es el caso de un gameDay que TM repitió y
+            // cuyo primer partido ya se aplicó. Preseleccionarla lleva derecho
+            // al «Choque en la fecha».
+            $ocupada = null;
+            if ($selId && !$esLlaveG) {
+                foreach ($rs as $r) {
+                    $eq = (int) $r->equipo_id;
+                    if (!$eq) continue;
+                    $p = \App\Partido::where('fecha_id', $selId)
+                        ->where(function ($q) use ($eq) { $q->where('equipol_id', $eq)->orWhere('equipov_id', $eq); })
+                        ->first();
+                    if ($p) { $ocupada = $p; break; }
+                }
+                if ($ocupada) $selId = 0;
             }
 
             // Si esa ronda ya tiene nombre en OTRO grupo del torneo, se ofrece
@@ -4608,6 +4667,10 @@ class ImportPartidosController extends Controller
                 . '<option value="0"' . ($selTxt === '0' ? ' selected' : '') . '>por ahora no</option>';
 
             $html .= '<tr><td class="num">' . e((string) $k)
+                . ($repetida ? '<br><span class="err">TM repite el número: este DT ya tiene otro partido en esa ronda. Elegí a mano la fecha que le corresponde.</span>' : '')
+                . ($ocupada ? '<br><span class="err">En la fecha que correspondería ya está '
+                    . e($this->nombreEquipo($ocupada->equipol_id) . ' vs ' . $this->nombreEquipo($ocupada->equipov_id))
+                    . ' (' . e(substr((string) $ocupada->dia, 0, 10)) . ', #' . (int) $ocupada->id . '). TM le puso el mismo número a los dos: elegí a mano.</span>' : '')
                 . '<input type="hidden" name="r[' . (int) $i . ']" value="' . e((string) $k) . '"></td>'
                 . '<td><span class="sub">' . $lista . '</span></td>'
                 . '<td><select name="f[' . (int) $i . ']" class="s2" data-placeholder="elegí la fecha…">' . $opts . '</select> '
