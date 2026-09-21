@@ -208,9 +208,10 @@ class DuplicadosEquipos
     private static function preparar($e): array
     {
         $nombre = (string) $e->nombre;
+        $comparable = self::paraComparar($nombre);
 
-        $norm   = DuplicadosPersonas::normalizar($nombre);
-        $tokens = DuplicadosPersonas::tokenizar($nombre);
+        $norm   = DuplicadosPersonas::normalizar($comparable);
+        $tokens = DuplicadosPersonas::tokenizar($comparable);
 
         $red = [];
         foreach ($tokens as $t) $red[] = DuplicadosPersonas::reducir($t);
@@ -243,6 +244,35 @@ class DuplicadosEquipos
             'orden'     => implode(' ', $ordenado),
             'utiles'    => implode(' ', $utiles),
         ];
+    }
+
+    /**
+     * El nombre listo para comparar.
+     *
+     * `DuplicadosPersonas::normalizar()` TIRA lo que está entre paréntesis, y
+     * en una persona está bien («Rodríguez (h)» es Rodríguez). En un club es al
+     * revés: el paréntesis es justamente lo que lo distingue del otro. Sin esto
+     * la pantalla daba **100, «el nombre es idéntico»** a dos clubes que no
+     * tienen nada que ver:
+     *
+     *   Huracán #19 (Parque Patricios) vs Huracán (Tres Arroyos) #45
+     *   Ferro #57 (Caballito)          vs Ferro (Gral. Pico) #738
+     *
+     * Así que el contenido del paréntesis se conserva como una palabra más:
+     * «Huracán Tres Arroyos» contra «Huracán» baja a "está adentro del otro
+     * nombre", que es lo que de verdad pasa, y encima se lee en la fila.
+     *
+     * La única excepción es el paréntesis de club desaparecido —«Boca (- 2019)»,
+     * «Alumni (1981-2019)»—, que sí es un agregado de Transfermarkt y no parte
+     * del nombre: ese se saca, para que la ficha vieja y la actual del mismo
+     * club sigan apareando.
+     */
+    private static function paraComparar(string $nombre): string
+    {
+        $p = ClubDesaparecido::partir($nombre);
+        if ($p) $nombre = $p['nombre'];
+
+        return str_replace(['(', ')', '[', ']'], ' ', $nombre);
     }
 
     /**
