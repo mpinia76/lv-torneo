@@ -64,6 +64,10 @@
             {{Form::number('grupos', '', ['class' => 'form-control'])}}
         </div>
         <div class="form-group col-xs-12 col-sm-6 col-md-2">
+            {{Form::label('nombres_grupos', 'Nombre de grupos')}}
+            {{ Form::select('nombres_grupos',['letras'=>'Letras (A, B, C...)','numeros'=>'Números (1, 2, 3...)'],old('nombres_grupos', 'letras'), ['class' => 'form-control js-example-basic-single', 'id' => 'nombres_grupos', 'style' => 'width:100%']) }}
+        </div>
+        <div class="form-group col-xs-12 col-sm-6 col-md-2">
             {{Form::label('tipo', 'Tipo')}}
             {{ Form::select('tipo',[''=>'Seleccionar...','Liga'=>'Liga','Copa'=>'Copa'],'', ['class' => 'form-control', 'id' => 'tipo']) }}
         </div>
@@ -107,7 +111,7 @@
             </div>
             <div class="form-group col-xs-12 col-md-12">
                 <input type="hidden" name="banderas_grupos" value="1">
-                <small class="text-muted">Posiciones y Penales se aplican a <b>todos</b> los grupos que se creen.
+                <small class="text-muted">Nombre, Posiciones y Penales se aplican a <b>todos</b> los grupos que se creen.
                     Se proponen según el Tipo (Copa: penales; Liga: posiciones) y después se ajustan
                     grupo por grupo en <b>Editar torneo</b>.</small>
             </div>
