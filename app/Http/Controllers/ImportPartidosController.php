@@ -2691,7 +2691,9 @@ class ImportPartidosController extends Controller
                 ->with('error', 'El club de TM ' . e($tmId) . ' ya estaba mapeado a este equipo, así que no creé nada '
                     . 'ni toqué ningún dato. Si querés completarlo a mano: '
                     . '<a href="' . e($links['datos']) . '" target="_blank"><b>Datos y hechos ↗</b></a> · '
-                    . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a>');
+                    . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a> · '
+                    . '<a href="' . e($this->urlWikipediaBusqueda((string) \App\Equipo::where('id', $yaMapeado)->value('nombre')))
+                    . '" target="_blank">Buscar en Wikipedia ↗</a>');
         }
 
         $club = $this->clubDeTm($tmId);
@@ -2903,9 +2905,21 @@ class ImportPartidosController extends Controller
             . '<span style="opacity:.7">(fundación, estadio, socios)</span> · '
             . '<a href="' . e($links['perfil']) . '" target="_blank">Perfil del club ↗</a> · '
             . '<a href="' . e(route('import_partidos.crear_equipo', ['tm_id' => $tmId, 'ver_datos' => 1]))
-            . '" target="_blank">Ver qué leí del sitio ↗</a>';
+            . '" target="_blank">Ver qué leí del sitio ↗</a> · '
+            . '<a href="' . e($this->urlWikipediaBusqueda($nombre)) . '" target="_blank">Buscar en Wikipedia ↗</a> '
+            . '<span style="opacity:.7">(historia)</span>';
 
         return redirect()->route('equipos.edit', $equipo->id)->with('success', $msg);
+    }
+
+    /**
+     * Búsqueda en Wikipedia en español. Si el nombre coincide con un artículo
+     * (o con una redirección, p.ej. «Ferencvárosi TC»), Wikipedia salta
+     * directo al artículo; si no, muestra la lista de resultados.
+     */
+    private function urlWikipediaBusqueda(string $nombre): string
+    {
+        return 'https://es.wikipedia.org/w/index.php?' . http_build_query(['search' => trim($nombre)]);
     }
 
     /**
