@@ -529,14 +529,16 @@ class EquipoController extends Controller
         set_time_limit(0);
         //dd($request);
 
-        // La vista equipos/ver no ofrece links de orden, asi que esto solo se
-        // alcanza escribiendo la URL a mano. Lista blanca igual: son los alias
-        // que devuelve el SELECT de abajo.
-        $orderRaw = (string) $request->query('order', '');
+        // Lista blanca: son los alias que devuelve el SELECT de abajo. Se
+        // compara en minusculas para no caer al default por una mayuscula.
+        $orderRaw = strtolower((string) $request->query('order', ''));
         $order = in_array($orderRaw, ['jugados','goles','amarillas','rojas','recibidos','invictas','titulos','errados','atajos','jugador'], true)
             ? $orderRaw
-            : 'jugados';
-        $tipoOrder = strtoupper((string) $request->query('tipoOrder')) === 'ASC' ? 'ASC' : 'DESC';
+            : null;
+        // Orden desconocido: vuelve al default completo (jugados DESC), no a
+        // jugados con el sentido que traia la URL.
+        $tipoOrder = ($order !== null && strtoupper((string) $request->query('tipoOrder')) === 'ASC') ? 'ASC' : 'DESC';
+        $order = $order ?? 'jugados';
 
 
 

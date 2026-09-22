@@ -337,7 +337,7 @@
                     $veColumnas = [
                         'jugados'   => ['J',    'Partidos jugados'],
                         'titulos'   => ['Tít.', 'Títulos'],
-                        'Goles'     => ['Goles','Goles'],
+                        'goles'     => ['Goles','Goles'],
                         'amarillas' => ['TA',   'Tarjetas amarillas'],
                         'rojas'     => ['TR',   'Tarjetas rojas'],
                         'errados'   => ['P. Err.',  'Penales errados'],
@@ -362,7 +362,7 @@
                                             'equipoId'   => $equipo->id,
                                             'pestActiva' => 'jugadores',
                                             'order'      => $veClave,
-                                            'tipoOrder'  => ($order == $veClave && $tipoOrder == 'ASC') ? 'DESC' : 'ASC',
+                                            'tipoOrder'  => ($order == $veClave && $tipoOrder == 'DESC') ? 'ASC' : 'DESC',
                                         ]) }}">
                                             {{ $veCol[0] }}
                                             @if($order == $veClave)
