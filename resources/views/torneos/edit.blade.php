@@ -75,6 +75,16 @@
                 </div>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('inconcluso', 'Inconcluso', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label title="Se suspendió y nunca terminó (ej. Copa de la Superliga 2020): no tiene posiciones finales ni le faltan partidos.">
+                        {{-- El hidden va antes: un checkbox destildado no viaja y update($request->all()) no lo pisaría. --}}
+                        <input type="hidden" name="inconcluso" value="0">
+                        {{ Form::checkbox('inconcluso', 1, $torneo->inconcluso ?? 0) }}
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('descenso', 'Descensos Gral.')}}
                 {{Form::number('descenso', $torneo->descenso, ['class' => 'form-control'])}}
             </div>

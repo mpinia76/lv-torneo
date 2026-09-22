@@ -46,6 +46,7 @@ class ControlTorneos
         $q = DB::table('torneos as t')
             ->select('t.id', 't.nombre', 't.year', 't.tipo', 't.ambito', 't.equipos as esperados', 't.grupos')
             ->selectRaw('COALESCE(t.parcial, 0) AS parcial')
+            ->selectRaw($this->hayInconcluso() ? 'COALESCE(t.inconcluso, 0) AS inconcluso' : '0 AS inconcluso')
             ->selectRaw('(SELECT COUNT(DISTINCT p.equipo_id) FROM plantillas p
                             INNER JOIN grupos g ON g.id = p.grupo_id
                            WHERE g.torneo_id = t.id) AS cargados')
@@ -141,6 +142,19 @@ class ControlTorneos
         return $out;
     }
 
+    /**
+     * La columna `torneos.inconcluso` se agrega a mano en phpMyAdmin (el deploy
+     * es solo git pull). Hasta que exista, la pantalla sigue andando igual.
+     */
+    private function hayInconcluso(): bool
+    {
+        static $hay = null;
+        if ($hay === null) {
+            $hay = \Illuminate\Support\Facades\Schema::hasColumn('torneos', 'inconcluso');
+        }
+        return $hay;
+    }
+
     /** Reparte las filas en las tres listas. */
     public function clasificar(array $filas): array
     {
@@ -155,6 +169,11 @@ class ControlTorneos
                 $listas['sobran'][] = $fila;
             } elseif ($cargados < $esperados) {
                 $listas['faltan'][] = $fila;
+            } elseif ((int) $fila->inconcluso === 1) {
+                // Torneo suspendido que nunca terminó (Copa de la Superliga
+                // 2020, pandemia): no le faltan partidos ni posiciones, no
+                // existen. Solo se controla la cantidad de equipos.
+                continue;
             } elseif ((int) $fila->partidos === 0 || (int) $fila->fechas_incompletas > 0) {
                 // La cantidad de equipos da, pero los partidos no: no está
                 // completo, así que no va a la lista de posiciones.
