@@ -2144,12 +2144,29 @@ class ImportPartidosController extends Controller
         }
 
         // ── equipo -> grupo, según las plantillas del torneo ─────────────────
-        $grupoDe = [];
-        foreach (DB::table('plantillas')
-                     ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
-                     ->where('grupos.torneo_id', $torneo->id)
-                     ->select('plantillas.equipo_id', 'plantillas.grupo_id')->get() as $pl) {
-            $grupoDe[(int) $pl->equipo_id] = (int) $pl->grupo_id;
+        // UN EQUIPO PUEDE TENER PLANTILLA EN DOS GRUPOS: su zona y el grupo de
+        // llaves, cuando ya se le cargó el plantel de los playoffs. Antes se
+        // quedaba con la última fila que leía, así que el mismo equipo caía a
+        // veces en la zona y a veces en Playoffs según el orden de la consulta.
+        // Ahora: $grupoDe es la ZONA (el grupo sin penales, si tiene), y
+        // $enLlaves marca a los que ya tienen plantilla en el grupo de llaves.
+        $plantillasTorneo = DB::table('plantillas')
+            ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+            ->where('grupos.torneo_id', $torneo->id)
+            ->select('plantillas.equipo_id', 'plantillas.grupo_id', 'grupos.penales')->get();
+
+        $grupoDe = []; $enLlaves = [];
+        foreach ($plantillasTorneo as $pl) {
+            $eq = (int) $pl->equipo_id;
+            if (!empty($pl->penales)) {
+                $enLlaves[$eq][(int) $pl->grupo_id] = true;
+                if (!isset($grupoDe[$eq])) $grupoDe[$eq] = (int) $pl->grupo_id;
+            } else {
+                // La zona le gana al grupo de llaves.
+                if (!isset($grupoDe[$eq]) || isset($enLlaves[$eq][$grupoDe[$eq]])) {
+                    $grupoDe[$eq] = (int) $pl->grupo_id;
+                }
+            }
         }
 
         $unico = $grupos->count() === 1 ? (int) $grupos->keys()->first() : null;
@@ -2166,19 +2183,32 @@ class ImportPartidosController extends Controller
         $conPenales = $grupos->filter(function ($g) { return !empty($g->penales); });
         $playoffId  = $conPenales->count() === 1 ? (int) $conPenales->keys()->first() : null;
 
-        // Cuántos partidos de ESTA fecha cruzan zonas.
-        $cruzan = 0; $conDosGrupos = 0;
+        // Cuántos partidos de ESTA fecha cruzan zonas, y cuántos son entre dos
+        // equipos que ya tienen plantilla en el grupo de llaves.
+        $cruzan = 0; $conDosGrupos = 0; $ambosEnLlaves = 0;
         foreach ($filas as $r) {
             $a = isset($grupoDe[(int) $r->equipo_id]) ? $grupoDe[(int) $r->equipo_id] : null;
             $b = isset($grupoDe[(int) $r->rival_id]) ? $grupoDe[(int) $r->rival_id] : null;
             if ($a && $b) { $conDosGrupos++; if ($a !== $b) $cruzan++; }
+            if ($playoffId && isset($enLlaves[(int) $r->equipo_id][$playoffId])
+                && isset($enLlaves[(int) $r->rival_id][$playoffId])) $ambosEnLlaves++;
         }
 
         // LA DECISIÓN ES POR FECHA ENTERA, NO PARTIDO POR PARTIDO. De cuartos
         // en adelante pueden cruzarse dos equipos del mismo grupo: mirando
         // partido por partido, ése sería el único que caería en la zona A
         // mientras sus hermanos van a Playoffs.
-        $proponeLlaves = $playoffId && $conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos;
+        //
+        // Y LA PLANTILLA DEL GRUPO DE LLAVES MANDA: si los dos equipos de cada
+        // partido ya están en el plantel de Playoffs, la fecha es de playoffs
+        // aunque la cuenta de cruces no dé mayoría. Caso real: semifinales de
+        // la Libertadores 2026 (fecha 17) — 2 partidos, uno entre dos equipos
+        // del mismo grupo de la fase de grupos: 1 cruce sobre 2 no es mayoría,
+        // y la semifinal Estudiantes–Flamengo se proponía para la zona A.
+        $proponeLlaves = $playoffId && (
+            ($conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
+            || $ambosEnLlaves === $filas->count()
+        );
 
         // `grupo_destino` = toda la fecha va a ese grupo. Sin él se rutea por
         // plantilla, que es lo que corresponde en una liga con zonas.
