@@ -123,6 +123,9 @@ class TorneoController extends Controller
         $delFormulario = $request->has('banderas_grupos');
         $posicionesGrupos = $delFormulario ? (int) $request->has('posiciones_grupos') : 1;
         $penalesGrupos    = $delFormulario ? (int) $request->has('penales_grupos')    : 0;
+        // Nombres de los grupos: letras (A, B, ..., Z, AA...) o numeros (1, 2, 3...).
+        // Sin el campo (alta vieja), letras como siempre.
+        $gruposConNumeros = $request->input('nombres_grupos') === 'numeros';
 
         DB::beginTransaction();
         $ok=1;
@@ -138,11 +141,16 @@ class TorneoController extends Controller
 
 
 
-                // Nombre en letras (A, B, ..., Z, AA, AB...). Posiciones y Penales
-                // salen de lo que se tildo en el alta, iguales para todos los grupos.
-                $letra = '';
-                for ($n = $i; $n > 0; $n = intdiv($n - 1, 26)) {
-                    $letra = chr(65 + ($n - 1) % 26) . $letra;
+                // Nombre en letras (A, B, ..., Z, AA, AB...) o en numeros (1, 2, 3...),
+                // segun lo elegido en el alta. Posiciones y Penales salen de lo que
+                // se tildo en el alta, iguales para todos los grupos.
+                if ($gruposConNumeros) {
+                    $letra = (string) $i;
+                } else {
+                    $letra = '';
+                    for ($n = $i; $n > 0; $n = intdiv($n - 1, 26)) {
+                        $letra = chr(65 + ($n - 1) % 26) . $letra;
+                    }
                 }
 
                 $grupo = new Grupo([
