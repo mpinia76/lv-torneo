@@ -5591,7 +5591,24 @@ class ImportPartidosController extends Controller
                     $x->where('partidos.equipol_id', $rivalId)->where('partidos.equipov_id', $equipoId);
                 });
             })
-            ->select('partidos.id', 'fechas.numero');
+            ->select('partidos.id', 'fechas.numero', 'partidos.equipol_id', 'grupos.penales');
+
+        // IDA Y VUELTA: EL PAR NO ALCANZA, HACE FALTA LA LOCALÍA. En una llave
+        // los mismos dos equipos se cruzan DOS veces en la misma ronda, con la
+        // localía invertida. Con sólo la ida cargada, la vuelta de TM
+        // encontraba la ida como candidato único y quedaba «duplicado» de ella:
+        // no se creaba nunca, y «Ya jugados con la fecha corrida» ofrecía mover
+        // la ida al día de la vuelta. Pasó con la Copa UEFA 2000/01: 23
+        // vueltas de «2ª Ronda - Vuelta» (07 y 09/11) atadas a sus idas del
+        // 24 y 26/10 — el número de fecha no separa nada, «2ª Ronda - Ida»,
+        // «2ª Ronda - Vuelta» y «2ª Ronda» dan todos 2.
+        //
+        // En contexto de copa —grupo de llaves, ronda que dice ida/vuelta, o
+        // sin número de fecha— un candidato con la localía al revés es el
+        // OTRO partido de la llave, no éste. En una liga se sigue aceptando:
+        // ahí el número de fecha ya separa la ida de la vuelta, y la localía
+        // invertida es un error de carga que la auditoría muestra aparte.
+        $esIdaVuelta = (bool) preg_match('/\b(ida|vuelta)\b/iu', (string) $ronda);
 
         // Con el torneo elegido la llave es redonda. Sin él (se entró por
         // `comp=` a mano) queda el número de fecha solo, que puede repetirse
@@ -5604,6 +5621,8 @@ class ImportPartidosController extends Controller
         $todos = [];
         $cands = [];
         foreach ($q->get() as $r) {
+            $alReves = (int) $r->equipol_id !== (int) $equipoId;
+            if ($alReves && ($esIdaVuelta || $nRonda === '' || (int) $r->penales === 1)) continue;
             $todos[] = (int) $r->id;
             $suyo = preg_replace('/\D/', '', (string) $r->numero);
             if ($suyo === '' || $nRonda === '') continue;

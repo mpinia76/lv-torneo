@@ -160,12 +160,14 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      * de TM cambia y las clases se renombran, pero "la fila que no tiene ni
      * partido ni clubes" se sigue cumpliendo.
      *
-     * EN LAS COPAS LA RONDA NO ES UNA FILA: es el título de la caja. En el
-     * calendario de una copa (`pokalwettbewerb/UEFA`, temporada 2000) cada
-     * ronda es una caja aparte con su título arriba de la tabla
-     * («1ª ronda», «Octavos de final») y adentro no hay ninguna fila de
-     * encabezado. Mirando sólo `<tr>` los 205 partidos de la Copa UEFA
-     * 2000/01 quedaban en «—» y «Aplicar» los mandaba todos a una sola fecha.
+     * EN LAS COPAS LA RONDA PUEDE NO SER UNA FILA sino el título de la caja
+     * (cada ronda, una caja con su título arriba de la tabla y ninguna fila
+     * de encabezado adentro). Mirando sólo `<tr>`, los 205 partidos de la
+     * Copa UEFA 2000/01 (`pokalwettbewerb/UEFA`, temporada 2000) quedaron
+     * todos en «—» y «Aplicar» los mandaba a una sola fecha. [2026-09-23:
+     * el maquetado de las cajas se supuso, no se pudo mirar el HTML crudo;
+     * si con esto sigue saliendo «—», abrir la página y ver dónde está el
+     * nombre de la ronda.]
      * Por eso se recorren, en orden de documento, las filas Y los títulos
      * (h2/h3 y `.content-box-headline`); una fila de encabezado dentro de la
      * tabla, si la hay, pisa al título porque viene después.
