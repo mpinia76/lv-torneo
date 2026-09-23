@@ -359,7 +359,17 @@ class ImportPartidosController extends Controller
         $pais     = trim((string) $request->get('pais', '')) ?: null;
         $soloHtml = (string) $request->get('solo_html', '0') === '1';
 
+        // Los torneos COMPLETOS (con posiciones finales guardadas en
+        // `posicion_torneos`) no aparecen: ya no hay fixture que bajarles.
+        // El que viene elegido por URL se deja igual, para no romper un link.
         $conTm = \App\Torneo::whereNotNull('tm_competition_id')->where('tm_competition_id', '!=', '')
+            ->where(function ($q) use ($torneoElegido) {
+                $q->whereNotExists(function ($s) {
+                    $s->select(DB::raw(1))->from('posicion_torneos')
+                        ->whereColumn('posicion_torneos.torneo_id', 'torneos.id');
+                });
+                if ($torneoElegido) $q->orWhere('torneos.id', $torneoElegido->id);
+            })
             ->orderBy('year', 'desc')->orderBy('nombre')->get();
 
         $opts = '<option value="">— elegí un torneo tuyo —</option>';
@@ -378,7 +388,7 @@ class ImportPartidosController extends Controller
             . '(alineaciones, goles, tarjetas) lo trae después la pantalla de siempre.</p>';
 
         if ($conTm->isEmpty()) {
-            $html .= '<div class="err-box">Ningún torneo tuyo tiene cargado el id de competencia de Transfermarkt. '
+            $html .= '<div class="err-box">Ningún torneo tuyo tiene cargado el id de competencia de Transfermarkt (o todos los que lo tienen ya están completos, con posiciones guardadas). '
                 . 'Averigualo con el buscador de abajo y guardalo en <b>Editar torneo → transfermarkt.com</b>. '
                 . 'Se hace una sola vez por torneo.</div>';
         } else {
