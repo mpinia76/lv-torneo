@@ -194,7 +194,8 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
                 $txt = trim(preg_replace('/\s+/u', ' ', $tr->textContent));
                 $txt = preg_replace('#\s*\d{1,2}/\d{1,2}/\d{2,4}\s*#', ' ', $txt);
                 $txt = preg_replace('/^[\s\-–—·|]+|[\s\-–—·|]+$/u', '', $txt);
-                $actual = ($txt !== '' && mb_strlen($txt) <= 60) ? $txt : null;
+                if ($this->esRotuloGenerico($txt)) continue;
+                $actual =($txt !== '' && mb_strlen($txt) <= 60) ? $txt : null;
                 continue;
             }
 
@@ -223,11 +224,31 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
             // títulos de columna juntos), ni una fecha suelta.
             if ($txt === '' || mb_strlen($txt) > 60) continue;
             if (preg_match('#\d{1,2}/\d{1,2}/\d{2,4}#', $txt)) continue;
+            if ($this->esRotuloGenerico($txt)) continue;
 
             $actual = $txt;
         }
 
         return $mapa;
+    }
+
+    /**
+     * Rótulos que TM pone arriba de una lista de partidos y que NO son una
+     * ronda: no cambian la ronda en curso, se saltean.
+     *
+     * Caso real (KNVB Beker 2000/01, `pokalwettbewerb/NLP`): cada grupo de la
+     * fase de grupos es una caja titulada «Grupo 15», con la tabla de
+     * posiciones y abajo una fila sola «Plan de encuentros» antes de los
+     * partidos. Como esa fila viene DESPUÉS del título, lo pisaba: los 117
+     * partidos de los 20 grupos quedaban en una sola ronda «Plan de
+     * encuentros» y se perdía en qué grupo jugó cada uno.
+     */
+    private function esRotuloGenerico($txt)
+    {
+        return (bool) preg_match(
+            '/^(plan de encuentros|calendario|partidos|resultados|spielplan|fixtures(?: & results)?|matches)$/iu',
+            trim((string) $txt)
+        );
     }
 
     /**
