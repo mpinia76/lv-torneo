@@ -2143,6 +2143,17 @@ class ImportPartidosController extends Controller
                 . '<p class="err-box">' . e($torneo->nombre . ' ' . $torneo->year) . ' no tiene grupos cargados.</p>');
         }
 
+        // ── LA RONDA DE TM ES UNA ZONA: «Grupo 15» ──────────────────────────
+        // Fase de grupos de una copa leída del calendario en HTML (KNVB Beker
+        // 2000/01: 20 grupos, 117 partidos). Si el torneo tiene una zona que
+        // se llama igual, esos partidos van ahí, repartidos en fechas: el
+        // camino normal los mandaba a UNA sola fecha y chocaba con el índice
+        // único (fecha, visitante) apenas un equipo era visitante dos veces.
+        $zona = $this->zonaDeLaRonda($gameday, $grupos);
+        if ($zona) {
+            return $this->aplicarZona($filas, $torneo, $zona, $comp, $gameday, $confirmar, $html, $alFixture);
+        }
+
         // ── equipo -> grupo, según las plantillas del torneo ─────────────────
         // UN EQUIPO PUEDE TENER PLANTILLA EN DOS GRUPOS: su zona y el grupo de
         // llaves, cuando ya se le cargó el plantel de los playoffs. Antes se
@@ -2610,6 +2621,199 @@ class ImportPartidosController extends Controller
         $html .= '<p class="acciones">'
             . '<a class="boton" href="' . e($alFixture) . '">Seguir con otra fecha →</a>'
             . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
+
+        return $this->pagina('Aplicar fecha', $html);
+    }
+
+    /**
+     * La zona del torneo que corresponde a una ronda de TM «Grupo 15».
+     *
+     * Acepta que la zona se llame «15», «Grupo 15» o «G15», sin importar
+     * mayúsculas. Nunca un grupo de llaves (`penales`), y sólo si hay UNA que
+     * coincide: con dos, se sigue por el camino de siempre.
+     */
+    private function zonaDeLaRonda($gameday, $grupos)
+    {
+        if (!preg_match('/^(?:grupo|group|gruppe|groep)\s+(\S+)$/iu', trim((string) $gameday), $m)) return null;
+        $clave = mb_strtolower($m[1]);
+
+        $hallados = $grupos->filter(function ($g) use ($clave) {
+            if (!empty($g->penales)) return false;
+            $n = mb_strtolower(trim((string) $g->nombre));
+            $n = preg_replace('/^(?:grupo|group|zona|g)\s*/u', '', $n);
+            return $n === $clave;
+        });
+
+        return $hallados->count() === 1 ? $hallados->first() : null;
+    }
+
+    /**
+     * Número de fecha (1, 2, 3...) de cada partido de una zona.
+     *
+     * TM no dice en qué fecha del grupo va cada partido, sólo el día. Se
+     * recorren por día y cada uno va a la PRIMERA fecha donde todavía no jugó
+     * ninguno de sus dos equipos: así ningún equipo juega dos veces en la misma
+     * fecha, que es lo que exige el índice único de `partidos`. En un grupo de
+     * 4 a una rueda salen 3 fechas de 2 partidos; en uno de 3, 3 fechas de 1
+     * (uno libre por fecha). Comprobado a mano con los grupos 15, 16 y 18 de
+     * la KNVB Beker 2000/01.
+     *
+     * Lo que ya está cargado en la zona cuenta: si un equipo ya tiene partido
+     * en la fecha 1, el nuevo no va ahí.
+     *
+     * Devuelve [import_partidos.id => número].
+     */
+    private function fechasDeZona($filas, $zona)
+    {
+        $ocupado = [];   // número => [equipo_id => true]
+        foreach (\App\Fecha::where('grupo_id', $zona->id)->get() as $f) {
+            $k = (int) preg_replace('/\D/', '', (string) $f->numero);
+            if ($k <= 0) continue;
+            foreach (DB::table('partidos')->where('fecha_id', $f->id)->get(['equipol_id', 'equipov_id']) as $p) {
+                $ocupado[$k][(int) $p->equipol_id] = true;
+                $ocupado[$k][(int) $p->equipov_id] = true;
+            }
+        }
+
+        $orden = $filas->sortBy(function ($r) { return (string) $r->dia . sprintf('%012d', (int) $r->id); });
+
+        $asignado = [];
+        foreach ($orden as $r) {
+            $l = (int) $r->equipo_id; $v = (int) $r->rival_id;
+            for ($k = 1; ; $k++) {
+                if (empty($ocupado[$k][$l]) && empty($ocupado[$k][$v])) break;
+            }
+            $ocupado[$k][$l] = true;
+            $ocupado[$k][$v] = true;
+            $asignado[(int) $r->id] = $k;
+        }
+        return $asignado;
+    }
+
+    /** La fecha de la zona con ese número: «1» o «Fecha 1» sirven. */
+    private function fechaDeZonaPorNumero($zonaId, $k)
+    {
+        foreach (\App\Fecha::where('grupo_id', $zonaId)->orderBy('id')->get() as $f) {
+            if ((int) preg_replace('/\D/', '', (string) $f->numero) === (int) $k) return $f;
+        }
+        return null;
+    }
+
+    /**
+     * Aplica una ronda de TM que es una zona entera («Grupo 15»).
+     *
+     * Muestra el reparto en fechas y recién con `confirmar=1` escribe. Las
+     * fechas que faltan se crean con el número pelado («1», «2», «3») y ese
+     * mismo orden; las que existen se reusan.
+     */
+    private function aplicarZona($filas, $torneo, $zona, $comp, $gameday, $confirmar, $html, $alFixture)
+    {
+        $numeros = $this->fechasDeZona($filas, $zona);
+
+        $sinMapear = $filas->filter(function ($r) { return !$r->equipo_id || !$r->rival_id; });
+        if ($sinMapear->count()) {
+            return $this->pagina('Aplicar fecha', $html
+                . '<p class="err-box">No creé nada: ' . $sinMapear->count() . ' partido(s) de esta zona tienen un '
+                . 'club sin mapear. Mapealos en la pantalla del fixture y volvé.</p>');
+        }
+
+        if (!$confirmar) {
+            $html .= '<p class="ok-box"><b>Es una zona:</b> los ' . $filas->count() . ' partidos van al grupo <b>'
+                . e($zona->nombre) . '</b> de ' . e($torneo->nombre . ' ' . $torneo->year) . ', repartidos en fechas '
+                . 'por día: cada partido va a la primera fecha donde no jugó ninguno de sus dos equipos. '
+                . 'Las fechas que no existan se crean.</p>'
+                . '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Día</th><th>Local</th><th>Res.</th>'
+                . '<th>Visitante</th><th></th></tr></thead><tbody>';
+
+            $lista = $filas->sortBy(function ($r) use ($numeros) {
+                return sprintf('%04d', $numeros[(int) $r->id]) . (string) $r->dia;
+            });
+            foreach ($lista as $r) {
+                $k = $numeros[(int) $r->id];
+                $existe = $this->fechaDeZonaPorNumero($zona->id, $k);
+                $html .= '<tr><td class="num">' . $k . '</td>'
+                    . '<td class="num">' . e(substr((string) $r->dia, 0, 10)) . '</td>'
+                    . '<td>' . e($this->nombreEquipo($r->equipo_id)) . '</td>'
+                    . '<td class="num">' . ($r->goles_favor === null ? '—' : e($r->goles_favor) . ':' . e($r->goles_contra)) . '</td>'
+                    . '<td>' . e($this->nombreEquipo($r->rival_id)) . '</td>'
+                    . '<td class="sub">' . ($existe ? 'fecha «' . e($existe->numero) . '» ya existe' : 'se crea la fecha') . '</td></tr>';
+            }
+            $html .= '</tbody></table></div>'
+                . '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar', [
+                    'comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id, 'confirmar' => 1]))
+                . '">Crear estos ' . $filas->count() . ' partidos en el grupo ' . e($zona->nombre) . '</a> '
+                . '<span class="sub">recién acá se escribe</span></p>';
+
+            return $this->pagina('Aplicar fecha', $html);
+        }
+
+        $creados = 0; $errores = []; $detalle = '';
+        foreach ($filas->sortBy('dia') as $r) {
+            try {
+                $k = $numeros[(int) $r->id];
+                $fecha = $this->fechaDeZonaPorNumero($zona->id, $k);
+                if (!$fecha) {
+                    $fecha = new \App\Fecha();
+                    $fecha->forceFill([
+                        'numero'     => (string) $k,
+                        'grupo_id'   => $zona->id,
+                        'orden'      => $k,
+                        'url_nombre' => Str::slug('fecha-' . $k),
+                    ])->save();
+                }
+
+                $lId = (int) $r->equipo_id; $vId = (int) $r->rival_id;
+                $ya = \App\Partido::where('fecha_id', $fecha->id)
+                    ->where(function ($q) use ($lId, $vId) {
+                        $q->where('equipol_id', $lId)->orWhere('equipov_id', $lId)
+                            ->orWhere('equipol_id', $vId)->orWhere('equipov_id', $vId);
+                    })->first();
+                if ($ya) {
+                    $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($lId) . ' o ' . $this->nombreEquipo($vId)
+                        . ' en la fecha ' . $fecha->numero . ' del grupo ' . $zona->nombre . ' (#' . $ya->id . ').';
+                    continue;
+                }
+
+                $partido = new \App\Partido();
+                $partido->forceFill([
+                    'fecha_id'   => $fecha->id,
+                    'dia'        => $r->dia,
+                    'equipol_id' => $lId,
+                    'equipov_id' => $vId,
+                    'golesl'     => $r->goles_favor,
+                    'golesv'     => $r->goles_contra,
+                ])->save();
+
+                DB::table('import_partidos')->where('id', $r->id)
+                    ->update(['estado' => 'aplicado', 'partido_id' => $partido->id,
+                        'motivo' => null, 'updated_at' => now()]);
+
+                $detalle .= '<tr><td class="num">' . e($fecha->numero) . '</td>'
+                    . '<td class="num">' . e(substr((string) $r->dia, 0, 10)) . '</td>'
+                    . '<td>' . e($this->nombreEquipo($lId)) . '</td>'
+                    . '<td class="num">' . ($r->goles_favor === null ? '—' : e($r->goles_favor) . ':' . e($r->goles_contra)) . '</td>'
+                    . '<td>' . e($this->nombreEquipo($vId)) . '</td>'
+                    . '<td class="num">#' . $partido->id . '</td></tr>';
+                $creados++;
+            } catch (\Throwable $ex) {
+                $errores[] = 'Error en ' . $r->club_nombre . ' vs ' . $r->rival_nombre . ': ' . $ex->getMessage();
+                Log::error('aplicarZona: ' . $ex->getMessage());
+            }
+        }
+
+        $this->recontarEquipos($zona->id);
+
+        $html .= '<h1>Creados ' . $creados . ' partidos</h1>'
+            . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · ' . e($gameday) . ' de TM → grupo <b>'
+            . e($zona->nombre) . '</b></p>';
+        if (!empty($errores)) {
+            $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>' . e(implode(' — ', $errores)) . '</p>';
+        }
+        if ($detalle) {
+            $html .= '<div class="scroll"><table><thead><tr><th>Fecha</th><th>Día</th><th>Local</th><th>Res.</th>'
+                . '<th>Visitante</th><th>Partido</th></tr></thead><tbody>' . $detalle . '</tbody></table></div>';
+        }
+        $html .= '<p class="acciones"><a class="boton" href="' . e($alFixture) . '">Seguir con otra fecha →</a></p>';
 
         return $this->pagina('Aplicar fecha', $html);
     }
