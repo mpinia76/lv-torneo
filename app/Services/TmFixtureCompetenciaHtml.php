@@ -138,7 +138,7 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 
             $ultimoDia = $fila['dia_crudo'];
 
-            $clave = spl_object_hash($tr);
+            $clave = $tr->getNodePath();
             $fila['ronda']      = isset($rondaDe[$clave]) ? $rondaDe[$clave] : null;
             $fila['resultado']  = trim(preg_replace('/\s+/u', ' ', $a->textContent));
             $filas[$gameId]     = ['game_id' => $gameId] + $fila;
@@ -160,25 +160,60 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      * de TM cambia y las clases se renombran, pero "la fila que no tiene ni
      * partido ni clubes" se sigue cumpliendo.
      *
-     * Devuelve spl_object_hash($tr) => nombre de la ronda.
+     * EN LAS COPAS LA RONDA NO ES UNA FILA: es el título de la caja. En el
+     * calendario de una copa (`pokalwettbewerb/UEFA`, temporada 2000) cada
+     * ronda es una caja aparte con su título arriba de la tabla
+     * («1ª ronda», «Octavos de final») y adentro no hay ninguna fila de
+     * encabezado. Mirando sólo `<tr>` los 205 partidos de la Copa UEFA
+     * 2000/01 quedaban en «—» y «Aplicar» los mandaba todos a una sola fecha.
+     * Por eso se recorren, en orden de documento, las filas Y los títulos
+     * (h2/h3 y `.content-box-headline`); una fila de encabezado dentro de la
+     * tabla, si la hay, pisa al título porque viene después.
+     *
+     * Un título que no sirve como nombre (largo, o vacío después de sacarle
+     * la fecha) CORTA la ronda en vez de ignorarse: si no, los partidos de esa
+     * caja heredarían el nombre de la caja anterior, que es peor que «—».
+     *
+     * Devuelve $tr->getNodePath() => nombre de la ronda. NO spl_object_hash():
+     * los objetos DOM de PHP se crean y se liberan en cada consulta, así que el
+     * hash de una fila en esta pasada no es el de la misma fila en leerComp()
+     * —y puede ser el de otra—. El path es del nodo, no del objeto.
      */
     private function rondasPorFila(\DOMXPath $xp)
     {
         $mapa  = [];
-        $filas = $xp->query('//tr');
+        $filas = $xp->query('//tr | //h2 | //h3 | //*[contains(concat(" ", normalize-space(@class), " "), " content-box-headline ")]');
         if (!$filas) return $mapa;
 
         $actual = null;
 
         foreach ($filas as $tr) {
+            if (strtolower($tr->nodeName) !== 'tr') {
+                $txt = trim(preg_replace('/\s+/u', ' ', $tr->textContent));
+                $txt = preg_replace('#\s*\d{1,2}/\d{1,2}/\d{2,4}\s*#', ' ', $txt);
+                $txt = preg_replace('/^[\s\-–—·|]+|[\s\-–—·|]+$/u', '', $txt);
+                $actual = ($txt !== '' && mb_strlen($txt) <= 60) ? $txt : null;
+                continue;
+            }
+
             $tienePartido = $xp->query('.//a[contains(@href, "/spielbericht/")]', $tr)->length > 0;
 
             if ($tienePartido) {
-                if ($actual !== null) $mapa[spl_object_hash($tr)] = $actual;
+                if ($actual !== null) $mapa[$tr->getNodePath()] = $actual;
                 continue;
             }
 
             if ($xp->query('.//a[contains(@href, "/verein/")]', $tr)->length > 0) continue;
+
+            // Un encabezado de ronda es UNA celda (con colspan). Una fila con
+            // varias celdas con texto es la cabecera de columnas («Fecha ·
+            // Local · Resultado…»): corta, no la frena el largo, y le ponía
+            // «FechaLocal» de nombre a la ronda.
+            $conTexto = 0;
+            foreach ($xp->query('./th | ./td', $tr) as $celda) {
+                if (trim($celda->textContent) !== '') $conTexto++;
+            }
+            if ($conTexto > 1) continue;
 
             $txt = trim(preg_replace('/\s+/u', ' ', $tr->textContent));
 
