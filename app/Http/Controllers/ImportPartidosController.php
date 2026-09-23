@@ -2159,7 +2159,7 @@ class ImportPartidosController extends Controller
         // se llama igual, esos partidos van ahí, repartidos en fechas: el
         // camino normal los mandaba a UNA sola fecha y chocaba con el índice
         // único (fecha, visitante) apenas un equipo era visitante dos veces.
-        $zona = $this->zonaDeLaRonda($gameday, $grupos);
+        $zona = $this->zonaDeLaRonda($gameday, $grupos, $filas);
         if ($zona) {
             return $this->aplicarZona($filas, $torneo, $zona, $comp, $gameday, $confirmar, $html, $alFixture);
         }
@@ -2642,17 +2642,44 @@ class ImportPartidosController extends Controller
      * mayúsculas. Nunca un grupo de llaves (`penales`), y sólo si hay UNA que
      * coincide: con dos, se sigue por el camino de siempre.
      */
-    private function zonaDeLaRonda($gameday, $grupos)
+    private function zonaDeLaRonda($gameday, $grupos, $filas = null)
     {
         if (!preg_match('/^(?:grupo|group|gruppe|groep)\s+(\S+)$/iu', trim((string) $gameday), $m)) return null;
         $clave = mb_strtolower($m[1]);
 
+        // OJO con la «g» suelta: se saca sólo si le sigue un número («G15»).
+        // Antes la regla era `(grupo|group|zona|g)\s*` y a una zona llamada
+        // «G» le comía el nombre entero: quedaba '' y nunca coincidía con la
+        // ronda «Grupo G» (Champions 2002/03: los 12 partidos del G fueron a
+        // UNA sola fecha y 10 chocaron con «Ya hay un partido de...»).
         $hallados = $grupos->filter(function ($g) use ($clave) {
             if (!empty($g->penales)) return false;
             $n = mb_strtolower(trim((string) $g->nombre));
-            $n = preg_replace('/^(?:grupo|group|zona|g)\s*/u', '', $n);
+            $n = preg_replace('/^(?:(?:grupo|group|zona)\s*|g(?=\d))/u', '', $n);
             return $n === $clave;
         });
+
+        // DOS FASES DE GRUPOS con los mismos nombres (1ra fase A..H, 2da A..D):
+        // desempata la plantilla — la zona donde tienen plantilla los equipos
+        // de esta ronda. Si sigue sin quedar una sola, camino de siempre.
+        if ($hallados->count() > 1 && $filas !== null) {
+            $equipos = [];
+            foreach ($filas as $r) {
+                if ($r->equipo_id) $equipos[(int) $r->equipo_id] = true;
+                if ($r->rival_id)  $equipos[(int) $r->rival_id]  = true;
+            }
+            $cuenta = [];
+            foreach ($hallados as $g) {
+                $cuenta[$g->id] = \App\Plantilla::where('grupo_id', $g->id)
+                    ->whereIn('equipo_id', array_keys($equipos))->count();
+            }
+            arsort($cuenta);
+            $ids = array_keys($cuenta);
+            if ($cuenta[$ids[0]] > 0 && (count($ids) < 2 || $cuenta[$ids[0]] > $cuenta[$ids[1]])) {
+                return $hallados->get($ids[0]);
+            }
+            return null;
+        }
 
         return $hallados->count() === 1 ? $hallados->first() : null;
     }
