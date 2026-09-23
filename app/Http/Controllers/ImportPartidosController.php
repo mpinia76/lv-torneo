@@ -4084,12 +4084,22 @@ class ImportPartidosController extends Controller
             // Ojo: la temporada de Transfermarkt no es el año del torneo. El Clausura 2026
             // sale como seasonId 2025. Preseleccionamos mirando los años reales de los partidos.
             $anios = [];
-            $anios[substr($g['desde'], 0, 4)] = true;
-            $anios[substr($g['hasta'], 0, 4)] = true;
-            $anios[(string) $g['temp']] = true;
-            $anios[(string) ((int) $g['temp'] + 1)] = true;
-            $anios[$g['temp'] . '/' . substr((string) ((int) $g['temp'] + 1), -2)] = true;
-            $anios[$g['temp'] . '/' . ((int) $g['temp'] + 1)] = true;
+            $anioDesde = substr((string) $g['desde'], 0, 4);
+            $anioHasta = substr((string) $g['hasta'], 0, 4);
+            if ($anioDesde !== '' && $anioDesde === $anioHasta) {
+                // Todos los partidos en el mismo año: el torneo es ESE año y
+                // ningún otro. Aceptar también temp/temp+1 mandaba la CONCACAF
+                // Champions Cup jugada en 2025 (TM temp 2024) al torneo 2024
+                // cuando el 2025 todavía no existía (22-sep-2026).
+                $anios[$anioDesde] = true;
+            } else {
+                $anios[$anioDesde] = true;
+                $anios[$anioHasta] = true;
+                $anios[(string) $g['temp']] = true;
+                $anios[(string) ((int) $g['temp'] + 1)] = true;
+                $anios[$g['temp'] . '/' . substr((string) ((int) $g['temp'] + 1), -2)] = true;
+                $anios[$g['temp'] . '/' . ((int) $g['temp'] + 1)] = true;
+            }
 
             // Agrupados por país (nacionales) o confederación (internacionales),
             // para no confundir un Apertura argentino con uno chileno.
