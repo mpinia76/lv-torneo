@@ -109,10 +109,7 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         $ultimoDia = null;
 
         foreach ($links as $a) {
-            // gameId de CUALQUIER largo: los partidos viejos de TM tienen ids
-            // de 3 dígitos (Rosenborg-Estrella Roja, Copa UEFA 03/04 = 227). Con
-            // \d{4,} se perdía casi toda la 1ª ronda y la ida de la 2ª.
-            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d+)#', $a->getAttribute('href'), $m)) {
+            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
                 continue;
             }
 
@@ -227,6 +224,13 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
             // títulos de columna juntos), ni una fecha suelta.
             if ($txt === '' || mb_strlen($txt) > 60) continue;
             if (preg_match('#\d{1,2}/\d{1,2}/\d{2,4}#', $txt)) continue;
+            // Ni una hora suelta. En el calendario de liga TM repite cada
+            // partido en una fila de UNA celda para celulares («jue 15/08/24
+            // 19:00»); cuando el día es el mismo que el anterior la fila trae
+            // sólo la hora, «21:30», y pisaba a «1. Jornada»: LaLiga 2024/25
+            // quedó con rondas «21:30», «19:00», «16:15»… y cada jornada con
+            // un partido. Ningún nombre de ronda lleva hh:mm.
+            if (preg_match('/\b\d{1,2}:\d{2}\b/', $txt)) continue;
             if ($this->esRotuloGenerico($txt)) continue;
 
             $actual = $txt;
