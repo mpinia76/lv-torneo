@@ -96,7 +96,7 @@
                             @php $escudos = explode(',',$torneo->escudo); @endphp
                             @foreach($escudos as $escudo)
                                 @if($escudo!='')
-                                    @php $escudoArr = explode('_',$escudo); @endphp
+                                    @php $escudoArr = partesEscudo($escudo); @endphp
                                     <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}" class="me-2">
                                         <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" class="rounded shadow-sm">
                                         @if(isset($escudoArr[2]) && $escudoArr[2] != '')
@@ -190,7 +190,7 @@
                                 @php $escudos = explode(',',$torneo->escudo); @endphp
                                 @foreach($escudos as $escudo)
                                     @if($escudo!='')
-                                        @php $escudoArr = explode('_',$escudo); @endphp
+                                        @php $escudoArr = partesEscudo($escudo); @endphp
                                         <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}" class="me-2">
                                             <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" class="rounded shadow-sm">
                                             @if(isset($escudoArr[2]) && $escudoArr[2] != '')

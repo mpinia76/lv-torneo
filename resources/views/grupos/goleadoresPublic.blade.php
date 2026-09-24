@@ -83,7 +83,7 @@
                                 @if($jugador->escudo)
                                     @foreach(explode(',', $jugador->escudo) as $escudo)
                                         @if($escudo)
-                                            @php $escudoArr = explode('_', $escudo); @endphp
+                                            @php $escudoArr = partesEscudo($escudo); @endphp
                                             <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
                                                 <x-escudo :src="$escudoArr[0]" nombre="Equipo"/>
                                             </a>

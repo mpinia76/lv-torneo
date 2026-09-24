@@ -1519,7 +1519,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         if (!empty($g->escudo)) {
             foreach (explode(',', trim($g->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 3) continue;
                 [$esc, $id, $goles] = $parts;
                 $equipos[$id] = [
@@ -1609,7 +1609,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         if (!empty($goleador->escudo)) {
             foreach (explode(',', trim($goleador->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 3) continue;
                 [$esc, $id, $goles] = $parts;
                 $equipos[$id] = [
@@ -1895,7 +1895,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         if (!empty($t->escudo)) {
             foreach (explode(',', trim($t->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 4) continue;
                 [$esc, $id, $rojas, $amarillas] = $parts;
                 $equipos[$id] = [
@@ -1974,7 +1974,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         if (!empty($tarjeta->escudo)) {
             foreach (explode(',', trim($tarjeta->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 4) continue;
                 [$esc, $id, $rojas, $amarillas] = $parts;
                 $equipos[$id] = [
@@ -3976,7 +3976,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                 if (!empty($tecnico->escudo)) {
                     $items = explode(',', rtrim($tecnico->escudo, ','));
                     foreach ($items as $item) {
-                        $parts = explode('_', $item);
+                        $parts = partesEscudo($item);
                         if (count($parts) >= 4) {
                             $escudosArray[$parts[1]] = $parts; // indexado por equipo_id
                         }
@@ -4325,7 +4325,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         if (!empty($a->escudo)) {
             foreach (explode(',', trim($a->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 4) continue;
                 [$esc, $id, $rec, $inv] = $parts;
                 $equipos[$id] = [
@@ -4406,7 +4406,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         if (!empty($arquero->escudo)) {
             foreach (explode(',', trim($arquero->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 4) continue;
                 [$esc, $id, $rec, $inv] = $parts;
                 $equipos[$id] = [
@@ -4830,7 +4830,7 @@ group by jugador_id, jugador, foto, nacionalidad';
         if (!empty($j->escudo)) {
             foreach (explode(',', trim($j->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 2) continue;
                 [$esc, $id] = $parts;
                 $equipos[$id] = ['escudo' => $esc];
@@ -4885,7 +4885,7 @@ group by jugador_id, jugador, foto, nacionalidad';
         if (!empty($jugador->jugando)) {
             foreach (explode(',', trim($jugador->jugando, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 2) continue;
                 // 0 = escudo, 1 = equipo_id, 2 = nombre (may be missing in old entries)
                 $jugandoEquipos[$parts[1]] = [
@@ -4927,7 +4927,7 @@ group by jugador_id, jugador, foto, nacionalidad';
         if (!empty($jugador->escudo)) {
             foreach (explode(',', trim($jugador->escudo, ',')) as $item) {
                 if (!$item) continue;
-                $parts = explode('_', $item);
+                $parts = partesEscudo($item);
                 if (count($parts) < 2) continue;
                 $equipos[$parts[1]] = [
                     'escudo' => $parts[0],

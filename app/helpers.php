@@ -41,6 +41,22 @@ if (!function_exists('partirEscudo')) {
     }
 }
 
+if (!function_exists('partesEscudo')) {
+    /**
+     * Lo mismo que explode('_', $cadena), pero sin partir el nombre del
+     * archivo del escudo (escudo_tm_683.png_733_5_Nombre ->
+     * ['escudo_tm_683.png', '733', '5', 'Nombre']).
+     * Para las cadenas "escudo_id_..." que arman los listados.
+     */
+    function partesEscudo($cadena)
+    {
+        [$escudo, $resto] = partirEscudo($cadena);
+        $partes = $resto === '' ? [] : explode('_', $resto);
+        array_unshift($partes, $escudo);
+        return $partes;
+    }
+}
+
 if (!function_exists('clubesDesdeCadena')) {
     /**
      * Lee las cadenas "escudo_equipoId_[datos...]_nombre[_titulos]" que arma

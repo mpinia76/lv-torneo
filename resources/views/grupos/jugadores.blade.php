@@ -71,7 +71,7 @@
                                 @php $escudos = explode(',', $jugador->escudo); @endphp
                                 @foreach($escudos as $escudo)
                                     @if($escudo != '')
-                                        @php $escudoArr = explode('_', $escudo); @endphp
+                                        @php $escudoArr = partesEscudo($escudo); @endphp
                                         <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
                                             <img src="{{ url('images/' . $escudoArr[0]) }}" height="25">
                                         </a>

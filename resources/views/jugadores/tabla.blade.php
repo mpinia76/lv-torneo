@@ -26,7 +26,7 @@
         $fjEquiposFila = [];
         foreach (explode(',', (string) $fjT->escudo) as $fjCadena) {
             if (trim($fjCadena) === '') { continue; }
-            $fjPartes = explode('_', $fjCadena);
+            $fjPartes = partesEscudo($fjCadena);
             $fjEquiposFila[] = [
                 'escudo' => $fjPartes[0] ?? '',
                 'id'     => $fjPartes[1] ?? '',

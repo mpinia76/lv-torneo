@@ -2295,6 +2295,55 @@ class ImportPartidosController extends Controller
             $plan[] = ['fila' => $r, 'grupo_id' => $destino, 'nota' => $nota];
         }
 
+        // ── UN EQUIPO CON DOS RIVALES EN LA MISMA RONDA ─────────────────────
+        // En una ronda de TM cada equipo juega contra UN rival (una vez, o dos
+        // si la ronda trae ida y vuelta juntas). Si aparece contra dos rivales
+        // distintos, uno de esos partidos tiene un club mal: un mapeo de TM
+        // equivocado o un error del propio calendario de TM. Caso real, Copa
+        // del Rey 2001/02, octavos de ida: «Córdoba – Mallorca» y «Figueres –
+        // Córdoba», y la vuelta decía «Novelda – Figueres». En un grupo de
+        // llaves no corre el control de «otro partido del equipo en la fecha»,
+        // así que los dos se crearon y el error recién saltó en la vuelta.
+        //
+        // Esos partidos se muestran y NO se crean: el resto de la ronda sí.
+        $rivalesDe = [];
+        foreach ($plan as $x) {
+            $l = (int) $x['fila']->equipo_id; $v = (int) $x['fila']->rival_id;
+            if (!$l || !$v) continue;
+            $rivalesDe[$l][$v] = true;
+            $rivalesDe[$v][$l] = true;
+        }
+        $repetidos = [];
+        foreach ($rivalesDe as $eq => $rs) {
+            if (count($rs) > 1) $repetidos[$eq] = true;
+        }
+        $dudosos = [];
+        if ($repetidos) {
+            $limpio = [];
+            foreach ($plan as $x) {
+                $l = (int) $x['fila']->equipo_id; $v = (int) $x['fila']->rival_id;
+                if (isset($repetidos[$l]) || isset($repetidos[$v])) $dudosos[] = $x['fila'];
+                else $limpio[] = $x;
+            }
+            $plan = $limpio;
+            $nombres = [];
+            foreach (array_keys($repetidos) as $eq) $nombres[] = $this->nombreEquipo($eq);
+            $html .= '<div class="err-box"><b>' . count($dudosos) . ' partidos NO se crean:</b> '
+                . e(implode(', ', $nombres)) . ' ' . (count($nombres) > 1 ? 'aparecen' : 'aparece')
+                . ' contra dos rivales distintos en esta ronda, así que uno de estos partidos tiene un club mal '
+                . '(el mapeo de TM, o el calendario de TM). Abrí la ficha en TM, corregí el mapeo o el partido, '
+                . '«Guardar en staging» y volvé a aplicar: el resto de la ronda se crea igual.<br>';
+            foreach ($dudosos as $r) {
+                $html .= e(substr((string) $r->dia, 0, 10) . ' · ' . $r->club_nombre . ' (' . $this->nombreEquipo($r->equipo_id)
+                    . ') vs ' . $r->rival_nombre . ' (' . $this->nombreEquipo($r->rival_id) . ')')
+                    . $this->linkTm($r->external_id) . '<br>';
+            }
+            $html .= '</div>';
+            if (empty($plan)) {
+                return $this->pagina('Aplicar fecha', $html . '<p class="err-box">No queda nada que crear.</p>');
+            }
+        }
+
         // ── Previsualización ────────────────────────────────────────────────
         if (!$confirmar) {
             $porGrupo = [];
