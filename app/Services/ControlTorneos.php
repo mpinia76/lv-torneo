@@ -145,6 +145,41 @@ class ControlTorneos
             }
         }
 
+        // FECHAS CORTAS A PROPÓSITO. Si todos los equipos del torneo jugaron la
+        // MISMA cantidad de partidos de tabla, no falta ninguno: una fecha con
+        // menos partidos es una fecha extra o una jornada que TM repartió mal
+        // (Eredivisie 2000/01: 306 partidos, 34 por equipo, repartidos en 37
+        // fechas). Cargado DT por DT, en cambio, los equipos quedan
+        // desparejos y la fecha sigue contando como a medias.
+        $revisar = [];
+        foreach ($out as $tid => $x) if ($x['incompletas'] > 0) $revisar[] = (int) $tid;
+        if ($revisar) {
+            $porEquipo = DB::select(
+                "SELECT x.torneo_id, x.equipo_id, COUNT(*) AS n FROM (
+                     SELECT g.torneo_id, pa.equipol_id AS equipo_id
+                       FROM partidos pa
+                       INNER JOIN fechas fe ON fe.id = pa.fecha_id
+                       INNER JOIN grupos g ON g.id = fe.grupo_id
+                      WHERE g.torneo_id IN (" . implode(',', $revisar) . ")
+                        AND fe.numero REGEXP '^[0-9]+$' AND g.nombre <> 'Playoffs'
+                     UNION ALL
+                     SELECT g.torneo_id, pa.equipov_id
+                       FROM partidos pa
+                       INNER JOIN fechas fe ON fe.id = pa.fecha_id
+                       INNER JOIN grupos g ON g.id = fe.grupo_id
+                      WHERE g.torneo_id IN (" . implode(',', $revisar) . ")
+                        AND fe.numero REGEXP '^[0-9]+$' AND g.nombre <> 'Playoffs'
+                 ) x GROUP BY x.torneo_id, x.equipo_id"
+            );
+            $cuentas = [];
+            foreach ($porEquipo as $r) $cuentas[(int) $r->torneo_id][] = (int) $r->n;
+            foreach ($cuentas as $tid => $ns) {
+                if (count($ns) >= 2 && min($ns) > 0 && min($ns) === max($ns)) {
+                    $out[$tid]['incompletas'] = 0;
+                }
+            }
+        }
+
         return $out;
     }
 
