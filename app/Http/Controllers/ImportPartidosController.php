@@ -2244,7 +2244,9 @@ class ImportPartidosController extends Controller
         // `normalizarFixture()` guarda «—». Ese valor termina siendo el
         // `numero` de la fecha que se crea: una fecha llamada «—» no es lo que
         // quiso nadie, así que hay que preguntar cómo se llama.
-        $sinRonda = ($gameday === '' || $gameday === '—');
+        // Una HORA suelta («14:30») tampoco es ronda: el calendario en HTML a
+        // veces corre las columnas y la hora cae donde iba la jornada.
+        $sinRonda = ($gameday === '' || $gameday === '—' || preg_match('/^\d{1,2}:\d{2}$/', $gameday));
 
         // UN SOLO GRUPO: SE PREGUNTA IGUAL POR LA FECHA. `$proponeLlaves` exige
         // partidos CRUZANDO zonas, y en una copa internacional todas las rondas
@@ -2254,7 +2256,12 @@ class ImportPartidosController extends Controller
         // ya cargadas al lado). Con un solo grupo, rutear por plantilla y
         // mandar todo a ese grupo son lo mismo, así que `modo=plantilla` no lo
         // apaga: lo único que cambia es que ahora se puede elegir la fecha.
-        if (!$grupoDestino && $unico !== null && ($playoffId === $unico || $sinRonda)) {
+        //
+        // Y TAMBIÉN EN UNA LIGA DE UN GRUPO: el gameday del calendario en HTML
+        // viene como «1. Jornada», que no es el nombre de ninguna fecha tuya
+        // («1»). Se creaba al lado de la que ya existía. Ahora siempre se
+        // pregunta, con la fecha del número de jornada preseleccionada.
+        if (!$grupoDestino && $unico !== null) {
             $grupoDestino = $unico;
         }
 
@@ -2386,11 +2393,24 @@ class ImportPartidosController extends Controller
                     // torneo, la vuelta va ahí. Sirve igual para reaplicar una
                     // fecha que quedó a medias.
                     $fechaDestino = (int) $this->fechaDeLasLlaves($filas, $torneo->id);
+                    // En un grupo SIN llaves la fecha es un número: «1. Jornada»
+                    // → «1». Si ya existe en el grupo se preselecciona; si no, se
+                    // propone como nombre de la nueva.
+                    $numJornada = $this->numeroDeJornada($gameday);
+                    if (!$fechaDestino && empty($grupos[$grupoDestino]->penales) && $numJornada !== null) {
+                        $fechaDestino = (int) \App\Fecha::where('grupo_id', $grupoDestino)
+                            ->where('numero', $numJornada)->value('id');
+                        if (!$fechaDestino) { $fechaNombre = $numJornada; }
+                    }
                     // `nombreDeRonda()` adivina por la CANTIDAD de partidos, y
                     // sin ronda de TM eso miente: una llave sola —ida y
                     // vuelta— son 2 partidos y propondría «Semifinal». Mejor
                     // vacío: la pantalla lo pide y no crea nada hasta tenerlo.
-                    if (!$fechaDestino && !$sinRonda) $fechaNombre = $this->nombreDeRonda(count($filas), $gameday);
+                    // Y adivinar «Octavos» por cantidad sólo tiene sentido en llaves.
+                    if (!$fechaDestino && $fechaNombre === '' && !$sinRonda) {
+                        $fechaNombre = !empty($grupos[$grupoDestino]->penales)
+                            ? $this->nombreDeRonda(count($filas), $gameday) : $gameday;
+                    }
                 }
 
                 $optsG = '';
@@ -2409,7 +2429,7 @@ class ImportPartidosController extends Controller
                     . ($unico !== null
                         ? 'Este torneo tiene un solo grupo, así que no hay nada que rutear: lo único que falta '
                           . 'decidir es a qué fecha van.'
-                          . ($sinRonda ? ' Transfermarkt no trajo el nombre de la ronda —quedó «—»—, '
+                          . ($sinRonda ? ' Transfermarkt no trajo el nombre de la ronda —quedó «' . e($gameday ?: '—') . '»—, '
                               . 'así que tampoco se puede deducir.' : '')
                         : ($grupoDestino === $playoffId
                             ? 'Los dos equipos de cada partido están en zonas distintas: esto es una ronda de playoffs, '
@@ -2482,7 +2502,7 @@ class ImportPartidosController extends Controller
             $fechaLibre = trim((string) $request->get('fecha_nombre', ''));
             if (!$grupoDestino && $sinRonda) {
                 $html .= '<div class="' . ($fechaLibre === '' ? 'err-box' : 'ok-box') . '">'
-                    . '<div><b>Transfermarkt no trajo el nombre de la ronda</b> (quedó «—»). '
+                    . '<div><b>Transfermarkt no trajo el nombre de la ronda</b> (quedó «' . e($gameday ?: '—') . '»). '
                     . 'La fecha se crea con ese nombre en cada grupo, así que decime cómo se llama.</div>'
                     . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
                     . '<input type="hidden" name="comp" value="' . e($comp) . '">'
@@ -2566,7 +2586,8 @@ class ImportPartidosController extends Controller
                 $fechaFijada->forceFill([
                     'numero'     => $fechaNombre,
                     'grupo_id'   => $grupoDestino,
-                    'orden'      => ((int) \App\Fecha::where('grupo_id', $grupoDestino)->max('orden')) + 1,
+                    'orden'      => is_numeric($fechaNombre) ? (int) $fechaNombre
+                        : ((int) \App\Fecha::where('grupo_id', $grupoDestino)->max('orden')) + 1,
                     'url_nombre' => Str::slug($fechaNombre),
                 ])->save();
             }
@@ -2574,7 +2595,8 @@ class ImportPartidosController extends Controller
 
         // EL `numero` DE LA FECHA cuando se rutea por plantilla: el gameday de
         // TM, salvo que TM no haya traído ronda y lo hayas escrito vos.
-        $numeroFecha = $gameday;
+        $numeroFecha = $this->numeroDeJornada($gameday);
+        if ($numeroFecha === null) $numeroFecha = $gameday;
         if (!$grupoDestino && $sinRonda) {
             $numeroFecha = trim((string) $request->get('fecha_nombre', ''));
             if ($numeroFecha === '') {
@@ -2958,6 +2980,20 @@ class ImportPartidosController extends Controller
      * los cuartos o una tercera ronda previa. TM manda un número de gameday y
      * nada más, así que el nombre lo termina de decidir el usuario.
      */
+    /**
+     * El número de una jornada de liga, si el gameday de TM lo es:
+     * «5», «5. Jornada», «Jornada 5», «5. Spieltag», «Speeldag 5» -> '5'.
+     * Una hora («14:30»), «Grupo A» u «Octavos» -> null.
+     */
+    private function numeroDeJornada($gameday)
+    {
+        $pal = '(?:jornada|fecha|spieltag|speeldag|matchday|giornata|journ[ée]e|rodada|round|runde)';
+        if (preg_match('/^\s*(?:' . $pal . '\s*)?(\d{1,3})\s*\.?\s*(?:' . $pal . ')?\s*$/iu', (string) $gameday, $m)) {
+            return (string) (int) $m[1];
+        }
+        return null;
+    }
+
     private function nombreDeRonda($cuantos, $gameday)
     {
         $mapa = [1 => 'Final', 2 => 'Semifinal', 4 => 'Cuartos de final',
