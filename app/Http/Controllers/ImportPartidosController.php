@@ -2958,11 +2958,20 @@ class ImportPartidosController extends Controller
                             if (count($cadena) > 6) { $ok = false; break; }
                         }
                         if (!$ok) continue;
+                        // Una cadena no puede llevarse un partido que está bien
+                        // ubicado a una jornada lejana: PSV–Willem II del 05/09
+                        // (jornada 3 en TM y en voetbal.com) terminaba en la 18.
+                        // Si el partido queda a más de 10 días de su jornada
+                        // nueva y más lejos que de la que tenía, la cadena no va.
                         $costo = abs($ts($i) - $mediana[$a]);
                         foreach ($cadena as $x) {
                             $destino = $asignado[$x] === $a ? $b : $a;
-                            $costo += abs($ts($x) - $mediana[$destino]) - abs($ts($x) - $mediana[$asignado[$x]]);
+                            $dNuevo = abs($ts($x) - $mediana[$destino]);
+                            $dViejo = abs($ts($x) - $mediana[$asignado[$x]]);
+                            if ($dNuevo > 10 * 86400 && $dNuevo > $dViejo) { $ok = false; break; }
+                            $costo += $dNuevo - $dViejo;
                         }
+                        if (!$ok) continue;
                         if ($mejor === null || $costo < $mejor[0]) $mejor = [$costo, $a, $b, $cadena];
                     }
                 }
