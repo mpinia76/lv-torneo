@@ -22,6 +22,14 @@ use App\Services\NivelCompetencia;
  */
 class ImportPartidosController extends Controller
 {
+    /**
+     * Partidos que el rearmado no pudo ubicar: sus dos equipos no tienen
+     * ninguna jornada libre en común (cada uno tiene su hueco en otra). Se
+     * quedan en la jornada de TM, repetidos, y se muestran para resolverlos
+     * a mano. Lo llena `renumerarJornadas()`.
+     */
+    private $sinLugar = [];
+
     const TMAPI = 'https://tmapi.transfermarkt.technology';
 
     /**
@@ -2778,6 +2786,7 @@ class ImportPartidosController extends Controller
      */
     private function renumerarJornadas(array &$filas, array $anclas = [])
     {
+        $this->sinLugar = [];
         $dia = function ($i) use ($filas) { return substr((string) $filas[$i]['dia'], 0, 10); };
         $ts  = function ($i) use ($dia) { return strtotime($dia($i)); };
         $lv  = function ($i) use ($filas) { return [(string) $filas[$i]['club_external_id'], (string) $filas[$i]['rival_external_id']]; };
@@ -2898,6 +2907,10 @@ class ImportPartidosController extends Controller
                 if ($d < $dist) { $dist = $d; $mejor = $k; }
             }
             if ($mejor !== null) $asignado[$i] = $mejor;
+            else $this->sinLugar[] = [
+                'dia' => $dia($i), 'jornada' => (int) $asignado[$i],
+                'local' => (string) $filas[$i]['club_nombre'], 'visita' => (string) $filas[$i]['rival_nombre'],
+            ];
             foreach ([$l, $v] as $e) $ocupado[$asignado[$i]][$e] = true;
         }
 
@@ -3094,7 +3107,20 @@ class ImportPartidosController extends Controller
 
             $sinRenumerar = str_replace(['&renumerar=1', '?renumerar=1&', '?renumerar=1'], ['', '?', ''], $base);
 
-            return '<div class="' . ($raras ? 'warn-box' : 'ok-box') . '"><b>Jornadas rearmadas</b>, corrigiendo '
+            $sinLugar = '';
+            if ($this->sinLugar) {
+                $sinLugar = '<div class="err-box" style="margin-top:8px"><b>' . count($this->sinLugar) . ' partidos no '
+                    . 'tienen lugar:</b> sus dos equipos no tienen ninguna jornada libre en común (cada uno tiene su hueco '
+                    . 'en otra), así que quedaron en la jornada de TM, repetidos. Son los que hacen que esas jornadas '
+                    . 'tengan más de ' . $normal . '. «Aplicar» los deja afuera (un equipo contra dos rivales); cargalos '
+                    . 'después a mano en la fecha que elijas.<br>';
+                foreach ($this->sinLugar as $x) {
+                    $sinLugar .= e($x['dia'] . ' · ' . $x['local'] . ' vs ' . $x['visita'] . ' · quedó en la ' . $x['jornada']) . '<br>';
+                }
+                $sinLugar .= '</div>';
+            }
+
+            return $sinLugar . '<div class="' . ($raras ? 'warn-box' : 'ok-box') . '"><b>Jornadas rearmadas</b>, corrigiendo '
                 . 'lo mínimo: se respeta la jornada de TM salvo cuando un equipo aparece dos veces en la misma. Ahí se queda el '
                 . 'partido más cercano a la fecha típica de la jornada, y el otro va a la jornada libre para sus dos '
                 . 'equipos más cercana en días. Lo que ya tenés cargado no se toca acá: si está en otra fecha, abajo '
