@@ -30,6 +30,9 @@ class ImportPartidosController extends Controller
      */
     private $sinLugar = [];
 
+    /** Los que `extras=1` mandó a fechas nuevas (35, 36...). */
+    private $enExtra = [];
+
     const TMAPI = 'https://tmapi.transfermarkt.technology';
 
     /**
@@ -323,6 +326,7 @@ class ImportPartidosController extends Controller
         // `renumerarJornadas()`. Viaja en todos los botones (va en `$base`).
         $renumerar = (string) $request->get('renumerar', '0') === '1';
         $moverFechas = $renumerar && (string) $request->get('mover_fechas', '0') === '1';
+        $extras = $renumerar && (string) $request->get('extras', '0') === '1';
         $filtro  = trim((string) $request->get('estado', ''));
         $gameday = trim((string) $request->get('gameday', ''));
         // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
@@ -526,7 +530,7 @@ class ImportPartidosController extends Controller
             // equivocada (aplicado con las jornadas mezcladas de TM), anclarlo
             // arrastraba el error a toda la jornada. Lo ya cargado se compara
             // DESPUÉS, en `bloqueMoverFechas()`, que ofrece moverlo.
-            $renumeradas = $this->renumerarJornadas($filas);
+            $renumeradas = $this->renumerarJornadas($filas, [], $extras);
         }
 
         $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
@@ -693,6 +697,7 @@ class ImportPartidosController extends Controller
             'comp' => $comp,
             'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
             'renumerar' => $renumerar ? 1 : null,
+            'extras'    => $extras ? 1 : null,
         ]));
 
         // LOS BOTONES QUE ESCRIBEN TRABAJAN SOBRE LO QUE SE ESTÁ VIENDO.
@@ -2784,9 +2789,10 @@ class ImportPartidosController extends Controller
      * Pisa `ronda` en `$filas` con el número pelado («10») y devuelve el
      * resumen [número => ['n', 'fijos', 'desde', 'hasta', 'antes' => [ronda TM => n]]].
      */
-    private function renumerarJornadas(array &$filas, array $anclas = [])
+    private function renumerarJornadas(array &$filas, array $anclas = [], $extras = false)
     {
         $this->sinLugar = [];
+        $this->enExtra = [];
         $dia = function ($i) use ($filas) { return substr((string) $filas[$i]['dia'], 0, 10); };
         $ts  = function ($i) use ($dia) { return strtotime($dia($i)); };
         $lv  = function ($i) use ($filas) { return [(string) $filas[$i]['club_external_id'], (string) $filas[$i]['rival_external_id']]; };
@@ -3000,6 +3006,34 @@ class ImportPartidosController extends Controller
             }
         }
 
+        // FECHAS EXTRA (`extras=1`): los que no tienen lugar van a jornadas
+        // nuevas después de la última (35, 36...), cada uno a la primera donde
+        // no juega ninguno de sus dos equipos. El torneo queda completo y sin
+        // choques; lo que se pierde es sólo el número «oficial» de esos
+        // partidos, que ninguna fuente tiene bien.
+        if ($extras && $quedan) {
+            $ultima = max(array_keys($mediana));
+            $en = [];
+            foreach ($asignado as $x => $k) {
+                if (in_array($x, $quedan, true)) continue;
+                foreach ($lv($x) as $e) $en[$k][$e] = true;
+            }
+            usort($quedan, function ($p, $q) use ($dia) { return strcmp($dia($p), $dia($q)); });
+            foreach ($quedan as $i) {
+                list($l, $v) = $lv($i);
+                for ($k = $ultima + 1; ; $k++) {
+                    if (empty($en[$k][$l]) && empty($en[$k][$v])) break;
+                }
+                $en[$k][$l] = true; $en[$k][$v] = true;
+                $this->enExtra[] = [
+                    'dia' => $dia($i), 'jornada' => $k, 'antes' => (int) $asignado[$i],
+                    'local' => (string) $filas[$i]['club_nombre'], 'visita' => (string) $filas[$i]['rival_nombre'],
+                ];
+                $asignado[$i] = $k;
+            }
+            $quedan = [];
+        }
+
         foreach ($quedan as $i) {
             $this->sinLugar[] = [
                 'dia' => $dia($i), 'jornada' => (int) $asignado[$i],
@@ -3209,6 +3243,21 @@ class ImportPartidosController extends Controller
                     . 'después a mano en la fecha que elijas.<br>';
                 foreach ($this->sinLugar as $x) {
                     $sinLugar .= e($x['dia'] . ' · ' . $x['local'] . ' vs ' . $x['visita'] . ' · quedó en la ' . $x['jornada']) . '<br>';
+                }
+                $sinLugar .= '<p class="acciones" style="margin-top:8px"><a class="boton-sec" href="'
+                    . e($base . $fuente . '&extras=1') . '">Ponerlos en fechas extra</a> <span class="sub">van a '
+                    . 'jornadas nuevas después de la última (35, 36…), sin choques. Solo muestra: se escribe al '
+                    . 'guardar en staging</span></p></div>';
+            }
+            if ($this->enExtra) {
+                $sinLugar .= '<div class="warn-box" style="margin-top:8px"><b>' . count($this->enExtra) . ' partidos '
+                    . 'van a fechas extra</b> (no tenían lugar en ninguna jornada). Para crearlos: <b>Guardar en '
+                    . 'staging</b> con esta vista y después «Aplicar» de cada fecha extra. '
+                    . '<a href="' . e(str_replace(['&extras=1', '?extras=1&', '?extras=1'], ['', '?', ''], $base) . $fuente)
+                    . '">Sin fechas extra</a><br>';
+                foreach ($this->enExtra as $x) {
+                    $sinLugar .= e($x['dia'] . ' · ' . $x['local'] . ' vs ' . $x['visita'] . ' · fecha ' . $x['jornada']
+                        . ' (TM la tenía en la ' . $x['antes'] . ')') . '<br>';
                 }
                 $sinLugar .= '</div>';
             }
