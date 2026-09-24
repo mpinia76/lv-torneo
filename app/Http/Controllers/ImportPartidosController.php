@@ -311,6 +311,9 @@ class ImportPartidosController extends Controller
         // Las fechas de los partidos YA JUGADOS son un botón aparte, nunca parte
         // de `refrescar`: ver `corregirFechasJugadas()`.
         $corregirJugados = (string) $request->get('fechas_jugados', '0') === '1';
+        // Rearmar las jornadas de una LIGA por fecha, sin creerle a TM: ver
+        // `renumerarJornadas()`. Viaja en todos los botones (va en `$base`).
+        $renumerar = (string) $request->get('renumerar', '0') === '1';
         $filtro  = trim((string) $request->get('estado', ''));
         $gameday = trim((string) $request->get('gameday', ''));
         // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
@@ -505,6 +508,11 @@ class ImportPartidosController extends Controller
                 . e($comp) . '</code>.</p>');
         }
 
+        // Antes de clasificar: la segunda pasada del emparejador compara el
+        // número de jornada, así que tiene que ver el número ya corregido.
+        $jornadasMal = $this->jornadasConChoque($filas);
+        $renumeradas = $renumerar ? $this->renumerarJornadas($filas) : null;
+
         $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
 
         // Qué temporada vino DE VERDAD. Sin esto no hay forma de saber si TM
@@ -668,6 +676,7 @@ class ImportPartidosController extends Controller
         $base = route('import_partidos.fixture', array_filter([
             'comp' => $comp,
             'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
+            'renumerar' => $renumerar ? 1 : null,
         ]));
 
         // LOS BOTONES QUE ESCRIBEN TRABAJAN SOBRE LO QUE SE ESTÁ VIENDO.
@@ -681,6 +690,8 @@ class ImportPartidosController extends Controller
         // salió de TM, el botón vuelve a bajar de TM.
         $fuente = $usarCache ? '&cache=1' : '';
         $costo  = $usarCache ? '' : ' <span class="sub">(vuelve a bajar de TM)</span>';
+
+        $html .= $this->bloqueRenumerar($renumeradas, $jornadasMal, $base, $fuente);
 
         $html .= '<p class="acciones">'
             . '<a class="boton" href="' . e($base . $fuente . '&guardar=1') . '">Guardar en staging</a>' . $costo
@@ -2704,6 +2715,161 @@ class ImportPartidosController extends Controller
             . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
 
         return $this->pagina('Aplicar fecha', $html);
+    }
+
+    /**
+     * Rondas de TM donde un equipo juega contra DOS rivales distintos.
+     *
+     * En una liga no puede pasar: cada equipo juega una vez por jornada. Pasa
+     * cuando TM mezcla las jornadas, como en la Eredivisie 2000/01: su
+     * «10. Jornada» trae el fin de semana del 27-29/10 Y el miércoles 01/11,
+     * que son dos jornadas distintas. Devuelve [ronda => [equipo tm => n]].
+     */
+    private function jornadasConChoque(array $filas)
+    {
+        $rivales = [];
+        foreach ($filas as $f) {
+            $r = (string) $f['ronda'];
+            $l = (string) $f['club_external_id']; $v = (string) $f['rival_external_id'];
+            if ($r === '' || $r === '—' || $l === '' || $v === '') continue;
+            $rivales[$r][$l][$v] = true;
+            $rivales[$r][$v][$l] = true;
+        }
+        $mal = [];
+        foreach ($rivales as $r => $eqs) {
+            foreach ($eqs as $eq => $rs) {
+                if (count($rs) > 1) $mal[$r][$eq] = count($rs);
+            }
+        }
+        return $mal;
+    }
+
+    /**
+     * Rearma las jornadas de una LIGA cuando TM las mezcló.
+     *
+     * La jornada de TM se respeta cuando es creíble: está libre para los dos
+     * equipos y el partido se jugó a no más de 4 días del día típico
+     * (mediana) de esa jornada en TM. Si no, el partido va a la PRIMERA
+     * jornada donde todavía no jugó ninguno de sus dos equipos.
+     *
+     * Por qué las dos cosas y no sólo la segunda: con sólo «primera jornada
+     * libre», un postergado de la fecha 5 que se juega en enero cambia de
+     * lugar con la revancha de la fecha 22 (la revancha se juega antes y
+     * ocupa el hueco de la 5). Y con sólo la de TM no se arregla nada: RKC –
+     * Twente del 01/10 figura en la «15. Jornada», que se jugó el 02-03/12.
+     * Probado con una liga simulada de 18 equipos, un postergado y jornadas
+     * cruzadas.
+     *
+     * Se recorren por día. Pisa `ronda` en `$filas` (por referencia) con el
+     * número pelado, «10», y devuelve el resumen
+     * [número => ['n', 'desde', 'hasta', 'antes' => [ronda TM => n]]].
+     */
+    private function renumerarJornadas(array &$filas)
+    {
+        $dias = [];
+        foreach ($filas as $f) {
+            $k = (int) preg_replace('/\D.*$/', '', ltrim((string) $f['ronda']));
+            if ($k > 0) $dias[$k][] = strtotime(substr((string) $f['dia'], 0, 10));
+        }
+        $mediana = [];
+        foreach ($dias as $k => $ds) {
+            sort($ds);
+            $mediana[$k] = $ds[intdiv(count($ds), 2)];
+        }
+
+        $orden = array_keys($filas);
+        usort($orden, function ($a, $b) use ($filas) {
+            $c = strcmp((string) $filas[$a]['dia'], (string) $filas[$b]['dia']);
+            return $c !== 0 ? $c : strcmp((string) $filas[$a]['external_id'], (string) $filas[$b]['external_id']);
+        });
+
+        $ocupado = [];
+        $resumen = [];
+        foreach ($orden as $i) {
+            $l = (string) $filas[$i]['club_external_id']; $v = (string) $filas[$i]['rival_external_id'];
+            if ($l === '' || $v === '') continue;
+
+            $antes = (string) $filas[$i]['ronda'];
+            $tm    = (int) preg_replace('/\D.*$/', '', ltrim($antes));
+            $dia   = substr((string) $filas[$i]['dia'], 0, 10);
+            $ts    = strtotime($dia);
+
+            $k = 0;
+            if ($tm > 0 && isset($mediana[$tm]) && abs($ts - $mediana[$tm]) <= 4 * 86400
+                && empty($ocupado[$tm][$l]) && empty($ocupado[$tm][$v])) {
+                $k = $tm;
+            }
+            if (!$k) {
+                for ($k = 1; ; $k++) {
+                    if (empty($ocupado[$k][$l]) && empty($ocupado[$k][$v])) break;
+                }
+            }
+            $ocupado[$k][$l] = true;
+            $ocupado[$k][$v] = true;
+            $filas[$i]['ronda'] = (string) $k;
+
+            if (!isset($resumen[$k])) $resumen[$k] = ['n' => 0, 'desde' => $dia, 'hasta' => $dia, 'antes' => []];
+            $resumen[$k]['n']++;
+            if ($dia < $resumen[$k]['desde']) $resumen[$k]['desde'] = $dia;
+            if ($dia > $resumen[$k]['hasta']) $resumen[$k]['hasta'] = $dia;
+            if (!isset($resumen[$k]['antes'][$antes])) $resumen[$k]['antes'][$antes] = 0;
+            $resumen[$k]['antes'][$antes]++;
+        }
+        ksort($resumen);
+        return $resumen;
+    }
+
+    /** El aviso de jornadas mezcladas, o el resumen del rearmado. */
+    private function bloqueRenumerar($renumeradas, array $jornadasMal, $base, $fuente)
+    {
+        if ($renumeradas !== null) {
+            $cuenta = [];
+            foreach ($renumeradas as $x) {
+                if (!isset($cuenta[$x['n']])) $cuenta[$x['n']] = 0;
+                $cuenta[$x['n']]++;
+            }
+            arsort($cuenta);
+            $normal = (int) key($cuenta);
+
+            $raras = 0;
+            $filasHtml = '';
+            foreach ($renumeradas as $k => $x) {
+                $rara = $x['n'] !== $normal;
+                if ($rara) $raras++;
+                $antes = [];
+                foreach ($x['antes'] as $r => $n) $antes[] = e($r) . ($n > 1 ? ' (' . $n . ')' : '');
+                $filasHtml .= '<tr' . ($rara ? ' class="warn"' : '') . '><td class="num">' . (int) $k . '</td>'
+                    . '<td class="num">' . (int) $x['n'] . '</td>'
+                    . '<td class="num">' . e($x['desde']) . ($x['hasta'] !== $x['desde'] ? ' → ' . e($x['hasta']) : '') . '</td>'
+                    . '<td class="sub">' . implode(' · ', $antes) . '</td></tr>';
+            }
+
+            $sinRenumerar = str_replace(['&renumerar=1', '?renumerar=1&', '?renumerar=1'], ['', '?', ''], $base);
+
+            return '<div class="' . ($raras ? 'warn-box' : 'ok-box') . '"><b>Jornadas rearmadas por fecha</b>, sin usar '
+                . 'las de Transfermarkt: cada partido va a la primera jornada donde no jugó ninguno de sus dos equipos. '
+                . 'Quedaron <b>' . count($renumeradas) . '</b> jornadas'
+                . ($raras ? ', y <b>' . $raras . '</b> no tienen ' . $normal . ' partidos como el resto: ésas son las '
+                    . 'que hay que mirar antes de aplicar.' : ', todas de ' . $normal . ' partidos.')
+                . ' Para que «Aplicar» use estos números hay que <b>Guardar en staging</b> con esta vista. '
+                . '<a href="' . e($sinRenumerar . $fuente) . '">Volver a las jornadas de TM</a>.'
+                . '<details style="margin-top:6px"><summary>Ver el rearmado</summary>'
+                . '<div class="scroll"><table><thead><tr><th>Jornada</th><th>Partidos</th><th>Período</th>'
+                . '<th>Venían de (TM)</th></tr></thead><tbody>' . $filasHtml . '</tbody></table></div></details></div>';
+        }
+
+        if (empty($jornadasMal)) return '';
+
+        $lista = [];
+        foreach ($jornadasMal as $r => $eqs) $lista[] = e($r) . ' (' . count($eqs) . ' equipos)';
+
+        return '<div class="warn-box"><b>Transfermarkt mezcló las jornadas:</b> en ' . count($jornadasMal)
+            . ' ronda(s) hay equipos que juegan contra dos rivales distintos — ' . implode(', ', array_slice($lista, 0, 12))
+            . (count($lista) > 12 ? '…' : '') . '. En una liga eso no puede pasar, y «Aplicar» deja afuera esos '
+            . 'partidos. Si esto es una <b>liga</b>, rearmá las jornadas por fecha: '
+            . '<a class="boton-sec" href="' . e($base . $fuente . '&renumerar=1') . '">Rearmar jornadas por fecha</a> '
+            . '<span class="sub">solo muestra; se escribe al guardar en staging</span>. '
+            . 'En una copa con ida y vuelta en la misma ronda no hace falta.</div>';
     }
 
     /**
