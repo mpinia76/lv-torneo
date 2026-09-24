@@ -511,7 +511,31 @@ class ImportPartidosController extends Controller
         // Antes de clasificar: la segunda pasada del emparejador compara el
         // número de jornada, así que tiene que ver el número ya corregido.
         $jornadasMal = $this->jornadasConChoque($filas);
-        $renumeradas = $renumerar ? $this->renumerarJornadas($filas) : null;
+        $renumeradas = null;
+        if ($renumerar) {
+            // LO QUE YA ESTÁ CARGADO MANDA. Un partido que ya tenés en la
+            // base está en una fecha tuya, y ésa es su jornada: el rearmado
+            // la toma como fija y acomoda el resto alrededor. Sin esto, la
+            // Eredivisie 2000/01 proponía un Groningen nuevo en la fecha 2,
+            // donde ya estaba el Groningen cargado (#29490).
+            $anclas = [];
+            $pre = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
+            $pids = [];
+            foreach ($pre as $i => $f) if (!empty($f['partido_id'])) $pids[$i] = (int) $f['partido_id'];
+            if ($pids) {
+                $numeros = [];
+                foreach (array_chunk(array_values(array_unique($pids)), 500) as $trozo) {
+                    foreach (DB::table('partidos')->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+                                 ->whereIn('partidos.id', $trozo)->select('partidos.id', 'fechas.numero')->get() as $r) {
+                        $numeros[(int) $r->id] = $this->numeroDeJornada($r->numero);
+                    }
+                }
+                foreach ($pids as $i => $pid) {
+                    if (!empty($numeros[$pid])) $anclas[$i] = (int) $numeros[$pid];
+                }
+            }
+            $renumeradas = $this->renumerarJornadas($filas, $anclas);
+        }
 
         $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
 
@@ -2764,7 +2788,7 @@ class ImportPartidosController extends Controller
      * número pelado, «10», y devuelve el resumen
      * [número => ['n', 'desde', 'hasta', 'antes' => [ronda TM => n]]].
      */
-    private function renumerarJornadas(array &$filas)
+    private function renumerarJornadas(array &$filas, array $anclas = [])
     {
         $dias = [];
         foreach ($filas as $f) {
@@ -2785,11 +2809,33 @@ class ImportPartidosController extends Controller
 
         $ocupado = [];
         $resumen = [];
+
+        // Los ya cargados van primero y quedan donde están (ver `$anclas` en
+        // fixture()): ocupan su jornada para que nadie más caiga ahí.
+        foreach ($anclas as $i => $k) {
+            if (!isset($filas[$i])) continue;
+            $ocupado[$k][(string) $filas[$i]['club_external_id']] = true;
+            $ocupado[$k][(string) $filas[$i]['rival_external_id']] = true;
+        }
+
         foreach ($orden as $i) {
             $l = (string) $filas[$i]['club_external_id']; $v = (string) $filas[$i]['rival_external_id'];
             if ($l === '' || $v === '') continue;
 
             $antes = (string) $filas[$i]['ronda'];
+            if (isset($anclas[$i])) {
+                $k = (int) $anclas[$i];
+                $filas[$i]['ronda'] = (string) $k;
+                $dia = substr((string) $filas[$i]['dia'], 0, 10);
+                if (!isset($resumen[$k])) $resumen[$k] = ['n' => 0, 'desde' => $dia, 'hasta' => $dia, 'antes' => [], 'fijos' => 0];
+                $resumen[$k]['n']++;
+                $resumen[$k]['fijos'] = (isset($resumen[$k]['fijos']) ? $resumen[$k]['fijos'] : 0) + 1;
+                if ($dia < $resumen[$k]['desde']) $resumen[$k]['desde'] = $dia;
+                if ($dia > $resumen[$k]['hasta']) $resumen[$k]['hasta'] = $dia;
+                if (!isset($resumen[$k]['antes'][$antes])) $resumen[$k]['antes'][$antes] = 0;
+                $resumen[$k]['antes'][$antes]++;
+                continue;
+            }
             $tm    = (int) preg_replace('/\D.*$/', '', ltrim($antes));
             $dia   = substr((string) $filas[$i]['dia'], 0, 10);
             $ts    = strtotime($dia);
@@ -2808,7 +2854,7 @@ class ImportPartidosController extends Controller
             $ocupado[$k][$v] = true;
             $filas[$i]['ronda'] = (string) $k;
 
-            if (!isset($resumen[$k])) $resumen[$k] = ['n' => 0, 'desde' => $dia, 'hasta' => $dia, 'antes' => []];
+            if (!isset($resumen[$k])) $resumen[$k] = ['n' => 0, 'desde' => $dia, 'hasta' => $dia, 'antes' => [], 'fijos' => 0];
             $resumen[$k]['n']++;
             if ($dia < $resumen[$k]['desde']) $resumen[$k]['desde'] = $dia;
             if ($dia > $resumen[$k]['hasta']) $resumen[$k]['hasta'] = $dia;
@@ -2839,7 +2885,7 @@ class ImportPartidosController extends Controller
                 $antes = [];
                 foreach ($x['antes'] as $r => $n) $antes[] = e($r) . ($n > 1 ? ' (' . $n . ')' : '');
                 $filasHtml .= '<tr' . ($rara ? ' class="warn"' : '') . '><td class="num">' . (int) $k . '</td>'
-                    . '<td class="num">' . (int) $x['n'] . '</td>'
+                    . '<td class="num">' . (int) $x['n'] . (!empty($x['fijos']) ? ' <span class="sub">(' . (int) $x['fijos'] . ' ya cargados)</span>' : '') . '</td>'
                     . '<td class="num">' . e($x['desde']) . ($x['hasta'] !== $x['desde'] ? ' → ' . e($x['hasta']) : '') . '</td>'
                     . '<td class="sub">' . implode(' · ', $antes) . '</td></tr>';
             }
@@ -2847,7 +2893,8 @@ class ImportPartidosController extends Controller
             $sinRenumerar = str_replace(['&renumerar=1', '?renumerar=1&', '?renumerar=1'], ['', '?', ''], $base);
 
             return '<div class="' . ($raras ? 'warn-box' : 'ok-box') . '"><b>Jornadas rearmadas por fecha</b>, sin usar '
-                . 'las de Transfermarkt: cada partido va a la primera jornada donde no jugó ninguno de sus dos equipos. '
+                . 'las de Transfermarkt. Los partidos <b>que ya tenés cargados quedan en su fecha</b>; el resto va a su '
+                . 'jornada de TM si es creíble, y si no a la primera jornada donde no jugó ninguno de sus dos equipos. '
                 . 'Quedaron <b>' . count($renumeradas) . '</b> jornadas'
                 . ($raras ? ', y <b>' . $raras . '</b> no tienen ' . $normal . ' partidos como el resto: ésas son las '
                     . 'que hay que mirar antes de aplicar.' : ', todas de ' . $normal . ' partidos.')
