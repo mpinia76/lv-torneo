@@ -112,7 +112,7 @@
                     </p>
                 @endif
                 <p class="ctrl-sub" style="margin-top:.6em">
-                    Los torneos marcados <b>inconclusos</b> (suspendidos, nunca terminaron) no entran en este control.
+                    Los torneos marcados <b>inconclusos</b> (sin campeón: suspendidos o fases previas) no entran en este control.
                 </p>
             </div>
 

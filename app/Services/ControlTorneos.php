@@ -73,8 +73,9 @@ class ControlTorneos
         if (empty($f['parciales'])) {
             $q->whereRaw('COALESCE(t.parcial, 0) = 0');
         }
-        // Torneo suspendido que nunca terminó (Copa de la Superliga 2020,
-        // pandemia): no entra en NINGUNA lista, ni siquiera por equipos.
+        // Inconcluso = torneo sin campeón: suspendido que nunca terminó (Copa
+        // de la Superliga 2020, pandemia) o fase previa que TM lista aparte
+        // (UEFA Champions League Qualifying). No entra en NINGUNA lista.
         if ($this->hayInconcluso()) {
             $q->whereRaw('COALESCE(t.inconcluso, 0) = 0');
         }
