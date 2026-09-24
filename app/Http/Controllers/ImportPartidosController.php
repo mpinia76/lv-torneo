@@ -215,11 +215,11 @@ class ImportPartidosController extends Controller
 
                 if (!$f->sondeado)          $estado = '<span class="warn">sin sondear</span>';
                 elseif (!$f->enStaging && $f->sd)
-                                            $estado = '<span class="gris"' . $cuando . '>'
-                                                . (((int) $f->sd->partidos === 0)
-                                                    ? 'sondeado · TM no le da partidos'
-                                                    : 'sondeado · nada para cargar (' . (int) $f->sd->fuera_1ra . ' excluidos)')
-                                                . '</span>';
+                    $estado = '<span class="gris"' . $cuando . '>'
+                        . (((int) $f->sd->partidos === 0)
+                            ? 'sondeado · TM no le da partidos'
+                            : 'sondeado · nada para cargar (' . (int) $f->sd->fuera_1ra . ' excluidos)')
+                        . '</span>';
                 elseif ($f->conflicto)      $estado = '<span class="err">' . $f->conflicto . ' conflicto(s)</span>';
                 elseif ($f->nuevo)          $estado = '<span class="warn">' . $f->nuevo . ' por aplicar</span>';
                 elseif ($f->aplicado > $f->detalle) $estado = '<span class="warn">falta detalle</span>';
@@ -438,7 +438,7 @@ class ImportPartidosController extends Controller
             . '<input name="comp" value="' . e($comp) . '" placeholder="ej ARGC" size="12"> '
             . '<button>Ver</button></form></p>'
             . '</div></details>'
-            ;
+        ;
 
         foreach ($avisos as $a) $html .= '<p class="ok-box">' . $a . '</p>';
 
@@ -470,8 +470,8 @@ class ImportPartidosController extends Controller
                 $fuenteHtml = true;
             } else {
                 return $this->pagina('Fixture', $html . $this->cajaFixtureHtml(
-                    $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
-                    'El calendario en HTML no trajo partidos.'));
+                        $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
+                        'El calendario en HTML no trajo partidos.'));
             }
         }
 
@@ -504,9 +504,9 @@ class ImportPartidosController extends Controller
                     $saltados   = 0;
                 } else {
                     return $this->pagina('Fixture', $html . $this->cajaFixtureHtml(
-                        $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
-                        'No pude traer la temporada ' . e($season) . '. La API devolvió la edición en curso '
-                        . '(no sabe de temporadas) y el calendario en HTML tampoco trajo partidos.'));
+                            $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
+                            'No pude traer la temporada ' . e($season) . '. La API devolvió la edición en curso '
+                            . '(no sabe de temporadas) y el calendario en HTML tampoco trajo partidos.'));
                 }
             }
 
@@ -554,17 +554,24 @@ class ImportPartidosController extends Controller
             $vino = implode(' — ', $lista) ?: 'no vino ninguna';
 
             if ($fuenteHtml) {
-                $sinRonda = 0;
-                foreach ($filas as $f) if ((string) $f['ronda'] === '—') $sinRonda++;
+                $sinRonda = 0; $sinHora = 0;
+                foreach ($filas as $f) {
+                    if ((string) $f['ronda'] === '—') $sinRonda++;
+                    if (!empty($f['sin_hora'])) $sinHora++;
+                }
 
                 $html .= '<p class="ok-box"><b>Temporada ' . e($season) . '</b>, la del torneo, '
                     . 'leída del <b>calendario en HTML</b> de Transfermarkt. '
                     . 'La API no sabe de temporadas —contesta la edición en curso le pidas la que le pidas—, '
                     . 'así que para las ediciones viejas se lee la página del torneo. '
                     . 'Vino: <b>' . $vino . '</b>.</p>'
-                    . '<p class="warn-box">De esta fuente <b>no viene la hora</b>, sólo el día: por eso los '
-                    . 'partidos figuran a las 00:00 y el botón que corrige horarios está apagado —escribiría esa '
-                    . 'hora falsa—. Los partidos definidos <b>por penales</b> quedan sin marcador: el calendario '
+                    . '<p class="warn-box">' . ($sinHora
+                        ? '<b>' . $sinHora . '</b> partido(s) vinieron <b>sin hora</b> (TM no la tiene): figuran a '
+                        . 'las 00:00. '
+                        : '')
+                    . '«Guardar, corregir horarios y cargar resultados» <b>sólo completa la hora</b> de los partidos '
+                    . 'que tenés a las 00:00 el mismo día que dice TM; no pisa una hora cargada. '
+                    . 'Los partidos definidos <b>por penales</b> quedan sin marcador: el calendario '
                     . 'publica la tanda sumada a los 90\' y no hay con qué separarla.'
                     . ($sinRonda ? ' Además, <b>' . $sinRonda . '</b> partido(s) quedaron sin número de fecha '
                         . '(agrupados en «—»): TM no los tenía bajo ningún encabezado de ronda.' : '')
@@ -611,7 +618,11 @@ class ImportPartidosController extends Controller
             // Del calendario en HTML no viene la hora: las filas traen 00:00.
             // Pisar con eso el horario de un partido sería romperlo. Los
             // resultados sí se cargan: el día y el marcador son buenos.
-            if (!$fuenteHtml) $refrescadas = $this->refrescarHorarios($filas);
+            // Del calendario en HTML ahora SÍ viene la hora, pero sólo se usa
+            // para completar la que falta (partidos guardados a las 00:00 el
+            // mismo día). No se pisa una hora cargada: TM guarda la original
+            // de los reprogramados.
+            $refrescadas = $fuenteHtml ? $this->completarHoras($filas) : $this->refrescarHorarios($filas);
             $resultados = $this->completarResultados($filas);
         }
 
@@ -655,20 +666,22 @@ class ImportPartidosController extends Controller
             $html .= '<p class="ok-box">Guardadas <b>' . $guardadas . '</b> filas en staging.'
                 . ($refrescar
                     ? ($fuenteHtml
-                        ? ' <b>No toqué ningún horario</b>: el calendario en HTML no trae la hora.'
+                        ? ($refrescadas
+                            ? ' Completé la hora de <b>' . $refrescadas . '</b> partidos que estaban a las 00:00.'
+                            : ' Ningún partido cargado estaba a las 00:00 con la hora disponible en TM.')
                         : ($refrescadas
                             ? ' Actualicé el horario de <b>' . $refrescadas . '</b> partidos que todavía no se jugaron.'
                             : ' Ningún horario necesitaba corrección.'))
-                      . ($resultados['cargados']
+                    . ($resultados['cargados']
                         ? ' Cargué el resultado de <b>' . $resultados['cargados'] . '</b> partidos que estaban sin marcador.'
                         // «Ningún partido estaba sin resultado» era mentira cuando los
                         // que faltaban eran los definidos por penales: el botón no los
                         // puede cargar y decía que no había nada. Se cuentan aparte.
                         : ($sinMarcador ? '' : ' Ningún partido estaba sin resultado.'))
-                      . ($sinMarcador
+                    . ($sinMarcador
                         ? ' <b>' . $sinMarcador . '</b> partidos siguen sin resultado y este botón no los puede'
-                          . ' cargar: TM los dio por penales y el marcador del fixture viene con la tanda sumada.'
-                          . ' Están abajo, en «Revisar».'
+                        . ' cargar: TM los dio por penales y el marcador del fixture viene con la tanda sumada.'
+                        . ' Están abajo, en «Revisar».'
                         : '')
                     : '')
                 . '</p>';
@@ -744,7 +757,7 @@ class ImportPartidosController extends Controller
                     : 'No corregí ninguna fecha.')
                 . ($jugadas['salteadas']
                     ? ' Dejé <b>' . $jugadas['salteadas'] . '</b> sin tocar porque el corrimiento pasa los 10 días: '
-                      . 'ésos van de a uno, mirándolos.' : '')
+                    . 'ésos van de a uno, mirándolos.' : '')
                 // El resultado NO se toca acá: este botón escribe la fecha y
                 // nada más, como dice su nombre. Pero un partido al que recién
                 // le arreglaste la fecha es, casi siempre, uno que hasta hoy no
@@ -752,13 +765,13 @@ class ImportPartidosController extends Controller
                 // a mano evita la vuelta por la pantalla anterior.
                 . ($jugadas['cargadas']
                     ? '<br>Les falta el marcador: hasta recién no aparejaban, así que ninguna pasada se lo pudo '
-                      . 'cargar. <a href="' . e($base . $fuente . '&refrescar=1') . '"><b>Cargar los resultados '
-                      . 'ahora →</b></a>' : '')
+                    . 'cargar. <a href="' . e($base . $fuente . '&refrescar=1') . '"><b>Cargar los resultados '
+                    . 'ahora →</b></a>' : '')
                 . '</p>'
                 . ($jugadas['detalle']
                     ? '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partido</th><th>Antes</th>'
-                      . '<th>Ahora</th><th>Partido</th></tr></thead><tbody>'
-                      . $jugadas['detalle'] . '</tbody></table></div>'
+                    . '<th>Ahora</th><th>Partido</th></tr></thead><tbody>'
+                    . $jugadas['detalle'] . '</tbody></table></div>'
                     : '');
         }
 
@@ -784,9 +797,9 @@ class ImportPartidosController extends Controller
             foreach ($etiquetas as $k => $lab) {
                 if (empty($porTipo[$k])) continue;
                 $chips .= ' · ' . ($revisar === $k
-                    ? '<b>' . e($lab) . ' (' . $porTipo[$k] . ')</b>'
-                    : '<a href="' . e($base . '&cache=1&revisar=' . $k) . '">' . e($lab)
-                      . ' (' . $porTipo[$k] . ')</a>');
+                        ? '<b>' . e($lab) . ' (' . $porTipo[$k] . ')</b>'
+                        : '<a href="' . e($base . '&cache=1&revisar=' . $k) . '">' . e($lab)
+                        . ' (' . $porTipo[$k] . ')</a>');
             }
 
             $html .= '<h2>Revisar <span class="sub">(' . count($problemas) . ')</span></h2>'
@@ -795,19 +808,19 @@ class ImportPartidosController extends Controller
                 . 'bien vos.</p>'
                 . ($sinResultado
                     ? '<p class="ok-box"><b>' . $sinResultado . '</b> «sin resultado» son la excepción: el partido '
-                      . 'ya lo tenés creado —por eso no figura en NUEVOS— pero está sin marcador y TM ya lo jugó. '
-                      . 'Esos los carga solos <b>«Guardar, corregir horarios y cargar resultados»</b>. '
-                      . 'Las vueltas de llave no entran acá: van al bloque «Llaves de ida y vuelta» y se cargan a mano.</p>'
+                    . 'ya lo tenés creado —por eso no figura en NUEVOS— pero está sin marcador y TM ya lo jugó. '
+                    . 'Esos los carga solos <b>«Guardar, corregir horarios y cargar resultados»</b>. '
+                    . 'Las vueltas de llave no entran acá: van al bloque «Llaves de ida y vuelta» y se cargan a mano.</p>'
                     : '')
                 . ($sinMarcador
                     ? '<p class="warn-box"><b>' . $sinMarcador . '</b> partidos <b>jugados y sin resultado</b> que el '
-                      . 'botón de arriba NO puede cargar: TM los dio por penales y el marcador del listado del '
-                      . 'fixture viene con la tanda sumada (1:1 con tanda 4:2 lo publica 5:3). Los 90\' reales salen '
-                      . 'del <b>detalle</b> del partido, que trae la tanda y la puede restar. En cada fila: '
-                      . '<b>«Traer solo el marcador»</b> escribe el resultado y la tanda y nada más —no toca '
-                      . 'alineación ni incidencias, así que sirve también en los partidos que cargaste a mano—, y '
-                      . '«Bajar el detalle» trae además alineación e incidencias, pero se planta si el partido ya '
-                      . 'las tiene. <b>Cualquiera de los dos gasta 1 crédito por partido.</b></p>'
+                    . 'botón de arriba NO puede cargar: TM los dio por penales y el marcador del listado del '
+                    . 'fixture viene con la tanda sumada (1:1 con tanda 4:2 lo publica 5:3). Los 90\' reales salen '
+                    . 'del <b>detalle</b> del partido, que trae la tanda y la puede restar. En cada fila: '
+                    . '<b>«Traer solo el marcador»</b> escribe el resultado y la tanda y nada más —no toca '
+                    . 'alineación ni incidencias, así que sirve también en los partidos que cargaste a mano—, y '
+                    . '«Bajar el detalle» trae además alineación e incidencias, pero se planta si el partido ya '
+                    . 'las tiene. <b>Cualquiera de los dos gasta 1 crédito por partido.</b></p>'
                     : '')
                 . '<p class="acciones">' . $chips . '</p>'
                 . '<div class="scroll"><table><thead><tr><th>Día</th><th>Partido</th><th>Qué pasa</th>'
@@ -827,8 +840,8 @@ class ImportPartidosController extends Controller
                     . $this->linkTm($pr['external_id'] ?? null)
                     . (empty($pr['external_id']) ? ''
                         : ' · <a href="' . e(route('import_partidos.partido',
-                                ['game_id' => $pr['external_id']]))
-                            . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
+                            ['game_id' => $pr['external_id']]))
+                        . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
                     // El detalle es el ÚNICO lugar donde está la tanda separada del
                     // marcador, así que para estos partidos es el arreglo, no un extra.
                     // Se ofrecen los dos caminos, y primero el que no puede romper
@@ -837,17 +850,17 @@ class ImportPartidosController extends Controller
                     // se planta si el partido ya las tiene cargadas a mano.
                     . ((isset($pr['tipo']) && $pr['tipo'] === 'sin_marcador')
                         ? ' · <a href="' . e(route('import_detalles.marcador',
-                                array_filter(['partido_id' => (int) $pr['partido_id'],
-                                    'game_id' => $pr['external_id'],
-                                    'comp' => $comp,
-                                    'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null])))
-                            . '" title="Baja el detalle, le resta la tanda al marcador de TM y escribe SOLO el '
-                            . 'resultado y la tanda. No toca alineación ni incidencias. Gasta 1 crédito.">'
-                            . '<b>Traer solo el marcador →</b></a>'
-                          . ' · <a href="' . e(route('import_detalles.bajar',
-                                ['partido_id' => (int) $pr['partido_id']]))
-                            . '" title="Además del marcador trae alineación e incidencias. Se planta si el '
-                            . 'partido ya tiene alineación cargada. Gasta 1 crédito.">Bajar el detalle</a>'
+                            array_filter(['partido_id' => (int) $pr['partido_id'],
+                                'game_id' => $pr['external_id'],
+                                'comp' => $comp,
+                                'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null])))
+                        . '" title="Baja el detalle, le resta la tanda al marcador de TM y escribe SOLO el '
+                        . 'resultado y la tanda. No toca alineación ni incidencias. Gasta 1 crédito.">'
+                        . '<b>Traer solo el marcador →</b></a>'
+                        . ' · <a href="' . e(route('import_detalles.bajar',
+                            ['partido_id' => (int) $pr['partido_id']]))
+                        . '" title="Además del marcador trae alineación e incidencias. Se planta si el '
+                        . 'partido ya tiene alineación cargada. Gasta 1 crédito.">Bajar el detalle</a>'
                         : '')
                     . '</td></tr>';
             }
@@ -1064,7 +1077,7 @@ class ImportPartidosController extends Controller
 
         $opts = '';
         foreach (['' => 'tipo: como diga el torneo', 'copa' => 'copa (pokalwettbewerb)',
-                  'liga' => 'liga (wettbewerb)'] as $v => $t) {
+                     'liga' => 'liga (wettbewerb)'] as $v => $t) {
             $opts .= '<option value="' . e($v) . '"' . ($tipoHtml === $v ? ' selected' : '') . '>' . e($t) . '</option>';
         }
 
@@ -1155,6 +1168,7 @@ class ImportPartidosController extends Controller
             if (empty($r['local_tm']) || empty($r['visita_tm'])) continue;
 
             $res = $this->marcadorDeTexto(isset($r['resultado']) ? $r['resultado'] : '');
+            $hora = (isset($r['hora']) && preg_match('/^\d{2}:\d{2}$/', (string) $r['hora'])) ? $r['hora'] : null;
 
             $filas[] = [
                 'external_id'             => (string) $r['game_id'],
@@ -1168,8 +1182,9 @@ class ImportPartidosController extends Controller
                 'rival_external_id'       => (string) $r['visita_tm'],
                 'rival_nombre'            => isset($r['visita_nombre']) ? $r['visita_nombre'] : null,
                 'local'                   => 1,
-                // Sin hora: se guarda el día a las 00:00 y se marca la fila.
-                'dia'                     => substr((string) $r['dia'], 0, 10) . ' 00:00:00',
+                // La hora viene de la columna «Horario» del calendario. Si
+                // TM no la tiene, el día a las 00:00 y la fila marcada.
+                'dia'                     => substr((string) $r['dia'], 0, 10) . ' ' . ($hora ? $hora . ':00' : '00:00:00'),
                 'goles_favor'             => $res['gf'],
                 'goles_contra'            => $res['gc'],
                 'equipo_id' => null, 'rival_id' => null, 'partido_id' => null,
@@ -1185,7 +1200,7 @@ class ImportPartidosController extends Controller
                 'penales_contra' => null,
                 'marcador_tm'    => $res['crudo'],
                 'hora_definida'  => true,
-                'sin_hora'       => true,
+                'sin_hora'       => $hora === null,
                 'reprogramado'   => false,
             ];
         }
@@ -1300,8 +1315,8 @@ class ImportPartidosController extends Controller
             $tuyo = ($p->golesl === null || $p->golesv === null)
                 ? '<span class="sub">sin resultado</span>'
                 : e($p->golesl . ':' . $p->golesv)
-                  . ($p->penalesl !== null && $p->penalesv !== null
-                      ? ' <span class="sub">y ' . e($p->penalesl . '-' . $p->penalesv) . ' p</span>' : '');
+                . ($p->penalesl !== null && $p->penalesv !== null
+                    ? ' <span class="sub">y ' . e($p->penalesl . '-' . $p->penalesv) . ' p</span>' : '');
 
             $html .= '<tr>'
                 . '<td class="num">' . e(substr((string) $f['dia'], 0, 10)) . '</td>'
@@ -1315,8 +1330,8 @@ class ImportPartidosController extends Controller
                 . $this->linkTm($f['external_id'] ?? null)
                 . (empty($f['external_id']) ? ''
                     : ' · <a href="' . e(route('import_partidos.partido',
-                            ['game_id' => $f['external_id']]))
-                        . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
+                        ['game_id' => $f['external_id']]))
+                    . '" title="Abre el JSON de TM de ESTE partido. Gasta 1 crédito.">Sondear</a>')
                 . '</td></tr>';
         }
         return $html . '</tbody></table></div>';
@@ -1415,7 +1430,7 @@ class ImportPartidosController extends Controller
             'por_penales'    => $porPenales,
             'ida_vuelta'     => $idaVuelta,
             'ida_marcador'   => $idaVuelta && isset($sc['firstLegScore']['home'])
-                                    ? $sc['firstLegScore']['home'] . ':' . $sc['firstLegScore']['away'] : null,
+                ? $sc['firstLegScore']['home'] . ':' . $sc['firstLegScore']['away'] : null,
             'penales_favor'  => $penF,
             'penales_contra' => $penC,
             'marcador_tm'    => $brutoTm,
@@ -1515,7 +1530,7 @@ class ImportPartidosController extends Controller
 
             if ($partido) {
                 $corrido = (int) round((strtotime(substr((string) $partido->dia, 0, 10))
-                    - strtotime(substr((string) $f['dia'], 0, 10))) / 86400);
+                        - strtotime(substr((string) $f['dia'], 0, 10))) / 86400);
 
                 $filas[$i]['partido_id'] = $partido->id;
                 $filas[$i]['estado'] = 'duplicado';
@@ -1597,6 +1612,33 @@ class ImportPartidosController extends Controller
      * Acá TM es la fuente de la programación: mientras `isFinished` sea false su
      * horario manda. Con el partido jugado, la fecha queda congelada.
      */
+    /**
+     * Completa la hora de los partidos ya cargados que quedaron a las 00:00.
+     *
+     * Hasta el 2026-09-24 el calendario en HTML no leía la columna «Horario»
+     * y todo lo que se aplicó desde ahí quedó a medianoche (LaLiga 2024/25).
+     * Esto la completa, jugados o no, con tres condiciones: que TM la traiga,
+     * que el partido esté a las 00:00:00 y que sea el MISMO DÍA que dice TM.
+     * Si el día no coincide es un reprogramado y ése se mira aparte.
+     */
+    private function completarHoras(array $filas)
+    {
+        $n = 0;
+        foreach ($filas as $f) {
+            if (!empty($f['sin_hora']) || empty($f['partido_id']) || empty($f['dia'])) continue;
+            $dia = substr((string) $f['dia'], 0, 19);
+            if (substr($dia, 11, 8) === '00:00:00') continue;
+            $p = \App\Partido::find($f['partido_id']);
+            if (!$p) continue;
+            $actual = (string) $p->dia;
+            if (substr($actual, 0, 10) !== substr($dia, 0, 10)) continue;
+            if (strlen($actual) > 10 && substr($actual, 11, 8) !== '00:00:00') continue;
+            $p->forceFill(['dia' => $dia])->save();
+            $n++;
+        }
+        return $n;
+    }
+
     private function refrescarHorarios(array $filas)
     {
         $n = 0;
@@ -1636,7 +1678,7 @@ class ImportPartidosController extends Controller
             if (substr((string) $f['dia_base'], 0, 10) === substr((string) $f['dia'], 0, 10)) continue;
 
             $dias = abs((strtotime(substr((string) $f['dia'], 0, 10))
-                - strtotime(substr((string) $f['dia_base'], 0, 10))) / 86400);
+                    - strtotime(substr((string) $f['dia_base'], 0, 10))) / 86400);
             if ($dias > $limiteDias) { $out['salteadas']++; continue; }
 
             $p = \App\Partido::find($f['partido_id']);
@@ -1646,7 +1688,7 @@ class ImportPartidosController extends Controller
             $nueva = !empty($f['hora_definida'])
                 ? substr((string) $f['dia'], 0, 19)
                 : substr((string) $f['dia'], 0, 10) . ' '
-                  . (strlen($vieja) >= 19 ? substr($vieja, 11, 8) : '00:00:00');
+                . (strlen($vieja) >= 19 ? substr($vieja, 11, 8) : '00:00:00');
 
             $p->forceFill(['dia' => $nueva])->save();
 
@@ -1690,7 +1732,7 @@ class ImportPartidosController extends Controller
         $filasHtml = '';
         foreach ($corridos as $f) {
             $dias = (int) round((strtotime(substr((string) $f['dia'], 0, 10))
-                - strtotime(substr((string) $f['dia_base'], 0, 10))) / 86400);
+                    - strtotime(substr((string) $f['dia_base'], 0, 10))) / 86400);
             if (abs($dias) > $limiteDias) $lejos++;
 
             $nueva = !empty($f['hora_definida'])
@@ -1813,7 +1855,7 @@ class ImportPartidosController extends Controller
             $rows = DB::table('gols')
                 ->leftJoin('alineacions', function ($j) {
                     $j->on('alineacions.partido_id', '=', 'gols.partido_id')
-                      ->on('alineacions.jugador_id', '=', 'gols.jugador_id');
+                        ->on('alineacions.jugador_id', '=', 'gols.jugador_id');
                 })
                 ->whereIn('gols.partido_id', $t)
                 ->select('gols.partido_id', 'gols.tipo', 'alineacions.equipo_id',
@@ -1876,7 +1918,7 @@ class ImportPartidosController extends Controller
                     $deTm = $tmL . ':' . $tmV;
                 } else {
                     $conGoles = ((int) $p->golesl + (int) $p->penalesl === $tmL
-                              && (int) $p->golesv + (int) $p->penalesv === $tmV);
+                        && (int) $p->golesv + (int) $p->penalesv === $tmV);
                     $soloTanda = ((int) $p->penalesl === $tmL && (int) $p->penalesv === $tmV);
 
                     if (!$conGoles && !$soloTanda) {
@@ -1884,8 +1926,8 @@ class ImportPartidosController extends Controller
                         $tipo = 'penales';
                         $tuyo = $p->golesl . ':' . $p->golesv . ' y ' . $p->penalesl . '-' . $p->penalesv . ' p';
                         $deTm = $tmL . ':' . $tmV . ' (sería ' . ((int) $p->golesl + (int) $p->penalesl)
-                              . ':' . ((int) $p->golesv + (int) $p->penalesv) . ' o '
-                              . $p->penalesl . ':' . $p->penalesv . ')';
+                            . ':' . ((int) $p->golesv + (int) $p->penalesv) . ' o '
+                            . $p->penalesl . ':' . $p->penalesv . ')';
                     }
                 }
             } elseif (!empty($f['terminado']) && $f['goles_favor'] !== null
@@ -1899,12 +1941,12 @@ class ImportPartidosController extends Controller
                     $deTm = $tmL . ':' . $tmV;
                 }
 
-            // TM ya lo jugó y vos lo tenés SIN marcador. No es un conflicto —el
-            // partido está bien cargado, por eso la columna NUEVOS no lo ve— pero
-            // tampoco es "nada para revisar": es trabajo pendiente. Sin esta rama
-            // la pantalla se quedaba muda con los partidos cargados a medias.
-            // Este es el único caso de la lista que se arregla solo, con
-            // «Guardar, corregir horarios y cargar resultados».
+                // TM ya lo jugó y vos lo tenés SIN marcador. No es un conflicto —el
+                // partido está bien cargado, por eso la columna NUEVOS no lo ve— pero
+                // tampoco es "nada para revisar": es trabajo pendiente. Sin esta rama
+                // la pantalla se quedaba muda con los partidos cargados a medias.
+                // Este es el único caso de la lista que se arregla solo, con
+                // «Guardar, corregir horarios y cargar resultados».
             } elseif (!empty($f['terminado']) && $f['goles_favor'] !== null
                 && ($p->golesl === null || $p->golesv === null)) {
                 $tmL = $invertido ? (int) $f['goles_contra'] : (int) $f['goles_favor'];
@@ -1915,21 +1957,21 @@ class ImportPartidosController extends Controller
                 $tuyo = 'sin resultado';
                 $deTm = $tmL . ':' . $tmV;
 
-            // TM LO JUGÓ, VOS LO TENÉS VACÍO Y EL FIXTURE NO TRAE UN MARCADOR
-            // USABLE. Es el agujero que dejaba la pantalla muda: el caso de
-            // arriba pide `goles_favor !== null`, y `normalizarFixture()` lo
-            // pone en null a propósito cuando el partido se definió por penales
-            // (el `score` del listado viene con la tanda sumada: 1:1 con tanda
-            // 4:2 lo publica 5:3). Resultado: el partido no entraba en ninguna
-            // rama, `completarResultados()` lo salteaba y la pantalla decía
-            // «nada para revisar» y «ningún partido estaba sin resultado» con
-            // varios partidos vacíos. En una copa —donde media ronda se define
-            // por penales— eso es la mitad de la fecha.
-            //
-            // Esto NO lo arregla «Guardar, corregir horarios y cargar
-            // resultados»: el marcador de los 90' sale del DETALLE del partido,
-            // que sí trae `actions.shootout` y lo puede restar.
-            // Las vueltas de llave no llegan acá: las corta la primera rama.
+                // TM LO JUGÓ, VOS LO TENÉS VACÍO Y EL FIXTURE NO TRAE UN MARCADOR
+                // USABLE. Es el agujero que dejaba la pantalla muda: el caso de
+                // arriba pide `goles_favor !== null`, y `normalizarFixture()` lo
+                // pone en null a propósito cuando el partido se definió por penales
+                // (el `score` del listado viene con la tanda sumada: 1:1 con tanda
+                // 4:2 lo publica 5:3). Resultado: el partido no entraba en ninguna
+                // rama, `completarResultados()` lo salteaba y la pantalla decía
+                // «nada para revisar» y «ningún partido estaba sin resultado» con
+                // varios partidos vacíos. En una copa —donde media ronda se define
+                // por penales— eso es la mitad de la fecha.
+                //
+                // Esto NO lo arregla «Guardar, corregir horarios y cargar
+                // resultados»: el marcador de los 90' sale del DETALLE del partido,
+                // que sí trae `actions.shootout` y lo puede restar.
+                // Las vueltas de llave no llegan acá: las corta la primera rama.
             } elseif (!empty($f['terminado']) && $f['goles_favor'] === null
                 && !empty($f['marcador_tm'])
                 && ($p->golesl === null || $p->golesv === null)) {
@@ -2049,9 +2091,9 @@ class ImportPartidosController extends Controller
             $res = ($f['goles_favor'] === null)
                 ? (!empty($f['terminado']) && !empty($f['marcador_tm'])
                     ? '<span class="sub" title="Marcador de TM con la tanda sumada: el de los 90\' sale del '
-                      . 'detalle del partido">' . e((string) $f['marcador_tm'])
-                      . (!empty($f['por_penales']) && stripos((string) $f['marcador_tm'], 'pen') === false
-                            ? ' pen.' : '') . '</span>'
+                    . 'detalle del partido">' . e((string) $f['marcador_tm'])
+                    . (!empty($f['por_penales']) && stripos((string) $f['marcador_tm'], 'pen') === false
+                        ? ' pen.' : '') . '</span>'
                     : '<span class="sub">—</span>')
                 : (e($f['goles_favor']) . ':' . e($f['goles_contra']));
 
@@ -2067,7 +2109,7 @@ class ImportPartidosController extends Controller
                 . '<td>' . e($f['motivo'])
                 . ($f['partido_id']
                     ? ' <span class="id">#' . $f['partido_id'] . '</span> '
-                      . $this->linkIncidencias(isset($fechas[(int) $f['partido_id']]) ? $fechas[(int) $f['partido_id']] : null)
+                    . $this->linkIncidencias(isset($fechas[(int) $f['partido_id']]) ? $fechas[(int) $f['partido_id']] : null)
                     : '')
                 . '</td></tr>';
         }
@@ -2138,11 +2180,11 @@ class ImportPartidosController extends Controller
                 . 'La fecha ' . e($gameday) . ' no tiene partidos nuevos <b>en el staging</b>'
                 . (empty($porEstado)
                     ? ', que para esta competencia está vacío. Si la pantalla del fixture te muestra partidos '
-                      . 'nuevos, son los que acaba de bajar de TM y todavía no están guardados: apretá '
-                      . '<b>«Guardar en staging»</b> y volvé a intentar.'
+                    . 'nuevos, son los que acaba de bajar de TM y todavía no están guardados: apretá '
+                    . '<b>«Guardar en staging»</b> y volvé a intentar.'
                     : ': ahí hay ' . e(implode(', ', $porEstado)) . '. Si la pantalla del fixture te muestra '
-                      . 'nuevos que acá no aparecen, el staging quedó viejo —pasa cuando borraste los partidos '
-                      . 'que se habían creado—. <b>«Guardar en staging»</b> los devuelve a «nuevo».')
+                    . 'nuevos que acá no aparecen, el staging quedó viejo —pasa cuando borraste los partidos '
+                    . 'que se habían creado—. <b>«Guardar en staging»</b> los devuelve a «nuevo».')
                 . '</p>');
         }
 
@@ -2261,9 +2303,9 @@ class ImportPartidosController extends Controller
         // del mismo grupo de la fase de grupos: 1 cruce sobre 2 no es mayoría,
         // y la semifinal Estudiantes–Flamengo se proponía para la zona A.
         $proponeLlaves = $playoffId && (
-            ($conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
-            || $ambosEnLlaves === $filas->count()
-        );
+                ($conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
+                || $ambosEnLlaves === $filas->count()
+            );
 
         // `grupo_destino` = toda la fecha va a ese grupo. Sin él se rutea por
         // plantilla, que es lo que corresponde en una liga con zonas.
@@ -2376,7 +2418,7 @@ class ImportPartidosController extends Controller
                 . '«Guardar en staging» y volvé a aplicar: el resto de la ronda se crea igual.<br>';
             foreach ($dudosos as $r) {
                 $html .= e(substr((string) $r->dia, 0, 10) . ' · ' . $r->club_nombre . ' (' . $this->nombreEquipo($r->equipo_id)
-                    . ') vs ' . $r->rival_nombre . ' (' . $this->nombreEquipo($r->rival_id) . ')')
+                        . ') vs ' . $r->rival_nombre . ' (' . $this->nombreEquipo($r->rival_id) . ')')
                     . $this->linkTm($r->external_id) . '<br>';
             }
             $html .= '</div>';
@@ -2462,13 +2504,13 @@ class ImportPartidosController extends Controller
                 $html .= '<div class="ok-box"><div><b>Toda la fecha va a un solo grupo.</b> '
                     . ($unico !== null
                         ? 'Este torneo tiene un solo grupo, así que no hay nada que rutear: lo único que falta '
-                          . 'decidir es a qué fecha van.'
-                          . ($sinRonda ? ' Transfermarkt no trajo el nombre de la ronda —quedó «' . e($gameday ?: '—') . '»—, '
-                              . 'así que tampoco se puede deducir.' : '')
+                        . 'decidir es a qué fecha van.'
+                        . ($sinRonda ? ' Transfermarkt no trajo el nombre de la ronda —quedó «' . e($gameday ?: '—') . '»—, '
+                            . 'así que tampoco se puede deducir.' : '')
                         : ($grupoDestino === $playoffId
                             ? 'Los dos equipos de cada partido están en zonas distintas: esto es una ronda de playoffs, '
-                              . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
-                              . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
+                            . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
+                            . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
                             : 'Elegido a mano.'))
                     . '</div>'
                     . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
@@ -2505,10 +2547,10 @@ class ImportPartidosController extends Controller
                     . ' partidos sin plantilla:</b> ni el local ni el visitante tienen plantilla en este torneo. '
                     . ($grupoDestino
                         ? 'En un grupo de llaves eso es normal en las primeras rondas —el que queda eliminado nunca '
-                          . 'llega a tener plantilla—, pero que pase en TODOS suele significar que el torneo elegido '
-                          . 'no es éste. ' . ($sinPlantillaIgual ? 'Los estás creando igual.' : 'Por ahora no se crean.')
+                        . 'llega a tener plantilla—, pero que pase en TODOS suele significar que el torneo elegido '
+                        . 'no es éste. ' . ($sinPlantillaIgual ? 'Los estás creando igual.' : 'Por ahora no se crean.')
                         : 'Puede que hayas elegido el torneo equivocado, o que falte cargarles la plantilla. '
-                          . 'Esos no se crean.')
+                        . 'Esos no se crean.')
                     . '<br><span class="sub">';
                 foreach (array_slice($sinPlantilla, 0, 10) as $r) {
                     $html .= e($r->club_nombre . ' vs ' . $r->rival_nombre) . ' · ';
@@ -2523,8 +2565,8 @@ class ImportPartidosController extends Controller
                         'gameday' => $gameday, 'torneo_id' => $torneo->id, 'modo' => 'plantilla', 'interzonales' => 1]))
                     . '">Incluirlos, en el grupo del local</a>'
                     . ($playoffId ? ' <a class="boton" href="' . e(route('import_partidos.fixture_aplicar',
-                        ['comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id,
-                         'grupo_destino' => $playoffId]))
+                            ['comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id,
+                                'grupo_destino' => $playoffId]))
                         . '">Mandar toda la fecha a ' . e($grupos[$playoffId]->nombre) . '</a>' : '')
                     . '</p>';
             }
@@ -3262,7 +3304,7 @@ class ImportPartidosController extends Controller
                     . '">Sin fechas extra</a><br>';
                 foreach ($this->enExtra as $x) {
                     $sinLugar .= e($x['dia'] . ' · ' . $x['local'] . ' vs ' . $x['visita'] . ' · fecha ' . $x['jornada']
-                        . ' (TM la tenía en la ' . $x['antes'] . ')') . '<br>';
+                            . ' (TM la tenía en la ' . $x['antes'] . ')') . '<br>';
                 }
                 $sinLugar .= '</div>';
             }
@@ -3819,9 +3861,9 @@ class ImportPartidosController extends Controller
             $msg .= 'En TM figura como <b>' . e($nombreTm) . '</b>: es un club desaparecido. '
                 . ($conColumnaCierre
                     ? 'Le saqué el paréntesis al nombre y cargué la desaparición en <b>01/01/' . (int) $cierre['hasta']
-                        . '</b> (TM sólo da el año: corregí el día si lo sabés).'
+                    . '</b> (TM sólo da el año: corregí el día si lo sabés).'
                     : 'Le saqué el paréntesis al nombre, pero <b>no guardé el año de cierre</b>: falta correr '
-                        . '<code>database/sql/desaparicion_equipos.sql</code>.')
+                    . '<code>database/sql/desaparicion_equipos.sql</code>.')
                 . '<br>';
 
             // Un nombre limpio puede ser el mismo de otro equipo nuestro —el club
@@ -4440,8 +4482,8 @@ class ImportPartidosController extends Controller
             $avisos[] = $patron === ''
                 ? '<span class="err">No pude armar el patrón de «' . e($excluirComp) . '».</span>'
                 : 'Competencia <b>' . e($excluirComp) . '</b> excluida (patrón <code>' . e($patron) . '</code>). '
-                  . 'No se sondea más, en ningún DT. Se maneja en '
-                  . '<a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a>.';
+                . 'No se sondea más, en ningún DT. Se maneja en '
+                . '<a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a>.';
         }
         $incluirComp = trim((string) $request->get('incluir_comp', ''));
         if ($incluirComp !== '') {
@@ -4452,8 +4494,8 @@ class ImportPartidosController extends Controller
                 $avisos[] = 'Competencia <b>' . e($incluirComp) . '</b> <b>incluida</b>: sus partidos vuelven al sondeo.'
                     . (empty($r['apagadas']) ? ''
                         : '<br><span class="err">Ojo:</span> para eso apagué la(s) regla(s) <code>'
-                          . implode('</code>, <code>', array_map('e', $r['apagadas'])) . '</code>, que también tapaban otras competencias. '
-                          . 'Se prenden de nuevo en <a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a>.');
+                        . implode('</code>, <code>', array_map('e', $r['apagadas'])) . '</code>, que también tapaban otras competencias. '
+                        . 'Se prenden de nuevo en <a href="' . e(route('competencias_excluidas.index')) . '" target="_blank">Competencias excluidas ↗</a>.');
             }
         }
 
@@ -4580,18 +4622,18 @@ class ImportPartidosController extends Controller
         // dejado ni una fila en staging.
         if ($tecnicoId && $guardar) {
             $this->registrarSondeo($tecnicoId, [
-                'partidos'      => $cont['total'] + $fueraTotal,
-                'fuera_1ra'     => $fueraTotal,
-                'fuera_alcance' => $cont['excluido'],
-                'duplicados'    => $cont['duplicado'],
-                'nuevos'        => $cont['nuevo'],
-                'conflictos'    => $cont['conflicto'],
-                'guardadas'     => $guardadas,
-            ] + (Schema::hasColumn('tecnico_sondeos', 'fuera_detalle')
-                ? ['fuera_detalle' => json_encode(array_map(function ($g) {
+                    'partidos'      => $cont['total'] + $fueraTotal,
+                    'fuera_1ra'     => $fueraTotal,
+                    'fuera_alcance' => $cont['excluido'],
+                    'duplicados'    => $cont['duplicado'],
+                    'nuevos'        => $cont['nuevo'],
+                    'conflictos'    => $cont['conflicto'],
+                    'guardadas'     => $guardadas,
+                ] + (Schema::hasColumn('tecnico_sondeos', 'fuera_detalle')
+                    ? ['fuera_detalle' => json_encode(array_map(function ($g) {
                         return ['nombre' => $g['nombre'], 'n' => (int) $g['n'], 'motivo' => $g['motivo'], 'origen' => $g['origen']];
                     }, $fuera), JSON_UNESCAPED_UNICODE)]
-                : []));
+                    : []));
         }
 
         sort($temporadas);
@@ -4761,9 +4803,9 @@ class ImportPartidosController extends Controller
 
             $motivo = ($sd && (int) $sd->guardadas === 0 && (int) $sd->fuera_1ra > 0)
                 ? '<div class="ok-box"><b>No hay nada para aplicar, y está bien.</b><br>'
-                    . 'Este DT ya se sondeó el ' . e(substr((string) $sd->sondeado_at, 0, 16)) . ': sus '
-                    . (int) $sd->fuera_1ra . ' partidos son de competencias excluidas. '
-                    . 'No hace falta volver a sondearlo.</div>'
+                . 'Este DT ya se sondeó el ' . e(substr((string) $sd->sondeado_at, 0, 16)) . ': sus '
+                . (int) $sd->fuera_1ra . ' partidos son de competencias excluidas. '
+                . 'No hace falta volver a sondearlo.</div>'
                 : '<p class="sub">No hay partidos nuevos en staging. Corré el sondeo con <code>&guardar=1</code> primero.</p>';
 
             return $this->pagina('Aplicar', $html . $motivo);
@@ -5299,7 +5341,7 @@ class ImportPartidosController extends Controller
                 $ya = $exacto;
                 if (!$ya && $invertido && !$esLlave) {
                     $dias = abs((int) round((strtotime(substr((string) $invertido->dia, 0, 10))
-                        - strtotime(substr((string) $r->dia, 0, 10))) / 86400));
+                            - strtotime(substr((string) $r->dia, 0, 10))) / 86400));
 
                     if ($dias <= 1) {
                         $ya = $invertido;
@@ -5654,7 +5696,7 @@ class ImportPartidosController extends Controller
             . '<span class="sub">(sirve en una liga; en una copa, no)</span></label></p>'
             . (!empty($repetidas)
                 ? '<p><label><input type="checkbox" name="misma_ok" value="1"> '
-                    . '<b>Sí, esas rondas van a la misma fecha</b> <span class="sub">(crear igual)</span></label></p>'
+                . '<b>Sí, esas rondas van a la misma fecha</b> <span class="sub">(crear igual)</span></label></p>'
                 : '')
             . '<p class="acciones"><button class="boton">Crear los partidos</button> '
             . '<span class="sub">las fechas nuevas se crean recién acá</span></p>'
@@ -6362,7 +6404,7 @@ class ImportPartidosController extends Controller
         foreach ($cands as $p) {
             $ctx = $this->contextoPartido($p->id);
             $corrido = (int) round((strtotime(substr((string) $p->dia, 0, 10))
-                - strtotime(substr((string) $dia, 0, 10))) / 86400);
+                    - strtotime(substr((string) $dia, 0, 10))) / 86400);
             $donde = 'partido #' . $p->id . ' del ' . substr((string) $p->dia, 0, 10)
                 . ($ctx['torneo'] !== '' ? ' (' . $ctx['torneo'] . ')' : '');
 
@@ -6876,7 +6918,7 @@ class ImportPartidosController extends Controller
                 ->where('external_id', (string) $f['external_id'])
                 ->where(function ($q) use ($tecnicoId) {
                     $tecnicoId ? $q->whereNull('tecnico_id')->orWhere('tecnico_id', '<>', (int) $tecnicoId)
-                               : $q->whereNotNull('tecnico_id');
+                        : $q->whereNotNull('tecnico_id');
                 })
                 ->first(['id']);
 

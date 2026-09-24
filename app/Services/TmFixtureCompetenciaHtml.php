@@ -37,8 +37,8 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      * Los partidos del torneo.
      *
      * Devuelve una lista de:
-     *   ['game_id', 'dia' => 'Y-m-d', 'dia_crudo', 'local_tm', 'local_nombre',
-     *    'visita_tm', 'visita_nombre', 'resultado', 'ronda']
+     *   ['game_id', 'dia' => 'Y-m-d', 'hora' => 'H:i'|null, 'dia_crudo', 'local_tm',
+     *    'local_nombre', 'visita_tm', 'visita_nombre', 'resultado', 'ronda']
      * o null si no se pudo traer la página.
      *
      * `ronda` es el nombre de la jornada («Segunda ronda», «Octavos de final»,
@@ -55,11 +55,11 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 
         $url = self::urlComp($compId, $season, $copa);
 
-            // `getHtmlTm` es nuevo. Si el deploy subió los servicios pero no
-            // HttpHelper, llamarlo tira «Call to undefined method» y la pantalla
-            // se cae con un 500 pelado. Se cae con red: se usa el método viejo y
-            // se avisa, que es mucho más fácil de diagnosticar que una pantalla
-            // en blanco.
+        // `getHtmlTm` es nuevo. Si el deploy subió los servicios pero no
+        // HttpHelper, llamarlo tira «Call to undefined method» y la pantalla
+        // se cae con un 500 pelado. Se cae con red: se usa el método viejo y
+        // se avisa, que es mucho más fácil de diagnosticar que una pantalla
+        // en blanco.
         if (method_exists(HttpHelper::class, 'getHtmlTm')) {
             $html = HttpHelper::getHtmlTm($url, $pais);
         } else {
@@ -108,6 +108,15 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         // mirar la tabla.
         $ultimoDia = null;
 
+        // LA HORA, IGUAL. Va en su propia columna y también se escribe una
+        // sola vez: los partidos que siguen a la misma hora el mismo día traen
+        // la celda vacía (LaLiga 2024/25, 3.ª jornada: Valladolid–Leganés
+        // debajo de Athletic–Valencia, los dos a las 19:00). Se arrastra la
+        // última, pero sólo dentro del mismo día: un día nuevo sin hora es
+        // «sin hora», no la del día anterior.
+        $ultimaHora = null;
+        $horaDe     = [];
+
         foreach ($links as $a) {
             if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
                 continue;
@@ -136,7 +145,12 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
                 continue;
             }
 
-            $ultimoDia = $fila['dia_crudo'];
+            if ($fila['hora'] === null && $fila['dia_crudo'] === $ultimoDia) {
+                $fila['hora'] = $ultimaHora;
+            }
+            $ultimoDia  = $fila['dia_crudo'];
+            $ultimaHora = $fila['hora'];
+            $horaDe[$gameId] = $fila['hora'];
 
             $clave = $tr->getNodePath();
             $fila['ronda']      = isset($rondaDe[$clave]) ? $rondaDe[$clave] : null;
@@ -144,7 +158,17 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
             $filas[$gameId]     = ['game_id' => $gameId] + $fila;
         }
 
-        return $this->convertirFechas(array_values($filas));
+        // La hora se vuelve a pegar DESPUÉS de convertir las fechas y por
+        // gameId: convertirFechas() es del padre y no se sabe si conserva las
+        // claves que no conoce.
+        $out = $this->convertirFechas(array_values($filas));
+        if (is_array($out)) {
+            foreach ($out as $k => $f) {
+                $g = isset($f['game_id']) ? $f['game_id'] : null;
+                $out[$k]['hora'] = ($g !== null && isset($horaDe[$g])) ? $horaDe[$g] : null;
+            }
+        }
+        return $out;
     }
 
     /**
@@ -289,6 +313,27 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
             return null;
         }
 
+        // La hora: una celda que sea SÓLO «19:00» (o «9:30 PM»). Sólo la
+        // celda entera, para no confundirla con el marcador «1:1», que además
+        // va dentro del link al partido.
+        $hora = null;
+        foreach ($xp->query('./td', $tr) as $td) {
+            if ($xp->query('.//a[contains(@href, "/spielbericht/")]', $td)->length > 0) continue;
+            $txt = trim(preg_replace('/\s+/u', ' ', $td->textContent));
+            if (preg_match('/^(\d{1,2}):(\d{2})(?:\s*([AaPp])\.?\s*[Mm]\.?)?$/u', $txt, $h)) {
+                $hh = (int) $h[1];
+                if (!empty($h[3])) {
+                    $pm = strtolower($h[3]) === 'p';
+                    if ($hh === 12) $hh = 0;
+                    if ($pm) $hh += 12;
+                }
+                if ($hh < 24 && (int) $h[2] < 60) {
+                    $hora = sprintf('%02d:%02d', $hh, (int) $h[2]);
+                    break;
+                }
+            }
+        }
+
         $clubes = [];
         $orden  = [];
 
@@ -317,6 +362,7 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         return [
             'dia_crudo'     => $diaCrudo,
             'dia'           => null,
+            'hora'          => $hora,
             'ronda'         => null,
             'local_tm'      => $orden[0],
             'local_nombre'  => $clubes[$orden[0]],
