@@ -73,6 +73,11 @@ class ControlTorneos
         if (empty($f['parciales'])) {
             $q->whereRaw('COALESCE(t.parcial, 0) = 0');
         }
+        // Torneo suspendido que nunca terminó (Copa de la Superliga 2020,
+        // pandemia): no entra en NINGUNA lista, ni siquiera por equipos.
+        if ($this->hayInconcluso()) {
+            $q->whereRaw('COALESCE(t.inconcluso, 0) = 0');
+        }
 
         $filas = $q->orderByDesc('t.year')->orderBy('t.nombre')->get()->all();
 
@@ -169,11 +174,6 @@ class ControlTorneos
                 $listas['sobran'][] = $fila;
             } elseif ($cargados < $esperados) {
                 $listas['faltan'][] = $fila;
-            } elseif ((int) $fila->inconcluso === 1) {
-                // Torneo suspendido que nunca terminó (Copa de la Superliga
-                // 2020, pandemia): no le faltan partidos ni posiciones, no
-                // existen. Solo se controla la cantidad de equipos.
-                continue;
             } elseif ((int) $fila->partidos === 0 || (int) $fila->fechas_incompletas > 0) {
                 // La cantidad de equipos da, pero los partidos no: no está
                 // completo, así que no va a la lista de posiciones.

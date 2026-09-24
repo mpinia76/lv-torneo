@@ -111,6 +111,9 @@
                         así que siempre les «faltan» equipos.
                     </p>
                 @endif
+                <p class="ctrl-sub" style="margin-top:.6em">
+                    Los torneos marcados <b>inconclusos</b> (suspendidos, nunca terminaron) no entran en este control.
+                </p>
             </div>
 
             <div class="col-md-9">
