@@ -700,7 +700,8 @@ class ImportPartidosController extends Controller
         $costo  = $usarCache ? '' : ' <span class="sub">(vuelve a bajar de TM)</span>';
 
         $html .= $this->bloqueRenumerar($renumeradas, $jornadasMal, $base, $fuente);
-        if ($renumerar) $html .= $this->bloqueMoverFechas($filas, $moverFechas, $base, $fuente);
+        if ($renumerar) $html .= $this->bloqueMoverFechas($filas, $moverFechas, $base, $fuente,
+            array_map('intval', (array) $request->get('mover', [])));
 
         $html .= '<p class="acciones">'
             . '<a class="boton" href="' . e($base . $fuente . '&guardar=1') . '">Guardar en staging</a>' . $costo
@@ -2931,7 +2932,7 @@ class ImportPartidosController extends Controller
      * dos partidos directo, así que cada uno pasa primero por una fecha
      * temporal propia, todo en una transacción.
      */
-    private function bloqueMoverFechas(array $filas, $mover, $base, $fuente)
+    private function bloqueMoverFechas(array $filas, $mover, $base, $fuente, array $elegidos = [])
     {
         $pids = [];
         foreach ($filas as $f) {
@@ -2988,6 +2989,12 @@ class ImportPartidosController extends Controller
             $ok[$pid] = $d;
         }
 
+        // Se mueven sólo los tildados: el rearmado puede equivocarse en alguno
+        // y cada partido se revisa contra el calendario antes de moverlo.
+        if ($mover) {
+            $ok = array_intersect_key($ok, array_flip($elegidos));
+        }
+
         $html = '';
         if ($mover && $ok) {
             $movidos = 0;
@@ -3017,14 +3024,15 @@ class ImportPartidosController extends Controller
             });
             foreach (array_keys($grupos) as $g) $this->recontarEquipos($g);
             $html .= '<p class="ok-box"><b>Moví ' . $movidos . ' partidos</b> a la fecha que les corresponde según el rearmado.</p>';
-            if (!$chocan) return $html;
+            foreach (array_keys($ok) as $pid) unset($cambios[$pid]);
+            if (!$cambios) return $html;
         }
 
         $filasHtml = '';
         foreach ($cambios as $pid => $d) {
-            if ($mover && isset($ok[$pid])) continue;
             $r = $actual[$pid];
             $filasHtml .= '<tr' . (isset($chocan[$pid]) ? ' class="warn"' : '') . '>'
+                . '<td>' . (isset($chocan[$pid]) ? '' : '<input type="checkbox" name="mover[]" value="' . (int) $pid . '">') . '</td>'
                 . '<td class="num">' . e(substr((string) $r->dia, 0, 10)) . '</td>'
                 . '<td>' . e($this->nombreEquipo($r->equipol_id) . ' vs ' . $this->nombreEquipo($r->equipov_id)) . '</td>'
                 . '<td class="num">' . e($r->numero) . '</td><td class="num"><b>' . e($d) . '</b></td>'
@@ -3033,15 +3041,30 @@ class ImportPartidosController extends Controller
                     . (int) $chocan[$pid] . ')' : '') . '</td></tr>';
         }
 
-        return $html . '<div class="warn-box"><b>' . (count($cambios) - ($mover ? count($ok) : 0))
-            . ' partidos ya cargados están en otra fecha</b> que la del rearmado.'
-            . (!$mover && $ok ? ' <a class="boton-sec" href="' . e($base . $fuente . '&mover_fechas=1') . '">Mover los '
-                . count($ok) . ' a su fecha</a> <span class="sub">sólo cambia la fecha del partido; lo demás cuelga del partido</span>' : '')
-            . ($chocan ? ' Los marcados no se pueden mover solos: el que ocupa su lugar también está mal o el rearmado se '
-                . 'equivocó ahí; mirálos a mano.' : '')
-            . '<details style="margin-top:6px"><summary>Ver cuáles</summary><div class="scroll"><table><thead><tr>'
+        // El formulario va por GET a la misma pantalla: los parámetros de la
+        // vista (torneo, renumerar, cache) viajan como ocultos, porque un
+        // form GET descarta la query string de su action.
+        $q = [];
+        parse_str((string) parse_url($base . $fuente, PHP_URL_QUERY), $q);
+        $ocultos = '';
+        foreach ($q as $k => $v) {
+            if (is_array($v)) continue;
+            $ocultos .= '<input type="hidden" name="' . e($k) . '" value="' . e((string) $v) . '">';
+        }
+
+        return $html . '<div class="warn-box"><b>' . count($cambios)
+            . ' partidos ya cargados están en otra fecha</b> que la del rearmado. <b>Revisá cada uno contra el '
+            . 'calendario</b> y tildá los que de verdad van en otra fecha: el rearmado adivina, y con TM mezclado '
+            . 'puede equivocarse.'
+            . ($chocan ? ' Los marcados en amarillo no se pueden mover: en la fecha destino ya juega uno de los dos.' : '')
+            . '<form method="get" action="' . e(strtok($base, '?')) . '" style="margin-top:6px">' . $ocultos
+            . '<input type="hidden" name="mover_fechas" value="1">'
+            . '<div class="scroll"><table><thead><tr><th></th>'
             . '<th>Día</th><th>Partido</th><th>Está en</th><th>Va en</th><th></th><th></th></tr></thead><tbody>'
-            . $filasHtml . '</tbody></table></div></details></div>';
+            . $filasHtml . '</tbody></table></div>'
+            . ($ok ? '<p class="acciones"><button class="boton-sec">Mover los tildados</button> '
+                . '<span class="sub">sólo cambia la fecha del partido; goles, tarjetas y alineaciones cuelgan del partido</span></p>' : '')
+            . '</form></div>';
     }
 
     /** El aviso de jornadas mezcladas, o el resumen del rearmado. */
