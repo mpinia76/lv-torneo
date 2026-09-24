@@ -2897,7 +2897,8 @@ class ImportPartidosController extends Controller
 
         // Los que no entraron en ningún hueco (adelantados, o huecos ya
         // tomados): a la jornada libre para los dos más cercana en días; si
-        // no hay ninguna, se quedan donde estaban y «Aplicar» los frena.
+        // no hay ninguna, van a los intercambios en cadena de abajo.
+        $sinLugar = [];
         foreach ($pendientes as $i) {
             list($l, $v) = $lv($i);
             $mejor = null; $dist = PHP_INT_MAX;
@@ -2906,12 +2907,78 @@ class ImportPartidosController extends Controller
                 $d = $lejos($i, $k);
                 if ($d < $dist) { $dist = $d; $mejor = $k; }
             }
-            if ($mejor !== null) $asignado[$i] = $mejor;
-            else $this->sinLugar[] = [
+            if ($mejor !== null) {
+                $asignado[$i] = $mejor;
+                foreach ([$l, $v] as $e) $ocupado[$mejor][$e] = true;
+            } else {
+                $sinLugar[] = $i;
+            }
+        }
+
+        // 3. Intercambios en cadena para los que no tienen lugar. A tiene su
+        // hueco en la jornada `a`, B en la `b`. Se hace lugar para B en `a`:
+        // su partido de `a` pasa a `b` (donde B está libre); si el rival de
+        // ese partido ya jugaba en `b`, su partido de `b` pasa a `a`, y así
+        // (cadena de Kempe). Cada paso deja las dos jornadas sin repetidos.
+        // De todas las cadenas posibles se elige la que menos días corre los
+        // partidos que mueve, y como mucho de 6 partidos: una cadena larga
+        // desarma jornadas que estaban bien.
+        $partidoEn = function () use (&$asignado, $sinLugar, $lv) {
+            $m = [];
+            foreach ($asignado as $x => $k) {
+                if (in_array($x, $sinLugar, true)) continue;
+                foreach ($lv($x) as $e) $m[$k][$e] = $x;
+            }
+            return $m;
+        };
+        $quedan = [];
+        foreach ($sinLugar as $i) {
+            list($A, $B) = $lv($i);
+            $en = $partidoEn();
+            $libresDe = function ($e) use ($mediana, $en) {
+                $r = [];
+                foreach (array_keys($mediana) as $k) if (empty($en[$k][$e])) $r[] = $k;
+                return $r;
+            };
+            $mejor = null;
+            foreach ([[$A, $B], [$B, $A]] as $par) {
+                list($X, $Y) = $par;                     // X libre en a, se libera Y en a
+                foreach ($libresDe($X) as $a) {
+                    foreach ($libresDe($Y) as $b) {
+                        if ($a === $b) continue;
+                        $cadena = []; $cur = $Y; $lado = $a; $ok = true;
+                        while (isset($en[$lado][$cur])) {
+                            $x = $en[$lado][$cur];
+                            if (in_array($x, $cadena, true)) break;
+                            $cadena[] = $x;
+                            list($p, $q) = $lv($x);
+                            $cur = $p === $cur ? $q : $p;
+                            if ($cur === $X) { $ok = false; break; }
+                            $lado = $lado === $a ? $b : $a;
+                            if (count($cadena) > 6) { $ok = false; break; }
+                        }
+                        if (!$ok) continue;
+                        $costo = abs($ts($i) - $mediana[$a]);
+                        foreach ($cadena as $x) {
+                            $destino = $asignado[$x] === $a ? $b : $a;
+                            $costo += abs($ts($x) - $mediana[$destino]) - abs($ts($x) - $mediana[$asignado[$x]]);
+                        }
+                        if ($mejor === null || $costo < $mejor[0]) $mejor = [$costo, $a, $b, $cadena];
+                    }
+                }
+            }
+            if ($mejor === null) { $quedan[] = $i; continue; }
+            list(, $a, $b, $cadena) = $mejor;
+            foreach ($cadena as $x) $asignado[$x] = $asignado[$x] === $a ? $b : $a;
+            $asignado[$i] = $a;
+            $sinLugar = array_values(array_diff($sinLugar, [$i]));
+        }
+
+        foreach ($quedan as $i) {
+            $this->sinLugar[] = [
                 'dia' => $dia($i), 'jornada' => (int) $asignado[$i],
                 'local' => (string) $filas[$i]['club_nombre'], 'visita' => (string) $filas[$i]['rival_nombre'],
             ];
-            foreach ([$l, $v] as $e) $ocupado[$asignado[$i]][$e] = true;
         }
 
         $resumen = [];
