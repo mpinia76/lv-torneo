@@ -2769,97 +2769,171 @@ class ImportPartidosController extends Controller
     }
 
     /**
-     * Rearma las jornadas de una LIGA cuando TM las mezcló.
+     * Rearma las jornadas de una LIGA cuando TM las mezcló. Manda el
+     * CALENDARIO, no el número de jornada de TM.
      *
-     * La jornada de TM se respeta cuando es creíble: está libre para los dos
-     * equipos y el partido se jugó a no más de 4 días del día típico
-     * (mediana) de esa jornada en TM. Si no, el partido va a la PRIMERA
-     * jornada donde todavía no jugó ninguno de sus dos equipos.
+     * 1. Tandas: partidos seguidos sin más de 2 días de corte. Una tanda sin
+     *    equipos repetidos (o que queda así cortándola en un día, o sacándole
+     *    hasta 2 partidos cuyos dos equipos están repetidos: el postergado
+     *    típico) y de al menos media jornada es una JORNADA SEGURA.
+     * 2. El número de una jornada segura NO sale de contar tandas (un error
+     *    corre todas las siguientes): sale de cuántos partidos llevaba jugados
+     *    cada equipo antes de ese día. Se toma el valor más repetido entre
+     *    todos sus equipos, +1. Un postergado sólo mueve a dos equipos.
+     * 3. Los ya cargados (`$anclas`) quedan en tu fecha.
+     * 4. El resto, por día, va a una jornada donde no jugó ninguno de sus dos
+     *    equipos: la que da la cuenta de partidos si los dos coinciden; si no,
+     *    la de TM si está libre; si no, la de fecha más cercana.
      *
-     * Por qué las dos cosas y no sólo la segunda: con sólo «primera jornada
-     * libre», un postergado de la fecha 5 que se juega en enero cambia de
-     * lugar con la revancha de la fecha 22 (la revancha se juega antes y
-     * ocupa el hueco de la 5). Y con sólo la de TM no se arregla nada: RKC –
-     * Twente del 01/10 figura en la «15. Jornada», que se jugó el 02-03/12.
-     * Probado con una liga simulada de 18 equipos, un postergado y jornadas
-     * cruzadas.
+     * Por qué no contar tandas (la versión anterior): con las jornadas de TM
+     * mezcladas, un error empujaba al siguiente y la Eredivisie 2000/01
+     * terminaba con 37 jornadas que duraban tres meses.
      *
-     * Se recorren por día. Pisa `ronda` en `$filas` (por referencia) con el
-     * número pelado, «10», y devuelve el resumen
-     * [número => ['n', 'desde', 'hasta', 'antes' => [ronda TM => n]]].
+     * Pisa `ronda` en `$filas` con el número pelado («10») y devuelve el
+     * resumen [número => ['n', 'fijos', 'desde', 'hasta', 'antes' => [ronda TM => n]]].
      */
     private function renumerarJornadas(array &$filas, array $anclas = [])
     {
-        $dias = [];
-        foreach ($filas as $f) {
-            $k = (int) preg_replace('/\D.*$/', '', ltrim((string) $f['ronda']));
-            if ($k > 0) $dias[$k][] = strtotime(substr((string) $f['dia'], 0, 10));
+        $orden = []; $equipos = [];
+        foreach ($filas as $i => $f) {
+            $l = (string) $f['club_external_id']; $v = (string) $f['rival_external_id'];
+            if ($l === '' || $v === '' || empty($f['dia'])) continue;
+            $orden[] = $i; $equipos[$l] = true; $equipos[$v] = true;
         }
-        $mediana = [];
-        foreach ($dias as $k => $ds) {
-            sort($ds);
-            $mediana[$k] = $ds[intdiv(count($ds), 2)];
-        }
-
-        $orden = array_keys($filas);
-        usort($orden, function ($a, $b) use ($filas) {
-            $c = strcmp((string) $filas[$a]['dia'], (string) $filas[$b]['dia']);
+        $dia = function ($i) use ($filas) { return substr((string) $filas[$i]['dia'], 0, 10); };
+        usort($orden, function ($a, $b) use ($filas, $dia) {
+            $c = strcmp($dia($a), $dia($b));
             return $c !== 0 ? $c : strcmp((string) $filas[$a]['external_id'], (string) $filas[$b]['external_id']);
         });
+        $ts = function ($i) use ($dia) { return strtotime($dia($i)); };
+        $tmDe = function ($i) use ($filas) { return (int) preg_replace('/\D.*$/', '', ltrim((string) $filas[$i]['ronda'])); };
+        $lv = function ($i) use ($filas) { return [(string) $filas[$i]['club_external_id'], (string) $filas[$i]['rival_external_id']]; };
 
-        $ocupado = [];
-        $resumen = [];
-
-        // Los ya cargados van primero y quedan donde están (ver `$anclas` en
-        // fixture()): ocupan su jornada para que nadie más caiga ahí.
-        foreach ($anclas as $i => $k) {
-            if (!isset($filas[$i])) continue;
-            $ocupado[$k][(string) $filas[$i]['club_external_id']] = true;
-            $ocupado[$k][(string) $filas[$i]['rival_external_id']] = true;
+        // Partidos jugados por cada equipo ANTES de cada partido (días anteriores).
+        $previos = []; $cuenta = []; $pendiente = []; $diaAnt = null;
+        foreach ($orden as $i) {
+            if ($diaAnt !== null && $dia($i) !== $diaAnt) {
+                foreach ($pendiente as $e => $n) $cuenta[$e] = (isset($cuenta[$e]) ? $cuenta[$e] : 0) + $n;
+                $pendiente = [];
+            }
+            list($l, $v) = $lv($i);
+            $previos[$i] = [isset($cuenta[$l]) ? $cuenta[$l] : 0, isset($cuenta[$v]) ? $cuenta[$v] : 0];
+            $pendiente[$l] = (isset($pendiente[$l]) ? $pendiente[$l] : 0) + 1;
+            $pendiente[$v] = (isset($pendiente[$v]) ? $pendiente[$v] : 0) + 1;
+            $diaAnt = $dia($i);
         }
 
+        $minimo = max(1, (int) ceil(intdiv(count($equipos), 2) / 2));
+        $limpia = function (array $t) use ($lv) {
+            $c = [];
+            foreach ($t as $i) foreach ($lv($i) as $e) { if (isset($c[$e])) return false; $c[$e] = true; }
+            return true;
+        };
+
+        // 1. Tandas y jornadas seguras.
+        $brutas = []; $actual = []; $ultimo = null;
         foreach ($orden as $i) {
-            $l = (string) $filas[$i]['club_external_id']; $v = (string) $filas[$i]['rival_external_id'];
-            if ($l === '' || $v === '') continue;
+            if ($actual && $ts($i) - $ultimo > 2 * 86400) { $brutas[] = $actual; $actual = []; }
+            $actual[] = $i; $ultimo = $ts($i);
+        }
+        if ($actual) $brutas[] = $actual;
 
-            $antes = (string) $filas[$i]['ronda'];
-            if (isset($anclas[$i])) {
-                $k = (int) $anclas[$i];
-                $filas[$i]['ronda'] = (string) $k;
-                $dia = substr((string) $filas[$i]['dia'], 0, 10);
-                if (!isset($resumen[$k])) $resumen[$k] = ['n' => 0, 'desde' => $dia, 'hasta' => $dia, 'antes' => [], 'fijos' => 0];
-                $resumen[$k]['n']++;
-                $resumen[$k]['fijos'] = (isset($resumen[$k]['fijos']) ? $resumen[$k]['fijos'] : 0) + 1;
-                if ($dia < $resumen[$k]['desde']) $resumen[$k]['desde'] = $dia;
-                if ($dia > $resumen[$k]['hasta']) $resumen[$k]['hasta'] = $dia;
-                if (!isset($resumen[$k]['antes'][$antes])) $resumen[$k]['antes'][$antes] = 0;
-                $resumen[$k]['antes'][$antes]++;
-                continue;
+        $seguras = []; $resto = [];
+        $partir = function (array $t) use (&$partir, $limpia, $minimo, $lv, $dia, &$seguras, &$resto) {
+            if ($limpia($t)) {
+                if (count($t) >= $minimo) $seguras[] = $t; else foreach ($t as $i) $resto[] = $i;
+                return;
             }
-            $tm    = (int) preg_replace('/\D.*$/', '', ltrim($antes));
-            $dia   = substr((string) $filas[$i]['dia'], 0, 10);
-            $ts    = strtotime($dia);
-
-            $k = 0;
-            if ($tm > 0 && isset($mediana[$tm]) && abs($ts - $mediana[$tm]) <= 4 * 86400
-                && empty($ocupado[$tm][$l]) && empty($ocupado[$tm][$v])) {
-                $k = $tm;
+            // ¿Dos jornadas pegadas? Sólo si hay para dos jornadas casi
+            // completas (3/4 de una de cada lado): si no, un postergado del
+            // miércoles pegado al fin de semana partía la jornada en dos. El
+            // corte más tardío, en un día, que deja limpio lo anterior.
+            $casi = max($minimo, (int) ceil(1.5 * $minimo));
+            for ($p = count($t) - $casi; $p >= $casi; $p--) {
+                if ($dia($t[$p]) === $dia($t[$p - 1])) continue;
+                $izq = array_slice($t, 0, $p);
+                if ($limpia($izq)) { $seguras[] = $izq; $partir(array_slice($t, $p)); return; }
             }
-            if (!$k) {
-                for ($k = 1; ; $k++) {
-                    if (empty($ocupado[$k][$l]) && empty($ocupado[$k][$v])) break;
+            // ¿Una jornada con hasta 2 postergados metidos?
+            $c = [];
+            foreach ($t as $i) foreach ($lv($i) as $e) $c[$e] = isset($c[$e]) ? $c[$e] + 1 : 1;
+            $sacar = [];
+            foreach ($t as $i) { list($l, $v) = $lv($i); if ($c[$l] > 1 && $c[$v] > 1) $sacar[] = $i; }
+            if ($sacar && count($sacar) <= 2) {
+                $quedan = array_values(array_diff($t, $sacar));
+                if ($limpia($quedan) && count($quedan) >= $minimo) {
+                    $seguras[] = $quedan; foreach ($sacar as $i) $resto[] = $i; return;
                 }
             }
-            $ocupado[$k][$l] = true;
-            $ocupado[$k][$v] = true;
-            $filas[$i]['ronda'] = (string) $k;
+            foreach ($t as $i) $resto[] = $i;
+        };
+        foreach ($brutas as $t) $partir($t);
 
-            if (!isset($resumen[$k])) $resumen[$k] = ['n' => 0, 'desde' => $dia, 'hasta' => $dia, 'antes' => [], 'fijos' => 0];
-            $resumen[$k]['n']++;
-            if ($dia < $resumen[$k]['desde']) $resumen[$k]['desde'] = $dia;
-            if ($dia > $resumen[$k]['hasta']) $resumen[$k]['hasta'] = $dia;
-            if (!isset($resumen[$k]['antes'][$antes])) $resumen[$k]['antes'][$antes] = 0;
-            $resumen[$k]['antes'][$antes]++;
+        // 2. Número de cada jornada segura: la cuenta más repetida, +1.
+        $asignado = []; $ocupado = []; $fecha = [];
+        foreach ($seguras as $t) {
+            $votos = [];
+            foreach ($t as $i) foreach ($previos[$i] as $n) $votos[$n + 1] = isset($votos[$n + 1]) ? $votos[$n + 1] + 1 : 1;
+            arsort($votos);
+            $k = (int) key($votos);
+            if (isset($fecha[$k])) { foreach ($t as $i) $resto[] = $i; continue; }
+            $ds = [];
+            foreach ($t as $i) {
+                $asignado[$i] = $k; $ds[] = $ts($i);
+                foreach ($lv($i) as $e) $ocupado[$k][$e] = true;
+            }
+            sort($ds); $fecha[$k] = $ds[intdiv(count($ds), 2)];
+        }
+
+        // 3. Los ya cargados quedan en su fecha.
+        foreach ($anclas as $i => $n) {
+            if (!isset($filas[$i])) continue;
+            if (isset($asignado[$i])) foreach ($lv($i) as $e) unset($ocupado[$asignado[$i]][$e]);
+            $asignado[$i] = (int) $n;
+            foreach ($lv($i) as $e) $ocupado[(int) $n][$e] = true;
+        }
+        $resto = array_values(array_filter(array_unique($resto), function ($i) use ($anclas) { return !isset($anclas[$i]); }));
+        usort($resto, function ($a, $b) use ($filas) { return strcmp((string) $filas[$a]['dia'], (string) $filas[$b]['dia']); });
+
+        // 4. El resto.
+        $total = $fecha ? max(array_keys($fecha)) : 0;
+        foreach ($anclas as $n) $total = max($total, (int) $n);
+        foreach ($resto as $i) {
+            list($l, $v) = $lv($i);
+            $libres = [];
+            for ($n = 1; $n <= $total; $n++) if (empty($ocupado[$n][$l]) && empty($ocupado[$n][$v])) $libres[] = $n;
+            $porCuenta = $previos[$i][0] === $previos[$i][1] ? $previos[$i][0] + 1 : 0;
+            $tm = $tmDe($i);
+            if (!$libres) {
+                $n = ++$total; $fecha[$n] = $ts($i);
+            } elseif ($porCuenta && in_array($porCuenta, $libres, true)) {
+                $n = $porCuenta;
+            } elseif (in_array($tm, $libres, true)) {
+                $n = $tm;
+            } else {
+                $n = $libres[0]; $mejor = PHP_INT_MAX;
+                foreach ($libres as $c) {
+                    if (!isset($fecha[$c])) continue;
+                    $d = abs($ts($i) - $fecha[$c]);
+                    if ($d < $mejor) { $mejor = $d; $n = $c; }
+                }
+            }
+            $asignado[$i] = $n;
+            foreach ([$l, $v] as $e) $ocupado[$n][$e] = true;
+        }
+
+        $resumen = [];
+        foreach ($asignado as $i => $n) {
+            $antes = (string) $filas[$i]['ronda'];
+            $filas[$i]['ronda'] = (string) $n;
+            $d = $dia($i);
+            if (!isset($resumen[$n])) $resumen[$n] = ['n' => 0, 'fijos' => 0, 'desde' => $d, 'hasta' => $d, 'antes' => []];
+            $resumen[$n]['n']++;
+            if (isset($anclas[$i])) $resumen[$n]['fijos']++;
+            if ($d < $resumen[$n]['desde']) $resumen[$n]['desde'] = $d;
+            if ($d > $resumen[$n]['hasta']) $resumen[$n]['hasta'] = $d;
+            if (!isset($resumen[$n]['antes'][$antes])) $resumen[$n]['antes'][$antes] = 0;
+            $resumen[$n]['antes'][$antes]++;
         }
         ksort($resumen);
         return $resumen;
@@ -2893,8 +2967,9 @@ class ImportPartidosController extends Controller
             $sinRenumerar = str_replace(['&renumerar=1', '?renumerar=1&', '?renumerar=1'], ['', '?', ''], $base);
 
             return '<div class="' . ($raras ? 'warn-box' : 'ok-box') . '"><b>Jornadas rearmadas por fecha</b>, sin usar '
-                . 'las de Transfermarkt. Los partidos <b>que ya tenés cargados quedan en su fecha</b>; el resto va a su '
-                . 'jornada de TM si es creíble, y si no a la primera jornada donde no jugó ninguno de sus dos equipos. '
+                . 'las de Transfermarkt: los partidos jugados juntos (sin más de 2 días de corte) son una jornada, y los '
+                . 'postergados van a la jornada donde no jugó ninguno de sus dos equipos. Los <b>que ya tenés cargados '
+                . 'quedan en su fecha</b>. '
                 . 'Quedaron <b>' . count($renumeradas) . '</b> jornadas'
                 . ($raras ? ', y <b>' . $raras . '</b> no tienen ' . $normal . ' partidos como el resto: ésas son las '
                     . 'que hay que mirar antes de aplicar.' : ', todas de ' . $normal . ' partidos.')
