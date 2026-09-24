@@ -118,7 +118,7 @@ class TmFixtureClubHtml
         $ultimoDia = null;
 
         foreach ($links as $a) {
-            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
+            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d+)#', $a->getAttribute('href'), $m)) {
                 continue;
             }
 

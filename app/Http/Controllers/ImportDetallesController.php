@@ -2500,7 +2500,7 @@ class ImportDetallesController extends Controller
 
         // Sin DOM: contar con una expresión regular sobre el texto crudo. Si
         // acá salen y en el DOM no, la salida es no usar DOMDocument.
-        preg_match_all('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $html, $m);
+        preg_match_all('#/spielbericht/(?:index/spielbericht/)?(\d+)#', $html, $m);
         $porRegex = count(array_unique($m[1]));
 
         return '<h2>Qué ve el parser</h2>'

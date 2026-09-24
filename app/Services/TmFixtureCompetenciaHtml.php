@@ -109,7 +109,10 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         $ultimoDia = null;
 
         foreach ($links as $a) {
-            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
+            // gameId de CUALQUIER largo: los partidos viejos de TM tienen ids
+            // de 3 dígitos (Rosenborg-Estrella Roja, Copa UEFA 03/04 = 227). Con
+            // \d{4,} se perdía casi toda la 1ª ronda y la ida de la 2ª.
+            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d+)#', $a->getAttribute('href'), $m)) {
                 continue;
             }
 
