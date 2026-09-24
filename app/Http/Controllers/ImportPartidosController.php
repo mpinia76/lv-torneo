@@ -314,6 +314,7 @@ class ImportPartidosController extends Controller
         // Rearmar las jornadas de una LIGA por fecha, sin creerle a TM: ver
         // `renumerarJornadas()`. Viaja en todos los botones (va en `$base`).
         $renumerar = (string) $request->get('renumerar', '0') === '1';
+        $moverFechas = $renumerar && (string) $request->get('mover_fechas', '0') === '1';
         $filtro  = trim((string) $request->get('estado', ''));
         $gameday = trim((string) $request->get('gameday', ''));
         // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
@@ -513,28 +514,11 @@ class ImportPartidosController extends Controller
         $jornadasMal = $this->jornadasConChoque($filas);
         $renumeradas = null;
         if ($renumerar) {
-            // LO QUE YA ESTÁ CARGADO MANDA. Un partido que ya tenés en la
-            // base está en una fecha tuya, y ésa es su jornada: el rearmado
-            // la toma como fija y acomoda el resto alrededor. Sin esto, la
-            // Eredivisie 2000/01 proponía un Groningen nuevo en la fecha 2,
-            // donde ya estaba el Groningen cargado (#29490).
-            $anclas = [];
-            $pre = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
-            $pids = [];
-            foreach ($pre as $i => $f) if (!empty($f['partido_id'])) $pids[$i] = (int) $f['partido_id'];
-            if ($pids) {
-                $numeros = [];
-                foreach (array_chunk(array_values(array_unique($pids)), 500) as $trozo) {
-                    foreach (DB::table('partidos')->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
-                                 ->whereIn('partidos.id', $trozo)->select('partidos.id', 'fechas.numero')->get() as $r) {
-                        $numeros[(int) $r->id] = $this->numeroDeJornada($r->numero);
-                    }
-                }
-                foreach ($pids as $i => $pid) {
-                    if (!empty($numeros[$pid])) $anclas[$i] = (int) $numeros[$pid];
-                }
-            }
-            $renumeradas = $this->renumerarJornadas($filas, $anclas);
+            // Sin anclar lo ya cargado: si un partido quedó en una fecha
+            // equivocada (aplicado con las jornadas mezcladas de TM), anclarlo
+            // arrastraba el error a toda la jornada. Lo ya cargado se compara
+            // DESPUÉS, en `bloqueMoverFechas()`, que ofrece moverlo.
+            $renumeradas = $this->renumerarJornadas($filas);
         }
 
         $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
@@ -716,6 +700,7 @@ class ImportPartidosController extends Controller
         $costo  = $usarCache ? '' : ' <span class="sub">(vuelve a bajar de TM)</span>';
 
         $html .= $this->bloqueRenumerar($renumeradas, $jornadasMal, $base, $fuente);
+        if ($renumerar) $html .= $this->bloqueMoverFechas($filas, $moverFechas, $base, $fuente);
 
         $html .= '<p class="acciones">'
             . '<a class="boton" href="' . e($base . $fuente . '&guardar=1') . '">Guardar en staging</a>' . $costo
@@ -2780,7 +2765,8 @@ class ImportPartidosController extends Controller
      *    corre todas las siguientes): sale de cuántos partidos llevaba jugados
      *    cada equipo antes de ese día. Se toma el valor más repetido entre
      *    todos sus equipos, +1. Un postergado sólo mueve a dos equipos.
-     * 3. Los ya cargados (`$anclas`) quedan en tu fecha.
+     * 3. Si se pasan `$anclas` (índice => número), esos quedan fijos. La
+     *    pantalla ya no las pasa: ver `bloqueMoverFechas()`.
      * 4. El resto, por día, va a una jornada donde no jugó ninguno de sus dos
      *    equipos: la que da la cuenta de partidos si los dos coinciden; si no,
      *    la de TM si está libre; si no, la de fecha más cercana.
@@ -2939,6 +2925,133 @@ class ImportPartidosController extends Controller
         return $resumen;
     }
 
+    /**
+     * Partidos YA CARGADOS que están en otra fecha que la del rearmado.
+     *
+     * Pasa cuando se aplicaron jornadas con los números mezclados de TM (o se
+     * cargaron así hace tiempo). Con `mover_fechas=1` los mueve: sólo cambia
+     * `partidos.fecha_id` —goles, tarjetas y alineaciones cuelgan del partido—
+     * y crea la fecha destino en el mismo grupo si no existe.
+     *
+     * Antes de mover se arma el estado FINAL de cada fecha destino: si un
+     * equipo quedaría dos veces, ese partido no se mueve y se avisa. Los
+     * índices únicos (fecha, local) y (fecha, visitante) no dejan intercambiar
+     * dos partidos directo, así que cada uno pasa primero por una fecha
+     * temporal propia, todo en una transacción.
+     */
+    private function bloqueMoverFechas(array $filas, $mover, $base, $fuente)
+    {
+        $pids = [];
+        foreach ($filas as $f) {
+            if (!empty($f['partido_id']) && (string) $f['ronda'] !== '') $pids[(int) $f['partido_id']] = (string) $f['ronda'];
+        }
+        if (!$pids) return '';
+
+        $actual = [];
+        foreach (array_chunk(array_keys($pids), 500) as $trozo) {
+            foreach (DB::table('partidos')->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+                         ->whereIn('partidos.id', $trozo)
+                         ->select('partidos.id', 'partidos.fecha_id', 'partidos.equipol_id', 'partidos.equipov_id',
+                             'partidos.dia', 'fechas.numero', 'fechas.grupo_id')->get() as $r) {
+                $actual[(int) $r->id] = $r;
+            }
+        }
+
+        $cambios = [];
+        foreach ($pids as $pid => $destino) {
+            if (!isset($actual[$pid])) continue;
+            $num = $this->numeroDeJornada($actual[$pid]->numero);
+            if ($num === null || $num === $destino) continue;
+            $cambios[$pid] = $destino;
+        }
+        if (!$cambios) return '';
+
+        // Estado final por grupo y número de fecha: quién juega en cada una.
+        $grupos = [];
+        foreach ($cambios as $pid => $d) $grupos[(int) $actual[$pid]->grupo_id] = true;
+        $fechaDe = [];   // grupo => número => fecha_id
+        $ocupa = [];     // grupo => número => [equipo => partido]
+        foreach (array_keys($grupos) as $g) {
+            foreach (\App\Fecha::where('grupo_id', $g)->get() as $fx) {
+                $n = $this->numeroDeJornada($fx->numero);
+                if ($n === null) continue;
+                $fechaDe[$g][$n] = (int) $fx->id;
+                foreach (DB::table('partidos')->where('fecha_id', $fx->id)->get(['id', 'equipol_id', 'equipov_id']) as $pt) {
+                    if (isset($cambios[(int) $pt->id])) continue;             // se va de acá
+                    $ocupa[$g][$n][(int) $pt->equipol_id] = (int) $pt->id;
+                    $ocupa[$g][$n][(int) $pt->equipov_id] = (int) $pt->id;
+                }
+            }
+        }
+        $ok = []; $chocan = [];
+        foreach ($cambios as $pid => $d) {
+            $r = $actual[$pid]; $g = (int) $r->grupo_id;
+            $l = (int) $r->equipol_id; $v = (int) $r->equipov_id;
+            if (isset($ocupa[$g][$d][$l]) || isset($ocupa[$g][$d][$v])) {
+                $otro = isset($ocupa[$g][$d][$l]) ? $ocupa[$g][$d][$l] : $ocupa[$g][$d][$v];
+                $chocan[$pid] = $otro;
+                continue;
+            }
+            $ocupa[$g][$d][$l] = $pid; $ocupa[$g][$d][$v] = $pid;
+            $ok[$pid] = $d;
+        }
+
+        $html = '';
+        if ($mover && $ok) {
+            $movidos = 0;
+            DB::transaction(function () use ($ok, $actual, &$fechaDe, &$movidos) {
+                $tmp = [];
+                foreach ($ok as $pid => $d) {
+                    $g = (int) $actual[$pid]->grupo_id;
+                    $f = new \App\Fecha();
+                    $f->forceFill(['numero' => '~mv' . $pid, 'grupo_id' => $g, 'orden' => 9999,
+                        'url_nombre' => 'mv-' . $pid])->save();
+                    $tmp[$pid] = (int) $f->id;
+                    DB::table('partidos')->where('id', $pid)->update(['fecha_id' => $f->id]);
+                }
+                foreach ($ok as $pid => $d) {
+                    $g = (int) $actual[$pid]->grupo_id;
+                    if (empty($fechaDe[$g][$d])) {
+                        $f = new \App\Fecha();
+                        $f->forceFill(['numero' => (string) $d, 'grupo_id' => $g,
+                            'orden' => is_numeric($d) ? (int) $d : 999,
+                            'url_nombre' => Str::slug('fecha-' . $d)])->save();
+                        $fechaDe[$g][$d] = (int) $f->id;
+                    }
+                    DB::table('partidos')->where('id', $pid)->update(['fecha_id' => $fechaDe[$g][$d]]);
+                    $movidos++;
+                }
+                \App\Fecha::whereIn('id', array_values($tmp))->delete();
+            });
+            foreach (array_keys($grupos) as $g) $this->recontarEquipos($g);
+            $html .= '<p class="ok-box"><b>Moví ' . $movidos . ' partidos</b> a la fecha que les corresponde según el rearmado.</p>';
+            if (!$chocan) return $html;
+        }
+
+        $filasHtml = '';
+        foreach ($cambios as $pid => $d) {
+            if ($mover && isset($ok[$pid])) continue;
+            $r = $actual[$pid];
+            $filasHtml .= '<tr' . (isset($chocan[$pid]) ? ' class="warn"' : '') . '>'
+                . '<td class="num">' . e(substr((string) $r->dia, 0, 10)) . '</td>'
+                . '<td>' . e($this->nombreEquipo($r->equipol_id) . ' vs ' . $this->nombreEquipo($r->equipov_id)) . '</td>'
+                . '<td class="num">' . e($r->numero) . '</td><td class="num"><b>' . e($d) . '</b></td>'
+                . '<td class="num">#' . (int) $pid . '</td>'
+                . '<td class="sub">' . (isset($chocan[$pid]) ? 'no se mueve: en la ' . e($d) . ' ya juega uno de los dos (#'
+                    . (int) $chocan[$pid] . ')' : '') . '</td></tr>';
+        }
+
+        return $html . '<div class="warn-box"><b>' . (count($cambios) - ($mover ? count($ok) : 0))
+            . ' partidos ya cargados están en otra fecha</b> que la del rearmado.'
+            . (!$mover && $ok ? ' <a class="boton-sec" href="' . e($base . $fuente . '&mover_fechas=1') . '">Mover los '
+                . count($ok) . ' a su fecha</a> <span class="sub">sólo cambia la fecha del partido; lo demás cuelga del partido</span>' : '')
+            . ($chocan ? ' Los marcados no se pueden mover solos: el que ocupa su lugar también está mal o el rearmado se '
+                . 'equivocó ahí; mirálos a mano.' : '')
+            . '<details style="margin-top:6px"><summary>Ver cuáles</summary><div class="scroll"><table><thead><tr>'
+            . '<th>Día</th><th>Partido</th><th>Está en</th><th>Va en</th><th></th><th></th></tr></thead><tbody>'
+            . $filasHtml . '</tbody></table></div></details></div>';
+    }
+
     /** El aviso de jornadas mezcladas, o el resumen del rearmado. */
     private function bloqueRenumerar($renumeradas, array $jornadasMal, $base, $fuente)
     {
@@ -2968,8 +3081,9 @@ class ImportPartidosController extends Controller
 
             return '<div class="' . ($raras ? 'warn-box' : 'ok-box') . '"><b>Jornadas rearmadas por fecha</b>, sin usar '
                 . 'las de Transfermarkt: los partidos jugados juntos (sin más de 2 días de corte) son una jornada, y los '
-                . 'postergados van a la jornada donde no jugó ninguno de sus dos equipos. Los <b>que ya tenés cargados '
-                . 'quedan en su fecha</b>. '
+                . 'postergados van a la jornada donde no jugó ninguno de sus dos equipos. El número de cada jornada sale de '
+                . 'cuántos partidos llevaba jugados cada equipo. Lo que ya tenés cargado no se toca acá: si está en otra '
+                . 'fecha, abajo aparece para moverlo. '
                 . 'Quedaron <b>' . count($renumeradas) . '</b> jornadas'
                 . ($raras ? ', y <b>' . $raras . '</b> no tienen ' . $normal . ' partidos como el resto: ésas son las '
                     . 'que hay que mirar antes de aplicar.' : ', todas de ' . $normal . ' partidos.')
