@@ -2858,10 +2858,37 @@ class ImportPartidosController extends Controller
             foreach ($lv($i) as $e) $ocupado[$k][$e] = true;
         }
 
-        // 2. Cada suelto, a la jornada libre para los dos más cercana en días.
-        $orden = array_keys($sueltos);
-        usort($orden, function ($a, $b) use ($dia) { return strcmp($dia($a), $dia($b)); });
-        foreach ($orden as $i) {
+        // 2. Los sueltos llenan los HUECOS, jornada por jornada en orden. En
+        // cada jornada, entre los sueltos cuyos dos equipos no juegan ahí, va
+        // el primero que se jugó desde unos días antes de esa jornada: un
+        // postergado se juega DESPUÉS de su jornada, nunca mucho antes. Caso
+        // real, Eredivisie 2000/01: Feyenoord–Roosendaal (02/11) y Fortuna–
+        // Utrecht (02/12) son los dos que le faltan a la jornada 3; con «la
+        // jornada libre más cercana en días» terminaban en la 12 y la 15.
+        $pendientes = array_keys($sueltos);
+        $jornadas = array_keys($mediana);
+        sort($jornadas);
+        foreach ($jornadas as $k) {
+            $desde = (isset($esperado[$k]) ? $esperado[$k] : $mediana[$k]) - 3 * 86400;
+            while (true) {
+                $elegido = null;
+                foreach ($pendientes as $i) {
+                    list($l, $v) = $lv($i);
+                    if (!empty($ocupado[$k][$l]) || !empty($ocupado[$k][$v])) continue;
+                    if ($ts($i) < $desde) continue;
+                    if ($elegido === null || $ts($i) < $ts($elegido)) $elegido = $i;
+                }
+                if ($elegido === null) break;
+                $asignado[$elegido] = $k;
+                foreach ($lv($elegido) as $e) $ocupado[$k][$e] = true;
+                $pendientes = array_values(array_diff($pendientes, [$elegido]));
+            }
+        }
+
+        // Los que no entraron en ningún hueco (adelantados, o huecos ya
+        // tomados): a la jornada libre para los dos más cercana en días; si
+        // no hay ninguna, se quedan donde estaban y «Aplicar» los frena.
+        foreach ($pendientes as $i) {
             list($l, $v) = $lv($i);
             $mejor = null; $dist = PHP_INT_MAX;
             foreach ($mediana as $k => $m) {
