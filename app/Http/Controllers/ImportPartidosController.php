@@ -2685,8 +2685,13 @@ class ImportPartidosController extends Controller
                                 ->orWhere('equipol_id', $vId)->orWhere('equipov_id', $vId);
                         })->first();
                     if ($ya) {
-                        $errores[] = 'Ya hay un partido de ' . $this->nombreEquipo($lId) . ' en la fecha ' . $numeroFecha
-                            . ' del grupo ' . $grupos[$gId]->nombre . ' (#' . $ya->id . ').';
+                        // Nombrar al equipo que de verdad choca: antes decía
+                        // siempre el local, y el #partido no lo incluía.
+                        $quien = in_array((int) $ya->equipol_id, [$lId, $vId], true) ? (int) $ya->equipol_id : (int) $ya->equipov_id;
+                        $errores[] = 'No creé ' . $this->nombreEquipo($lId) . ' vs ' . $this->nombreEquipo($vId)
+                            . ': ' . $this->nombreEquipo($quien) . ' ya juega en la fecha ' . $numeroFecha
+                            . ' del grupo ' . $grupos[$gId]->nombre . ' (#' . $ya->id . ', '
+                            . $this->nombreEquipo($ya->equipol_id) . ' vs ' . $this->nombreEquipo($ya->equipov_id) . ').';
                         continue;
                     }
                 }
