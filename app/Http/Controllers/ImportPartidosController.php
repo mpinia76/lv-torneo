@@ -2923,7 +2923,7 @@ class ImportPartidosController extends Controller
         // De todas las cadenas posibles se elige la que menos días corre los
         // partidos que mueve, y como mucho de 6 partidos: una cadena larga
         // desarma jornadas que estaban bien.
-        $partidoEn = function () use (&$asignado, $sinLugar, $lv) {
+        $partidoEn = function () use (&$asignado, &$sinLugar, $lv) {
             $m = [];
             foreach ($asignado as $x => $k) {
                 if (in_array($x, $sinLugar, true)) continue;
@@ -2949,7 +2949,7 @@ class ImportPartidosController extends Controller
                         $cadena = []; $cur = $Y; $lado = $a; $ok = true;
                         while (isset($en[$lado][$cur])) {
                             $x = $en[$lado][$cur];
-                            if (in_array($x, $cadena, true)) break;
+                            if (in_array($x, $cadena, true)) { $ok = false; break; }
                             $cadena[] = $x;
                             list($p, $q) = $lv($x);
                             $cur = $p === $cur ? $q : $p;
@@ -2969,9 +2969,26 @@ class ImportPartidosController extends Controller
             }
             if ($mejor === null) { $quedan[] = $i; continue; }
             list(, $a, $b, $cadena) = $mejor;
+            $antes = $asignado;
             foreach ($cadena as $x) $asignado[$x] = $asignado[$x] === $a ? $b : $a;
             $asignado[$i] = $a;
             $sinLugar = array_values(array_diff($sinLugar, [$i]));
+
+            // Red: si la cadena dejó algún equipo repetido en una jornada, se
+            // deshace y el partido queda sin lugar, a la vista.
+            $visto = []; $roto = false;
+            foreach ($asignado as $x => $k) {
+                if (in_array($x, $sinLugar, true)) continue;
+                foreach ($lv($x) as $e) {
+                    if (isset($visto[$k][$e])) { $roto = true; break 2; }
+                    $visto[$k][$e] = true;
+                }
+            }
+            if ($roto) {
+                $asignado = $antes;
+                $sinLugar[] = $i;
+                $quedan[] = $i;
+            }
         }
 
         foreach ($quedan as $i) {
