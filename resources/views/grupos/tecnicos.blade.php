@@ -1,33 +1,33 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Técnicos')
+@section('pageTitle', __('Técnicos'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-        <h1 class="t-titulo">Técnicos</h1>
+        <h1 class="t-titulo">{{ __('Técnicos') }}</h1>
 
 
                 {{-- Barra de búsqueda --}}
                 <form class="d-flex justify-content-center mb-4">
                     <input type="hidden" name="torneoId" value="{{ $torneo_id }}">
-                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="Buscar técnico"
+                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="{{ __('Buscar técnico') }}"
                            value="{{ request()->get('buscarpor', session('nombre_filtro_jugador')) }}" style="width: 250px;">
-                    <button class="btn btn-success" type="submit">Buscar</button>
+                    <button class="btn btn-success" type="submit">{{ __('Buscar') }}</button>
                 </form>
 
 
         @php
             $columns = [
-                'puntaje' => 'Punt.',
-                'Jugados' => 'J',
-                'Ganados' => 'G',
-                'Empatados' => 'E',
-                'Perdidos' => 'P',
-                'golesl' => 'GF',
-                'golesv' => 'GC',
-                'diferencia' => 'Dif.',
+                'puntaje' => __('Punt.'),
+                'Jugados' => __('J'),
+                'Ganados' => __('G'),
+                'Empatados' => __('E'),
+                'Perdidos' => __('P'),
+                'golesl' => __('GF'),
+                'golesv' => __('GC'),
+                'diferencia' => __('Dif.'),
                 'prom' => '%',
             ];
         @endphp
@@ -36,8 +36,8 @@
             <thead class="table-dark">
             <tr>
                 <th>#</th>
-                <th>Técnico</th>
-                <th>Equipos</th>
+                <th>{{ __('Técnico') }}</th>
+                <th>{{ __('Equipos') }}</th>
                 @foreach($columns as $key => $label)
                     @php
                         $colOrder = ($order == $key) ? ($tipoOrder == 'ASC' ? 'DESC' : 'ASC') : 'ASC';
@@ -59,10 +59,10 @@
                     <td>{{ $i++ }}</td>
                     <td class="d-flex align-items-center gap-2">
                         <a href="{{ route('tecnicos.ver', ['tecnicoId' => $tecnico->tecnico_id]) }}">
-                            <img class="imgCircle" src="{{ url('images/' . ($tecnico->fotoTecnico ?? 'sin_foto_tecnico.png')) }}" width="35" height="35" alt="Foto">
+                            <img class="imgCircle" src="{{ url('images/' . ($tecnico->fotoTecnico ?? 'sin_foto_tecnico.png')) }}" width="35" height="35" alt="{{ __('Foto') }}">
                         </a>
                         {{ $tecnico->tecnico }}
-                        <img src="{{ url('images/' . removeAccents($tecnico->nacionalidadTecnico) . '.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}">
+                        <img src="{{ url('images/' . removeAccents($tecnico->nacionalidadTecnico) . '.gif') }}" alt="{{ trad_dato($tecnico->nacionalidadTecnico) }}">
                     </td>
                     <td>
                         @if($tecnico->escudo)
@@ -72,7 +72,7 @@
                                     <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
                                         <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" title="{{$escudoArr[4]}}" alt="{{$escudoArr[4]}}">
                                     </a>
-                                    Puntaje {{$escudoArr[2] ?? ''}} - Porcentaje {{$escudoArr[3] ?? ''}}
+                                    {{ __('Puntaje :puntaje - Porcentaje :porcentaje', ['puntaje' => $escudoArr[2] ?? '', 'porcentaje' => $escudoArr[3] ?? '']) }}
 
                                     <br>
                                 @endif
@@ -96,11 +96,11 @@
         {{-- Paginación y total --}}
         <div class="d-flex justify-content-between align-items-center mt-3">
             <div>{{ $goleadores->links() }}</div>
-            <div><strong>Total: {{ $goleadores->total() }}</strong></div>
+            <div><strong>{{ __('Total: :total', ['total' => $goleadores->total()]) }}</strong></div>
         </div>
 
         <div class="d-flex mt-3">
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
             </div>
         </div>

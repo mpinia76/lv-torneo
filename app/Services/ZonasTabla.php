@@ -65,9 +65,18 @@ class ZonasTabla
     {
         $clasificaciones = $torneo->clasificaciones->sortBy('id')->values();
 
+        // Una clasificación llamada "Descenso" (cantidad 0) sirve para los
+        // descensos administrativos marcados a mano (Elche 2014/15): va en rojo
+        // y no consume color de copa.
         $claseDe = [];
-        foreach ($clasificaciones as $n => $c) {
+        $n = 0;
+        foreach ($clasificaciones as $c) {
+            if (mb_strtolower(trim($c->nombre)) === 'descenso') {
+                $claseDe[$c->nombre] = 't-desciende';
+                continue;
+            }
             $claseDe[$c->nombre] = isset(self::CLASES[$n]) ? self::CLASES[$n] : 't-zona-4';
+            $n++;
         }
 
         $manuales = EquipoClasificado::where('torneo_id', $torneo->id)
@@ -135,12 +144,18 @@ class ZonasTabla
 
         // Leyenda en el orden de la tabla: copas por id, descenso al final.
         $leyenda = [];
+        $hayDescenso = isset($usadas['Descenso']);
         foreach ($claseDe as $nombre => $clase) {
-            if (isset($usadas[$nombre])) {
-                $leyenda[$nombre] = $clase;
+            if (!isset($usadas[$nombre])) {
+                continue;
             }
+            if ($clase === 't-desciende') {
+                $hayDescenso = true;   // se lista una sola vez, al final
+                continue;
+            }
+            $leyenda[$nombre] = $clase;
         }
-        if (isset($usadas['Descenso'])) {
+        if ($hayDescenso) {
             $leyenda['Descenso'] = 't-desciende';
         }
         return $leyenda;

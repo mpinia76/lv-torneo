@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Títulos')
+@section('pageTitle', __('Títulos'))
 
 @section('content')
 
@@ -12,10 +12,10 @@
         };
 
         $ttColumnas = [
-            'titulos'         => ['rot' => 'Títulos',         'tit' => 'Total de títulos'],
-            'ligas'           => ['rot' => 'Ligas',           'tit' => 'Ligas nacionales'],
-            'copas'           => ['rot' => 'Copas',           'tit' => 'Copas nacionales'],
-            'internacionales' => ['rot' => 'Internacionales', 'tit' => 'Títulos internacionales'],
+            'titulos'         => ['rot' => __('Títulos'),         'tit' => __('Total de títulos')],
+            'ligas'           => ['rot' => __('Ligas'),           'tit' => __('Ligas nacionales')],
+            'copas'           => ['rot' => __('Copas'),           'tit' => __('Copas nacionales')],
+            'internacionales' => ['rot' => __('Internacionales'), 'tit' => __('Títulos internacionales')],
         ];
 
         $ttCols   = count($ttColumnas) + 3; // #, equipo, reparto
@@ -25,8 +25,8 @@
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Equipos</span>
-            <h1>Títulos</h1>
+            <span class="t-eyebrow">{{ __('Equipos') }}</span>
+            <h1>{{ __('Títulos') }}</h1>
         </div>
 
         <form class="t-lista-busqueda" method="GET" action="{{ route('torneos.titulos') }}">
@@ -34,7 +34,7 @@
             <input type="hidden" name="tipoOrder" value="{{ $tipoOrder }}">
             @if($argentinos)<input type="hidden" name="argentinos" value="1">@endif
             <input type="search" name="buscarpor" class="form-control form-control-sm"
-                   placeholder="Buscar equipo" value="{{ $ttBuscar }}">
+                   placeholder="{{ __('Buscar equipo') }}" value="{{ $ttBuscar }}">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-search"></i></button>
         </form>
     </div>
@@ -42,29 +42,29 @@
     <div class="t-kpis">
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['equipos'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Equipos campeones</div>
+            <div class="t-kpi-rot">{{ __('Equipos campeones') }}</div>
         </div>
         <div class="t-kpi t-kpi-acento">
             <div class="t-kpi-num">{{ number_format($kpis['titulos'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Títulos</div>
+            <div class="t-kpi-rot">{{ __('Títulos') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['ligas'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Ligas</div>
+            <div class="t-kpi-rot">{{ __('Ligas') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['copas'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Copas</div>
+            <div class="t-kpi-rot">{{ __('Copas') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['internacionales'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Internacionales</div>
+            <div class="t-kpi-rot">{{ __('Internacionales') }}</div>
         </div>
     </div>
 
     <div class="t-lista-filtros">
         <a class="t-chip {{ $argentinos ? 't-chip-acento' : '' }}" href="{{ $ttLink(['argentinos' => $argentinos ? 0 : 1]) }}">
-            <i class="bi {{ $argentinos ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> Argentinos
+            <i class="bi {{ $argentinos ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> {{ __('Argentinos') }}
         </a>
         @if($ttBuscar)
             <a class="t-chip t-chip-acento" href="{{ $ttLink(['buscarpor' => '']) }}">
@@ -72,9 +72,9 @@
             </a>
         @endif
         <span class="t-lista-ayuda ms-auto">
-            <span class="t-referencia"><i class="t-ref-liga"></i> Ligas</span>
-            <span class="t-referencia"><i class="t-ref-copa"></i> Copas</span>
-            <span class="t-referencia"><i class="t-ref-inter"></i> Internacionales</span>
+            <span class="t-referencia"><i class="t-ref-liga"></i> {{ __('Ligas') }}</span>
+            <span class="t-referencia"><i class="t-ref-copa"></i> {{ __('Copas') }}</span>
+            <span class="t-referencia"><i class="t-ref-inter"></i> {{ __('Internacionales') }}</span>
         </span>
     </div>
 
@@ -84,7 +84,7 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Equipo</th>
+                    <th>{{ __('Equipo') }}</th>
                     @foreach($ttColumnas as $ttKey => $ttCol)
                         <th title="{{ $ttCol['tit'] }}" class="{{ $order == $ttKey ? 't-orden-activo' : '' }}">
                             <a href="{{ $ttLink(['order' => $ttKey, 'tipoOrder' => ($order == $ttKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
@@ -95,7 +95,7 @@
                             </a>
                         </th>
                     @endforeach
-                    <th title="Cómo se reparten los títulos">Reparto</th>
+                    <th title="{{ __('Cómo se reparten los títulos') }}">{{ __('Reparto') }}</th>
                 </tr>
                 </thead>
 
@@ -124,7 +124,7 @@
                         <td>
                             @if($ttTotal > 0)
                                 <span class="t-reparto"
-                                      title="{{ $equipo->ligas }} ligas · {{ $equipo->copas }} copas · {{ $equipo->internacionales }} internacionales">
+                                      title="{{ __(':ligas ligas · :copas copas · :inter internacionales', ['ligas' => $equipo->ligas, 'copas' => $equipo->copas, 'inter' => $equipo->internacionales]) }}">
                                     <i class="l" style="width: {{ round($equipo->ligas * 100 / $ttTotal, 1) }}%"></i>
                                     <i class="c" style="width: {{ round($equipo->copas * 100 / $ttTotal, 1) }}%"></i>
                                     <i class="n" style="width: {{ round($equipo->internacionales * 100 / $ttTotal, 1) }}%"></i>
@@ -135,7 +135,7 @@
                 @empty
                     <tr>
                         <td colspan="{{ $ttCols }}">
-                            <div class="t-vacio"><i class="bi bi-trophy"></i>No hay equipos con esos filtros.</div>
+                            <div class="t-vacio"><i class="bi bi-trophy"></i>{{ __('No hay equipos con esos filtros.') }}</div>
                         </td>
                     </tr>
                 @endforelse
@@ -144,13 +144,13 @@
         </div>
 
         <div class="t-panel-pie">
-            <div>{{ number_format($posiciones->total(), 0, ',', '.') }} equipos</div>
+            <div>{{ trans_choice(':n equipo|:n equipos', $posiciones->total(), ['n' => number_format($posiciones->total(), 0, ',', '.')]) }}</div>
             <div class="ms-auto t-paginacion">{{ $posiciones->appends($ttQuery)->links() }}</div>
         </div>
     </div>
 
     <div class="d-flex mt-3">
-        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver') }}</a>
     </div>
 
 @endsection

@@ -1,12 +1,12 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Títulos')
+@section('pageTitle', __('Títulos'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Títulos</h1>
+                <h1 class="t-titulo">{{ __('Títulos') }}</h1>
         {{-- Info del jugador --}}
         <div class="row mb-4">
             <div class="col-md-3 text-center">
@@ -18,19 +18,19 @@
             </div>
             <div class="col-md-9">
                 <div class="row">
-                    <div class="col-md-3"><dt>Nombre</dt><dd>{{ $jugador->persona->nombre }}</dd></div>
-                    <div class="col-md-3"><dt>Apellido</dt><dd>{{ $jugador->persona->apellido }}</dd></div>
-                    <div class="col-md-3"><dt>Ciudad Nacimiento</dt><dd>{{ $jugador->persona->ciudad }}</dd></div>
+                    <div class="col-md-3"><dt>{{ __('Nombre') }}</dt><dd>{{ $jugador->persona->nombre }}</dd></div>
+                    <div class="col-md-3"><dt>{{ __('Apellido') }}</dt><dd>{{ $jugador->persona->apellido }}</dd></div>
+                    <div class="col-md-3"><dt>{{ __('Ciudad Nacimiento') }}</dt><dd>{{ $jugador->persona->ciudad }}</dd></div>
                     <div class="col-md-3">
-                        <dt>Edad</dt>
+                        <dt>{{ __('Edad') }}</dt>
                         {!! ($jugador->persona->fallecimiento) ? '<img src="'.url('images/death.png').'" height="20">' : '' !!}
                         <dd>{{ ($jugador->persona->nacimiento)?$jugador->persona->getAgeAttribute():'' }}</dd>
                     </div>
                 </div>
                 <div class="row mt-3">
-                    <div class="col-md-3"><dt>Posición</dt><dd>{{ $jugador->tipoJugador }}</dd></div>
-                    <div class="col-md-3"><dt>Altura</dt><dd>{{ $jugador->persona->altura }} m.</dd></div>
-                    <div class="col-md-3"><dt>Peso</dt><dd>{{ $jugador->persona->peso }} kg.</dd></div>
+                    <div class="col-md-3"><dt>{{ __('Posición') }}</dt><dd>{{ trad_dato($jugador->tipoJugador) }}</dd></div>
+                    <div class="col-md-3"><dt>{{ __('Altura') }}</dt><dd>{{ $jugador->persona->altura }} m.</dd></div>
+                    <div class="col-md-3"><dt>{{ __('Peso') }}</dt><dd>{{ $jugador->persona->peso }} kg.</dd></div>
                 </div>
             </div>
         </div>
@@ -43,26 +43,26 @@
         @endif
 
         {{-- Estadísticas Jugador --}}
-        <h1 class="display-6 mb-3">Jugador</h1>
+        <h1 class="display-6 mb-3">{{ __('Jugador') }}</h1>
         <div class="row text-center mb-3">
-            <div class="col-md-3"><dt>Títulos</dt><dd>{{ $titulosJugadorLiga + $titulosJugadorCopa + $titulosJugadorInternacional }}</dd></div>
-            <div class="col-md-3"><dt>Ligas nacionales</dt><dd>{{ $titulosJugadorLiga }}</dd></div>
-            <div class="col-md-3"><dt>Copas nacionales</dt><dd>{{ $titulosJugadorCopa }}</dd></div>
-            <div class="col-md-3"><dt>Internacionales</dt><dd>{{ $titulosJugadorInternacional }}</dd></div>
+            <div class="col-md-3"><dt>{{ __('Títulos') }}</dt><dd>{{ $titulosJugadorLiga + $titulosJugadorCopa + $titulosJugadorInternacional }}</dd></div>
+            <div class="col-md-3"><dt>{{ __('Ligas nacionales') }}</dt><dd>{{ $titulosJugadorLiga }}</dd></div>
+            <div class="col-md-3"><dt>{{ __('Copas nacionales') }}</dt><dd>{{ $titulosJugadorCopa }}</dd></div>
+            <div class="col-md-3"><dt>{{ __('Internacionales') }}</dt><dd>{{ $titulosJugadorInternacional }}</dd></div>
         </div>
 
         <table class="table table-striped align-middle">
             <thead>
             <tr>
                 <th>#</th>
-                <th>Torneo</th>
-                <th>Equipos</th>
-                <th>Jugados</th>
-                <th>Goles</th>
-                <th>Amarillas</th>
-                <th>Rojas</th>
-                <th>Arq. Recibidos</th>
-                <th>Arq. V. Invictas</th>
+                <th>{{ __('Torneo') }}</th>
+                <th>{{ __('Equipos') }}</th>
+                <th>{{ __('Jugados') }}</th>
+                <th>{{ __('Goles') }}</th>
+                <th>{{ __('Amarillas') }}</th>
+                <th>{{ __('Rojas') }}</th>
+                <th>{{ __('Arq. Recibidos') }}</th>
+                <th>{{ __('Arq. V. Invictas') }}</th>
             </tr>
             </thead>
             <tbody>
@@ -100,7 +100,7 @@
                                     <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}" class="me-2">
                                         <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" class="rounded shadow-sm">
                                         @if(isset($escudoArr[2]) && $escudoArr[2] != '')
-                                            <small class="text-muted">Pos: {!! $escudoArr[2] !!}</small>
+                                            <small class="text-muted">{{ __('Pos:') }} {!! $escudoArr[2] !!}</small>
                                         @endif
                                     </a>
                                 @endif
@@ -120,7 +120,7 @@
             <tr class="fw-bold">
                 <td></td>
                 <td></td>
-                <td>Totales</td>
+                <td>{{ __('Totales') }}</td>
                 <td><a href="{{ route('jugadores.jugados',['jugadorId' => $jugador->id]) }}">{{ $totalJugados }}</a></td>
                 <td><a href="{{ route('jugadores.goles',['jugadorId' => $jugador->id]) }}">{{ $totalGoles }} ({{ $totalJugados ? round($totalGoles/$totalJugados,2) : 0 }})</a></td>
                 <td><a href="{{ route('jugadores.tarjetas',['jugadorId' => $jugador->id,'tipo'=>'Amarilla']) }}">{{ $totalAmarillas }} ({{ $totalJugados ? round($totalAmarillas/$totalJugados,2) : 0 }})</a></td>
@@ -133,28 +133,28 @@
 
         {{-- Técnico --}}
         @if(count($torneosTecnico)>0)
-            <h1 class="display-6 mb-3">Técnico</h1>
+            <h1 class="display-6 mb-3">{{ __('Técnico') }}</h1>
             <div class="row text-center mb-3">
-                <div class="col-md-3"><dt>Títulos</dt><dd>{{ $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional }}</dd></div>
-                <div class="col-md-3"><dt>Ligas nacionales</dt><dd>{{ $titulosTecnicoLiga }}</dd></div>
-                <div class="col-md-3"><dt>Copas nacionales</dt><dd>{{ $titulosTecnicoCopa }}</dd></div>
-                <div class="col-md-3"><dt>Internacionales</dt><dd>{{ $titulosTecnicoInternacional }}</dd></div>
+                <div class="col-md-3"><dt>{{ __('Títulos') }}</dt><dd>{{ $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional }}</dd></div>
+                <div class="col-md-3"><dt>{{ __('Ligas nacionales') }}</dt><dd>{{ $titulosTecnicoLiga }}</dd></div>
+                <div class="col-md-3"><dt>{{ __('Copas nacionales') }}</dt><dd>{{ $titulosTecnicoCopa }}</dd></div>
+                <div class="col-md-3"><dt>{{ __('Internacionales') }}</dt><dd>{{ $titulosTecnicoInternacional }}</dd></div>
             </div>
 
             <table class="table table-striped align-middle">
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Torneo</th>
-                    <th>Equipos</th>
-                    <th>Punt.</th>
-                    <th>J</th>
-                    <th>G</th>
-                    <th>E</th>
-                    <th>P</th>
-                    <th>GF</th>
-                    <th>GC</th>
-                    <th>Dif.</th>
+                    <th>{{ __('Torneo') }}</th>
+                    <th>{{ __('Equipos') }}</th>
+                    <th>{{ __('Punt.') }}</th>
+                    <th>{{ __('J') }}</th>
+                    <th>{{ __('G') }}</th>
+                    <th>{{ __('E') }}</th>
+                    <th>{{ __('P') }}</th>
+                    <th>{{ __('GF') }}</th>
+                    <th>{{ __('GC') }}</th>
+                    <th>{{ __('Dif.') }}</th>
                     <th>%</th>
                 </tr>
                 </thead>
@@ -194,7 +194,7 @@
                                         <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}" class="me-2">
                                             <img src="{{ url('images/'.$escudoArr[0]) }}" height="25" class="rounded shadow-sm">
                                             @if(isset($escudoArr[2]) && $escudoArr[2] != '')
-                                                <small class="text-muted">Pos: {!! $escudoArr[2] !!}</small>
+                                                <small class="text-muted">{{ __('Pos:') }} {!! $escudoArr[2] !!}</small>
                                             @endif
                                         </a>
                                     @endif
@@ -217,7 +217,7 @@
                 <tr class="fw-bold">
                     <td></td>
                     <td></td>
-                    <td>Totales</td>
+                    <td>{{ __('Totales') }}</td>
                     <td>
                         @if(isset($torneo->idTecnico))
                             <a href="{{ route('tecnicos.jugados', ['tecnicoId' => $torneo->idTecnico]) }}">
@@ -274,7 +274,7 @@
 
         {{-- Volver --}}
         <div class="d-flex mt-4">
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
     </div>
         </div>

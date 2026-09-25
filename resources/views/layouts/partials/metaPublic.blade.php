@@ -4,6 +4,12 @@
 
 <title>@hasSection('pageTitle')@yield('pageTitle') · @endif{{ config('app.name', 'Torneos') }}</title>
 
+{{-- La misma página en cada idioma, para los buscadores --}}
+@foreach(idiomas_sitio() as $codIdioma => $nomIdioma)
+<link rel="alternate" hreflang="{{ $codIdioma }}" href="{{ url_idioma($codIdioma) }}">
+@endforeach
+<link rel="alternate" hreflang="x-default" href="{{ url_idioma(array_keys(idiomas_sitio())[0]) }}">
+
 {{-- Tema elegido, antes de pintar, para que no parpadee --}}
 <script>
     (function () {
@@ -30,6 +36,6 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
-<link href="{{ asset('css/torneos.css') }}?v=15" rel="stylesheet">
+<link href="{{ asset('css/torneos.css') }}?v=16" rel="stylesheet">
 
 <link rel="shortcut icon" type="image/png" href="{{ url('images/icon_ball.png') }}">

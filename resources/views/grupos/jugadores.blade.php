@@ -1,18 +1,18 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Jugadores')
+@section('pageTitle', __('Jugadores'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-        <h1 class="t-titulo">Jugadores</h1>
+        <h1 class="t-titulo">{{ __('Jugadores') }}</h1>
 
                 <form class="d-flex justify-content-center mb-4">
                     <input type="hidden" name="torneoId" value="{{ $torneo->id }}">
                     <input type="text" name="buscarpor" class="form-control form-control-sm" style="max-width: 200px;"
-                           placeholder="Buscar" value="{{ request('buscarpor', session('nombre_filtro_jugador')) }}">
-                    <button class="btn btn-success" type="submit">Buscar</button>
+                           placeholder="{{ __('Buscar') }}" value="{{ request('buscarpor', session('nombre_filtro_jugador')) }}">
+                    <button class="btn btn-success" type="submit">{{ __('Buscar') }}</button>
                 </form>
 
         <div class="table-responsive">
@@ -20,18 +20,18 @@
                 <thead class="table-dark">
                 <tr>
                     <th>#</th>
-                    <th>Jugador</th>
-                    <th>Equipos</th>
+                    <th>{{ __('Jugador') }}</th>
+                    <th>{{ __('Equipos') }}</th>
                     @php
                         $columns = [
-                            'jugados' => 'Jugados',
-                            'Goles' => 'Goles',
-                            'amarillas' => 'Amarillas',
-                            'rojas' => 'Rojas',
-                            'errados' => 'P. Errados',
-                            'atajos' => 'P. Atajados',
-                            'recibidos' => 'Arq. Recibidos',
-                            'invictas' => 'Arq. V. Invictas',
+                            'jugados' => __('Jugados'),
+                            'Goles' => __('Goles'),
+                            'amarillas' => __('Amarillas'),
+                            'rojas' => __('Rojas'),
+                            'errados' => __('P. Errados'),
+                            'atajos' => __('P. Atajados'),
+                            'recibidos' => __('Arq. Recibidos'),
+                            'invictas' => __('Arq. V. Invictas'),
 
                         ];
                     @endphp
@@ -61,10 +61,10 @@
                         <td>{{ $i++ }}</td>
                         <td class="d-flex align-items-center gap-2">
                             <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->jugador_id]) }}">
-                                <img class="imgCircle" src="{{ url('images/' . ($jugador->foto ?? 'sin_foto.png')) }}" width="35" height="35" alt="Foto">
+                                <img class="imgCircle" src="{{ url('images/' . ($jugador->foto ?? 'sin_foto.png')) }}" width="35" height="35" alt="{{ __('Foto') }}">
                             </a>
                             {{ $jugador->jugador }}
-                            <img src="{{ url('images/' . removeAccents($jugador->nacionalidad) . '.gif') }}" alt="{{ $jugador->nacionalidad }}">
+                            <img src="{{ url('images/' . removeAccents($jugador->nacionalidad) . '.gif') }}" alt="{{ trad_dato($jugador->nacionalidad) }}">
                         </td>
                         <td>
                             @if($jugador->escudo)
@@ -98,11 +98,11 @@
         {{-- Paginación y total --}}
         <div class="d-flex justify-content-between align-items-center mt-3">
             <div>{{ $jugadores->links() }}</div>
-            <div><strong>Total: {{ $jugadores->total() }}</strong></div>
+            <div><strong>{{ __('Total: :total', ['total' => $jugadores->total()]) }}</strong></div>
         </div>
 
         <div class="d-flex mt-2">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success">Volver</a>
+            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
             </div>
         </div>

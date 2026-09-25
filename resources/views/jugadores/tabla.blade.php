@@ -55,47 +55,47 @@
 @endphp
 
 @if(count($torneosJugador) === 0)
-    <div class="t-panel"><div class="t-vacio"><i class="bi bi-clipboard-x"></i>Todavía no hay torneos cargados como jugador.</div></div>
+    <div class="t-panel"><div class="t-vacio"><i class="bi bi-clipboard-x"></i>{{ __('Todavía no hay torneos cargados como jugador.') }}</div></div>
 @else
 
     <div class="t-kpis">
         <div class="t-kpi">
             <div class="t-kpi-num">{{ $fjJugados }}</div>
-            <div class="t-kpi-rot">Partidos</div>
+            <div class="t-kpi-rot">{{ __('Partidos') }}</div>
         </div>
         <div class="t-kpi t-kpi-acento">
             <div class="t-kpi-num">{{ $fjGoles }}</div>
-            <div class="t-kpi-rot">Goles</div>
+            <div class="t-kpi-rot">{{ __('Goles') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ $fjProm }}</div>
-            <div class="t-kpi-rot">Gol/partido</div>
+            <div class="t-kpi-rot">{{ __('Gol/partido') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ count($torneosJugador) }}</div>
-            <div class="t-kpi-rot">Torneos</div>
+            <div class="t-kpi-rot">{{ __('Torneos') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ count($fjEquipos) }}</div>
-            <div class="t-kpi-rot">Equipos</div>
+            <div class="t-kpi-rot">{{ __('Equipos') }}</div>
         </div>
         <div class="t-kpi {{ $fjTitulos > 0 ? 't-kpi-win' : 't-kpi-apagado' }}">
             <div class="t-kpi-num">{{ $fjTitulos }}</div>
-            <div class="t-kpi-rot">Títulos</div>
+            <div class="t-kpi-rot">{{ __('Títulos') }}</div>
         </div>
         @if($fjArco)
             <div class="t-kpi">
                 <div class="t-kpi-num">{{ $fjInvictas }}</div>
-                <div class="t-kpi-rot">Vallas invictas</div>
+                <div class="t-kpi-rot">{{ __('Vallas invictas') }}</div>
             </div>
         @endif
     </div>
 
     @if($fjTitulos > 0)
         <div class="t-kpis-pie">
-            <span>Ligas nacionales <b>{{ $titulosJugadorLiga }}</b></span>
-            <span>Copas nacionales <b>{{ $titulosJugadorCopa }}</b></span>
-            <span>Internacionales <b>{{ $titulosJugadorInternacional }}</b></span>
+            <span>{{ __('Ligas nacionales') }} <b>{{ $titulosJugadorLiga }}</b></span>
+            <span>{{ __('Copas nacionales') }} <b>{{ $titulosJugadorCopa }}</b></span>
+            <span>{{ __('Internacionales') }} <b>{{ $titulosJugadorInternacional }}</b></span>
         </div>
     @endif
 
@@ -105,19 +105,19 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Torneo</th>
-                    <th class="t-izq">Equipos</th>
-                    <th title="Partidos jugados">J</th>
-                    <th title="Goles">Goles</th>
-                    <th title="Tarjetas amarillas">TA</th>
-                    <th title="Tarjetas rojas">TR</th>
+                    <th>{{ __('Torneo') }}</th>
+                    <th class="t-izq">{{ __('Equipos') }}</th>
+                    <th title="{{ __('Partidos jugados') }}">{{ __('J') }}</th>
+                    <th title="{{ __('Goles') }}">{{ __('Goles') }}</th>
+                    <th title="{{ __('Tarjetas amarillas') }}">{{ __('TA') }}</th>
+                    <th title="{{ __('Tarjetas rojas') }}">{{ __('TR') }}</th>
                     @if($fjPenales)
-                        <th title="Penales errados">P. Err.</th>
+                        <th title="{{ __('Penales errados') }}">{{ __('P. Err.') }}</th>
                     @endif
                     @if($fjArco)
-                        <th title="Penales atajados">P. Ataj.</th>
-                        <th title="Goles recibidos">GC</th>
-                        <th title="Vallas invictas">VI</th>
+                        <th title="{{ __('Penales atajados') }}">{{ __('P. Ataj.') }}</th>
+                        <th title="{{ __('Goles recibidos') }}">{{ __('GC') }}</th>
+                        <th title="{{ __('Vallas invictas') }}">{{ __('VI') }}</th>
                     @endif
                 </tr>
                 </thead>
@@ -183,8 +183,8 @@
                 <tfoot>
                 <tr class="t-totales">
                     <td></td>
-                    <td>Totales</td>
-                    <td class="t-izq">{{ count($fjEquipos) }} {{ count($fjEquipos) === 1 ? 'equipo' : 'equipos' }}</td>
+                    <td>{{ __('Totales') }}</td>
+                    <td class="t-izq">{{ trans_choice(':n equipo|:n equipos', count($fjEquipos), ['n' => count($fjEquipos)]) }}</td>
                     <td class="t-pts">{{ $fjJugados }}</td>
                     <td>{{ $fjGoles }} {!! $fjRatio($fjGoles, $fjJugados) !!}</td>
                     <td>{{ $fjAmarillas }}</td>

@@ -339,71 +339,91 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
 });
 
 
-// La raiz sirve el fixture directamente. Antes renderizaba portada.blade.php,
-// que era solo un <script>window.location = '/fixture'</script>: la URL mas
-// importante del sitio devolvia una pagina vacia (mala para buscadores, y un
-// parpadeo en blanco para el visitante).
-Route::get('/', 'FechaController@fixture')->name('home');
-
-// Se conserva la URL vieja para los favoritos, pero ahora redirige de verdad,
-// del lado del servidor, en vez de por JavaScript.
+// ─────────────────────────────────────────────────────────────────────────
+//  Sitio público, en cada idioma de idiomas_sitio() (app/helpers.php)
 //
-// El destino va por route('home') y NO como path literal '/': la app vive bajo
-// /~torneospinia/public, y Route::redirect con '/' resuelve contra la raiz del
-// dominio, que es la pagina por defecto de cPanel. Misma trampa del prefijo de
-// siempre: el destino lo pone route(), nunca una ruta escrita a mano.
-Route::get('portada', function () {
-    return redirect()->route('home');
-})->name('portada');
+//  Las mismas rutas se registran una vez por idioma: primero las de los otros
+//  idiomas con su prefijo (/en/verTorneo…) y al final las de español, sin
+//  prefijo, así las URLs de siempre no cambian. Todas llevan el MISMO nombre:
+//  como gana la última registrada, route('torneos.ver') apunta a la de español
+//  y App\Routing\UrlIdioma le agrega el /en cuando la página está en inglés.
+//  Así ninguna vista tuvo que cambiar sus route() ni sus routeIs().
+// ─────────────────────────────────────────────────────────────────────────
+$rutasPublicas = function () {
+    // La raiz sirve el fixture directamente. Antes renderizaba portada.blade.php,
+    // que era solo un <script>window.location = '/fixture'</script>: la URL mas
+    // importante del sitio devolvia una pagina vacia (mala para buscadores, y un
+    // parpadeo en blanco para el visitante).
+    Route::get('/', 'FechaController@fixture')->name('home');
 
-Route::get('posiciones', 'GrupoController@posiciones')->name('grupos.posiciones');
-Route::get('tablaGoles', 'GrupoController@goleadores')->name('grupos.goleadores');
-Route::get('tablaJugadores', 'GrupoController@jugadores')->name('grupos.jugadores');
-Route::get('tablaTarjetas', 'GrupoController@tarjetas')->name('grupos.tarjetas');
-Route::get('jueces', 'PartidoController@arbitros')->name('partidos.arbitros');
-Route::get('promedios', 'TorneoController@promedios')->name('torneos.promedios');
-Route::get('tecnicos', 'GrupoController@tecnicos')->name('grupos.tecnicos');
-Route::get('verTorneo', 'TorneoController@ver')->name('torneos.ver');
-Route::get('tabla', 'GrupoController@posicionesPublic')->name('grupos.posicionesPublic');
-Route::get('goleadores', 'GrupoController@goleadoresPublic')->name('grupos.goleadoresPublic');
-Route::get('tarjetero', 'GrupoController@tarjetasPublic')->name('grupos.tarjetasPublic');
-Route::get('verFechas', 'FechaController@ver')->name('fechas.ver');
-Route::get('fixture', 'FechaController@fixture')->name('fechas.fixture');
-Route::get('buscar', 'BuscadorController@index')->name('buscar');
+    // Se conserva la URL vieja para los favoritos, pero ahora redirige de verdad,
+    // del lado del servidor, en vez de por JavaScript.
+    //
+    // El destino va por route('home') y NO como path literal '/': la app vive bajo
+    // /~torneospinia/public, y Route::redirect con '/' resuelve contra la raiz del
+    // dominio, que es la pagina por defecto de cPanel. Misma trampa del prefijo de
+    // siempre: el destino lo pone route(), nunca una ruta escrita a mano.
+    Route::get('portada', function () {
+        return redirect()->route('home');
+    })->name('portada');
 
-// Menú «Torneos» por país / región: el desplegable baja el JSON la primera vez
-// que se abre; /competiciones es lo mismo como página común (sin JS, buscadores).
-Route::get('torneos-menu', 'MenuTorneosController@json')->name('torneos.menuJson');
-Route::get('competiciones', 'MenuTorneosController@explorar')->name('torneos.explorar');
-Route::get('verFecha', 'FechaController@showPublic')->name('fechas.showPublic');
-Route::get('detalleFecha', 'FechaController@detalle')->name('fechas.detalle');
-Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');
-Route::get('jugadorJugados', 'JugadorController@jugados')->name('jugadores.jugados');
-Route::get('jugadorGoles', 'JugadorController@goles')->name('jugadores.goles');
-Route::get('jugadorTarjetas', 'JugadorController@tarjetas')->name('jugadores.tarjetas');
-Route::get('jugadorPenals', 'JugadorController@penals')->name('jugadores.penals');
-Route::get('jugadorTitulos', 'JugadorController@titulos')->name('jugadores.titulos');
-Route::get('verEquipo', 'EquipoController@ver')->name('equipos.ver');
-Route::get('equipoJugados', 'EquipoController@jugados')->name('equipos.jugados');
-Route::get('verTecnico', 'TecnicoController@ver')->name('tecnicos.ver');
-Route::get('tecnicoJugados', 'TecnicoController@jugados')->name('tecnicos.jugados');
-Route::get('verArbitro', 'ArbitroController@ver')->name('arbitros.ver');
-Route::get('descensos', 'TorneoController@promediosPublic')->name('torneos.promediosPublic');
-Route::get('acumulado', 'TorneoController@acumulado')->name('torneos.acumulado');
-Route::get('arqueros', 'GrupoController@arqueros')->name('grupos.arqueros');
-Route::get('metodo', 'GrupoController@metodo')->name('grupos.metodo');
-Route::get('plantillas', 'TorneoController@plantillas')->name('torneos.plantillas');
+    Route::get('posiciones', 'GrupoController@posiciones')->name('grupos.posiciones');
+    Route::get('tablaGoles', 'GrupoController@goleadores')->name('grupos.goleadores');
+    Route::get('tablaJugadores', 'GrupoController@jugadores')->name('grupos.jugadores');
+    Route::get('tablaTarjetas', 'GrupoController@tarjetas')->name('grupos.tarjetas');
+    Route::get('jueces', 'PartidoController@arbitros')->name('partidos.arbitros');
+    Route::get('promedios', 'TorneoController@promedios')->name('torneos.promedios');
+    Route::get('tecnicos', 'GrupoController@tecnicos')->name('grupos.tecnicos');
+    Route::get('verTorneo', 'TorneoController@ver')->name('torneos.ver');
+    Route::get('tabla', 'GrupoController@posicionesPublic')->name('grupos.posicionesPublic');
+    Route::get('goleadores', 'GrupoController@goleadoresPublic')->name('grupos.goleadoresPublic');
+    Route::get('tarjetero', 'GrupoController@tarjetasPublic')->name('grupos.tarjetasPublic');
+    Route::get('verFechas', 'FechaController@ver')->name('fechas.ver');
+    Route::get('fixture', 'FechaController@fixture')->name('fechas.fixture');
+    Route::get('buscar', 'BuscadorController@index')->name('buscar');
 
-Route::get('historiales', 'TorneoController@historiales')->name('torneos.historiales');
-Route::get('goleadoresHistorico', 'TorneoController@goleadores')->name('torneos.goleadores');
-Route::get('jugadoresHistorico', 'TorneoController@jugadores')->name('torneos.jugadores');
-Route::get('tarjetasHistorico', 'TorneoController@tarjetas')->name('torneos.tarjetas');
-Route::get('posicionesHistorico', 'TorneoController@posiciones')->name('torneos.posiciones');
-Route::get('otrasEstadisticas', 'TorneoController@estadisticasOtras')->name('torneos.estadisticasOtras');
-Route::get('estadisticasTorneo', 'TorneoController@estadisticasTorneo')->name('torneos.estadisticasTorneo');
-Route::get('tecnicosHistorico', 'TorneoController@tecnicos')->name('torneos.tecnicos');
-Route::get('arquerosHistorico', 'TorneoController@arqueros')->name('torneos.arqueros');
-Route::get('titulosHistorico', 'TorneoController@titulos')->name('torneos.titulos');
+    // Menú «Torneos» por país / región: el desplegable baja el JSON la primera vez
+    // que se abre; /competiciones es lo mismo como página común (sin JS, buscadores).
+    Route::get('torneos-menu', 'MenuTorneosController@json')->name('torneos.menuJson');
+    Route::get('competiciones', 'MenuTorneosController@explorar')->name('torneos.explorar');
+    Route::get('verFecha', 'FechaController@showPublic')->name('fechas.showPublic');
+    Route::get('detalleFecha', 'FechaController@detalle')->name('fechas.detalle');
+    Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');
+    Route::get('jugadorJugados', 'JugadorController@jugados')->name('jugadores.jugados');
+    Route::get('jugadorGoles', 'JugadorController@goles')->name('jugadores.goles');
+    Route::get('jugadorTarjetas', 'JugadorController@tarjetas')->name('jugadores.tarjetas');
+    Route::get('jugadorPenals', 'JugadorController@penals')->name('jugadores.penals');
+    Route::get('jugadorTitulos', 'JugadorController@titulos')->name('jugadores.titulos');
+    Route::get('verEquipo', 'EquipoController@ver')->name('equipos.ver');
+    Route::get('equipoJugados', 'EquipoController@jugados')->name('equipos.jugados');
+    Route::get('verTecnico', 'TecnicoController@ver')->name('tecnicos.ver');
+    Route::get('tecnicoJugados', 'TecnicoController@jugados')->name('tecnicos.jugados');
+    Route::get('verArbitro', 'ArbitroController@ver')->name('arbitros.ver');
+    Route::get('descensos', 'TorneoController@promediosPublic')->name('torneos.promediosPublic');
+    Route::get('acumulado', 'TorneoController@acumulado')->name('torneos.acumulado');
+    Route::get('arqueros', 'GrupoController@arqueros')->name('grupos.arqueros');
+    Route::get('metodo', 'GrupoController@metodo')->name('grupos.metodo');
+    Route::get('plantillas', 'TorneoController@plantillas')->name('torneos.plantillas');
+
+    Route::get('historiales', 'TorneoController@historiales')->name('torneos.historiales');
+    Route::get('goleadoresHistorico', 'TorneoController@goleadores')->name('torneos.goleadores');
+    Route::get('jugadoresHistorico', 'TorneoController@jugadores')->name('torneos.jugadores');
+    Route::get('tarjetasHistorico', 'TorneoController@tarjetas')->name('torneos.tarjetas');
+    Route::get('posicionesHistorico', 'TorneoController@posiciones')->name('torneos.posiciones');
+    Route::get('otrasEstadisticas', 'TorneoController@estadisticasOtras')->name('torneos.estadisticasOtras');
+    Route::get('estadisticasTorneo', 'TorneoController@estadisticasTorneo')->name('torneos.estadisticasTorneo');
+    Route::get('tecnicosHistorico', 'TorneoController@tecnicos')->name('torneos.tecnicos');
+    Route::get('arquerosHistorico', 'TorneoController@arqueros')->name('torneos.arqueros');
+    Route::get('titulosHistorico', 'TorneoController@titulos')->name('torneos.titulos');
+};
+
+foreach (array_reverse(array_keys(idiomas_sitio())) as $idioma) {
+    $esLaDeLaCasa = $idioma === array_keys(idiomas_sitio())[0];
+    Route::group(
+        $esLaDeLaCasa ? ['middleware' => 'idioma:' . $idioma] : ['prefix' => $idioma, 'middleware' => 'idioma:' . $idioma],
+        $rutasPublicas
+    );
+}
 
 
 Route::get('logout', 'Auth\LoginController@logout');

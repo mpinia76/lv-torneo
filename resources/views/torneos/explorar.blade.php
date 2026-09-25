@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', $zonaActual ? 'Torneos de ' . $zonaActual['nombre'] : 'Competiciones')
+@section('pageTitle', $zonaActual ? __('Torneos de :zona', ['zona' => $zonaActual['nombre']]) : __('Competiciones'))
 
 @section('content')
 
@@ -12,14 +12,14 @@
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Competiciones</span>
-            <h1>{{ $zonaActual ? $zonaActual['nombre'] : 'Competiciones' }}</h1>
+            <span class="t-eyebrow">{{ __('Competiciones') }}</span>
+            <h1>{{ $zonaActual ? $zonaActual['nombre'] : __('Competiciones') }}</h1>
         </div>
     </div>
 
     @if(!$zonaActual)
         <div class="t-panel">
-            <div class="t-panel-cuerpo">Todavía no hay torneos cargados.</div>
+            <div class="t-panel-cuerpo">{{ __('Todavía no hay torneos cargados.') }}</div>
         </div>
     @else
         @php
@@ -35,7 +35,7 @@
 
         <div class="t-explorar">
 
-            <nav class="t-panel t-explorar-zonas" aria-label="Países y regiones">
+            <nav class="t-panel t-explorar-zonas" aria-label="{{ __('Países y regiones') }}">
                 @foreach($zonas as $z)
                     @if($z['grupo'] !== $grupoPrevio)
                         @php $grupoPrevio = $z['grupo']; @endphp
@@ -63,13 +63,13 @@
                 @foreach($vigentes as $c)
                     @if($conTitulos && $c['tipo'] !== $tipoPrevio)
                         @php $tipoPrevio = $c['tipo']; @endphp
-                        <div class="t-mega-rot">{{ $c['tipo'] === 'Liga' ? 'Ligas' : 'Copas' }}</div>
+                        <div class="t-mega-rot">{{ $c['tipo'] === 'Liga' ? __('Ligas') : __('Copas') }}</div>
                     @endif
                     @include('torneos._competenciaFila', ['c' => $c])
                 @endforeach
 
                 @if(count($historicas))
-                    <div class="t-mega-rot" style="margin-top: 10px">Torneos que ya no se juegan</div>
+                    <div class="t-mega-rot" style="margin-top: 10px">{{ __('Torneos que ya no se juegan') }}</div>
                     @foreach($historicas as $c)
                         @include('torneos._competenciaFila', ['c' => $c])
                     @endforeach

@@ -12,7 +12,7 @@
                     @php $tit = titulosDesdeCadena($club['titulos'] ?? ''); @endphp
                     <a class="t-lista-club" href="{{ route('equipos.ver', ['equipoId' => $club['id']]) }}">
                         <x-escudo :src="$club['escudo']" :nombre="$club['nombre'] ?? ''"/>
-                        <span class="t-lista-club-nom">{{ $club['nombre'] ?: 'Equipo' }}</span>
+                        <span class="t-lista-club-nom">{{ $club['nombre'] ?: __('Equipo') }}</span>
                         @if(!empty($club['dato']))
                             <span class="t-lista-club-dato">{{ $club['dato'] }}</span>
                         @endif

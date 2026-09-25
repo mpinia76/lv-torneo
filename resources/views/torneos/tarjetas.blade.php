@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Tarjetas')
+@section('pageTitle', __('Tarjetas'))
 
 @section('content')
 
@@ -12,9 +12,9 @@
         };
 
         $tjColumnas = [
-            'amarillas' => ['rot' => 'Amarillas', 'tit' => 'Tarjetas amarillas'],
-            'rojas'     => ['rot' => 'Rojas',     'tit' => 'Tarjetas rojas (incluye doble amarilla)'],
-            'jugados'   => ['rot' => 'PJ',        'tit' => 'Partidos jugados'],
+            'amarillas' => ['rot' => __('Amarillas'), 'tit' => __('Tarjetas amarillas')],
+            'rojas'     => ['rot' => __('Rojas'),     'tit' => __('Tarjetas rojas (incluye doble amarilla)')],
+            'jugados'   => ['rot' => __('PJ'),        'tit' => __('Partidos jugados')],
         ];
 
         $tjCols   = count($tjColumnas) + 5; // #, jugador, prom A, prom R, equipos
@@ -23,8 +23,8 @@
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Protagonistas</span>
-            <h1>Tarjetas</h1>
+            <span class="t-eyebrow">{{ __('Protagonistas') }}</span>
+            <h1>{{ __('Tarjetas') }}</h1>
         </div>
 
         <form class="t-lista-busqueda" method="GET" action="{{ route('torneos.tarjetas') }}">
@@ -32,7 +32,7 @@
             <input type="hidden" name="tipoOrder" value="{{ $tipoOrder }}">
             @if($actuales)<input type="hidden" name="actuales" value="1">@endif
             <input type="search" name="buscarpor" class="form-control form-control-sm"
-                   placeholder="Buscar jugador" value="{{ $tjBuscar }}">
+                   placeholder="{{ __('Buscar jugador') }}" value="{{ $tjBuscar }}">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-search"></i></button>
         </form>
     </div>
@@ -40,28 +40,28 @@
     <div class="t-kpis">
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['total'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Jugadores</div>
+            <div class="t-kpi-rot">{{ __('Jugadores') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num t-num-amarilla">{{ number_format($kpis['amarillas'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Amarillas</div>
+            <div class="t-kpi-rot">{{ __('Amarillas') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num t-num-roja">{{ number_format($kpis['rojas'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Rojas</div>
+            <div class="t-kpi-rot">{{ __('Rojas') }}</div>
         </div>
     </div>
 
     <div class="t-lista-filtros">
         <a class="t-chip {{ $actuales ? 't-chip-acento' : '' }}" href="{{ $tjLink(['actuales' => $actuales ? 0 : 1]) }}">
-            <i class="bi {{ $actuales ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> Jugando
+            <i class="bi {{ $actuales ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> {{ __('Jugando') }}
         </a>
         @if($tjBuscar)
             <a class="t-chip t-chip-acento" href="{{ $tjLink(['buscarpor' => '']) }}">
                 <i class="bi bi-x-lg"></i> “{{ $tjBuscar }}”
             </a>
         @endif
-        <span class="t-lista-ayuda ms-auto"><i class="bi bi-chevron-down"></i> abre el detalle por club</span>
+        <span class="t-lista-ayuda ms-auto"><i class="bi bi-chevron-down"></i> {{ __('abre el detalle por club') }}</span>
     </div>
 
     <div class="t-panel">
@@ -70,7 +70,7 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Jugador</th>
+                    <th>{{ __('Jugador') }}</th>
                     @foreach($tjColumnas as $tjKey => $tjCol)
                         <th title="{{ $tjCol['tit'] }}" class="{{ $order == $tjKey ? 't-orden-activo' : '' }}">
                             <a href="{{ $tjLink(['order' => $tjKey, 'tipoOrder' => ($order == $tjKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
@@ -81,9 +81,9 @@
                             </a>
                         </th>
                     @endforeach
-                    <th title="Amarillas por partido">Prom. A</th>
-                    <th title="Rojas por partido">Prom. R</th>
-                    <th class="t-izq">Equipos</th>
+                    <th title="{{ __('Amarillas por partido') }}">{{ __('Prom. A') }}</th>
+                    <th title="{{ __('Rojas por partido') }}">{{ __('Prom. R') }}</th>
+                    <th class="t-izq">{{ __('Equipos') }}</th>
                 </tr>
                 </thead>
 
@@ -93,8 +93,8 @@
                         $tjClubes = clubesDesdeCadena($jugador->escudo, ['rojas', 'amarillas']);
                         foreach ($tjClubes as $tjIdx => $tjClub) {
                             $tjPartes = [];
-                            if ((int) $tjClub['amarillas'] > 0) { $tjPartes[] = $tjClub['amarillas'].((int) $tjClub['amarillas'] == 1 ? ' amarilla' : ' amarillas'); }
-                            if ((int) $tjClub['rojas'] > 0)     { $tjPartes[] = $tjClub['rojas'].((int) $tjClub['rojas'] == 1 ? ' roja' : ' rojas'); }
+                            if ((int) $tjClub['amarillas'] > 0) { $tjPartes[] = trans_choice(':n amarilla|:n amarillas', (int) $tjClub['amarillas'], ['n' => $tjClub['amarillas']]); }
+                            if ((int) $tjClub['rojas'] > 0)     { $tjPartes[] = trans_choice(':n roja|:n rojas', (int) $tjClub['rojas'], ['n' => $tjClub['rojas']]); }
                             $tjClubes[$tjIdx]['dato'] = implode(' · ', $tjPartes);
                         }
                         $tjActuales = clubesDesdeCadena($jugador->jugando);
@@ -132,7 +132,7 @@
                 @empty
                     <tr>
                         <td colspan="{{ $tjCols }}">
-                            <div class="t-vacio"><i class="bi bi-person-x"></i>No hay jugadores con esos filtros.</div>
+                            <div class="t-vacio"><i class="bi bi-person-x"></i>{{ __('No hay jugadores con esos filtros.') }}</div>
                         </td>
                     </tr>
                 @endforelse
@@ -141,13 +141,13 @@
         </div>
 
         <div class="t-panel-pie">
-            <div>{{ number_format($tarjetas->total(), 0, ',', '.') }} jugadores</div>
+            <div>{{ trans_choice(':n jugador|:n jugadores', $tarjetas->total(), ['n' => number_format($tarjetas->total(), 0, ',', '.')]) }}</div>
             <div class="ms-auto t-paginacion">{{ $tarjetas->appends($tjQuery)->links() }}</div>
         </div>
     </div>
 
     <div class="d-flex mt-3">
-        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver') }}</a>
     </div>
 
 @endsection

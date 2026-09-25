@@ -13,6 +13,17 @@
         try { return localStorage.getItem(clave); } catch (e) { return null; }
     }
 
+    /* Textos en el idioma de la página: window.TRAD lo pone footerPublic con
+       textos_js() (app/helpers.php). Clave = texto en español, como __() en PHP;
+       si falta, queda en español. t('Hay :n', {n: 3}) reemplaza placeholders. */
+    function t(texto, datos) {
+        var s = (window.TRAD && window.TRAD[texto]) || texto;
+        if (datos) {
+            Object.keys(datos).forEach(function (k) { s = s.split(':' + k).join(datos[k]); });
+        }
+        return s;
+    }
+
     /* ---------- tema ---------- */
 
     function temaActual() {
@@ -25,7 +36,7 @@
         var oscuro = temaActual() === 'dark';
         icono.className = oscuro ? 'bi bi-sun' : 'bi bi-moon-stars';
         var boton = icono.closest('button');
-        if (boton) boton.setAttribute('aria-label', oscuro ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro');
+        if (boton) boton.setAttribute('aria-label', oscuro ? t('Cambiar a tema claro') : t('Cambiar a tema oscuro'));
     }
 
     function alternarTema() {
@@ -51,7 +62,7 @@
             var compacto = valor === 'compacto';
             icono.className = compacto ? 'bi bi-arrows-expand' : 'bi bi-arrows-collapse';
             var boton = icono.closest('button');
-            if (boton) boton.title = compacto ? 'Filas cómodas' : 'Filas compactas';
+            if (boton) boton.title = compacto ? t('Filas cómodas') : t('Filas compactas');
         }
     }
 
@@ -164,8 +175,8 @@
                 var lista = document.getElementById('mega-lista');
                 if (!lista) return;
                 lista.innerHTML = '';
-                var aviso = crear('div', 't-mega-aviso', 'No se pudo cargar el menú. ');
-                var enlace = crear('a', '', 'Ver todas las competiciones');
+                var aviso = crear('div', 't-mega-aviso', t('No se pudo cargar el menú. '));
+                var enlace = crear('a', '', t('Ver todas las competiciones'));
                 enlace.href = panel.getAttribute('data-explorar');
                 aviso.appendChild(enlace);
                 lista.appendChild(aviso);
@@ -278,7 +289,7 @@
         if (c.ed.length > MAX_ANIOS) {
             var mas = crear('button', 't-mega-anio t-mega-mas', '+' + (c.ed.length - MAX_ANIOS));
             mas.type = 'button';
-            mas.title = 'Ver todas las temporadas';
+            mas.title = t('Ver todas las temporadas');
             mas.addEventListener('click', function () {
                 var ocultos = anios.querySelectorAll('[hidden]');
                 for (var i = 0; i < ocultos.length; i++) ocultos[i].hidden = false;
@@ -296,7 +307,7 @@
 
         var volver = crear('button', 't-mega-volver');
         volver.type = 'button';
-        volver.setAttribute('aria-label', 'Volver a la lista de países');
+        volver.setAttribute('aria-label', t('Volver a la lista de países'));
         volver.appendChild(crear('i', 'bi bi-chevron-left'));
         volver.addEventListener('click', function () {
             mega.panel.classList.remove('t-mega--detalle');
@@ -307,7 +318,7 @@
         cab.appendChild(crear('span', 't-mega-lista-titulo', titulo));
 
         if (enlace) {
-            var a = crear('a', 't-mega-lista-link', 'Ver página');
+            var a = crear('a', 't-mega-lista-link', t('Ver página'));
             a.href = enlace;
             cab.appendChild(a);
         }
@@ -340,7 +351,7 @@
         vigentes.forEach(function (c) {
             if (hayLigas && hayCopas && c.t !== tipoActual) {
                 tipoActual = c.t;
-                lista.appendChild(crear('div', 't-mega-rot', c.t === 'L' ? 'Ligas' : 'Copas'));
+                lista.appendChild(crear('div', 't-mega-rot', c.t === 'L' ? t('Ligas') : t('Copas')));
             }
             lista.appendChild(filaCompetencia(c));
         });
@@ -351,7 +362,7 @@
             boton.type = 'button';
             boton.setAttribute('aria-expanded', vigentes.length ? 'false' : 'true');
             boton.appendChild(crear('i', 'bi bi-chevron-right'));
-            boton.appendChild(document.createTextNode(' Torneos que ya no se juegan (' + historicas.length + ')'));
+            boton.appendChild(document.createTextNode(' ' + t('Torneos que ya no se juegan (:n)', { n: historicas.length })));
             var cuerpo = crear('div', 't-mega-historicas-cuerpo');
             cuerpo.hidden = vigentes.length > 0;
             historicas.forEach(function (c) { cuerpo.appendChild(filaCompetencia(c)); });
@@ -406,12 +417,12 @@
         var lista = document.getElementById('mega-lista');
         lista.innerHTML = '';
         var titulo = resultados.length
-            ? (resultados.length >= MAX_RESULTADOS ? 'Primeros ' + MAX_RESULTADOS + ' resultados' : resultados.length + (resultados.length === 1 ? ' resultado' : ' resultados'))
-            : 'Sin resultados';
+            ? (resultados.length >= MAX_RESULTADOS ? t('Primeros :n resultados', { n: MAX_RESULTADOS }) : (resultados.length === 1 ? t('1 resultado') : t(':n resultados', { n: resultados.length })))
+            : t('Sin resultados');
         lista.appendChild(cabeceraLista(crear('i', 'bi bi-search'), titulo, null));
 
         if (!resultados.length) {
-            lista.appendChild(crear('div', 't-mega-aviso', 'No hay torneos que coincidan con «' + texto.trim() + '».'));
+            lista.appendChild(crear('div', 't-mega-aviso', t('No hay torneos que coincidan con «:q».', { q: texto.trim() })));
         }
         resultados.forEach(function (r) { lista.appendChild(filaCompetencia(r.c, r.z)); });
 

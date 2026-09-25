@@ -1,11 +1,11 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Detalle Fecha')
+@section('pageTitle', __('Detalle Fecha'))
 
 @section('content')
     @php
         $torneoDet   = $partido->fecha->grupo->torneo;
-        $numeroFecha = is_numeric($partido->fecha->numero) ? 'Fecha ' . $partido->fecha->numero : $partido->fecha->numero;
+        $numeroFecha = is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero);
         $sinJugar    = is_null($partido->golesl) && is_null($partido->golesv);
     @endphp
 
@@ -168,7 +168,7 @@
                         <b>
                             <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">{{ $partido->equipol->nombre }}</a>
                             @if($partido->equipol->bandera_url)
-                                <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" title="{{ $partido->equipol->pais }}">
+                                <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ trad_dato($partido->equipol->pais) }}" title="{{ trad_dato($partido->equipol->pais) }}">
                             @endif
                         </b>
                     @endif
@@ -183,7 +183,7 @@
                         @endif
                     </div>
                     @if($partido->penalesl || $partido->penalesv)
-                        <div class="t-eyebrow mt-2">Penales {{ $partido->penalesl }}–{{ $partido->penalesv }}</div>
+                        <div class="t-eyebrow mt-2">{{ __('Penales') }} {{ $partido->penalesl }}–{{ $partido->penalesv }}</div>
                     @endif
                 </div>
 
@@ -195,7 +195,7 @@
                         <b>
                             <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">{{ $partido->equipov->nombre }}</a>
                             @if($partido->equipov->bandera_url)
-                                <img class="bandera" src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" title="{{ $partido->equipov->pais }}">
+                                <img class="bandera" src="{{ $partido->equipov->bandera_url }}" alt="{{ trad_dato($partido->equipov->pais) }}" title="{{ trad_dato($partido->equipov->pais) }}">
                             @endif
                         </b>
                     @endif
@@ -204,10 +204,10 @@
 
             <div class="t-meta-partido">
                 @if($partido->dia)
-                    <span>Día <b>{{ date('d/m/Y', strtotime($partido->dia)) }}</b></span>
-                    <span>Hora <b>{{ date('H:i', strtotime($partido->dia)) }}</b></span>
+                    <span>{{ __('Día') }} <b>{{ date('d/m/Y', strtotime($partido->dia)) }}</b></span>
+                    <span>{{ __('Hora') }} <b>{{ date('H:i', strtotime($partido->dia)) }}</b></span>
                 @else
-                    <span>Sin fecha confirmada</span>
+                    <span>{{ __('Sin fecha confirmada') }}</span>
                 @endif
                 <span>{{ $torneoDet->nombre }} {{ $torneoDet->year }}</span>
             </div>
@@ -217,32 +217,32 @@
         <ul class="nav nav-tabs justify-content-center mb-3" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="alineaciones-tab" data-bs-toggle="tab" data-bs-target="#alineaciones" type="button" role="tab" aria-controls="alineaciones" aria-selected="true">
-                    Alineaciones
+                    {{ __('Alineaciones') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="goles-tab" data-bs-toggle="tab" data-bs-target="#goles" type="button" role="tab" aria-controls="goles" aria-selected="false">
-                    Goles
+                    {{ __('Goles') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="tarjetas-tab" data-bs-toggle="tab" data-bs-target="#tarjetas" type="button" role="tab" aria-controls="tarjetas" aria-selected="false">
-                    Tarjetas
+                    {{ __('Tarjetas') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="cambios-tab" data-bs-toggle="tab" data-bs-target="#cambios" type="button" role="tab" aria-controls="cambios" aria-selected="false">
-                    Cambios
+                    {{ __('Cambios') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="arbitros-tab" data-bs-toggle="tab" data-bs-target="#arbitros" type="button" role="tab" aria-controls="arbitros" aria-selected="false">
-                    Árbitros
+                    {{ __('Árbitros') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="incidencias-tab" data-bs-toggle="tab" data-bs-target="#incidencias" type="button" role="tab" aria-controls="incidencias" aria-selected="false">
-                    Incidencias
+                    {{ __('Incidencias') }}
                 </button>
             </li>
         </ul>
@@ -256,7 +256,7 @@
                     <tr>
                         <td></td>
                         <td></td>
-                        <td colspan="3" style="font-weight: bold">Titulares</td>
+                        <td colspan="3" style="font-weight: bold">{{ __('Titulares') }}</td>
                     </tr>
 
                     <tr>
@@ -283,7 +283,7 @@
                                         <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                     @endif
                                             </a>
-                                    <span style="font-weight: bold"> {{ $titularl->jugador->persona->full_name}} <img id="original" src="{{ $titularl->jugador->persona->bandera_url }}" alt="{{ $titularl->jugador->persona->nacionalidad }}"></span>
+                                    <span style="font-weight: bold"> {{ $titularl->jugador->persona->full_name}} <img id="original" src="{{ $titularl->jugador->persona->bandera_url }}" alt="{{ trad_dato($titularl->jugador->persona->nacionalidad) }}"></span>
                                     @php
 
 
@@ -336,17 +336,17 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>{{ __('Gol en contra') }}</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de penal') }}</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de tiro libre') }}</title><use href="#ev-tirolibre"/></svg>
                                                     @elseif($g[0]=='Olímpico')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol olímpico') }}</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de cabeza') }}</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol') }}</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -354,11 +354,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                            <svg class="ev ev-atajado" role="img" width="18" height="18"><title>Penal atajado</title><use href="#ev-guante"/></svg>
+                                                            <svg class="ev ev-atajado" role="img" width="18" height="18"><title>{{ __('Penal atajado') }}</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -366,15 +366,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>{{ __('Amarilla') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>Roja</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>{{ __('Roja') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
+                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>{{ __('Doble amarilla') }}</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -385,9 +385,9 @@
                                                 @if (!empty($tieneCambio))
                                                     @foreach($tieneCambio as $t)
                                                         @if($t[0]=='Sale')
-                                                            <svg class="ev ev-sale" role="img" width="18" height="18"><title>Sale</title><use href="#ev-sale"/></svg>
+                                                            <svg class="ev ev-sale" role="img" width="18" height="18"><title>{{ __('Sale') }}</title><use href="#ev-sale"/></svg>
                                                         @else
-                                                            <svg class="ev ev-entra" role="img" width="18" height="18"><title>Entra</title><use href="#ev-entra"/></svg>
+                                                            <svg class="ev ev-entra" role="img" width="18" height="18"><title>{{ __('Entra') }}</title><use href="#ev-entra"/></svg>
                                                         @endif
                                                         {{$t[1]}}'
                                                 @endforeach
@@ -417,7 +417,7 @@
                                                 <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                             @endif
                                             </a>
-                                            <span style="font-weight: bold"> {{ $titularv->jugador->persona->full_name}} <img id="original" src="{{ $titularv->jugador->persona->bandera_url }}" alt="{{ $titularv->jugador->persona->nacionalidad }}"></span>
+                                            <span style="font-weight: bold"> {{ $titularv->jugador->persona->full_name}} <img id="original" src="{{ $titularv->jugador->persona->bandera_url }}" alt="{{ trad_dato($titularv->jugador->persona->nacionalidad) }}"></span>
                                             @php
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
@@ -469,17 +469,17 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>{{ __('Gol en contra') }}</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de penal') }}</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de tiro libre') }}</title><use href="#ev-tirolibre"/></svg>
                                                     @elseif($g[0]=='Olímpico')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol olímpico') }}</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de cabeza') }}</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol') }}</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -487,11 +487,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                        <svg class="ev ev-atajado" role="img" width="18" height="18"><title>Penal atajado</title><use href="#ev-guante"/></svg>
+                                                        <svg class="ev ev-atajado" role="img" width="18" height="18"><title>{{ __('Penal atajado') }}</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -499,15 +499,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>{{ __('Amarilla') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>Roja</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>{{ __('Roja') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
+                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>{{ __('Doble amarilla') }}</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -518,9 +518,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <svg class="ev ev-sale" role="img" width="18" height="18"><title>Sale</title><use href="#ev-sale"/></svg>
+                                                        <svg class="ev ev-sale" role="img" width="18" height="18"><title>{{ __('Sale') }}</title><use href="#ev-sale"/></svg>
                                                     @else
-                                                        <svg class="ev ev-entra" role="img" width="18" height="18"><title>Entra</title><use href="#ev-entra"/></svg>
+                                                        <svg class="ev ev-entra" role="img" width="18" height="18"><title>{{ __('Entra') }}</title><use href="#ev-entra"/></svg>
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -536,7 +536,7 @@
                     <tr>
                         <td></td>
                         <td></td>
-                        <td colspan="3" style="font-weight: bold">Suplentes</td>
+                        <td colspan="3" style="font-weight: bold">{{ __('Suplentes') }}</td>
                     </tr>
 
                     <tr>
@@ -556,7 +556,7 @@
                                                 @else
                                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                                 @endif</a>
-                                            <span style="font-weight: bold"> {{ $suplentel->jugador->persona->full_name}} <img id="original" src="{{ $suplentel->jugador->persona->bandera_url }}" alt="{{ $suplentel->jugador->persona->nacionalidad }}"></span>
+                                            <span style="font-weight: bold"> {{ $suplentel->jugador->persona->full_name}} <img id="original" src="{{ $suplentel->jugador->persona->bandera_url }}" alt="{{ trad_dato($suplentel->jugador->persona->nacionalidad) }}"></span>
                                             @php
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
@@ -606,17 +606,17 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>{{ __('Gol en contra') }}</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de penal') }}</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de tiro libre') }}</title><use href="#ev-tirolibre"/></svg>
                                                     @elseif($g[0]=='Olímpico')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol olímpico') }}</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de cabeza') }}</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol') }}</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -624,11 +624,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                        <svg class="ev ev-atajado" role="img" width="18" height="18"><title>Penal atajado</title><use href="#ev-guante"/></svg>
+                                                        <svg class="ev ev-atajado" role="img" width="18" height="18"><title>{{ __('Penal atajado') }}</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -636,15 +636,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>{{ __('Amarilla') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>Roja</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>{{ __('Roja') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
+                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>{{ __('Doble amarilla') }}</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -655,9 +655,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <svg class="ev ev-sale" role="img" width="18" height="18"><title>Sale</title><use href="#ev-sale"/></svg>
+                                                        <svg class="ev ev-sale" role="img" width="18" height="18"><title>{{ __('Sale') }}</title><use href="#ev-sale"/></svg>
                                                     @else
-                                                        <svg class="ev ev-entra" role="img" width="18" height="18"><title>Entra</title><use href="#ev-entra"/></svg>
+                                                        <svg class="ev ev-entra" role="img" width="18" height="18"><title>{{ __('Entra') }}</title><use href="#ev-entra"/></svg>
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -685,7 +685,7 @@
                                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
                                                 @endif
                                             </a>
-                                            <span style="font-weight: bold"> {{ $suplentev->jugador->persona->full_name}} <img id="original" src="{{ $suplentev->jugador->persona->bandera_url }}" alt="{{ $suplentev->jugador->persona->nacionalidad }}"></span>
+                                            <span style="font-weight: bold"> {{ $suplentev->jugador->persona->full_name}} <img id="original" src="{{ $suplentev->jugador->persona->bandera_url }}" alt="{{ trad_dato($suplentev->jugador->persona->nacionalidad) }}"></span>
                                             @php
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
@@ -735,17 +735,17 @@
                                             @if (!empty($goleador))
                                                 @foreach($goleador as $g)
                                                     @if($g[0]=='En Contra')
-                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>Gol en contra</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-contra" role="img" width="18" height="18"><title>{{ __('Gol en contra') }}</title><use href="#ev-pelota"/></svg>
                                                     @elseif($g[0]=='Penal')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de penal</title><use href="#ev-penal"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de penal') }}</title><use href="#ev-penal"/></svg>
                                                     @elseif($g[0]=='Tiro Libre')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de tiro libre</title><use href="#ev-tirolibre"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de tiro libre') }}</title><use href="#ev-tirolibre"/></svg>
                                                     @elseif($g[0]=='Olímpico')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol olímpico</title><use href="#ev-olimpico"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol olímpico') }}</title><use href="#ev-olimpico"/></svg>
                                                     @elseif($g[0]=='Cabeza')
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol de cabeza</title><use href="#ev-cabeza"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol de cabeza') }}</title><use href="#ev-cabeza"/></svg>
                                                     @else
-                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>Gol</title><use href="#ev-pelota"/></svg>
+                                                        <svg class="ev ev-gol" role="img" width="18" height="18"><title>{{ __('Gol') }}</title><use href="#ev-pelota"/></svg>
                                                     @endif
                                                     {{$g[1]}}'
                                                 @endforeach
@@ -753,11 +753,11 @@
                                             @if (!empty($incPenales))
                                                 @foreach($incPenales as $p)
                                                     @if($p[0]=='Errado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @elseif($p[0]=='Atajado')
-                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>Penal errado</title><use href="#ev-errado"/></svg>
+                                                        <svg class="ev ev-errado" role="img" width="18" height="18"><title>{{ __('Penal errado') }}</title><use href="#ev-errado"/></svg>
                                                     @else
-                                                        <svg class="ev ev-atajado" role="img" width="18" height="18"><title>Penal atajado</title><use href="#ev-guante"/></svg>
+                                                        <svg class="ev ev-atajado" role="img" width="18" height="18"><title>{{ __('Penal atajado') }}</title><use href="#ev-guante"/></svg>
                                                     @endif
                                                     {{$p[1]}}'
                                                 @endforeach
@@ -765,15 +765,15 @@
                                             @if (!empty($tarjetero))
                                                 @foreach($tarjetero as $t)
                                                     @if($t[0]=='Amarilla')
-                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>{{ __('Amarilla') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Roja')
-                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>Roja</title><use href="#ev-tarjeta"/></svg>
+                                                        <svg class="ev ev-roja" role="img" width="18" height="18"><title>{{ __('Roja') }}</title><use href="#ev-tarjeta"/></svg>
 
                                                     @endif
                                                     @if($t[0]=='Doble Amarilla')
-                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
+                                                        <svg class="ev ev-doble" role="img" width="18" height="18"><title>{{ __('Doble amarilla') }}</title><use href="#ev-doble"/></svg>
 
                                                     @endif
 
@@ -784,9 +784,9 @@
                                             @if (!empty($tieneCambio))
                                                 @foreach($tieneCambio as $t)
                                                     @if($t[0]=='Sale')
-                                                        <svg class="ev ev-sale" role="img" width="18" height="18"><title>Sale</title><use href="#ev-sale"/></svg>
+                                                        <svg class="ev ev-sale" role="img" width="18" height="18"><title>{{ __('Sale') }}</title><use href="#ev-sale"/></svg>
                                                     @else
-                                                        <svg class="ev ev-entra" role="img" width="18" height="18"><title>Entra</title><use href="#ev-entra"/></svg>
+                                                        <svg class="ev ev-entra" role="img" width="18" height="18"><title>{{ __('Entra') }}</title><use href="#ev-entra"/></svg>
                                                     @endif
                                                     {{$t[1]}}'
                                                 @endforeach
@@ -801,7 +801,7 @@
                     <tr>
                         <td></td>
                         <td></td>
-                        <td colspan="3" style="font-weight: bold">Técnicos</td>
+                        <td colspan="3" style="font-weight: bold">{{ __('Técnicos') }}</td>
                     </tr>
                     <tr>
                         <td></td>
@@ -818,7 +818,7 @@
                                         @else
                                             <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                         @endif</a>
-                                    <span style="font-weight: bold"> {{ $tecnicol->tecnico->persona->full_name}} <img id="original" src="{{ $tecnicol->tecnico->persona->bandera_url }}" alt="{{ $tecnicol->tecnico->persona->nacionalidad }}"></span>
+                                    <span style="font-weight: bold"> {{ $tecnicol->tecnico->persona->full_name}} <img id="original" src="{{ $tecnicol->tecnico->persona->bandera_url }}" alt="{{ trad_dato($tecnicol->tecnico->persona->nacionalidad) }}"></span>
                                 </td>
                             </tr>
                         @endforeach
@@ -838,7 +838,7 @@
                                         @else
                                             <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
                                         @endif</a>
-                                    <span style="font-weight: bold"> {{ $tecnicov->tecnico->persona->full_name}} <img id="original" src="{{ $tecnicov->tecnico->persona->bandera_url }}" alt="{{ $tecnicov->tecnico->persona->nacionalidad }}"></span>
+                                    <span style="font-weight: bold"> {{ $tecnicov->tecnico->persona->full_name}} <img id="original" src="{{ $tecnicov->tecnico->persona->bandera_url }}" alt="{{ trad_dato($tecnicov->tecnico->persona->nacionalidad) }}"></span>
                                 </td>
                             </tr>
                         @endforeach
@@ -890,7 +890,7 @@
                         }
                         $persona = optional($jugadoresSueltos->get($evento['jugador_id'] ?? null))->persona;
                         $evento['dorsal'] = $evento['dorsal'] ?? '';
-                        $evento['jugador'] = $persona ? $persona->full_name : 'Jugador sin alineacion';
+                        $evento['jugador'] = $persona ? $persona->full_name : __('Jugador sin alineacion');
                         $evento['foto'] = ($persona && $persona->foto) ? $persona->foto : 'sin_foto.png';
                         $evento['escudo'] = null;
                     }
@@ -923,7 +923,7 @@
                                             <img id="original" class="imgCircle" src="{{ url('images/'.$arrGol['foto']) }}" >
 
                                            </a>
-                                    <span style="font-weight: bold"> {{ $arrGol['jugador']}}</span> {{ $arrGol['tipo']}}
+                                    <span style="font-weight: bold"> {{ $arrGol['jugador']}}</span> {{ trad_dato($arrGol['tipo']) }}
                         </div>
 
                         @endforeach
@@ -943,15 +943,15 @@
 
                             {{ \App\Services\MinutoHelper::texto($arrTarjeta['minuto'], $arrTarjeta['adicionado'] ?? null, '') }}'
                             @if( $arrTarjeta['tipo']=='Amarilla')
-                                <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>Amarilla</title><use href="#ev-tarjeta"/></svg>
+                                <svg class="ev ev-amarilla" role="img" width="18" height="18"><title>{{ __('Amarilla') }}</title><use href="#ev-tarjeta"/></svg>
 
                             @endif
                             @if( $arrTarjeta['tipo']=='Roja')
-                                <svg class="ev ev-roja" role="img" width="18" height="18"><title>Roja</title><use href="#ev-tarjeta"/></svg>
+                                <svg class="ev ev-roja" role="img" width="18" height="18"><title>{{ __('Roja') }}</title><use href="#ev-tarjeta"/></svg>
 
                             @endif
                             @if( $arrTarjeta['tipo']=='Doble Amarilla')
-                                <svg class="ev ev-doble" role="img" width="18" height="18"><title>Doble amarilla</title><use href="#ev-doble"/></svg>
+                                <svg class="ev ev-doble" role="img" width="18" height="18"><title>{{ __('Doble amarilla') }}</title><use href="#ev-doble"/></svg>
 
                             @endif
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrTarjeta['jugador_id']))}}" >
@@ -980,9 +980,9 @@
 
                             {{ \App\Services\MinutoHelper::texto($arrCambio['minuto'], $arrCambio['adicionado'] ?? null, '') }}'
                             @if($arrCambio['tipo']=='Sale')
-                                <svg class="ev ev-sale" role="img" width="18" height="18"><title>Sale</title><use href="#ev-sale"/></svg>
+                                <svg class="ev ev-sale" role="img" width="18" height="18"><title>{{ __('Sale') }}</title><use href="#ev-sale"/></svg>
                             @else
-                                <svg class="ev ev-entra" role="img" width="18" height="18"><title>Entra</title><use href="#ev-entra"/></svg>
+                                <svg class="ev ev-entra" role="img" width="18" height="18"><title>{{ __('Entra') }}</title><use href="#ev-entra"/></svg>
                             @endif
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrCambio['jugador_id']))}}" >
 
@@ -1010,7 +1010,7 @@
                                 @else
                                     <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
                                 @endif</a>
-                            <span style="font-weight: bold"> {{ $arbitro->arbitro->persona->full_name}} <img id="original" src="{{ $arbitro->arbitro->persona->bandera_url }}" alt="{{ $arbitro->arbitro->persona->nacionalidad }}"></span> {{ $arbitro->tipo}}
+                            <span style="font-weight: bold"> {{ $arbitro->arbitro->persona->full_name}} <img id="original" src="{{ $arbitro->arbitro->persona->bandera_url }}" alt="{{ trad_dato($arbitro->arbitro->persona->nacionalidad) }}"></span> {{ trad_dato($arbitro->tipo) }}
                         </div>
 
                     @endforeach
@@ -1037,8 +1037,8 @@
                             </a>
                             <span style="font-weight: bold">{{ $arrPenal['jugador'] }}</span>
                             {{
-                                ($arrPenal['tipo'] == 'Errado' || $arrPenal['tipo'] == 'Atajado') ? 'Penal errado' :
-                                ($arrPenal['tipo'] == 'Atajó' ? 'Penal atajado' : $arrPenal['tipo'])
+                                ($arrPenal['tipo'] == 'Errado' || $arrPenal['tipo'] == 'Atajado') ? __('Penal errado') :
+                                ($arrPenal['tipo'] == 'Atajó' ? __('Penal atajado') : trad_dato($arrPenal['tipo']))
                             }}
 
                         </div>
@@ -1065,7 +1065,7 @@
         </div>
 
         <div class="text-center mt-4 mb-5">
-            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
     </div>
 @endsection

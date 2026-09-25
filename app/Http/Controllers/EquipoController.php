@@ -367,8 +367,8 @@ class EquipoController extends Controller
                 $torneo->porcentaje = $jugado->porcentaje;
                 $torneo->posicion = (!empty($posicionTorneo)) ? (
                 ($posicionTorneo->posicion == 1) ?
-                    '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                    (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
+                    '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón') :
+                    (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón') : $posicionTorneo->posicion)
                 ) : '';
                 if ((!empty($posicionTorneo))&&($posicionTorneo->posicion == 1)){
                     $torneosTitulos[]=$torneo;
@@ -409,8 +409,8 @@ class EquipoController extends Controller
 
             // Posición manual no aplica lógica de tabla
             $obj->posicion = ($manual->posicion == 1) ?
-                '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                (($manual->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $manual->posicion);
+                '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón') :
+                (($manual->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón') : $manual->posicion);
 
 
 
@@ -515,7 +515,7 @@ class EquipoController extends Controller
                     $tituloExtra->porcentaje = $jugado->porcentaje;
 
                     // Para títulos extras NO hay posición
-                    $tituloExtra->posicion = '<span class="text-success">Título Extra</span>';
+                    $tituloExtra->posicion = '<span class="text-success">' . __('Título Extra') . '</span>';
 
                     // Agregamos al array final de títulos mostrados
                     $torneosTitulos[] = $tituloExtra;

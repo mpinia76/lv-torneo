@@ -1,30 +1,30 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Tarjetas')
+@section('pageTitle', __('Tarjetas'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-        <h1 class="t-titulo">Tarjetas</h1>
+        <h1 class="t-titulo">{{ __('Tarjetas') }}</h1>
 
 
                 {{-- Barra de búsqueda --}}
                 <form class="d-flex justify-content-center mb-4">
                     <input type="hidden" name="torneoId" value="{{ $torneo->id }}">
-                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="Buscar jugador"
+                    <input type="search" name="buscarpor" class="form-control me-2" placeholder="{{ __('Buscar jugador') }}"
                            value="{{ request()->get('buscarpor', session('nombre_filtro_jugador')) }}" style="width: 250px;">
-                    <button class="btn btn-success" type="submit">Buscar</button>
+                    <button class="btn btn-success" type="submit">{{ __('Buscar') }}</button>
                 </form>
 
 
         @php
             $columns = [
-                'amarillas' => 'Amarillas',
-                'rojas' => 'Rojas',
-                'jugados' => 'Jugados',
-                'prom_amarillas' => 'Prom. A',
-                'prom_rojas' => 'Prom. R',
+                'amarillas' => __('Amarillas'),
+                'rojas' => __('Rojas'),
+                'jugados' => __('Jugados'),
+                'prom_amarillas' => __('Prom. A'),
+                'prom_rojas' => __('Prom. R'),
             ];
         @endphp
 
@@ -32,8 +32,8 @@
             <thead class="table-dark">
             <tr>
                 <th>#</th>
-                <th>Jugador</th>
-                <th>Equipos</th>
+                <th>{{ __('Jugador') }}</th>
+                <th>{{ __('Equipos') }}</th>
                 @foreach($columns as $key => $label)
                     @php
                         $colOrder = ($order == $key) ? ($tipoOrder == 'ASC' ? 'DESC' : 'ASC') : 'ASC';
@@ -55,10 +55,10 @@
                     <td>{{ $i++ }}</td>
                     <td class="d-flex align-items-center gap-2">
                         <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">
-                            <img class="imgCircle" src="{{ url('images/' . ($jugador->foto ?? 'sin_foto.png')) }}" width="35" height="35" alt="Foto">
+                            <img class="imgCircle" src="{{ url('images/' . ($jugador->foto ?? 'sin_foto.png')) }}" width="35" height="35" alt="{{ __('Foto') }}">
                         </a>
                         {{ $jugador->jugador }}
-                        <img src="{{ url('images/' . removeAccents($jugador->nacionalidad) . '.gif') }}" alt="{{ $jugador->nacionalidad }}">
+                        <img src="{{ url('images/' . removeAccents($jugador->nacionalidad) . '.gif') }}" alt="{{ trad_dato($jugador->nacionalidad) }}">
                     </td>
                     <td>
                         @if($jugador->escudo)
@@ -85,11 +85,11 @@
         {{-- Paginación y total --}}
         <div class="d-flex justify-content-between align-items-center mt-3">
             <div>{{ $tarjetas->links() }}</div>
-            <div><strong>Total: {{ $tarjetas->total() }}</strong></div>
+            <div><strong>{{ __('Total: :total', ['total' => $tarjetas->total()]) }}</strong></div>
         </div>
 
         <div class="d-flex mt-3">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
             </div>
         </div>

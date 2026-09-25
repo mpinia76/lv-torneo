@@ -546,9 +546,9 @@ GROUP BY grupos.torneo_id') as $f) {
                 if (isset($posPorTorneo[$tid][$eid]) && isset($alineadoEn[$tid][$eid])) {
                     $posicion = $posPorTorneo[$tid][$eid];
                     if ($posicion == 1) {
-                        $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón';
+                        $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón');
                     } elseif ($posicion == 2) {
-                        $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón';
+                        $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón');
                     } else {
                         $strPosicion = $posicion;
                     }
@@ -617,10 +617,10 @@ GROUP BY grupos.torneo_id') as $f) {
             $strPosicion = '';
 
             if($posicion == 1){
-                $strPosicion = '<img src="'.asset('images/campeon.png').'" height="20"> Campeón';
+                $strPosicion = '<img src="'.asset('images/campeon.png').'" height="20"> ' . __('Campeón');
             }
             elseif($posicion == 2){
-                $strPosicion = '<img src="'.asset('images/subcampeon.png').'" height="20"> Subcampeón';
+                $strPosicion = '<img src="'.asset('images/subcampeon.png').'" height="20"> ' . __('Subcampeón');
             }
             else{
                 $strPosicion = $manual->posicion;
@@ -750,8 +750,8 @@ ORDER BY partidos.dia ASC';
                     if(!empty($partidoTecnico)) {
                         $strPosicion = (!empty($posicionTorneo)) ? (
                         ($posicionTorneo->posicion == 1) ?
-                            '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                            (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
+                            '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón') :
+                            (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón') : $posicionTorneo->posicion)
                         ) : '';
                     }
 
@@ -2690,8 +2690,8 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                     ->first();
                 $strPosicion = '';
                 if ($posicion) {
-                    $strPosicion = $posicion->posicion == 1 ? '<img src="'.asset('images/campeon.png').'" height="20"> Campeón' :
-                        ($posicion->posicion == 2 ? '<img src="'.asset('images/subcampeon.png').'" height="20"> Subcampeón' : $posicion->posicion);
+                    $strPosicion = $posicion->posicion == 1 ? '<img src="'.asset('images/campeon.png').'" height="20"> ' . __('Campeón') :
+                        ($posicion->posicion == 2 ? '<img src="'.asset('images/subcampeon.png').'" height="20"> ' . __('Subcampeón') : $posicion->posicion);
                 }
                 $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
             }
@@ -2816,7 +2816,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
             $tituloExtra->nombreTorneo = $tituloExtra->nombre.' '.$tituloExtra->year;
             $tituloExtra->year = $tituloExtra->year;
-            $tituloExtra->escudo = $tituloExtra->equipo->escudo.'_'.$tituloExtra->equipo_id.'_<img src="'.asset('images/campeon.png').'" height="20"> Campeón_'.$tituloExtra->equipo->nombre.',';
+            $tituloExtra->escudo = $tituloExtra->equipo->escudo.'_'.$tituloExtra->equipo_id.'_<img src="'.asset('images/campeon.png').'" height="20"> ' . __('Campeón') . '_'.$tituloExtra->equipo->nombre.',';
             // -----------------------------
             // COMO TÉCNICO
             // -----------------------------

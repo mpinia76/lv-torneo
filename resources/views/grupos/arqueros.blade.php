@@ -1,20 +1,20 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Arqueros')
+@section('pageTitle', __('Arqueros'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Arqueros</h1>
+                <h1 class="t-titulo">{{ __('Arqueros') }}</h1>
 
                 {{-- Búsqueda --}}
         <form class="d-flex justify-content-center mb-4">
             <input type="hidden" name="torneoId" value="{{ $torneo->id }}">
             <input type="search" name="buscarpor"
                    value="{{ request()->get('buscarpor', session('nombre_filtro_jugador')) }}"
-                   class="form-control me-2" placeholder="Buscar arquero" style="width: 250px;">
-            <button class="btn btn-success" type="submit">Buscar</button>
+                   class="form-control me-2" placeholder="{{ __('Buscar arquero') }}" style="width: 250px;">
+            <button class="btn btn-success" type="submit">{{ __('Buscar') }}</button>
         </form>
 
         @php
@@ -27,11 +27,11 @@
                 <thead class="table-dark text-center">
                 <tr>
                     <th>#</th>
-                    <th>Jugador</th>
-                    <th>Equipos</th>
+                    <th>{{ __('Jugador') }}</th>
+                    <th>{{ __('Equipos') }}</th>
                     <th>
                         <a href="{{ route('grupos.arqueros', ['torneoId' => $torneo->id,'order'=>'jugados','tipoOrder'=>$tipoOrder]) }}" class="text-white text-decoration-none">
-                            Jugados
+                            {{ __('Jugados') }}
                             @if($order=='jugados')
                                 <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
                             @endif
@@ -39,7 +39,7 @@
                     </th>
                     <th>
                         <a href="{{ route('grupos.arqueros', ['torneoId' => $torneo->id,'order'=>'recibidos','tipoOrder'=>$tipoOrder]) }}" class="text-white text-decoration-none">
-                            Goles
+                            {{ __('Goles') }}
                             @if($order=='recibidos')
                                 <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
                             @endif
@@ -47,7 +47,7 @@
                     </th>
                     <th>
                         <a href="{{ route('grupos.arqueros', ['torneoId' => $torneo->id,'order'=>'invictas','tipoOrder'=>$tipoOrder]) }}" class="text-white text-decoration-none">
-                            Vallas invictas
+                            {{ __('Vallas invictas') }}
                             @if($order=='invictas')
                                 <i class="bi {{ $tipoOrder=='ASC' ? 'bi-arrow-up' : 'bi-arrow-down' }}"></i>
                             @endif
@@ -61,10 +61,10 @@
                         <td>{{ $i + 1 }}</td>
                         <td class="d-flex align-items-center gap-2">
                             <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">
-                                <img src="{{ url('images/' . ($jugador->foto ?? 'sin_foto.png')) }}" class="imgCircle" width="35" height="35" alt="Foto">
+                                <img src="{{ url('images/' . ($jugador->foto ?? 'sin_foto.png')) }}" class="imgCircle" width="35" height="35" alt="{{ __('Foto') }}">
                             </a>
                             {{ $jugador->jugador }}
-                            <img src="{{ url('images/' . removeAccents($jugador->nacionalidad) . '.gif') }}" alt="{{ $jugador->nacionalidad }}">
+                            <img src="{{ url('images/' . removeAccents($jugador->nacionalidad) . '.gif') }}" alt="{{ trad_dato($jugador->nacionalidad) }}">
                         </td>
                         <td>
                             @if($jugador->escudo)
@@ -91,12 +91,12 @@
         {{-- Paginación y total --}}
         <div class="d-flex justify-content-between align-items-center mt-3">
             <div>{{ $arqueros->links() }}</div>
-            <div><strong>Total: {{ $arqueros->total() }}</strong></div>
+            <div><strong>{{ __('Total: :total', ['total' => $arqueros->total()]) }}</strong></div>
         </div>
 
         {{-- Botón volver --}}
         <div class="d-flex mt-3">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success">Volver</a>
+            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
             </div>
         </div>

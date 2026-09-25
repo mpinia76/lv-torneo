@@ -1,13 +1,13 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Partidos')
+@section('pageTitle', __('Partidos'))
 
 @section('content')
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Fixture</span>
-            <h1>Partidos</h1>
+            <span class="t-eyebrow">{{ __('Fixture') }}</span>
+            <h1>{{ __('Partidos') }}</h1>
         </div>
     </div>
 
@@ -17,7 +17,7 @@
         <div class="t-panel-cuerpo">
             <form id="formFechas" method="GET" action="" class="t-navdia">
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="actualizarFecha(-1)">
-                    <i class="bi bi-chevron-left"></i> Anterior
+                    <i class="bi bi-chevron-left"></i> {{ __('Anterior') }}
                 </button>
 
                 <input type="date"
@@ -28,7 +28,7 @@
                        onchange="enviarFormulario()">
 
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="actualizarFecha(1)">
-                    Siguiente <i class="bi bi-chevron-right"></i>
+                    {{ __('Siguiente') }} <i class="bi bi-chevron-right"></i>
                 </button>
             </form>
         </div>
@@ -56,7 +56,7 @@
                         @if($partido->fecha->numero)
                             <span class="t-sep">·</span>
                             <span class="t-eyebrow">
-                                {{ is_numeric($partido->fecha->numero) ? 'Fecha ' . $partido->fecha->numero : $partido->fecha->numero }}
+                                {{ is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero) }}
                             </span>
                         @endif
                     </div>
@@ -68,7 +68,7 @@
                 @elseif ($partido->fecha->numero != $lastFecha)
                     <div class="t-subgrupo">
                         <span class="t-eyebrow">
-                            {{ is_numeric($partido->fecha->numero) ? 'Fecha ' . $partido->fecha->numero : $partido->fecha->numero }}
+                            {{ is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero) }}
                         </span>
                     </div>
                     @php $lastFecha = $partido->fecha->numero; @endphp
@@ -82,8 +82,8 @@
                     <div class="t-subgrupo">
                         <span class="t-dia-nombre">
                             {{ $currentDate != 'sin_fecha'
-                                ? strftime('%A %d de %B de %Y', strtotime($currentDate))
-                                : 'Sin fecha confirmada' }}
+                                ? fecha_larga($currentDate)
+                                : __('Sin fecha confirmada') }}
                         </span>
                     </div>
                 @endif
@@ -105,7 +105,7 @@
                         <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">{{ $partido->equipol->nombre }}</a>
                         <x-escudo :src="$partido->equipol->escudo" :nombre="$partido->equipol->nombre"/>
                         @if($partido->equipol->bandera_url)
-                            <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ $partido->equipol->pais }}" title="{{ $partido->equipol->pais }}">
+                            <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ trad_dato($partido->equipol->pais) }}" title="{{ trad_dato($partido->equipol->pais) }}">
                         @endif
                     </span>
 
@@ -115,21 +115,21 @@
                         @else
                             {{ $partido->golesl }}&thinsp;–&thinsp;{{ $partido->golesv }}
                             @if($partido->penalesl || $partido->penalesv)
-                                <small>({{ $partido->penalesl }}–{{ $partido->penalesv }} p)</small>
+                                <small>{{ __('(:local–:visitante p)', ['local' => $partido->penalesl, 'visitante' => $partido->penalesv]) }}</small>
                             @endif
                         @endif
                     </span>
 
                     <span class="t-equipo visita {{ $visitaGana ? 'gana' : '' }}">
                         @if($partido->equipov->bandera_url)
-                            <img class="bandera" src="{{ $partido->equipov->bandera_url }}" alt="{{ $partido->equipov->pais }}" title="{{ $partido->equipov->pais }}">
+                            <img class="bandera" src="{{ $partido->equipov->bandera_url }}" alt="{{ trad_dato($partido->equipov->pais) }}" title="{{ trad_dato($partido->equipov->pais) }}">
                         @endif
                         <x-escudo :src="$partido->equipov->escudo" :nombre="$partido->equipov->nombre"/>
                         <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">{{ $partido->equipov->nombre }}</a>
                     </span>
 
                     <span class="t-estado">
-                        <span class="t-chip">{{ $sinJugar ? 'Programado' : 'Final' }}</span>
+                        <span class="t-chip">{{ $sinJugar ? __('Programado') : __('Final') }}</span>
                         <i class="bi bi-chevron-right t-chevron"></i>
                     </span>
                 </div>
@@ -140,13 +140,13 @@
 
         @if(!$hayPartidos)
             <div class="t-panel-cuerpo text-center" style="padding: 34px 14px">
-                <div class="t-eyebrow">Sin partidos</div>
-                <p class="mb-0 mt-2">No hay partidos cargados para este día. Probá con otra fecha.</p>
+                <div class="t-eyebrow">{{ __('Sin partidos') }}</div>
+                <p class="mb-0 mt-2">{{ __('No hay partidos cargados para este día. Probá con otra fecha.') }}</p>
             </div>
         @endif
 
         <div class="t-panel-pie">
-            <span>Clic en cualquier fila para ver el detalle del partido</span>
+            <span>{{ __('Clic en cualquier fila para ver el detalle del partido') }}</span>
         </div>
     </div>
 

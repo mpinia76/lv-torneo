@@ -1,7 +1,7 @@
 {{-- Pie --}}
 <footer class="t-pie mt-auto">
     <div class="container t-pie-inner">
-        <div>&copy; {{ date('Y') }} Todos los derechos reservados.</div>
+        <div>&copy; {{ date('Y') }} {{ __('Todos los derechos reservados.') }}</div>
         <!--<div>
             <a href="#" class="me-3">Aviso Legal</a>
             <a href="#" class="me-3">Privacidad</a>
@@ -16,7 +16,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
 <script src="{{ asset('ini.js') }}"></script>
 <script src="{{ asset('js/dropdownFilter.js') }}"></script>
-<script src="{{ asset('js/torneos.js') }}?v=7"></script>
+{{-- Textos de torneos.js en el idioma de la página (en español no hace falta) --}}
+<script>window.TRAD = @json(app()->getLocale() === 'es' ? new stdClass : textos_js());</script>
+<script src="{{ asset('js/torneos.js') }}?v=8"></script>
 
 @yield('bottom')
 

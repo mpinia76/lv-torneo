@@ -141,6 +141,117 @@ if (!function_exists('titulosDesdeCadena')) {
         );
         $detalle = preg_replace('/(\p{L})\s+(?=\d)/u', '$1 · ', $detalle);
 
+        // "2 Ligas · 1 Copa" en el idioma de la página (en español no cambia).
+        if (app()->getLocale() !== 'es') {
+            $detalle = preg_replace_callback('/\p{L}+/u', function ($m) {
+                return trad_dato($m[0]);
+            }, $detalle);
+        }
+
         return ['total' => $total, 'detalle' => $detalle];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Idiomas del sitio público (ver App\Http\Middleware\Idioma)
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('idiomas_sitio')) {
+    /**
+     * Idiomas del sitio público. El primero es el de la casa: va sin prefijo
+     * en la URL. Los demás van con /<codigo>/ adelante (/en/verTorneo…).
+     * Para sumar uno: agregarlo acá y crear resources/lang/<codigo>.json.
+     */
+    function idiomas_sitio()
+    {
+        return ['es' => 'Español', 'en' => 'English'];
+    }
+}
+
+if (! function_exists('trad_dato')) {
+    /**
+     * Traduce un valor fijo que viene de la base (país, posición, Liga/Copa…).
+     * Si no está en el archivo del idioma, lo devuelve tal cual. Con null o
+     * vacío no toca nada (__() con '' no es seguro).
+     */
+    function trad_dato($valor)
+    {
+        if ($valor === null || $valor === '') {
+            return $valor;
+        }
+        $clave = (string) $valor;
+        $t = __($clave);
+        return is_string($t) ? $t : $clave;
+    }
+}
+
+if (! function_exists('fecha_larga')) {
+    /** "sábado 5 de octubre de 2024" / "Saturday, 5 October 2024". */
+    function fecha_larga($fecha)
+    {
+        $c = \Carbon\Carbon::parse($fecha)->locale(app()->getLocale());
+        return app()->getLocale() === 'es'
+            ? $c->isoFormat('dddd D [de] MMMM [de] YYYY')
+            : $c->isoFormat('dddd, D MMMM YYYY');
+    }
+}
+
+if (! function_exists('url_idioma')) {
+    /**
+     * La página que se está viendo, en otro idioma: saca o pone el /en del
+     * principio del path y conserva la query string.
+     */
+    function url_idioma($idioma)
+    {
+        $req   = request();
+        $raiz  = rtrim($req->root(), '/');
+        $path  = trim($req->path(), '/');           // sin la base /~torneospinia/public
+        $otros = array_slice(array_keys(idiomas_sitio()), 1);
+
+        $partes = $path === '' ? [] : explode('/', $path);
+        if ($partes && in_array($partes[0], $otros, true)) {
+            array_shift($partes);
+        }
+        if ($idioma !== array_keys(idiomas_sitio())[0]) {
+            array_unshift($partes, $idioma);
+        }
+
+        $url = $raiz . ($partes ? '/' . implode('/', $partes) : '');
+        $qs  = $req->getQueryString();
+        return $qs ? $url . '?' . $qs : $url;
+    }
+}
+
+if (! function_exists('textos_js')) {
+    /**
+     * Textos de public/js/torneos.js traducidos al idioma actual (los usa su
+     * función t()). Al agregar un t('…') nuevo en el JS, sumarlo acá y al .json.
+     */
+    function textos_js()
+    {
+        $claves = [
+            'Cambiar a tema claro',
+            'Cambiar a tema oscuro',
+            'Filas cómodas',
+            'Filas compactas',
+            'No se pudo cargar el menú. ',
+            'Ver todas las competiciones',
+            'Ver todas las temporadas',
+            'Volver a la lista de países',
+            'Ver página',
+            'Ligas',
+            'Copas',
+            'Torneos que ya no se juegan (:n)',
+            'Primeros :n resultados',
+            '1 resultado',
+            ':n resultados',
+            'Sin resultados',
+            'No hay torneos que coincidan con «:q».',
+        ];
+        $salida = [];
+        foreach ($claves as $c) {
+            $salida[$c] = __($c);
+        }
+        return $salida;
     }
 }

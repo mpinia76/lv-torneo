@@ -27,12 +27,12 @@
             <a href="{{ $href }}">{{ $nombre }}</a>
             @if($nacionalidad)
                 <img class="bandera" src="{{ url('images/'.removeAccents($nacionalidad).'.gif') }}"
-                     alt="{{ $nacionalidad }}" title="{{ $nacionalidad }}">
+                     alt="{{ trad_dato($nacionalidad) }}" title="{{ trad_dato($nacionalidad) }}">
             @endif
         </span>
         @if(count($clubes))
             <span class="t-lista-sub">
-                <span class="t-lista-punto"></span> {{ $rot }}
+                <span class="t-lista-punto"></span> {{ trad_dato($rot) }}
                 @foreach($clubes as $club)
                     <a href="{{ route('equipos.ver', ['equipoId' => $club['id']]) }}">
                         <x-escudo :src="$club['escudo']" :nombre="$club['nombre'] ?? ''" tam="sm"/>

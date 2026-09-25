@@ -1,13 +1,13 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Tarjetas')
+@section('pageTitle', __('Tarjetas'))
 
 @section('content')
     <script type="text/javascript" src="{{ asset('js/echarts.min.js') }}"></script>
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Tarjetas</h1>
+                <h1 class="t-titulo">{{ __('Tarjetas') }}</h1>
 
                 <div class="row">
                     <div class="col-xs-12 col-sm-6 col-md-3">
@@ -16,7 +16,7 @@
                         @if($torneo)
                             <div class="mb-3 d-flex align-items-center">
                                 @if($torneo->escudo)
-                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="Escudo {{ $torneo->nombre }}" height="40" class="me-2">
+                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="{{ __('Escudo :nombre', ['nombre' => $torneo->nombre]) }}" height="40" class="me-2">
                                 @endif
                                 <strong>{{ $torneo->getFullNameAttribute() }}</strong>
                             </div>
@@ -26,7 +26,7 @@
                         <div class="mb-3">
                             <img
                                 src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
-                                alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
+                                alt="{{ __('Foto de :nombre', ['nombre' => $jugador->persona->getFullNameAttribute()]) }}"
                                 class="img-fluid rounded shadow-sm"
                                 height="200">
                         </div>
@@ -46,9 +46,9 @@
                             {{-- Cards de tarjetas --}}
                             @php
                                 $opciones = [
-                                    '' => ['label' => 'Todas', 'valorDB' => ''],
-                                    'Rojas' => ['label' => 'Rojas', 'valorDB' => 'Roja'],
-                                    'Amarillas' => ['label' => 'Amarillas', 'valorDB' => 'Amarilla'],
+                                    '' => ['label' => __('Todas'), 'valorDB' => ''],
+                                    'Rojas' => ['label' => __('Rojas'), 'valorDB' => 'Roja'],
+                                    'Amarillas' => ['label' => __('Amarillas'), 'valorDB' => 'Amarilla'],
                                 ];
                             @endphp
 
@@ -96,7 +96,7 @@
                     <div class="row mt-4">
                         <div class="col-md-12">
                             <div class="alert alert-info small mb-0">
-                                ℹ️ Se incluyen <strong>{{ $tarjetasManuales }}</strong> {{ $tarjetasManuales == 1 ? 'tarjeta cargada manualmente' : 'tarjetas cargadas manualmente' }} en los totales. Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.
+                                ℹ️ {!! trans_choice('Se incluyen <strong>:n</strong> tarjeta cargada manualmente en los totales.|Se incluyen <strong>:n</strong> tarjetas cargadas manualmente en los totales.', (int) $tarjetasManuales, ['n' => (int) $tarjetasManuales]) !!} {{ __('Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.') }}
                             </div>
                         </div>
                     </div>
@@ -116,14 +116,14 @@
                         {{-- Paginación y total --}}
                         <div class="d-flex justify-content-between align-items-center mt-3">
                             {{ $partidos->links() }}
-                            <strong>Total: {{ $partidos->total() }}</strong>
+                            <strong>{{ __('Total: :n', ['n' => $partidos->total()]) }}</strong>
                         </div>
                     </div>
                 </div>
 
                 {{-- Botón volver --}}
                 <div class="d-flex mt-3">
-                    <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+                    <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
                 </div>
 
             </div>
@@ -141,20 +141,20 @@
                     orient: 'horizontal',
                     bottom: 0,
                     left: 'center',
-                    data: ['Rojas', 'Amarillas']
+                    data: [@json(__('Rojas')), @json(__('Amarillas'))]
                 },
                 tooltip: {
                     trigger: 'item',
                     formatter: "{b}: {c} ({d}%)"
                 },
                 series: [{
-                    name: 'Tarjetas',
+                    name: @json(__('Tarjetas')),
                     type: 'pie',
                     radius: '70%',
                     center: ['50%', '50%'],
                     data: [
-                        {value: {{ $totalRojas }}, name: 'Rojas'},
-                        {value: {{ $totalAmarillas }}, name: 'Amarillas'}
+                        {value: {{ $totalRojas }}, name: @json(__('Rojas'))},
+                        {value: {{ $totalAmarillas }}, name: @json(__('Amarillas'))}
                     ]
                 }]
             });

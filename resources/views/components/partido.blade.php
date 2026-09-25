@@ -18,7 +18,7 @@
     $torneoEscudo = $val($p, 'escudoTorneo')  ?? optional($torneoRel)->escudo;
     $numero       = $val($p, 'numero')        ?? optional($fechaRel)->numero;
     $numeroTxt    = $numero !== null && $numero !== ''
-                        ? (is_numeric($numero) ? 'Fecha ' . $numero : $numero)
+                        ? (is_numeric($numero) ? __('Fecha :numero', ['numero' => $numero]) : trad_dato($numero))
                         : '';
 
     $equipoL = $val($p, 'equipol');
@@ -89,7 +89,7 @@
         @endif
         <x-escudo :src="$localEscudo" :nombre="$localNombre"/>
         @if($banderaL)
-            <img class="bandera" src="{{ $banderaL }}" alt="{{ $localPais }}" title="{{ $localPais }}">
+            <img class="bandera" src="{{ $banderaL }}" alt="{{ trad_dato($localPais) }}" title="{{ trad_dato($localPais) }}">
         @endif
     </span>
 
@@ -99,14 +99,14 @@
         @else
             {{ $golesl }}&thinsp;–&thinsp;{{ $golesv }}
             @if($penalesl || $penalesv)
-                <small>({{ $penalesl }}–{{ $penalesv }} p)</small>
+                <small>{{ __('(:l–:v p)', ['l' => $penalesl, 'v' => $penalesv]) }}</small>
             @endif
         @endif
     </span>
 
     <span class="t-equipo visita {{ $ganaVisita ? 'gana' : '' }} {{ $destacar && $destacar == $visitaId ? 'propio' : '' }}">
         @if($banderaV)
-            <img class="bandera" src="{{ $banderaV }}" alt="{{ $visitaPais }}" title="{{ $visitaPais }}">
+            <img class="bandera" src="{{ $banderaV }}" alt="{{ trad_dato($visitaPais) }}" title="{{ trad_dato($visitaPais) }}">
         @endif
         <x-escudo :src="$visitaEscudo" :nombre="$visitaNombre"/>
         @if($visitaId)
@@ -118,7 +118,7 @@
 
     <span class="t-estado">
         @if($neutral && $esNeutral)
-            <span class="t-chip">Neutral</span>
+            <span class="t-chip">{{ __('Neutral') }}</span>
         @endif
         {{ $slot }}
         <i class="bi bi-chevron-right t-chevron"></i>

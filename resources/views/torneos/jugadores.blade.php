@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Jugadores')
+@section('pageTitle', __('Jugadores'))
 
 @section('content')
 
@@ -12,15 +12,15 @@
         };
 
         $jgColumnas = [
-            'jugados'   => ['rot' => 'PJ',    'tit' => 'Partidos jugados'],
-            'titulos'   => ['rot' => 'Tít.',  'tit' => 'Títulos ganados'],
-            'Goles'     => ['rot' => 'Goles', 'tit' => 'Goles convertidos'],
-            'amarillas' => ['rot' => 'Amar.', 'tit' => 'Tarjetas amarillas'],
-            'rojas'     => ['rot' => 'Rojas', 'tit' => 'Tarjetas rojas'],
-            'errados'   => ['rot' => 'P. Err.', 'tit' => 'Penales errados'],
-            'atajos'    => ['rot' => 'P. Atj.', 'tit' => 'Penales atajados (arqueros)'],
-            'recibidos' => ['rot' => 'GC',    'tit' => 'Goles recibidos (arqueros)'],
-            'invictas'  => ['rot' => 'Inv.',  'tit' => 'Vallas invictas (arqueros)'],
+            'jugados'   => ['rot' => __('PJ'),    'tit' => __('Partidos jugados')],
+            'titulos'   => ['rot' => __('Tít.'),  'tit' => __('Títulos ganados')],
+            'Goles'     => ['rot' => __('Goles'), 'tit' => __('Goles convertidos')],
+            'amarillas' => ['rot' => __('Amar.'), 'tit' => __('Tarjetas amarillas')],
+            'rojas'     => ['rot' => __('Rojas'), 'tit' => __('Tarjetas rojas')],
+            'errados'   => ['rot' => __('P. Err.'), 'tit' => __('Penales errados')],
+            'atajos'    => ['rot' => __('P. Atj.'), 'tit' => __('Penales atajados (arqueros)')],
+            'recibidos' => ['rot' => __('GC'),    'tit' => __('Goles recibidos (arqueros)')],
+            'invictas'  => ['rot' => __('Inv.'),  'tit' => __('Vallas invictas (arqueros)')],
         ];
 
         $jgCols   = count($jgColumnas) + 3; // #, jugador, equipos
@@ -30,8 +30,8 @@
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Protagonistas</span>
-            <h1>Jugadores</h1>
+            <span class="t-eyebrow">{{ __('Protagonistas') }}</span>
+            <h1>{{ __('Jugadores') }}</h1>
         </div>
 
         <form class="t-lista-busqueda" method="GET" action="{{ route('torneos.jugadores') }}">
@@ -39,7 +39,7 @@
             <input type="hidden" name="tipoOrder" value="{{ $tipoOrder }}">
             @if($actuales)<input type="hidden" name="actuales" value="1">@endif
             <input type="search" name="buscarpor" class="form-control form-control-sm"
-                   placeholder="Buscar jugador" value="{{ $jgBuscar }}">
+                   placeholder="{{ __('Buscar jugador') }}" value="{{ $jgBuscar }}">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-search"></i></button>
         </form>
     </div>
@@ -47,32 +47,32 @@
     <div class="t-kpis">
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['total'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Jugadores</div>
+            <div class="t-kpi-rot">{{ __('Jugadores') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['jugados'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Partidos jugados</div>
+            <div class="t-kpi-rot">{{ __('Partidos jugados') }}</div>
         </div>
         <div class="t-kpi t-kpi-acento">
             <div class="t-kpi-num">{{ number_format($kpis['goles'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Goles</div>
+            <div class="t-kpi-rot">{{ __('Goles') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['titulos'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Títulos</div>
+            <div class="t-kpi-rot">{{ __('Títulos') }}</div>
         </div>
     </div>
 
     <div class="t-lista-filtros">
         <a class="t-chip {{ $actuales ? 't-chip-acento' : '' }}" href="{{ $jgLink(['actuales' => $actuales ? 0 : 1]) }}">
-            <i class="bi {{ $actuales ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> Jugando
+            <i class="bi {{ $actuales ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> {{ __('Jugando') }}
         </a>
         @if($jgBuscar)
             <a class="t-chip t-chip-acento" href="{{ $jgLink(['buscarpor' => '']) }}">
                 <i class="bi bi-x-lg"></i> “{{ $jgBuscar }}”
             </a>
         @endif
-        <span class="t-lista-ayuda ms-auto"><i class="bi bi-chevron-down"></i> abre el detalle por club</span>
+        <span class="t-lista-ayuda ms-auto"><i class="bi bi-chevron-down"></i> {{ __('abre el detalle por club') }}</span>
     </div>
 
     <div class="t-panel">
@@ -81,7 +81,7 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Jugador</th>
+                    <th>{{ __('Jugador') }}</th>
                     @foreach($jgColumnas as $jgKey => $jgCol)
                         <th title="{{ $jgCol['tit'] }}" class="{{ $order == $jgKey ? 't-orden-activo' : '' }}">
                             <a href="{{ $jgLink(['order' => $jgKey, 'tipoOrder' => ($order == $jgKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
@@ -92,7 +92,7 @@
                             </a>
                         </th>
                     @endforeach
-                    <th class="t-izq">Equipos</th>
+                    <th class="t-izq">{{ __('Equipos') }}</th>
                 </tr>
                 </thead>
 
@@ -139,7 +139,7 @@
                 @empty
                     <tr>
                         <td colspan="{{ $jgCols }}">
-                            <div class="t-vacio"><i class="bi bi-person-x"></i>No hay jugadores con esos filtros.</div>
+                            <div class="t-vacio"><i class="bi bi-person-x"></i>{{ __('No hay jugadores con esos filtros.') }}</div>
                         </td>
                     </tr>
                 @endforelse
@@ -148,13 +148,13 @@
         </div>
 
         <div class="t-panel-pie">
-            <div>{{ number_format($jugadores->total(), 0, ',', '.') }} jugadores</div>
+            <div>{{ trans_choice(':n jugador|:n jugadores', $jugadores->total(), ['n' => number_format($jugadores->total(), 0, ',', '.')]) }}</div>
             <div class="ms-auto t-paginacion">{{ $jugadores->appends($jgQuery)->links() }}</div>
         </div>
     </div>
 
     <div class="d-flex mt-3">
-        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver') }}</a>
     </div>
 
 @endsection

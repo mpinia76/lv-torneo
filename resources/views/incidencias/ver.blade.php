@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Ver arbitro')
+@section('pageTitle', __('Ver arbitro'))
 
 @section('content')
     <div class="container">
@@ -8,16 +8,16 @@
 
         <div class="row">
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
-                <dt>Nombre</dt>
+                <dt>{{ __('Nombre') }}</dt>
                 <dd>{{$arbitro->persona->nombre}}</dd>
             </div>
 
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
-                <dt>Apellido</dt>
+                <dt>{{ __('Apellido') }}</dt>
                 <dd>{{$arbitro->persona->apellido}}</dd>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-4">
-                <dt>Ciudad Nacimiento</dt>
+                <dt>{{ __('Ciudad Nacimiento') }}</dt>
                 <dd>{{$arbitro->persona->ciudad}}</dd>
 
             </div>
@@ -27,7 +27,7 @@
         <div class="row">
 
             <div class="form-group col-xs-12 col-sm-6 col-md-3">
-                <dt>Edad</dt>
+                <dt>{{ __('Edad') }}</dt>
                 {!! ($arbitro->persona->fallecimiento)?'<img id="original" src="'.url('images/death.png').'">':'' !!}
                 <dd>{{($arbitro->persona->nacimiento)?$arbitro->persona->getAgeAttribute():''}}</dd>
 
@@ -63,7 +63,7 @@
 
         <div class="d-flex">
 
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
     </div>
 

@@ -15,7 +15,7 @@
         @endforeach
 
         <button type="button" class="t-lista-mas" data-lista-abre="{{ $id }}"
-                aria-expanded="false" aria-controls="{{ $id }}" title="Ver el detalle por club">
+                aria-expanded="false" aria-controls="{{ $id }}" title="{{ __('Ver el detalle por club') }}">
             @if(count($clubes) > $max)
                 +{{ count($clubes) - $max }}
             @else

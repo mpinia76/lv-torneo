@@ -1,13 +1,13 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Partidos jugados')
+@section('pageTitle', __('Partidos jugados'))
 
 @section('content')
     <script type="text/javascript" src="{{ asset('js/echarts.min.js') }}"></script>
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Jugados</h1>
+                <h1 class="t-titulo">{{ __('Jugados') }}</h1>
 
                 <div class="row">
                     <div class="col-xs-12 col-sm-6 col-md-3">
@@ -16,7 +16,7 @@
                         @if($torneo)
                             <div class="mb-3 d-flex align-items-center">
                                 @if($torneo->escudo)
-                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="Escudo {{ $torneo->nombre }}" height="40" class="me-2">
+                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="{{ __('Escudo :nombre', ['nombre' => $torneo->nombre]) }}" height="40" class="me-2">
                                 @endif
                                 <strong>{{ $torneo->getFullNameAttribute() }}</strong>
                             </div>
@@ -26,7 +26,7 @@
                         <div class="mb-3">
                             <img
                                 src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
-                                alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
+                                alt="{{ __('Foto de :nombre', ['nombre' => $jugador->persona->getFullNameAttribute()]) }}"
                                 class="img-fluid rounded shadow-sm"
                                 height="200">
                         </div>
@@ -46,10 +46,10 @@
                             {{-- Cards de Jugados/Ganados/Empatados/Perdidos --}}
                             @php
                                 $opciones = [
-                                        '' => ['label' => 'Jugados', 'total' => $totalJugados + ($totalManuales ?? 0)],
-                                        'Ganados' => ['label' => 'Ganados', 'total' => $totalGanados],
-                                        'Empatados' => ['label' => 'Empatados', 'total' => $totalEmpatados],
-                                        'Perdidos' => ['label' => 'Perdidos', 'total' => $totalPerdidos],
+                                        '' => ['label' => __('Jugados'), 'total' => $totalJugados + ($totalManuales ?? 0)],
+                                        'Ganados' => ['label' => __('Ganados'), 'total' => $totalGanados],
+                                        'Empatados' => ['label' => __('Empatados'), 'total' => $totalEmpatados],
+                                        'Perdidos' => ['label' => __('Perdidos'), 'total' => $totalPerdidos],
                                     ];
                             @endphp
 
@@ -85,8 +85,7 @@
                                 <div class="row mt-2">
                                     <div class="col-12 text-center">
                                         <small class="text-muted">
-                                            Incluye {{ $totalManuales }} partidos cargados manualmente sin detalle de resultado,
-                                            no representados en el gráfico ni en la tabla.
+                                            {{ trans_choice('Incluye :n partido cargado manualmente sin detalle de resultado, no representado en el gráfico ni en la tabla.|Incluye :n partidos cargados manualmente sin detalle de resultado, no representados en el gráfico ni en la tabla.', (int) $totalManuales, ['n' => $totalManuales]) }}
                                         </small>
                                     </div>
                                 </div>
@@ -110,7 +109,7 @@
                                 {{ $partidos->links() }}
                             </div>
                             <div class="col-md-3 text-end">
-                                <strong>Total: {{ $partidos->total() }}</strong>
+                                <strong>{{ __('Total: :n', ['n' => $partidos->total()]) }}</strong>
                             </div>
                         </div>
                     </div>
@@ -118,7 +117,7 @@
 
                 {{-- Botón volver --}}
                 <div class="d-flex mt-3">
-                    <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+                    <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
                 </div>
             </div>
         </div>
@@ -135,21 +134,21 @@
                     orient: 'horizontal',
                     bottom: 0,
                     left: 'center',
-                    data: ['Ganados', 'Empatados', 'Perdidos']
+                    data: [@json(__('Ganados')), @json(__('Empatados')), @json(__('Perdidos'))]
                 },
                 tooltip: {
                     trigger: 'item',
                     formatter: "{b}: {c} ({d}%)"
                 },
                 series: [{
-                    name: 'Partidos',
+                    name: @json(__('Partidos')),
                     type: 'pie',
                     radius: '70%',
                     center: ['50%', '50%'],
                     data: [
-                        {value: {{ $totalGanados }}, name: 'Ganados'},
-                        {value: {{ $totalEmpatados }}, name: 'Empatados'},
-                        {value: {{ $totalPerdidos }}, name: 'Perdidos'}
+                        {value: {{ $totalGanados }}, name: @json(__('Ganados'))},
+                        {value: {{ $totalEmpatados }}, name: @json(__('Empatados'))},
+                        {value: {{ $totalPerdidos }}, name: @json(__('Perdidos'))}
                     ]
                 }]
             });

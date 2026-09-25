@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Promedios')
+@section('pageTitle', __('Promedios'))
 
 @section('content')
 
@@ -19,7 +19,7 @@
                 <x-escudo :src="$torneo->escudo" :nombre="$torneo->nombre" tam="sm"/>
                 {{ $torneo->nombre }} {{ $torneo->year }}
             </span>
-            <h1>Promedios</h1>
+            <h1>{{ __('Promedios') }}</h1>
         </div>
     </div>
 
@@ -29,10 +29,10 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Equipo</th>
+                    <th>{{ __('Equipo') }}</th>
                     <th>Pts</th>
-                    <th>PJ</th>
-                    <th>Promedio</th>
+                    <th>{{ __('PJ') }}</th>
+                    <th>{{ __('Promedio') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -44,7 +44,7 @@
                                 <x-escudo :src="$equipo->foto" :nombre="$equipo->equipo"/>
                                 <a href="{{ route('equipos.ver', ['equipoId' => $equipo->equipo_id]) }}">{{ $equipo->equipo }}</a>
                                 @if($equipo->pais)
-                                    <img class="bandera" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}" title="{{ $equipo->pais }}">
+                                    <img class="bandera" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ trad_dato($equipo->pais) }}" title="{{ trad_dato($equipo->pais) }}">
                                 @endif
                             </span>
                         </td>
@@ -61,14 +61,14 @@
         @if($descienden > 0)
             <div class="t-panel-pie">
                 <span class="t-referencia"><i style="background: var(--t-loss)"></i>
-                    {{ $descienden == 1 ? 'Desciende por promedio' : 'Descienden por promedio (' . $descienden . ')' }}
+                    {{ $descienden == 1 ? __('Desciende por promedio') : __('Descienden por promedio (:n)', ['n' => $descienden]) }}
                 </span>
             </div>
         @endif
     </div>
 
     <div class="d-flex mt-3">
-        <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-outline-secondary btn-sm">Volver al torneo</a>
+        <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver al torneo') }}</a>
     </div>
 
 @endsection

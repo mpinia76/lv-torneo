@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Posiciones')
+@section('pageTitle', __('Posiciones'))
 
 @section('content')
 
@@ -10,7 +10,7 @@
                 <x-escudo :src="$torneo->escudo" :nombre="$torneo->nombre" tam="sm"/>
                 {{ $torneo->nombre }} {{ $torneo->year }}
             </span>
-            <h1>Tabla de posiciones</h1>
+            <h1>{{ __('Tabla de posiciones') }}</h1>
         </div>
     </div>
 
@@ -24,7 +24,7 @@
         <div class="t-panel">
             @if(count($arrPosiciones) > 1)
                 <div class="t-grupo">
-                    <span class="t-grupo-nombre">Grupo {{ $nombre }}</span>
+                    <span class="t-grupo-nombre">{{ __('Grupo :nombre', ['nombre' => $nombre]) }}</span>
                 </div>
             @endif
 
@@ -33,15 +33,15 @@
                     <thead>
                     <tr>
                         <th>#</th>
-                        <th>Equipo</th>
-                        <th>Pts</th>
-                        <th>PJ</th>
-                        <th>G</th>
-                        <th>E</th>
-                        <th>P</th>
-                        <th>GF</th>
-                        <th>GC</th>
-                        <th>Dif</th>
+                        <th>{{ __('Equipo') }}</th>
+                        <th>{{ __('Pts') }}</th>
+                        <th>{{ __('PJ') }}</th>
+                        <th>{{ __('G') }}</th>
+                        <th>{{ __('E') }}</th>
+                        <th>{{ __('P') }}</th>
+                        <th>{{ __('GF') }}</th>
+                        <th>{{ __('GC') }}</th>
+                        <th>{{ __('Dif') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -53,14 +53,14 @@
                                 $claseFila = $i <= $numClasificados ? 't-clasifica' : '';
                             }
                         @endphp
-                        <tr class="{{ $claseFila }}" @if(!empty($leyendaZonas) && !empty($equipo->zona)) title="{{ $equipo->zona }}" @endif>
+                        <tr class="{{ $claseFila }}" @if(!empty($leyendaZonas) && !empty($equipo->zona)) title="{{ trad_dato($equipo->zona) }}" @endif>
                             <td class="t-pos">{{ $i }}</td>
                             <td>
                                 <span class="t-nombre">
                                     <x-escudo :src="$equipo->foto" :nombre="$equipo->equipo"/>
                                     <a href="{{ route('equipos.ver', ['equipoId' => $equipo->equipo_id]) }}">{{ $equipo->equipo }}</a>
                                     @if($equipo->pais)
-                                        <img class="bandera" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}" title="{{ $equipo->pais }}">
+                                        <img class="bandera" src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ trad_dato($equipo->pais) }}" title="{{ trad_dato($equipo->pais) }}">
                                     @endif
                                 </span>
                             </td>
@@ -82,12 +82,12 @@
             @if(!empty($leyendaZonas))
                 <div class="t-panel-pie">
                     @foreach($leyendaZonas as $zonaNombre => $zonaClase)
-                        <span class="t-referencia {{ $zonaClase }}"><i></i> {{ $zonaNombre }}</span>
+                        <span class="t-referencia {{ $zonaClase }}"><i></i> {{ trad_dato($zonaNombre) }}</span>
                     @endforeach
                 </div>
             @elseif($numClasificados)
                 <div class="t-panel-pie">
-                    <span class="t-referencia"><i style="background: var(--t-win)"></i> Clasifica</span>
+                    <span class="t-referencia"><i style="background: var(--t-win)"></i> {{ __('Clasifica') }}</span>
                 </div>
             @endif
         </div>
@@ -95,7 +95,7 @@
 
     @if($incidencias->isNotEmpty())
         <div class="t-panel">
-            <div class="t-grupo"><span class="t-grupo-nombre">Incidencias del torneo</span></div>
+            <div class="t-grupo"><span class="t-grupo-nombre">{{ __('Incidencias del torneo') }}</span></div>
             <div class="t-panel-cuerpo">
                 <ul class="mb-0 ps-3">
                     @foreach($incidencias as $incidencia)
@@ -107,7 +107,7 @@
     @endif
 
     <div class="d-flex mt-3">
-        <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-outline-secondary btn-sm">Volver al torneo</a>
+        <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver al torneo') }}</a>
     </div>
 
 @endsection

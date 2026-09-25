@@ -1,19 +1,19 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Goleadores')
+@section('pageTitle', __('Goleadores'))
 
 @section('content')
 
     @php
         $columns = [
-            'goles'      => 'Goles',
-            'Jugada'     => 'Jugada',
-            'Cabeza'     => 'Cabeza',
-            'Penal'      => 'Penal',
-            'Tiro_Libre' => 'T. Libre',
-            'Olimpico'   => 'Olímp.',
-            'jugados'    => 'PJ',
-            'promedio'   => 'Prom.',
+            'goles'      => __('Goles'),
+            'Jugada'     => __('Jugada'),
+            'Cabeza'     => __('Cabeza'),
+            'Penal'      => __('Penal'),
+            'Tiro_Libre' => __('T. Libre'),
+            'Olimpico'   => __('Olímp.'),
+            'jugados'    => __('PJ'),
+            'promedio'   => __('Prom.'),
         ];
     @endphp
 
@@ -23,15 +23,15 @@
                 <x-escudo :src="$torneo->escudo" :nombre="$torneo->nombre" tam="sm"/>
                 {{ $torneo->nombre }} {{ $torneo->year }}
             </span>
-            <h1>Goleadores</h1>
+            <h1>{{ __('Goleadores') }}</h1>
         </div>
 
         <form class="d-flex gap-2">
             <input type="hidden" name="torneoId" value="{{ $torneo->id }}">
             <input type="search" name="buscarpor" class="form-control form-control-sm" style="width: 220px"
-                   placeholder="Buscar jugador"
+                   placeholder="{{ __('Buscar jugador') }}"
                    value="{{ request()->get('buscarpor', session('nombre_filtro_jugador')) }}">
-            <button class="btn btn-outline-secondary btn-sm" type="submit">Buscar</button>
+            <button class="btn btn-outline-secondary btn-sm" type="submit">{{ __('Buscar') }}</button>
         </form>
     </div>
 
@@ -41,8 +41,8 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Jugador</th>
-                    <th class="t-izq">Equipos</th>
+                    <th>{{ __('Jugador') }}</th>
+                    <th class="t-izq">{{ __('Equipos') }}</th>
                     @foreach($columns as $key => $label)
                         <th>
                             @if($key != 'promedio')
@@ -74,7 +74,7 @@
                                 </a>
                                 <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->id]) }}">{{ $jugador->jugador }}</a>
                                 @if($jugador->nacionalidad)
-                                    <img class="bandera" src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}" title="{{ $jugador->nacionalidad }}">
+                                    <img class="bandera" src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ trad_dato($jugador->nacionalidad) }}" title="{{ trad_dato($jugador->nacionalidad) }}">
                                 @endif
                             </span>
                         </td>
@@ -85,7 +85,7 @@
                                         @if($escudo)
                                             @php $escudoArr = partesEscudo($escudo); @endphp
                                             <a href="{{ route('equipos.ver', ['equipoId' => $escudoArr[1]]) }}">
-                                                <x-escudo :src="$escudoArr[0]" nombre="Equipo"/>
+                                                <x-escudo :src="$escudoArr[0]" :nombre="__('Equipo')"/>
                                             </a>
                                         @endif
                                     @endforeach
@@ -107,13 +107,13 @@
         </div>
 
         <div class="t-panel-pie">
-            <div>{{ $goleadores->total() }} jugadores</div>
+            <div>{{ trans_choice(':n jugador|:n jugadores', $goleadores->total(), ['n' => $goleadores->total()]) }}</div>
             <div class="ms-auto t-paginacion">{{ $goleadores->appends(request()->except('page'))->links() }}</div>
         </div>
     </div>
 
     <div class="d-flex mt-3">
-        <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-outline-secondary btn-sm">Volver al torneo</a>
+        <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver al torneo') }}</a>
     </div>
 
 @endsection

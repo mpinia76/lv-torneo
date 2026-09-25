@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Penales')
+@section('pageTitle', __('Penales'))
 
 @section('content')
     <script type="text/javascript" src="{{ asset('js/echarts.min.js') }}"></script>
@@ -8,7 +8,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Penales</h1>
+                <h1 class="t-titulo">{{ __('Penales') }}</h1>
 
                 <div class="row">
                     {{-- COLUMNA IZQUIERDA (Jugador y Torneo) --}}
@@ -17,7 +17,7 @@
                         @if($torneo)
                             <div class="mb-3 d-flex align-items-center">
                                 @if($torneo->escudo)
-                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="Escudo {{ $torneo->nombre }}" height="40" class="me-2">
+                                    <img src="{{ url('images/'.$torneo->escudo) }}" alt="{{ __('Escudo :nombre', ['nombre' => $torneo->nombre]) }}" height="40" class="me-2">
                                 @endif
                                 <strong>{{ $torneo->getFullNameAttribute() }}</strong>
                             </div>
@@ -26,7 +26,7 @@
                         {{-- Foto jugador --}}
                         <div class="mb-3 text-center">
                             <img src="{{ $jugador->persona->foto ? url('images/'.$jugador->persona->foto) : url('images/sin_foto.png') }}"
-                                 alt="Foto de {{ $jugador->persona->getFullNameAttribute() }}"
+                                 alt="{{ __('Foto de :nombre', ['nombre' => $jugador->persona->getFullNameAttribute()]) }}"
                                  class="img-fluid rounded shadow-sm"
                                  height="200">
                         </div>
@@ -46,10 +46,10 @@
                         <div class="row text-center">
                             @php
                                 $opciones = [
-                                    '' => ['label' => 'Todos', 'valorDB' => ''],
-                                    'Convertidos' => ['label' => 'Convertidos', 'valorDB' => 'Convertido'],
-                                    'Errados' => ['label' => 'Errados', 'valorDB' => 'Errado'],
-                                    'Atajados' => ['label' => 'Atajados', 'valorDB' => 'Atajado'],
+                                    '' => ['label' => __('Todos'), 'valorDB' => ''],
+                                    'Convertidos' => ['label' => __('Convertidos'), 'valorDB' => 'Convertido'],
+                                    'Errados' => ['label' => __('Errados'), 'valorDB' => 'Errado'],
+                                    'Atajados' => ['label' => __('Atajados'), 'valorDB' => 'Atajado'],
                                 ];
                             @endphp
 
@@ -88,13 +88,13 @@
                                 </div>
                             </div>
                         @endif
-                        <h5 class="card-title text-center">🧤 Penales al arquero</h5>
+                        <h5 class="card-title text-center">🧤 {{ __('Penales al arquero') }}</h5>
                         <div class="row text-center">
                             @php
                                 $opciones = [
-                                    '' => ['label' => 'Todos', 'valorDB' => ''],
-                                    'Convirtieron' => ['label' => 'Convirtieron', 'valorDB' => 'Convirtieron'],
-                                    'Atajó' => ['label' => 'Atajó', 'valorDB' => 'Atajó'],
+                                    '' => ['label' => __('Todos'), 'valorDB' => ''],
+                                    'Convirtieron' => ['label' => __('Convirtieron'), 'valorDB' => 'Convirtieron'],
+                                    'Atajó' => ['label' => __('Atajó'), 'valorDB' => 'Atajó'],
                                 ];
                             @endphp
 

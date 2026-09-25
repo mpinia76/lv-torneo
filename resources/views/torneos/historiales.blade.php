@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Historiales')
+@section('pageTitle', __('Historiales'))
 
 @section('content')
 
@@ -19,24 +19,24 @@
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Equipos</span>
-            <h1>Historial</h1>
+            <span class="t-eyebrow">{{ __('Equipos') }}</span>
+            <h1>{{ __('Historial') }}</h1>
         </div>
     </div>
 
     <div class="t-panel t-panel-cuerpo">
         <form class="t-duelo-form" method="GET" action="{{ route('torneos.historiales') }}">
             <select class="form-control form-control-sm js-example-basic-single" id="equipo1" name="equipo1" onchange="this.form.submit()">
-                <option value="">Elegí un equipo…</option>
+                <option value="">{{ __('Elegí un equipo…') }}</option>
                 @foreach($equipos as $hiEquipo)
                     <option value="{{ $hiEquipo->id }}" @if($hiEquipo->id == $e1->id) selected @endif>{{ $hiEquipo->nombre }}</option>
                 @endforeach
             </select>
 
-            <span class="t-duelo-vs">vs.</span>
+            <span class="t-duelo-vs">{{ __('vs.') }}</span>
 
             <select class="form-control form-control-sm js-example-basic-single" id="equipo2" name="equipo2" onchange="this.form.submit()">
-                <option value="">Elegí un equipo…</option>
+                <option value="">{{ __('Elegí un equipo…') }}</option>
                 @foreach($equipos as $hiEquipo)
                     <option value="{{ $hiEquipo->id }}" @if($hiEquipo->id == $e2->id) selected @endif>{{ $hiEquipo->nombre }}</option>
                 @endforeach
@@ -58,7 +58,7 @@
                     <span class="e">{{ $hiEmp }}</span>
                     <span class="p">{{ $hiGanoB }}</span>
                 </div>
-                <div class="t-duelo-rot">victorias · empates · victorias</div>
+                <div class="t-duelo-rot">{{ __('victorias · empates · victorias') }}</div>
                 @if($hiJug > 0)
                     <span class="t-ge t-ge-ancha" title="{{ $hiGanoA }} · {{ $hiEmp }} · {{ $hiGanoB }}">
                         <i class="g" style="width: {{ round($hiGanoA * 100 / $hiJug, 1) }}%"></i>
@@ -66,7 +66,7 @@
                         <i class="p" style="width: {{ round($hiGanoB * 100 / $hiJug, 1) }}%"></i>
                     </span>
                 @endif
-                <div class="t-duelo-pie">{{ $hiJug }} {{ $hiJug == 1 ? 'partido' : 'partidos' }} · {{ $hiUno->golesl }}–{{ $hiDos->golesl }} en goles</div>
+                <div class="t-duelo-pie">{{ trans_choice(':n partido|:n partidos', $hiJug, ['n' => $hiJug]) }} · {{ __(':a–:b en goles', ['a' => $hiUno->golesl, 'b' => $hiDos->golesl]) }}</div>
             </div>
 
             <a class="t-duelo-lado" href="{{ route('equipos.ver', ['equipoId' => $e2->id]) }}">
@@ -81,15 +81,15 @@
                 <table class="t-tabla t-lista-tabla">
                     <thead>
                     <tr>
-                        <th>Equipo</th>
-                        <th title="Puntos">Pts</th>
-                        <th title="Partidos jugados">J</th>
-                        <th title="Ganados">G</th>
-                        <th title="Empatados">E</th>
-                        <th title="Perdidos">P</th>
-                        <th title="Goles a favor">GF</th>
-                        <th title="Goles en contra">GC</th>
-                        <th title="Diferencia de gol">Dif.</th>
+                        <th>{{ __('Equipo') }}</th>
+                        <th title="{{ __('Puntos') }}">{{ __('Pts') }}</th>
+                        <th title="{{ __('Partidos jugados') }}">{{ __('J') }}</th>
+                        <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                        <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                        <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                        <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                        <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                        <th title="{{ __('Diferencia de gol') }}">{{ __('Dif.') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -127,16 +127,16 @@
         </div>
     @elseif(!empty($e1->id) && !empty($e2->id))
         <div class="t-panel">
-            <div class="t-vacio"><i class="bi bi-calendar-x"></i>No hay partidos cargados entre estos dos equipos.</div>
+            <div class="t-vacio"><i class="bi bi-calendar-x"></i>{{ __('No hay partidos cargados entre estos dos equipos.') }}</div>
         </div>
     @else
         <div class="t-panel">
-            <div class="t-vacio"><i class="bi bi-shield"></i>Elegí dos equipos para ver el historial.</div>
+            <div class="t-vacio"><i class="bi bi-shield"></i>{{ __('Elegí dos equipos para ver el historial.') }}</div>
         </div>
     @endif
 
     <div class="d-flex mt-3">
-        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver') }}</a>
     </div>
 
 @endsection

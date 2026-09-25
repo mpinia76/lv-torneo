@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Método Paenza')
+@section('pageTitle', __('Método Paenza'))
 
 @section('content')
     <div class="container">
@@ -12,9 +12,9 @@
                 @foreach($fechas as $f)
                     <option value="{{ $f->numero }}" @if($f->numero==$fecha->numero) selected @endif>
                         @if(is_numeric($f->numero))
-                            Fecha {{ $f->numero }}
+                            {{ __('Fecha :numero', ['numero' => $f->numero]) }}
                         @else
-                            {{ $f->numero }}
+                            {{ trad_dato($f->numero) }}
                         @endif
                     </option>
                 @endforeach
@@ -26,8 +26,8 @@
             <thead class="table-dark">
             <tr>
                 <th>#</th>
-                <th style="width: 300px;">Equipo</th>
-                <th>Puntos que enfrenta</th>
+                <th style="width: 300px;">{{ __('Equipo') }}</th>
+                <th>{{ __('Puntos que enfrenta') }}</th>
             </tr>
             </thead>
             <tbody>
@@ -49,21 +49,21 @@
         @foreach($arrPosiciones as $nombre => $posiciones)
             @php $i = 1; @endphp
             @if(count($arrPosiciones) > 1)
-                <h5 class="mt-4 mb-2">Grupo {{ $nombre }}</h5>
+                <h5 class="mt-4 mb-2">{{ __('Grupo :nombre', ['nombre' => $nombre]) }}</h5>
             @endif
             <table class="table table-striped table-hover align-middle">
                 <thead class="table-dark">
                 <tr>
                     <th>#</th>
-                    <th style="width: 300px;">Equipo</th>
-                    <th>Punt.</th>
-                    <th>J</th>
-                    <th>G</th>
-                    <th>E</th>
-                    <th>P</th>
-                    <th>GF</th>
-                    <th>GC</th>
-                    <th>Dif.</th>
+                    <th style="width: 300px;">{{ __('Equipo') }}</th>
+                    <th>{{ __('Punt.') }}</th>
+                    <th>{{ __('J') }}</th>
+                    <th>{{ __('G') }}</th>
+                    <th>{{ __('E') }}</th>
+                    <th>{{ __('P') }}</th>
+                    <th>{{ __('GF') }}</th>
+                    <th>{{ __('GC') }}</th>
+                    <th>{{ __('Dif.') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -92,7 +92,7 @@
         @endforeach
 
         <div class="d-flex">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
     </div>
 @endsection

@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Partidos jugados')
+@section('pageTitle', __('Partidos jugados'))
 
 @section('content')
     <script type="text/javascript" src="{{ asset('js/echarts.min.js') }}"></script>
@@ -10,12 +10,12 @@
         <div class="row mb-4 align-items-center">
             <div class="col-md-3 text-center">
                 @if($equipo->escudo)
-                    <img src="{{ url('images/'.$equipo->escudo) }}" alt="Escudo" class="img-fluid mb-2" style="max-height: 200px;">
+                    <img src="{{ url('images/'.$equipo->escudo) }}" alt="{{ __('Escudo') }}" class="img-fluid mb-2" style="max-height: 200px;">
                 @endif
                 <h4>
                     <a href="{{ route('equipos.ver', ['equipoId' => $equipo->id]) }}">
                         {{ $equipo->nombre }}
-                        <img src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ $equipo->pais }}">
+                        <img src="{{ url('images/'.removeAccents($equipo->pais).'.gif') }}" alt="{{ trad_dato($equipo->pais) }}">
                     </a>
                 </h4>
                 @if($torneo)
@@ -27,10 +27,10 @@
                 <div class="row text-center">
                     @php
                         $stats = [
-                            '' => 'Jugados',
-                            'Ganados' => 'Ganados',
-                            'Empatados' => 'Empatados',
-                            'Perdidos' => 'Perdidos'
+                            '' => __('Jugados'),
+                            'Ganados' => __('Ganados'),
+                            'Empatados' => __('Empatados'),
+                            'Perdidos' => __('Perdidos')
                         ];
                         $totales = [$totalJugados, $totalGanados, $totalEmpatados, $totalPerdidos];
                         $i = 0;
@@ -74,13 +74,13 @@
 
                 <div class="d-flex justify-content-between align-items-center mt-3">
                     <div>{{ $partidos->links() }}</div>
-                    <div><strong>Total: {{ $partidos->total() }}</strong></div>
+                    <div><strong>{{ __('Total: :total', ['total' => $partidos->total()]) }}</strong></div>
                 </div>
             </div>
         </div>
 
         <div class="d-flex justify-content-start mt-4">
-            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
 
     </div>
@@ -94,17 +94,17 @@
                 color: ['#26eb0e','#e5cf0d','#f90a23'],
                 textStyle: { fontFamily: 'Roboto, Arial, Verdana, sans-serif', fontSize: 13 },
                 tooltip: { trigger: 'item', backgroundColor: 'rgba(0,0,0,0.75)', padding: [10, 15], formatter: "{b}: {c} ({d}%)" },
-                legend: { orient: 'horizontal', bottom: '0%', left: 'center', data: ['Ganados','Empatados','Perdidos'], itemHeight: 8, itemWidth: 8 },
+                legend: { orient: 'horizontal', bottom: '0%', left: 'center', data: [@json(__('Ganados')),@json(__('Empatados')),@json(__('Perdidos'))], itemHeight: 8, itemWidth: 8 },
                 series: [{
-                    name: 'Partidos',
+                    name: @json(__('Partidos')),
                     type: 'pie',
                     radius: '70%',
                     center: ['50%', '50%'],
                     itemStyle: { borderWidth: 1, borderColor: '#fff' },
                     data: [
-                        {value: {{$totalGanados}}, name: 'Ganados'},
-                        {value: {{$totalEmpatados}}, name: 'Empatados'},
-                        {value: {{$totalPerdidos}}, name: 'Perdidos'}
+                        {value: {{$totalGanados}}, name: @json(__('Ganados'))},
+                        {value: {{$totalEmpatados}}, name: @json(__('Empatados'))},
+                        {value: {{$totalPerdidos}}, name: @json(__('Perdidos'))}
                     ]
                 }]
             });

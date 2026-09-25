@@ -33,11 +33,11 @@
             {{ $fpCorto }}
             @if($persona->nacionalidad)
                 <img class="bandera" src="{{ $persona->bandera_url }}"
-                     alt="{{ $persona->nacionalidad }}" title="{{ $persona->nacionalidad }}">
+                     alt="{{ trad_dato($persona->nacionalidad) }}" title="{{ trad_dato($persona->nacionalidad) }}">
             @endif
             @if($persona->fallecimiento)
                 <img class="t-ficha-obito" src="{{ url('images/death.png') }}"
-                     alt="Fallecido" title="Fallecido" height="18">
+                     alt="{{ __('Fallecido') }}" title="{{ __('Fallecido') }}" height="18">
             @endif
         </h1>
 

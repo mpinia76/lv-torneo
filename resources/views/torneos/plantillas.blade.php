@@ -1,12 +1,12 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Plantillas')
+@section('pageTitle', __('Plantillas'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Plantillas</h1>
+                <h1 class="t-titulo">{{ __('Plantillas') }}</h1>
         {{-- Selección de equipo --}}
         <form method="GET" class="mb-3 d-flex align-items-center">
             <div class="d-flex justify-content-center align-items-center flex-wrap gap-2">
@@ -23,22 +23,22 @@
         {{-- Escudo --}}
         @if($e1->escudo)
             <div class="mb-3">
-                <img src="{{ url('images/'.$e1->escudo) }}" height="100" alt="Escudo {{ $e1->nombre }}">
+                <img src="{{ url('images/'.$e1->escudo) }}" height="100" alt="{{ __('Escudo :nombre', ['nombre' => $e1->nombre]) }}">
             </div>
         @endif
 
         @php
             $campos = [
-                'dorsal' => 'Dorsal',
-                'jugador' => 'Jugador',
-                'nacimiento' => 'Edad',
-                'tipoJugador' => 'Tipo',
-                'jugados' => 'Jugados',
-                'Goles' => 'Goles',
-                'amarillas' => 'Amarillas',
-                'rojas' => 'Rojas',
-                'recibidos' => 'Arq. Recibidos',
-                'invictas' => 'Arq. V. Invictas'
+                'dorsal' => __('Dorsal'),
+                'jugador' => __('Jugador'),
+                'nacimiento' => __('Edad'),
+                'tipoJugador' => __('Tipo'),
+                'jugados' => __('Jugados'),
+                'Goles' => __('Goles'),
+                'amarillas' => __('Amarillas'),
+                'rojas' => __('Rojas'),
+                'recibidos' => __('Arq. Recibidos'),
+                'invictas' => __('Arq. V. Invictas')
             ];
         @endphp
 
@@ -72,13 +72,13 @@
                     <td>{{ $jugador->dorsal }}</td>
                     <td>
                         <a href="{{ route('jugadores.ver', ['jugadorId' => $jugador->jugador_id]) }}">
-                            <img src="{{ url('images/'.($jugador->foto ?? 'sin_foto.png')) }}" class="imgCircle me-1" width="30" height="30" alt="Foto">
+                            <img src="{{ url('images/'.($jugador->foto ?? 'sin_foto.png')) }}" class="imgCircle me-1" width="30" height="30" alt="{{ __('Foto') }}">
                         </a>
                         {{ $jugador->jugador }}
-                        <img src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ $jugador->nacionalidad }}">
+                        <img src="{{ url('images/'.removeAccents($jugador->nacionalidad).'.gif') }}" alt="{{ trad_dato($jugador->nacionalidad) }}">
                     </td>
                     <td>{{ $jugador->edad }}</td>
-                    <td>{{ $jugador->tipoJugador }}</td>
+                    <td>{{ trad_dato($jugador->tipoJugador) }}</td>
                     <td><a href="{{ route('jugadores.jugados', ['jugadorId'=>$jugador->jugador_id,'torneoId'=>$torneo->id]) }}">{{ $jugador->jugados }}</a></td>
                     <td><a href="{{ route('jugadores.goles', ['jugadorId'=>$jugador->jugador_id,'torneoId'=>$torneo->id]) }}">{{ $jugador->goles }}</a></td>
                     <td><a href="{{ route('jugadores.tarjetas', ['jugadorId'=>$jugador->jugador_id,'torneoId'=>$torneo->id,'tipo'=>'Amarilla']) }}">{{ $jugador->amarillas }}</a></td>
@@ -93,23 +93,23 @@
         {{-- Paginación y total --}}
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>{{ $jugadores->links() }}</div>
-            <div><strong>Total: {{ $jugadores->total() }}</strong></div>
+            <div><strong>{{ __('Total: :n', ['n' => $jugadores->total()]) }}</strong></div>
         </div>
 
         {{-- Tabla de técnicos --}}
                 <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
                     <thead class="table-dark text-center">
             <tr>
-                <th>Técnico</th>
-                <th>Edad</th>
-                <th>Punt.</th>
-                <th>J</th>
-                <th>G</th>
-                <th>E</th>
-                <th>P</th>
-                <th>GF</th>
-                <th>GC</th>
-                <th>Dif.</th>
+                <th>{{ __('Técnico') }}</th>
+                <th>{{ __('Edad') }}</th>
+                <th>{{ __('Punt.') }}</th>
+                <th>{{ __('J') }}</th>
+                <th>{{ __('G') }}</th>
+                <th>{{ __('E') }}</th>
+                <th>{{ __('P') }}</th>
+                <th>{{ __('GF') }}</th>
+                <th>{{ __('GC') }}</th>
+                <th>{{ __('Dif.') }}</th>
                 <th>%</th>
             </tr>
             </thead>
@@ -118,10 +118,10 @@
                 <tr>
                     <td>
                         <a href="{{ route('tecnicos.ver', ['tecnicoId' => $tecnico->tecnico_id]) }}">
-                            <img src="{{ url('images/'.($tecnico->fotoTecnico ?? 'sin_foto_tecnico.png')) }}" class="imgCircle me-1" width="30" height="30" alt="Foto Técnico">
+                            <img src="{{ url('images/'.($tecnico->fotoTecnico ?? 'sin_foto_tecnico.png')) }}" class="imgCircle me-1" width="30" height="30" alt="{{ __('Foto Técnico') }}">
                         </a>
                         {{ $tecnico->tecnico }}
-                        <img src="{{ url('images/'.removeAccents($tecnico->nacionalidadTecnico).'.gif') }}" alt="{{ $tecnico->nacionalidadTecnico }}">
+                        <img src="{{ url('images/'.removeAccents($tecnico->nacionalidadTecnico).'.gif') }}" alt="{{ trad_dato($tecnico->nacionalidadTecnico) }}">
                     </td>
                     <td>{{ $tecnico->edad }}</td>
                     <td>{{ $tecnico->puntaje }}</td>
@@ -139,7 +139,7 @@
         </table>
 
         <div class="d-flex">
-            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('torneos.ver', ['torneoId' => $torneo->id]) }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
             </div>
         </div>

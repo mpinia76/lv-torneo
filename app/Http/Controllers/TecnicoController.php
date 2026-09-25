@@ -463,9 +463,9 @@ ORDER BY partidos.dia DESC') as $f) {
                     if ($ultimo !== null && isset($dirigio[$ultimo][$eid])) {
                         $posicion = $posPorTorneo[$tid][$eid];
                         if ($posicion == 1) {
-                            $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón';
+                            $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón');
                         } elseif ($posicion == 2) {
-                            $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón';
+                            $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón');
                         } else {
                             $strPosicion = $posicion;
                         }
@@ -670,8 +670,8 @@ ORDER BY torneos.year DESC';
                     if(!empty($alineacion)) {
                         $strPosicion = (!empty($posicionTorneo)) ? (
                         ($posicionTorneo->posicion == 1) ?
-                            '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón' :
-                            (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón' : $posicionTorneo->posicion)
+                            '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón') :
+                            (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón') : $posicionTorneo->posicion)
                         ) : '';
                     }
 
@@ -808,9 +808,9 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
             // Construimos la "posición" como se hace en las no manuales
             $strPosicion = '';
             if ($manual->posicion == 1) {
-                $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> Campeón';
+                $strPosicion = '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón');
             } elseif ($manual->posicion == 2) {
-                $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">Subcampeón';
+                $strPosicion = '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón');
             } elseif ($manual->posicion > 2) {
                 $strPosicion = $manual->posicion;
             }

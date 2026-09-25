@@ -48,7 +48,7 @@
     $ftBarra = function ($g, $e, $p) {
         $total = $g + $e + $p;
         if ($total <= 0) { return ''; }
-        return '<span class="t-ge" title="'.$g.'G · '.$e.'E · '.$p.'P">'
+        return '<span class="t-ge" title="'.$g.__('G').' · '.$e.__('E').' · '.$p.__('P').'">'
             .'<i class="g" style="width:'.round($g * 100 / $total, 1).'%"></i>'
             .'<i class="e" style="width:'.round($e * 100 / $total, 1).'%"></i>'
             .'<i class="p" style="width:'.round($p * 100 / $total, 1).'%"></i></span>';
@@ -56,52 +56,52 @@
 @endphp
 
 @if(count($torneosTecnico) === 0)
-    <div class="t-panel"><div class="t-vacio"><i class="bi bi-clipboard-x"></i>Todavía no hay torneos cargados como técnico.</div></div>
+    <div class="t-panel"><div class="t-vacio"><i class="bi bi-clipboard-x"></i>{{ __('Todavía no hay torneos cargados como técnico.') }}</div></div>
 @else
 
     <div class="t-kpis">
         <div class="t-kpi">
             <div class="t-kpi-num">{{ $ftJugados }}</div>
-            <div class="t-kpi-rot">Dirigidos</div>
+            <div class="t-kpi-rot">{{ __('Dirigidos') }}</div>
         </div>
         <div class="t-kpi t-kpi-acento">
             <div class="t-kpi-num">{{ $ftEfec }}<small>%</small></div>
-            <div class="t-kpi-rot">Efectividad</div>
+            <div class="t-kpi-rot">{{ __('Efectividad') }}</div>
         </div>
         <div class="t-kpi t-kpi-win">
             <div class="t-kpi-num">{{ $ftGanados }}</div>
-            <div class="t-kpi-rot">Ganados</div>
+            <div class="t-kpi-rot">{{ __('Ganados') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ $ftEmpatados }}</div>
-            <div class="t-kpi-rot">Empatados</div>
+            <div class="t-kpi-rot">{{ __('Empatados') }}</div>
         </div>
         <div class="t-kpi t-kpi-loss">
             <div class="t-kpi-num">{{ $ftPerdidos }}</div>
-            <div class="t-kpi-rot">Perdidos</div>
+            <div class="t-kpi-rot">{{ __('Perdidos') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ count($torneosTecnico) }}</div>
-            <div class="t-kpi-rot">Torneos</div>
+            <div class="t-kpi-rot">{{ __('Torneos') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ count($ftEquipos) }}</div>
-            <div class="t-kpi-rot">Equipos</div>
+            <div class="t-kpi-rot">{{ __('Equipos') }}</div>
         </div>
         <div class="t-kpi {{ $ftTitulos > 0 ? 't-kpi-win' : 't-kpi-apagado' }}">
             <div class="t-kpi-num">{{ $ftTitulos }}</div>
-            <div class="t-kpi-rot">Títulos</div>
+            <div class="t-kpi-rot">{{ __('Títulos') }}</div>
         </div>
     </div>
 
     <div class="t-kpis-pie">
         @if($ftTitulos > 0)
-            <span>Ligas nacionales <b>{{ $titulosTecnicoLiga }}</b></span>
-            <span>Copas nacionales <b>{{ $titulosTecnicoCopa }}</b></span>
-            <span>Internacionales <b>{{ $titulosTecnicoInternacional }}</b></span>
+            <span>{{ __('Ligas nacionales') }} <b>{{ $titulosTecnicoLiga }}</b></span>
+            <span>{{ __('Copas nacionales') }} <b>{{ $titulosTecnicoCopa }}</b></span>
+            <span>{{ __('Internacionales') }} <b>{{ $titulosTecnicoInternacional }}</b></span>
         @endif
-        <span>Goles <b>{{ $ftFavor }}</b> a favor · <b>{{ $ftContra }}</b> en contra</span>
-        <span class="t-referencia">{!! $ftBarra($ftGanados, $ftEmpatados, $ftPerdidos) !!} balance de la carrera</span>
+        <span>{!! __('Goles :favor a favor · :contra en contra', ['favor' => '<b>'.e($ftFavor).'</b>', 'contra' => '<b>'.e($ftContra).'</b>']) !!}</span>
+        <span class="t-referencia">{!! $ftBarra($ftGanados, $ftEmpatados, $ftPerdidos) !!} {{ __('balance de la carrera') }}</span>
     </div>
 
     <div class="t-panel">
@@ -110,17 +110,17 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Torneo</th>
-                    <th class="t-izq">Equipos</th>
-                    <th title="Puntos">Pts</th>
-                    <th title="Dirigidos">J</th>
-                    <th title="Ganados">G</th>
-                    <th title="Empatados">E</th>
-                    <th title="Perdidos">P</th>
-                    <th title="Goles a favor">GF</th>
-                    <th title="Goles en contra">GC</th>
-                    <th title="Diferencia de gol">Dif.</th>
-                    <th title="Efectividad sobre puntos posibles">Rend.</th>
+                    <th>{{ __('Torneo') }}</th>
+                    <th class="t-izq">{{ __('Equipos') }}</th>
+                    <th title="{{ __('Puntos') }}">{{ __('Pts') }}</th>
+                    <th title="{{ __('Dirigidos') }}">{{ __('J') }}</th>
+                    <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                    <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                    <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                    <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                    <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                    <th title="{{ __('Diferencia de gol') }}">{{ __('Dif.') }}</th>
+                    <th title="{{ __('Efectividad sobre puntos posibles') }}">{{ __('Rend.') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -201,8 +201,8 @@
                 <tfoot>
                 <tr class="t-totales">
                     <td></td>
-                    <td>Totales</td>
-                    <td class="t-izq">{{ count($ftEquipos) }} {{ count($ftEquipos) === 1 ? 'equipo' : 'equipos' }}</td>
+                    <td>{{ __('Totales') }}</td>
+                    <td class="t-izq">{{ trans_choice(':n equipo|:n equipos', count($ftEquipos), ['n' => count($ftEquipos)]) }}</td>
                     <td class="t-pts">{{ $ftPuntaje }}</td>
                     <td>
                         @if($ftId)

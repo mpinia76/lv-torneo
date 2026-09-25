@@ -278,6 +278,12 @@ a:hover { color: var(--t-accent-hover); }
     padding: 0;
 }
 .t-boton-icono:hover { background: var(--t-surface-2); color: var(--t-ink); }
+/* Cambio de idioma (ES / EN): mismo botón, con el código en vez de ícono */
+.t-idioma {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: .72rem; font-weight: 500; letter-spacing: .02em;
+    text-decoration: none;
+}
 
 .t-seg {
     display: inline-flex;

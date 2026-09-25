@@ -127,8 +127,8 @@ class MenuTorneos
         'fiyi' => 'ofc', 'nueva zelanda' => 'ofc', 'tahiti' => 'ofc',
     ];
 
-    /** Memo por request. */
-    protected static $zonasMemo = null;
+    /** Memo por request (e idioma). */
+    protected static $zonasMemo = [];
 
     // ─────────────────────────────────────────────────────────────────────
     //  Datos
@@ -146,7 +146,7 @@ class MenuTorneos
     {
         Cache::forget(self::CACHE_TORNEOS);
         Cache::forget(self::CACHE_ZONAS);
-        self::$zonasMemo = null;
+        self::$zonasMemo = [];
     }
 
     /**
@@ -168,8 +168,9 @@ class MenuTorneos
      */
     public static function zonas()
     {
-        if (self::$zonasMemo !== null) {
-            return self::$zonasMemo;
+        $idioma = app()->getLocale();
+        if (isset(self::$zonasMemo[$idioma])) {
+            return self::$zonasMemo[$idioma];
         }
 
         $datos = Cache::remember(self::CACHE_ZONAS, self::CACHE_SEGUNDOS, function () {
@@ -178,9 +179,37 @@ class MenuTorneos
 
         // Los escudos de confederación se resuelven fuera de la caché: así un
         // escudo recién subido aparece enseguida, sin esperar a que venza.
-        self::$zonasMemo = self::conEscudos($datos);
+        // La caché guarda los nombres en español; el idioma se aplica acá.
+        self::$zonasMemo[$idioma] = self::traducir(self::conEscudos($datos));
 
-        return self::$zonasMemo;
+        return self::$zonasMemo[$idioma];
+    }
+
+    /**
+     * Nombres de zona en el idioma de la página (países, "Torneos UEFA"…, con
+     * las claves de resources/lang/<idioma>.json) y, fuera del español, los
+     * países de cada sección reordenados por su nombre traducido.
+     */
+    protected static function traducir($datos)
+    {
+        if (app()->getLocale() === 'es') {
+            return $datos;
+        }
+
+        foreach ($datos['zonas'] as $clave => $z) {
+            $datos['zonas'][$clave]['nombre'] = trad_dato($z['nombre']);
+        }
+
+        $ordenGrupos = array_flip(array_keys(self::$grupos));
+        uasort($datos['zonas'], function ($a, $b) use ($ordenGrupos) {
+            $ga = $ordenGrupos[$a['grupo']];
+            $gb = $ordenGrupos[$b['grupo']];
+            if ($ga !== $gb)                 return $ga - $gb;
+            if ($a['orden'] !== $b['orden']) return $a['orden'] - $b['orden'];
+            return strcmp(self::normalizar($a['nombre']), self::normalizar($b['nombre']));
+        });
+
+        return $datos;
     }
 
     /** Separado de zonas() para poder probarlo con cualquier colección. */
@@ -290,7 +319,7 @@ class MenuTorneos
     /** Títulos de las secciones del menú (clave del grupo => título). */
     public static function titulosGrupos()
     {
-        return self::$grupos;
+        return array_map('trad_dato', self::$grupos);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -309,6 +338,7 @@ class MenuTorneos
         }
 
         $zona = self::zonaDe($torneo);
+        $zona['nombre'] = trad_dato($zona['nombre']);
         $comp = null;
 
         $datos = self::zonas();
@@ -367,7 +397,7 @@ class MenuTorneos
         return [
             'v'      => $datos['version'],
             'url'    => route('fechas.ver') . '?torneoId=',
-            'grupos' => self::$grupos,
+            'grupos' => self::titulosGrupos(),
             'zonas'  => $zonas,
         ];
     }

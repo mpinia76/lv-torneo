@@ -16,6 +16,6 @@
     <a href="{{ $href }}">{{ $nombre }}</a>
     @if($pais)
         <img class="bandera" src="{{ url('images/'.removeAccents($pais).'.gif') }}"
-             alt="{{ $pais }}" title="{{ $pais }}">
+             alt="{{ trad_dato($pais) }}" title="{{ trad_dato($pais) }}">
     @endif
 </span>

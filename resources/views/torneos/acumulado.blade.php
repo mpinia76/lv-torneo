@@ -1,12 +1,12 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Acumulado')
+@section('pageTitle', __('Acumulado'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Acumulado</h1>
+                <h1 class="t-titulo">{{ __('Acumulado') }}</h1>
 
 
 
@@ -36,15 +36,15 @@
         <table class="table table-striped table-hover align-middle" style="font-size: 14px;">
             <thead class="table-dark">
             <th>#</th>
-            <th>Equipo</th>
-            <th>Punt.</th>
-            <th>J</th>
-            <th>G</th>
-            <th>E</th>
-            <th>P</th>
+            <th>{{ __('Equipo') }}</th>
+            <th>{{ __('Punt.') }}</th>
+            <th>{{ __('J') }}</th>
+            <th>{{ __('G') }}</th>
+            <th>{{ __('E') }}</th>
+            <th>{{ __('P') }}</th>
             <th>GF</th>
-            <th>GC</th>
-            <th>Dif.</th>
+            <th>{{ __('GC') }}</th>
+            <th>{{ __('Dif.') }}</th>
             </thead>
             <tbody>
             @foreach($acumulado as $i => $equipo)
@@ -76,13 +76,13 @@
 
         <div class="mt-3">
             @foreach($colores as $nombre => $color)
-                <span class="badge {{ str_replace('table-', 'bg-', $color) }}">{{ $nombre }}</span>
+                <span class="badge {{ str_replace('table-', 'bg-', $color) }}">{{ trad_dato($nombre) }}</span>
             @endforeach
         </div>
 
         <div class="d-flex">
 
-            <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">Volver</a>
+            <a href="{{ route('torneos.ver',array('torneoId' => $torneo->id))}}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
     </div>
 

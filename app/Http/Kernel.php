@@ -65,5 +65,7 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        // Idioma del sitio público según el prefijo de la URL (ver routes/web.php).
+        'idioma' => \App\Http\Middleware\Idioma::class,
     ];
 }

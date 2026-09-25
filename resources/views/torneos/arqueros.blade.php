@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Arqueros')
+@section('pageTitle', __('Arqueros'))
 
 @section('content')
 
@@ -12,10 +12,10 @@
         };
 
         $aqColumnas = [
-            'jugados'   => ['rot' => 'PJ',       'tit' => 'Partidos jugados'],
-            'invictas'  => ['rot' => 'Invictas', 'tit' => 'Vallas invictas'],
-            'recibidos' => ['rot' => 'GC',       'tit' => 'Goles recibidos'],
-            'atajos'    => ['rot' => 'P. Atj.',  'tit' => 'Penales atajados'],
+            'jugados'   => ['rot' => __('PJ'),       'tit' => __('Partidos jugados')],
+            'invictas'  => ['rot' => __('Invictas'), 'tit' => __('Vallas invictas')],
+            'recibidos' => ['rot' => __('GC'),       'tit' => __('Goles recibidos')],
+            'atajos'    => ['rot' => __('P. Atj.'),  'tit' => __('Penales atajados')],
         ];
 
         $aqCols   = count($aqColumnas) + 4; // #, arquero, promedio de gol recibido, equipos
@@ -24,8 +24,8 @@
 
     <div class="t-cabecera">
         <div>
-            <span class="t-eyebrow">Protagonistas</span>
-            <h1>Arqueros</h1>
+            <span class="t-eyebrow">{{ __('Protagonistas') }}</span>
+            <h1>{{ __('Arqueros') }}</h1>
         </div>
 
         <form class="t-lista-busqueda" method="GET" action="{{ route('torneos.arqueros') }}">
@@ -33,7 +33,7 @@
             <input type="hidden" name="tipoOrder" value="{{ $tipoOrder }}">
             @if($actuales)<input type="hidden" name="actuales" value="1">@endif
             <input type="search" name="buscarpor" class="form-control form-control-sm"
-                   placeholder="Buscar arquero" value="{{ $aqBuscar }}">
+                   placeholder="{{ __('Buscar arquero') }}" value="{{ $aqBuscar }}">
             <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-search"></i></button>
         </form>
     </div>
@@ -41,32 +41,32 @@
     <div class="t-kpis">
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['total'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Arqueros</div>
+            <div class="t-kpi-rot">{{ __('Arqueros') }}</div>
         </div>
         <div class="t-kpi t-kpi-win">
             <div class="t-kpi-num">{{ number_format($kpis['invictas'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Vallas invictas</div>
+            <div class="t-kpi-rot">{{ __('Vallas invictas') }}</div>
         </div>
         <div class="t-kpi t-kpi-loss">
             <div class="t-kpi-num">{{ number_format($kpis['recibidos'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Goles recibidos</div>
+            <div class="t-kpi-rot">{{ __('Goles recibidos') }}</div>
         </div>
         <div class="t-kpi">
             <div class="t-kpi-num">{{ number_format($kpis['atajos'], 0, ',', '.') }}</div>
-            <div class="t-kpi-rot">Penales atajados</div>
+            <div class="t-kpi-rot">{{ __('Penales atajados') }}</div>
         </div>
     </div>
 
     <div class="t-lista-filtros">
         <a class="t-chip {{ $actuales ? 't-chip-acento' : '' }}" href="{{ $aqLink(['actuales' => $actuales ? 0 : 1]) }}">
-            <i class="bi {{ $actuales ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> Jugando
+            <i class="bi {{ $actuales ? 'bi-check-circle-fill' : 'bi-circle' }}"></i> {{ __('Jugando') }}
         </a>
         @if($aqBuscar)
             <a class="t-chip t-chip-acento" href="{{ $aqLink(['buscarpor' => '']) }}">
                 <i class="bi bi-x-lg"></i> “{{ $aqBuscar }}”
             </a>
         @endif
-        <span class="t-lista-ayuda ms-auto"><i class="bi bi-chevron-down"></i> abre el detalle por club</span>
+        <span class="t-lista-ayuda ms-auto"><i class="bi bi-chevron-down"></i> {{ __('abre el detalle por club') }}</span>
     </div>
 
     <div class="t-panel">
@@ -75,7 +75,7 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>Arquero</th>
+                    <th>{{ __('Arquero') }}</th>
                     @foreach($aqColumnas as $aqKey => $aqCol)
                         <th title="{{ $aqCol['tit'] }}" class="{{ $order == $aqKey ? 't-orden-activo' : '' }}">
                             <a href="{{ $aqLink(['order' => $aqKey, 'tipoOrder' => ($order == $aqKey && $tipoOrder == 'DESC') ? 'ASC' : 'DESC']) }}">
@@ -86,8 +86,8 @@
                             </a>
                         </th>
                     @endforeach
-                    <th title="Goles recibidos por partido">Prom.</th>
-                    <th class="t-izq">Equipos</th>
+                    <th title="{{ __('Goles recibidos por partido') }}">{{ __('Prom.') }}</th>
+                    <th class="t-izq">{{ __('Equipos') }}</th>
                 </tr>
                 </thead>
 
@@ -96,7 +96,7 @@
                     @php
                         $aqClubes = clubesDesdeCadena($arquero->escudo, ['recibidos', 'invictas']);
                         foreach ($aqClubes as $aqIdx => $aqClub) {
-                            $aqClubes[$aqIdx]['dato'] = $aqClub['recibidos'].' GC · '.$aqClub['invictas'].' invictas';
+                            $aqClubes[$aqIdx]['dato'] = __(':gc GC · :inv invictas', ['gc' => $aqClub['recibidos'], 'inv' => $aqClub['invictas']]);
                         }
                         $aqActuales = clubesDesdeCadena($arquero->jugando);
                         $aqFilaId   = 'arq-eq-' . $arquero->id;
@@ -114,7 +114,7 @@
                         </td>
                         <td><a href="{{ route('jugadores.jugados', ['jugadorId' => $arquero->id]) }}">{{ $arquero->jugados }}</a></td>
                         <td class="t-pts">
-                            <span class="t-lista-ef" title="{{ $aqInvPct }}% de los partidos sin goles en contra">
+                            <span class="t-lista-ef" title="{{ __(':pct% de los partidos sin goles en contra', ['pct' => $aqInvPct]) }}">
                                 <b>{{ $arquero->invictas }}</b>
                                 <span class="t-lista-ef-pista"><i style="width: {{ min(100, max(0, $aqInvPct)) }}%"></i></span>
                             </span>
@@ -131,7 +131,7 @@
                 @empty
                     <tr>
                         <td colspan="{{ $aqCols }}">
-                            <div class="t-vacio"><i class="bi bi-person-x"></i>No hay arqueros con esos filtros.</div>
+                            <div class="t-vacio"><i class="bi bi-person-x"></i>{{ __('No hay arqueros con esos filtros.') }}</div>
                         </td>
                     </tr>
                 @endforelse
@@ -140,13 +140,13 @@
         </div>
 
         <div class="t-panel-pie">
-            <div>{{ number_format($arqueros->total(), 0, ',', '.') }} arqueros</div>
+            <div>{{ trans_choice(':n arquero|:n arqueros', $arqueros->total(), ['n' => number_format($arqueros->total(), 0, ',', '.')]) }}</div>
             <div class="ms-auto t-paginacion">{{ $arqueros->appends($aqQuery)->links() }}</div>
         </div>
     </div>
 
     <div class="d-flex mt-3">
-        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">Volver</a>
+        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver') }}</a>
     </div>
 
 @endsection

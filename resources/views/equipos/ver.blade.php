@@ -36,7 +36,7 @@
         $veBarra = function ($g, $e, $p) {
             $total = $g + $e + $p;
             if ($total <= 0) { return ''; }
-            return '<span class="t-ge" title="'.$g.'G · '.$e.'E · '.$p.'P">'
+            return '<span class="t-ge" title="'.$g.__('G').' · '.$e.__('E').' · '.$p.__('P').'">'
                 .'<i class="g" style="width:'.round($g * 100 / $total, 1).'%"></i>'
                 .'<i class="e" style="width:'.round($e * 100 / $total, 1).'%"></i>'
                 .'<i class="p" style="width:'.round($p * 100 / $total, 1).'%"></i></span>';
@@ -70,24 +70,24 @@
             @endif
 
             <div class="t-ficha-cuerpo">
-                <span class="t-eyebrow">{{ $equipo->siglas ?: 'Club' }}</span>
+                <span class="t-eyebrow">{{ $equipo->siglas ?: __('Club') }}</span>
 
                 <h1 class="t-ficha-nombre">
                     {{ $equipo->nombre }}
                     @if($equipo->pais)
                         <img class="bandera" src="{{ $equipo->bandera_url }}"
-                             alt="{{ $equipo->pais }}" title="{{ $equipo->pais }}">
+                             alt="{{ trad_dato($equipo->pais) }}" title="{{ trad_dato($equipo->pais) }}">
                     @endif
                 </h1>
 
                 @php
                     $veDatos = [
-                        'País'      => $equipo->pais,
+                        'País'      => trad_dato($equipo->pais),
                         // Con el club desaparecido la edad de hoy no dice nada: se muestran
                         // los años que existió, en el renglón de la desaparición.
-                        'Fundación' => $veFundado ? $veFundado->format('d/m/Y').($veDesap ? '' : ' · '.$veFundado->age.' años') : '',
+                        'Fundación' => $veFundado ? $veFundado->format('d/m/Y').($veDesap ? '' : ' · '.trans_choice(':n año|:n años', $veFundado->age, ['n' => $veFundado->age])) : '',
                         'Desaparición' => $veDesap
-                            ? $veDesap->format('d/m/Y').($veFundado && $veFundado->lte($veDesap) ? ' · '.$veFundado->diffInYears($veDesap).' años de historia' : '')
+                            ? $veDesap->format('d/m/Y').($veFundado && $veFundado->lte($veDesap) ? ' · '.trans_choice(':n año de historia|:n años de historia', $veFundado->diffInYears($veDesap), ['n' => $veFundado->diffInYears($veDesap)]) : '')
                             : '',
                         'Estadio'   => $equipo->estadio,
                         'Socios'    => $equipo->socios ? number_format($equipo->socios, 0, ',', '.') : '',
@@ -97,7 +97,7 @@
                 @if(count($veDatos))
                     <div class="t-ficha-chips">
                         @foreach($veDatos as $veEtiqueta => $veValor)
-                            <span class="t-dato"><span>{{ $veEtiqueta }}</span><b>{{ $veValor }}</b></span>
+                            <span class="t-dato"><span>{{ __($veEtiqueta) }}</span><b>{{ $veValor }}</b></span>
                         @endforeach
                     </div>
                 @endif
@@ -108,49 +108,49 @@
         <div class="t-kpis">
             <div class="t-kpi">
                 <div class="t-kpi-num">{{ $veJugados }}</div>
-                <div class="t-kpi-rot">Partidos</div>
+                <div class="t-kpi-rot">{{ __('Partidos') }}</div>
             </div>
             <div class="t-kpi t-kpi-acento">
                 <div class="t-kpi-num">{{ $veEfec }}<small>%</small></div>
-                <div class="t-kpi-rot">Efectividad</div>
+                <div class="t-kpi-rot">{{ __('Efectividad') }}</div>
             </div>
             <div class="t-kpi t-kpi-win">
                 <div class="t-kpi-num">{{ $veGanados }}</div>
-                <div class="t-kpi-rot">Ganados</div>
+                <div class="t-kpi-rot">{{ __('Ganados') }}</div>
             </div>
             <div class="t-kpi">
                 <div class="t-kpi-num">{{ $veEmpatados }}</div>
-                <div class="t-kpi-rot">Empatados</div>
+                <div class="t-kpi-rot">{{ __('Empatados') }}</div>
             </div>
             <div class="t-kpi t-kpi-loss">
                 <div class="t-kpi-num">{{ $vePerdidos }}</div>
-                <div class="t-kpi-rot">Perdidos</div>
+                <div class="t-kpi-rot">{{ __('Perdidos') }}</div>
             </div>
             <div class="t-kpi">
                 <div class="t-kpi-num">{{ count($torneosEquipo) }}</div>
-                <div class="t-kpi-rot">Torneos</div>
+                <div class="t-kpi-rot">{{ __('Torneos') }}</div>
             </div>
             <div class="t-kpi {{ $veTitulos > 0 ? 't-kpi-win' : 't-kpi-apagado' }}">
                 <div class="t-kpi-num">{{ $veTitulos }}</div>
-                <div class="t-kpi-rot">Títulos</div>
+                <div class="t-kpi-rot">{{ __('Títulos') }}</div>
             </div>
         </div>
 
         <div class="t-kpis-pie">
-            <span>Goles <b>{{ $veFavor }}</b> a favor · <b>{{ $veContra }}</b> en contra
+            <span>{!! __('Goles :favor a favor · :contra en contra', ['favor' => '<b>'.e($veFavor).'</b>', 'contra' => '<b>'.e($veContra).'</b>']) !!}
                 ({!! $veDif($veFavor - $veContra) !!})</span>
-            <span class="t-referencia">{!! $veBarra($veGanados, $veEmpatados, $vePerdidos) !!} balance histórico</span>
+            <span class="t-referencia">{!! $veBarra($veGanados, $veEmpatados, $vePerdidos) !!} {{ __('balance histórico') }}</span>
         </div>
 
         {{-- Pestañas --}}
         <ul class="nav nav-tabs" id="equipoTabs" role="tablist">
             @php
                 $vePestanas = [
-                    'historia'  => 'Historia',
-                    'titulos'   => 'Títulos',
-                    'tabla'     => 'Torneos',
-                    'partidos'  => 'Partidos',
-                    'jugadores' => 'Jugadores',
+                    'historia'  => __('Historia'),
+                    'titulos'   => __('Títulos'),
+                    'tabla'     => __('Torneos'),
+                    'partidos'  => __('Partidos'),
+                    'jugadores' => __('Jugadores'),
                 ];
             @endphp
             @foreach($vePestanas as $veClave => $veNombre)
@@ -169,7 +169,7 @@
                 @if(trim((string) $equipo->historia) !== '')
                     <p class="t-prosa">{!! nl2br(e($equipo->historia)) !!}</p>
                 @else
-                    <div class="t-vacio"><i class="bi bi-journal-text"></i>Todavía no hay historia cargada para este club.</div>
+                    <div class="t-vacio"><i class="bi bi-journal-text"></i>{{ __('Todavía no hay historia cargada para este club.') }}</div>
                 @endif
             </div>
 
@@ -178,40 +178,40 @@
                 <div class="t-kpis">
                     <div class="t-kpi {{ $veTitulos > 0 ? 't-kpi-win' : 't-kpi-apagado' }}">
                         <div class="t-kpi-num">{{ $veTitulos }}</div>
-                        <div class="t-kpi-rot">Total</div>
+                        <div class="t-kpi-rot">{{ __('Total') }}</div>
                     </div>
                     <div class="t-kpi">
                         <div class="t-kpi-num">{{ $titulosLiga }}</div>
-                        <div class="t-kpi-rot">Ligas nacionales</div>
+                        <div class="t-kpi-rot">{{ __('Ligas nacionales') }}</div>
                     </div>
                     <div class="t-kpi">
                         <div class="t-kpi-num">{{ $titulosCopa }}</div>
-                        <div class="t-kpi-rot">Copas nacionales</div>
+                        <div class="t-kpi-rot">{{ __('Copas nacionales') }}</div>
                     </div>
                     <div class="t-kpi">
                         <div class="t-kpi-num">{{ $titulosInternacional }}</div>
-                        <div class="t-kpi-rot">Internacionales</div>
+                        <div class="t-kpi-rot">{{ __('Internacionales') }}</div>
                     </div>
                 </div>
 
                 @if(count($torneosTitulos) === 0)
-                    <div class="t-vacio"><i class="bi bi-trophy"></i>Todavía no hay títulos cargados.</div>
+                    <div class="t-vacio"><i class="bi bi-trophy"></i>{{ __('Todavía no hay títulos cargados.') }}</div>
                 @else
                     <div class="t-tabla-wrap">
                         <table class="t-tabla">
                             <thead>
                             <tr>
                                 <th>#</th>
-                                <th>Torneo</th>
-                                <th title="Puntos">Pts</th>
-                                <th title="Jugados">J</th>
-                                <th title="Ganados">G</th>
-                                <th title="Empatados">E</th>
-                                <th title="Perdidos">P</th>
-                                <th title="Goles a favor">GF</th>
-                                <th title="Goles en contra">GC</th>
-                                <th title="Diferencia de gol">Dif.</th>
-                                <th title="Efectividad sobre puntos posibles">Rend.</th>
+                                <th>{{ __('Torneo') }}</th>
+                                <th title="{{ __('Puntos') }}">{{ __('Pts') }}</th>
+                                <th title="{{ __('Jugados') }}">{{ __('J') }}</th>
+                                <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                                <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                                <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                                <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                                <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                                <th title="{{ __('Diferencia de gol') }}">{{ __('Dif.') }}</th>
+                                <th title="{{ __('Efectividad sobre puntos posibles') }}">{{ __('Rend.') }}</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -247,24 +247,24 @@
             {{-- Torneos --}}
             <div class="tab-pane fade {{ $vePest == 'tabla' ? 'show active' : '' }}" id="tabla" role="tabpanel">
                 @if(count($torneosEquipo) === 0)
-                    <div class="t-vacio"><i class="bi bi-calendar-x"></i>Este club todavía no tiene torneos cargados.</div>
+                    <div class="t-vacio"><i class="bi bi-calendar-x"></i>{{ __('Este club todavía no tiene torneos cargados.') }}</div>
                 @else
                     <div class="t-tabla-wrap">
                         <table class="t-tabla">
                             <thead>
                             <tr>
                                 <th>#</th>
-                                <th>Torneo</th>
-                                <th class="t-izq">Posición</th>
-                                <th title="Puntos">Pts</th>
-                                <th title="Jugados">J</th>
-                                <th title="Ganados">G</th>
-                                <th title="Empatados">E</th>
-                                <th title="Perdidos">P</th>
-                                <th title="Goles a favor">GF</th>
-                                <th title="Goles en contra">GC</th>
-                                <th title="Diferencia de gol">Dif.</th>
-                                <th title="Efectividad sobre puntos posibles">Rend.</th>
+                                <th>{{ __('Torneo') }}</th>
+                                <th class="t-izq">{{ __('Posición') }}</th>
+                                <th title="{{ __('Puntos') }}">{{ __('Pts') }}</th>
+                                <th title="{{ __('Jugados') }}">{{ __('J') }}</th>
+                                <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                                <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                                <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                                <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                                <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                                <th title="{{ __('Diferencia de gol') }}">{{ __('Dif.') }}</th>
+                                <th title="{{ __('Efectividad sobre puntos posibles') }}">{{ __('Rend.') }}</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -296,8 +296,8 @@
                             <tfoot>
                             <tr class="t-totales">
                                 <td></td>
-                                <td>Totales</td>
-                                <td class="t-izq">{{ count($torneosEquipo) }} torneos</td>
+                                <td>{{ __('Totales') }}</td>
+                                <td class="t-izq">{{ trans_choice(':n torneo|:n torneos', count($torneosEquipo), ['n' => count($torneosEquipo)]) }}</td>
                                 <td class="t-pts">{{ $vePuntaje }}</td>
                                 <td><a href="{{ route('equipos.jugados', ['equipoId' => $equipo->id]) }}">{{ $veJugados }}</a></td>
                                 <td><a href="{{ route('equipos.jugados', ['equipoId' => $equipo->id, 'tipo' => 'Ganados']) }}">{{ $veGanados }}</a></td>
@@ -317,7 +317,7 @@
             {{-- Partidos --}}
             <div class="tab-pane fade {{ $vePest == 'partidos' ? 'show active' : '' }}" id="partidos" role="tabpanel">
                 @if($partidos->total() === 0)
-                    <div class="t-vacio"><i class="bi bi-calendar-x"></i>No hay partidos cargados.</div>
+                    <div class="t-vacio"><i class="bi bi-calendar-x"></i>{{ __('No hay partidos cargados.') }}</div>
                 @else
                     <div class="t-panel t-lista-partidos">
                         @foreach($partidos as $vePartido)
@@ -326,7 +326,7 @@
                     </div>
                     <div class="t-pie-lista">
                         {{ $partidos->appends(['pestActiva' => 'partidos'])->links() }}
-                        <span>{{ $partidos->total() }} partidos</span>
+                        <span>{{ trans_choice(':n partido|:n partidos', $partidos->total(), ['n' => $partidos->total()]) }}</span>
                     </div>
                 @endif
             </div>
@@ -335,27 +335,27 @@
             <div class="tab-pane fade {{ $vePest == 'jugadores' ? 'show active' : '' }}" id="jugadores" role="tabpanel">
                 @php
                     $veColumnas = [
-                        'jugados'   => ['J',    'Partidos jugados'],
-                        'titulos'   => ['Tít.', 'Títulos'],
-                        'goles'     => ['Goles','Goles'],
-                        'amarillas' => ['TA',   'Tarjetas amarillas'],
-                        'rojas'     => ['TR',   'Tarjetas rojas'],
-                        'errados'   => ['P. Err.',  'Penales errados'],
-                        'atajos'    => ['P. Ataj.', 'Penales atajados'],
-                        'recibidos' => ['GC',   'Goles recibidos (arquero)'],
-                        'invictas'  => ['VI',   'Vallas invictas (arquero)'],
+                        'jugados'   => [__('J'),    __('Partidos jugados')],
+                        'titulos'   => [__('Tít.'), __('Títulos')],
+                        'goles'     => [__('Goles'),__('Goles')],
+                        'amarillas' => [__('TA'),   __('Tarjetas amarillas')],
+                        'rojas'     => [__('TR'),   __('Tarjetas rojas')],
+                        'errados'   => [__('P. Err.'),  __('Penales errados')],
+                        'atajos'    => [__('P. Ataj.'), __('Penales atajados')],
+                        'recibidos' => [__('GC'),   __('Goles recibidos (arquero)')],
+                        'invictas'  => [__('VI'),   __('Vallas invictas (arquero)')],
                     ];
                 @endphp
 
                 @if($jugadores->total() === 0)
-                    <div class="t-vacio"><i class="bi bi-people"></i>No hay jugadores cargados para este club.</div>
+                    <div class="t-vacio"><i class="bi bi-people"></i>{{ __('No hay jugadores cargados para este club.') }}</div>
                 @else
                     <div class="t-tabla-wrap">
                         <table class="t-tabla">
                             <thead>
                             <tr>
                                 <th>#</th>
-                                <th>Jugador</th>
+                                <th>{{ __('Jugador') }}</th>
                                 @foreach($veColumnas as $veClave => $veCol)
                                     <th title="{{ $veCol[1] }}" class="{{ $order == $veClave ? 't-orden-activo' : '' }}">
                                         <a href="{{ route('equipos.ver', [
@@ -407,7 +407,7 @@
                     </div>
                     <div class="t-pie-lista">
                         {{ $jugadores->appends(['pestActiva' => 'jugadores', 'order' => $order, 'tipoOrder' => $tipoOrder])->links() }}
-                        <span>{{ $jugadores->total() }} jugadores</span>
+                        <span>{{ trans_choice(':n jugador|:n jugadores', $jugadores->total(), ['n' => $jugadores->total()]) }}</span>
                     </div>
                 @endif
             </div>
@@ -416,7 +416,7 @@
 
         <div class="d-flex justify-content-start my-4">
             <a href="{{ url()->previous() }}" class="btn btn-success btn-sm">
-                <i class="bi bi-arrow-left"></i> Volver
+                <i class="bi bi-arrow-left"></i> {{ __('Volver') }}
             </a>
         </div>
 

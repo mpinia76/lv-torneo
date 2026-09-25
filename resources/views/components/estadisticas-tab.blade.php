@@ -19,15 +19,15 @@
                         {{ $i }}
                     @elseif($field === 'numero')
                         @if(is_numeric($row->numero))
-                            Fecha {{ $row->numero }}
+                            {{ __('Fecha :numero', ['numero' => $row->numero]) }}
                         @else
-                            {{ $row->numero }}
+                            {{ trad_dato($row->numero) }}
                         @endif
                     @elseif($field === 'nombre')
 
                         @if(!empty($row->escudo))
                             <img src="{{ url('images/'.$row->escudo) }}"
-                                 alt="escudo {{ $row->nombre }}"
+                                 alt="{{ __('escudo :nombre', ['nombre' => $row->nombre]) }}"
                                  width="24" height="24"
                                  class="me-2 img-fluid d-inline">
                         @endif
@@ -37,7 +37,7 @@
 
                         @if(!empty($row->escudoTorneo))
                             <img src="{{ url('images/'.$row->escudoTorneo) }}"
-                                 alt="escudoTorneo {{ $row->nombreTorneo }}"
+                                 alt="{{ __('escudo :nombre', ['nombre' => $row->nombreTorneo]) }}"
                                  width="24" height="24"
                                  class="me-2 img-fluid d-inline">
                         @endif

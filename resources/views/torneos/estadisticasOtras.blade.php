@@ -1,20 +1,20 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Estadísticas del Torneo')
+@section('pageTitle', __('Estadísticas del Torneo'))
 
 @section('content')
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Estadísticas Generales</h1>
+                <h1 class="t-titulo">{{ __('Estadísticas Generales') }}</h1>
         <ul class="nav nav-tabs" id="myTab" role="tablist">
             @php
                 $tabs = [
-                    'torneos' => 'Torneos',
-                    'fechas' => 'Fechas',
-                    'partidos' => 'Partidos',
-                     'resumen' => 'Resumen General',
-                     'graficos' => 'Gráficos',
+                    'torneos' => __('Torneos'),
+                    'fechas' => __('Fechas'),
+                    'partidos' => __('Partidos'),
+                     'resumen' => __('Resumen General'),
+                     'graficos' => __('Gráficos'),
                 ];
             @endphp
             @foreach($tabs as $id => $label)
@@ -43,14 +43,14 @@
                     'Neutrales' => 'torneoMasGolesNeutrales',
                 ] as $title => $key)
                     @if($title)
-                        <h5>{{ $title }}</h5>
+                        <h5>{{ __($title) }}</h5>
                     @endif
                     <x-estadisticas-tab :data="$estadisticas[$key]" :columns="[
-                        'Torneo' => 'nombreTorneo',
+                        __('Torneo') => 'nombreTorneo',
 
-                        'Goles' => 'goles',
-                        'Promedio' => 'promedio',
-                        'Partidos' => 'partidos',
+                        __('Goles') => 'goles',
+                        __('Promedio') => 'promedio',
+                        __('Partidos') => 'partidos',
                     ]"/>
                 @endforeach
             </div>
@@ -64,15 +64,15 @@
                     'Neutrales' => 'fechaMasGolesNeutrales',
                 ] as $title => $key)
                     @if($title)
-                        <h5>{{ $title }}</h5>
+                        <h5>{{ __($title) }}</h5>
                     @endif
                     <x-estadisticas-tab :data="$estadisticas[$key]" :columns="[
-                        'Torneo' => 'nombreTorneo',
+                        __('Torneo') => 'nombreTorneo',
 
-                        'Fecha' => 'numero',
-                        'Goles' => 'goles',
-                        'Promedio' => 'promedio',
-                        'Partidos' => 'partidos',
+                        __('Fecha') => 'numero',
+                        __('Goles') => 'goles',
+                        __('Promedio') => 'promedio',
+                        __('Partidos') => 'partidos',
                     ]"/>
                 @endforeach
             </div>
@@ -86,7 +86,7 @@
                     'Neutrales' => 'maxGolesNeutrales',
                 ] as $title => $key)
                     @if($title)
-                        <h5>{{ $title }}</h5>
+                        <h5>{{ __($title) }}</h5>
                     @endif
                     <x-estadisticas-partidos :data="$estadisticas[$key]" :showTorneo="true"/>
                 @endforeach
@@ -95,29 +95,29 @@
             {{-- Resumen General --}}
             <div class="tab-pane fade" id="resumen" role="tabpanel" aria-labelledby="resumen-tab">
                 <x-estadisticas-tab :data="$estadisticasResumen" :columns="[
-                    'Torneo' => 'nombreTorneo',
+                    __('Torneo') => 'nombreTorneo',
 
-                    'Partidos' => 'partidos',
-                    'Goles' => 'goles',
-                    'Promedio' => 'promedio_goles',
-                    'Max 1 partido' => 'max_goles',
-                     'Goles Local' => 'goles_local',
-                    'Goles Visitante' => 'goles_visitante',
-                    'Goles Neutrales' => 'goles_neutral',
-                    'Amarillas' => 'amarillas',
-                    'Rojas' => 'rojas',
+                    __('Partidos') => 'partidos',
+                    __('Goles') => 'goles',
+                    __('Promedio') => 'promedio_goles',
+                    __('Max 1 partido') => 'max_goles',
+                     __('Goles Local') => 'goles_local',
+                    __('Goles Visitante') => 'goles_visitante',
+                    __('Goles Neutrales') => 'goles_neutral',
+                    __('Amarillas') => 'amarillas',
+                    __('Rojas') => 'rojas',
 
                 ]"/>
             </div>
 
             <div class="tab-pane fade" id="graficos" role="tabpanel" aria-labelledby="graficos-tab">
-                <h1 class="t-titulo">Estadísticas Generales en Gráficos</h1>
+                <h1 class="t-titulo">{{ __('Estadísticas Generales en Gráficos') }}</h1>
 
                 <div class="row">
                     {{-- 1️⃣ Goles totales por torneo --}}
                     <div class="col-md-6 mb-4">
                         <div class="card shadow p-3">
-                            <h5 class="text-center text-primary">Goles por Torneo</h5>
+                            <h5 class="text-center text-primary">{{ __('Goles por Torneo') }}</h5>
                             <canvas id="golesPorTorneo"></canvas>
                         </div>
                     </div>
@@ -125,7 +125,7 @@
                     {{-- 2️⃣ Promedio de goles por torneo --}}
                     <div class="col-md-6 mb-4">
                         <div class="card shadow p-3">
-                            <h5 class="text-center text-warning">Promedio de Goles por Torneo</h5>
+                            <h5 class="text-center text-warning">{{ __('Promedio de Goles por Torneo') }}</h5>
                             <canvas id="promedioGolesTorneo"></canvas>
                         </div>
                     </div>
@@ -133,7 +133,7 @@
                     {{-- 3️⃣ Distribución goles locales vs visitantes --}}
                     <div class="col-md-12 mb-4">
                         <div class="card shadow p-3">
-                            <h5 class="text-center text-danger">Goles Locales vs Visitantes</h5>
+                            <h5 class="text-center text-danger">{{ __('Goles Locales vs Visitantes') }}</h5>
                             <canvas id="localesVsVisitantes"></canvas>
                         </div>
                     </div>
@@ -144,7 +144,7 @@
         </div>
 
         <div class="d-flex mt-3">
-            <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+            <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
             </div>
         </div>
@@ -161,7 +161,7 @@
                 data: {
                     labels: datosResumen.map(d => d.nombreTorneo),
                     datasets: [{
-                        label: 'Goles',
+                        label: @json(__('Goles')),
                         data: datosResumen.map(d => d.goles),
                         backgroundColor: 'rgba(54, 162, 235, 0.7)'
                     }]
@@ -176,7 +176,7 @@
                 data: {
                     labels: datosResumen.map(d => d.nombreTorneo),
                     datasets: [{
-                        label: 'Promedio Goles',
+                        label: @json(__('Promedio Goles')),
                         data: datosResumen.map(d => d.promedio_goles),
                         backgroundColor: 'rgba(255, 206, 86, 0.7)'
                     }]
@@ -192,12 +192,12 @@
                     labels: datosResumen.map(d => d.nombreTorneo),
                     datasets: [
                         {
-                            label: 'Goles Locales',
+                            label: @json(__('Goles Locales')),
                             data: datosResumen.map(d => d.goles_local),
                             backgroundColor: 'rgba(75, 192, 192, 0.7)'
                         },
                         {
-                            label: 'Goles Visitante',
+                            label: @json(__('Goles Visitante')),
                             data: datosResumen.map(d => d.goles_visitante),
                             backgroundColor: 'rgba(255, 99, 132, 0.7)'
                         }

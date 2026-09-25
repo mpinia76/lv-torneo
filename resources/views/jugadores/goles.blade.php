@@ -1,6 +1,6 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', 'Goles')
+@section('pageTitle', __('Goles'))
 
 @section('content')
     <script src="{{ asset('js/echarts.min.js') }}"></script>
@@ -8,7 +8,7 @@
     <div class="container">
         <div class="card shadow-sm border-0">
             <div class="card-body">
-                <h1 class="t-titulo">Goles</h1>
+                <h1 class="t-titulo">{{ __('Goles') }}</h1>
 
                 {{-- Info del torneo y jugador --}}
                 <div class="row mb-4">
@@ -43,12 +43,12 @@
                                 <div class="row g-2 text-center">
                                     @php
                                         $tipos = [
-                                            '' => ['label' => 'Todos', 'count' => $totalTodos],
-                                            'Jugada' => ['label' => 'Jugada', 'count' => $totalJugada],
-                                            'Cabeza' => ['label' => 'Cabeza', 'count' => $totalCabeza],
-                                            'Penal' => ['label' => 'Penal', 'count' => $totalPenal],
-                                            'Tiro Libre' => ['label' => 'Tiro Libre', 'count' => $totalTiroLibre],
-                                            'Olímpico' => ['label' => 'Olímpico', 'count' => $totalOlimpico],
+                                            '' => ['label' => __('Todos'), 'count' => $totalTodos],
+                                            'Jugada' => ['label' => __('Jugada'), 'count' => $totalJugada],
+                                            'Cabeza' => ['label' => __('Cabeza'), 'count' => $totalCabeza],
+                                            'Penal' => ['label' => __('Penal'), 'count' => $totalPenal],
+                                            'Tiro Libre' => ['label' => __('Tiro Libre'), 'count' => $totalTiroLibre],
+                                            'Olímpico' => ['label' => __('Olímpico'), 'count' => $totalOlimpico],
                                         ];
                                     @endphp
 
@@ -87,7 +87,7 @@
                 {{-- Nota de goles manuales --}}
                 @if($golesManuales > 0)
                     <div class="alert alert-info small mb-3">
-                        ℹ️ Se incluyen <strong>{{ $golesManuales }}</strong> {{ $golesManuales == 1 ? 'gol cargado manualmente' : 'goles cargados manualmente' }} en los totales. Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.
+                        ℹ️ {!! trans_choice('Se incluye <strong>:n</strong> gol cargado manualmente en los totales.|Se incluyen <strong>:n</strong> goles cargados manualmente en los totales.', (int) $golesManuales, ['n' => (int) $golesManuales]) !!} {{ __('Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.') }}
                     </div>
                 @endif
 
@@ -105,12 +105,12 @@
                         {{-- Paginación --}}
                         <div class="d-flex justify-content-between align-items-center mt-3">
                             {{ $partidos->links() }}
-                            <strong>Total: {{ $partidos->total() }}</strong>
+                            <strong>{{ __('Total: :total', ['total' => $partidos->total()]) }}</strong>
                         </div>
                     </div>
                 </div>
 
-                <a href="{{ url()->previous() }}" class="btn btn-success">Volver</a>
+                <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
             </div>
         </div>
     </div>
@@ -129,19 +129,19 @@
                 legend: {
                     bottom: '0%',
                     left: 'center',
-                    data: ['Jugada','Cabeza','Penal','Tiro Libre','Olímpico']
+                    data: [@json(__('Jugada')),@json(__('Cabeza')),@json(__('Penal')),@json(__('Tiro Libre')),@json(__('Olímpico'))]
                 },
                 series: [{
-                    name: 'Goles',
+                    name: @json(__('Goles')),
                     type: 'pie',
                     radius: '70%',
                     center: ['50%','50%'],
                     data: [
-                        {value: {{ $totalJugada }}, name: 'Jugada'},
-                        {value: {{ $totalCabeza }}, name: 'Cabeza'},
-                        {value: {{ $totalPenal }}, name: 'Penal'},
-                        {value: {{ $totalTiroLibre }}, name: 'Tiro Libre'},
-                        {value: {{ $totalOlimpico }}, name: 'Olímpico'}
+                        {value: {{ $totalJugada }}, name: @json(__('Jugada'))},
+                        {value: {{ $totalCabeza }}, name: @json(__('Cabeza'))},
+                        {value: {{ $totalPenal }}, name: @json(__('Penal'))},
+                        {value: {{ $totalTiroLibre }}, name: @json(__('Tiro Libre'))},
+                        {value: {{ $totalOlimpico }}, name: @json(__('Olímpico'))}
                     ]
                 }]
             });
