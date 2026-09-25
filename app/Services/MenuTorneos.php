@@ -172,9 +172,13 @@ class MenuTorneos
             return self::$zonasMemo;
         }
 
-        self::$zonasMemo = Cache::remember(self::CACHE_ZONAS, self::CACHE_SEGUNDOS, function () {
+        $datos = Cache::remember(self::CACHE_ZONAS, self::CACHE_SEGUNDOS, function () {
             return self::armar(self::torneos());
         });
+
+        // Los escudos de confederación se resuelven fuera de la caché: así un
+        // escudo recién subido aparece enseguida, sin esperar a que venza.
+        self::$zonasMemo = self::conEscudos($datos);
 
         return self::$zonasMemo;
     }
@@ -256,18 +260,31 @@ class MenuTorneos
             return strcmp(self::normalizar($a['nombre']), self::normalizar($b['nombre']));
         });
 
-        // Los escudos de confederación también entran en la versión: al subir
-        // uno nuevo cambia la URL del JSON y el navegador no usa la vieja.
-        foreach ($zonas as $z) {
-            if (!empty($z['escudo'])) {
-                $firma[] = $z['escudo'];
-            }
-        }
-
         return [
             'version' => substr(md5(implode('|', $firma)), 0, 10),
             'zonas'   => $zonas,
         ];
+    }
+
+    /**
+     * Completa el escudo de cada zona de confederación (según los archivos que
+     * haya hoy en public/images/confederaciones) y lo mete en la versión, para
+     * que al subir uno cambie la URL del JSON y el navegador no use la vieja.
+     */
+    protected static function conEscudos($datos)
+    {
+        $escudos = [];
+        foreach ($datos['zonas'] as $clave => $z) {
+            $escudo = strpos($clave, 'r-') === 0 ? self::escudoConfederacion($z['grupo']) : null;
+            $datos['zonas'][$clave]['escudo'] = $escudo;
+            if ($escudo) {
+                $escudos[] = $escudo;
+            }
+        }
+        if ($escudos) {
+            $datos['version'] = substr(md5($datos['version'] . '|' . implode('|', $escudos)), 0, 10);
+        }
+        return $datos;
     }
 
     /** Títulos de las secciones del menú (clave del grupo => título). */
