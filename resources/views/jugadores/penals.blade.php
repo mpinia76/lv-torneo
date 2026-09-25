@@ -78,17 +78,14 @@
 
                         {{-- Gráfico de penales del jugador --}}
                         @if($tipo == '')
-                            <div class="row mt-3">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="chart-container">
-                                            <div class="chart has-fixed-height" id="pie_basic"></div>
-                                        </div>
-                                    </div>
+                            <div class="card shadow-sm mt-3">
+                                <div class="card-body">
+                                    <div id="pie_basic" style="height:300px;"></div>
                                 </div>
                             </div>
                         @endif
-                        <h5 class="card-title text-center">🧤 {{ __('Penales al arquero') }}</h5>
+
+                        <h5 class="card-title text-center mt-4">🧤 {{ __('Penales al arquero') }}</h5>
                         <div class="row text-center">
                             @php
                                 $opciones = [
@@ -119,3 +116,98 @@
                                 </div>
                             @endforeach
                         </div>
+
+                        {{-- Gráfico de penales al arquero --}}
+                        @if($tipo == '' && $totalTodosArquero > 0)
+                            <div class="card shadow-sm mt-3">
+                                <div class="card-body">
+                                    <div id="pie_arqueros" style="height:300px;"></div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Nota de penales manuales --}}
+                @if($penalesManuales > 0)
+                    <div class="alert alert-info small mt-3 mb-3">
+                        ℹ️ {!! trans_choice('Se incluye <strong>:n</strong> penal cargado manualmente en los totales.|Se incluyen <strong>:n</strong> penales cargados manualmente en los totales.', (int) $penalesManuales, ['n' => (int) $penalesManuales]) !!} {{ __('Los partidos correspondientes no se listan abajo porque no tienen detalle disponible.') }}
+                    </div>
+                @endif
+
+                {{-- Tabla de partidos --}}
+                <div class="card shadow-sm mt-3 mb-4">
+                    <div class="card-body">
+                        <div class="t-panel t-lista-partidos">
+                            @foreach($partidos as $partido)
+                                <x-partido :p="$partido"/>
+                            @endforeach
+                        </div>
+
+                        {{-- Paginación --}}
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            {{ $partidos->links() }}
+                            <strong>{{ __('Total: :total', ['total' => $partidos->total()]) }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
+            </div>
+        </div>
+    </div>
+
+    {{-- Gráficos de torta --}}
+    <script>
+        var pie_basic_element = document.getElementById('pie_basic');
+        if (pie_basic_element) {
+            var pie_basic = echarts.init(pie_basic_element);
+            pie_basic.setOption({
+                color: ['#4caf50', '#f44336', '#2196f3'],
+                tooltip: { trigger: 'item', formatter: "{b}: {c} ({d}%)" },
+                legend: {
+                    bottom: '0%',
+                    left: 'center',
+                    data: [@json(__('Convertidos')), @json(__('Errados')), @json(__('Atajados'))]
+                },
+                series: [{
+                    name: @json(__('Penales')),
+                    type: 'pie',
+                    radius: '70%',
+                    center: ['50%', '50%'],
+                    data: [
+                        {value: {{ (int) $totalConvertidos }}, name: @json(__('Convertidos'))},
+                        {value: {{ (int) $totalErrados }}, name: @json(__('Errados'))},
+                        {value: {{ (int) $totalAtajados }}, name: @json(__('Atajados'))}
+                    ]
+                }]
+            });
+            window.addEventListener('resize', function () { pie_basic.resize(); });
+        }
+
+        var pie_arqueros_element = document.getElementById('pie_arqueros');
+        if (pie_arqueros_element) {
+            var pie_arqueros = echarts.init(pie_arqueros_element);
+            pie_arqueros.setOption({
+                color: ['#4caf50', '#f44336'],
+                tooltip: { trigger: 'item', formatter: "{b}: {c} ({d}%)" },
+                legend: {
+                    bottom: '0%',
+                    left: 'center',
+                    data: [@json(__('Atajó')), @json(__('Convirtieron'))]
+                },
+                series: [{
+                    name: @json(__('Penales al arquero')),
+                    type: 'pie',
+                    radius: '70%',
+                    center: ['50%', '50%'],
+                    data: [
+                        {value: {{ (int) $totalAtajos }}, name: @json(__('Atajó'))},
+                        {value: {{ (int) $totalConvirtieron }}, name: @json(__('Convirtieron'))}
+                    ]
+                }]
+            });
+            window.addEventListener('resize', function () { pie_arqueros.resize(); });
+        }
+    </script>
+@endsection

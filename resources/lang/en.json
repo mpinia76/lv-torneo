@@ -467,6 +467,7 @@
     "Sale": "Off",
     "San Marino": "San Marino",
     "Se incluye <strong>:n</strong> gol cargado manualmente en los totales.|Se incluyen <strong>:n</strong> goles cargados manualmente en los totales.": "<strong>:n</strong> manually entered goal is included in the totals.|<strong>:n</strong> manually entered goals are included in the totals.",
+    "Se incluye <strong>:n</strong> penal cargado manualmente en los totales.|Se incluyen <strong>:n</strong> penales cargados manualmente en los totales.": "<strong>:n</strong> manually entered penalty is included in the totals.|<strong>:n</strong> manually entered penalties are included in the totals.",
     "Se incluyen <strong>:n</strong> tarjeta cargada manualmente en los totales.|Se incluyen <strong>:n</strong> tarjetas cargadas manualmente en los totales.": "<strong>:n</strong> manually added card is included in the totals.|<strong>:n</strong> manually added cards are included in the totals.",
     "Se muestran hasta 20 resultados por tipo": "Showing up to 20 results per type",
     "Segunda Fase": "Second round",
