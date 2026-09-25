@@ -85,45 +85,48 @@
                             </div>
                         @endif
 
-                        <h5 class="card-title text-center mt-4">🧤 {{ __('Penales al arquero') }}</h5>
-                        <div class="row text-center">
-                            @php
-                                $opciones = [
-                                    '' => ['label' => __('Todos'), 'valorDB' => ''],
-                                    'Convirtieron' => ['label' => __('Convirtieron'), 'valorDB' => 'Convirtieron'],
-                                    'Atajó' => ['label' => __('Atajó'), 'valorDB' => 'Atajó'],
-                                ];
-                            @endphp
+                        {{-- Penales al arquero: solo si el jugador atajó o recibió alguno --}}
+                        @if($totalTodosArquero > 0)
+                            <h5 class="card-title text-center mt-4">🧤 {{ __('Penales al arquero') }}</h5>
+                            <div class="row text-center">
+                                @php
+                                    $opciones = [
+                                        '' => ['label' => __('Todos'), 'valorDB' => ''],
+                                        'Convirtieron' => ['label' => __('Convirtieron'), 'valorDB' => 'Convirtieron'],
+                                        'Atajó' => ['label' => __('Atajó'), 'valorDB' => 'Atajó'],
+                                    ];
+                                @endphp
 
-                            @foreach($opciones as $tipoClave => $opcion)
-                                <div class="col-6 col-md-3 mb-2">
-                                    <a href="{{ route('jugadores.penals', array_filter([
-                                        'jugadorId' => $jugador->id,
-                                        'torneoId' => $torneo->id ?? null,
-                                        'tipo' => $opcion['valorDB'] ?: null
-                                    ])) }}">
-                                        <div class="p-2 rounded {{ $tipo == $opcion['valorDB'] ? 'bg-success text-white' : 'bg-light' }}">
-                                            <div>{{ $opcion['label'] }}</div>
-                                            <strong>
-                                                @switch($tipoClave)
-                                                    @case('') {{ $totalTodosArquero }} @break
-                                                    @case('Convirtieron') {{ $totalConvirtieron }} @break
-                                                    @case('Atajó') {{ $totalAtajos }} @break
-                                                @endswitch
-                                            </strong>
-                                        </div>
-                                    </a>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        {{-- Gráfico de penales al arquero --}}
-                        @if($tipo == '' && $totalTodosArquero > 0)
-                            <div class="card shadow-sm mt-3">
-                                <div class="card-body">
-                                    <div id="pie_arqueros" style="height:300px;"></div>
-                                </div>
+                                @foreach($opciones as $tipoClave => $opcion)
+                                    <div class="col-6 col-md-3 mb-2">
+                                        <a href="{{ route('jugadores.penals', array_filter([
+                                            'jugadorId' => $jugador->id,
+                                            'torneoId' => $torneo->id ?? null,
+                                            'tipo' => $opcion['valorDB'] ?: null
+                                        ])) }}">
+                                            <div class="p-2 rounded {{ $tipo == $opcion['valorDB'] ? 'bg-success text-white' : 'bg-light' }}">
+                                                <div>{{ $opcion['label'] }}</div>
+                                                <strong>
+                                                    @switch($tipoClave)
+                                                        @case('') {{ $totalTodosArquero }} @break
+                                                        @case('Convirtieron') {{ $totalConvirtieron }} @break
+                                                        @case('Atajó') {{ $totalAtajos }} @break
+                                                    @endswitch
+                                                </strong>
+                                            </div>
+                                        </a>
+                                    </div>
+                                @endforeach
                             </div>
+
+                            {{-- Gráfico de penales al arquero --}}
+                            @if($tipo == '')
+                                <div class="card shadow-sm mt-3">
+                                    <div class="card-body">
+                                        <div id="pie_arqueros" style="height:300px;"></div>
+                                    </div>
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </div>
