@@ -162,10 +162,11 @@ class ControlController extends Controller
      * siempre en los controles tapando los errores que sí se pueden corregir.
      *
      * La salida es la de siempre, la incidencia, pero de un click. Va con
-     * `equipo_id` y `puntos` en NULL a propósito: así no se publica en el
-     * front ni toca la tabla de posiciones (ver `posicionesPublic` y
-     * `GrupoController`, que filtran por `whereNotNull('equipo_id')`), y el
-     * partido desaparece de TODOS los controles.
+     * `equipo_id` y `puntos` en NULL a propósito: así no toca la tabla de
+     * posiciones (ver `posicionesPublic` y `GrupoController`, que filtran
+     * por `whereNotNull('equipo_id')`), y el partido desaparece de TODOS los
+     * controles. OJO: la observación SÍ se ve en el detalle público del
+     * partido (pestaña Incidencias), por eso el texto nunca nombra a TM.
      */
     public function marcarSinDatos(Request $request)
     {
@@ -256,10 +257,10 @@ class ControlController extends Controller
     /**
      * La incidencia de "no se puede arreglar" en un partido.
      *
-     * Va con `equipo_id` y `puntos` en NULL a propósito: así no se publica en
-     * el front ni toca la tabla de posiciones (ver `posicionesPublic` y
-     * `GrupoController`, que filtran por `whereNotNull('equipo_id')`), y el
-     * partido desaparece de TODOS los controles.
+     * Va con `equipo_id` y `puntos` en NULL a propósito: así no toca la tabla
+     * de posiciones (ver `posicionesPublic` y `GrupoController`, que filtran
+     * por `whereNotNull('equipo_id')`), y el partido desaparece de TODOS los
+     * controles. La observación SÍ se ve en el detalle público del partido.
      *
      * Devuelve `['creada' => bool, 'ya_tenia' => bool, 'texto' => string]`. No
      * invalida los conteos: eso lo hace quien llama, una sola vez, aunque haya

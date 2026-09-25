@@ -493,49 +493,53 @@ class Controles
      *
      * La clave llega por POST desde la fila, así que se valida contra este
      * mapa: cualquier cosa que no esté acá cae en el texto genérico.
+     *
+     * REGLA: el 'texto' se ve en el sitio público (pestaña Incidencias del
+     * detalle del partido). **Nunca nombrar a Transfermarkt ni a TM ahí.**
+     * El 'boton' sí puede decir TM: sólo lo ve el admin.
      */
     public function motivoSinDatos($clave): array
     {
         $motivos = [
             'arbitros.terna' => [
                 'boton' => 'Terna incompleta en TM',
-                'texto' => 'Terna incompleta en TM: la ficha de Transfermarkt de este partido no publica la terna completa (falta algún asistente).',
+                'texto' => 'Terna incompleta: no hay registro de la terna arbitral completa de este partido (falta algún asistente).',
             ],
             'alineaciones.sin_jugadores' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'Transfermarkt no publica la alineación de alguno de los dos equipos ("no data available").',
+                'texto' => 'No hay registro de la alineación de alguno de los dos equipos.',
             ],
             'alineaciones.faltan' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'La alineación que publica Transfermarkt para este partido está incompleta.',
+                'texto' => 'La alineación registrada para este partido está incompleta.',
             ],
             'tecnicos.faltan' => [
                 'boton' => 'Sin técnico en TM',
-                'texto' => 'Transfermarkt no publica el técnico de alguno de los dos equipos en este partido.',
+                'texto' => 'No hay registro del técnico de alguno de los dos equipos en este partido.',
             ],
             'goles.diferencia' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'La ficha de Transfermarkt no tiene todos los goles del partido: el detalle no da el resultado.',
+                'texto' => 'No hay registro de todos los goles del partido: el detalle no da el resultado.',
             ],
             'goles.por_equipo' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'La ficha de Transfermarkt no permite saber de qué equipo es cada gol de este partido.',
+                'texto' => 'No hay registro de qué equipo convirtió cada gol de este partido.',
             ],
             'goles.sin_jugar' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'El goleador no figura en la alineación que publica Transfermarkt para este partido.',
+                'texto' => 'El goleador no figura en la alineación registrada para este partido.',
             ],
             'tarjetas.sin_jugar' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'El amonestado no figura en la alineación que publica Transfermarkt para este partido.',
+                'texto' => 'El amonestado no figura en la alineación registrada para este partido.',
             ],
             'cambios.sin_jugar' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'El jugador del cambio no figura en la alineación que publica Transfermarkt para este partido.',
+                'texto' => 'El jugador del cambio no figura en la alineación registrada para este partido.',
             ],
             'cambios.impares' => [
                 'boton' => 'Sin datos en TM',
-                'texto' => 'La ficha de Transfermarkt no dice quién salió en ese cambio: publica al que entra y no a su contraparte.',
+                'texto' => 'No hay registro de quién salió en ese cambio: figura el que entra y no su contraparte.',
             ],
             // Acá el dato NO falta: TM lo publica bien y nosotros lo guardamos
             // bien. El que se equivoca es el control, que cuenta cuántos entran
@@ -543,7 +547,7 @@ class Controles
             // dentro de dos años esa observación mentiría.
             'cambios.sale_solo' => [
                 'boton' => 'Salida sin reemplazo',
-                'texto' => 'Salida sin reemplazo: Transfermarkt publica el movimiento como "Substitution without replacement" (el jugador sale y no entra nadie, con los cambios agotados). El dato está bien cargado; el control lo marca porque compara cuántos entran contra cuántos salen.',
+                'texto' => 'Salida sin reemplazo: el jugador sale y no entra nadie (con los cambios agotados). El dato está bien cargado; el control lo marca porque compara cuántos entran contra cuántos salen.',
             ],
             // Tampoco es "sin datos": lo más probable es que el partido no se
             // haya jugado (postergado, suspendido, anulado). Escribir "TM no
@@ -558,7 +562,7 @@ class Controles
 
         return $motivos[$clave] ?? [
             'boton' => 'Sin datos en TM',
-            'texto' => 'Transfermarkt no publica el detalle completo de este partido.',
+            'texto' => 'No hay registro del detalle completo de este partido.',
         ];
     }
 
