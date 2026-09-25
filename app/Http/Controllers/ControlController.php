@@ -289,7 +289,9 @@ class ControlController extends Controller
             'torneo_id'     => $partido->torneo_id,
             'equipo_id'     => null,
             'puntos'        => null,
-            'observaciones' => $motivo.' Marcado desde Controles de carga el '.date('d/m/Y').'.',
+            // Sólo el motivo: la observación se ve en el detalle público del
+            // partido, y "Marcado desde Controles de carga" es cocina interna.
+            'observaciones' => $motivo,
         ]);
 
         return ['creada' => true, 'ya_tenia' => false,
