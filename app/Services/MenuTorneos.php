@@ -157,7 +157,7 @@ class MenuTorneos
      *   'zonas'   => [
      *      clave => [
      *        'clave' => 'p-argentina', 'nombre' => 'Argentina', 'grupo' => 'local'|'conmebol'|'uefa'|…,
-     *        'bandera' => 'Argentina.gif'|null, 'orden' => int, 'ultimo' => 2025, 'ediciones' => 312,
+     *        'bandera' => 'Argentina.gif'|null, 'escudo' => 'confederaciones/uefa.png'|null, 'orden' => int, 'ultimo' => 2025, 'ediciones' => 312,
      *        'competencias' => [
      *           ['clave', 'nombre', 'tipo', 'escudo', 'ultimo' => 2025, 'historica' => bool,
      *            'ediciones' => [['id' => 812, 'year' => '2025'], …]],
@@ -256,6 +256,14 @@ class MenuTorneos
             return strcmp(self::normalizar($a['nombre']), self::normalizar($b['nombre']));
         });
 
+        // Los escudos de confederación también entran en la versión: al subir
+        // uno nuevo cambia la URL del JSON y el navegador no usa la vieja.
+        foreach ($zonas as $z) {
+            if (!empty($z['escudo'])) {
+                $firma[] = $z['escudo'];
+            }
+        }
+
         return [
             'version' => substr(md5(implode('|', $firma)), 0, 10),
             'zonas'   => $zonas,
@@ -334,6 +342,7 @@ class MenuTorneos
                 'n'  => $z['nombre'],
                 'g'  => $z['grupo'],
                 'b'  => $z['bandera'] ? url('images/' . $z['bandera']) : '',
+                'es' => !empty($z['escudo']) ? url('images/' . $z['escudo']) : '',
                 'cs' => $comps,
             ];
         }
@@ -377,7 +386,14 @@ class MenuTorneos
                 $nombre = self::capitalizar($t->region);
             }
 
-            return ['clave' => 'r-' . $clave, 'nombre' => $nombre, 'grupo' => $conf, 'bandera' => null, 'orden' => 0];
+            return [
+                'clave'   => 'r-' . $clave,
+                'nombre'  => $nombre,
+                'grupo'   => $conf,
+                'bandera' => null,
+                'escudo'  => self::escudoConfederacion($conf),
+                'orden'   => 0,
+            ];
         }
 
         $pais = trim((string) $t->pais);
@@ -400,8 +416,32 @@ class MenuTorneos
             'grupo'   => $grupo,
             // Mismo criterio que las banderitas de nacionalidad de las fichas.
             'bandera' => removeAccents($pais) . '.gif',
+            'escudo'  => null,
             'orden'   => 1,
         ];
+    }
+
+    /** Carpeta (dentro de public/images) con los escudos de las confederaciones. */
+    const CARPETA_CONFEDERACIONES = 'confederaciones';
+
+    /**
+     * Escudo de la confederación: public/images/confederaciones/<clave>.svg|png|webp
+     * (fifa, conmebol, uefa, concacaf, afc, caf, ofc). Si no está el archivo
+     * devuelve null y la zona sigue con el globito, así no se piden imágenes
+     * que no existen. Ojo: el menú se cachea una hora (MenuTorneos::olvidar()).
+     */
+    public static function escudoConfederacion($conf)
+    {
+        if (!isset(self::$nombresRegion[$conf])) {
+            return null;
+        }
+        foreach (['svg', 'png', 'webp'] as $ext) {
+            $archivo = self::CARPETA_CONFEDERACIONES . '/' . $conf . '.' . $ext;
+            if (is_file(public_path('images/' . $archivo))) {
+                return $archivo;
+            }
+        }
+        return null;
     }
 
     public static function claveCompetencia($nombre)

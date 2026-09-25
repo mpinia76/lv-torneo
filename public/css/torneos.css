@@ -201,6 +201,16 @@ a:hover { color: var(--t-accent-hover); }
     vertical-align: middle;
 }
 
+/* Escudo de confederación en lugar de bandera: mismo ancho que la bandera
+   para que los nombres queden alineados, sin recortar (son escudos, no
+   rectángulos). */
+.escudo-conf {
+    width: 15px; height: 15px;
+    flex: none;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
 /* ---------- 5. NAVEGACIÓN ------------------------------------------------ */
 
 .t-navbar {

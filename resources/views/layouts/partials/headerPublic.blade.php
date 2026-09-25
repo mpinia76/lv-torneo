@@ -155,7 +155,9 @@
                     @if($ctxTorneo)
                         <a class="t-barra-zona" href="{{ route('torneos.explorar', ['zona' => $ctxTorneo['zona']['clave']]) }}"
                            title="Más torneos de {{ $ctxTorneo['zona']['nombre'] }}">
-                            @if($ctxTorneo['zona']['bandera'])
+                            @if(!empty($ctxTorneo['zona']['escudo']))
+                            <img class="escudo-conf" src="{{ url('images/'.$ctxTorneo['zona']['escudo']) }}" alt="" onerror="this.remove()">
+                        @elseif($ctxTorneo['zona']['bandera'])
                                 <img class="bandera" src="{{ url('images/'.$ctxTorneo['zona']['bandera']) }}" alt="" onerror="this.remove()">
                             @else
                                 <i class="bi bi-globe2"></i>

@@ -209,6 +209,16 @@
     }
 
     function iconoZona(z) {
+        if (z.es) {
+            // Escudo de la confederación (Torneos FIFA, Conmebol, UEFA…).
+            var esc = crear('img', 'escudo-conf');
+            esc.src = z.es;
+            esc.alt = '';
+            esc.onerror = function () {
+                if (esc.parentNode) esc.parentNode.replaceChild(crear('i', 'bi bi-globe2'), esc);
+            };
+            return esc;
+        }
         if (z.b) {
             var img = crear('img', 'bandera');
             img.src = z.b;

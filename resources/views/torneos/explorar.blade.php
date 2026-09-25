@@ -46,7 +46,9 @@
                     <a class="t-mega-zona {{ $z['clave'] === $zonaActual['clave'] ? 'activo' : '' }}"
                        href="{{ route('torneos.explorar', ['zona' => $z['clave']]) }}"
                        @if($z['clave'] === $zonaActual['clave']) aria-current="page" @endif>
-                        @if($z['bandera'])
+                        @if(!empty($z['escudo']))
+                            <img class="escudo-conf" src="{{ url('images/'.$z['escudo']) }}" alt="" onerror="this.remove()">
+                        @elseif($z['bandera'])
                             <img class="bandera" src="{{ url('images/'.$z['bandera']) }}" alt="" onerror="this.remove()">
                         @else
                             <i class="bi bi-globe2"></i>
