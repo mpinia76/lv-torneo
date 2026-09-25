@@ -23,7 +23,7 @@
         </div>
     @else
         @php
-            $titulosGrupo = ['local' => '', 'inter' => 'Internacional', 'paises' => 'Ligas del mundo'];
+            $titulosGrupo = \App\Services\MenuTorneos::titulosGrupos();
             $grupoPrevio  = null;
 
             $vigentes   = array_values(array_filter($zonaActual['competencias'], function ($c) { return !$c['historica']; }));

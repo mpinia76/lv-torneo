@@ -1773,6 +1773,7 @@ td.t-dif-neg { color: var(--t-loss); }
     padding: 4px 6px 10px;
 }
 .t-mega-zonas .t-mega-rot:first-child { padding-top: 6px; }
+.t-mega-zonas .t-mega-rot { white-space: normal; line-height: 1.35; }
 .t-mega-zona {
     display: flex; align-items: center; gap: 8px;
     width: 100%;

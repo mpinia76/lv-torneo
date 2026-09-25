@@ -173,7 +173,7 @@
     }
 
     function prepararMega(d) {
-        var datos = { url: d.url, zonas: d.zonas || [], porClave: {} };
+        var datos = { url: d.url, grupos: d.grupos || {}, zonas: d.zonas || [], porClave: {} };
         datos.zonas.forEach(function (z) {
             datos.porClave[z.c] = z;
             z.cs.forEach(function (c) {
@@ -188,7 +188,8 @@
         if (!nav) return;
         nav.innerHTML = '';
 
-        var titulos = { local: '', inter: 'Internacional', paises: 'Ligas del mundo' };
+        // Secciones por confederación; los títulos vienen del servidor (MenuTorneos::$grupos).
+        var titulos = mega.datos.grupos;
         var grupoActual = null;
 
         mega.datos.zonas.forEach(function (z) {

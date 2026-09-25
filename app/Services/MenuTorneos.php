@@ -10,9 +10,13 @@ use Illuminate\Support\Facades\Cache;
  * después por competencia, y recién ahí por temporada.
  *
  *   Argentina                      <- zona "local", siempre primera
- *   Internacional: Sudamérica,     <- ambito Internacional, por región
- *                  Mundial, Europa…
- *   Países: España, Inglaterra…    <- el resto de los nacionales, por país
+ *   Mundial:    Torneos FIFA
+ *   Sudamérica: Torneos Conmebol,  <- por confederación: primero sus torneos
+ *               Brasil, Chile…        internacionales (ambito Internacional,
+ *   Europa:     Torneos UEFA,         por región) y después los países
+ *               Alemania, España…     (nacionales, por país)
+ *   …
+ *   Otros países                   <- país que no está en $confederaciones
  *
  * Una "competencia" junta las ediciones que tienen el mismo nombre
  * ("Copa Argentina" 2019, 2022, 2023…). Se agrupa por nombre y no por el id de
@@ -36,23 +40,91 @@ class MenuTorneos
     const PAIS_LOCAL = 'Argentina';
 
     /**
-     * Regiones de los internacionales: lo que se escribe en torneos.region
-     * (en minúscula y sin acentos) => [clave, nombre visible, orden].
+     * Secciones del menú, en orden. 'local' no lleva título (es Argentina sola).
+     * Clave => título de la sección.
+     */
+    protected static $grupos = [
+        'local'    => '',
+        'fifa'     => 'Mundial',
+        'conmebol' => 'Sudamérica · Conmebol',
+        'uefa'     => 'Europa · UEFA',
+        'concacaf' => 'Norte y Centroamérica · Concacaf',
+        'afc'      => 'Asia · AFC',
+        'caf'      => 'África · CAF',
+        'ofc'      => 'Oceanía · OFC',
+        'otros'    => 'Otros países',
+    ];
+
+    /** Nombre de la zona con los torneos internacionales de cada confederación. */
+    protected static $nombresRegion = [
+        'fifa'     => 'Torneos FIFA',
+        'conmebol' => 'Torneos Conmebol',
+        'uefa'     => 'Torneos UEFA',
+        'concacaf' => 'Torneos Concacaf',
+        'afc'      => 'Torneos AFC',
+        'caf'      => 'Torneos CAF',
+        'ofc'      => 'Torneos OFC',
+    ];
+
+    /**
+     * Lo que se escribe en torneos.region (en minúscula y sin acentos) =>
+     * confederación.
      */
     protected static $regiones = [
-        'conmebol'   => ['conmebol', 'Sudamérica', 1],
-        'sudamerica' => ['conmebol', 'Sudamérica', 1],
-        'fifa'       => ['fifa', 'Mundial', 2],
-        'mundial'    => ['fifa', 'Mundial', 2],
-        'uefa'       => ['uefa', 'Europa', 3],
-        'europa'     => ['uefa', 'Europa', 3],
-        'concacaf'   => ['concacaf', 'Norte y Centroamérica', 4],
-        'afc'        => ['afc', 'Asia', 5],
-        'asia'       => ['afc', 'Asia', 5],
-        'caf'        => ['caf', 'África', 6],
-        'africa'     => ['caf', 'África', 6],
-        'ofc'        => ['ofc', 'Oceanía', 7],
-        'oceania'    => ['ofc', 'Oceanía', 7],
+        'conmebol' => 'conmebol', 'sudamerica' => 'conmebol',
+        'fifa'     => 'fifa',     'mundial'    => 'fifa',
+        'uefa'     => 'uefa',     'europa'     => 'uefa',
+        'concacaf' => 'concacaf',
+        'afc'      => 'afc',      'asia'       => 'afc',
+        'caf'      => 'caf',      'africa'     => 'caf',
+        'ofc'      => 'ofc',      'oceania'    => 'ofc',
+    ];
+
+    /**
+     * País (como en torneos.pais, en minúscula y sin acentos) => confederación.
+     * El que no esté acá cae en «Otros países»: se agrega una línea y listo.
+     */
+    protected static $confederaciones = [
+        // Conmebol
+        'argentina' => 'conmebol', 'bolivia' => 'conmebol', 'brasil' => 'conmebol', 'chile' => 'conmebol',
+        'colombia' => 'conmebol', 'ecuador' => 'conmebol', 'paraguay' => 'conmebol', 'peru' => 'conmebol',
+        'uruguay' => 'conmebol', 'venezuela' => 'conmebol',
+        // UEFA
+        'albania' => 'uefa', 'alemania' => 'uefa', 'andorra' => 'uefa', 'armenia' => 'uefa', 'austria' => 'uefa',
+        'azerbaiyan' => 'uefa', 'belgica' => 'uefa', 'bielorrusia' => 'uefa', 'bosnia y herzegovina' => 'uefa',
+        'bulgaria' => 'uefa', 'chipre' => 'uefa', 'croacia' => 'uefa', 'dinamarca' => 'uefa', 'escocia' => 'uefa',
+        'eslovaquia' => 'uefa', 'eslovenia' => 'uefa', 'espana' => 'uefa', 'estonia' => 'uefa', 'finlandia' => 'uefa',
+        'francia' => 'uefa', 'gales' => 'uefa', 'georgia' => 'uefa', 'gibraltar' => 'uefa', 'grecia' => 'uefa',
+        'holanda' => 'uefa', 'hungria' => 'uefa', 'inglaterra' => 'uefa', 'irlanda' => 'uefa',
+        'irlanda del norte' => 'uefa', 'islandia' => 'uefa', 'islas feroe' => 'uefa', 'israel' => 'uefa',
+        'italia' => 'uefa', 'kazajistan' => 'uefa', 'kosovo' => 'uefa', 'letonia' => 'uefa',
+        'liechtenstein' => 'uefa', 'lituania' => 'uefa', 'luxemburgo' => 'uefa', 'macedonia' => 'uefa',
+        'macedonia del norte' => 'uefa', 'malta' => 'uefa', 'moldavia' => 'uefa', 'montenegro' => 'uefa',
+        'noruega' => 'uefa', 'paises bajos' => 'uefa', 'polonia' => 'uefa', 'portugal' => 'uefa',
+        'republica checa' => 'uefa', 'chequia' => 'uefa', 'rumania' => 'uefa', 'rusia' => 'uefa',
+        'san marino' => 'uefa', 'serbia' => 'uefa', 'suecia' => 'uefa', 'suiza' => 'uefa', 'turquia' => 'uefa',
+        'ucrania' => 'uefa',
+        // Concacaf
+        'belice' => 'concacaf', 'canada' => 'concacaf', 'costa rica' => 'concacaf', 'cuba' => 'concacaf',
+        'curazao' => 'concacaf', 'el salvador' => 'concacaf', 'estados unidos' => 'concacaf', 'eeuu' => 'concacaf',
+        'guatemala' => 'concacaf', 'guyana' => 'concacaf', 'haiti' => 'concacaf', 'honduras' => 'concacaf',
+        'jamaica' => 'concacaf', 'mexico' => 'concacaf', 'nicaragua' => 'concacaf', 'panama' => 'concacaf',
+        'puerto rico' => 'concacaf', 'republica dominicana' => 'concacaf', 'surinam' => 'concacaf',
+        'trinidad y tobago' => 'concacaf',
+        // AFC (Australia juega en Asia desde 2006)
+        'arabia saudita' => 'afc', 'arabia saudi' => 'afc', 'australia' => 'afc', 'barein' => 'afc',
+        'catar' => 'afc', 'qatar' => 'afc', 'china' => 'afc', 'corea del sur' => 'afc', 'emiratos arabes unidos' => 'afc',
+        'emiratos arabes' => 'afc', 'filipinas' => 'afc', 'hong kong' => 'afc', 'india' => 'afc',
+        'indonesia' => 'afc', 'irak' => 'afc', 'iran' => 'afc', 'japon' => 'afc', 'jordania' => 'afc',
+        'kuwait' => 'afc', 'libano' => 'afc', 'malasia' => 'afc', 'oman' => 'afc', 'singapur' => 'afc',
+        'siria' => 'afc', 'tailandia' => 'afc', 'uzbekistan' => 'afc', 'vietnam' => 'afc',
+        // CAF
+        'angola' => 'caf', 'argelia' => 'caf', 'camerun' => 'caf', 'costa de marfil' => 'caf', 'egipto' => 'caf',
+        'ghana' => 'caf', 'kenia' => 'caf', 'libia' => 'caf', 'mali' => 'caf', 'marruecos' => 'caf',
+        'nigeria' => 'caf', 'rd congo' => 'caf', 'senegal' => 'caf', 'sudafrica' => 'caf', 'tunez' => 'caf',
+        'zambia' => 'caf',
+        // OFC
+        'fiyi' => 'ofc', 'nueva zelanda' => 'ofc', 'tahiti' => 'ofc',
     ];
 
     /** Memo por request. */
@@ -84,7 +156,7 @@ class MenuTorneos
      *   'version' => 'a1b2c3…',
      *   'zonas'   => [
      *      clave => [
-     *        'clave' => 'p-argentina', 'nombre' => 'Argentina', 'grupo' => 'local'|'inter'|'paises',
+     *        'clave' => 'p-argentina', 'nombre' => 'Argentina', 'grupo' => 'local'|'conmebol'|'uefa'|…,
      *        'bandera' => 'Argentina.gif'|null, 'orden' => int, 'ultimo' => 2025, 'ediciones' => 312,
      *        'competencias' => [
      *           ['clave', 'nombre', 'tipo', 'escudo', 'ultimo' => 2025, 'historica' => bool,
@@ -175,9 +247,11 @@ class MenuTorneos
         }
         unset($z);
 
-        uasort($zonas, function ($a, $b) {
-            $g = ['local' => 0, 'inter' => 1, 'paises' => 2];
-            if ($g[$a['grupo']] !== $g[$b['grupo']]) return $g[$a['grupo']] - $g[$b['grupo']];
+        $ordenGrupos = array_flip(array_keys(self::$grupos));
+        uasort($zonas, function ($a, $b) use ($ordenGrupos) {
+            $ga = $ordenGrupos[$a['grupo']];
+            $gb = $ordenGrupos[$b['grupo']];
+            if ($ga !== $gb)                         return $ga - $gb;
             if ($a['orden'] !== $b['orden'])         return $a['orden'] - $b['orden'];
             return strcmp(self::normalizar($a['nombre']), self::normalizar($b['nombre']));
         });
@@ -186,6 +260,12 @@ class MenuTorneos
             'version' => substr(md5(implode('|', $firma)), 0, 10),
             'zonas'   => $zonas,
         ];
+    }
+
+    /** Títulos de las secciones del menú (clave del grupo => título). */
+    public static function titulosGrupos()
+    {
+        return self::$grupos;
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -259,9 +339,10 @@ class MenuTorneos
         }
 
         return [
-            'v'     => $datos['version'],
-            'url'   => route('fechas.ver') . '?torneoId=',
-            'zonas' => $zonas,
+            'v'      => $datos['version'],
+            'url'    => route('fechas.ver') . '?torneoId=',
+            'grupos' => self::$grupos,
+            'zonas'  => $zonas,
         ];
     }
 
@@ -269,7 +350,11 @@ class MenuTorneos
     //  Reglas
     // ─────────────────────────────────────────────────────────────────────
 
-    /** ['clave', 'nombre', 'grupo', 'bandera', 'orden'] de un torneo. */
+    /**
+     * ['clave', 'nombre', 'grupo', 'bandera', 'orden'] de un torneo.
+     * 'grupo' es la sección del menú (ver $grupos); 'orden' pone los torneos
+     * internacionales de la confederación (0) antes que sus países (1).
+     */
     public static function zonaDe($t)
     {
         if ($t->ambito === 'Internacional') {
@@ -282,14 +367,17 @@ class MenuTorneos
             }
 
             if (isset(self::$regiones[$region])) {
-                list($clave, $nombre, $orden) = self::$regiones[$region];
+                $conf   = self::$regiones[$region];
+                $clave  = $conf;
+                $nombre = self::$nombresRegion[$conf];
             } else {
+                // Región escrita de otra forma: queda en «Otros», con su nombre.
+                $conf   = 'otros';
                 $clave  = self::slug($region);
                 $nombre = self::capitalizar($t->region);
-                $orden  = 50;
             }
 
-            return ['clave' => 'r-' . $clave, 'nombre' => $nombre, 'grupo' => 'inter', 'bandera' => null, 'orden' => $orden];
+            return ['clave' => 'r-' . $clave, 'nombre' => $nombre, 'grupo' => $conf, 'bandera' => null, 'orden' => 0];
         }
 
         $pais = trim((string) $t->pais);
@@ -297,15 +385,22 @@ class MenuTorneos
             $pais = self::PAIS_LOCAL;
         }
         $pais  = self::capitalizar($pais);
-        $local = self::normalizar($pais) === self::normalizar(self::PAIS_LOCAL);
+        $norm  = self::normalizar($pais);
+        $local = $norm === self::normalizar(self::PAIS_LOCAL);
+
+        if ($local) {
+            $grupo = 'local';
+        } else {
+            $grupo = isset(self::$confederaciones[$norm]) ? self::$confederaciones[$norm] : 'otros';
+        }
 
         return [
             'clave'   => 'p-' . self::slug($pais),
             'nombre'  => $pais,
-            'grupo'   => $local ? 'local' : 'paises',
+            'grupo'   => $grupo,
             // Mismo criterio que las banderitas de nacionalidad de las fichas.
             'bandera' => removeAccents($pais) . '.gif',
-            'orden'   => 0,
+            'orden'   => 1,
         ];
     }
 
