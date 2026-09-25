@@ -2,20 +2,20 @@
 
 namespace App;
 
-use App\Providers\ComposerServiceProvider;
+use App\Services\MenuTorneos;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cache;
 
 class Torneo extends Model
 {
     /**
      * Los menús públicos se arman con una lista de torneos cacheada
-     * (ver ComposerServiceProvider). Al tocar un torneo hay que tirarla.
+     * (ver App\Services\MenuTorneos). Al tocar un torneo hay que tirarla,
+     * junto con el armado por país y competencia.
      */
     protected static function booted()
     {
-        static::saved(function () { Cache::forget(ComposerServiceProvider::CACHE_KEY); });
-        static::deleted(function () { Cache::forget(ComposerServiceProvider::CACHE_KEY); });
+        static::saved(function () { MenuTorneos::olvidar(); });
+        static::deleted(function () { MenuTorneos::olvidar(); });
     }
 
      protected $fillable = ['nombre', 'year', 'equipos','grupos','tipo','ambito', 'url_nombre','escudo','neutral', 'descenso', 'descenso_promedio', 'region','sofa_tournament_id',

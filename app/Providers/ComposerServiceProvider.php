@@ -2,17 +2,16 @@
 
 namespace App\Providers;
 
-use App\Torneo;
-use Illuminate\Support\Facades\Cache;
+use App\Services\MenuTorneos;
 use Illuminate\Support\ServiceProvider;
 use View;
 
 class ComposerServiceProvider  extends ServiceProvider
 {
-    /** Clave del caché con la lista de torneos que alimenta los menús. */
-    const CACHE_KEY = 'torneos.menu';
+    /** Clave del caché con la lista de torneos (ahora vive en MenuTorneos). */
+    const CACHE_KEY = MenuTorneos::CACHE_TORNEOS;
 
-    /** Minutos que vive el caché (igual se limpia solo al guardar un torneo). */
+    /** Se conserva por si algo externo la lee. */
     const CACHE_MINUTOS = 60;
 
     /**
@@ -41,13 +40,11 @@ class ComposerServiceProvider  extends ServiceProvider
         View::composer('*', function ($view) use (&$torneos, &$torneosMenu) {
 
             if ($torneos === null) {
-                $torneos = Cache::remember(self::CACHE_KEY, self::CACHE_MINUTOS * 60, function () {
-                    return Torneo::orderBy('year', 'DESC')->orderBy('id', 'DESC')->get();
-                });
+                $torneos = MenuTorneos::torneos();
 
-                // $torneosMenu: lo que se navega desde los menús públicos.
-                // Queda afuera lo parcial (torneos cargados solo con los partidos del
-                // ciclo de un DT) y lo del exterior: a eso se llega desde las fichas.
+                // $torneosMenu: la lista vieja, solo lo argentino y los internacionales
+                // propios. El menú superior ya no la usa (ahora arma todo el mundo por
+                // país con MenuTorneos); queda por si alguna vista vieja la pide.
                 $torneosMenu = $torneos->filter(function ($t) {
                     if (!empty($t->parcial)) return false;
 

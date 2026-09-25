@@ -370,6 +370,11 @@ Route::get('tarjetero', 'GrupoController@tarjetasPublic')->name('grupos.tarjetas
 Route::get('verFechas', 'FechaController@ver')->name('fechas.ver');
 Route::get('fixture', 'FechaController@fixture')->name('fechas.fixture');
 Route::get('buscar', 'BuscadorController@index')->name('buscar');
+
+// Menú «Torneos» por país / región: el desplegable baja el JSON la primera vez
+// que se abre; /competiciones es lo mismo como página común (sin JS, buscadores).
+Route::get('torneos-menu', 'MenuTorneosController@json')->name('torneos.menuJson');
+Route::get('competiciones', 'MenuTorneosController@explorar')->name('torneos.explorar');
 Route::get('verFecha', 'FechaController@showPublic')->name('fechas.showPublic');
 Route::get('detalleFecha', 'FechaController@detalle')->name('fechas.detalle');
 Route::get('verJugador', 'JugadorController@ver')->name('jugadores.ver');

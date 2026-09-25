@@ -1,19 +1,9 @@
 @php
-    $menu = $torneosMenu ?? $torneos;
-
-    $ligas = $menu->filter(function ($t) {
-        return $t->tipo == 'Liga' && $t->ambito == 'Nacional';
-    })->groupBy('year');
-
-    $copas = $menu->filter(function ($t) {
-        return $t->tipo == 'Copa' && $t->ambito == 'Nacional';
-    })->groupBy('year');
-
-    $internacionales = $menu->filter(function ($t) {
-        return $t->ambito == 'Internacional';
-    })->groupBy('year');
-
     $torneoActivo = Session::get('codigoTorneo');
+
+    // Zona (país / región) y otras temporadas del torneo que se está mirando.
+    $ctxTorneo = $torneoActivo ? \App\Services\MenuTorneos::contexto($torneoActivo) : null;
+    $menuVersion = \App\Services\MenuTorneos::zonas()['version'];
 @endphp
 
 <header>
@@ -76,47 +66,46 @@
                                href="{{ route('fechas.fixture') }}">Partidos</a>
                         </li>
 
-                        {{-- Últimos torneos vistos: lo completa torneos.js con lo guardado en el navegador --}}
-                        <li class="nav-item dropdown" id="menu-recientes" hidden>
-                            <a class="nav-link dropdown-toggle" href="#" id="recientesDropdown" role="button"
-                               data-bs-toggle="dropdown" aria-expanded="false">Recientes</a>
-                            <ul class="dropdown-menu t-menu-corto" id="recientesMenu" aria-labelledby="recientesDropdown"></ul>
-                        </li>
+                        {{--
+                            Torneos: panel por país / región -> competencia -> temporada.
+                            El contenido lo arma torneos.js con el JSON de torneos.menuJson
+                            la primera vez que se abre. Sin JS, el enlace lleva a /competiciones.
+                        --}}
+                        <li class="nav-item dropdown t-nav-mega">
+                            <a class="nav-link dropdown-toggle {{ request()->routeIs('torneos.explorar') ? 'active' : '' }}"
+                               href="{{ route('torneos.explorar') }}" id="torneosDropdown" role="button"
+                               data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">Torneos</a>
 
-                        @foreach([
-                            ['id' => 'liga',  'label' => 'Ligas',         'grupos' => $ligas,           'placeholder' => 'Buscar liga o año...'],
-                            ['id' => 'copa',  'label' => 'Copas',         'grupos' => $copas,           'placeholder' => 'Buscar copa o año...'],
-                            ['id' => 'inter', 'label' => 'Internacional', 'grupos' => $internacionales, 'placeholder' => 'Buscar torneo o año...'],
-                        ] as $m)
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="{{ $m['id'] }}Dropdown" role="button"
-                                   data-bs-toggle="dropdown" aria-expanded="false">{{ $m['label'] }}</a>
-                                <ul class="dropdown-menu t-menu-torneos" aria-labelledby="{{ $m['id'] }}Dropdown">
-                                    <li class="t-menu-buscador">
-                                        <input type="text" class="form-control form-control-sm"
-                                               placeholder="{{ $m['placeholder'] }}"
-                                               onkeyup="filterDropdown(this, '{{ $m['id'] }}DropdownMenu')">
-                                    </li>
-                                    <div id="{{ $m['id'] }}DropdownMenu">
-                                        @foreach($m['grupos'] as $anio => $lista)
-                                            <div class="t-menu-grupo" data-anio="{{ $anio }}">
-                                                <div class="t-menu-anio">{{ $anio }}</div>
-                                                @foreach($lista as $t)
-                                                    <li>
-                                                        <a class="dropdown-item {{ $torneoActivo == $t->id ? 'activo' : '' }}"
-                                                           href="{{ route('fechas.ver', ['torneoId' => $t->id]) }}">
-                                                            <x-escudo :src="$t->escudo" :nombre="$t->nombre" tam="sm"/>
-                                                            <span>{{ $t->nombre }}</span>
-                                                        </a>
-                                                    </li>
-                                                @endforeach
-                                            </div>
-                                        @endforeach
+                            <div class="dropdown-menu t-mega" id="menu-torneos" aria-labelledby="torneosDropdown"
+                                 data-url="{{ route('torneos.menuJson', ['v' => $menuVersion]) }}"
+                                 data-explorar="{{ route('torneos.explorar') }}"
+                                 data-zona="{{ $ctxTorneo ? $ctxTorneo['zona']['clave'] : '' }}"
+                                 data-activo="{{ $torneoActivo }}">
+
+                                <div class="t-mega-cabeza">
+                                    <label class="t-mega-buscador">
+                                        <i class="bi bi-search"></i>
+                                        <input type="search" id="mega-buscar" autocomplete="off"
+                                               placeholder="Buscar torneo, país o año…" aria-label="Buscar torneo, país o año">
+                                    </label>
+                                    <div class="t-mega-recientes" id="mega-recientes" hidden>
+                                        <span class="t-mega-rot">Vistos hace poco</span>
+                                        <div class="t-mega-chips" id="recientesMenu"></div>
                                     </div>
-                                    <li class="t-menu-vacio" hidden>Sin torneos que coincidan</li>
-                                </ul>
-                            </li>
-                        @endforeach
+                                </div>
+
+                                <div class="t-mega-cuerpo">
+                                    <nav class="t-mega-zonas" id="mega-zonas" aria-label="Países y regiones"></nav>
+                                    <div class="t-mega-lista" id="mega-lista" aria-live="polite">
+                                        <div class="t-mega-aviso">Cargando torneos…</div>
+                                    </div>
+                                </div>
+
+                                <div class="t-mega-pie">
+                                    <a href="{{ route('torneos.explorar') }}">Ver todas las competiciones <i class="bi bi-arrow-right"></i></a>
+                                </div>
+                            </div>
+                        </li>
 
                         {{-- Protagonistas --}}
                         <li class="nav-item dropdown">
@@ -162,10 +151,45 @@
              data-torneo-escudo="{{ Session::has('escudoTorneo') ? url('images/'.Session::get('escudoTorneo')) : '' }}"
              data-torneo-url="{{ route('fechas.ver', ['torneoId' => $tId]) }}">
             <div class="container t-barra-inner">
-                <span class="t-barra-titulo">
+                <div class="t-barra-titulo">
+                    @if($ctxTorneo)
+                        <a class="t-barra-zona" href="{{ route('torneos.explorar', ['zona' => $ctxTorneo['zona']['clave']]) }}"
+                           title="Más torneos de {{ $ctxTorneo['zona']['nombre'] }}">
+                            @if($ctxTorneo['zona']['bandera'])
+                                <img class="bandera" src="{{ url('images/'.$ctxTorneo['zona']['bandera']) }}" alt="" onerror="this.remove()">
+                            @else
+                                <i class="bi bi-globe2"></i>
+                            @endif
+                            <span>{{ $ctxTorneo['zona']['nombre'] }}</span>
+                        </a>
+                        <i class="bi bi-chevron-right t-barra-sep" aria-hidden="true"></i>
+                    @endif
+
                     <x-escudo :src="Session::get('escudoTorneo')" :nombre="Session::get('nombreTorneo')"/>
-                    {{ Session::get('nombreTorneo') }}
-                </span>
+
+                    @php
+                        $edicionesBarra = ($ctxTorneo && $ctxTorneo['competencia']) ? $ctxTorneo['competencia']['ediciones'] : [];
+                    @endphp
+
+                    @if(count($edicionesBarra) > 1)
+                        {{-- Nombre + selector de temporada: se cambia de año sin volver al menú --}}
+                        <span>{{ $ctxTorneo['torneo']->nombre }}</span>
+                        <div class="dropdown">
+                            <button class="t-barra-temporada dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                                    aria-expanded="false" aria-label="Cambiar de temporada">{{ $ctxTorneo['torneo']->year }}</button>
+                            <ul class="dropdown-menu t-menu-corto t-menu-temporadas">
+                                @foreach($edicionesBarra as $ed)
+                                    <li>
+                                        <a class="dropdown-item {{ $ed['id'] == $tId ? 'activo' : '' }}"
+                                           href="{{ route('fechas.ver', ['torneoId' => $ed['id']]) }}">{{ $ed['year'] }}</a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @else
+                        <span>{{ Session::get('nombreTorneo') }}</span>
+                    @endif
+                </div>
 
                 <ul class="nav">
                     <li class="nav-item">

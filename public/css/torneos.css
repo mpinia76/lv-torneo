@@ -1676,3 +1676,287 @@ td.t-dif-neg { color: var(--t-loss); }
     .t-duelo { grid-template-columns: 1fr; gap: 14px; }
     .t-duelo-form select { min-width: 0; width: 100%; }
 }
+
+/* ==========================================================================
+   16. MENÚ TORNEOS POR PAÍS / REGIÓN (panel grande) y página /competiciones
+   Clases compartidas: .t-mega-zona, .t-mega-comp, .t-mega-anio… se usan en
+   el desplegable (armado por torneos.js) y en torneos/explorar.blade.php.
+   ========================================================================== */
+
+.t-navbar > .container { position: relative; }
+
+.t-navbar .dropdown-menu.t-mega {
+    padding: 0;
+    overflow: hidden;
+    max-height: none;
+    font-size: .875rem;
+}
+.t-navbar .dropdown-menu.t-mega.show { display: flex; flex-direction: column; }
+
+@media (min-width: 992px) {
+    /* el panel se centra en la barra, no bajo el ítem */
+    .t-navbar .t-nav-mega { position: static; }
+    .t-navbar .dropdown-menu.t-mega {
+        left: 50%;
+        transform: translateX(-50%);
+        top: 100%;
+        margin-top: 2px;
+        width: min(880px, calc(100vw - 32px));
+        height: min(620px, calc(100vh - 90px));
+    }
+}
+
+.t-mega-cabeza {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--t-line);
+    display: flex; flex-direction: column; gap: 8px;
+}
+.t-mega-buscador {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0;
+    padding: 0 10px;
+    border: 1px solid var(--t-line);
+    border-radius: var(--t-radius-sm);
+    background: var(--t-surface-2);
+    color: var(--t-muted);
+}
+.t-mega-buscador:focus-within { border-color: var(--t-accent); background: var(--t-surface); }
+.t-mega-buscador input {
+    flex: 1; min-width: 0;
+    border: 0; outline: 0; background: transparent;
+    padding: 7px 0;
+    font-size: .875rem;
+    color: var(--t-ink);
+}
+
+.t-mega-recientes { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.t-mega-recientes[hidden] { display: none; }
+.t-mega-chips {
+    display: flex; gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    min-width: 0;
+}
+.t-mega-chips::-webkit-scrollbar { display: none; }
+.t-mega-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px 3px 4px;
+    border: 1px solid var(--t-line);
+    border-radius: 99px;
+    background: var(--t-surface);
+    color: var(--t-ink-2);
+    font-size: .78rem;
+    white-space: nowrap;
+    flex: none;
+}
+.t-mega-chip:hover { background: var(--t-accent-soft); color: var(--t-accent); border-color: transparent; }
+
+.t-mega-rot {
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    padding: 10px 10px 4px;
+    white-space: nowrap;
+}
+.t-mega-recientes .t-mega-rot { padding: 0; }
+
+.t-mega-cuerpo { display: flex; flex: 1; min-height: 0; }
+
+.t-mega-zonas {
+    width: 220px;
+    flex: none;
+    overflow-y: auto;
+    background: var(--t-surface-2);
+    border-right: 1px solid var(--t-line);
+    padding: 4px 6px 10px;
+}
+.t-mega-zonas .t-mega-rot:first-child { padding-top: 6px; }
+.t-mega-zona {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--t-radius-sm);
+    background: transparent;
+    color: var(--t-ink-2);
+    font-size: .84rem;
+    text-align: left;
+    cursor: pointer;
+}
+.t-mega-zona:hover { background: var(--t-surface); color: var(--t-ink); }
+.t-mega-zona.activo { background: var(--t-accent-soft); color: var(--t-accent); font-weight: 600; }
+.t-mega-zona .bi { width: 15px; text-align: center; color: var(--t-muted); }
+.t-mega-zona.activo .bi { color: var(--t-accent); }
+.t-mega-zona-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-mega-cuenta {
+    font-family: var(--t-fuente-dato);
+    font-size: 10.5px;
+    color: var(--t-muted);
+    font-weight: 400;
+}
+
+.t-mega-lista {
+    flex: 1; min-width: 0;
+    overflow-y: auto;
+    padding: 0 14px 12px;
+}
+.t-mega-lista-cab {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 0 8px;
+    margin-bottom: 2px;
+    background: var(--t-surface);
+    border-bottom: 1px solid var(--t-line);
+}
+.t-mega-lista-cab .bi { color: var(--t-muted); }
+.t-mega-lista-titulo {
+    font-family: var(--t-fuente-titulo);
+    font-weight: 700;
+    font-size: .95rem;
+    color: var(--t-ink);
+}
+.t-mega-lista-link { margin-left: auto; font-size: .78rem; white-space: nowrap; }
+.t-mega-volver {
+    display: none;
+    border: 0; background: transparent;
+    padding: 2px 4px 2px 0;
+    color: var(--t-ink-2);
+}
+.t-mega-lista > .t-mega-rot { padding-left: 2px; }
+
+.t-mega-comp {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 14px;
+    padding: 7px 2px;
+    border-bottom: 1px solid var(--t-line);
+}
+.t-mega-comp:last-child { border-bottom: 0; }
+.t-mega-comp-nombre {
+    display: flex; align-items: center; gap: 9px;
+    min-width: 0;
+    color: var(--t-ink);
+    font-weight: 500;
+}
+.t-mega-comp-nombre:hover { color: var(--t-accent); }
+.t-mega-comp-txt { display: flex; flex-direction: column; min-width: 0; }
+.t-mega-comp-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-mega-comp-zona {
+    display: flex; align-items: center; gap: 5px;
+    font-size: .75rem; font-weight: 400;
+    color: var(--t-muted);
+}
+.t-mega-comp-zona .bi { font-size: 11px; }
+
+.t-mega-anios {
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;
+    max-width: 400px;
+}
+.t-mega-anio {
+    display: inline-block;
+    padding: 1px 8px;
+    border: 1px solid var(--t-line);
+    border-radius: 99px;
+    background: var(--t-surface);
+    color: var(--t-ink-2);
+    font-family: var(--t-fuente-dato);
+    font-size: 11.5px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.t-mega-anio:hover { background: var(--t-accent-soft); color: var(--t-accent); border-color: transparent; }
+.t-mega-anio.activo { background: var(--t-accent); color: var(--t-accent-ink); border-color: var(--t-accent); }
+.t-mega-anio[hidden] { display: none; }
+.t-mega-mas { border-style: dashed; color: var(--t-muted); }
+
+.t-mega-historicas { margin-top: 8px; }
+.t-mega-toggle {
+    display: flex; align-items: center; gap: 4px;
+    width: 100%;
+    border: 0; background: transparent;
+    padding: 8px 2px;
+    color: var(--t-muted);
+    font-size: .8125rem;
+    text-align: left;
+}
+.t-mega-toggle:hover { color: var(--t-ink); }
+.t-mega-toggle .bi { transition: transform .15s ease; }
+.t-mega-toggle[aria-expanded="true"] .bi { transform: rotate(90deg); }
+
+.t-mega-aviso { padding: 18px 2px; color: var(--t-muted); font-size: .84rem; }
+
+.t-mega-pie {
+    border-top: 1px solid var(--t-line);
+    padding: 8px 14px;
+    text-align: right;
+    font-size: .8125rem;
+}
+
+/* celular: dentro del panel lateral, primero países y al tocar uno sus torneos */
+@media (max-width: 991.98px) {
+    /* .navbar-nav tiene flex-wrap: sin esto el ítem toma el ancho de su contenido */
+    .t-offcanvas .t-nav-mega { width: 100%; min-width: 0; }
+    .t-offcanvas .dropdown-menu.t-mega {
+        max-height: none;
+        background: var(--t-surface);
+        border: 1px solid var(--t-line) !important;
+        border-radius: var(--t-radius);
+    }
+    .t-mega-cabeza { padding: 8px; }
+    .t-mega-cuerpo { display: block; }
+    .t-mega-zonas { width: auto; border-right: 0; background: transparent; padding: 0 4px 6px; }
+    .t-mega-lista { display: none; padding: 0 10px 10px; overflow: visible; }
+    .t-mega--detalle .t-mega-zonas { display: none; }
+    .t-mega--detalle .t-mega-lista { display: block; }
+    .t-mega-lista-cab { position: static; }
+    .t-mega-volver { display: inline-flex; }
+    .t-mega-comp { grid-template-columns: 1fr; }
+    .t-mega-anios { justify-content: flex-start; max-width: none; padding-left: 29px; }
+    .t-mega-pie { text-align: left; }
+}
+
+/* barra del torneo: país › torneo [temporada] */
+.t-barra-torneo .t-barra-titulo { flex-wrap: wrap; row-gap: 4px; }
+.t-barra-zona {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--t-muted);
+    font-weight: 500;
+}
+.t-barra-zona:hover { color: var(--t-accent); }
+.t-barra-sep { color: var(--t-line-strong); font-size: 11px; }
+.t-barra-temporada {
+    border: 1px solid var(--t-line-strong);
+    border-radius: 99px;
+    background: var(--t-surface);
+    color: var(--t-ink);
+    padding: 1px 9px;
+    font-family: var(--t-fuente-dato);
+    font-size: 12px;
+    font-weight: 500;
+}
+.t-barra-temporada:hover { border-color: var(--t-accent); color: var(--t-accent); }
+.t-barra-torneo .dropdown-menu.t-menu-temporadas {
+    min-width: 120px;
+    max-height: 50vh;
+    overflow-y: auto;
+    font-family: var(--t-fuente-dato);
+}
+.t-barra-torneo .t-menu-temporadas .dropdown-item.activo { background: var(--t-accent-soft); color: var(--t-accent); font-weight: 600; }
+
+/* página /competiciones */
+.t-explorar { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
+.t-explorar-zonas { padding: 4px 6px 10px; position: sticky; top: 72px; max-height: calc(100vh - 90px); overflow-y: auto; }
+.t-explorar-zonas a.t-mega-zona { text-decoration: none; }
+.t-explorar-lista { padding: 0 16px 8px; }
+.t-explorar .t-mega-anios { max-width: 60%; }
+@media (max-width: 767.98px) {
+    .t-explorar { grid-template-columns: 1fr; }
+    .t-explorar-zonas { position: static; max-height: 240px; }
+    .t-explorar .t-mega-comp { grid-template-columns: 1fr; }
+    .t-explorar .t-mega-anios { justify-content: flex-start; max-width: none; padding-left: 29px; }
+}
