@@ -63,7 +63,27 @@ class ImportDetallesController extends Controller
         if ($comp !== '')  $q->where('competencia_external_id', $comp);
         if ($ronda !== '') $q->where('ronda', $ronda);
 
-        $filas = $q->orderBy('dia', 'desc')->limit(2000)->get();
+        // LOS CONTADORES Y EL «SIN DETALLE» SE RESUELVEN EN SQL, NO SOBRE LA
+        // LISTA RECORTADA. Antes se traían las 2000 más nuevas y recién ahí se
+        // separaban las que ya tenían alineación: con LaLiga (ES1) sin filtro
+        // de fecha, las 2000 más nuevas eran todas temporadas ya cargadas, la
+        // pantalla decía «2000 importados · 2000 con detalle · 0 sin detalle»
+        // y la 2004/05 pendiente quedaba afuera del corte. Con NL1 no pasaba
+        // porque tenía menos filas que el tope.
+        $conAlin = function ($sub) {
+            $sub->from('alineacions')->select('partido_id')->distinct();
+        };
+        $total  = (clone $q)->count();
+        $listos = (clone $q)->whereIn('partido_id', $conAlin)->count();
+
+        $sinResultado = DB::table('partidos')
+            ->whereIn('id', (clone $q)->select('partido_id'))
+            ->where(function ($w) { $w->whereNull('golesl')->orWhereNull('golesv'); })
+            ->count();
+
+        $lista = clone $q;
+        if (!$conDetalle) $lista->whereNotIn('partido_id', $conAlin);
+        $filas = $lista->orderBy('dia', 'desc')->limit(2000)->get();
 
         // ¿Cuáles ya tienen alineación? Una sola consulta para todos.
         $ids = [];
@@ -89,12 +109,6 @@ class ImportDetallesController extends Controller
             }
         }
 
-        $sinResultado = 0;
-        foreach (array_unique($ids) as $pid) {
-            if (!isset($marcadores[$pid])) continue;
-            if ($marcadores[$pid]->golesl === null || $marcadores[$pid]->golesv === null) $sinResultado++;
-        }
-
         $fechas = $this->mapaFechas($ids);
 
         // Partidos que tienen MÁS DE UN gameId apuntándoles. Es siempre un error
@@ -103,12 +117,9 @@ class ImportDetallesController extends Controller
         // recién cuando la tanda se planta. Ver `gameIdsDelPartido()`.
         $dobles = $this->partidosConVariosGameId($ids);
 
-        $pendientes = [];
-        $listos = 0;
-        foreach ($filas as $f) {
-            if (isset($conAlineacion[(int) $f->partido_id])) { $listos++; if (!$conDetalle) continue; }
-            $pendientes[] = $f;
-        }
+        // La lista ya viene filtrada desde SQL (sin detalle, salvo que se pida
+        // ver también los que lo tienen).
+        $pendientes = $filas->all();
 
         $tecnicos = $this->tecnicosConPartidos();
 
@@ -211,9 +222,9 @@ class ImportDetallesController extends Controller
                 : '')
 
             . '<div class="cards">'
-            . $this->card(count($filas), 'Partidos importados')
+            . $this->card($total, 'Partidos importados')
             . $this->card($listos, 'Con detalle', 'ok')
-            . $this->card(count($filas) - $listos, 'Sin detalle', (count($filas) - $listos) ? 'warn' : '')
+            . $this->card($total - $listos, 'Sin detalle', ($total - $listos) ? 'warn' : '')
             . $this->card($mapeados, 'Jugadores mapeados')
             . $this->card($porRevisar, 'Por revisar', $porRevisar ? 'warn' : '')
             . $this->card($nRotos, 'Mapeos rotos', $nRotos ? 'warn' : '')
