@@ -117,8 +117,12 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         $ultimaHora = null;
         $horaDe     = [];
 
+        // CUALQUIER LARGO DE gameId. Los partidos más viejos de TM tienen ids
+        // de 3 dígitos: LaLiga 2003/04 jornada 1 es 492–502, la 2 es 699–708.
+        // Con `\d{4,}` se salteaban en silencio y el torneo llegaba con 350 de
+        // 380 partidos, sin las jornadas 1 a 3 y sin ningún aviso.
         foreach ($links as $a) {
-            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d{4,})#', $a->getAttribute('href'), $m)) {
+            if (!preg_match('#/spielbericht/(?:index/spielbericht/)?(\d+)#', $a->getAttribute('href'), $m)) {
                 continue;
             }
 
