@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use App\Grupo;
 
 use DB;
+use App\Services\ZonasTabla;
 use Illuminate\Support\Facades\Log;
 
 
@@ -262,12 +263,19 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
         }
 
 
+        // Ligas de tabla única: copas y descenso con la misma config que el Acumulado.
+        $leyendaZonas = [];
+        if (count($arrPosiciones) === 1 && ZonasTabla::aplica($torneo)) {
+            $clave = array_key_first($arrPosiciones);
+            $leyendaZonas = ZonasTabla::marcar($torneo, $arrPosiciones[$clave]['equipos']);
+        }
+
         $incidencias=Incidencia::where('torneo_id',$torneo_id)->whereNotNull('equipo_id')->paginate()->withQueryString();
 
 
 
 
-        return view('grupos.posicionesPublic', compact('torneo','arrPosiciones','incidencias'));
+        return view('grupos.posicionesPublic', compact('torneo','arrPosiciones','incidencias','leyendaZonas'));
     }
 
     public function goleadores(Request $request)

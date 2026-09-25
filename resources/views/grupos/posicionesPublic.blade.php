@@ -46,7 +46,14 @@
                     </thead>
                     <tbody>
                     @foreach($posiciones as $equipo)
-                        <tr class="{{ $i <= $numClasificados ? 't-clasifica' : '' }}">
+                        @php
+                            if (!empty($leyendaZonas)) {
+                                $claseFila = $equipo->zonaClase ?? '';
+                            } else {
+                                $claseFila = $i <= $numClasificados ? 't-clasifica' : '';
+                            }
+                        @endphp
+                        <tr class="{{ $claseFila }}" @if(!empty($leyendaZonas) && !empty($equipo->zona)) title="{{ $equipo->zona }}" @endif>
                             <td class="t-pos">{{ $i }}</td>
                             <td>
                                 <span class="t-nombre">
@@ -72,7 +79,13 @@
                 </table>
             </div>
 
-            @if($numClasificados)
+            @if(!empty($leyendaZonas))
+                <div class="t-panel-pie">
+                    @foreach($leyendaZonas as $zonaNombre => $zonaClase)
+                        <span class="t-referencia {{ $zonaClase }}"><i></i> {{ $zonaNombre }}</span>
+                    @endforeach
+                </div>
+            @elseif($numClasificados)
                 <div class="t-panel-pie">
                     <span class="t-referencia"><i style="background: var(--t-win)"></i> Clasifica</span>
                 </div>

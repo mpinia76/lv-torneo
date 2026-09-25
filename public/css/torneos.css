@@ -473,6 +473,12 @@ table.t-tabla .t-nombre { display: flex; align-items: center; gap: 8px; font-wei
 tr.t-clasifica  .t-pos::before { background: var(--t-win); }
 tr.t-repechaje  .t-pos::before { background: var(--t-accent); }
 tr.t-desciende  .t-pos::before { background: var(--t-loss); }
+/* zonas de copa de las ligas (orden de las clasificaciones del torneo) */
+tr.t-zona-1 .t-pos::before, .t-referencia.t-zona-1 i { background: var(--t-win); }
+tr.t-zona-2 .t-pos::before, .t-referencia.t-zona-2 i { background: var(--t-accent); }
+tr.t-zona-3 .t-pos::before, .t-referencia.t-zona-3 i { background: #D08A12; }
+tr.t-zona-4 .t-pos::before, .t-referencia.t-zona-4 i { background: #7A5AB8; }
+.t-referencia.t-desciende i { background: var(--t-loss); }
 
 /* tira de últimos resultados */
 .t-forma { display: inline-flex; gap: 3px; }
