@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
+
 /**
  * El calendario completo de una COMPETENCIA en una temporada, del HTML de TM.
  *
@@ -26,6 +28,24 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
 {
     const BASE_LIGA = 'https://www.transfermarkt.es/-/gesamtspielplan/wettbewerb/';
     const BASE_COPA = 'https://www.transfermarkt.es/-/gesamtspielplan/pokalwettbewerb/';
+
+    /**
+     * EL HTML SE GUARDA MEDIA HORA. La pantalla del fixture se arma entera en
+     * el servidor y cada botón (Rearmar jornadas, Guardar en staging, Guardar
+     * y cargar resultados) es un link que la vuelve a armar: sin esto, cada
+     * clic volvía a pedir la misma página a TM y gastaba un crédito para
+     * leer lo mismo que ya estabas viendo. Así el botón trabaja sobre
+     * exactamente el calendario que viste.
+     *
+     * `$fresco = true` la saltea («Volver a bajar de TM»). `$deCache` queda
+     * con el momento de la bajada original cuando se usó la guardada.
+     * Sólo se guarda una página con partidos: un muro de consentimiento o
+     * una respuesta vacía no se recuerdan.
+     */
+    const CACHE_MINUTOS = 30;
+
+    public $fresco  = false;
+    public $deCache = null;
 
     public static function urlComp($compId, $season, $copa = false)
     {
@@ -52,20 +72,37 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
         $this->avisos      = [];
         $this->descartadas = 0;
         $this->crudo       = '';
+        $this->deCache     = null;
 
-        $url = self::urlComp($compId, $season, $copa);
+        $url   = self::urlComp($compId, $season, $copa);
+        $clave = 'tm_html_comp:' . md5($url . '|' . (string) $pais);
+        $html  = null;
+
+        if (!$this->fresco) {
+            $guardado = Cache::get($clave);
+            if (is_array($guardado) && !empty($guardado['html'])) {
+                $html          = $guardado['html'];
+                $this->deCache = (int) $guardado['t'];
+            }
+        }
 
         // `getHtmlTm` es nuevo. Si el deploy subió los servicios pero no
         // HttpHelper, llamarlo tira «Call to undefined method» y la pantalla
         // se cae con un 500 pelado. Se cae con red: se usa el método viejo y
         // se avisa, que es mucho más fácil de diagnosticar que una pantalla
         // en blanco.
-        if (method_exists(HttpHelper::class, 'getHtmlTm')) {
-            $html = HttpHelper::getHtmlTm($url, $pais);
-        } else {
-            $this->avisos[] = 'Este servidor todavía tiene la versión vieja de HttpHelper: no puedo elegir el '
-                . 'país de salida. Falta subir app/Services/HttpHelper.php.';
-            $html = HttpHelper::getHtmlContent($url);
+        if ($html === null) {
+            if (method_exists(HttpHelper::class, 'getHtmlTm')) {
+                $html = HttpHelper::getHtmlTm($url, $pais);
+            } else {
+                $this->avisos[] = 'Este servidor todavía tiene la versión vieja de HttpHelper: no puedo elegir el '
+                    . 'país de salida. Falta subir app/Services/HttpHelper.php.';
+                $html = HttpHelper::getHtmlContent($url);
+            }
+
+            if ($html && strpos($html, '/spielbericht/') !== false) {
+                Cache::put($clave, ['html' => $html, 't' => time()], now()->addMinutes(self::CACHE_MINUTOS));
+            }
         }
 
         if (!$html) {

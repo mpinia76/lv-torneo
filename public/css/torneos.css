@@ -210,6 +210,13 @@ a:hover { color: var(--t-accent-hover); }
     object-fit: contain;
     vertical-align: middle;
 }
+/* Varios escudos (FIFA, Conmebol, AFC, Concacaf) son azul oscuro sobre
+   transparente: en modo oscuro no se ven sin un fondo claro. */
+[data-bs-theme="dark"] .escudo-conf {
+    background: #fff;
+    border-radius: 3px;
+    padding: 1px;
+}
 
 /* ---------- 5. NAVEGACIÓN ------------------------------------------------ */
 

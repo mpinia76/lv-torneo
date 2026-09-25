@@ -374,6 +374,9 @@ class ImportPartidosController extends Controller
         if ($tipoHtml !== 'liga' && $tipoHtml !== 'copa') $tipoHtml = '';
         $pais     = trim((string) $request->get('pais', '')) ?: null;
         $soloHtml = (string) $request->get('solo_html', '0') === '1';
+        // `fresco=1` es «Volver a bajar de TM»: saltea el calendario en HTML
+        // guardado. Ver `TmFixtureCompetenciaHtml::CACHE_MINUTOS`.
+        $this->htmlFresco = (string) $request->get('fresco', '0') === '1';
 
         // Los torneos COMPLETOS (con posiciones finales guardadas en
         // `posicion_torneos`) no aparecen: ya no hay fixture que bajarles.
@@ -706,9 +709,22 @@ class ImportPartidosController extends Controller
         // otro. El cartel amarillo avisaba, pero lo disparaba el propio botón.
         // De paso, con el torneo la segunda pasada del emparejador puede filtrar
         // por `grupos.torneo_id`.
+        //
+        // LAS PERILLAS DEL HTML TAMBIÉN VIAJAN. `$base` perdía `solo_html`,
+        // `season`, `tipo` y `pais`: desde una vista leída del calendario en
+        // HTML, cada botón pedía primero el fixture a la API (1 crédito, que
+        // contesta la edición en curso), veía que no era la temporada y recién
+        // ahí iba al HTML (otro crédito). Y sin `tm_season_id` en el torneo, el
+        // botón directamente bajaba la temporada equivocada. La temporada va
+        // SIEMPRE explícita: el botón tiene que leer la misma que viste.
         $base = route('import_partidos.fixture', array_filter([
             'comp' => $comp,
+            'comp_forzado' => $compForzado !== '' ? $comp : null,
             'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
+            'season'    => $season !== '' ? $season : null,
+            'tipo'      => $tipoHtml !== '' ? $tipoHtml : null,
+            'pais'      => $pais,
+            'solo_html' => $fuenteHtml ? 1 : null,
             'renumerar' => $renumerar ? 1 : null,
             'extras'    => $extras ? 1 : null,
         ]));
@@ -723,7 +739,16 @@ class ImportPartidosController extends Controller
         // Si la vista salió del staging, el botón sigue usando el staging; si
         // salió de TM, el botón vuelve a bajar de TM.
         $fuente = $usarCache ? '&cache=1' : '';
-        $costo  = $usarCache ? '' : ' <span class="sub">(vuelve a bajar de TM)</span>';
+        $costo  = $usarCache ? ''
+            : ($fuenteHtml
+                ? ' <span class="sub">(usa el calendario que estás viendo; no gasta crédito por '
+                  . \App\Services\TmFixtureCompetenciaHtml::CACHE_MINUTOS . ' min)</span>'
+                : ' <span class="sub">(vuelve a bajar de TM)</span>');
+        if ($fuenteHtml && $this->htmlDeCache) {
+            $min = max(0, (int) floor((time() - $this->htmlDeCache) / 60));
+            $html .= '<p class="sub">Calendario bajado de TM hace <b>' . $min . ' min</b> y releído sin gastar '
+                . 'crédito. Si esperás resultados nuevos, <a href="' . e($base . '&fresco=1') . '">volvé a bajarlo</a>.</p>';
+        }
 
         $html .= $this->bloqueRenumerar($renumeradas, $jornadasMal, $base, $fuente);
         if ($renumerar) $html .= $this->bloqueMoverFechas($filas, $moverFechas, $base, $fuente,
@@ -745,7 +770,7 @@ class ImportPartidosController extends Controller
             . 'del fixture viene con la tanda sumada—; ésos van con «Traer solo el marcador», en Revisar.</span>'
             . '</p>'
             . '<p class="acciones">'
-            . '<a href="' . e($base) . '">Volver a bajar de TM</a> · '
+            . '<a href="' . e($base . '&fresco=1') . '">Volver a bajar de TM</a> · '
             . '<a href="' . e($base . '&cache=1') . '">Releer sin bajar</a> · '
             . '<a href="' . e($base . '&cache=1&estado=conflicto') . '">Ver solo conflictos</a> · '
             . '<a href="' . e($base . '&cache=1&estado=nuevo') . '">Ver solo nuevos</a>'
@@ -1114,6 +1139,10 @@ class ImportPartidosController extends Controller
             . '<a class="boton-sec" href="' . e($crudo) . '">Ver qué contestó Transfermarkt</a></p>';
     }
 
+    /** Ver `fixture()`: `fresco=1` y cuándo se bajó el HTML que se está usando. */
+    private $htmlFresco  = false;
+    private $htmlDeCache = null;
+
     private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [], $pais = null, $tipo = '')
     {
         // En TM las ligas van por `/wettbewerb/` y las copas por
@@ -1133,6 +1162,8 @@ class ImportPartidosController extends Controller
                 : ($torneo ? (strcasecmp((string) $torneo->tipo, 'Copa') === 0) : true));
 
         $svc = new \App\Services\TmFixtureCompetenciaHtml;
+        $svc->fresco = $this->htmlFresco;
+        $this->htmlDeCache = null;
         $leido = null;
         $intentos = [];
 
@@ -1146,7 +1177,7 @@ class ImportPartidosController extends Controller
                 . ' → ' . (is_array($r) ? count($r) . ' partidos' : 'no vino la página')
                 . ((is_array($r) && !empty($r)) ? '' : $this->queVino($svc->crudo));
 
-            if (is_array($r) && !empty($r)) { $leido = $r; break; }
+            if (is_array($r) && !empty($r)) { $leido = $r; $this->htmlDeCache = $svc->deCache; break; }
         }
 
         if (!empty($svc->avisos)) $avisos = array_merge($avisos, (array) $svc->avisos);
