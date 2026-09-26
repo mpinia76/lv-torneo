@@ -31,18 +31,6 @@
         $thBuscar = request()->get('buscarpor', session('nombre_filtro_equipo'));
 
         $thTipos = ['' => __('Todos'), 'liga' => __('Ligas'), 'copa' => __('Copas')];
-
-        /* Zonas agrupadas como en el menú de torneos: Argentina sola arriba, después
-           Mundial, Sudamérica, Europa… (la sección 'local' no lleva título). */
-        $thZonasPorGrupo = [];
-        foreach ($zonasDatos as $thZ) {
-            $thZonasPorGrupo[$thZ['grupo']][] = $thZ;
-        }
-
-        $thComps = ['vigentes' => [], 'historicas' => []];
-        foreach (($zonaActual['competencias'] ?? []) as $thC) {
-            $thComps[$thC['historica'] ? 'historicas' : 'vigentes'][] = $thC;
-        }
     @endphp
 
     <div class="t-cabecera">
@@ -85,38 +73,7 @@
         <input type="hidden" name="tipoOrder" value="{{ $tipoOrder }}">
         @if($tipo)<input type="hidden" name="tipo" value="{{ $tipo }}">@endif
 
-        <label class="t-lista-rot" for="thZona">{{ __('Zona') }}</label>
-        <select id="thZona" name="zona" class="t-lista-select"
-                onchange="this.form.competencia.value=''; if (this.form.paisEquipo) { this.form.paisEquipo.value=''; } this.form.submit()">
-            @foreach($thZonasPorGrupo as $thGrupo => $thZonas)
-                @if(($grupos[$thGrupo] ?? '') === '')
-                    @foreach($thZonas as $thZ)
-                        <option value="{{ $thZ['clave'] }}" @if($thZ['clave'] === $zona) selected @endif>{{ $thZ['nombre'] }}</option>
-                    @endforeach
-                @else
-                    <optgroup label="{{ $grupos[$thGrupo] }}">
-                        @foreach($thZonas as $thZ)
-                            <option value="{{ $thZ['clave'] }}" @if($thZ['clave'] === $zona) selected @endif>{{ $thZ['nombre'] }}</option>
-                        @endforeach
-                    </optgroup>
-                @endif
-            @endforeach
-        </select>
-
-        <label class="t-lista-rot" for="thCompetencia">{{ __('Competencia') }}</label>
-        <select id="thCompetencia" name="competencia" class="t-lista-select" onchange="this.form.submit()">
-            <option value="">{{ __('Todas las competencias') }}</option>
-            @foreach($thComps['vigentes'] as $thC)
-                <option value="{{ $thC['clave'] }}" @if($thC['clave'] === $competencia) selected @endif>{{ $thC['nombre'] }}</option>
-            @endforeach
-            @if($thComps['historicas'])
-                <optgroup label="{{ __('Históricas') }}">
-                    @foreach($thComps['historicas'] as $thC)
-                        <option value="{{ $thC['clave'] }}" @if($thC['clave'] === $competencia) selected @endif>{{ $thC['nombre'] }}</option>
-                    @endforeach
-                </optgroup>
-            @endif
-        </select>
+        @include('torneos._filtroZona')
 
         @if($esInternacional && count($paisesEquipos) > 1)
             <label class="t-lista-rot" for="thPais">{{ __('Equipos de') }}</label>

@@ -27,10 +27,15 @@
         $volverUrl  = route('jugadores.verificarPersonas') . ($volver ? '?' . $volver : '');
         $totalFilas = 0;
         $dudosos    = 0;
+        // Árbitros: el tramo es un torneo, no un club, y solo hay partidos.
+        $porTorneo  = !empty($previo['porTorneo']);
+        $anios      = [];
         foreach ($previo['partidos'] as $unPartido) {
             $totalFilas += $unPartido['filas'];
             if ($unPartido['dudoso']) { $dudosos++; }
+            if ($unPartido['year']) { $anios[(string) $unPartido['year']] = ($anios[(string) $unPartido['year']] ?? 0) + 1; }
         }
+        ksort($anios);
     @endphp
 
     <div class="container-fluid">
@@ -48,7 +53,7 @@
 
         <p class="text-muted">
             Las dos personas siguen existiendo: esto NO es una fusión. Se mueve el tramo
-            <strong>{{ $nombreClub }}</strong> de una ficha a la otra, con sus planteles y sus partidos.
+            <strong>{{ $nombreClub }}</strong> de una ficha a la otra, @if($porTorneo) con los partidos que arbitró. @else con sus planteles y sus partidos. @endif
             La ficha de origen no se borra aunque quede sin registros.
         </p>
 
@@ -92,9 +97,13 @@
 
         @if(!$previo['plantillas'] && !$previo['partidos'])
             <div class="alert alert-danger">
-                La ficha #{{ $orig->id }} no tiene ningún plantel ni partido de {{ $nombreClub }}.
-                Puede que el club de la otra ficha sea otra fila de <code>equipos</code> con el mismo nombre:
-                la pantalla de repetidos compara los clubes por nombre, no por id.
+                @if($porTorneo)
+                    La ficha #{{ $orig->id }} no tiene ningún partido de {{ $nombreClub }} que se pueda mover.
+                @else
+                    La ficha #{{ $orig->id }} no tiene ningún plantel ni partido de {{ $nombreClub }}.
+                    Puede que el club de la otra ficha sea otra fila de <code>equipos</code> con el mismo nombre:
+                    la pantalla de repetidos compara los clubes por nombre, no por id.
+                @endif
             </div>
         @endif
 
@@ -164,11 +173,27 @@
                     Partidos ({{ count($previo['partidos']) }})
                     <small class="text-muted">— {{ $totalFilas }} registros: alineaciones, goles, tarjetas, cambios y penales</small>
                 </h5>
-                <p class="small text-muted mb-1">
-                    Los goles y las tarjetas no saben de club: solo tienen partido y ficha. Por eso se mueven
-                    por partido y no por temporada — si se movieran sueltos, el gol quedaría en una ficha que
-                    ya no figura en ese partido.
-                </p>
+                @if($porTorneo)
+                    {{-- El nombre del torneo se repite todas las temporadas: el tramo
+                         real casi siempre es un rango de años, no el torneo entero. --}}
+                    @if(count($anios) > 1)
+                        <div class="small mb-2">
+                            <span class="text-muted mr-1">Temporadas:</span>
+                            @foreach($anios as $unAnio => $cuantos)
+                                <label class="mr-2 mb-0">
+                                    <input type="checkbox" class="mv-anio" data-anio="{{ $unAnio }}" checked>
+                                    {{ $unAnio }} <span class="text-muted">({{ $cuantos }})</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+                @else
+                    <p class="small text-muted mb-1">
+                        Los goles y las tarjetas no saben de club: solo tienen partido y ficha. Por eso se mueven
+                        por partido y no por temporada — si se movieran sueltos, el gol quedaría en una ficha que
+                        ya no figura en ese partido.
+                    </p>
+                @endif
                 @if($dudosos)
                     <div class="alert alert-warning py-2">
                         <strong>{{ $dudosos }} partidos vienen destildados.</strong>
@@ -201,6 +226,7 @@
                                 <td>
                                     <input type="checkbox" name="partidos[]" class="mv-item-pa"
                                            value="{{ $unPartido['id'] }}"
+                                           data-anio="{{ $unPartido['year'] }}"
                                            @if($unPartido['dudoso']) data-dudoso="1" @else checked @endif>
                                 </td>
                                 <td class="text-nowrap">
@@ -253,10 +279,16 @@
                         @if($previo['contradictorios'])
                             <li>
                                 <strong>{{ $previo['contradictorios'] }} partidos bloqueados:</strong>
-                                ahí la ficha de destino ya juega para otro equipo. Una persona no puede
-                                estar en las dos alineaciones del mismo partido, así que ese registro no
-                                puede ser suyo — si igual creés que lo es, hay un error de carga antes que
-                                un traspaso.
+                                @if($porTorneo)
+                                    ahí la ficha de destino ya figura en el partido con otra función (principal,
+                                    línea, cuarto, VAR). Una persona no cumple dos funciones en el mismo partido:
+                                    si igual creés que es suyo, hay un error de carga antes que un traspaso.
+                                @else
+                                    ahí la ficha de destino ya juega para otro equipo. Una persona no puede
+                                    estar en las dos alineaciones del mismo partido, así que ese registro no
+                                    puede ser suyo — si igual creés que lo es, hay un error de carga antes que
+                                    un traspaso.
+                                @endif
                             </li>
                         @endif
                         @if($previo['contraElClub'])
@@ -266,12 +298,12 @@
                             </li>
                         @endif
                         @if($previo['fueraDelClub'])
-                            <li>{{ $previo['fueraDelClub'] }} partidos de otros clubes.</li>
+                            <li>{{ $previo['fueraDelClub'] }} partidos de otros {{ $porTorneo ? 'torneos' : 'clubes' }}.</li>
                         @endif
                         @if($previo['sinPartido'])
                             <li>
                                 {{ $previo['sinPartido'] }} filas con el partido sin cargar
-                                (<code>partido_id</code> en NULL): no se pueden ubicar en ningún club.
+                                (<code>partido_id</code> en NULL): no se pueden ubicar en ningún {{ $porTorneo ? 'torneo' : 'club' }}.
                             </li>
                         @endif
                         @foreach($previo['sinMover'] as $unaTabla)
@@ -292,7 +324,7 @@
                     <input class="form-check-input" type="checkbox" name="descartar" value="1" id="descartar" checked>
                     <label class="form-check-label" for="descartar">
                         Marcar el par como <strong>personas distintas</strong> (recomendado: al mover el tramo,
-                        el par pierde el club compartido, que era la única señal fuerte que tenía)
+                        el par pierde el {{ $porTorneo ? 'torneo' : 'club' }} compartido, que era la única señal fuerte que tenía)
                     </label>
                 </div>
             </div>
@@ -305,6 +337,15 @@
     </div>
 
     <script>
+        // Árbitros: tildar/destildar una temporada entera.
+        document.querySelectorAll('.mv-anio').forEach(function (anio) {
+            anio.addEventListener('change', function () {
+                document.querySelectorAll('.mv-item-pa[data-anio="' + anio.dataset.anio + '"]').forEach(function (uno) {
+                    if (!uno.dataset.dudoso || !anio.checked) { uno.checked = anio.checked; }
+                });
+            });
+        });
+
         document.querySelectorAll('.mv-todos').forEach(function (maestro) {
             maestro.addEventListener('change', function () {
                 document.querySelectorAll('.mv-item-' + maestro.dataset.grupo).forEach(function (uno) {

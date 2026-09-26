@@ -2007,3 +2007,26 @@ td.t-dif-neg { color: var(--t-loss); }
     .t-explorar .t-mega-comp { grid-template-columns: 1fr; }
     .t-explorar .t-mega-anios { justify-content: flex-start; max-width: none; padding-left: 29px; }
 }
+
+/* ---------- estadísticas totales ---------- */
+
+.t-seccion { margin: 26px 0 10px; }
+.t-graf-tit {
+    font-size: .8125rem;
+    font-weight: 600;
+    color: var(--t-ink-2);
+    margin: 0 0 8px;
+}
+.t-graf { height: 220px; }
+.t-graf-grilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+}
+.t-graf-grilla > .t-panel + .t-panel { margin-top: 0; }
+.t-grilla-2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+}
+@media (min-width: 992px) { .t-grilla-2 { grid-template-columns: 1fr 1fr; } }

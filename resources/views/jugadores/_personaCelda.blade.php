@@ -106,9 +106,13 @@
                             // Traspaso parcial: este tramo va a la OTRA ficha, sin fusionar.
                             // Hace falta el id real del equipo —el nombre no alcanza, puede
                             // haber dos clubes homónimos en `equipos`— y un rol con equipo:
-                            // los árbitros no tienen club, lo que se les muestra son torneos.
+                            // los árbitros no tienen club: su tramo es el torneo, y viajan
+                            // los ids de `torneos` en lugar de los de `equipos`.
+                            $idsTramo = $club['rol'] === 'arbitro'
+                                ? ($club['torneo_ids'] ?? [])
+                                : ($club['equipo_ids'] ?? []);
                             $puedeMover = $otro
-                                && !empty($club['equipo_ids'])
+                                && !empty($idsTramo)
                                 && in_array($club['rol'], \App\Services\MoverRegistros::ROLES, true);
                         @endphp
                         <span class="dup-club @if($mismoAnio) dup-club-igual @elseif($esComun) dup-club-comun @endif"
@@ -120,7 +124,7 @@
                                        'origen'   => $p->id,
                                        'destino'  => $otro->id,
                                        'rol'      => $club['rol'],
-                                       'equipos'  => implode(',', $club['equipo_ids']),
+                                       'equipos'  => implode(',', $idsTramo),
                                        'etiqueta' => $club['equipo'].' '.$periodo,
                                        // Solo la query string: la ruta la arma el
                                        // controller con route(). Con el path entero,

@@ -42,12 +42,18 @@ use Illuminate\Support\Facades\Schema;
 class MoverRegistros
 {
     /**
-     * Roles soportados. Los árbitros quedan afuera a propósito: `partido_arbitros`
-     * no tiene equipo, así que "el club" no existe como criterio de corte —lo que
-     * la pantalla les muestra son torneos. Partir la carrera de un árbitro es otro
-     * problema; mover su ficha entera ya lo resuelve "Reasignar".
+     * Roles soportados.
+     *
+     * Los árbitros no tienen club (`partido_arbitros` no tiene equipo), así que
+     * para ellos el tramo es el TORNEO: lo que llega en `$equipoIds` son ids de
+     * `torneos`, igual que la pantalla de repetidos les muestra torneos en vez de
+     * clubes. No tienen plantel ni goles/tarjetas: lo único que se mueve es la
+     * fila de `partido_arbitros` de cada partido elegido. Ver permitidosPorTorneo().
      */
-    const ROLES = ['jugador', 'tecnico'];
+    const ROLES = ['jugador', 'tecnico', 'arbitro'];
+
+    /** Roles cuyo tramo se elige por torneo y no por club. */
+    const ROLES_POR_TORNEO = ['arbitro'];
 
     /** Caché de Schema::hasTable/hasColumn: son consultas a information_schema. */
     private static $esquema = [];
@@ -96,6 +102,8 @@ class MoverRegistros
         }
 
         $cfg                     = $relaciones[$rol];
+        $cfg['rol']              = $rol;
+        $cfg['porTorneo']        = in_array($rol, self::ROLES_POR_TORNEO, true);
         $cfg['pivotePlantilla']  = self::pivotePlantilla($rol);
         $cfg['pivotesConEquipo'] = self::pivotesConEquipo($rol);
 
@@ -152,7 +160,7 @@ class MoverRegistros
 
         $equipoIds = array_values(array_unique(array_filter(array_map('intval', $equipoIds))));
         if (!$equipoIds) {
-            return self::error('No se indicó ningún club.');
+            return self::error($base['porTorneo'] ? 'No se indicó ningún torneo.' : 'No se indicó ningún club.');
         }
 
         $tabla = $base['tabla'];
@@ -177,7 +185,16 @@ class MoverRegistros
             return self::error("La persona #{$personaOrigen} no tiene ficha de {$rol}: no hay nada que mover.");
         }
 
-        $equipos    = DB::table('equipos')->whereIn('id', $equipoIds)->pluck('nombre', 'id')->all();
+        if ($base['porTorneo']) {
+            // Para los árbitros "equipos" son los torneos del tramo, con su año
+            // (el mismo nombre se repite todas las temporadas).
+            $equipos = [];
+            foreach (DB::table('torneos')->whereIn('id', $equipoIds)->orderBy('year')->get(['id', 'nombre', 'year']) as $t) {
+                $equipos[(int) $t->id] = trim($t->nombre . ' ' . $t->year);
+            }
+        } else {
+            $equipos = DB::table('equipos')->whereIn('id', $equipoIds)->pluck('nombre', 'id')->all();
+        }
         $permitidos = self::permitidos($base, $fichasOrigen, $equipoIds, $fichasDestino);
 
         $plantillas = self::detallarPlantillas($base, $fichasOrigen, $permitidos['plantillas'], $fichasDestino);
@@ -189,6 +206,7 @@ class MoverRegistros
             'ok'            => true,
             'mensaje'       => '',
             'rol'           => $rol,
+            'porTorneo'     => $base['porTorneo'],
             'origen'        => $personas->get($personaOrigen),
             'destino'       => $personas->get($personaDestino),
             'fichasOrigen'  => $fichasOrigen,
@@ -222,6 +240,10 @@ class MoverRegistros
      */
     private static function permitidos(array $base, array $fichasOrigen, array $equipoIds, array $fichasDestino = []): array
     {
+        if (!empty($base['porTorneo'])) {
+            return self::permitidosPorTorneo($base, $fichasOrigen, $equipoIds, $fichasDestino);
+        }
+
         $fk = $base['fk'];
 
         $delClub    = [];   // el club aparece explícito en una fila con equipo
@@ -372,6 +394,101 @@ class MoverRegistros
             'sinPartido' => $sinPartido,
             'contradictorios' => count($contradictorios),
         ];
+    }
+
+    /**
+     * La lista blanca de los árbitros: los partidos de la ficha de origen que son
+     * de alguno de esos torneos.
+     *
+     * Acá no hay "contra el club" ni partidos dudosos: la fila de
+     * `partido_arbitros` es el único registro y el torneo sale del propio partido.
+     *
+     * Contradictorio = el destino ya figura en ese partido con OTRA función
+     * (principal y línea, por ejemplo). Una persona no cumple dos funciones en el
+     * mismo partido, así que eso no se mueve. Si figura con la MISMA función, es
+     * la misma fila cargada dos veces y moverFilas() la unifica (el choque de la
+     * fusión es partido + tipo).
+     */
+    private static function permitidosPorTorneo(array $base, array $fichasOrigen, array $torneoIds, array $fichasDestino): array
+    {
+        $fk     = $base['fk'];
+        $hijos  = self::hijosPorPartido($base);
+        $salida = [
+            'plantillas' => [], 'partidos' => [], 'dudosos' => [], 'contra' => 0,
+            'fuera' => 0, 'sinPartido' => 0, 'contradictorios' => 0,
+        ];
+
+        $todos = [];
+        foreach ($hijos as $hijo) {
+            foreach (DB::table($hijo)->whereIn($fk, $fichasOrigen)->distinct()->pluck('partido_id') as $id) {
+                if ($id === null || (int) $id === 0) {
+                    continue;
+                }
+                $todos[(int) $id] = true;
+            }
+
+            $salida['sinPartido'] += DB::table($hijo)->whereIn($fk, $fichasOrigen)
+                ->where(function ($w) {
+                    $w->whereNull('partido_id')->orWhere('partido_id', 0);
+                })
+                ->count();
+        }
+
+        if (!$todos || !$torneoIds || !self::hayTabla('partidos') || !self::hayTabla('fechas')
+            || !self::hayTabla('grupos') || !self::hayColumna('partidos', 'fecha_id')) {
+            $salida['fuera'] = count($todos);
+            return $salida;
+        }
+
+        $delTorneo = [];
+        foreach (array_chunk(array_keys($todos), 1000) as $lote) {
+            $ids = DB::table('partidos as pa')
+                ->join('fechas as fe', 'fe.id', '=', 'pa.fecha_id')
+                ->join('grupos as g', 'g.id', '=', 'fe.grupo_id')
+                ->whereIn('pa.id', $lote)
+                ->whereIn('g.torneo_id', $torneoIds)
+                ->pluck('pa.id');
+
+            foreach ($ids as $id) {
+                $delTorneo[(int) $id] = true;
+            }
+        }
+
+        $contradictorios = [];
+        if ($fichasDestino && $delTorneo) {
+            foreach ($hijos as $hijo) {
+                if (!self::hayColumna($hijo, 'tipo')) {
+                    continue;
+                }
+
+                $tiposOrigen = [];
+                foreach (DB::table($hijo)->whereIn($fk, $fichasOrigen)->whereIn('partido_id', array_keys($delTorneo))
+                            ->get(['partido_id', 'tipo']) as $f) {
+                    $tiposOrigen[(int) $f->partido_id][(string) $f->tipo] = true;
+                }
+
+                foreach (DB::table($hijo)->whereIn($fk, $fichasDestino)->whereIn('partido_id', array_keys($delTorneo))
+                            ->get(['partido_id', 'tipo']) as $f) {
+                    $pid = (int) $f->partido_id;
+                    if (!isset($tiposOrigen[$pid][(string) $f->tipo])) {
+                        $contradictorios[$pid] = true;
+                    }
+                }
+            }
+
+            foreach (array_keys($contradictorios) as $pid) {
+                unset($delTorneo[$pid]);
+            }
+        }
+
+        $ids = array_keys($delTorneo);
+        sort($ids);
+
+        $salida['partidos']        = $ids;
+        $salida['contradictorios'] = count($contradictorios);
+        $salida['fuera']           = max(0, count($todos) - count($delTorneo) - count($contradictorios));
+
+        return $salida;
     }
 
     /** Ids de los planteles del club que cuelgan de la ficha de origen. */
@@ -636,6 +753,16 @@ class MoverRegistros
         // ni llegan hasta acá: permitidos() bloquea los del rival y también los
         // que el destino tiene sin equipo cargado.)
         $choques = [];
+        if ($fichasDestino && !empty($base['porTorneo'])) {
+            // Árbitros: a esta altura solo quedan los partidos donde el destino
+            // tiene la MISMA función (los otros son contradictorios y ni llegan).
+            foreach (self::hijosPorPartido($base) as $hijo) {
+                foreach (DB::table($hijo)->whereIn($fk, $fichasDestino)->whereIn('partido_id', $ids)
+                            ->distinct()->pluck('partido_id') as $id) {
+                    $choques[(int) $id] = true;
+                }
+            }
+        }
         if ($fichasDestino) {
             foreach ($base['pivotesConEquipo'] as $hijo) {
                 if (!self::hayTabla($hijo) || !self::hayColumna($hijo, $fk)) {
@@ -702,6 +829,8 @@ class MoverRegistros
                 return 'Penal' . ($tipo ? ' ' . mb_strtolower($tipo) : '') . ($n > 1 ? ' x' . $n : '');
             case 'partido_tecnicos':
                 return 'Dirigió';
+            case 'partido_arbitros':
+                return $tipo ? (string) $tipo : 'Arbitró';
             default:
                 return $n . ' en ' . $hijo;
         }
@@ -792,8 +921,9 @@ class MoverRegistros
             if (!$plantillaIds && !$partidoIds) {
                 DB::rollBack();
                 return self::error(
-                    'No quedó ningún registro para mover: ninguno de los tildados pertenece a ese club '
-                    . 'en esta ficha. Volvé a abrir la pantalla, los datos cambiaron.'
+                    'No quedó ningún registro para mover: ninguno de los tildados pertenece a ese '
+                    . ($base['porTorneo'] ? 'torneo' : 'club')
+                    . ' en esta ficha. Volvé a abrir la pantalla, los datos cambiaron.'
                 );
             }
 

@@ -27,6 +27,7 @@ use App\Penal;
 use App\Alineacion;
 use App\Cambio;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use function GuzzleHttp\Promise\iter_for;
 use Illuminate\Support\Facades\Http;
 use App\Services\HttpHelper;
@@ -2069,33 +2070,14 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // torneos internacionales). Son las mismas zonas del menú de torneos
         // (App\Services\MenuTorneos), así tabla y menú no se desalinean.
         // -----------------------------------------------------------------
-        $zonasDatos = MenuTorneos::zonas()['zonas'];
-        $grupos     = MenuTorneos::titulosGrupos();
-
-        $zona = (string) $request->query('zona', '');
-        if (!isset($zonasDatos[$zona])) {
-            $zona = MenuTorneos::zonaLocal();
-            if (!isset($zonasDatos[$zona])) {
-                $zona = (string) key($zonasDatos);
-            }
-        }
-        $zonaActual     = $zonasDatos[$zona] ?? null;
-        $esInternacional = strpos($zona, 'r-') === 0;
-
-        // Competencia dentro de la zona (opcional): Liga Profesional, Libertadores…
-        $competencia       = (string) $request->query('competencia', '');
-        $competenciaActual = null;
-        if ($competencia !== '' && $zonaActual) {
-            foreach ($zonaActual['competencias'] as $c) {
-                if ($c['clave'] === $competencia) {
-                    $competenciaActual = $c;
-                    break;
-                }
-            }
-        }
-        if (!$competenciaActual) {
-            $competencia = '';
-        }
+        $filtro            = $this->filtroZona($request);
+        $zonasDatos        = $filtro['zonasDatos'];
+        $grupos            = $filtro['grupos'];
+        $zona              = $filtro['zona'];
+        $zonaActual        = $filtro['zonaActual'];
+        $esInternacional   = $filtro['esInternacional'];
+        $competencia       = $filtro['competencia'];
+        $competenciaActual = $filtro['competenciaActual'];
 
         // Liga / Copa. Con una competencia elegida no hace falta: ya es una u otra.
         $tipo = strtolower((string) $request->query('tipo', ''));
@@ -2669,250 +2651,261 @@ partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, e
 
 
 
+    /**
+     * Zona y competencia pedidas, validadas contra las del menú de torneos. Lo
+     * usan la tabla histórica y las estadísticas totales: sin zona elegida va
+     * la del país de la casa (sumar todo el mundo junto no mide nada).
+     */
+    private function filtroZona(Request $request)
+    {
+        $zonasDatos = MenuTorneos::zonas()['zonas'];
+
+        $zona = (string) $request->query('zona', '');
+        if (!isset($zonasDatos[$zona])) {
+            $zona = MenuTorneos::zonaLocal();
+            if (!isset($zonasDatos[$zona])) {
+                $zona = (string) key($zonasDatos);
+            }
+        }
+        $zonaActual = $zonasDatos[$zona] ?? null;
+
+        $competencia       = (string) $request->query('competencia', '');
+        $competenciaActual = null;
+        if ($competencia !== '' && $zonaActual) {
+            foreach ($zonaActual['competencias'] as $c) {
+                if ($c['clave'] === $competencia) {
+                    $competenciaActual = $c;
+                    break;
+                }
+            }
+        }
+        if (!$competenciaActual) {
+            $competencia = '';
+        }
+
+        return [
+            'zonasDatos'        => $zonasDatos,
+            'grupos'            => MenuTorneos::titulosGrupos(),
+            'zona'              => $zona,
+            'zonaActual'        => $zonaActual,
+            'esInternacional'   => strpos($zona, 'r-') === 0,
+            'competencia'       => $competencia,
+            'competenciaActual' => $competenciaActual,
+        ];
+    }
+
+    /**
+     * Estadísticas totales de una zona (o de una competencia dentro de ella):
+     * números generales, récords, evolución por temporada y resumen por
+     * temporada.
+     *
+     * Antes se hacían 6 consultas por cada torneo de la base (miles, sin
+     * caché) y se mezclaba todo el mundo. Ahora son unas pocas consultas
+     * agrupadas por torneo, sobre los torneos de la zona, y el resultado se
+     * guarda una hora.
+     */
     public function estadisticasOtras(Request $request)
     {
-        //$torneo= $request->query('torneo');
+        $filtro = $this->filtroZona($request);
+        $zona        = $filtro['zona'];
+        $competencia = $filtro['competencia'];
 
+        $datos = Cache::remember(
+            'estadisticas.totales.v1.' . md5($zona . '|' . $competencia),
+            3600,
+            function () use ($zona, $competencia) {
+                return $this->calcularEstadisticasTotales(MenuTorneos::idsDeZona($zona, $competencia));
+            }
+        );
 
+        return view('torneos.estadisticasOtras', array_merge($filtro, $datos));
+    }
 
-        $estadisticas=array();
+    /**
+     * Mínimos para que un promedio entre en los récords: una temporada de 3
+     * partidos o una fecha de 1 no compiten con una liga de 380.
+     */
+    const MIN_PARTIDOS_TEMPORADA = 10;
+    const MIN_PARTIDOS_FECHA     = 5;
 
+    /** Todo lo que muestra estadisticasOtras, para un conjunto de torneos. */
+    private function calcularEstadisticasTotales(array $ids)
+    {
+        $vacio = [
+            'kpis'       => ['temporadas' => 0, 'partidos' => 0, 'goles' => 0, 'promedio' => 0, 'local' => null],
+            'temporadas' => [],
+            'record'     => ['masGoles' => [], 'goleadas' => [], 'fechas' => [], 'tempMas' => [], 'tempMenos' => []],
+            'evolucion'  => [],
+        ];
+        if (!$ids) {
+            return $vacio;
+        }
+        // Ids enteros salidos de la base: van directo al IN.
+        $in = implode(',', array_map('intval', $ids));
 
+        // ---- Una fila por temporada (torneo) -------------------------------
+        $filas = DB::select("
+            SELECT g.torneo_id,
+                   COUNT(*) AS partidos,
+                   SUM(p.golesl + p.golesv) AS goles,
+                   MAX(p.golesl + p.golesv) AS max_goles,
+                   SUM(CASE WHEN p.golesl + p.golesv = 0 THEN 1 ELSE 0 END) AS sin_goles,
+                   SUM(CASE WHEN COALESCE(p.neutral, 0) = 0 THEN 1 ELSE 0 END) AS no_neutrales,
+                   SUM(CASE WHEN COALESCE(p.neutral, 0) = 0 AND p.golesl > p.golesv THEN 1 ELSE 0 END) AS gana_local,
+                   SUM(CASE WHEN COALESCE(p.neutral, 0) = 0 AND p.golesl = p.golesv THEN 1 ELSE 0 END) AS empata,
+                   SUM(CASE WHEN COALESCE(p.neutral, 0) = 0 AND p.golesl < p.golesv THEN 1 ELSE 0 END) AS gana_visita,
+                   SUM(CASE WHEN EXISTS (SELECT 1 FROM alineacions a WHERE a.partido_id = p.id) THEN 1 ELSE 0 END) AS con_detalle
+            FROM partidos p
+            INNER JOIN fechas f ON p.fecha_id = f.id
+            INNER JOIN grupos g ON f.grupo_id = g.id
+            WHERE g.torneo_id IN ($in)
+              AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL
+            GROUP BY g.torneo_id
+        ");
 
-        // Helper para simplificar las consultas de partidos con condiciones dinámicas
-        $getPartidosQuery = function ($condition) {
-            return DB::select(DB::raw("
-            SELECT
-                torneos.nombre AS nombreTorneo, torneos.year,torneos.escudo AS escudoTorneo, fechas.numero, partidos.dia,
-                e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local,
-                e2.id AS equipov_id, e2.escudo AS fotoVisitante, e2.nombre AS visitante,
-                partidos.golesl, partidos.golesv, partidos.penalesl, partidos.penalesv,
-                partidos.id AS partido_id,
-                e1.pais AS paisLocal, e2.pais AS paisVisitante
+        $tarjetas = [];
+        foreach (DB::select("
+            SELECT g.torneo_id,
+                   SUM(CASE WHEN t.tipo = 'Amarilla' THEN 1 ELSE 0 END) AS amarillas,
+                   SUM(CASE WHEN t.tipo IN ('Roja', 'Doble Amarilla') THEN 1 ELSE 0 END) AS rojas
+            FROM tarjetas t
+            INNER JOIN partidos p ON t.partido_id = p.id
+            INNER JOIN fechas f ON p.fecha_id = f.id
+            INNER JOIN grupos g ON f.grupo_id = g.id
+            WHERE g.torneo_id IN ($in)
+            GROUP BY g.torneo_id
+        ") as $t) {
+            $tarjetas[$t->torneo_id] = $t;
+        }
+
+        $porId = [];
+        foreach ($filas as $f) {
+            $porId[$f->torneo_id] = $f;
+        }
+
+        // Mismo orden que el menú: más nuevas primero.
+        $temporadas = [];
+        $kpis = ['temporadas' => 0, 'partidos' => 0, 'goles' => 0, 'promedio' => 0, 'local' => null];
+        $noNeutrales = 0;
+        $ganaLocal   = 0;
+
+        foreach (MenuTorneos::torneos() as $torneo) {
+            if (!isset($porId[$torneo->id])) {
+                continue;
+            }
+            $f = $porId[$torneo->id];
+            $t = $tarjetas[$torneo->id] ?? null;
+
+            $partidos   = (int) $f->partidos;
+            $conDetalle = (int) $f->con_detalle;
+            $tarjetasOk = $conDetalle > 0 && $t;
+
+            $temporadas[] = (object) [
+                'torneo_id'    => (int) $torneo->id,
+                'nombre'       => $torneo->nombre,
+                'year'         => (string) $torneo->year,
+                'escudo'       => $torneo->escudo,
+                'parcial'      => !empty($torneo->parcial),
+                'partidos'     => $partidos,
+                'goles'        => (int) $f->goles,
+                'promedio'     => $partidos ? $f->goles / $partidos : 0,
+                'max_goles'    => (int) $f->max_goles,
+                'sin_goles'    => (int) $f->sin_goles,
+                'no_neutrales' => (int) $f->no_neutrales,
+                'gana_local'   => (int) $f->gana_local,
+                'empata'       => (int) $f->empata,
+                'gana_visita'  => (int) $f->gana_visita,
+                'con_detalle'  => $conDetalle,
+                // Tarjetas por partido: solo sobre los partidos con detalle
+                // cargado; en los demás no hay tarjetas que contar.
+                'amarillas_pp' => $tarjetasOk ? $t->amarillas / $conDetalle : null,
+                'rojas_pp'     => $tarjetasOk ? $t->rojas / $conDetalle : null,
+            ];
+
+            $kpis['temporadas']++;
+            $kpis['partidos'] += $partidos;
+            $kpis['goles']    += (int) $f->goles;
+            $noNeutrales      += (int) $f->no_neutrales;
+            $ganaLocal        += (int) $f->gana_local;
+        }
+        $kpis['promedio'] = $kpis['partidos'] ? $kpis['goles'] / $kpis['partidos'] : 0;
+        $kpis['local']    = $noNeutrales ? $ganaLocal * 100 / $noNeutrales : null;
+
+        // ---- Récords -------------------------------------------------------
+        $camposPartido = "
+            torneos.id AS torneo_id, torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo AS escudoTorneo,
+            fechas.numero, partidos.dia, partidos.neutral,
+            e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e1.pais AS paisLocal,
+            e2.id AS equipov_id, e2.escudo AS fotoVisitante, e2.nombre AS visitante, e2.pais AS paisVisitante,
+            partidos.golesl, partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id AS partido_id";
+        $desdePartido = "
             FROM partidos
             INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
             INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             INNER JOIN torneos ON grupos.torneo_id = torneos.id
-            WHERE $condition
-            AND partidos.golesl IS NOT NULL
-            AND partidos.golesv IS NOT NULL
-            ORDER BY partidos.dia ASC
-        "));
-        };
+            WHERE torneos.id IN ($in)
+              AND partidos.golesl IS NOT NULL AND partidos.golesv IS NOT NULL";
 
-        // Consultas de máximos
-        $maxGoles = $getPartidosQuery('partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos)');
-        $maxGolesLocales = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesl = (SELECT MAX(golesl) FROM partidos WHERE partidos.neutral = 0)');
-        $maxGolesVisitantes = $getPartidosQuery('partidos.neutral = 0 AND partidos.golesv = (SELECT MAX(golesv) FROM partidos WHERE partidos.neutral = 0)');
-        $maxGolesNeutrales = $getPartidosQuery('partidos.neutral != 0 AND partidos.golesl + partidos.golesv = (SELECT MAX(golesl + golesv) FROM partidos WHERE partidos.neutral != 0)');
+        $record = [];
+        $record['masGoles'] = DB::select("SELECT $camposPartido $desdePartido
+            ORDER BY (partidos.golesl + partidos.golesv) DESC, ABS(partidos.golesl - partidos.golesv) DESC, partidos.dia DESC
+            LIMIT 5");
+        $record['goleadas'] = DB::select("SELECT $camposPartido $desdePartido
+            ORDER BY ABS(partidos.golesl - partidos.golesv) DESC, (partidos.golesl + partidos.golesv) DESC, partidos.dia DESC
+            LIMIT 5");
 
-        //dd($maxGolesLocales);
-        // Helper para fechas con más goles
-        $getFechaMasGoles = function ($columna, $neutralCondition) {
-            return DB::select(DB::raw("
-            SELECT t.nombreTorneo, t.year, t.escudoTorneo, t.numero, t.partidos, t.goles, t.promedio
-            FROM (
-                SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo, fechas.numero,
-                       SUM(partidos.$columna) AS goles, COUNT(*) AS partidos,
-                       (SUM(partidos.$columna)/COUNT(*)) AS promedio
-                FROM partidos
-                INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-                INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-                INNER JOIN fechas ON partidos.fecha_id = fechas.id
-                INNER JOIN grupos ON fechas.grupo_id = grupos.id
-                INNER JOIN torneos ON grupos.torneo_id = torneos.id
-                WHERE $neutralCondition
-                AND partidos.golesl IS NOT NULL
-                AND partidos.golesv IS NOT NULL
-                GROUP BY torneos.nombre, torneos.year, torneos.escudo, fechas.numero
-            ) AS t
-            WHERE t.goles = (
-                SELECT MAX(t.goles)
-                FROM (
-                    SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo, fechas.numero,
-                           SUM(partidos.$columna) AS goles
-                    FROM partidos
-                    INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-                    INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-                    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-                    INNER JOIN grupos ON fechas.grupo_id = grupos.id
-                    INNER JOIN torneos ON grupos.torneo_id = torneos.id
-                    WHERE $neutralCondition
-                    AND partidos.golesl IS NOT NULL
-                    AND partidos.golesv IS NOT NULL
-                    GROUP BY torneos.nombre, torneos.year, torneos.escudo, fechas.numero
-                ) AS t
-            )
-        "));
-        };
+        // Fechas (jornadas) con más goles por partido, con un mínimo de partidos.
+        $record['fechas'] = DB::select("
+            SELECT f.id AS fecha_id, f.numero, t.id AS torneo_id, t.nombre AS nombreTorneo, t.year, t.escudo AS escudoTorneo,
+                   COUNT(*) AS partidos, SUM(p.golesl + p.golesv) AS goles,
+                   SUM(p.golesl + p.golesv) / COUNT(*) AS promedio
+            FROM partidos p
+            INNER JOIN fechas f ON p.fecha_id = f.id
+            INNER JOIN grupos g ON f.grupo_id = g.id
+            INNER JOIN torneos t ON g.torneo_id = t.id
+            WHERE t.id IN ($in)
+              AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL
+            GROUP BY f.id, f.numero, t.id, t.nombre, t.year, t.escudo
+            HAVING COUNT(*) >= " . self::MIN_PARTIDOS_FECHA . "
+            ORDER BY promedio DESC, goles DESC
+            LIMIT 5");
 
-        $fechaMasGoles = $getFechaMasGoles('golesl + golesv','1=1');
-        $fechaMasGolesLocales = $getFechaMasGoles('golesl','partidos.neutral = 0');
-        $fechaMasGolesVisitantes = $getFechaMasGoles('golesv','partidos.neutral = 0');
-        $fechaMasGolesNeutrales = $getFechaMasGoles('golesl + golesv','partidos.neutral != 0');
+        // Temporadas con más y con menos goles por partido.
+        $comparables = array_values(array_filter($temporadas, function ($t) {
+            return $t->partidos >= self::MIN_PARTIDOS_TEMPORADA;
+        }));
+        usort($comparables, function ($a, $b) {
+            return $b->promedio <=> $a->promedio;
+        });
+        $record['tempMas']   = array_slice($comparables, 0, 5);
+        $record['tempMenos'] = array_slice(array_reverse($comparables), 0, 5);
 
-        // Helper para torneos con más goles
-        $getTorneoMasGoles = function ($columna, $neutralCondition) {
-            return DB::select(DB::raw("
-        SELECT t.nombreTorneo, t.year, t.escudoTorneo, t.partidos, t.goles, t.promedio
-        FROM (
-            SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo,
-                   SUM(partidos.$columna) AS goles, COUNT(*) AS partidos,
-                   (SUM(partidos.$columna)/COUNT(*)) AS promedio
-            FROM partidos
-            INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-            INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-            INNER JOIN fechas ON partidos.fecha_id = fechas.id
-            INNER JOIN grupos ON fechas.grupo_id = grupos.id
-            INNER JOIN torneos ON grupos.torneo_id = torneos.id
-            WHERE $neutralCondition
-            AND partidos.golesl IS NOT NULL
-            AND partidos.golesv IS NOT NULL
-            GROUP BY torneos.nombre, torneos.year, torneos.escudo
-        ) AS t
-        WHERE t.goles = (
-            SELECT MAX(t.goles)
-            FROM (
-                SELECT torneos.nombre AS nombreTorneo, torneos.year, torneos.escudo as escudoTorneo,
-                       SUM(partidos.$columna) AS goles
-                FROM partidos
-                INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
-                INNER JOIN equipos e2 ON partidos.equipov_id = e2.id
-                INNER JOIN fechas ON partidos.fecha_id = fechas.id
-                INNER JOIN grupos ON fechas.grupo_id = grupos.id
-                INNER JOIN torneos ON grupos.torneo_id = torneos.id
-                WHERE $neutralCondition
-                AND partidos.golesl IS NOT NULL
-                AND partidos.golesv IS NOT NULL
-                GROUP BY torneos.nombre, torneos.year, torneos.escudo
-            ) AS t
-        )
-    "));
-        };
-
-
-        $torneoMasGoles = $getTorneoMasGoles('golesl + golesv','1=1');
-        $torneoMasGolesLocales = $getTorneoMasGoles('golesl', 'partidos.neutral = 0');
-        $torneoMasGolesVisitantes = $getTorneoMasGoles('golesv', 'partidos.neutral = 0');
-        $torneoMasGolesNeutrales = $getTorneoMasGoles('golesl + golesv','partidos.neutral != 0');
-
-        $estadisticas['torneoMasGoles']=$torneoMasGoles;
-        $estadisticas['torneoMasGolesLocales']=$torneoMasGolesLocales;
-        $estadisticas['torneoMasGolesVisitantes']=$torneoMasGolesVisitantes;
-        $estadisticas['torneoMasGolesNeutrales']=$torneoMasGolesNeutrales;
-        $estadisticas['maxGoles']=$maxGoles;
-        $estadisticas['maxGolesLocales']=$maxGolesLocales;
-        $estadisticas['maxGolesVisitantes']=$maxGolesVisitantes;
-        $estadisticas['maxGolesNeutrales']=$maxGolesNeutrales;
-        $estadisticas['fechaMasGoles']=$fechaMasGoles;
-        $estadisticas['fechaMasGolesLocales']=$fechaMasGolesLocales;
-        $estadisticas['fechaMasGolesVisitantes']=$fechaMasGolesVisitantes;
-        $estadisticas['fechaMasGolesNeutrales']=$fechaMasGolesNeutrales;
-
-        $estadisticasResumen = [];
-
-        $todosTorneos = DB::select(DB::raw("
-    SELECT t.id, t.nombre AS nombreTorneo, t.year, t.escudo AS escudoTorneo
-    FROM torneos t
-    ORDER BY t.year DESC
-"));
-
-        foreach($todosTorneos as $torneo) {
-            $torneoId = $torneo->id;
-
-            // Totales (partidos y goles)
-            $totales = DB::selectOne(DB::raw("
-        SELECT COUNT(*) AS partidos,
-               SUM(p.golesl + p.golesv) AS goles,
-               (SUM(p.golesl + p.golesv) * 1.0 / COUNT(*)) AS promedio_goles
-        FROM partidos p
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId
-                AND p.golesl IS NOT NULL
-                AND p.golesv IS NOT NULL
-    "), ['torneoId' => $torneoId]);
-
-            // Máximo de goles
-            $maxGoles = DB::selectOne(DB::raw("
-        SELECT MAX(p.golesl + p.golesv) AS max_goles
-        FROM partidos p
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId
-    "), ['torneoId' => $torneoId]);
-
-            // Empates
-            $empates = DB::selectOne(DB::raw("
-        SELECT COUNT(*) AS empates
-        FROM partidos p
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId
-          AND p.golesl = p.golesv
-    "), ['torneoId' => $torneoId]);
-
-            // Goles
-            $golesVisitante = DB::selectOne(DB::raw("
-        SELECT SUM(p.golesl) AS goles_local, SUM(p.golesv) AS goles_visitante
-        FROM partidos p
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId AND p.neutral = 0
-    "), ['torneoId' => $torneoId]);
-
-            $golesNeutral = DB::selectOne(DB::raw("
-        SELECT SUM(p.golesl + p.golesv) AS goles_neutral
-        FROM partidos p
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId AND p.neutral = 1
-    "), ['torneoId' => $torneoId]);
-
-            // Tarjetas
-            $tarjetas = DB::selectOne(DB::raw("
-        SELECT
-            SUM(CASE WHEN t.tipo = 'Amarilla' THEN 1 ELSE 0 END) AS amarillas,
-            SUM(CASE WHEN t.tipo = 'Roja' THEN 1 ELSE 0 END) AS rojas
-        FROM tarjetas t
-        INNER JOIN partidos p ON t.partido_id = p.id
-        INNER JOIN fechas f ON p.fecha_id = f.id
-        INNER JOIN grupos g ON f.grupo_id = g.id
-        WHERE g.torneo_id = :torneoId
-    "), ['torneoId' => $torneoId]);
-
-
-
-            $estadisticasResumen[] = [
-                'nombreTorneo' => $torneo->nombreTorneo,
-                'year' => $torneo->year,
-                'escudoTorneo' => $torneo->escudoTorneo,
-                'partidos' => $totales->partidos ?? 0,
-                'goles' => $totales->goles ?? 0,
-                'goles_local' => $golesVisitante->goles_local ?? 0,
-                'promedio_goles' => $totales->promedio_goles ?? 0,
-                'max_goles' => $maxGoles->max_goles ?? 0,
-                'empates' => $empates->empates ?? 0,
-                'goles_visitante' => $golesVisitante->goles_visitante ?? 0,
-                'amarillas' => $tarjetas->amarillas ?? 0,
-                'rojas' => $tarjetas->rojas ?? 0,
-                'goles_neutral' => $golesNeutral->goles_neutral ?? 0,
+        // ---- Evolución (se muestra con una competencia elegida) -------------
+        // De la más vieja a la más nueva. Las tarjetas solo cuando al menos la
+        // mitad de los partidos de esa temporada tienen detalle.
+        $evolucion = [];
+        foreach (array_reverse($temporadas) as $t) {
+            if ($t->parcial) {
+                continue;
+            }
+            $conTarjetas = $t->amarillas_pp !== null && $t->con_detalle * 2 >= $t->partidos;
+            $evolucion[] = [
+                'temporada' => $t->year,
+                'goles'     => round($t->promedio, 2),
+                'local'     => $t->no_neutrales ? round($t->gana_local * 100 / $t->no_neutrales, 1) : null,
+                'tarjetas'  => $conTarjetas ? round($t->amarillas_pp + $t->rojas_pp, 2) : null,
             ];
         }
 
-        $estadisticasResumen = collect($estadisticasResumen)->map(function($item) {
-            return (object) $item;
-        })->all();
-
-
-
-
-
-        return view('torneos.estadisticasOtras', compact('estadisticas','estadisticasResumen'));
+        return [
+            'kpis'       => $kpis,
+            'temporadas' => $temporadas,
+            'record'     => $record,
+            'evolucion'  => $evolucion,
+        ];
     }
-
 
     public function tecnicos(Request $request)
     {
