@@ -468,6 +468,65 @@ class MenuTorneos
         ];
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    //  Filtros por zona (tabla histórica)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /** Clave de la zona del país de la casa ('p-argentina'). */
+    public static function zonaLocal()
+    {
+        return 'p-' . self::slug(self::PAIS_LOCAL);
+    }
+
+    /**
+     * Ids de los torneos de una zona y, si se pasa, de una sola competencia.
+     * Incluye los parciales: sus partidos también se jugaron, y la tabla
+     * histórica siempre los sumó.
+     */
+    public static function idsDeZona($zona, $competencia = '')
+    {
+        $ids = [];
+        foreach (self::torneos() as $t) {
+            if (self::zonaDe($t)['clave'] !== $zona) {
+                continue;
+            }
+            if ($competencia !== '' && $competencia !== null && self::claveCompetencia($t->nombre) !== $competencia) {
+                continue;
+            }
+            $ids[] = (int) $t->id;
+        }
+        return $ids;
+    }
+
+    /**
+     * Zona de algo cargado a mano (estadística manual, título extra), que no
+     * tiene país ni región propios. Se deduce del equipo:
+     *   - nacional      -> el país del equipo (sin país: el de la casa);
+     *   - internacional -> Torneos FIFA si el nombre lo dice (Mundial,
+     *                      Intercontinental), si no la confederación del país
+     *                      del equipo.
+     * Es una aproximación: una Sudamericana jugada por un club mexicano caería
+     * en Concacaf. Para eso habría que cargar la región en el registro.
+     */
+    public static function zonaDeManual($ambito, $nombre, $paisEquipo)
+    {
+        $pais = trim((string) $paisEquipo);
+        if ($pais === '') {
+            $pais = self::PAIS_LOCAL;
+        }
+
+        if (self::normalizar($ambito) !== 'internacional') {
+            return 'p-' . self::slug(self::capitalizar($pais));
+        }
+
+        if (preg_match('/mundial|intercontinental|fifa/', self::normalizar($nombre))) {
+            return 'r-fifa';
+        }
+
+        $norm = self::normalizar($pais);
+        return 'r-' . (isset(self::$confederaciones[$norm]) ? self::$confederaciones[$norm] : 'otros');
+    }
+
     /** Carpeta (dentro de public/images) con los escudos de las confederaciones. */
     const CARPETA_CONFEDERACIONES = 'confederaciones';
 
