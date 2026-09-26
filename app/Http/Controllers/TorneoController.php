@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Log;
 use function GuzzleHttp\Promise\iter_for;
 use Illuminate\Support\Facades\Http;
 use App\Services\HttpHelper;
+use App\Services\MenuTorneos;
 use DB;
 
 class TorneoController extends Controller
@@ -2061,17 +2062,61 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $nombreFiltro  = " AND (equipos.nombre LIKE '%$nombreEscaped%') ";
         }
 
-        $tipo = '';
-        if ($request->query('tipo')) {
-            $tipo = $request->query('tipo');
+        // -----------------------------------------------------------------
+        // Filtros. Con torneos de todo el mundo, sumar a todos juntos no mide
+        // nada (Barcelona y Boca en la misma tabla), así que siempre hay una
+        // zona: un país (sus torneos nacionales) o una confederación (sus
+        // torneos internacionales). Son las mismas zonas del menú de torneos
+        // (App\Services\MenuTorneos), así tabla y menú no se desalinean.
+        // -----------------------------------------------------------------
+        $zonasDatos = MenuTorneos::zonas()['zonas'];
+        $grupos     = MenuTorneos::titulosGrupos();
+
+        $zona = (string) $request->query('zona', '');
+        if (!isset($zonasDatos[$zona])) {
+            $zona = MenuTorneos::zonaLocal();
+            if (!isset($zonasDatos[$zona])) {
+                $zona = (string) key($zonasDatos);
+            }
+        }
+        $zonaActual     = $zonasDatos[$zona] ?? null;
+        $esInternacional = strpos($zona, 'r-') === 0;
+
+        // Competencia dentro de la zona (opcional): Liga Profesional, Libertadores…
+        $competencia       = (string) $request->query('competencia', '');
+        $competenciaActual = null;
+        if ($competencia !== '' && $zonaActual) {
+            foreach ($zonaActual['competencias'] as $c) {
+                if ($c['clave'] === $competencia) {
+                    $competenciaActual = $c;
+                    break;
+                }
+            }
+        }
+        if (!$competenciaActual) {
+            $competencia = '';
         }
 
-        $ambito = '';
-        if ($request->query('ambito')) {
-            $ambito = $request->query('ambito');
+        // Liga / Copa. Con una competencia elegida no hace falta: ya es una u otra.
+        $tipo = strtolower((string) $request->query('tipo', ''));
+        if (!in_array($tipo, ['liga', 'copa'], true) || $competencia !== '') {
+            $tipo = '';
         }
 
-        $argentinos = ($request->query('argentinos')) ? 1 : 0;
+        // País de los equipos: solo en zonas internacionales (en una liga
+        // nacional son todos del mismo país). ?argentinos=1 es el enlace viejo.
+        $paisEquipo = trim((string) $request->query('paisEquipo', ''));
+        if ($paisEquipo === '' && $request->query('argentinos')) {
+            $paisEquipo = MenuTorneos::PAIS_LOCAL;
+        }
+        if (!$esInternacional) {
+            $paisEquipo = '';
+        }
+
+        $idsZona = MenuTorneos::idsDeZona($zona, $competencia);
+        // Ids enteros (vienen de la base): se pueden meter en el SQL tal cual.
+        $filtroTorneos = $idsZona ? ' AND torneos.id IN (' . implode(',', $idsZona) . ')' : ' AND 1=0';
+        $filtroTorneos .= ($tipo) ? ' AND torneos.tipo = ' . DB::connection()->getPdo()->quote($tipo) : '';
 
         // Columnas por las que se puede ordenar. "titulos" no entra: se calcula
         // después de paginar, así que ordenar por ese campo daría cualquier cosa.
@@ -2116,9 +2161,7 @@ from (
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
         INNER JOIN torneos ON grupos.torneo_id = torneos.id
-        WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .= ($tipo) ? ' AND torneos.tipo = '.DB::connection()->getPdo()->quote($tipo) : '';
-        $sql .= ($ambito) ? ' AND torneos.ambito = '.DB::connection()->getPdo()->quote($ambito) : '';
+        WHERE golesl is not null AND golesv is not null'.$nombreFiltro.$filtroTorneos;
         $sql .= ' union all
        select DISTINCT equipos.nombre equipo, equipos.pais pais, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id, 0 as puntos
 		 from partidos
@@ -2127,9 +2170,7 @@ from (
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		 INNER JOIN torneos ON grupos.torneo_id = torneos.id
-		 WHERE golesl is not null AND golesv is not null'.$nombreFiltro;
-        $sql .= ($tipo) ? ' AND torneos.tipo = '.DB::connection()->getPdo()->quote($tipo) : '';
-        $sql .= ($ambito) ? ' AND torneos.ambito = '.DB::connection()->getPdo()->quote($ambito) : '';
+		 WHERE golesl is not null AND golesv is not null'.$nombreFiltro.$filtroTorneos;
         $sql .= ' UNION ALL
     SELECT
         equipos.nombre AS equipo,
@@ -2143,23 +2184,55 @@ from (
     FROM incidencias
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     INNER JOIN torneos ON incidencias.torneo_id = torneos.id
-    WHERE 1=1'.$nombreFiltro;
-        $sql .= ($tipo) ? ' AND torneos.tipo = '.DB::connection()->getPdo()->quote($tipo) : '';
-        $sql .= ($ambito) ? ' AND torneos.ambito = '.DB::connection()->getPdo()->quote($ambito) : '';
+    WHERE 1=1'.$nombreFiltro.$filtroTorneos;
         $sql .= ' GROUP BY equipos.nombre, equipos.pais, equipos.escudo, equipos.id, incidencias.puntos';
         $sql .= ') a WHERE 1=1 ';
-
-        // Filter argentinos here
-        if ($argentinos) {
-            $sql .= " AND pais = 'Argentina' ";
-        }
 
         $sql .= ' group by equipo, pais, foto, equipo_id
 order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
         $posiciones = DB::select(DB::raw($sql));
 
+        // Países de los equipos de la zona, para el filtro "Equipos de".
+        $paisesEquipos = [];
+        if ($esInternacional) {
+            foreach ($posiciones as $fila) {
+                $p = trim((string) $fila->pais);
+                if ($p !== '') {
+                    $paisesEquipos[$p] = $p;
+                }
+            }
+            uasort($paisesEquipos, function ($a, $b) {
+                return strcmp(trad_dato($a), trad_dato($b));
+            });
+            if ($paisEquipo !== '' && !isset($paisesEquipos[$paisEquipo])) {
+                $paisEquipo = '';
+            }
+            if ($paisEquipo !== '') {
+                $posiciones = array_values(array_filter($posiciones, function ($fila) use ($paisEquipo) {
+                    return trim((string) $fila->pais) === $paisEquipo;
+                }));
+            }
+        }
+
         $manuales = EquipoEstadisticaManual::all()->groupBy('equipo_id');
+
+        // Un registro manual cuenta si cae en la zona (deducida del equipo, ver
+        // MenuTorneos::zonaDeManual), en la competencia elegida (por nombre) y
+        // en el tipo.
+        $manualCuenta = function ($m, $paisDelEquipo) use ($zona, $competencia, $tipo) {
+            if (MenuTorneos::zonaDeManual($m->ambito, $m->torneo_nombre, $paisDelEquipo) !== $zona) {
+                return false;
+            }
+            if ($competencia !== '' && MenuTorneos::claveCompetencia($m->torneo_nombre) !== $competencia) {
+                return false;
+            }
+            // Manual records store tipo capitalized ('Copa', 'Liga'); the filter is lowercase.
+            if ($tipo && strtolower($m->tipo) != $tipo) {
+                return false;
+            }
+            return true;
+        };
 
         // -----------------------------------------------------------------
         // STEP 1: merge manual stats into the FULL result set, BEFORE sorting
@@ -2180,15 +2253,8 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             $manualGolesContra = 0;
 
             foreach ($manual as $m) {
-                // Respect the SAME ambito / tipo filters applied to real matches
-                // in the SQL. Without this, e.g. selecting "Internacional" still
-                // added a team's "Nacional" manual points. Manual records store
-                // ambito/tipo capitalized ('Nacional', 'Copa', ...) while the query
-                // params come lowercase, so compare case-insensitively.
-                if ($ambito && strtolower($m->ambito) != strtolower($ambito)) {
-                    continue;
-                }
-                if ($tipo && strtolower($m->tipo) != strtolower($tipo)) {
+                // Same zone / competition / tipo filters as the real matches.
+                if (!$manualCuenta($m, $posicion->pais)) {
                     continue;
                 }
 
@@ -2264,88 +2330,62 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         );
 
         // -----------------------------------------------------------------
-        // STEP 4: titles loop. This only builds the "titulos" display string
-        // and does NOT affect the ranking, so it can run after pagination
-        // (only over the 15 visible rows). Manual stats are NOT re-added here
-        // to avoid double counting; only manual posicion==1 is counted for
-        // title purposes.
+        // STEP 4: titles. Only the display string, only for the visible rows,
+        // and with the SAME zone / competition / tipo filters as the table:
+        // a Champions table must not show Barcelona's Spanish leagues.
         // -----------------------------------------------------------------
+        $enZona      = array_flip($idsZona);
+        $torneosPorId = MenuTorneos::torneos()->keyBy('id');
+        $idsVisibles = [];
+        foreach ($posiciones as $posicion) {
+            $idsVisibles[] = (int) $posicion->equipo_id;
+        }
+        $campeonatos = $idsVisibles
+            ? PosicionTorneo::whereIn('equipo_id', $idsVisibles)->where('posicion', 1)->get()->groupBy('equipo_id')
+            : collect();
+        $extras = ($idsVisibles && $competencia === '')
+            ? Titulo::whereIn('equipo_id', $idsVisibles)->get()->groupBy('equipo_id')
+            : collect();
+
+        $sumar = function ($ambitoTitulo, $tipoTitulo, &$liga, &$copa, &$internacional) use ($tipo) {
+            $esCopa = strtolower((string) $tipoTitulo) === 'copa';
+            if ($tipo === 'copa' && !$esCopa) return;
+            if ($tipo === 'liga' && $esCopa) return;
+
+            if (strtolower((string) $ambitoTitulo) === 'internacional') {
+                $internacional++;
+            } elseif ($esCopa) {
+                $copa++;
+            } else {
+                $liga++;
+            }
+        };
+
         foreach ($posiciones as $posicion) {
             $titulosCopa = 0;
             $titulosLiga = 0;
             $titulosInternacional = 0;
 
-            $posicionTorneo = PosicionTorneo::where('equipo_id', '=', $posicion->equipo_id)->get();
-            foreach ($posicionTorneo as $pt) {
-                $torneo = Torneo::findOrFail($pt->torneo_id);
-                if ($pt->posicion == 1) {
-                    if ($torneo->ambito == 'Nacional') {
-                        if (!$ambito || $ambito == 'nacional') {
-                            if ($torneo->tipo == 'Copa') {
-                                if (!$tipo || $tipo == 'copa') {
-                                    $titulosCopa++;
-                                }
-                            } else {
-                                if (!$tipo || $tipo == 'liga') {
-                                    $titulosLiga++;
-                                }
-                            }
-                        }
-                    } else {
-                        if (!$ambito || $ambito == 'internacional') {
-                            $titulosInternacional++;
-                        }
-                    }
+            foreach ($campeonatos[$posicion->equipo_id] ?? [] as $pt) {
+                if (!isset($enZona[$pt->torneo_id]) || !isset($torneosPorId[$pt->torneo_id])) {
+                    continue;
                 }
+                $t = $torneosPorId[$pt->torneo_id];
+                $sumar($t->ambito, $t->tipo, $titulosLiga, $titulosCopa, $titulosInternacional);
             }
 
             // Manual titles (posicion == 1). Stats already merged in STEP 1.
-            $manual = $manuales[$posicion->equipo_id] ?? collect();
-            foreach ($manual as $m) {
-                if ($m->posicion == 1) {
-                    if ($m->ambito == 'Nacional') {
-                        if (!$ambito || $ambito == 'nacional') {
-                            if ($m->tipo == 'Copa') {
-                                if (!$tipo || $tipo == 'copa') {
-                                    $titulosCopa++;
-                                }
-                            } else {
-                                if (!$tipo || $tipo == 'liga') {
-                                    $titulosLiga++;
-                                }
-                            }
-                        }
-                    } else {
-                        if (!$ambito || $ambito == 'internacional') {
-                            $titulosInternacional++;
-                        }
-                    }
+            foreach ($manuales[$posicion->equipo_id] ?? [] as $m) {
+                if ($m->posicion == 1 && $manualCuenta($m, $posicion->pais)) {
+                    $sumar($m->ambito, $m->tipo, $titulosLiga, $titulosCopa, $titulosInternacional);
                 }
             }
 
-            // ---- EXTRA TITLES ----
-            $titulosExtras = Titulo::where('equipo_id', $posicion->equipo_id)->get();
-            foreach ($titulosExtras as $te) {
-                // Apply TIPO filter if set
-                if ($tipo) {
-                    if (strtolower($tipo) == 'liga' && strtolower($te->tipo) != 'liga') continue;
-                    if (strtolower($tipo) == 'copa' && strtolower($te->tipo) != 'copa') continue;
-                }
-                // Apply AMBITO filter if set
-                if ($ambito) {
-                    if (strtolower($ambito) != strtolower($te->ambito)) continue;
-                }
-
-                switch ($te->tipo) {
-                    case 'Liga':
-                        $titulosLiga++;
-                        break;
-                    case 'Copa':
-                        $titulosCopa++;
-                        break;
-                    case 'Internacional':
-                        $titulosInternacional++;
-                        break;
+            // Extra titles ("Campeón por acumulado"…): no belong to a competition,
+            // so they only count when no competition is selected.
+            foreach ($extras[$posicion->equipo_id] ?? [] as $te) {
+                if (MenuTorneos::zonaDeManual($te->ambito, $te->nombre, $posicion->pais) === $zona) {
+                    $sumar($te->ambito, $te->tipo, $titulosLiga, $titulosCopa, $titulosInternacional);
                 }
             }
 
@@ -2355,7 +2395,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                 $ligas = ($titulosLiga) ? $titulosLiga.' Ligas' : '';
                 $copas = ($titulosCopa) ? $titulosCopa.' Copas' : '';
                 $internacionales = ($titulosInternacional) ? $titulosInternacional.' Internacionales' : '';
-                $posicion->titulos = $titulosCopa + $titulosLiga + $titulosInternacional.' ('.$ligas.' '.$copas.' '.$internacionales.')';
+                $posicion->titulos = ($titulosCopa + $titulosLiga + $titulosInternacional).' ('.trim(preg_replace('/\s+/', ' ', $ligas.' '.$copas.' '.$internacionales)).')';
             }
         }
 
@@ -2364,8 +2404,11 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
         $i = $offSet + 1;
 
-        return view('torneos.posiciones',
-            compact('posiciones', 'i', 'argentinos', 'tipo', 'ambito', 'order', 'tipoOrder', 'kpis'));
+        return view('torneos.posiciones', compact(
+            'posiciones', 'i', 'tipo', 'order', 'tipoOrder', 'kpis',
+            'zonasDatos', 'grupos', 'zona', 'zonaActual', 'esInternacional',
+            'competencia', 'competenciaActual', 'paisEquipo', 'paisesEquipos'
+        ));
     }
 
     public function estadisticasTorneo(Request $request)
