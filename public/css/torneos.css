@@ -2030,3 +2030,27 @@ td.t-dif-neg { color: var(--t-loss); }
     gap: 14px;
 }
 @media (min-width: 992px) { .t-grilla-2 { grid-template-columns: 1fr 1fr; } }
+
+/* barras horizontales con rótulo y valor (marcadores, tipos de gol…) */
+.t-barras { display: grid; gap: 7px; }
+.t-barras-fila {
+    display: grid;
+    grid-template-columns: minmax(84px, 38%) 1fr auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+}
+.t-barras-rot { color: var(--t-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-barras-pista {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--t-surface-2);
+    overflow: hidden;
+}
+.t-barras-pista i { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--t-accent); }
+.t-barras-l i { background: var(--t-win); }
+.t-barras-e i { background: var(--t-draw); }
+.t-barras-v i { background: var(--t-loss); }
+.t-barras-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--t-ink); text-align: right; min-width: 64px; }
+.t-barras-val small { font-weight: 500; color: var(--t-muted); }
+table.t-tabla th.t-orden-activo { color: var(--t-accent); }
