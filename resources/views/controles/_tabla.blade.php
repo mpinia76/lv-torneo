@@ -70,6 +70,7 @@
                   data-saltea-sin-gameid="1">
                 @csrf
                 <input type="hidden" name="ids" class="ctrl-lote-ids" value="">
+                <input type="hidden" name="check" value="{{ $clave }}">
                 <button type="submit" class="ctrl-lote-boton" disabled
                         data-texto="Rehacer %n seleccionado(s)"
                         title="Vuelve a bajar el detalle de los partidos tildados desde Transfermarkt y lo escribe. Cuesta 1 llamada por partido.">Rehacer seleccionados</button>

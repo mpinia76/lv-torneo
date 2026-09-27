@@ -162,7 +162,8 @@
                                     {{-- El activo ya tiene el total: es el de la tabla. --}}
                                     <span class="ctrl-total {{ $filas->total() ? 'hay' : 'limpio' }}">{{ $filas->total() }}</span>
                                 @else
-                                    <span class="ctrl-total cargando" data-check="{{ $c }}">·</span>
+                                    <span class="ctrl-total cargando" data-check="{{ $c }}"
+                                          @if(in_array($c, \App\Services\Controles::PESADOS)) data-pesado="1" @endif>·</span>
                                 @endif
                                 {{ $d['titulo'] }}
                             </a>
@@ -259,14 +260,24 @@
 
 @section('bottom')
     <script>
-        // Los totales del menú se piden de a uno y en orden: son consultas
-        // pesadas y no tiene sentido largarlas todas juntas contra la base.
+        // Totales del menú.
+        //
+        // Los livianos se piden de a POR_VEZ en paralelo (antes iban de a uno
+        // en fila y el costado tardaba minuto y medio en completarse).
+        //
+        // Los pesados (Controles::PESADOS, de 5 a 45 s cada uno) NO se calculan
+        // solos: se pide sólo lo que haya en cache y, si no hay nada, queda un
+        // "calcular" para pedirlo a mano cuando haga falta.
         (function () {
-            var pendientes = Array.prototype.slice.call(document.querySelectorAll('.ctrl-total[data-check]'));
+            var POR_VEZ = 3;
             var filtros = @json(array_filter($filtros));
+            var todos = Array.prototype.slice.call(document.querySelectorAll('.ctrl-total[data-check]'));
+            var livianos = todos.filter(function (el) { return !el.hasAttribute('data-pesado'); });
+            var pesados  = todos.filter(function (el) { return el.hasAttribute('data-pesado'); });
 
-            function url(check) {
+            function url(check, soloCache) {
                 var qs = ['check=' + encodeURIComponent(check)];
+                if (soloCache) { qs.push('cache=1'); }
                 for (var k in filtros) {
                     if (filtros.hasOwnProperty(k)) {
                         qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(filtros[k]));
@@ -275,21 +286,48 @@
                 return '{{ route('controles.conteo') }}?' + qs.join('&');
             }
 
-            function siguiente() {
-                var el = pendientes.shift();
-                if (!el) { return; }
-
-                fetch(url(el.getAttribute('data-check')), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            function pedir(el, soloCache) {
+                return fetch(url(el.getAttribute('data-check'), soloCache), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
+                        if (d.total === null || d.total === undefined) {
+                            el.textContent = 'calcular';
+                            el.className = 'ctrl-total calcular';
+                            el.title = 'Este total es lento (varios segundos): se calcula sólo si lo pedís.';
+                            return;
+                        }
                         el.textContent = d.total;
                         el.className = 'ctrl-total ' + (d.total > 0 ? 'hay' : 'limpio');
+                        el.removeAttribute('title');
                     })
-                    .catch(function () { el.textContent = '?'; })
-                    .then(siguiente);
+                    .catch(function () { el.textContent = '?'; });
             }
 
-            siguiente();
+            // Livianos: una cola atendida por POR_VEZ "trabajadores".
+            function trabajador() {
+                var el = livianos.shift();
+                if (!el) { return Promise.resolve(); }
+                return pedir(el, false).then(trabajador);
+            }
+            var hilos = [];
+            for (var i = 0; i < POR_VEZ; i++) { hilos.push(trabajador()); }
+
+            // Pesados: sólo lo cacheado, después de los livianos.
+            Promise.all(hilos).then(function () {
+                pesados.forEach(function (el) { pedir(el, true); });
+            });
+
+            // "calcular": el span está adentro del link del menú, así que el
+            // clic se frena para no navegar.
+            document.addEventListener('click', function (ev) {
+                var el = ev.target.closest ? ev.target.closest('.ctrl-total.calcular') : null;
+                if (!el) { return; }
+                ev.preventDefault();
+                ev.stopPropagation();
+                el.textContent = '…';
+                el.className = 'ctrl-total cargando';
+                pedir(el, false);
+            });
         })();
     </script>
 @endsection

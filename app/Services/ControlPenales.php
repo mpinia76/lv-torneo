@@ -115,7 +115,7 @@ class ControlPenales
      */
     public function malCargados(array $filtros)
     {
-        $version = (int) Cache::get('controles.version', 1);
+        $version = $this->controles->versionDe('penales.mal_cargados');
         $llave   = 'controles.'.$version.'.penales.mal.'.md5(json_encode($filtros));
 
         $filas = Cache::remember($llave, self::TTL, function () use ($filtros) {

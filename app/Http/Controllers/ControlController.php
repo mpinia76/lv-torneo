@@ -63,8 +63,12 @@ class ControlController extends Controller
     }
 
     /**
-     * Total de un chequeo, para el badge del menú. Se pide por AJAX de a uno
-     * para que la pantalla se vea enseguida aunque los conteos tarden.
+     * Total de un chequeo, para el badge del menú. Se pide por AJAX para que
+     * la pantalla se vea enseguida aunque los conteos tarden.
+     *
+     * Con `cache=1` no calcula nada: devuelve el total si ya estaba guardado y
+     * `null` si no. Así piden su total los Controles::PESADOS al abrir el
+     * panel; el cálculo de verdad sólo corre cuando se aprieta "calcular".
      */
     public function conteo(Request $request)
     {
@@ -76,9 +80,13 @@ class ControlController extends Controller
 
         $filtros = $this->controles->filtrosDesde($request);
 
+        $total = $request->boolean('cache')
+            ? $this->controles->conteoCacheado($clave, $filtros)
+            : $this->controles->contar($clave, $filtros);
+
         return response()->json([
             'check' => $clave,
-            'total' => $this->controles->contar($clave, $filtros),
+            'total' => $total,
         ]);
     }
 
@@ -177,7 +185,7 @@ class ControlController extends Controller
         $r      = $this->incidenciaSinDatos((int) $request->input('partido_id'), $motivo['texto']);
 
         if ($r['creada']) {
-            $this->controles->invalidarConteos();
+            $this->controles->invalidarConteo($request->input('check'));
         }
 
         return back()->with('success', $r['texto']);
@@ -240,7 +248,7 @@ class ControlController extends Controller
         }
 
         if ($creadas) {
-            $this->controles->invalidarConteos();
+            $this->controles->invalidarConteo($request->input('check'));
         }
 
         $mensaje = 'Incidencias cargadas: '.$creadas.'.'
@@ -406,7 +414,7 @@ class ControlController extends Controller
         }
 
         if ($ok) {
-            $this->controles->invalidarConteos();
+            $this->controles->invalidarConteo($request->input('check'));
         }
 
         $mensaje = 'Rehice el detalle de '.$ok.' partido(s)'

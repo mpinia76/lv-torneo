@@ -109,6 +109,8 @@
 .ctrl-total.cargando { color: #adb5bd; background: #f1f3f5; }
 .ctrl-total.hay      { background: #f8d7da; color: #842029; }
 .ctrl-total.limpio   { background: #d1e7dd; color: #0f5132; }
+.ctrl-total.calcular { background: #fff3cd; color: #664d03; font-weight: 600; cursor: pointer; }
+.ctrl-total.calcular:hover { background: #ffe69c; }
 
 /* -------------------------------------------------- encabezado y tabla -- */
 

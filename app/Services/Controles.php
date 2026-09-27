@@ -49,6 +49,20 @@ class Controles
      */
     private const CLAVE_VERSION = 'controles.version';
 
+    /**
+     * Los controles caros (de 5 a 45 segundos cada uno medidos el 26/09/2026,
+     * y crecen con cada partido cargado). Su total NO se calcula solo al
+     * abrir el panel: se muestra el que está en cache y, si no hay, un
+     * "calcular" que lo pide a mano. Antes el menú los esperaba en fila y el
+     * costado tardaba minuto y medio en completarse.
+     */
+    public const PESADOS = [
+        'partidos.sin_resultado',
+        'partidos.penales_sumados',
+        'penales.faltantes',
+        'penales.mal_cargados',
+    ];
+
     /** La ficha del partido en Transfermarkt, para pegarle el gameId atrás. */
     public const TM_PARTIDO = 'https://www.transfermarkt.com/spielbericht/index/spielbericht/';
 
@@ -358,10 +372,7 @@ class Controles
      */
     public function contar(string $clave, array $filtros = []): int
     {
-        $version = (int) Cache::get(self::CLAVE_VERSION, 1);
-        $llave   = 'controles.'.$version.'.'.$clave.'.'.md5(json_encode($filtros));
-
-        return (int) Cache::remember($llave, self::TTL_CONTEO, function () use ($clave, $filtros) {
+        return (int) Cache::remember($this->llaveConteo($clave, $filtros), self::TTL_CONTEO, function () use ($clave, $filtros) {
             if ($clave === 'penales.faltantes') {
                 return app(ControlPenales::class)->contarFaltantes($filtros);
             }
@@ -381,10 +392,52 @@ class Controles
         });
     }
 
+    /** El total si ya está en cache; null si habría que calcularlo. */
+    public function conteoCacheado(string $clave, array $filtros = []): ?int
+    {
+        $total = Cache::get($this->llaveConteo($clave, $filtros));
+
+        return $total === null ? null : (int) $total;
+    }
+
+    /**
+     * Versión de los datos de UN chequeo: la global (que sube con
+     * "Recalcular totales") más la propia (que sube cuando se toca algo desde
+     * ese control). ControlPenales la usa también para su lista cacheada.
+     */
+    public function versionDe(string $clave): string
+    {
+        return (int) Cache::get(self::CLAVE_VERSION, 1).'-'.(int) Cache::get(self::CLAVE_VERSION.'.'.$clave, 1);
+    }
+
+    private function llaveConteo(string $clave, array $filtros): string
+    {
+        return 'controles.'.$this->versionDe($clave).'.'.$clave.'.'.md5(json_encode($filtros));
+    }
+
     /** Tira a la basura todos los totales cacheados. */
     public function invalidarConteos(): void
     {
         Cache::forever(self::CLAVE_VERSION, ((int) Cache::get(self::CLAVE_VERSION, 1)) + 1);
+    }
+
+    /**
+     * Tira sólo el total del chequeo desde el que se tocó algo.
+     *
+     * Una incidencia o un rehacer también pueden mover los totales de otros
+     * controles, pero esos se ponen al día solos cuando vence su cache
+     * (TTL_CONTEO) o con "Recalcular totales". Tirar los 25 por cada clic
+     * obligaba a recalcularlos todos, pesados incluidos.
+     */
+    public function invalidarConteo(?string $clave): void
+    {
+        if (!$clave || !$this->definicion($clave)) {
+            $this->invalidarConteos();
+            return;
+        }
+
+        $llave = self::CLAVE_VERSION.'.'.$clave;
+        Cache::forever($llave, ((int) Cache::get($llave, 1)) + 1);
     }
 
     /** Años disponibles para el filtro. */
