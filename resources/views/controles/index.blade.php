@@ -118,7 +118,7 @@
 
                 <div class="ctrl-campo">
                     <label>Torneo</label>
-                    <select name="torneo">
+                    <select name="torneo" id="ctrl-filtro-torneo">
                         <option value="">Todos</option>
                         {{-- $torneosFiltro y no $torneos: el composer global de
                              ComposerServiceProvider pisa $torneos en todas las vistas. --}}
@@ -259,6 +259,14 @@
 @endsection
 
 @section('bottom')
+    {{-- jQuery y select2 vienen del layout. El torneo con buscador: la lista
+         con "Todos" los años es larga y a ojo no se encuentra nada. --}}
+    <script>
+        $(function () {
+            if (!$.fn.select2) { return; }
+            $('#ctrl-filtro-torneo').select2({ width: '260px' });
+        });
+    </script>
     <script>
         // Totales del menú.
         //
