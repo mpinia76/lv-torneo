@@ -465,6 +465,18 @@ class PersonaDuplicadoController extends Controller
             return ['problemas' => $problemas, 'fichas' => $fichas];
         });
 
+        // La lista viene de cache (10 minutos) y en ese rato el importador de
+        // detalle sigue bajando fotos: una ficha marcada "no está el archivo"
+        // puede tener el archivo ya en disco, y en la tabla se ve la foto al
+        // lado del cartel que dice que no está. Las marcadas así son pocas, así
+        // que se vuelve a preguntar al disco por cada una antes de mostrarlas.
+        foreach ($this->fotosProblema['problemas'] as $id => $d) {
+            if ($d['motivo'] !== FotosPersonas::FALTA) continue;
+            if (FotosPersonas::revisarDirecto($d['foto']) === null) {
+                unset($this->fotosProblema['problemas'][$id], $this->fotosProblema['fichas'][$id]);
+            }
+        }
+
         return $this->fotosProblema;
     }
 

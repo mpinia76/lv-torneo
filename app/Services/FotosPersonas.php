@@ -163,6 +163,20 @@ class FotosPersonas
         return self::revisarArchivo(public_path('images/' . $foto), (int) $archivos[$foto]);
     }
 
+    /**
+     * Lo mismo que revisar(), pero preguntando derecho al disco por ESE
+     * archivo, sin el índice del directorio. Sirve para re-chequear unas pocas
+     * fichas contra una lista cacheada: el directorio se lee una vez y queda
+     * guardado 10 minutos, y en ese rato el importador sigue bajando fotos.
+     */
+    public static function revisarDirecto(string $foto)
+    {
+        $ruta = public_path('images/' . $foto);
+        if (!is_file($ruta)) return self::falta(null);
+
+        return self::revisarArchivo($ruta, (int) @filesize($ruta));
+    }
+
     private static function falta($parecido)
     {
         return ['motivo' => self::FALTA, 'bytes' => 0, 'parecido' => $parecido,
