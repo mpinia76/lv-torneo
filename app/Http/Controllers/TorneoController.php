@@ -1834,19 +1834,20 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $validFields = ['rojas', 'amarillas', 'jugados', 'jugador'];
         $orderField  = in_array($order, $validFields) ? $order : 'rojas';
 
-        if (strtoupper($tipoOrder) === 'DESC') {
-            $todos = $todos->sortBy([
-                [$orderField, 'desc'],
-                ['amarillas', 'desc'],
-                ['jugador', 'asc'],
-            ])->values();
-        } else {
-            $todos = $todos->sortBy([
-                [$orderField, 'asc'],
-                ['amarillas', 'desc'],
-                ['jugador', 'asc'],
-            ])->values();
-        }
+        // sortBy() con varias columnas ([[campo, dir], ...]) es de Laravel 8;
+        // en 7.x lo toma como una clave y revienta en data_get. Comparador a mano,
+        // igual que en arqueros().
+        $direction = strtoupper($tipoOrder) === 'DESC' ? -1 : 1;
+
+        $todos = $todos->sort(function ($a, $b) use ($orderField, $direction) {
+            $cmp = ($a->{$orderField} <=> $b->{$orderField}) * $direction;
+            if ($cmp !== 0) return $cmp;
+
+            $cmp = $b->amarillas <=> $a->amarillas;
+            if ($cmp !== 0) return $cmp;
+
+            return strcmp((string) $a->jugador, (string) $b->jugador);
+        })->values();
 
         // ---------------------------------------------------------------
         // 5) Paginate manually
