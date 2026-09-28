@@ -900,7 +900,19 @@ class ImportPartidosController extends Controller
 
         $html .= $this->bloqueLlaves($filas);
 
-        $html .= '<h2>Fechas</h2><div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partidos</th>'
+        $html .= '<h2>Fechas</h2>';
+        // «Aplicar todas»: sólo con torneo elegido, liga de un grupo y algo nuevo.
+        $nuevosTotal = 0;
+        foreach ($porFecha as $d) $nuevosTotal += (int) $d['nuevo'];
+        if ($torneoElegido && $nuevosTotal
+            && \App\Grupo::where('torneo_id', $torneoElegido->id)->count() === 1
+            && !\App\Grupo::where('torneo_id', $torneoElegido->id)->where('penales', 1)->exists()) {
+            $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar_todas',
+                    ['comp' => $comp, 'torneo_id' => (int) $torneoElegido->id])) . '">Aplicar todas →</a> '
+                . '<span class="sub">cada ronda a su fecha («1. Jornada» → 1). Usa lo guardado en staging; '
+                . 'primero muestra qué va a dónde.</span></p>';
+        }
+        $html .= '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partidos</th>'
             . '<th>Período</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th></th></tr></thead><tbody>';
         foreach ($porFecha as $r => $d) {
             $html .= '<tr>'
@@ -2168,6 +2180,10 @@ class ImportPartidosController extends Controller
         $torneoId = (int) $request->get('torneo_id');
         $confirmar = (string) $request->get('confirmar', '0') === '1';
         $interzonales = (string) $request->get('interzonales', '0') === '1';
+        // `lote`: lo llama fixtureAplicarTodas() de a una ronda. En vez de la
+        // página devuelve un array con lo creado y lo que no; los controles
+        // son EXACTAMENTE los mismos que aplicando a mano.
+        $lote = (bool) $request->attributes->get('lote', false);
 
         // El torneo vuelve con vos. Sin él, la pantalla de fixture pierde la
         // temporada y Transfermarkt manda la edición en curso: ver el comentario
@@ -2431,7 +2447,7 @@ class ImportPartidosController extends Controller
         foreach ($rivalesDe as $eq => $rs) {
             if (count($rs) > 1) $repetidos[$eq] = true;
         }
-        $dudosos = [];
+        $dudosos = []; $erroresLote = [];
         if ($repetidos) {
             $limpio = [];
             foreach ($plan as $x) {
@@ -2453,7 +2469,14 @@ class ImportPartidosController extends Controller
                     . $this->linkTm($r->external_id) . '<br>';
             }
             $html .= '</div>';
+            if ($lote) {
+                foreach ($dudosos as $r) {
+                    $erroresLote[] = 'No creé ' . $this->nombreEquipo($r->equipo_id) . ' vs '
+                        . $this->nombreEquipo($r->rival_id) . ': uno de los dos aparece contra dos rivales en esta ronda.';
+                }
+            }
             if (empty($plan)) {
+                if ($lote) return ['creados' => 0, 'errores' => $erroresLote, 'fecha' => null, 'detalle' => ''];
                 return $this->pagina('Aplicar fecha', $html . '<p class="err-box">No queda nada que crear.</p>');
             }
         }
@@ -2798,6 +2821,11 @@ class ImportPartidosController extends Controller
 
         foreach (array_keys($fechasTocadas) as $gId) $this->recontarEquipos($gId);
 
+        if ($lote) {
+            return ['creados' => $creados, 'errores' => array_merge($erroresLote, $errores),
+                'fecha' => $fechaFijada ? $fechaFijada->numero : $numeroFecha, 'detalle' => $detalle];
+        }
+
         $html .= '<h1>Creados ' . $creados . ' partidos</h1>'
             . '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · fecha ' . e($gameday)
             . ($fechaFijada
@@ -2816,6 +2844,139 @@ class ImportPartidosController extends Controller
             . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
 
         return $this->pagina('Aplicar fecha', $html);
+    }
+
+    /**
+     * «Aplicar todas»: cada ronda del staging a SU fecha, de una.
+     *
+     * Sólo para ligas de UN grupo sin llaves, que es donde no hay nada que
+     * decidir: «1. Jornada» va a la fecha 1, «2. Jornada» a la 2… (la crea si
+     * no existe). Copas, zonas y rondas sin número («Octavos», «—», una hora)
+     * siguen yendo de a una, porque ahí sí hay que elegir.
+     *
+     * No reimplementa nada: llama a fixtureAplicar() de a una ronda con los
+     * mismos parámetros que el botón de cada fila, así que valen todos los
+     * controles de siempre (dos rivales en la ronda, equipo que ya juega en
+     * la fecha). Un choque deja afuera ESE partido y sigue con el resto.
+     *
+     * Sin `confirmar` sólo muestra qué va a dónde.
+     */
+    public function fixtureAplicarTodas(Request $request)
+    {
+        set_time_limit(0);
+
+        $comp      = trim((string) $request->get('comp', ''));
+        $torneoId  = (int) $request->get('torneo_id');
+        $confirmar = (string) $request->get('confirmar', '0') === '1';
+
+        $alFixture = route('import_partidos.fixture',
+            array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null]));
+        $html = '<p class="sub"><a href="' . e($alFixture) . '">← Volver al fixture</a></p>'
+            . '<h1>Aplicar todas las fechas · ' . e($comp) . '</h1>';
+
+        $torneo = $torneoId ? \App\Torneo::find($torneoId) : null;
+        if ($comp === '' || !$torneo) {
+            return $this->pagina('Aplicar todas', $html . '<p class="err-box">Faltan <code>comp</code> y el torneo.</p>');
+        }
+
+        $grupos = \App\Grupo::where('torneo_id', $torneo->id)->orderBy('id')->get();
+        if ($grupos->count() !== 1 || !empty($grupos->first()->penales)) {
+            return $this->pagina('Aplicar todas', $html . '<p class="err-box">«Aplicar todas» es sólo para una '
+                . '<b>liga de un grupo</b>. ' . e($torneo->nombre . ' ' . $torneo->year) . ' tiene '
+                . $grupos->count() . ' grupo(s)' . ($grupos->count() === 1 ? ' con llaves' : '')
+                . ': ahí cada ronda necesita que elijas a dónde va, así que se aplica de a una.</p>');
+        }
+        $grupo = $grupos->first();
+
+        $rondas = DB::table('import_partidos')
+            ->whereNull('tecnico_id')
+            ->where('competencia_external_id', $comp)
+            ->where('estado', 'nuevo')
+            ->select('ronda', DB::raw('count(*) as n'), DB::raw('min(dia) as desde'), DB::raw('max(dia) as hasta'))
+            ->groupBy('ronda')->get()->keyBy('ronda')->all();
+        uksort($rondas, 'strnatcasecmp');
+
+        if (empty($rondas)) {
+            return $this->pagina('Aplicar todas', $html . '<p class="ok-box">No hay partidos nuevos en el staging '
+                . 'de ' . e($comp) . '. Si la pantalla del fixture te muestra nuevos, apretá antes «Guardar en staging».</p>');
+        }
+
+        $plan = []; $aMano = [];
+        foreach ($rondas as $ronda => $d) {
+            $num = $this->numeroDeJornada($ronda);
+            if ($num === null) { $aMano[] = $d; continue; }
+            $plan[] = ['ronda' => (string) $ronda, 'num' => $num, 'n' => (int) $d->n,
+                'desde' => $d->desde, 'hasta' => $d->hasta,
+                'existe' => (bool) \App\Fecha::where('grupo_id', $grupo->id)->where('numero', $num)->value('id')];
+        }
+
+        $html .= '<p class="sub">' . e($torneo->nombre . ' ' . $torneo->year) . ' · grupo ' . e($grupo->nombre) . '</p>';
+
+        if (!empty($aMano)) {
+            $html .= '<p class="warn-box"><b>' . count($aMano) . ' ronda(s) sin número de jornada</b> quedan afuera '
+                . 'y van de a una desde el fixture: ';
+            foreach ($aMano as $d) $html .= '«' . e($d->ronda) . '» (' . (int) $d->n . ') ';
+            $html .= '</p>';
+        }
+
+        if (!$confirmar) {
+            $total = 0;
+            $html .= '<div class="scroll"><table><thead><tr><th>Ronda de TM</th><th>Va a la fecha</th>'
+                . '<th>Partidos</th><th>Período</th></tr></thead><tbody>';
+            foreach ($plan as $x) {
+                $total += $x['n'];
+                $html .= '<tr><td>' . e($x['ronda']) . '</td>'
+                    . '<td class="num"><b>' . e($x['num']) . '</b>' . ($x['existe'] ? '' : ' <span class="sub">(nueva)</span>') . '</td>'
+                    . '<td class="num">' . $x['n'] . '</td>'
+                    . '<td class="num">' . e(substr((string) $x['desde'], 0, 10))
+                    . (substr((string) $x['desde'], 0, 10) !== substr((string) $x['hasta'], 0, 10)
+                        ? ' → ' . e(substr((string) $x['hasta'], 0, 10)) : '') . '</td></tr>';
+            }
+            $html .= '</tbody></table></div>';
+            if (empty($plan)) return $this->pagina('Aplicar todas', $html . '<p class="err-box">No hay nada que crear.</p>');
+            $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar_todas',
+                    ['comp' => $comp, 'torneo_id' => $torneo->id, 'confirmar' => 1])) . '">Crear estos ' . $total
+                . ' partidos en ' . count($plan) . ' fechas</a> <span class="sub">recién acá se escribe; los '
+                . 'controles son los mismos que aplicando de a una</span></p>';
+            return $this->pagina('Aplicar todas', $html);
+        }
+
+        $creados = 0; $filasHtml = ''; $errores = [];
+        foreach ($plan as $x) {
+            $sub = Request::create('/', 'GET', [
+                'comp' => $comp, 'gameday' => $x['ronda'], 'torneo_id' => $torneo->id,
+                'grupo_destino' => $grupo->id, 'fecha_nombre' => $x['num'], 'confirmar' => 1,
+            ]);
+            $sub->attributes->set('lote', true);
+            try {
+                $r = $this->fixtureAplicar($sub);
+            } catch (\Throwable $ex) {
+                Log::error('fixtureAplicarTodas: ' . $ex->getMessage());
+                $r = ['creados' => 0, 'errores' => [$ex->getMessage()], 'fecha' => $x['num'], 'detalle' => ''];
+            }
+            if (!is_array($r)) {
+                $r = ['creados' => 0, 'errores' => ['no se pudo aplicar: abrila de a una para ver por qué'],
+                    'fecha' => $x['num'], 'detalle' => ''];
+            }
+            $creados += (int) $r['creados'];
+            foreach ((array) $r['errores'] as $e) $errores[] = $x['ronda'] . ': ' . $e;
+            $filasHtml .= '<tr><td>' . e($x['ronda']) . '</td><td class="num"><b>' . e($r['fecha'] ?: $x['num']) . '</b></td>'
+                . '<td class="num">' . (int) $r['creados'] . ' de ' . $x['n'] . '</td>'
+                . '<td class="num">' . (count((array) $r['errores']) ? '<b class="err">' . count((array) $r['errores']) . '</b>' : '0')
+                . '</td></tr>';
+        }
+
+        $html .= '<h1>Creados ' . $creados . ' partidos</h1>';
+        if (!empty($errores)) {
+            $html .= '<p class="err-box"><b>' . count($errores) . ' quedaron sin crear:</b><br>'
+                . implode('<br>', array_map('e', $errores)) . '</p>';
+        }
+        $html .= '<div class="scroll"><table><thead><tr><th>Ronda de TM</th><th>Fecha</th><th>Creados</th>'
+            . '<th>Sin crear</th></tr></thead><tbody>' . $filasHtml . '</tbody></table></div>'
+            . '<p class="acciones"><a class="boton" href="' . e($alFixture) . '">Volver al fixture →</a>'
+            . '<a class="boton-sec" href="' . e(route('import_detalles.index')) . '">Bajar el detalle de estos partidos</a></p>';
+
+        return $this->pagina('Aplicar todas', $html);
     }
 
     /**
