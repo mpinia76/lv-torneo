@@ -77,6 +77,7 @@ class TernaSondeoController extends Controller
         foreach (self::$claves as $rol) { $falta[$rol] = 0; $ok[$rol] = 0; $distinto[$rol] = 0; $soloBase[$rol] = 0; $sinDato[$rol] = 0; }
 
         $faltaSinMapear = 0;
+        $faltaDuplicado = 0;
         $descartados    = [];
         $otrasClaves    = [];
         $detalle        = '';
@@ -128,10 +129,32 @@ class TernaSondeoController extends Controller
                     $celdas .= '<td class="gris">sólo base<br><span class="id">' . e($this->nombre($nombres, $db)) . '</span></td>';
                 } elseif ($tm !== null && $db === null) {
                     $falta[$rol]++;
-                    $mapeado = isset($mapaTm[$tm]);
-                    if (!$mapeado) $faltaSinMapear++;
-                    $celdas .= '<td class="err"><b>FALTA</b><br><span class="id">TM ' . e($tm)
-                        . ($mapeado ? ' · mapeado' : ' · <b>sin mapear</b>') . '</span></td>';
+                    $mapeado  = isset($mapaTm[$tm]);
+                    $esperado = $mapeado ? (int) $mapaTm[$tm] : null;
+
+                    // ¿Ese mismo árbitro ya está cargado en este partido con OTRO
+                    // rol? Si sí, la fila no se perdió por el importador: la
+                    // rechazó la base. `partido_arbitros` no admite dos veces al
+                    // mismo juez en un partido, y eso pasa cuando dos ids de
+                    // Transfermarkt distintos apuntan a la misma persona nuestra.
+                    $yaEn = null;
+                    if ($esperado !== null) {
+                        foreach ($base as $rolBase => $aid) {
+                            if ((int) $aid === $esperado) { $yaEn = $rolBase; break; }
+                        }
+                    }
+
+                    if (!$mapeado) {
+                        $faltaSinMapear++;
+                        $nota = ' · <b>sin mapear</b>';
+                    } elseif ($yaEn !== null) {
+                        $faltaDuplicado++;
+                        $nota = ' · <b>ya está en este partido como ' . e($yaEn) . '</b>';
+                    } else {
+                        $nota = ' · mapeado y libre';
+                    }
+
+                    $celdas .= '<td class="err"><b>FALTA</b><br><span class="id">TM ' . e($tm) . $nota . '</span></td>';
                 } else {
                     $esperado = isset($mapaTm[$tm]) ? (int) $mapaTm[$tm] : null;
                     if ($esperado !== null && $esperado !== $db) {
@@ -165,10 +188,18 @@ class TernaSondeoController extends Controller
                 . 'en ' . $sondeados . ' partidos.</b><br>'
                 . 'Son celdas donde TM trae un id y <code>partido_arbitros</code> no tiene nada para ese rol.'
                 . ($faltaSinMapear > 0
-                    ? '<br><b>' . $faltaSinMapear . ' de esos árbitros no están en <code>arbitro_tm</code></b>, que es '
-                    . 'la causa más probable: el importador saltea al juez que no puede resolver ni crear.'
-                    : '<br>Todos están mapeados en <code>arbitro_tm</code>, así que el problema está en el guardado, '
-                    . 'no en la resolución del árbitro.')
+                    ? '<br>· <b>' . $faltaSinMapear . '</b> con el árbitro sin mapear en <code>arbitro_tm</code>: '
+                    . 'el importador saltea al juez que no puede resolver ni crear.'
+                    : '')
+                . ($faltaDuplicado > 0
+                    ? '<br>· <b>' . $faltaDuplicado . '</b> donde ese mismo árbitro <b>ya está en el partido con otro rol</b>. '
+                    . 'Ahí no falla el importador: la base rechaza la fila porque no admite dos veces al mismo juez en un '
+                    . 'partido. Pasa cuando dos ids de Transfermarkt apuntan a la misma persona nuestra — o sea, un '
+                    . 'árbitro duplicado en <code>arbitro_tm</code>, o TM repitiendo a alguien en dos roles.'
+                    : '')
+                . ($faltaSinMapear === 0 && $faltaDuplicado === 0
+                    ? '<br>Todos están mapeados y libres, así que el problema está en el guardado.'
+                    : '')
                 . '</div>';
         }
         $cuerpo .= $veredicto;
