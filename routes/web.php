@@ -293,6 +293,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/plantillas', 'ImportDetallesController@plantillas')->name('import_detalles.plantillas');
     Route::get('/import-detalles/resultados', 'ImportDetallesController@resultados')->name('import_detalles.resultados');
     Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');
+    // Mide si Transfermarkt manda los asistentes o no los tiene. Ver TernaSondeoController.
+    Route::get('/import-detalles/terna-sondeo', 'TernaSondeoController@index')->name('import_detalles.terna_sondeo');
     Route::get('/import-detalles/competencia', 'ImportDetallesController@competencia')->name('import_detalles.competencia');
     Route::get('/import-detalles/club-html', 'ImportDetallesController@clubHtml')->name('import_detalles.club_html');
     Route::get('/import-detalles/competencia-html', 'ImportDetallesController@competenciaHtml')->name('import_detalles.competencia_html');
