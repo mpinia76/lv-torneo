@@ -90,6 +90,19 @@
                 </form>
             @endif
 
+            {{-- La terna tiene su propio recorrido: marcar de a 25 tildando la
+                 página son dos docenas de vueltas. El barrido va torneo por
+                 torneo, sondea una muestra contra Transfermarkt y sólo marca
+                 los que quedan si esa muestra no pierde nada. Ver
+                 TernaSondeoController. --}}
+            @if($clave === 'arbitros.terna')
+                <a href="{{ route('import_detalles.terna_barrido') }}"
+                   style="display:inline-block;background:#15714e;color:#fff;padding:6px 12px;text-decoration:none;font-weight:600;border-radius:3px"
+                   title="Recorre torneo por torneo: sondea 15 partidos contra Transfermarkt y, si en esa muestra no falta nada nuestro, marca todos los que queden de ese torneo. Un click por torneo.">
+                    Barrer todos, torneo por torneo →
+                </a>
+            @endif
+
             <span class="ctrl-lote-nota">
                 <b>Rehacer</b> baja y <b>escribe</b> el detalle de los tildados sin pasar por la vista previa:
                 reemplaza alineación, goles, tarjetas, cambios y árbitros. <b>1 llamada por partido</b> (más las
@@ -102,6 +115,12 @@
                     <br><b>{{ $sinDatos['boton'] }}</b> no gasta llamadas: carga la incidencia en cada tildado y esos
                     partidos salen de todos los controles. Es para lo que no tiene arreglo posible, no para
                     esconder un error nuestro.
+                @endif
+                @if($clave === 'arbitros.terna')
+                    <br><b>Barrer todos</b> es lo mismo pero sin tildar de a página: recorre torneo por torneo,
+                    sondea 15 partidos contra Transfermarkt y, sólo si en esa muestra no falta nada que nosotros
+                    debiéramos tener, marca los que queden de ese torneo. Un torneo que pierde datos no se marca:
+                    te lo muestra para revisar.
                 @endif
             </span>
         </div>
