@@ -7,64 +7,61 @@ use Illuminate\Support\Facades\DB;
 use App\Services\HttpHelper;
 
 /**
- * Sondeo de la terna arbitral.
+ * Sondeo de la terna arbitral: ¿el dato no existe en Transfermarkt, o existe y
+ * lo estamos perdiendo?
  *
- * Contesta con datos una pregunta que hasta ahora se contestaba de memoria:
- * ¿Transfermarkt manda los asistentes y nosotros los perdemos, o directamente
- * no los tiene?
+ * La primera versión de esta pantalla contaba cuántos asistentes manda TM y
+ * cantaba "se está perdiendo el dato" con eso solo. Estaba mal: el sondeo elige
+ * partidos a los que les falta Línea 1 *o* Línea 2, así que un partido que ya
+ * tiene la Línea 1 cargada y sólo le falta la Línea 2 sumaba igual. Contar lo
+ * que TM tiene sin mirar lo que hay en la base no prueba nada.
  *
- * Agarra N partidos ya importados a los que el control "Terna incompleta" les
- * marca un faltante, vuelve a pedir `/game/{gameId}` y anota, clave por clave,
- * si el dato vino con valor, vino en null, o la clave ni siquiera existe. Esa
- * distinción es la que resuelve la discusión:
+ * Ahora compara rol por rol, y sólo cuenta como pérdida la celda donde TM trae
+ * un árbitro y `partido_arbitros` no tiene nada para ese rol. De paso dice si
+ * ese árbitro está en `arbitro_tm`, que es la causa más probable de que el
+ * importador lo haya salteado.
  *
- *   - clave presente en null  -> TM conoce el campo y no tiene el dato
- *   - clave ausente           -> puede ser que el dato viva en otro lado
- *   - clave con valor         -> el dato estaba y lo estábamos perdiendo
- *
- * Además lista TODAS las claves de primer nivel del JSON del partido y marca
- * las que huelan a árbitro, por si la terna viene en una rama que no miramos.
- *
- * Cuesta una llamada por partido sondeado. No escribe nada en la base.
+ * Cuesta una llamada por partido. No escribe nada.
  *
  *   /admin/import-detalles/terna-sondeo?n=25
- *   /admin/import-detalles/terna-sondeo?n=25&torneo_id=123
  */
 class TernaSondeoController extends Controller
 {
     const TMAPI = 'https://tmapi.transfermarkt.technology';
 
-    /** Las claves de `refereeIds` que conocemos, en el orden en que importan. */
+    /** Clave de tmapi -> rol nuestro. Sólo estas cinco entran en `partido_arbitros`. */
     private static $claves = [
         'refereeId'                => 'Principal',
-        'firstRefereeAssistantId'  => 'Línea 1',
-        'secondRefereeAssistantId' => 'Línea 2',
+        'firstRefereeAssistantId'  => 'Linea 1',
+        'secondRefereeAssistantId' => 'Linea 2',
         'fourthOfficialId'         => 'Cuarto',
         'firstVideoAssistantId'    => 'VAR',
-        'secondVideoAssistantId'   => 'AVAR',
-        'firstGoalJudgeId'         => 'Juez gol 1',
-        'secondGoalJudgeId'        => 'Juez gol 2',
+    ];
+
+    /** Las que TM manda y no tienen lugar en el enum: se miran, no se cargan. */
+    private static $clavesFuera = [
+        'secondVideoAssistantId' => 'AVAR',
+        'firstGoalJudgeId'       => 'Juez gol 1',
+        'secondGoalJudgeId'      => 'Juez gol 2',
     ];
 
     public function index(Request $request)
     {
         set_time_limit(0);
 
-        $n        = max(1, min(60, (int) $request->get('n', 20)));
-        $torneoId = (int) $request->get('torneo_id', 0);
-        $soloSin  = (string) $request->get('solo_sin_terna', '1') !== '0';
+        $n       = max(1, min(60, (int) $request->get('n', 20)));
+        $soloSin = (string) $request->get('solo_sin_terna', '1') !== '0';
 
-        $filas = $this->partidos($n, $torneoId, $soloSin);
+        $filas = $this->partidos($n, $soloSin);
 
         $cuerpo = '<p class="sub"><a href="' . e(url('/admin/controles?check=arbitros.terna')) . '">← Controles · Terna incompleta</a></p>'
             . '<h1>Sondeo de la terna en Transfermarkt</h1>'
-            . '<p class="sub">Vuelve a pedir <code>/game/{gameId}</code> de ' . count($filas) . ' partido(s) ya importados '
-            . 'y mira qué manda TM en <code>refereeIds</code>. Una llamada por partido. No escribe nada.</p>'
+            . '<p class="sub">Compara, rol por rol, lo que manda <code>/game/{gameId}</code> contra lo que hay en '
+            . '<code>partido_arbitros</code>. Una llamada por partido. No escribe nada.</p>'
             . '<form method="get" style="margin:12px 0">'
-            . '<label>Partidos a sondear <input type="number" name="n" value="' . $n . '" min="1" max="60" size="4"></label> '
+            . '<label>Partidos <input type="number" name="n" value="' . $n . '" min="1" max="60" size="4"></label> '
             . '<label><input type="checkbox" name="solo_sin_terna" value="1"' . ($soloSin ? ' checked' : '')
             . '> sólo los que hoy tienen la terna incompleta</label> '
-            . '<input type="hidden" name="torneo_id" value="' . ($torneoId ?: '') . '"> '
             . '<button>Sondear</button></form>';
 
         if (empty($filas)) {
@@ -72,16 +69,19 @@ class TernaSondeoController extends Controller
                 $cuerpo . '<div class="ok-box">No encontré partidos importados que cumplan el filtro.</div>');
         }
 
-        // ── El sondeo ───────────────────────────────────────────────────────
-        $conteo = [];   // clave => ['valor'=>n, 'null'=>n, 'ausente'=>n]
-        foreach (array_keys(self::$claves) as $k) $conteo[$k] = ['valor' => 0, 'null' => 0, 'ausente' => 0];
+        $enBase   = $this->arbitrosEnBase(array_map(function ($f) { return (int) $f->id; }, $filas));
+        $mapaTm   = $this->mapaArbitroTm();
+        $nombres  = $this->nombresArbitros();
 
-        $otrasClaves = [];   // claves de refereeIds que no conocemos
-        $ramasRaras  = [];   // claves del game que huelen a árbitro
-        $detalle     = '';
-        $primerCrudo = null;
-        $llamadas    = 0;
-        $fallaron    = 0;
+        $falta = []; $ok = []; $distinto = []; $soloBase = []; $sinDato = [];
+        foreach (self::$claves as $rol) { $falta[$rol] = 0; $ok[$rol] = 0; $distinto[$rol] = 0; $soloBase[$rol] = 0; $sinDato[$rol] = 0; }
+
+        $faltaSinMapear = 0;
+        $descartados    = [];
+        $otrasClaves    = [];
+        $detalle        = '';
+        $primerCrudo    = null;
+        $llamadas = 0; $fallaron = 0; $sondeados = 0;
 
         foreach ($filas as $f) {
             $json = HttpHelper::getJson(self::TMAPI . '/game/' . rawurlencode((string) $f->external_id));
@@ -89,138 +89,133 @@ class TernaSondeoController extends Controller
 
             if (!is_array($json) || empty($json)) {
                 $fallaron++;
-                $detalle .= '<tr class="err"><td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
+                $detalle .= '<tr><td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
                     . '<td>' . e($f->partido) . '</td>'
-                    . '<td class="num">' . e((string) $f->external_id) . '</td>'
-                    . '<td colspan="' . count(self::$claves) . '">la API no devolvió el partido</td></tr>';
+                    . '<td colspan="' . count(self::$claves) . '" class="err">la API no devolvió el partido</td></tr>';
                 continue;
             }
+            $sondeados++;
 
             $game = isset($json['data']) ? $json['data'] : $json;
             $ids  = isset($game['refereeIds']) && is_array($game['refereeIds']) ? $game['refereeIds'] : [];
+            $base = isset($enBase[(int) $f->id]) ? $enBase[(int) $f->id] : [];
 
             if ($primerCrudo === null) {
                 $primerCrudo = ['partido' => $f->partido, 'gameId' => $f->external_id,
                     'refereeIds' => isset($game['refereeIds']) ? $game['refereeIds'] : '(no viene la clave)',
-                    'claves_del_game' => array_keys($game)];
-            }
-
-            // Ramas de primer nivel que puedan contener árbitros y no miramos.
-            foreach (array_keys($game) as $k) {
-                $bajo = mb_strtolower($k);
-                if ($k === 'refereeIds') continue;
-                if (mb_strpos($bajo, 'refer') !== false || mb_strpos($bajo, 'official') !== false
-                    || mb_strpos($bajo, 'schieds') !== false || mb_strpos($bajo, 'umpire') !== false) {
-                    $ramasRaras[$k] = isset($ramasRaras[$k]) ? $ramasRaras[$k] + 1 : 1;
-                }
+                    'en_la_base' => $base, 'claves_del_game' => array_keys($game)];
             }
 
             foreach (array_keys($ids) as $k) {
-                if (!isset(self::$claves[$k])) {
-                    $otrasClaves[$k] = isset($otrasClaves[$k]) ? $otrasClaves[$k] + 1 : 1;
-                }
+                if (isset(self::$claves[$k]) || isset(self::$clavesFuera[$k])) continue;
+                $otrasClaves[$k] = true;
+            }
+            foreach (self::$clavesFuera as $k => $etiqueta) {
+                if (!empty($ids[$k])) $descartados[$etiqueta] = isset($descartados[$etiqueta]) ? $descartados[$etiqueta] + 1 : 1;
             }
 
             $celdas = '';
             foreach (self::$claves as $clave => $rol) {
-                if (!array_key_exists($clave, $ids)) {
-                    $conteo[$clave]['ausente']++;
-                    $celdas .= '<td class="num gris">—</td>';
-                } elseif ($ids[$clave] === null || $ids[$clave] === '' || $ids[$clave] === 0 || $ids[$clave] === '0') {
-                    $conteo[$clave]['null']++;
-                    $celdas .= '<td class="num warn">null</td>';
+                $tm  = isset($ids[$clave]) && $ids[$clave] !== null && $ids[$clave] !== '' && $ids[$clave] !== 0 && $ids[$clave] !== '0'
+                    ? (string) $ids[$clave] : null;
+                $db  = isset($base[$rol]) ? (int) $base[$rol] : null;
+
+                if ($tm === null && $db === null) {
+                    $sinDato[$rol]++;
+                    $celdas .= '<td class="gris">—</td>';
+                } elseif ($tm === null && $db !== null) {
+                    $soloBase[$rol]++;
+                    $celdas .= '<td class="gris">sólo base<br><span class="id">' . e($this->nombre($nombres, $db)) . '</span></td>';
+                } elseif ($tm !== null && $db === null) {
+                    $falta[$rol]++;
+                    $mapeado = isset($mapaTm[$tm]);
+                    if (!$mapeado) $faltaSinMapear++;
+                    $celdas .= '<td class="err"><b>FALTA</b><br><span class="id">TM ' . e($tm)
+                        . ($mapeado ? ' · mapeado' : ' · <b>sin mapear</b>') . '</span></td>';
                 } else {
-                    $conteo[$clave]['valor']++;
-                    $celdas .= '<td class="num ok"><b>' . e(is_array($ids[$clave])
-                            ? json_encode($ids[$clave]) : (string) $ids[$clave]) . '</b></td>';
+                    $esperado = isset($mapaTm[$tm]) ? (int) $mapaTm[$tm] : null;
+                    if ($esperado !== null && $esperado !== $db) {
+                        $distinto[$rol]++;
+                        $celdas .= '<td class="warn">distinto<br><span class="id">TM ' . e($tm) . ' → #' . $esperado
+                            . ' · base #' . $db . '</span></td>';
+                    } else {
+                        $ok[$rol]++;
+                        $celdas .= '<td class="ok">ok<br><span class="id">' . e($this->nombre($nombres, $db)) . '</span></td>';
+                    }
                 }
             }
 
             $detalle .= '<tr><td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
-                . '<td>' . e($f->partido) . '</td>'
-                . '<td class="num"><span class="id">' . e((string) $f->external_id) . '</span></td>'
+                . '<td>' . e($f->partido) . ' <span class="id">#' . (int) $f->id . ' · game ' . e((string) $f->external_id) . '</span></td>'
                 . $celdas . '</tr>';
         }
 
-        $sondeados = $llamadas - $fallaron;
+        $totalFalta = array_sum($falta);
 
-        // ── El veredicto ────────────────────────────────────────────────────
-        $conAsistente = $conteo['firstRefereeAssistantId']['valor'] + $conteo['secondRefereeAssistantId']['valor'];
-        $nullAsist    = $conteo['firstRefereeAssistantId']['null'] + $conteo['secondRefereeAssistantId']['null'];
-        $ausAsist     = $conteo['firstRefereeAssistantId']['ausente'] + $conteo['secondRefereeAssistantId']['ausente'];
-
+        // ── Veredicto ───────────────────────────────────────────────────────
         if ($sondeados === 0) {
             $veredicto = '<div class="err-box">No se pudo sondear ningún partido: la API no respondió.</div>';
-        } elseif ($conAsistente > 0) {
-            $veredicto = '<div class="err-box"><b>Transfermarkt SÍ manda asistentes en algunos de estos partidos '
-                . '(' . $conAsistente . ' valor(es) en ' . $sondeados . ' partidos) y en la base no están.</b><br>'
-                . 'O sea que el dato se está perdiendo en el camino: hay que mirar por qué el importador no lo guardó. '
-                . 'Empezá por un partido de los que abajo tienen número en Línea 1 o Línea 2 y rehacelo mirando los avisos.</div>';
-        } elseif ($nullAsist > 0 && $ausAsist === 0) {
-            $veredicto = '<div class="ok-box"><b>Transfermarkt no tiene los asistentes de estos partidos.</b><br>'
-                . 'Manda las claves <code>firstRefereeAssistantId</code> y <code>secondRefereeAssistantId</code> '
-                . 'explícitamente en <code>null</code> en los ' . $sondeados . ' partidos sondeados. '
-                . 'No es un problema del importador: el dato no existe en la fuente. '
-                . 'Estos partidos son para marcar con "Terna incompleta en TM".</div>';
-        } elseif ($ausAsist > 0 && $conAsistente === 0) {
-            $veredicto = '<div class="err-box"><b>Ojo: las claves de los asistentes ni siquiera vienen en el JSON.</b><br>'
-                . 'Que no aparezcan (en vez de venir en null) deja abierta la posibilidad de que la terna viaje en otra '
-                . 'rama o en otro endpoint. Mirá abajo las claves del partido y el crudo antes de dar por cerrado que '
-                . 'el dato no existe.</div>';
+        } elseif ($totalFalta === 0) {
+            $veredicto = '<div class="ok-box"><b>No se está perdiendo nada.</b><br>'
+                . 'En los ' . $sondeados . ' partidos sondeados no hay ni un rol donde Transfermarkt traiga un árbitro '
+                . 'y la base esté vacía. Lo que falta en la terna, TM no lo tiene: manda esas claves en <code>null</code>. '
+                . 'Son partidos para marcar con "Terna incompleta en TM".</div>';
         } else {
-            $veredicto = '<div class="ok-box">Sondeo terminado. Mirá la tabla.</div>';
+            $veredicto = '<div class="err-box"><b>Se están perdiendo ' . $totalFalta . ' árbitro(s) '
+                . 'en ' . $sondeados . ' partidos.</b><br>'
+                . 'Son celdas donde TM trae un id y <code>partido_arbitros</code> no tiene nada para ese rol.'
+                . ($faltaSinMapear > 0
+                    ? '<br><b>' . $faltaSinMapear . ' de esos árbitros no están en <code>arbitro_tm</code></b>, que es '
+                    . 'la causa más probable: el importador saltea al juez que no puede resolver ni crear.'
+                    : '<br>Todos están mapeados en <code>arbitro_tm</code>, así que el problema está en el guardado, '
+                    . 'no en la resolución del árbitro.')
+                . '</div>';
         }
-
         $cuerpo .= $veredicto;
 
-        // ── Resumen por clave ───────────────────────────────────────────────
-        $cuerpo .= '<h2>Qué manda Transfermarkt, clave por clave</h2>'
-            . '<p class="sub">Sobre ' . $sondeados . ' partido(s) sondeados con éxito'
-            . ($fallaron ? ' (' . $fallaron . ' no respondieron)' : '') . '.</p>'
-            . '<div class="scroll"><table><thead><tr><th>Clave de Transfermarkt</th><th>Rol</th>'
-            . '<th>Con dato</th><th>En null</th><th>Clave ausente</th></tr></thead><tbody>';
-        foreach (self::$claves as $clave => $rol) {
-            $c = $conteo[$clave];
-            $cuerpo .= '<tr>'
-                . '<td><code>' . e($clave) . '</code></td>'
-                . '<td>' . e($rol) . '</td>'
-                . '<td class="num">' . ($c['valor'] ? '<b class="ok">' . $c['valor'] . '</b>' : '0') . '</td>'
-                . '<td class="num">' . ($c['null'] ? '<b class="warn">' . $c['null'] . '</b>' : '0') . '</td>'
-                . '<td class="num gris">' . $c['ausente'] . '</td>'
-                . '</tr>';
+        // ── Resumen por rol ─────────────────────────────────────────────────
+        $cuerpo .= '<h2>Rol por rol</h2>'
+            . '<p class="sub">Sobre ' . $sondeados . ' partido(s)' . ($fallaron ? ' (' . $fallaron . ' no respondieron)' : '') . '. '
+            . '<b>Falta</b> es lo único que indica un problema nuestro.</p>'
+            . '<div class="scroll"><table><thead><tr><th>Rol</th><th>Falta</th><th>Coincide</th>'
+            . '<th>Distinto</th><th>Sólo en la base</th><th>Ninguno lo tiene</th></tr></thead><tbody>';
+        foreach (self::$claves as $rol) {
+            $cuerpo .= '<tr><td><b>' . e($rol) . '</b></td>'
+                . '<td class="num">' . ($falta[$rol] ? '<b class="err">' . $falta[$rol] . '</b>' : '0') . '</td>'
+                . '<td class="num ok">' . $ok[$rol] . '</td>'
+                . '<td class="num">' . ($distinto[$rol] ? '<b class="warn">' . $distinto[$rol] . '</b>' : '0') . '</td>'
+                . '<td class="num gris">' . $soloBase[$rol] . '</td>'
+                . '<td class="num gris">' . $sinDato[$rol] . '</td></tr>';
         }
         $cuerpo .= '</tbody></table></div>';
 
-        if (!empty($otrasClaves)) {
-            $cuerpo .= '<div class="err-box" style="margin-top:14px"><b>Claves de <code>refereeIds</code> que no conocemos:</b> '
-                . e(implode(', ', array_keys($otrasClaves))) . '. Estas hay que mapearlas.</div>';
+        if (!empty($descartados)) {
+            $partes = [];
+            foreach ($descartados as $k => $v) $partes[] = $k . ' (' . $v . ')';
+            $cuerpo .= '<p class="sub">Transfermarkt además manda roles que no existen en tu enum y se descartan a propósito: '
+                . e(implode(' · ', $partes)) . '.</p>';
         }
-        if (!empty($ramasRaras)) {
-            $cuerpo .= '<div class="err-box" style="margin-top:14px"><b>Ramas del partido que podrían traer árbitros y no miramos:</b> '
-                . e(implode(', ', array_keys($ramasRaras))) . '.</div>';
+        if (!empty($otrasClaves)) {
+            $cuerpo .= '<div class="err-box"><b>Claves de <code>refereeIds</code> sin mapear:</b> '
+                . e(implode(', ', array_keys($otrasClaves))) . '</div>';
         }
 
-        // ── El detalle ──────────────────────────────────────────────────────
-        $cuerpo .= '<h2>Partido por partido</h2><div class="scroll"><table><thead><tr>'
-            . '<th>Fecha</th><th>Partido</th><th>gameId</th>';
+        // ── Detalle ─────────────────────────────────────────────────────────
+        $cuerpo .= '<h2>Partido por partido</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Partido</th>';
         foreach (self::$claves as $rol) $cuerpo .= '<th>' . e($rol) . '</th>';
         $cuerpo .= '</tr></thead><tbody>' . $detalle . '</tbody></table></div>';
 
         if ($primerCrudo) {
-            $cuerpo .= '<h2>El crudo del primero</h2>'
-                . '<p class="sub">' . e($primerCrudo['partido']) . ' · gameId ' . e($primerCrudo['gameId']) . '</p>'
-                . '<pre>' . e(json_encode($primerCrudo, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre>';
+            $cuerpo .= '<h2>El crudo del primero</h2><pre>'
+                . e(json_encode($primerCrudo, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre>';
         }
 
         return $this->pagina('Sondeo de terna', $cuerpo);
     }
 
-    /**
-     * Los partidos a sondear: importados (tienen gameId), con alineación
-     * cargada, y por defecto sólo los que hoy tienen la terna incompleta —
-     * que son exactamente los que lista el control.
-     */
-    private function partidos($n, $torneoId, $soloSin)
+    // ═══════════════════════════ DATOS ═══════════════════════════
+
+    private function partidos($n, $soloSin)
     {
         $existe = function ($rol) {
             return "EXISTS (SELECT 1 FROM partido_arbitros pa
@@ -228,8 +223,6 @@ class TernaSondeoController extends Controller
         };
 
         $q = DB::table('partidos')
-            ->join('fechas as fecha', 'partidos.fecha_id', '=', 'fecha.id')
-            ->join('grupos as grupo', 'fecha.grupo_id', '=', 'grupo.id')
             ->join('equipos as el', 'partidos.equipol_id', '=', 'el.id')
             ->join('equipos as ev', 'partidos.equipov_id', '=', 'ev.id')
             ->join('import_partidos as ip', 'ip.partido_id', '=', 'partidos.id')
@@ -238,11 +231,9 @@ class TernaSondeoController extends Controller
                 $s->select(DB::raw(1))->from('alineacions')
                     ->whereColumn('alineacions.partido_id', 'partidos.id');
             })
-            ->select('partidos.id', 'partidos.dia', 'ip.external_id',
+            ->select('partidos.id', 'partidos.dia', DB::raw('MAX(ip.external_id) as external_id'),
                 DB::raw("CONCAT(el.nombre, ' vs ', ev.nombre) as partido"))
-            ->groupBy('partidos.id', 'partidos.dia', 'ip.external_id', 'el.nombre', 'ev.nombre');
-
-        if ($torneoId) $q->where('grupo.torneo_id', $torneoId);
+            ->groupBy('partidos.id', 'partidos.dia', 'el.nombre', 'ev.nombre');
 
         if ($soloSin) {
             $q->where(function ($w) use ($existe) {
@@ -252,6 +243,44 @@ class TernaSondeoController extends Controller
         }
 
         return $q->orderByDesc('partidos.dia')->limit($n)->get()->all();
+    }
+
+    /** partido_id => [tipo => arbitro_id] */
+    private function arbitrosEnBase(array $partidoIds)
+    {
+        $out = [];
+        if (empty($partidoIds)) return $out;
+        foreach (DB::table('partido_arbitros')->whereIn('partido_id', $partidoIds)
+                     ->select('partido_id', 'tipo', 'arbitro_id')->get() as $r) {
+            $out[(int) $r->partido_id][(string) $r->tipo] = (int) $r->arbitro_id;
+        }
+        return $out;
+    }
+
+    /** tm_referee_id => arbitro_id */
+    private function mapaArbitroTm()
+    {
+        $out = [];
+        foreach (DB::table('arbitro_tm')->select('tm_referee_id', 'arbitro_id')->get() as $r) {
+            $out[(string) $r->tm_referee_id] = (int) $r->arbitro_id;
+        }
+        return $out;
+    }
+
+    /** arbitro_id => nombre */
+    private function nombresArbitros()
+    {
+        $out = [];
+        foreach (DB::table('arbitros')->join('personas', 'personas.id', '=', 'arbitros.persona_id')
+                     ->select('arbitros.id', 'personas.name')->get() as $r) {
+            $out[(int) $r->id] = (string) $r->name;
+        }
+        return $out;
+    }
+
+    private function nombre(array $nombres, $id)
+    {
+        return isset($nombres[$id]) && $nombres[$id] !== '' ? $nombres[$id] : ('#' . $id);
     }
 
     private function pagina($titulo, $cuerpo)
@@ -266,7 +295,7 @@ class TernaSondeoController extends Controller
             .err{color:#9c3529} .ok{color:#15714e} .warn{color:#8a5d00} .gris{color:#9aa69f}
             .scroll{overflow:auto;border:1px solid #dde2dd;background:#fff;max-height:70vh}
             table{border-collapse:collapse;width:100%;font-size:12.5px}
-            th,td{padding:6px 10px;border-bottom:1px solid #eceee9;text-align:left;white-space:nowrap}
+            th,td{padding:6px 10px;border-bottom:1px solid #eceee9;text-align:left;white-space:nowrap;vertical-align:top}
             thead th{position:sticky;top:0;background:#eef1ec;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
             td.num{font-variant-numeric:tabular-nums}
             .id{color:#9aa69f;font-size:11px}
