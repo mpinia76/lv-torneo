@@ -247,6 +247,13 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
         Route::post('/probar',      'CompetenciaExcluidaController@probar')->name('competencias_excluidas.probar');
         Route::post('/excluir-rapido', 'CompetenciaExcluidaController@excluirRapido')->name('competencias_excluidas.excluirRapido');
     });
+
+    // Tira la caché del sitio público. Se vacía sola con cada cambio hecho desde
+    // la app; esto es para los cambios hechos por fuera (phpMyAdmin, SQL a mano).
+    Route::post('/cache-paginas/vaciar', function () {
+        \App\Services\CachePaginas::vaciarTodo();
+        return back()->with('success', 'Caché del sitio público vaciada.');
+    })->name('cache_paginas.vaciar');
     Route::get('/scraper/jugador-transfermarkt-goles',
         [App\Http\Controllers\ScraperController::class, 'jugadorTransfermarktGoles'])
         ->name('scraper.jugador-transfermarkt-goles');
@@ -424,7 +431,10 @@ $rutasPublicas = function () {
 foreach (array_reverse(array_keys(idiomas_sitio())) as $idioma) {
     $esLaDeLaCasa = $idioma === array_keys(idiomas_sitio())[0];
     Route::group(
-        $esLaDeLaCasa ? ['middleware' => 'idioma:' . $idioma] : ['prefix' => $idioma, 'middleware' => 'idioma:' . $idioma],
+        // 'pagina.cache' va después de 'idioma': la clave de la caché lleva el idioma.
+        $esLaDeLaCasa
+            ? ['middleware' => ['idioma:' . $idioma, 'pagina.cache']]
+            : ['prefix' => $idioma, 'middleware' => ['idioma:' . $idioma, 'pagina.cache']],
         $rutasPublicas
     );
 }

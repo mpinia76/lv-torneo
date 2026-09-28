@@ -41,7 +41,7 @@
 
     <!-- build the submission button -->
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}
-        <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+        <a href="{{ url_volver() }}" class="btn btn-success m-1">Volver</a>
     {{ Form::close() }}
     </div>
 

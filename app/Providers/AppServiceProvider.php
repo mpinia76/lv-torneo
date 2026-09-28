@@ -52,5 +52,11 @@ class AppServiceProvider extends ServiceProvider
             });*/
         DB::statement("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));");
 
+        // Toda escritura en la base (Eloquent, SQL crudo, importadores, comandos)
+        // deja vieja la caché del sitio público: ver App\Services\CachePaginas.
+        DB::listen(function ($query) {
+            \App\Services\CachePaginas::consulta($query->sql);
+        });
+
     }
 }

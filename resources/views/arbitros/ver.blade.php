@@ -23,7 +23,7 @@
         </div>
 
         <div class="d-flex justify-content-start my-4">
-            <a href="{{ url()->previous() }}" class="btn btn-success btn-sm">
+            <a href="{{ url_volver() }}" class="btn btn-success btn-sm">
                 <i class="bi bi-arrow-left"></i> {{ __('Volver') }}
             </a>
         </div>

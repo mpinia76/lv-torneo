@@ -80,7 +80,7 @@
         </div>
 
         <div class="d-flex justify-content-start mt-4">
-            <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
+            <a href="{{ url_volver() }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
 
     </div>

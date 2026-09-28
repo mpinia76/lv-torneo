@@ -1,3 +1,6 @@
+{{-- Las marcas cp:cabecera las usa la caché de páginas (App\Http\Middleware\PaginaEnCache):
+     lo que queda entre ellas se arma de nuevo en cada visita, porque depende de la sesión. --}}
+<!--cp:cabecera-->
 @php
     $torneoActivo = Session::get('codigoTorneo');
 
@@ -256,3 +259,4 @@
         </div>
     @endif
 </header>
+<!--/cp:cabecera-->

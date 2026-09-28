@@ -98,6 +98,15 @@
                         </a>
 
                         <ul class="dropdown-menu" role="menu">
+                            <li>
+                                <form method="POST" action="{{ route('cache_paginas.vaciar') }}" style="margin:0"
+                                      title="Se vacía sola con cada cambio hecho desde la app; esto es para cambios hechos por fuera (phpMyAdmin)">
+                                    @csrf
+                                    <button type="submit" class="btn btn-link" style="padding:3px 20px;color:#333">
+                                        <i class="fa fa-refresh"></i> Vaciar caché del sitio
+                                    </button>
+                                </form>
+                            </li>
                             <li><a href="{{ url('/logout') }}"><i class="fa fa-btn fa-sign-out"></i>Logout</a></li>
                         </ul>
                     </li>

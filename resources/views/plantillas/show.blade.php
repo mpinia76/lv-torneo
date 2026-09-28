@@ -63,7 +63,7 @@
             <input type="hidden" name="_token" value="{{ csrf_token() }}">
             <button class="btn btn-danger m-1">Eliminar</button>
         </form>
-        <a href="{{ url()->previous() }}" class="btn btn-success m-1">Volver</a>
+        <a href="{{ url_volver() }}" class="btn btn-success m-1">Volver</a>
     </div>
     </div>
     <script>

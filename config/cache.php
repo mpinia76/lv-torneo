@@ -101,4 +101,10 @@ return [
 
     'prefix' => env('CACHE_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_cache'),
 
+    /*
+    | Caché del HTML de las páginas públicas (App\Services\CachePaginas).
+    | CACHE_PAGINAS=false en el .env la apaga sin tocar código.
+    */
+    'paginas' => env('CACHE_PAGINAS', true),
+
 ];

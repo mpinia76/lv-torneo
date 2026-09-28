@@ -67,5 +67,7 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         // Idioma del sitio público según el prefijo de la URL (ver routes/web.php).
         'idioma' => \App\Http\Middleware\Idioma::class,
+        // Caché del HTML de las páginas públicas (ver App\Services\CachePaginas).
+        'pagina.cache' => \App\Http\Middleware\PaginaEnCache::class,
     ];
 }

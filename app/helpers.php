@@ -255,3 +255,22 @@ if (! function_exists('textos_js')) {
         return $salida;
     }
 }
+
+if (!function_exists('url_volver')) {
+    /**
+     * Link del botón "Volver": la página anterior del visitante.
+     *
+     * Es lo mismo que url()->previous(), salvo cuando la página se está por
+     * guardar en la caché del sitio público: ahí devuelve una marca que
+     * App\Http\Middleware\PaginaEnCache cambia por la página anterior de cada
+     * visitante (si no, todos volverían a donde venía el primero).
+     */
+    function url_volver()
+    {
+        if (request()->attributes->get('cp.guardando')) {
+            return \App\Http\Middleware\PaginaEnCache::HUECO_VOLVER;
+        }
+
+        return url()->previous();
+    }
+}

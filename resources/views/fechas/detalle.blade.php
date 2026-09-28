@@ -1065,7 +1065,7 @@
         </div>
 
         <div class="text-center mt-4 mb-5">
-            <a href="{{ url()->previous() }}" class="btn btn-success">{{ __('Volver') }}</a>
+            <a href="{{ url_volver() }}" class="btn btn-success">{{ __('Volver') }}</a>
         </div>
     </div>
 @endsection

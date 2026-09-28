@@ -8499,30 +8499,13 @@ private function normalizarMinuto(string $texto): int
             $torneo_id = $torneo->id;
         }
 
-        // Guardar info del torneo en sesión
-        $request->session()->put('nombreTorneo', $torneo->nombre . ' ' . $torneo->year);
-        $request->session()->put('escudoTorneo', $torneo->escudo);
-        $request->session()->put('codigoTorneo', $torneo_id);
-
         $grupos = Grupo::where('torneo_id', $torneo_id)->get();
 
-        // Limpiar sesiones
-        $request->session()->forget(['sessionAcumulado', 'sessionPosiciones', 'sessionPromedios', 'sessionPaenza']);
+        // Barra del torneo en la sesión (nombre, escudo y secciones).
+        \App\Services\TorneoEnSesion::fijar($request, $torneo, $grupos);
 
         $arrgrupos = '';
         foreach ($grupos as $grupo) {
-            if ($grupo->acumulado) {
-                $request->session()->put('sessionAcumulado', 1);
-            }
-            if ($grupo->posiciones) {
-                $request->session()->put('sessionPosiciones', 1);
-                if (count($grupos) == 1) {
-                    $request->session()->put('sessionPaenza', 1);
-                }
-            }
-            if ($grupo->promedios) {
-                $request->session()->put('sessionPromedios', 1);
-            }
             $arrgrupos .= $grupo->id . ',';
         }
 

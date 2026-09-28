@@ -32,6 +32,7 @@ use function GuzzleHttp\Promise\iter_for;
 use Illuminate\Support\Facades\Http;
 use App\Services\HttpHelper;
 use App\Services\MenuTorneos;
+use App\Services\CachePaginas;
 use DB;
 
 class TorneoController extends Controller
@@ -521,9 +522,7 @@ class TorneoController extends Controller
         $torneo_id = (int) $request->query('torneoId');
 
         $torneo=Torneo::findOrFail($torneo_id);
-        $request->session()->put('nombreTorneo', $torneo->nombre.' '.$torneo->year);
-        $request->session()->put('escudoTorneo', $torneo->escudo);
-        $request->session()->put('codigoTorneo', $torneo_id);
+        \App\Services\TorneoEnSesion::fijar($request, $torneo);
         return view('torneos.ver', compact('torneo','torneo'));
     }
 
@@ -1320,139 +1319,145 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $nombreFiltro2 = " AND (P2.apellido LIKE '%$nombreEscaped%' OR P2.nombre LIKE '%$nombreEscaped%') ";
         }
 
-        // 1) Real goleadores from gols table (no pagination yet, no ORDER BY needed)
-        $sql = "SELECT jugadors.id, personas.name as jugador,
-            CONCAT(personas.apellido,', ',personas.nombre) completo,
-            personas.foto, personas.nacionalidad,
-            COUNT(gols.id) goles,
-            count(case when tipo='Jugada' then 1 else NULL end) as Jugada,
-            '' as escudo, 0 as jugados,
-            count(case when tipo='Cabeza' then 1 else NULL end) as Cabeza,
-            count(case when tipo='Penal' then 1 else NULL end) as Penal,
-            count(case when tipo='Tiro Libre' then 1 else NULL end) as Tiro_Libre,
-            count(case when tipo='Olímpico' then 1 else NULL end) as Olimpico,
-            '' AS jugando
-        FROM gols
-        INNER JOIN jugadors ON gols.jugador_id = jugadors.id
-        INNER JOIN partidos ON gols.partido_id = partidos.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        WHERE gols.tipo <> 'En contra'" . $nombreFiltro;
+        // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
+        // cambien los datos, así la página 2 o cambiar el orden no los repiten.
+        // Dependen solo del filtro de nombre, de "actuales" y del año.
+        $goleadoresPorId = CachePaginas::datos('hist.goleadores.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+            // 1) Real goleadores from gols table (no pagination yet, no ORDER BY needed)
+            $sql = "SELECT jugadors.id, personas.name as jugador,
+                CONCAT(personas.apellido,', ',personas.nombre) completo,
+                personas.foto, personas.nacionalidad,
+                COUNT(gols.id) goles,
+                count(case when tipo='Jugada' then 1 else NULL end) as Jugada,
+                '' as escudo, 0 as jugados,
+                count(case when tipo='Cabeza' then 1 else NULL end) as Cabeza,
+                count(case when tipo='Penal' then 1 else NULL end) as Penal,
+                count(case when tipo='Tiro Libre' then 1 else NULL end) as Tiro_Libre,
+                count(case when tipo='Olímpico' then 1 else NULL end) as Olimpico,
+                '' AS jugando
+            FROM gols
+            INNER JOIN jugadors ON gols.jugador_id = jugadors.id
+            INNER JOIN partidos ON gols.partido_id = partidos.id
+            INNER JOIN personas ON jugadors.persona_id = personas.id
+            WHERE gols.tipo <> 'En contra'" . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-        SELECT DISTINCT J1.id
-        FROM alineacions
-        INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-        INNER JOIN personas P2 ON J1.persona_id = P2.id
-        INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-        INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-        INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-        INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-        WHERE T1.year LIKE '%$year%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+            SELECT DISTINCT J1.id
+            FROM alineacions
+            INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+            INNER JOIN personas P2 ON J1.persona_id = P2.id
+            INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+            WHERE T1.year LIKE '%$year%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+        )" : "";
 
-        $sql .= " GROUP BY jugadors.id, jugador, foto, nacionalidad";
+            $sql .= " GROUP BY jugadors.id, jugador, foto, nacionalidad";
 
-        $goleadores = collect(DB::select(DB::raw($sql)));
+            $goleadores = collect(DB::select(DB::raw($sql)));
 
-        // Cast numeric fields so additions work correctly
-        $goleadores->transform(function ($g) {
-            $g->goles      = (int) $g->goles;
-            $g->Jugada     = (int) $g->Jugada;
-            $g->Cabeza     = (int) $g->Cabeza;
-            $g->Penal      = (int) $g->Penal;
-            $g->Tiro_Libre = (int) $g->Tiro_Libre;
-            $g->Olimpico   = (int) $g->Olimpico;
-            $g->jugados    = (int) $g->jugados;
-            return $g;
-        });
+            // Cast numeric fields so additions work correctly
+            $goleadores->transform(function ($g) {
+                $g->goles      = (int) $g->goles;
+                $g->Jugada     = (int) $g->Jugada;
+                $g->Cabeza     = (int) $g->Cabeza;
+                $g->Penal      = (int) $g->Penal;
+                $g->Tiro_Libre = (int) $g->Tiro_Libre;
+                $g->Olimpico   = (int) $g->Olimpico;
+                $g->jugados    = (int) $g->jugados;
+                return $g;
+            });
 
-        // 2) Fetch ALL manuals (only when not filtering by torneo)
-        //
-        // `goles_olimpico` es de setiembre de 2026: si la migración todavía no
-        // corrió en este entorno, la columna no está y pedirla revienta la
-        // pantalla PÚBLICA de goleadores. Por eso se pregunta antes y, si falta,
-        // se selecciona un cero con el mismo nombre: el resto del código no se
-        // entera.
-        $selOlimpico = \Schema::hasColumn('jugador_estadistica_manuals', 'goles_olimpico')
-            ? 'm.goles_olimpico' : DB::raw('0 as goles_olimpico');
+            // 2) Fetch ALL manuals (only when not filtering by torneo)
+            //
+            // `goles_olimpico` es de setiembre de 2026: si la migración todavía no
+            // corrió en este entorno, la columna no está y pedirla revienta la
+            // pantalla PÚBLICA de goleadores. Por eso se pregunta antes y, si falta,
+            // se selecciona un cero con el mismo nombre: el resto del código no se
+            // entera.
+            $selOlimpico = \Schema::hasColumn('jugador_estadistica_manuals', 'goles_olimpico')
+                ? 'm.goles_olimpico' : DB::raw('0 as goles_olimpico');
 
-        $manuales = collect();
-        //if (!$request->query('torneoId')) {
-            $manuales = DB::table('jugador_estadistica_manuals as m')
-                ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
-                ->select(
-                    'm.jugador_id',
-                    'm.partidos',
-                    'm.goles_cabeza',
-                    'm.goles_penal',
-                    'm.goles_tiro_libre',
-                    'm.goles_jugada',
-                    $selOlimpico,
-                    'm.goles_en_contra',
-                    'equipos.escudo',
-                    'equipos.id as equipo_id',
-                    'equipos.nombre',
-                    'm.torneo_nombre'
-                )
-                ->get()
-                ->groupBy('jugador_id');
-        //}
-
-        // 3) Merge manuals with real goleadores
-        $goleadoresPorId = $goleadores->keyBy('id');
-
-        foreach ($manuales as $jugadorId => $items) {
-            if ($goleadoresPorId->has($jugadorId)) {
-                $this->aplicarManuales($goleadoresPorId[$jugadorId], $items, $year);
-            } else {
-                // Player has only manual stats — fetch persona data
-                $persona = DB::table('jugadors')
-                    ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+            $manuales = collect();
+            //if (!$request->query('torneoId')) {
+                $manuales = DB::table('jugador_estadistica_manuals as m')
+                    ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
                     ->select(
-                        'jugadors.id',
-                        'personas.name as jugador',
-                        DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                        'personas.foto',
-                        'personas.nacionalidad',
-                        'personas.apellido',
-                        'personas.nombre'
+                        'm.jugador_id',
+                        'm.partidos',
+                        'm.goles_cabeza',
+                        'm.goles_penal',
+                        'm.goles_tiro_libre',
+                        'm.goles_jugada',
+                        $selOlimpico,
+                        'm.goles_en_contra',
+                        'equipos.escudo',
+                        'equipos.id as equipo_id',
+                        'equipos.nombre',
+                        'm.torneo_nombre'
                     )
-                    ->where('jugadors.id', $jugadorId)
-                    ->first();
+                    ->get()
+                    ->groupBy('jugador_id');
+            //}
 
-                if (!$persona) {
-                    continue;
-                }
+            // 3) Merge manuals with real goleadores
+            $goleadoresPorId = $goleadores->keyBy('id');
 
-                // Apply name filter manually for manual-only players
-                if ($nombre) {
-                    $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
-                    if (!str_contains($texto, strtolower($nombre))) {
+            foreach ($manuales as $jugadorId => $items) {
+                if ($goleadoresPorId->has($jugadorId)) {
+                    $this->aplicarManuales($goleadoresPorId[$jugadorId], $items, $year);
+                } else {
+                    // Player has only manual stats — fetch persona data
+                    $persona = DB::table('jugadors')
+                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+                        ->select(
+                            'jugadors.id',
+                            'personas.name as jugador',
+                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
+                            'personas.foto',
+                            'personas.nacionalidad',
+                            'personas.apellido',
+                            'personas.nombre'
+                        )
+                        ->where('jugadors.id', $jugadorId)
+                        ->first();
+
+                    if (!$persona) {
                         continue;
                     }
+
+                    // Apply name filter manually for manual-only players
+                    if ($nombre) {
+                        $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
+                        if (!str_contains($texto, strtolower($nombre))) {
+                            continue;
+                        }
+                    }
+
+                    $g = (object) [
+                        'id'           => $jugadorId,
+                        'jugador'      => $persona->jugador,
+                        'completo'     => $persona->completo,
+                        'foto'         => $persona->foto,
+                        'nacionalidad' => $persona->nacionalidad,
+                        'goles'        => 0,
+                        'Jugada'       => 0,
+                        'Cabeza'       => 0,
+                        'Penal'        => 0,
+                        'Tiro_Libre'   => 0,
+                        'Olimpico'     => 0,
+                        'jugados'      => 0,
+                        'escudo'       => '',
+                        'jugando'      => '',
+                    ];
+
+                    $this->aplicarManuales($g, $items, $year);
+                    $goleadoresPorId->put($jugadorId, $g);
                 }
-
-                $g = (object) [
-                    'id'           => $jugadorId,
-                    'jugador'      => $persona->jugador,
-                    'completo'     => $persona->completo,
-                    'foto'         => $persona->foto,
-                    'nacionalidad' => $persona->nacionalidad,
-                    'goles'        => 0,
-                    'Jugada'       => 0,
-                    'Cabeza'       => 0,
-                    'Penal'        => 0,
-                    'Tiro_Libre'   => 0,
-                    'Olimpico'     => 0,
-                    'jugados'      => 0,
-                    'escudo'       => '',
-                    'jugando'      => '',
-                ];
-
-                $this->aplicarManuales($g, $items, $year);
-                $goleadoresPorId->put($jugadorId, $g);
             }
-        }
+            return $goleadoresPorId;
+        });
 
         // 4) Sort the full merged collection by the requested field
         $todos = $goleadoresPorId->values();
@@ -1712,121 +1717,128 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $year    = date('Y');
 
         // ---------------------------------------------------------------
-        // 1) Real cards from tarjetas table (no ORDER BY, no pagination yet)
-        // ---------------------------------------------------------------
-        $sql = 'SELECT jugadors.id, personas.name as jugador,
-            CONCAT(personas.apellido,\', \',personas.nombre) completo,
-            personas.foto, personas.nacionalidad,
-            count( case when tipo=\'Amarilla\' then 1 else NULL end) as amarillas,
-            count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as rojas,
-            "" escudo, 0 as jugados, "" as jugando
-        FROM tarjetas
-        INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        INNER JOIN partidos ON tarjetas.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        WHERE 1=1' . $nombreFiltro;
+        // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
+        // cambien los datos, así la página 2 o cambiar el orden no los repiten.
+        // Dependen solo del filtro de nombre, de "actuales" y del año.
+        $tarjetasPorId = CachePaginas::datos('hist.tarjetas.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+            // 1) Real cards from tarjetas table (no ORDER BY, no pagination yet)
+            // ---------------------------------------------------------------
+            $sql = 'SELECT jugadors.id, personas.name as jugador,
+                CONCAT(personas.apellido,\', \',personas.nombre) completo,
+                personas.foto, personas.nacionalidad,
+                count( case when tipo=\'Amarilla\' then 1 else NULL end) as amarillas,
+                count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as rojas,
+                "" escudo, 0 as jugados, "" as jugando
+            FROM tarjetas
+            INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
+            INNER JOIN personas ON jugadors.persona_id = personas.id
+            INNER JOIN partidos ON tarjetas.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            WHERE 1=1' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-        SELECT DISTINCT J1.id
-        FROM alineacions
-        INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-        INNER JOIN personas P2 ON J1.persona_id = P2.id
-        INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-        INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-        INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-        INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-        WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : '';
+            $sql .= ($actuales) ? " AND EXISTS (
+            SELECT DISTINCT J1.id
+            FROM alineacions
+            INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+            INNER JOIN personas P2 ON J1.persona_id = P2.id
+            INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+            WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+        )" : '';
 
-        $sql .= ' GROUP BY jugadors.id, jugador, foto, nacionalidad';
+            $sql .= ' GROUP BY jugadors.id, jugador, foto, nacionalidad';
 
-        $tarjetas = collect(DB::select(DB::raw($sql)));
+            $tarjetas = collect(DB::select(DB::raw($sql)));
 
-        // Cast numeric fields
-        $tarjetas->transform(function ($t) {
-            $t->amarillas = (int) $t->amarillas;
-            $t->rojas     = (int) $t->rojas;
-            $t->jugados   = (int) $t->jugados;
-            $t->escudo    = $t->escudo ?? '';
-            $t->jugando   = '';
-            return $t;
-        });
+            // Cast numeric fields
+            $tarjetas->transform(function ($t) {
+                $t->amarillas = (int) $t->amarillas;
+                $t->rojas     = (int) $t->rojas;
+                $t->jugados   = (int) $t->jugados;
+                $t->escudo    = $t->escudo ?? '';
+                $t->jugando   = '';
+                return $t;
+            });
 
-        // ---------------------------------------------------------------
-        // 2) Fetch ALL manuals (always — they have no real torneo_id)
-        // ---------------------------------------------------------------
-        $manuales = DB::table('jugador_estadistica_manuals as m')
-            ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
-            ->select(
-                'm.jugador_id',
-                'm.partidos',
-                'm.amarillas',
-                'm.rojas',
-                'equipos.escudo',
-                'equipos.id as equipo_id',
-                'equipos.nombre',
-                'm.torneo_nombre'
-            )
-            ->get()
-            ->groupBy('jugador_id');
+            // ---------------------------------------------------------------
+            // 2) Fetch ALL manuals (always — they have no real torneo_id)
+            // ---------------------------------------------------------------
+            $manuales = DB::table('jugador_estadistica_manuals as m')
+                ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
+                ->select(
+                    'm.jugador_id',
+                    'm.partidos',
+                    'm.amarillas',
+                    'm.rojas',
+                    'equipos.escudo',
+                    'equipos.id as equipo_id',
+                    'equipos.nombre',
+                    'm.torneo_nombre'
+                )
+                ->get()
+                ->groupBy('jugador_id');
 
-        // ---------------------------------------------------------------
-        // 3) Merge manuals with real tarjetas
-        // ---------------------------------------------------------------
-        $tarjetasPorId = $tarjetas->keyBy('id');
+            // ---------------------------------------------------------------
+            // 3) Merge manuals with real tarjetas
+            // ---------------------------------------------------------------
+            $tarjetasPorId = $tarjetas->keyBy('id');
 
-        foreach ($manuales as $jugadorId => $items) {
-            if ($tarjetasPorId->has($jugadorId)) {
-                $this->aplicarManualesTarjetas($tarjetasPorId[$jugadorId], $items, $year);
-            } else {
-                // Manual-only player: fetch persona data
-                $persona = DB::table('jugadors')
-                    ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-                    ->select(
-                        'jugadors.id',
-                        'personas.name as jugador',
-                        DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                        'personas.foto',
-                        'personas.nacionalidad',
-                        'personas.apellido',
-                        'personas.nombre'
-                    )
-                    ->where('jugadors.id', $jugadorId)
-                    ->first();
+            foreach ($manuales as $jugadorId => $items) {
+                if ($tarjetasPorId->has($jugadorId)) {
+                    $this->aplicarManualesTarjetas($tarjetasPorId[$jugadorId], $items, $year);
+                } else {
+                    // Manual-only player: fetch persona data
+                    $persona = DB::table('jugadors')
+                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+                        ->select(
+                            'jugadors.id',
+                            'personas.name as jugador',
+                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
+                            'personas.foto',
+                            'personas.nacionalidad',
+                            'personas.apellido',
+                            'personas.nombre'
+                        )
+                        ->where('jugadors.id', $jugadorId)
+                        ->first();
 
-                if (!$persona) {
-                    continue;
-                }
-
-                // Apply name filter
-                if ($nombre) {
-                    $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
-                    if (!str_contains($texto, strtolower($nombre))) {
+                    if (!$persona) {
                         continue;
                     }
+
+                    // Apply name filter
+                    if ($nombre) {
+                        $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
+                        if (!str_contains($texto, strtolower($nombre))) {
+                            continue;
+                        }
+                    }
+
+                    $t = (object) [
+                        'id'           => $jugadorId,
+                        'jugador'      => $persona->jugador,
+                        'completo'     => $persona->completo,
+                        'foto'         => $persona->foto,
+                        'nacionalidad' => $persona->nacionalidad,
+                        'amarillas'    => 0,
+                        'rojas'        => 0,
+                        'jugados'      => 0,
+                        'escudo'       => '',
+                        'jugando'      => '',
+                    ];
+
+                    $this->aplicarManualesTarjetas($t, $items, $year);
+                    $tarjetasPorId->put($jugadorId, $t);
                 }
-
-                $t = (object) [
-                    'id'           => $jugadorId,
-                    'jugador'      => $persona->jugador,
-                    'completo'     => $persona->completo,
-                    'foto'         => $persona->foto,
-                    'nacionalidad' => $persona->nacionalidad,
-                    'amarillas'    => 0,
-                    'rojas'        => 0,
-                    'jugados'      => 0,
-                    'escudo'       => '',
-                    'jugando'      => '',
-                ];
-
-                $this->aplicarManualesTarjetas($t, $items, $year);
-                $tarjetasPorId->put($jugadorId, $t);
             }
-        }
 
-        // ---------------------------------------------------------------
+            // ---------------------------------------------------------------
+            return $tarjetasPorId;
+        });
+
         // 4) Sort the merged collection
         // ---------------------------------------------------------------
         $todos = $tarjetasPorId->values();
@@ -2401,14 +2413,9 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
     {
         $torneo = Torneo::findOrFail((int) $request->query('torneoId'));
 
-        // La barra del torneo sale de la sesión: si se llega directo a esta
-        // página desde otro torneo, se actualiza (igual que en Fixture).
-        if ((int) $request->session()->get('codigoTorneo') !== (int) $torneo->id) {
-            $request->session()->put('nombreTorneo', $torneo->nombre . ' ' . $torneo->year);
-            $request->session()->put('escudoTorneo', $torneo->escudo);
-            $request->session()->put('codigoTorneo', $torneo->id);
-            $request->session()->forget(['sessionAcumulado', 'sessionPosiciones', 'sessionPromedios', 'sessionPaenza']);
-        }
+        // La barra del torneo sale de la sesión: se deja igual que en Fixture
+        // (también cuando se llega directo a esta página desde otro torneo).
+        \App\Services\TorneoEnSesion::fijar($request, $torneo);
 
         $est = \App\Services\EstadisticasTorneo::cargar($torneo->id);
 
@@ -2473,9 +2480,10 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         $zona        = $filtro['zona'];
         $competencia = $filtro['competencia'];
 
-        $datos = Cache::remember(
-            'estadisticas.totales.v1.' . md5($zona . '|' . $competencia),
-            3600,
+        // Se guarda mientras no cambien los datos (App\Services\CachePaginas).
+        $datos = CachePaginas::datos(
+            'estadisticas.totales.v1',
+            [$zona, $competencia],
             function () use ($zona, $competencia) {
                 return $this->calcularEstadisticasTotales(MenuTorneos::idsDeZona($zona, $competencia));
             }
@@ -3897,150 +3905,157 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         $year    = date('Y');
 
         // ---------------------------------------------------------------
-        // 1) Real arqueros (no ORDER BY, no pagination yet)
-        // ---------------------------------------------------------------
-        $sql = 'SELECT
-        id, jugador, completo,
-        SUM(jugados) as jugados,
-        SUM(recibidos) as recibidos,
-        SUM(invictas) as invictas,
-        escudo, foto, nacionalidad, jugando,
-        SUM(atajos) as atajos
-    FROM (SELECT jugadors.id, personas.name as jugador,
-            CONCAT(personas.apellido,\', \',personas.nombre) completo,
-            COUNT(jugadors.id) as jugados,
-            sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
-            sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas,
-            "" escudo, personas.foto, personas.nacionalidad, "" as jugando, 0 as atajos
-        FROM alineacions
-        INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        INNER JOIN partidos ON alineacions.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-        WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')' . $nombreFiltro;
+        // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
+        // cambien los datos, así la página 2 o cambiar el orden no los repiten.
+        // Dependen solo del filtro de nombre, de "actuales" y del año.
+        $arquerosPorId = CachePaginas::datos('hist.arqueros.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+            // 1) Real arqueros (no ORDER BY, no pagination yet)
+            // ---------------------------------------------------------------
+            $sql = 'SELECT
+            id, jugador, completo,
+            SUM(jugados) as jugados,
+            SUM(recibidos) as recibidos,
+            SUM(invictas) as invictas,
+            escudo, foto, nacionalidad, jugando,
+            SUM(atajos) as atajos
+        FROM (SELECT jugadors.id, personas.name as jugador,
+                CONCAT(personas.apellido,\', \',personas.nombre) completo,
+                COUNT(jugadors.id) as jugados,
+                sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
+                sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas,
+                "" escudo, personas.foto, personas.nacionalidad, "" as jugando, 0 as atajos
+            FROM alineacions
+            INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+            INNER JOIN personas ON jugadors.persona_id = personas.id
+            INNER JOIN partidos ON alineacions.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+            WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-        SELECT DISTINCT J1.id
-        FROM alineacions
-        INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-        INNER JOIN personas P2 ON J1.persona_id = P2.id
-        INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-        INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-        INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-        INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-        WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+            SELECT DISTINCT J1.id
+            FROM alineacions
+            INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+            INNER JOIN personas P2 ON J1.persona_id = P2.id
+            INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+            WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+        )" : "";
 
-        $sql .= ' GROUP BY jugadors.id, personas.name, personas.apellido, personas.nombre, personas.foto, personas.nacionalidad ';
-        $sql .= ' UNION ALL
-        SELECT jugadors.id, personas.name as jugador,
-            CONCAT(personas.apellido,\', \',personas.nombre) completo,
-            0 as jugados, 0 as recibidos, 0 as invictas, "" escudo,
-            personas.foto, personas.nacionalidad, "" as jugando,
-            SUM(case when tipo=\'Atajó\' then 1 else 0 end) as atajos
-        FROM penals
-        INNER JOIN jugadors ON penals.jugador_id = jugadors.id
-        INNER JOIN personas ON jugadors.persona_id = personas.id
-        LEFT JOIN partidos ON penals.partido_id = partidos.id
-        INNER JOIN fechas ON partidos.fecha_id = fechas.id
-        INNER JOIN grupos ON grupos.id = fechas.grupo_id
-        WHERE jugadors.tipoJugador = \'Arquero\'' . $nombreFiltro;
+            $sql .= ' GROUP BY jugadors.id, personas.name, personas.apellido, personas.nombre, personas.foto, personas.nacionalidad ';
+            $sql .= ' UNION ALL
+            SELECT jugadors.id, personas.name as jugador,
+                CONCAT(personas.apellido,\', \',personas.nombre) completo,
+                0 as jugados, 0 as recibidos, 0 as invictas, "" escudo,
+                personas.foto, personas.nacionalidad, "" as jugando,
+                SUM(case when tipo=\'Atajó\' then 1 else 0 end) as atajos
+            FROM penals
+            INNER JOIN jugadors ON penals.jugador_id = jugadors.id
+            INNER JOIN personas ON jugadors.persona_id = personas.id
+            LEFT JOIN partidos ON penals.partido_id = partidos.id
+            INNER JOIN fechas ON partidos.fecha_id = fechas.id
+            INNER JOIN grupos ON grupos.id = fechas.grupo_id
+            WHERE jugadors.tipoJugador = \'Arquero\'' . $nombreFiltro;
 
-        $sql .= ' GROUP BY jugadors.id, jugador, completo, foto, nacionalidad
-    ) t GROUP BY id, jugador, completo, foto, nacionalidad';
+            $sql .= ' GROUP BY jugadors.id, jugador, completo, foto, nacionalidad
+        ) t GROUP BY id, jugador, completo, foto, nacionalidad';
 
-        $arqueros = collect(DB::select(DB::raw($sql)));
+            $arqueros = collect(DB::select(DB::raw($sql)));
 
-        // Cast numeric fields
-        $arqueros->transform(function ($a) {
-            $a->jugados   = (int) $a->jugados;
-            $a->recibidos = (int) $a->recibidos;
-            $a->invictas  = (int) $a->invictas;
-            $a->atajos    = (int) $a->atajos;
-            $a->escudo    = $a->escudo ?? '';
-            $a->jugando   = '';
-            return $a;
-        });
+            // Cast numeric fields
+            $arqueros->transform(function ($a) {
+                $a->jugados   = (int) $a->jugados;
+                $a->recibidos = (int) $a->recibidos;
+                $a->invictas  = (int) $a->invictas;
+                $a->atajos    = (int) $a->atajos;
+                $a->escudo    = $a->escudo ?? '';
+                $a->jugando   = '';
+                return $a;
+            });
 
-        // ---------------------------------------------------------------
-        // 2) Fetch ALL manuals for arqueros (always)
-        // ---------------------------------------------------------------
-        $manuales = DB::table('jugador_estadistica_manuals as m')
-            ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
-            ->join('jugadors', 'm.jugador_id', '=', 'jugadors.id')
-            ->where('jugadors.tipoJugador', 'Arquero')
-            ->select(
-                'm.jugador_id',
-                'm.partidos',
-                'm.goles_recibidos',
-                'm.vallas_invictas',
-                'm.penales_atajo',
-                'equipos.escudo',
-                'equipos.id as equipo_id',
-                'equipos.nombre',
-                'm.torneo_nombre'
-            )
-            ->get()
-            ->groupBy('jugador_id');
+            // ---------------------------------------------------------------
+            // 2) Fetch ALL manuals for arqueros (always)
+            // ---------------------------------------------------------------
+            $manuales = DB::table('jugador_estadistica_manuals as m')
+                ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
+                ->join('jugadors', 'm.jugador_id', '=', 'jugadors.id')
+                ->where('jugadors.tipoJugador', 'Arquero')
+                ->select(
+                    'm.jugador_id',
+                    'm.partidos',
+                    'm.goles_recibidos',
+                    'm.vallas_invictas',
+                    'm.penales_atajo',
+                    'equipos.escudo',
+                    'equipos.id as equipo_id',
+                    'equipos.nombre',
+                    'm.torneo_nombre'
+                )
+                ->get()
+                ->groupBy('jugador_id');
 
-        // ---------------------------------------------------------------
-        // 3) Merge manuals with real arqueros
-        // ---------------------------------------------------------------
-        $arquerosPorId = $arqueros->keyBy('id');
+            // ---------------------------------------------------------------
+            // 3) Merge manuals with real arqueros
+            // ---------------------------------------------------------------
+            $arquerosPorId = $arqueros->keyBy('id');
 
-        foreach ($manuales as $jugadorId => $items) {
-            if ($arquerosPorId->has($jugadorId)) {
-                $this->aplicarManualesArqueros($arquerosPorId[$jugadorId], $items, $year);
-            } else {
-                // Manual-only arquero
-                $persona = DB::table('jugadors')
-                    ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-                    ->select(
-                        'jugadors.id',
-                        'personas.name as jugador',
-                        DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                        'personas.foto',
-                        'personas.nacionalidad',
-                        'personas.apellido',
-                        'personas.nombre'
-                    )
-                    ->where('jugadors.id', $jugadorId)
-                    ->where('jugadors.tipoJugador', 'Arquero')
-                    ->first();
+            foreach ($manuales as $jugadorId => $items) {
+                if ($arquerosPorId->has($jugadorId)) {
+                    $this->aplicarManualesArqueros($arquerosPorId[$jugadorId], $items, $year);
+                } else {
+                    // Manual-only arquero
+                    $persona = DB::table('jugadors')
+                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+                        ->select(
+                            'jugadors.id',
+                            'personas.name as jugador',
+                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
+                            'personas.foto',
+                            'personas.nacionalidad',
+                            'personas.apellido',
+                            'personas.nombre'
+                        )
+                        ->where('jugadors.id', $jugadorId)
+                        ->where('jugadors.tipoJugador', 'Arquero')
+                        ->first();
 
-                if (!$persona) {
-                    continue;
-                }
-
-                if ($nombre) {
-                    $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
-                    if (!str_contains($texto, strtolower($nombre))) {
+                    if (!$persona) {
                         continue;
                     }
+
+                    if ($nombre) {
+                        $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
+                        if (!str_contains($texto, strtolower($nombre))) {
+                            continue;
+                        }
+                    }
+
+                    $a = (object) [
+                        'id'           => $jugadorId,
+                        'jugador'      => $persona->jugador,
+                        'completo'     => $persona->completo,
+                        'foto'         => $persona->foto,
+                        'nacionalidad' => $persona->nacionalidad,
+                        'jugados'      => 0,
+                        'recibidos'    => 0,
+                        'invictas'     => 0,
+                        'atajos'       => 0,
+                        'escudo'       => '',
+                        'jugando'      => '',
+                    ];
+
+                    $this->aplicarManualesArqueros($a, $items, $year);
+                    $arquerosPorId->put($jugadorId, $a);
                 }
-
-                $a = (object) [
-                    'id'           => $jugadorId,
-                    'jugador'      => $persona->jugador,
-                    'completo'     => $persona->completo,
-                    'foto'         => $persona->foto,
-                    'nacionalidad' => $persona->nacionalidad,
-                    'jugados'      => 0,
-                    'recibidos'    => 0,
-                    'invictas'     => 0,
-                    'atajos'       => 0,
-                    'escudo'       => '',
-                    'jugando'      => '',
-                ];
-
-                $this->aplicarManualesArqueros($a, $items, $year);
-                $arquerosPorId->put($jugadorId, $a);
             }
-        }
 
-        // ---------------------------------------------------------------
+            // ---------------------------------------------------------------
+            return $arquerosPorId;
+        });
+
         // 4) Sort the merged collection
         // ---------------------------------------------------------------
         $todos = $arquerosPorId->values();
@@ -4281,294 +4296,301 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         $year    = date('Y');
 
         // ---------------------------------------------------------------
-        // 1) Build the giant UNION query (same as before, no ORDER BY needed)
-        // ---------------------------------------------------------------
-        $sql = 'SELECT jugador_id, "" escudo, foto, nacionalidad, jugador,
-       sum(jugados) jugados,
-       sum(goles) goles,
-       sum(rojas) rojas,
-       sum(amarillas) amarillas,
-       sum(errados) errados,
-       sum(atajos) atajos,
-       sum(recibidos) recibidos,
-       sum(invictas) invictas, sum(titulos) titulos
-from
-(SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "1" as goles, "0" as  amarillas
-, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-FROM gols
-INNER JOIN jugadors ON gols.jugador_id = jugadors.id
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN partidos ON gols.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-WHERE gols.tipo <> \'En contra\'' . $nombreFiltro;
+        // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
+        // cambien los datos, así la página 2 o cambiar el orden no los repiten.
+        // Dependen solo del filtro de nombre, de "actuales" y del año.
+        $jugadoresPorId = CachePaginas::datos('hist.jugadores.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+            // 1) Build the giant UNION query (same as before, no ORDER BY needed)
+            // ---------------------------------------------------------------
+            $sql = 'SELECT jugador_id, "" escudo, foto, nacionalidad, jugador,
+           sum(jugados) jugados,
+           sum(goles) goles,
+           sum(rojas) rojas,
+           sum(amarillas) amarillas,
+           sum(errados) errados,
+           sum(atajos) atajos,
+           sum(recibidos) recibidos,
+           sum(invictas) invictas, sum(titulos) titulos
+    from
+    (SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "1" as goles, "0" as  amarillas
+    , "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
+    FROM gols
+    INNER JOIN jugadors ON gols.jugador_id = jugadors.id
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    INNER JOIN partidos ON gols.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id
+    WHERE gols.tipo <> \'En contra\'' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-, ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-FROM tarjetas
-INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
-INNER JOIN personas ON jugadors.persona_id = personas.id
-LEFT JOIN partidos ON tarjetas.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id' . $nombreFiltro;
+            $sql .= ' UNION ALL
+     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+    , ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
+    FROM tarjetas
+    INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    LEFT JOIN partidos ON tarjetas.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " WHERE EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " WHERE EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, ( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados, ( case when tipo=\'Atajó\' then 1 else NULL end) as  atajos
-FROM penals
-INNER JOIN jugadors ON penals.jugador_id = jugadors.id
-INNER JOIN personas ON jugadors.persona_id = personas.id
-LEFT JOIN partidos ON penals.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id' . $nombreFiltro;
+            $sql .= ' UNION ALL
+     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, ( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados, ( case when tipo=\'Atajó\' then 1 else NULL end) as  atajos
+    FROM penals
+    INNER JOIN jugadors ON penals.jugador_id = jugadors.id
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    LEFT JOIN partidos ON penals.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " WHERE EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " WHERE EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
-, "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
-(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-FROM alineacions
-INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN partidos ON alineacions.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-WHERE  alineacions.tipo = \'Titular\'' . $nombreFiltro;
+            $sql .= ' UNION ALL
+     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
+    , "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
+    (case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
+    FROM alineacions
+    INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    INNER JOIN partidos ON alineacions.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id
+    WHERE  alineacions.tipo = \'Titular\'' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
-, "0" as  rojas, "0" AS recibidos,
-"0" AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-FROM alineacions
-INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador != \'Arquero\'
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN partidos ON alineacions.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')' . $nombreFiltro;
+            $sql .= ' UNION ALL
+     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
+    , "0" as  rojas, "0" AS recibidos,
+    "0" AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
+    FROM alineacions
+    INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador != \'Arquero\'
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    INNER JOIN partidos ON alineacions.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id
+    LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+    WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' UNION ALL
- SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
-, "0" as  rojas, "0" AS recibidos,
-"0" AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-FROM alineacions
-INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN partidos ON alineacions.partido_id = partidos.id
-INNER JOIN fechas ON partidos.fecha_id = fechas.id
-INNER JOIN grupos ON grupos.id = fechas.grupo_id
-LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-WHERE  (cambios.tipo = \'Entra\')' . $nombreFiltro;
+            $sql .= ' UNION ALL
+     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
+    , "0" as  rojas, "0" AS recibidos,
+    "0" AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
+    FROM alineacions
+    INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    INNER JOIN partidos ON alineacions.partido_id = partidos.id
+    INNER JOIN fechas ON partidos.fecha_id = fechas.id
+    INNER JOIN grupos ON grupos.id = fechas.grupo_id
+    LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
+    WHERE  (cambios.tipo = \'Entra\')' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' UNION ALL
-SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as amarillas , "0" as rojas, "0" AS recibidos,
-"0" AS invictas, "0" AS jugando, count(DISTINCT posicion_torneos.id) AS titulos, "0" as  errados, "0" as  atajos
-FROM plantilla_jugadors
-INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
-INNER JOIN personas ON jugadors.persona_id = personas.id
-INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
-INNER JOIN grupos ON grupos.id = plantillas.grupo_id
-INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND posicion_torneos.equipo_id = plantillas.equipo_id AND posicion_torneos.posicion=1
-WHERE 1=1 ' . $nombreFiltro;
+            $sql .= ' UNION ALL
+    SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as amarillas , "0" as rojas, "0" AS recibidos,
+    "0" AS invictas, "0" AS jugando, count(DISTINCT posicion_torneos.id) AS titulos, "0" as  errados, "0" as  atajos
+    FROM plantilla_jugadors
+    INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
+    INNER JOIN personas ON jugadors.persona_id = personas.id
+    INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
+    INNER JOIN grupos ON grupos.id = plantillas.grupo_id
+    INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND posicion_torneos.equipo_id = plantillas.equipo_id AND posicion_torneos.posicion=1
+    WHERE 1=1 ' . $nombreFiltro;
 
-        $sql .= ($actuales) ? " AND EXISTS (
-SELECT DISTINCT J1.id
-FROM alineacions
-INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-INNER JOIN personas P2 ON J1.persona_id = P2.id
-INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-)" : "";
+            $sql .= ($actuales) ? " AND EXISTS (
+    SELECT DISTINCT J1.id
+    FROM alineacions
+    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
+    INNER JOIN personas P2 ON J1.persona_id = P2.id
+    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
+    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
+    )" : "";
 
-        $sql .= ' GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre,personas.nacionalidad';
-        $sql .= ' ) a
-group by jugador_id, jugador, foto, nacionalidad';
+            $sql .= ' GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre,personas.nacionalidad';
+            $sql .= ' ) a
+    group by jugador_id, jugador, foto, nacionalidad';
 
-        $jugadores = collect(DB::select(DB::raw($sql)));
+            $jugadores = collect(DB::select(DB::raw($sql)));
 
-        // Cast numeric fields to int so additions work cleanly
-        $jugadores->transform(function ($j) {
-            $j->jugados    = (int) $j->jugados;
-            $j->goles      = (int) $j->goles;
-            $j->rojas      = (int) $j->rojas;
-            $j->amarillas  = (int) $j->amarillas;
-            $j->errados    = (int) $j->errados;
-            $j->atajos     = (int) $j->atajos;
-            $j->recibidos  = (int) $j->recibidos;
-            $j->invictas   = (int) $j->invictas;
-            $j->titulos    = (int) $j->titulos;
-            $j->escudo     = $j->escudo ?? '';
-            $j->jugando    = '';
-            return $j;
-        });
+            // Cast numeric fields to int so additions work cleanly
+            $jugadores->transform(function ($j) {
+                $j->jugados    = (int) $j->jugados;
+                $j->goles      = (int) $j->goles;
+                $j->rojas      = (int) $j->rojas;
+                $j->amarillas  = (int) $j->amarillas;
+                $j->errados    = (int) $j->errados;
+                $j->atajos     = (int) $j->atajos;
+                $j->recibidos  = (int) $j->recibidos;
+                $j->invictas   = (int) $j->invictas;
+                $j->titulos    = (int) $j->titulos;
+                $j->escudo     = $j->escudo ?? '';
+                $j->jugando    = '';
+                return $j;
+            });
 
-        // ---------------------------------------------------------------
-        // 2) Fetch ALL manuals (always — they have no real torneo_id)
-        // ---------------------------------------------------------------
-        $manuales = DB::table('jugador_estadistica_manuals as m')
-            ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
-            ->select(
-                'm.jugador_id',
-                'm.partidos',
-                'm.posicion',
-                'm.goles_cabeza',
-                'm.goles_penal',
-                'm.goles_tiro_libre',
-                'm.goles_jugada',
-                \Schema::hasColumn('jugador_estadistica_manuals', 'goles_olimpico')
-                    ? 'm.goles_olimpico' : DB::raw('0 as goles_olimpico'),
-                'm.goles_en_contra',
-                'm.amarillas',
-                'm.rojas',
-                'm.goles_recibidos',
-                'm.vallas_invictas',
-                'm.penales_atajo',
-                'm.penales_atajados',
-                'm.penales_errados',
-                'equipos.escudo',
-                'equipos.id as equipo_id',
-                'equipos.nombre',
-                'm.torneo_nombre'
-            )
-            ->get()
-            ->groupBy('jugador_id');
+            // ---------------------------------------------------------------
+            // 2) Fetch ALL manuals (always — they have no real torneo_id)
+            // ---------------------------------------------------------------
+            $manuales = DB::table('jugador_estadistica_manuals as m')
+                ->join('equipos', 'm.equipo_id', '=', 'equipos.id')
+                ->select(
+                    'm.jugador_id',
+                    'm.partidos',
+                    'm.posicion',
+                    'm.goles_cabeza',
+                    'm.goles_penal',
+                    'm.goles_tiro_libre',
+                    'm.goles_jugada',
+                    \Schema::hasColumn('jugador_estadistica_manuals', 'goles_olimpico')
+                        ? 'm.goles_olimpico' : DB::raw('0 as goles_olimpico'),
+                    'm.goles_en_contra',
+                    'm.amarillas',
+                    'm.rojas',
+                    'm.goles_recibidos',
+                    'm.vallas_invictas',
+                    'm.penales_atajo',
+                    'm.penales_atajados',
+                    'm.penales_errados',
+                    'equipos.escudo',
+                    'equipos.id as equipo_id',
+                    'equipos.nombre',
+                    'm.torneo_nombre'
+                )
+                ->get()
+                ->groupBy('jugador_id');
 
-        // ---------------------------------------------------------------
-        // 3) Merge manuals with real jugadores
-        // ---------------------------------------------------------------
-        $jugadoresPorId = $jugadores->keyBy('jugador_id');
+            // ---------------------------------------------------------------
+            // 3) Merge manuals with real jugadores
+            // ---------------------------------------------------------------
+            $jugadoresPorId = $jugadores->keyBy('jugador_id');
 
-        foreach ($manuales as $jugadorId => $items) {
-            if ($jugadoresPorId->has($jugadorId)) {
-                $this->aplicarManualesJugador($jugadoresPorId[$jugadorId], $items, $year);
-            } else {
-                // Manual-only player: fetch persona data
-                $persona = DB::table('jugadors')
-                    ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-                    ->select(
-                        'jugadors.id',
-                        'personas.name as jugador',
-                        DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                        'personas.foto',
-                        'personas.nacionalidad',
-                        'personas.apellido',
-                        'personas.nombre'
-                    )
-                    ->where('jugadors.id', $jugadorId)
-                    ->first();
+            foreach ($manuales as $jugadorId => $items) {
+                if ($jugadoresPorId->has($jugadorId)) {
+                    $this->aplicarManualesJugador($jugadoresPorId[$jugadorId], $items, $year);
+                } else {
+                    // Manual-only player: fetch persona data
+                    $persona = DB::table('jugadors')
+                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+                        ->select(
+                            'jugadors.id',
+                            'personas.name as jugador',
+                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
+                            'personas.foto',
+                            'personas.nacionalidad',
+                            'personas.apellido',
+                            'personas.nombre'
+                        )
+                        ->where('jugadors.id', $jugadorId)
+                        ->first();
 
-                if (!$persona) {
-                    continue;
-                }
-
-                // Apply name filter
-                if ($nombre) {
-                    $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
-                    if (!str_contains($texto, strtolower($nombre))) {
+                    if (!$persona) {
                         continue;
                     }
+
+                    // Apply name filter
+                    if ($nombre) {
+                        $texto = strtolower($persona->apellido . ' ' . $persona->nombre);
+                        if (!str_contains($texto, strtolower($nombre))) {
+                            continue;
+                        }
+                    }
+
+                    $j = (object) [
+                        'jugador_id'   => $jugadorId,
+                        'jugador'      => $persona->jugador,
+                        'completo'     => $persona->completo,
+                        'foto'         => $persona->foto,
+                        'nacionalidad' => $persona->nacionalidad,
+                        'jugados'      => 0,
+                        'titulos'      => 0,
+                        'goles'        => 0,
+                        'rojas'        => 0,
+                        'amarillas'    => 0,
+                        'recibidos'    => 0,
+                        'invictas'     => 0,
+                        'atajos'       => 0,
+                        'errados'      => 0,
+                        'escudo'       => '',
+                        'jugando'      => '',
+                    ];
+
+                    $this->aplicarManualesJugador($j, $items, $year);
+                    $jugadoresPorId->put($jugadorId, $j);
                 }
-
-                $j = (object) [
-                    'jugador_id'   => $jugadorId,
-                    'jugador'      => $persona->jugador,
-                    'completo'     => $persona->completo,
-                    'foto'         => $persona->foto,
-                    'nacionalidad' => $persona->nacionalidad,
-                    'jugados'      => 0,
-                    'titulos'      => 0,
-                    'goles'        => 0,
-                    'rojas'        => 0,
-                    'amarillas'    => 0,
-                    'recibidos'    => 0,
-                    'invictas'     => 0,
-                    'atajos'       => 0,
-                    'errados'      => 0,
-                    'escudo'       => '',
-                    'jugando'      => '',
-                ];
-
-                $this->aplicarManualesJugador($j, $items, $year);
-                $jugadoresPorId->put($jugadorId, $j);
             }
-        }
 
-        // ---------------------------------------------------------------
+            // ---------------------------------------------------------------
+            return $jugadoresPorId;
+        });
+
         // 4) Sort the merged collection by the requested field
         // ---------------------------------------------------------------
         $todos = $jugadoresPorId->values();

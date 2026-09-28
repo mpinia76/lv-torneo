@@ -274,7 +274,7 @@
 
         {{-- Volver --}}
         <div class="d-flex mt-4">
-            <a href="{{ url()->previous() }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
+            <a href="{{ url_volver() }}" class="btn btn-success m-1">{{ __('Volver') }}</a>
         </div>
     </div>
         </div>
