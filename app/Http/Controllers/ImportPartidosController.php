@@ -379,26 +379,46 @@ class ImportPartidosController extends Controller
         $this->htmlFresco = (string) $request->get('fresco', '0') === '1';
 
         // Los torneos COMPLETOS (con posiciones finales guardadas en
-        // `posicion_torneos`) no aparecen: ya no hay fixture que bajarles.
-        // El que viene elegido por URL se deja igual, para no romper un link.
-        $conTm = \App\Torneo::whereNotNull('tm_competition_id')->where('tm_competition_id', '!=', '')
-            ->where(function ($q) use ($torneoElegido) {
-                $q->whereNotExists(function ($s) {
-                    $s->select(DB::raw(1))->from('posicion_torneos')
-                        ->whereColumn('posicion_torneos.torneo_id', 'torneos.id');
-                });
-                if ($torneoElegido) $q->orWhere('torneos.id', $torneoElegido->id);
-            })
+        // `posicion_torneos`) y los INCONCLUSOS (`torneos.inconcluso`) no
+        // aparecen: no hay fixture que bajarles. `ocultos=1` los muestra
+        // igual, marcados (link debajo del desplegable). El que viene elegido
+        // por URL se deja siempre, para no romper un link.
+        $verOcultos = (string) $request->get('ocultos', '0') === '1';
+        $hayInconcluso = Schema::hasColumn('torneos', 'inconcluso');
+
+        $todosTm = \App\Torneo::whereNotNull('tm_competition_id')->where('tm_competition_id', '!=', '')
+            ->select('torneos.*')
+            ->selectRaw('EXISTS (SELECT 1 FROM posicion_torneos WHERE posicion_torneos.torneo_id = torneos.id) AS completo')
             ->orderBy('year', 'desc')->orderBy('nombre')->get();
+
+        $ocultosN = 0;
+        $conTm = $todosTm->filter(function ($t) use ($verOcultos, $torneoElegido, $hayInconcluso, &$ocultosN) {
+            $oculto = !empty($t->completo) || ($hayInconcluso && !empty($t->inconcluso));
+            if ($oculto) $ocultosN++;
+            if ($torneoElegido && $torneoElegido->id === $t->id) return true;
+            return $verOcultos || !$oculto;
+        })->values();
 
         $opts = '<option value="">— elegí un torneo tuyo —</option>';
         foreach ($conTm as $t) {
             $sel = ($torneoElegido && $torneoElegido->id === $t->id) ? ' selected' : '';
             $temp = trim((string) $t->tm_season_id);
+            $marca = ($hayInconcluso && !empty($t->inconcluso)) ? ' · INCONCLUSO'
+                : (!empty($t->completo) ? ' · COMPLETO' : '');
             $opts .= '<option value="' . $t->id . '"' . $sel . '>'
                 . e($t->nombre . ' ' . $t->year . '  ·  ' . $t->tm_competition_id
-                    . ($temp !== '' ? ' · temporada ' . $temp : ' · SIN TEMPORADA')) . '</option>';
+                    . ($temp !== '' ? ' · temporada ' . $temp : ' · SIN TEMPORADA') . $marca) . '</option>';
         }
+        $linkOcultos = $ocultosN === 0 ? ''
+            : '<p class="sub">' . ($verOcultos
+                ? 'Mostrando también los completos e inconclusos (' . $ocultosN . '). <a href="'
+                    . e(route('import_partidos.fixture', array_filter(['torneo_id' => $torneoElegido ? $torneoElegido->id : null])))
+                    . '">Ocultarlos</a>'
+                : $ocultosN . ' torneo' . ($ocultosN == 1 ? '' : 's') . ' oculto' . ($ocultosN == 1 ? '' : 's')
+                    . ' por estar completos (con posiciones guardadas) o inconclusos. <a href="'
+                    . e(route('import_partidos.fixture', array_filter(['torneo_id' => $torneoElegido ? $torneoElegido->id : null, 'ocultos' => 1])))
+                    . '">Mostrarlos</a>')
+            . '</p>';
 
         $html = '<p class="sub"><a href="' . e(route('import_partidos.index')) . '">← Carga de partidos</a></p>'
             . '<h1>Fixture por competencia</h1>'
@@ -407,14 +427,16 @@ class ImportPartidosController extends Controller
             . '(alineaciones, goles, tarjetas) lo trae después la pantalla de siempre.</p>';
 
         if ($conTm->isEmpty()) {
-            $html .= '<div class="err-box">Ningún torneo tuyo tiene cargado el id de competencia de Transfermarkt (o todos los que lo tienen ya están completos, con posiciones guardadas). '
+            $html .= $linkOcultos . '<div class="err-box">Ningún torneo tuyo tiene cargado el id de competencia de Transfermarkt (o todos los que lo tienen ya están completos, con posiciones guardadas, o inconclusos). '
                 . 'Averigualo con el buscador de abajo y guardalo en <b>Editar torneo → transfermarkt.com</b>. '
                 . 'Se hace una sola vez por torneo.</div>';
         } else {
             $html .= '<form method="get" style="margin:12px 0">'
                 . '<select name="torneo_id" class="s2" data-placeholder="elegí un torneo tuyo…">' . $opts . '</select> '
                 . '<button>Ver fixture</button> '
+                . ($verOcultos ? '<input type="hidden" name="ocultos" value="1">' : '')
                 . '<span class="sub">1 crédito + 1 por los nombres de los clubes</span></form>'
+                . $linkOcultos
                 . '<p class="sub">La temporada sale del torneo (<b>Editar torneo → Id Temporada</b>), no se tipea '
                 . 'acá. Hace falta porque el id de competencia es de la <b>copa</b>, no de la edición: tus cinco '
                 . 'Copas Argentina comparten <code>ARCA</code>, y sin temporada Transfermarkt manda la que está en '
