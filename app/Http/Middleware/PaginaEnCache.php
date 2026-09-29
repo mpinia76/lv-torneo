@@ -136,7 +136,9 @@ class PaginaEnCache
         // Las mediciones de PerfDebug tienen que ver el controlador de verdad.
         // Solo con sesión iniciada, como PerfDebug: si no, cualquiera saltearía
         // la caché agregando &perf=1.
-        if ($request->query('perf') && Auth::check()) {
+        // Lo mismo con ?debug=1 (el Acumulado muestra por qué quedó cada zona):
+        // si se guardara, la versión con el debug le llegaría a cualquiera.
+        if (($request->query('perf') || $request->query('debug')) && Auth::check()) {
             return false;
         }
 
