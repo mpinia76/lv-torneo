@@ -1155,6 +1155,9 @@ class ImportPartidosController extends Controller
     private $htmlFresco  = false;
     private $htmlDeCache = null;
 
+    /** Con menos partidos que esto en el calendario HTML, se completa con la portada. */
+    const PORTADA_SI_MENOS_DE = 60;
+
     private function fixtureDesdeHtml($comp, $season, $torneo, $compNombre, array &$avisos = [], $pais = null, $tipo = '')
     {
         // En TM las ligas van por `/wettbewerb/` y las copas por
@@ -1201,6 +1204,36 @@ class ImportPartidosController extends Controller
             // consentimiento.
             $avisos[] = 'Probé estas dos rutas y ninguna trajo partidos — ' . implode(' · ', $intentos);
             return null;
+        }
+
+        // EL CALENDARIO PUEDE VENIR INCOMPLETO en torneos chicos: Playoffs
+        // Liga AUF 13/14 trae 1 de 3 partidos (las finales no están en el
+        // calendario, sí en la portada). Si vino poco, se suma lo que la
+        // portada tenga y el calendario no, por gameId. Una llamada más, sólo
+        // en torneos chicos, y queda en la caché de 30 min como la otra.
+        if (count($leido) < self::PORTADA_SI_MENOS_DE) {
+            $port = $svc->leerPortada($comp, $season, false, $pais);
+            if (is_array($port) && $port) {
+                $ya = [];
+                foreach ($leido as $r) {
+                    $ya[(string) $r['game_id']] = true;
+                }
+                $sumados = 0;
+                foreach ($port as $r) {
+                    if (!isset($ya[(string) $r['game_id']])) {
+                        $leido[] = $r;
+                        $ya[(string) $r['game_id']] = true;
+                        $sumados++;
+                    }
+                }
+                if ($sumados) {
+                    usort($leido, function ($a, $b) {
+                        return strcmp((string) $a['dia'] . ' ' . (string) $a['hora'], (string) $b['dia'] . ' ' . (string) $b['hora']);
+                    });
+                    $avisos[] = 'El calendario de Transfermarkt venía incompleto: sumé ' . $sumados . ' partido'
+                        . ($sumados == 1 ? '' : 's') . ' que están en la portada de la competencia y no en el calendario.';
+                }
+            }
         }
 
         $anio = $torneo ? (string) $torneo->year : '';

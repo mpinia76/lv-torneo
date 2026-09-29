@@ -69,12 +69,39 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
      */
     public function leerComp($compId, $season, $copa = false, $guardarCrudo = false, $pais = null)
     {
+        return $this->leerUrl(self::urlComp($compId, $season, $copa), $guardarCrudo, $pais);
+    }
+
+    /**
+     * La PORTADA de la competencia (`startseite/.../plus/?saison_id=`).
+     *
+     * EL CALENDARIO DE TM PUEDE ESTAR INCOMPLETO. Playoffs Liga AUF 13/14
+     * (`URUP`, temporada 2013) tiene 3 partidos —semifinal y dos finales—:
+     * `gesamtspielplan/wettbewerb` trae 1, `gesamtspielplan/pokalwettbewerb`
+     * trae 2, y la portada trae los 3. En torneos chicos la portada lista
+     * todos los partidos en la misma tabla que el calendario (fecha, hora,
+     * clubes, link al partido, filas de ronda), así que se lee con el mismo
+     * lector. En torneos grandes muestra sólo algunos: sirve de complemento,
+     * nunca de reemplazo. Ver `fixtureDesdeHtml()`.
+     */
+    public static function urlPortada($compId, $season)
+    {
+        return 'https://www.transfermarkt.es/-/startseite/wettbewerb/' . rawurlencode((string) $compId)
+            . '/plus/?saison_id=' . rawurlencode((string) $season);
+    }
+
+    public function leerPortada($compId, $season, $guardarCrudo = false, $pais = null)
+    {
+        return $this->leerUrl(self::urlPortada($compId, $season), $guardarCrudo, $pais);
+    }
+
+    private function leerUrl($url, $guardarCrudo = false, $pais = null)
+    {
         $this->avisos      = [];
         $this->descartadas = 0;
         $this->crudo       = '';
         $this->deCache     = null;
 
-        $url   = self::urlComp($compId, $season, $copa);
         $clave = 'tm_html_comp:' . md5($url . '|' . (string) $pais);
         $html  = null;
 
