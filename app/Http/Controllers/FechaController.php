@@ -9529,7 +9529,22 @@ private function normalizarMinuto(string $texto): int
                 // Penal no convertido. active = el que pateó. Si hay passivePlayerId,
                 // ese es el ARQUERO que lo atajó -> 'Penal atajado'; si no, fue errado
                 // (afuera/palo) -> 'Penal errado'. Se guardan en la tabla Penal.
-                $tipo = !empty($passive) ? 'Penal atajado' : 'Penal errado';
+                //
+                // OJO (29/09/2026): TM manda el arquero en passivePlayerId TAMBIÉN
+                // cuando el penal fue afuera (Ajax–Roda JC 2013, gameId 2342571),
+                // así que "hay arquero" no alcanza. Manda el código de motivo:
+                // 501 = atajado ("Saved"), 502 = errado ("Missed"). El texto de
+                // `reason` (forma anidada) va después, y lo del arquero queda como
+                // último recurso para un código que no conocemos.
+                $motivo = (int) (isset($a['actionReasonId']) ? $a['actionReasonId'] : (isset($a['reasonId']) ? $a['reasonId'] : 0));
+                $txtPen = strtolower(isset($a['reason']) && is_string($a['reason']) ? $a['reason'] : '');
+                if ($motivo === 501 || strpos($txtPen, 'saved') !== false) {
+                    $tipo = 'Penal atajado';
+                } elseif ($motivo === 502 || strpos($txtPen, 'missed') !== false) {
+                    $tipo = 'Penal errado';
+                } else {
+                    $tipo = !empty($passive) ? 'Penal atajado' : 'Penal errado';
+                }
                 $addEv($active, $tipo, $min);
             }
         }

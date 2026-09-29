@@ -2598,6 +2598,11 @@ class TmDetallePartido
             if ($cod === 501) {
                 return ['atajado' => true, 'fuente' => 'atajado (reasonId 501)', 'dudoso' => false];
             }
+            // 502 = "Missed" en la ficha web: lo tiró afuera (o al palo; TM no
+            // los separa). Confirmado con Ajax–Roda JC 2013 (2342571, Pluim).
+            if ($cod === 502) {
+                return ['atajado' => false, 'fuente' => 'errado (reasonId 502)', 'dudoso' => false];
+            }
         }
 
         // Ni una cosa ni la otra: va como Errado —es lo más probable— pero
