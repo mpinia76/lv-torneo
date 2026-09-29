@@ -9493,7 +9493,7 @@ private function normalizarMinuto(string $texto): int
             return $m;
         };
 
-        foreach ((isset($d['actions']) ? $d['actions'] : []) as $a) {
+        foreach ($this->tmAccionesPlanas($d) as $a) {
             $min      = $minuteOf($a);
             $actionId = (int) (isset($a['actionId']) ? $a['actionId'] : 0);
             $det      = isset($a['details']) ? $a['details'] : [];
@@ -9644,6 +9644,57 @@ private function normalizarMinuto(string $texto): int
      *
      * Es un extra: si algo falla acá, el import del detalle sigue igual.
      */
+    /**
+     * Las acciones de /game/{id} como lista plana, venga el JSON como venga.
+     *
+     * TM manda dos formas (29-sep-2026):
+     *   · plana: `data.actions` en la raíz, con `type` (GOAL / CARD / SUBSTITUTE /
+     *     MISSED_PENALTY / PLACEHOLDER). Vista en la Premier League.
+     *   · anidada: `homeClub.actions.goals|cards|substitutes|missedPenalties`,
+     *     sin `type`. Es la de Argentina, España, Italia, Francia, Holanda…
+     *
+     * Hasta este arreglo acá sólo se leía la plana, así que pegando la URL de
+     * un partido que no fuera inglés se cargaba la alineación y ningún evento
+     * (el mismo bug que tenía TmDetallePartido, al revés).
+     *
+     * En la anidada no se dice quién entra y quién sale. El resto de este
+     * método asume activo = sale / pasivo = entra (así viene en la plana,
+     * confirmado con 3 cambios de la fecha 1 de la Premier 13/14), así que acá
+     * se da vuelta el par cuando el ACTIVO es el que estaba en el banco.
+     */
+    private function tmAccionesPlanas(array $d)
+    {
+        if (!empty($d['actions']) && is_array($d['actions'])) return $d['actions'];
+
+        $tipos = ['goals' => 'GOAL', 'cards' => 'CARD', 'substitutes' => 'SUBSTITUTE',
+                  'missedPenalties' => 'MISSED_PENALTY'];
+        $out = [];
+        foreach (['homeClub', 'awayClub'] as $lado) {
+            $acc = isset($d[$lado]['actions']) && is_array($d[$lado]['actions']) ? $d[$lado]['actions'] : [];
+            $banco = [];
+            foreach ((isset($d[$lado]['lineup']['substitutes']) ? $d[$lado]['lineup']['substitutes'] : []) as $p) {
+                if (!empty($p['id'])) $banco[(string) $p['id']] = true;
+            }
+            foreach ($tipos as $rama => $tipo) {
+                if (empty($acc[$rama]) || !is_array($acc[$rama])) continue;
+                foreach ($acc[$rama] as $a) {
+                    if (!is_array($a)) continue;
+                    $a['type'] = $tipo;
+                    if ($tipo === 'SUBSTITUTE') {
+                        $act = isset($a['activePlayerId']) ? (string) $a['activePlayerId'] : '';
+                        $pas = isset($a['passivePlayerId']) ? (string) $a['passivePlayerId'] : '';
+                        if (isset($banco[$act]) && !isset($banco[$pas])) {
+                            $a['activePlayerId'] = $pas;
+                            $a['passivePlayerId'] = $act;
+                        }
+                    }
+                    $out[] = $a;
+                }
+            }
+        }
+        return $out;
+    }
+
     private function recordarGameIdTM($partido, string $gameId)
     {
         // El que escribe la fila es el servicio, así que hay una sola versión

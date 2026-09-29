@@ -103,14 +103,31 @@ class TmDetallePartido
      * existía en la base. Los partidos cargados antes de esa fecha lo tienen
      * mal y se corrigen con el relevamiento (`import_detalles.tipos_gol`).
      */
+    /*
+     * CORREGIDA el 29/09/2026. Antes decía 202 = cabeza, 203 = penal, 204 = tiro
+     * libre, y estaba corrida: cruzando la ficha web de TM con el JSON de la
+     * fecha 1 de la Premier 13/14 (Man City–Newcastle 2350367, Arsenal–Villa
+     * 2350360, Liverpool–Stoke 2350359) da:
+     *   201 remate de izquierda · 202 remate de derecha · 203 cabeza ·
+     *   204 penal · 205 gol tras penal atajado (rebote) · 207 tiro libre directo
+     * (FechaController::importarPartidoProcess_TM ya lo tenía bien.)
+     *
+     * Con la forma anidada del JSON casi no importaba, porque el tipo sale del
+     * texto de `action` y el código es sólo el último recurso. Con la forma
+     * PLANA (Premier) no hay texto: el código es lo único.
+     *
+     * 200 y 206 no se confirmaron con esta prueba (206 = en contra coincide con
+     * FechaController); 211 = olímpico se confirmó con texto "direct corner".
+     */
     private static $accionGol = [
         200 => self::GOL_JUGADA,
         201 => self::GOL_JUGADA,
-        202 => self::GOL_CABEZA,
-        203 => self::GOL_PENAL,
-        204 => self::GOL_TIROLIBRE,
+        202 => self::GOL_JUGADA,
+        203 => self::GOL_CABEZA,
+        204 => self::GOL_PENAL,
         205 => self::GOL_JUGADA,
         206 => self::GOL_ENCONTRA,
+        207 => self::GOL_TIROLIBRE,
         211 => self::GOL_OLIMPICO,
     ];
 
@@ -2158,10 +2175,77 @@ class TmDetallePartido
      * sólo aparece cuando hubo alguno, por eso el `awayClub` de un partido sin
      * penales fallados no la trae.
      */
+    /**
+     * La OTRA forma del JSON de /game/{id}: sin `homeClub.actions`, con una
+     * lista plana `actions` en la raíz. Aparece en partidos viejos (confirmado
+     * con Liverpool–Stoke del 17/08/2013, gameId 2350359, 29-sep-2026):
+     *
+     *   {"actionId":201,"actionReasonId":202,"minute":37,"addedTime":0,
+     *    "type":"GOAL","clubId":"31","activePlayerId":"47082","passivePlayerId":"72047",
+     *    "score":{"home":1,"away":0}}
+     *
+     * No trae `action` ni `reason` en texto: el tipo sale del `actionId`
+     * (tipoGol / tipoTarjeta ya caen ahí) y el motivo del penal del
+     * `actionReasonId`. Hay filas `PLACEHOLDER` (el 0', el 45', el 90') que no
+     * son nada.
+     *
+     * Hasta este arreglo `accionesDelLado()` sólo miraba `homeClub.actions` y en
+     * estos partidos devolvía vacío: la vista previa mostraba la alineación
+     * completa y «Goles: Nada», y el control «Goles · No coinciden con el
+     * resultado» se llenaba de partidos que en TM sí tienen los goles.
+     *
+     * Se reparte por `clubId` y se reagrupa con las mismas ramas que la forma
+     * vieja, así el resto del servicio no se entera de la diferencia.
+     */
+    private function accionesPlanasDelLado(array $game, $clave)
+    {
+        $acc = [];
+        if (!isset($game['actions']) || !is_array($game['actions'])) return $acc;
+
+        $club = $this->valor(isset($game[$clave]) ? $game[$clave] : [], ['id', 'clubId']);
+        if ($club === null) return $acc;
+
+        $ramas = ['GOAL' => 'goals', 'CARD' => 'cards', 'SUBSTITUTE' => 'substitutes',
+                  'MISSED_PENALTY' => 'missedPenalties'];
+
+        foreach ($game['actions'] as $a) {
+            if (!is_array($a)) continue;
+            $tipo = strtoupper(trim((string) (isset($a['type']) ? $a['type'] : '')));
+            if ($tipo === 'PLACEHOLDER') continue;
+            if (!isset($a['clubId']) || (string) $a['clubId'] !== (string) $club) continue;
+
+            if (isset($ramas[$tipo])) {
+                $rama = $ramas[$tipo];
+            } elseif ($tipo !== '') {
+                // Un `type` que no conocemos (p. ej. la tanda de penales, que
+                // NO va a `penals`) se avisa y se saltea: adivinarlo por el
+                // actionId podría meter la tanda como penales del partido.
+                $this->aviso('Acción de TM de tipo «' . $tipo . '» que no reconozco (la salteo): ' . $this->resumenCrudo($a));
+                continue;
+            } else {
+                // Sin `type`, el rango del actionId: 2xx gol, 3xx tarjeta,
+                // 400 cambio, 5xx penal fallado. Lo que no entra en ninguno se
+                // avisa en vez de perderse callado.
+                $cod = (int) $this->valor($a, ['actionId']);
+                if ($cod >= 200 && $cod < 300)      $rama = 'goals';
+                elseif ($cod >= 300 && $cod < 400)  $rama = 'cards';
+                elseif ($cod === 400)               $rama = 'substitutes';
+                elseif ($cod >= 500 && $cod < 600)  $rama = 'missedPenalties';
+                else {
+                    $this->aviso('Acción de TM que no reconozco (la salteo): ' . $this->resumenCrudo($a));
+                    continue;
+                }
+            }
+            $acc[$rama][] = $a;
+        }
+        return $acc;
+    }
+
     private function accionesDelLado(array $game, $clave)
     {
         $out = [];
-        $acc = isset($game[$clave]['actions']) && is_array($game[$clave]['actions']) ? $game[$clave]['actions'] : [];
+        $acc = isset($game[$clave]['actions']) && is_array($game[$clave]['actions']) ? $game[$clave]['actions'] : null;
+        if ($acc === null) $acc = $this->accionesPlanasDelLado($game, $clave);
 
         foreach (['goals' => 'gol', 'cards' => 'tarjeta', 'substitutes' => 'cambio',
                   'missedPenalties' => 'penal'] as $rama => $clase) {
@@ -2314,6 +2398,11 @@ class TmDetallePartido
             $cod = (int) $this->valor($a, ['actionId', 'typeId']);
             if ($cod && isset(self::$accionGol[$cod])) {
                 return ['tipo' => self::$accionGol[$cod], 'fuente' => 'sin detallar (actionId ' . $cod . ')', 'dudoso' => false];
+            }
+            // Un código que no está en la tabla se marca dudoso: en la forma plana
+            // (sin texto) es la única pista, y así se ve en pantalla para sumarlo.
+            if ($cod) {
+                return ['tipo' => self::GOL_JUGADA, 'fuente' => 'actionId ' . $cod . ' desconocido', 'dudoso' => true];
             }
             return ['tipo' => self::GOL_JUGADA, 'fuente' => 'sin detallar', 'dudoso' => false];
         }
@@ -2489,6 +2578,18 @@ class TmDetallePartido
             }
         }
 
+        // Sin texto (la forma plana del JSON no lo trae): el código del motivo.
+        // 501 = atajado — confirmado con texto en Independiente Rivadavia–Racing
+        // (gameId 4889704, "Saved") y sin texto en Liverpool–Stoke 2013
+        // (gameId 2350359, Mignolet a Walters). Los otros códigos todavía no
+        // los vimos: siguen cayendo abajo como dudosos.
+        if ($txt === '') {
+            $cod = (int) $this->valor($a, ['reasonId', 'actionReasonId']);
+            if ($cod === 501) {
+                return ['atajado' => true, 'fuente' => 'atajado (reasonId 501)', 'dudoso' => false];
+            }
+        }
+
         // Ni una cosa ni la otra: va como Errado —es lo más probable— pero
         // marcado, así el vocabulario nuevo se ve en pantalla y se amplía la
         // lista de arriba en vez de quedar cargado mal en silencio.
@@ -2511,7 +2612,10 @@ class TmDetallePartido
         }
 
         // Si el texto no alcanzó, el código de la acción.
-        // 301 = amarilla, 302 = doble amarilla, 303 = roja directa.
+        // 301 = amarilla, 302 = doble amarilla, 303 = roja directa. Confirmados
+        // el 29/09/2026 con la forma plana: 302 = Koscielny en Arsenal–Villa
+        // (2350360, 301 a los 61' y 302 a los 67'), 303 = S. Taylor en
+        // Man City–Newcastle (2350367).
         $cod = (int) $this->valor($a, ['actionId', 'cardTypeId', 'typeId']);
         $mapa = [301 => 'Amarilla', 302 => 'Doble Amarilla', 303 => 'Roja',
             1 => 'Amarilla', 2 => 'Doble Amarilla', 3 => 'Roja'];
