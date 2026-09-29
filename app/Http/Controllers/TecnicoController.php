@@ -865,14 +865,11 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
             }
             //dd($torneosTecnico);
         }
-        $torneosTecnico = collect($torneosTecnico)
-            ->sortByDesc(function ($t) {
-                // intentamos sacar el año del nombre (ej: "Torneo 2020")
-                preg_match('/(\d{4})/', $t->nombreTorneo, $matches);
-                return $matches[1] ?? 0;
-            })
-            ->values()
-            ->all();
+        // Orden cronológico por fecha de partido, no por el año escrito: con
+        // torneos del mismo año ("Apertura 2011" / "LaLiga 2011/12") el año
+        // empataba y el orden salía al azar. Ver App\Services\OrdenTorneos.
+        $torneosTecnico = \App\Services\OrdenTorneos::ordenar($torneosTecnico, \App\Services\OrdenTorneos::ultimosComoTecnico($tecnico->persona_id));
+        $torneosJugador = \App\Services\OrdenTorneos::ordenar($torneosJugador, \App\Services\OrdenTorneos::ultimosComoJugador($tecnico->persona_id));
         return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
     }
 
