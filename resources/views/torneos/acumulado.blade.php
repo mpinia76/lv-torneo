@@ -69,10 +69,17 @@
                     <td>{{ $equipo->golesl }}</td>
                     <td>{{ $equipo->golesv }}</td>
                     <td>{{ $equipo->diferencia }}</td>
+                    @if(!empty($debugZonas))
+                        <td style="font-size:11px">{{ $equipo->zona }} {{ !empty($equipo->motivo) ? '— '.$equipo->motivo : '' }}</td>
+                    @endif
                 </tr>
             @endforeach
             </tbody>
         </table>
+
+        @if(!empty($debugZonas))
+            <pre style="font-size:11px;white-space:pre-wrap">{{ json_encode($debugZonas, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre>
+        @endif
 
         <div class="mt-3">
             @foreach($colores as $nombre => $color)

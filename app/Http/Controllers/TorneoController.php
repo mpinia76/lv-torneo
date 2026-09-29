@@ -1052,12 +1052,14 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             // 5) Descenso por posición: usamos $totalNonManual (puestos por puntos)
             if ($pos > $totalNonManual - $descenso) {
                 $equipo->zona = 'Descenso';
+                $equipo->motivo = 'posición (pos '.$pos.' > '.$totalNonManual.' - '.$descenso.')';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
 
             // 6) Descenso por promedio (sin cambios)
             if (!empty($promediosADescender) && isset($promediosADescender[$equipo->equipo_id])) {
                 $equipo->zona = 'Descenso';
+                $equipo->motivo = (isset($equipo->motivo) ? $equipo->motivo.' + ' : '').'promedio';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             }
         }
@@ -1086,6 +1088,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             if (isset($descendidosAcumulado[$equipo->equipo_id])) continue;
 
             $equipo->zona = 'Descenso';
+            $equipo->motivo = 'regla del último de la tabla';
             $descendidosAcumulado[$equipo->equipo_id] = $equipo;
             $descensosPorPosicion--;
         }
@@ -1099,8 +1102,23 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         //dd($promedios);
 
+        // ?debug=1 (logueado): muestra por qué quedó cada equipo en su zona.
+        $debugZonas = null;
+        if ($request->query('debug') && auth()->check()) {
+            $debugZonas = [
+                'version'            => 'zonas-2026-09-29b',
+                'descenso'           => $descenso,
+                'descenso_promedio'  => $torneo->descenso_promedio,
+                'manuales'           => $manualIds,
+                'totalNonManual'     => $totalNonManual,
+                'campeones'          => $campeones,
+                'promedios'          => array_map(function ($p) { return $p->equipo.' ('.$p->promedio.')'; }, isset($promedios) ? $promedios : []),
+                'ultimo'             => $ultimoAcumulado->equipo ?? null,
+            ];
+        }
+
         $i=1;
-        return view('torneos.acumulado', compact('torneo','acumulado','i'));
+        return view('torneos.acumulado', compact('torneo','acumulado','i','debugZonas'));
     }
 
 
