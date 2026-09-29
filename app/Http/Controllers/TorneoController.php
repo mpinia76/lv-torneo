@@ -1073,7 +1073,10 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             $descensosPorPosicion = $descenso - count($descendidosAcumulado);
         } else {
             // Si sí descendió por promedio, necesitamos asignar 1 más al anterior
-            $descensosPorPosicion = 1;
+            // (regla AFA: el último de la tabla anual baja además de los promedios).
+            // Sólo si el torneo tiene descenso por posición: en ligas que bajan
+            // únicamente por promedio (Uruguay) no hay que marcar a nadie más.
+            $descensosPorPosicion = $descenso > 0 ? 1 : 0;
         }
 
 // Recorrer desde el final del acumulado
