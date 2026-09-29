@@ -668,6 +668,13 @@ from ( ';
                     $arrequipos .=$key.',';
                 }
                 $arrequipos = substr($arrequipos, 0, -1);//quito última coma
+                // Un torneo anterior sin equipos cargados (creado pero vacío, o
+                // que todavía no existe en la base) deja la lista vacía y el
+                // SQL quedaba «IN ()» → error 1064 y la página en 500. Con 0
+                // no coincide ningún equipo: ese torneo no suma nada.
+                if ($arrequipos === '' || $arrequipos === false) {
+                    $arrequipos = '0';
+                }
 
 
 
@@ -896,6 +903,13 @@ from ( ';
                     $arrequipos .=$key.',';
                 }
                 $arrequipos = substr($arrequipos, 0, -1);//quito última coma
+                // Un torneo anterior sin equipos cargados (creado pero vacío, o
+                // que todavía no existe en la base) deja la lista vacía y el
+                // SQL quedaba «IN ()» → error 1064 y la página en 500. Con 0
+                // no coincide ningún equipo: ese torneo no suma nada.
+                if ($arrequipos === '' || $arrequipos === false) {
+                    $arrequipos = '0';
+                }
 
 
                 if (!$primero){
