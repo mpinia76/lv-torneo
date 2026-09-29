@@ -18,7 +18,7 @@
 <script src="{{ asset('js/dropdownFilter.js') }}"></script>
 {{-- Textos de torneos.js en el idioma de la página (en español no hace falta) --}}
 <script>window.TRAD = @json(app()->getLocale() === 'es' ? new stdClass : textos_js());</script>
-<script src="{{ asset('js/torneos.js') }}?v=8"></script>
+<script src="{{ asset('js/torneos.js') }}?v=9"></script>
 
 @yield('bottom')
 

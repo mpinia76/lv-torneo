@@ -511,6 +511,47 @@
         if (vacio) vacio.hidden = visiblesTotal > 0;
     };
 
+    /* ---------- horarios en la zona del visitante ----------
+       La página trae la hora argentina (la de la base) dentro de
+       <time class="t-local" datetime="ISO con offset">, armado por
+       hora_partido() en app/helpers.php. Acá se reescribe con la zona del
+       navegador. Si coincide con la argentina no se toca nada. */
+
+    function horasLocales() {
+        var zona = '';
+        try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* navegador viejo */ }
+        var dos = function (n) { return (n < 10 ? '0' : '') + n; };
+
+        Array.prototype.forEach.call(document.querySelectorAll('time.t-local[datetime]'), function (el) {
+            var d = new Date(el.getAttribute('datetime'));
+            if (isNaN(d.getTime())) return;
+
+            var que  = el.getAttribute('data-que');
+            var orig = el.textContent;
+            var diaAr = el.getAttribute('data-dia');
+            var ymd  = d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate());
+            var txt  = que === 'fecha'
+                ? dos(d.getDate()) + '/' + dos(d.getMonth() + 1) + '/' + d.getFullYear()
+                : dos(d.getHours()) + ':' + dos(d.getMinutes());
+
+            if (txt === orig && (que !== 'hora_dia' || ymd === diaAr)) return;
+
+            el.textContent = txt;
+            if (que === 'hora_dia' && ymd !== diaAr) {
+                /* la lista está agrupada por día argentino: se avisa el salto */
+                var dif = Math.round((Date.parse(ymd) - Date.parse(diaAr)) / 864e5);
+                if (dif) {
+                    var s = document.createElement('sup');
+                    s.textContent = (dif > 0 ? '+' : '\u2212') + Math.abs(dif);
+                    s.style.fontSize = '.7em';
+                    s.style.marginLeft = '1px';
+                    el.appendChild(s);
+                }
+            }
+            el.title = t('Horario de tu zona (:zona). En Argentina: :orig', { zona: zona || '?', orig: orig });
+        });
+    }
+
     /* ---------- arranque ---------- */
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -524,6 +565,7 @@
         var botonDensidad = document.getElementById('boton-densidad');
         if (botonDensidad) botonDensidad.addEventListener('click', alternarDensidad);
 
+        horasLocales();
         registrarTorneoActual();
         pintarRecientes();
         iniciarMega();

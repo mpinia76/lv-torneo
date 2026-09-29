@@ -682,5 +682,6 @@
     "Zona": "Region",
     "Ámbito": "Scope",
     "Árbitro": "Referee",
-    "Árbitros": "Referees"
+    "Árbitros": "Referees",
+    "Horario de tu zona (:zona). En Argentina: :orig": "Your local time (:zona). In Argentina: :orig"
 }

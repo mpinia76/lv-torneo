@@ -247,12 +247,49 @@ if (! function_exists('textos_js')) {
             ':n resultados',
             'Sin resultados',
             'No hay torneos que coincidan con «:q».',
+            'Horario de tu zona (:zona). En Argentina: :orig',
         ];
         $salida = [];
         foreach ($claves as $c) {
             $salida[$c] = __($c);
         }
         return $salida;
+    }
+}
+
+if (!function_exists('hora_partido')) {
+    /**
+     * Día u hora de un partido, para que el visitante la vea en SU zona.
+     *
+     * La base guarda todo en hora argentina (config/app.php). Acá se escribe
+     * esa hora —es lo que ve quien no tiene JavaScript y lo que queda en la
+     * caché del sitio— dentro de un <time> con el instante exacto (ISO con el
+     * offset histórico de Argentina, que calcula DateTimeZone). torneos.js
+     * (horasLocales) lo reescribe con la zona del navegador.
+     *
+     * $que: 'fecha' (d/m/Y) · 'hora' (H:i, cuando al lado va la fecha también
+     * convertida) · 'hora_dia' (H:i en listas agrupadas por día argentino: si
+     * en la zona del visitante cae otro día, el JS le agrega +1 / −1).
+     *
+     * Un partido a las 00:00 es "sin hora" en este sitio: no se convierte,
+     * porque moverlo cambiaría el día por una hora que nunca existió.
+     */
+    function hora_partido($dia, $que = 'hora')
+    {
+        if (!$dia) {
+            return '';
+        }
+        try {
+            $dt = new \DateTime((string) $dia, new \DateTimeZone(config('app.timezone', 'America/Argentina/Buenos_Aires')));
+        } catch (\Exception $e) {
+            return e((string) $dia);
+        }
+        $txt = $dt->format($que === 'fecha' ? 'd/m/Y' : 'H:i');
+        if ($dt->format('H:i:s') === '00:00:00') {
+            return e($txt);
+        }
+        return '<time class="t-local" datetime="' . $dt->format('c') . '" data-que="' . e($que) . '" data-dia="'
+            . $dt->format('Y-m-d') . '">' . e($txt) . '</time>';
     }
 }
 

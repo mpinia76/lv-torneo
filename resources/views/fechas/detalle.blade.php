@@ -204,8 +204,8 @@
 
             <div class="t-meta-partido">
                 @if($partido->dia)
-                    <span>{{ __('Día') }} <b>{{ date('d/m/Y', strtotime($partido->dia)) }}</b></span>
-                    <span>{{ __('Hora') }} <b>{{ date('H:i', strtotime($partido->dia)) }}</b></span>
+                    <span>{{ __('Día') }} <b>{!! hora_partido($partido->dia, 'fecha') !!}</b></span>
+                    <span>{{ __('Hora') }} <b>{!! hora_partido($partido->dia, 'hora') !!}</b></span>
                 @else
                     <span>{{ __('Sin fecha confirmada') }}</span>
                 @endif

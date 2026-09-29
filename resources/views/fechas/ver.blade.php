@@ -92,7 +92,7 @@
 
                 <div class="t-partido" data-href="{{ route('fechas.detalle', ['partidoId' => $partido->id]) }}">
 
-                    <span class="t-hora">{{ $partido->dia ? Carbon::parse($partido->dia)->format('H:i') : '' }}</span>
+                    <span class="t-hora">{!! hora_partido($partido->dia, 'hora_dia') !!}</span>
 
                     <span class="t-equipo local {{ $localGana ? 'gana' : '' }}">
                         @if($partido->equipol)

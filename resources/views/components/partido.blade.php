@@ -74,8 +74,8 @@
 
     <span class="t-cuando">
         @if($dia)
-            <span>{{ date('d/m/Y', strtotime($dia)) }}</span>
-            <span class="t-cuando-hora">{{ date('H:i', strtotime($dia)) }}</span>
+            <span>{!! hora_partido($dia, 'fecha') !!}</span>
+            <span class="t-cuando-hora">{!! hora_partido($dia, 'hora') !!}</span>
         @else
             <span>—</span>
         @endif
