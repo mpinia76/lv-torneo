@@ -277,6 +277,9 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-partidos/fixture-aplicar', 'ImportPartidosController@fixtureAplicar')->name('import_partidos.fixture_aplicar');
     Route::get('/import-partidos/fixture-aplicar-todas', 'ImportPartidosController@fixtureAplicarTodas')->name('import_partidos.fixture_aplicar_todas');
     Route::get('/import-partidos/fechas', 'ImportPartidosController@fechas')->name('import_partidos.fechas');
+    // Partidos importados del calendario HTML de TM con la hora de España
+    // (antes de aHoraArgentina): los encuentra y los pasa a hora argentina.
+    Route::get('/import-partidos/horas-html', 'HorasTmController@index')->name('import_partidos.horas_html');
 
     // Segunda etapa: el detalle de cada partido (alineaciones, goles, tarjetas,
     // cambios, árbitros). Ver ImportDetallesController.

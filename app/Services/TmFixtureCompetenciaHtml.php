@@ -207,9 +207,43 @@ class TmFixtureCompetenciaHtml extends TmFixtureClubHtml
             foreach ($out as $k => $f) {
                 $g = isset($f['game_id']) ? $f['game_id'] : null;
                 $out[$k]['hora'] = ($g !== null && isset($horaDe[$g])) ? $horaDe[$g] : null;
+                $out[$k] = self::aHoraArgentina($out[$k]);
             }
         }
         return $out;
+    }
+
+    /**
+     * EL CALENDARIO DE transfermarkt.es ESTÁ EN HORA DE ESPAÑA. Día y hora
+     * vienen en Europe/Madrid, no en la del partido: Danubio–Wanderers
+     * (semifinal uruguaya, 25/05/2014 16:00 en Montevideo) figura «21:00», y
+     * la final de ida (martes 03/06 21:00) figura «mié 04/06 02:00» — cambia
+     * hasta el día. Todo el sitio se guarda en hora argentina, igual que el
+     * camino de la API (`dateTimeUTC` + date() con el timezone de
+     * config/app.php), así que acá se convierte día Y hora juntos. La
+     * diferencia es 4 o 5 horas según el horario de verano europeo: la
+     * resuelve DateTimeZone, no una resta fija.
+     *
+     * Sin hora no se convierte: un «00:00» inventado movería el día.
+     */
+    public static function aHoraArgentina(array $fila)
+    {
+        if (empty($fila['dia']) || empty($fila['hora'])) {
+            return $fila;
+        }
+        try {
+            $dt = new \DateTime(substr((string) $fila['dia'], 0, 10) . ' ' . $fila['hora'] . ':00',
+                new \DateTimeZone('Europe/Madrid'));
+            $dt->setTimezone(new \DateTimeZone(config('app.timezone', 'America/Argentina/Buenos_Aires')));
+        } catch (\Exception $e) {
+            return $fila;
+        }
+        $fila['dia']  = $dt->format('Y-m-d');
+        $fila['hora'] = $dt->format('H:i');
+        // Marca para /admin/import-partidos/horas-html: el payload del staging
+        // guarda esta fila, y así se sabe que ya viene en hora argentina.
+        $fila['hora_ar'] = true;
+        return $fila;
     }
 
     /**
