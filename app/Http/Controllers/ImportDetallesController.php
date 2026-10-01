@@ -6320,12 +6320,44 @@ class ImportDetallesController extends Controller
             return $this->pagina('Mapeos dudosos', $cuerpo);
         }
 
+        // Se calcula al mostrar, con lo que ya quedó guardado: no hace falta
+        // volver a verificar (ni gastar llamadas) para ordenar.
+        $tm = new TmDetallePartido();
+        foreach ($malos as $i => $r) {
+            $malos[$i]['parecido'] = $tm->parecidoApellidos($r['tm']['apellido'], $r['tm']['nombre'],
+                $r['fila']->apellido, $r['fila']->nombre);
+        }
+        usort($malos, function ($a, $b) { return $a['parecido'] - $b['parecido']; });
+
         $partidos = DB::table('alineacions')
             ->whereIn('jugador_id', array_map(function ($r) { return (int) $r['fila']->jugador_id; }, $malos))
             ->groupBy('jugador_id')->selectRaw('jugador_id, COUNT(DISTINCT partido_id) AS n')->pluck('n', 'jugador_id')->all();
 
-        $cuerpo .= '<table><thead><tr><th>id TM</th><th>según TM</th><th>nació (TM)</th>'
-            . '<th>ficha de la base</th><th>nació (base)</th><th>partidos de la ficha</th><th></th></tr></thead><tbody>';
+        $umbral = 75;
+        $distintos = array_values(array_filter($malos, function ($r) use ($umbral) { return $r['parecido'] < $umbral; }));
+        $parecidos = array_values(array_filter($malos, function ($r) use ($umbral) { return $r['parecido'] >= $umbral; }));
+
+        $cuerpo .= '<h2>Apellidos que no se parecen (' . count($distintos) . ')</h2>'
+            . '<p class="sub">Acá está el problema de verdad: el caso Gayà / González. Revisá cada una; casi '
+            . 'todas son para <b>Desatar</b>. Pueden colarse apodos (TM con el nombre futbolero, la base con el '
+            . 'legal).</p>'
+            . $this->tablaMapeosDudosos($distintos, $partidos)
+            . '<h2>Mismo apellido escrito distinto (' . count($parecidos) . ')</h2>'
+            . '<p class="sub">Parecido ' . $umbral . '% o más (Alesandria / Alessandria, Castillo / Castrillo, '
+            . 'transliteraciones). Casi seguro es la <b>misma persona</b> con el apellido mal cargado en algún lado: '
+            . '<b>no desatar</b> — si se desata, el próximo partido le crea una ficha duplicada. Si querés, '
+            . 'corregí el apellido de la ficha.</p>'
+            . $this->tablaMapeosDudosos($parecidos, $partidos);
+
+        return $this->pagina('Mapeos dudosos', $cuerpo);
+    }
+
+    private function tablaMapeosDudosos(array $malos, array $partidos)
+    {
+        if (!$malos) return '<div class="ok-box">Ninguno.</div>';
+
+        $cuerpo = '<table><thead><tr><th>id TM</th><th>según TM</th><th>nació (TM)</th>'
+            . '<th>ficha de la base</th><th>nació (base)</th><th>parecido</th><th>partidos de la ficha</th><th></th></tr></thead><tbody>';
         foreach ($malos as $r) {
             $f = $r['fila'];
             $fechaBase = $f->nacimiento ? substr((string) $f->nacimiento, 0, 10) : '—';
@@ -6337,6 +6369,7 @@ class ImportDetallesController extends Controller
                 . '<td>' . e($fechaTm) . '</td>'
                 . '<td>#' . (int) $f->jugador_id . ' ' . e(trim($f->apellido . ', ' . $f->nombre)) . '</td>'
                 . '<td>' . e($fechaBase) . ($fechaBase !== $fechaTm ? ' <b class="err">≠</b>' : '') . '</td>'
+                . '<td>' . (int) $r['parecido'] . '%</td>'
                 . '<td>' . (int) ($partidos[$f->jugador_id] ?? 0) . '</td>'
                 . '<td><form method="post" style="display:inline" action="' . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
                 . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
@@ -6346,7 +6379,7 @@ class ImportDetallesController extends Controller
         }
         $cuerpo .= '</tbody></table>';
 
-        return $this->pagina('Mapeos dudosos', $cuerpo);
+        return $cuerpo;
     }
 
     /**

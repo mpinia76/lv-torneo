@@ -5365,6 +5365,36 @@ class TmDetallePartido
      * arregla rehaciendo los partidos, que con el mapeo borrado resuelven a la
      * persona de nuevo con el criterio actual.
      */
+    /**
+     * Qué tanto se parecen los apellidos de TM y de la ficha, 0-100: el mejor
+     * similar_text() entre una palabra del apellido de un lado y cualquier
+     * palabra del nombre completo del otro, en las dos direcciones.
+     *
+     * Sirve para separar, entre los que el criterio de hoy no uniría, el
+     * apellido mal escrito (Alesandria / Alessandria ≈ 95, Castillo /
+     * Castrillo ≈ 94: la misma persona) del apellido que no tiene nada que ver
+     * (Gayà / González: dos personas). Es una ayuda para ordenar la pantalla,
+     * no decide nada solo.
+     */
+    public function parecidoApellidos($apeTm, $nomTm, $apeBase, $nomBase)
+    {
+        $aTm = $this->tokensNombre($apeTm);
+        $aBa = $this->tokensNombre($apeBase);
+        $tTm = $this->tokensNombre($apeTm . ' ' . $nomTm);
+        $tBa = $this->tokensNombre($apeBase . ' ' . $nomBase);
+
+        $mejor = 0;
+        foreach ([[$aTm, $tBa], [$aBa, $tTm]] as $par) {
+            foreach ($par[0] as $x) {
+                foreach ($par[1] as $y) {
+                    similar_text($x, $y, $pct);
+                    if ($pct > $mejor) $mejor = $pct;
+                }
+            }
+        }
+        return (int) round($mejor);
+    }
+
     public static function desatarMapeoJugador($tmId)
     {
         $fila = DB::table('jugador_tm')->where('tm_player_id', (string) $tmId)->first();
