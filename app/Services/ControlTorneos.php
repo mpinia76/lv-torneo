@@ -105,6 +105,10 @@ class ControlTorneos
      * fecha de la otra zona queda con menos (o ninguno) y por grupo parecía
      * incompleta. Sumando: 15 partidos contra 7 + 7 esperados, completa.
      *
+     * «15b» SÍ cuenta como fecha de tabla: es la fecha que se crea a mano
+     * cuando un partido traído por DT choca con otro de la 15 (MLS 2017).
+     * Sin eso la tabla daba 34 PJ a todos y el control veía equipos desparejos.
+     *
      * Las fechas de playoffs ('Final', 'Cuartos de final'...) no se miran:
      * ahí la cantidad de partidos no sale de los equipos del grupo.
      * Se resuelve en PHP y con una sola consulta (sin derivadas correlacionadas,
@@ -130,7 +134,7 @@ class ControlTorneos
                LEFT JOIN (SELECT grupo_id, COUNT(DISTINCT equipo_id) AS cant FROM plantillas GROUP BY grupo_id) ec
                       ON ec.grupo_id = g.id
               WHERE g.torneo_id IN (" . implode(',', array_map('intval', $ids)) . ")
-                AND fe.numero REGEXP '^[0-9]+$'
+                AND fe.numero REGEXP '^[0-9]+[a-z]?$'
                 AND g.nombre <> 'Playoffs'
               GROUP BY g.torneo_id, fe.numero"
         );
@@ -161,14 +165,14 @@ class ControlTorneos
                        INNER JOIN fechas fe ON fe.id = pa.fecha_id
                        INNER JOIN grupos g ON g.id = fe.grupo_id
                       WHERE g.torneo_id IN (" . implode(',', $revisar) . ")
-                        AND fe.numero REGEXP '^[0-9]+$' AND g.nombre <> 'Playoffs'
+                        AND fe.numero REGEXP '^[0-9]+[a-z]?$' AND g.nombre <> 'Playoffs'
                      UNION ALL
                      SELECT g.torneo_id, pa.equipov_id
                        FROM partidos pa
                        INNER JOIN fechas fe ON fe.id = pa.fecha_id
                        INNER JOIN grupos g ON g.id = fe.grupo_id
                       WHERE g.torneo_id IN (" . implode(',', $revisar) . ")
-                        AND fe.numero REGEXP '^[0-9]+$' AND g.nombre <> 'Playoffs'
+                        AND fe.numero REGEXP '^[0-9]+[a-z]?$' AND g.nombre <> 'Playoffs'
                  ) x GROUP BY x.torneo_id, x.equipo_id"
             );
             $cuentas = [];
