@@ -3990,7 +3990,7 @@ class TmDetallePartido
 
         // ── 1) Mismo día de nacimiento ────────────────────────────────────
         if (!empty($datos['nacimiento'])) {
-            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm, $datos['nombre']);
+            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm, $datos['nombre'], $datos['apellido']);
             $mejor = $r['mejor']; $puntaje = $r['puntaje']; $empatados = $r['empatados'];
             $this->avisarMellizos($datos, $r['mellizos']);
 
@@ -4032,7 +4032,7 @@ class TmDetallePartido
             // partidos postergados TM también les deja el dato viejo).
             $alReves = $this->fechaDadaVuelta($datos['nacimiento']);
             if ($alReves) {
-                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm, $datos['nombre']);
+                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm, $datos['nombre'], $datos['apellido']);
                 $apeTm = $this->tokensNombre($datos['apellido']);
                 if ($r['mejor'] && $r['puntaje'] >= 2 && $r['empatados'] === 1
                     && $this->apellidosSeTocan($apeTm, $tokensTm,
@@ -4076,10 +4076,21 @@ class TmDetallePartido
      * compiten: son mellizos (ver nombresDePilaChocan) y vuelven aparte en
      * 'mellizos' para avisar.
      *
+     * Y al revés (oct-2026): los que NO comparten ningún apellido tampoco
+     * compiten, aunque coincidan en dos palabras. Jesse González (TM 263770,
+     * "José Luis | González Gudina") y José Gayà ("José Luis | Gayà Peña")
+     * nacieron los dos el 25/05/1995: "jose" + "luis" sumaban 2 palabras en
+     * común, el apareo los daba por la misma persona sin marcarlo para
+     * revisar, y los partidos del arquero de Dallas se le cargaban a Gayà.
+     * Dos palabras del nombre de pila no prueban nada. Mismo criterio que
+     * buscarPersonaRol() (apellidosSeTocan).
+     *
      * @return array ['mejor' => fila|null, 'puntaje' => int, 'empatados' => int, 'mellizos' => fila[]]
      */
-    private function mejorJugadorPorFecha($fecha, array $tokensTm, $nombreTm = null)
+    private function mejorJugadorPorFecha($fecha, array $tokensTm, $nombreTm = null, $apellidoTm = null)
     {
+        $apeTm = $apellidoTm !== null ? $this->tokensNombre($apellidoTm) : null;
+
         $cands = DB::table('jugadors')
             ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
             ->where('personas.nacimiento', $fecha)
@@ -4089,6 +4100,10 @@ class TmDetallePartido
         $mejor = null; $puntaje = 0; $empatados = 0; $mellizos = [];
         foreach ($cands as $c) {
             $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
+            if ($apeTm !== null
+                && !$this->apellidosSeTocan($apeTm, $tokensTm, $this->tokensNombre($c->apellido), $tokensBase)) {
+                continue;   // ningún apellido en común: es otra persona
+            }
             $p = count(array_intersect($tokensTm, $tokensBase));
             if ($p > 0 && $nombreTm !== null
                 && $this->nombresDePilaChocan($nombreTm, $tokensTm, $c->nombre, $tokensBase)) {
