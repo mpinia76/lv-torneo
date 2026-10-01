@@ -302,6 +302,7 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/mapeos-dudosos', 'ImportDetallesController@mapeosDudosos')->name('import_detalles.mapeos_dudosos');
     Route::post('/import-detalles/mapeos-dudosos/desatar', 'ImportDetallesController@mapeosDudososDesatar')->name('import_detalles.mapeos_dudosos_desatar');
     Route::post('/import-detalles/mapeos-dudosos/confirmar', 'ImportDetallesController@mapeosDudososConfirmar')->name('import_detalles.mapeos_dudosos_confirmar');
+    Route::get('/import-detalles/mapeos-dudosos/clubes', 'ImportDetallesController@mapeosDudososClubes')->name('import_detalles.mapeos_dudosos_clubes');
     Route::get('/import-detalles/plantillas', 'ImportDetallesController@plantillas')->name('import_detalles.plantillas');
     Route::get('/import-detalles/resultados', 'ImportDetallesController@resultados')->name('import_detalles.resultados');
     Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');

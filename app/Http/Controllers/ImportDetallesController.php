@@ -6294,6 +6294,7 @@ class ImportDetallesController extends Controller
         if (session('ok_desatar')) {
             $cuerpo .= '<div class="ok-box">' . session('ok_desatar') . '</div>';
         }
+        $cuerpo .= $this->seccionSeparados();
 
         if (!$guardado) {
             $cuerpo .= '<p class="sub">Todavía no se verificó nada (o pasó más de un día).</p>';
@@ -6389,6 +6390,77 @@ class ImportDetallesController extends Controller
         $cuerpo .= '</tbody></table>';
 
         return $cuerpo;
+    }
+
+    const LLAVE_SEPARADOS = 'import_detalles.mapeos_separados';
+
+    /** Los separados se guardan 90 días: hasta mover todos sus clubes. */
+    private function anotarSeparado($tmId, $viejo, $nuevo)
+    {
+        $lista = \Illuminate\Support\Facades\Cache::get(self::LLAVE_SEPARADOS, []);
+        $lista[(string) $tmId] = ['viejo' => (int) $viejo, 'nuevo' => (int) $nuevo, 'cuando' => now()->format('d/m/Y H:i')];
+        \Illuminate\Support\Facades\Cache::put(self::LLAVE_SEPARADOS, $lista, 86400 * 90);
+    }
+
+    /**
+     * Vuelve a abrir la página de los clubes de un separado. Acepta `viejo` en
+     * la URL para los que se separaron antes de que esto se anotara. El
+     * destino sale SIEMPRE del mapeo actual de `jugador_tm`, no de la URL.
+     * Con `listo=1` lo saca de la lista de separados.
+     */
+    public function mapeosDudososClubes(Request $request)
+    {
+        $tmId  = trim((string) $request->get('tm_id', ''));
+        $lista = \Illuminate\Support\Facades\Cache::get(self::LLAVE_SEPARADOS, []);
+        $volver = '<p class="sub"><a href="' . e(route('import_detalles.mapeos_dudosos')) . '">← Mapeos dudosos</a></p>';
+
+        if ((string) $request->get('listo', '0') === '1') {
+            unset($lista[$tmId]);
+            \Illuminate\Support\Facades\Cache::put(self::LLAVE_SEPARADOS, $lista, 86400 * 90);
+            return redirect()->route('import_detalles.mapeos_dudosos');
+        }
+
+        $viejo = (int) $request->get('viejo', isset($lista[$tmId]) ? $lista[$tmId]['viejo'] : 0);
+        $nuevo = (int) DB::table('jugador_tm')->where('tm_player_id', $tmId)->value('jugador_id');
+        if (!preg_match('/^\d{1,20}$/', $tmId) || !$viejo || !$nuevo) {
+            return $this->pagina('Separar', $volver . '<div class="err-box">No encuentro ese separado (falta el id de TM, '
+                . 'la ficha vieja, o el id de TM ya no tiene mapeo).</div>');
+        }
+        if ($viejo === $nuevo) {
+            return $this->pagina('Separar', $volver . '<div class="err-box">El id ' . e($tmId) . ' vuelve a apuntar a la '
+                . 'ficha #' . $viejo . ': no está separado.</div>');
+        }
+        if (!isset($lista[$tmId])) $this->anotarSeparado($tmId, $viejo, $nuevo);
+
+        return $this->pantallaSeparado($tmId, $viejo, $nuevo, null);
+    }
+
+    /** La sección «Separados» de la pantalla de mapeos dudosos. */
+    private function seccionSeparados()
+    {
+        $lista = \Illuminate\Support\Facades\Cache::get(self::LLAVE_SEPARADOS, []);
+        if (!$lista) return '';
+
+        $ids = [];
+        foreach ($lista as $x) { $ids[] = $x['viejo']; $ids[] = $x['nuevo']; }
+        $nombres = DB::table('jugadors')->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->whereIn('jugadors.id', $ids)->get(['jugadors.id', 'personas.apellido', 'personas.nombre'])->keyBy('id');
+        $nom = function ($id) use ($nombres) {
+            $p = $nombres->get($id);
+            return $p ? '#' . $id . ' ' . trim($p->apellido . ', ' . $p->nombre) : '#' . $id;
+        };
+
+        $html = '<h2>Separados (' . count($lista) . ')</h2>'
+            . '<p class="sub">Ya tienen su ficha propia. Desde acá se vuelve a la página de los clubes para terminar de '
+            . 'mover. Cuando movés todo lo del jugador de TM, apretá <b>Listo</b>.</p>'
+            . '<table><thead><tr><th>id TM</th><th>ficha nueva</th><th>ficha vieja</th><th>separado</th><th></th></tr></thead><tbody>';
+        foreach ($lista as $tm => $x) {
+            $html .= '<tr><td>' . e($tm) . '</td><td>' . e($nom($x['nuevo'])) . '</td><td>' . e($nom($x['viejo'])) . '</td>'
+                . '<td>' . e($x['cuando']) . '</td>'
+                . '<td><a class="boton" href="' . e(route('import_detalles.mapeos_dudosos_clubes', ['tm_id' => $tm])) . '" target="_blank">Clubes</a>'
+                . ' <a class="boton-sec" href="' . e(route('import_detalles.mapeos_dudosos_clubes', ['tm_id' => $tm, 'listo' => 1])) . '">Listo</a></td></tr>';
+        }
+        return $html . '</tbody></table>';
     }
 
     /**
@@ -6511,6 +6583,21 @@ class ImportDetallesController extends Controller
             \Illuminate\Support\Facades\Cache::put($llave, $guardado, 86400);
         }
 
+        // Se anota, así la página de los clubes se puede volver a abrir.
+        $this->anotarSeparado($tmId, (int) $r['viejo'], (int) $r['nuevo']);
+
+        return $this->pantallaSeparado($tmId, (int) $r['viejo'], (int) $r['nuevo'], !empty($r['creado']), $avisos);
+    }
+
+    /**
+     * La página de los clubes para mover, después de separar. Se arma igual
+     * recién separado y cuando se vuelve a abrir desde «Separados».
+     */
+    private function pantallaSeparado($tmId, $viejoId, $nuevoId, $creado, $avisos = '')
+    {
+        $volver = '<p class="sub"><a href="' . e(route('import_detalles.mapeos_dudosos')) . '">← Mapeos dudosos</a></p>';
+        $r = ['viejo' => (int) $viejoId, 'nuevo' => (int) $nuevoId, 'creado' => $creado];
+
         $fichas = DB::table('jugadors')->join('personas', 'personas.id', '=', 'jugadors.persona_id')
             ->whereIn('jugadors.id', [$r['viejo'], $r['nuevo']])
             ->get(['jugadors.id', 'jugadors.persona_id', 'personas.apellido', 'personas.nombre'])->keyBy('id');
@@ -6536,8 +6623,8 @@ class ImportDetallesController extends Controller
 
         $cuerpo = $volver . '<h1>Separar</h1>'
             . '<div class="ok-box">El id de TM ' . e($tmId) . ' ya no apunta a #' . (int) $r['viejo'] . ' ' . e($nomViejo)
-            . '. ' . ($r['creado'] ? 'Le creé su ficha: ' : 'Ya estaba en la base: ') . '#' . (int) $r['nuevo'] . ' '
-            . e($nomNuevo) . '. Todavía no moví ningún partido.</div>'
+            . '. ' . ($r['creado'] === null ? 'Su ficha: ' : ($r['creado'] ? 'Le creé su ficha: ' : 'Ya estaba en la base: ')) . '#' . (int) $r['nuevo'] . ' '
+            . e($nomNuevo) . '.' . ($r['creado'] === null ? '' : ' Todavía no moví ningún partido.') . '</div>'
             . '<table><tbody>'
             . '<tr><td>Jugador de TM (ficha nueva)</td><td><b>#' . (int) $r['nuevo'] . ' ' . e($nomNuevo) . '</b></td><td>'
             . '<a href="https://www.transfermarkt.es/-/profil/spieler/' . e($tmId) . '" target="_blank">perfil TM ' . e($tmId) . '</a>'
