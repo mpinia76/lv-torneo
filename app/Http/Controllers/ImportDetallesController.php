@@ -6650,7 +6650,47 @@ class ImportDetallesController extends Controller
                 . '<td>' . e(substr((string) $c->desde, 0, 10)) . '</td><td>' . e(substr((string) $c->hasta, 0, 10)) . '</td>'
                 . '<td>' . $link . '</td></tr>';
         }
-        $cuerpo .= '</tbody></table>' . $avisos;
+        $cuerpo .= '</tbody></table>';
+
+        // Partidos donde jugaron LOS DOS, uno en cada equipo (se enfrentaron).
+        // Con el bug quedaron los dos en la misma ficha: la alineación se
+        // separa sola al mover (tiene equipo), pero goles, tarjetas y cambios
+        // no tienen equipo y Mover los marca como dudosos. Se arreglan
+        // rehaciendo el partido desde TM, DESPUÉS de mover: con el mapeo ya
+        // corregido, el rehacer escribe cada cosa en la ficha que va.
+        $cruces = DB::table('alineacions as a')
+            ->join('partidos', 'partidos.id', '=', 'a.partido_id')
+            ->whereIn('a.jugador_id', [$r['viejo'], $r['nuevo']])
+            ->groupBy('a.partido_id', 'partidos.dia')
+            ->havingRaw('COUNT(DISTINCT a.equipo_id) > 1')
+            ->orderBy('partidos.dia')
+            ->get([DB::raw('a.partido_id'), DB::raw('partidos.dia')]);
+
+        if (count($cruces)) {
+            $equiposDe = [];
+            foreach (DB::table('partidos')->whereIn('partidos.id', $cruces->pluck('partido_id')->all())
+                         ->leftJoin('equipos as l', 'l.id', '=', 'partidos.equipol_id')
+                         ->leftJoin('equipos as v', 'v.id', '=', 'partidos.equipov_id')
+                         ->get(['partidos.id', 'l.nombre as local', 'v.nombre as visitante']) as $x) {
+                $equiposDe[(int) $x->id] = trim($x->local . ' – ' . $x->visitante);
+            }
+            $cuerpo .= '<h2>Partidos donde jugaron los dos (' . count($cruces) . ')</h2>'
+                . '<p class="sub">Uno en cada equipo. Primero <b>Mover</b> el club; recién después <b>Rehacer</b> cada uno '
+                . 'de estos (1 llamada a la API cada uno): así los goles, tarjetas y cambios quedan en la ficha correcta. '
+                . 'Si rehacés antes de mover, vuelve a salir todo bien igual, pero la alineación de la ficha vieja de ese '
+                . 'partido ya no la vas a ver en Mover.</p><table><tbody>';
+            foreach ($cruces as $c) {
+                $pid = (int) $c->partido_id;
+                $cuerpo .= '<tr><td>' . e(substr((string) $c->dia, 0, 10)) . '</td>'
+                    . '<td>' . e(isset($equiposDe[$pid]) ? $equiposDe[$pid] : '#' . $pid) . '</td>'
+                    . '<td><a href="' . e(route('import_detalles.ver', ['partido_id' => $pid])) . '" target="_blank">Ver</a>'
+                    . ' · <a class="err" href="' . e(route('import_detalles.bajar', ['partido_id' => $pid, 'forzar' => 1]))
+                    . '" target="_blank">Rehacer</a></td></tr>';
+            }
+            $cuerpo .= '</tbody></table>';
+        }
+
+        $cuerpo .= $avisos;
 
         return $this->pagina('Separar', $cuerpo);
     }
