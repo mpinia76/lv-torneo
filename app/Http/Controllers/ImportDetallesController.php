@@ -6356,6 +6356,9 @@ class ImportDetallesController extends Controller
     {
         if (!$malos) return '<div class="ok-box">Ninguno.</div>';
 
+        $tmDeFicha = $this->perfilesTmDeFichas(
+            array_map(function ($r) { return (int) $r['fila']->jugador_id; }, $malos));
+
         $cuerpo = '<table><thead><tr><th>id TM</th><th>según TM</th><th>nació (TM)</th>'
             . '<th>ficha de la base</th><th>nació (base)</th><th>parecido</th><th>partidos de la ficha</th><th></th></tr></thead><tbody>';
         foreach ($malos as $r) {
@@ -6367,11 +6370,13 @@ class ImportDetallesController extends Controller
                 . e($f->tm_player_id) . '</a></td>'
                 . '<td>' . e(trim($r['tm']['apellido'] . ', ' . $r['tm']['nombre'])) . '<br><small>' . e($f->nombre_tm) . '</small></td>'
                 . '<td>' . e($fechaTm) . '</td>'
-                . '<td>#' . (int) $f->jugador_id . ' ' . e(trim($f->apellido . ', ' . $f->nombre)) . '</td>'
+                . '<td>#' . (int) $f->jugador_id . ' ' . e(trim($f->apellido . ', ' . $f->nombre))
+                . '<br><small>' . $this->linksFicha((int) $f->jugador_id, $f->apellido . ' ' . $f->nombre,
+                    $tmDeFicha, (string) $f->tm_player_id) . '</small></td>'
                 . '<td>' . e($fechaBase) . ($fechaBase !== $fechaTm ? ' <b class="err">≠</b>' : '') . '</td>'
                 . '<td>' . (int) $r['parecido'] . '%</td>'
                 . '<td>' . (int) ($partidos[$f->jugador_id] ?? 0) . '</td>'
-                . '<td><form method="post" style="display:inline" action="' . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
+                . '<td><form method="post" style="display:inline" target="_blank" action="' . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
                 . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
                 . '<input type="hidden" name="tm_id" value="' . e($f->tm_player_id) . '">'
                 . '<button class="boton" type="submit">Separar</button></form>'
@@ -6384,6 +6389,52 @@ class ImportDetallesController extends Controller
         $cuerpo .= '</tbody></table>';
 
         return $cuerpo;
+    }
+
+    /**
+     * Para cada ficha, los ids de TM que apuntan a ella: los de `jugador_tm` y
+     * el de `jugadors.transfermarkt_url`. Sirve para linkear el perfil del
+     * DUEÑO de la ficha (no el del jugador que se le pegó por error).
+     *
+     * @return array jugador_id => [tm_id => true, ...]
+     */
+    private function perfilesTmDeFichas(array $jugadorIds)
+    {
+        $out = [];
+        $jugadorIds = array_values(array_unique(array_filter(array_map('intval', $jugadorIds))));
+        if (!$jugadorIds) return $out;
+
+        foreach (DB::table('jugador_tm')->whereIn('jugador_id', $jugadorIds)->get(['jugador_id', 'tm_player_id']) as $x) {
+            $out[(int) $x->jugador_id][(string) $x->tm_player_id] = true;
+        }
+        foreach (DB::table('jugadors')->whereIn('id', $jugadorIds)->whereNotNull('transfermarkt_url')
+                     ->get(['id', 'transfermarkt_url']) as $x) {
+            if (preg_match('~/spieler/(\d+)~', (string) $x->transfermarkt_url, $m)) {
+                $out[(int) $x->id][$m[1]] = true;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Links de una ficha: la ficha en el sitio, y su perfil de TM — el del
+     * dueño, sin contar `$excluirTm` (el id que está mal atado). Si la ficha
+     * no tiene otro id de TM, un link a la búsqueda de TM por el nombre.
+     */
+    private function linksFicha($jugadorId, $nombre, array $tmDeFicha, $excluirTm = '')
+    {
+        $links = ['<a href="' . e(route('jugadores.ver', ['jugadorId' => (int) $jugadorId])) . '" target="_blank">ficha</a>'];
+
+        $ids = isset($tmDeFicha[$jugadorId]) ? array_keys($tmDeFicha[$jugadorId]) : [];
+        $ids = array_values(array_filter($ids, function ($id) use ($excluirTm) { return (string) $id !== (string) $excluirTm; }));
+        foreach ($ids as $id) {
+            $links[] = '<a href="https://www.transfermarkt.es/-/profil/spieler/' . e($id) . '" target="_blank">TM ' . e($id) . '</a>';
+        }
+        if (!$ids) {
+            $links[] = '<a href="https://www.transfermarkt.es/schnellsuche/ergebnis/schnellsuche?query='
+                . rawurlencode(trim($nombre)) . '" target="_blank">buscar en TM</a>';
+        }
+        return implode(' · ', $links);
     }
 
     /**
@@ -6481,11 +6532,20 @@ class ImportDetallesController extends Controller
 
         $nomViejo = trim($viejo->apellido . ', ' . $viejo->nombre);
         $nomNuevo = trim($nuevo->apellido . ', ' . $nuevo->nombre);
+        $tmDeFicha = $this->perfilesTmDeFichas([$r['viejo'], $r['nuevo']]);
 
         $cuerpo = $volver . '<h1>Separar</h1>'
             . '<div class="ok-box">El id de TM ' . e($tmId) . ' ya no apunta a #' . (int) $r['viejo'] . ' ' . e($nomViejo)
             . '. ' . ($r['creado'] ? 'Le creé su ficha: ' : 'Ya estaba en la base: ') . '#' . (int) $r['nuevo'] . ' '
             . e($nomNuevo) . '. Todavía no moví ningún partido.</div>'
+            . '<table><tbody>'
+            . '<tr><td>Jugador de TM (ficha nueva)</td><td><b>#' . (int) $r['nuevo'] . ' ' . e($nomNuevo) . '</b></td><td>'
+            . '<a href="https://www.transfermarkt.es/-/profil/spieler/' . e($tmId) . '" target="_blank">perfil TM ' . e($tmId) . '</a>'
+            . ' · <a href="https://www.transfermarkt.es/-/leistungsdatendetails/spieler/' . e($tmId) . '" target="_blank">partidos por club</a>'
+            . ' · <a href="' . e(route('jugadores.ver', ['jugadorId' => (int) $r['nuevo']])) . '" target="_blank">ficha</a></td></tr>'
+            . '<tr><td>Dueño de la ficha vieja</td><td><b>#' . (int) $r['viejo'] . ' ' . e($nomViejo) . '</b></td><td>'
+            . $this->linksFicha((int) $r['viejo'], $viejo->apellido . ' ' . $viejo->nombre, $tmDeFicha, $tmId) . '</td></tr>'
+            . '</tbody></table>'
             . '<p class="sub">Elegí el club donde jugaba <b>' . e($nomNuevo) . '</b> y apretá <b>Mover</b>: se abre '
             . '«Mover registros» con vista previa, y de ese club pasan a la ficha nueva las alineaciones, los goles, '
             . 'las tarjetas, los cambios, los penales (también los convertidos) y la plantilla. Los clubes del otro '
