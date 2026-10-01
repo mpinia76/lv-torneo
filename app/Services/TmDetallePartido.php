@@ -128,16 +128,7 @@ class TmDetallePartido
         205 => self::GOL_JUGADA,
         206 => self::GOL_ENCONTRA,
         207 => self::GOL_TIROLIBRE,
-        // Sumados el 29/09/2026 con la Eredivisie 13/14 (ficha web × avisos
-        // de la tanda): 209 long distance kick (3 partidos), 210 tap-in (2),
-        // 212 deflected shot (1, por descarte), 213 solo run (1, por descarte:
-        // Go Ahead–Heracles 2342367, el otro gol era de cabeza = 203).
-        // Todos van como Jugada: no se agregan valores al enum de gols.tipo.
-        209 => self::GOL_JUGADA,
-        210 => self::GOL_JUGADA,
         211 => self::GOL_OLIMPICO,
-        212 => self::GOL_JUGADA,
-        213 => self::GOL_JUGADA,
     ];
 
     /** Avisos y datos sin reconocer que junta la corrida (se muestran en pantalla). */
@@ -2457,7 +2448,6 @@ class TmDetallePartido
 
         // Descripciones de jugada normal que sí conocemos: no las marcamos dudosas.
         $jugada = ['right-footed shot', 'left-footed shot', 'shot', 'tap-in', 'solo run', 'counter',
-            'long distance', 'deflected',
             'rechter', 'linker', 'schuss', 'remate', 'derecha', 'izquierda', 'contragolpe', 'combination'];
         foreach ($jugada as $aguja) {
             if (mb_strpos($txt, $aguja) !== false) {
@@ -2597,11 +2587,6 @@ class TmDetallePartido
             $cod = (int) $this->valor($a, ['reasonId', 'actionReasonId']);
             if ($cod === 501) {
                 return ['atajado' => true, 'fuente' => 'atajado (reasonId 501)', 'dudoso' => false];
-            }
-            // 502 = "Missed" en la ficha web: lo tiró afuera (o al palo; TM no
-            // los separa). Confirmado con Ajax–Roda JC 2013 (2342571, Pluim).
-            if ($cod === 502) {
-                return ['atajado' => false, 'fuente' => 'errado (reasonId 502)', 'dudoso' => false];
             }
         }
 

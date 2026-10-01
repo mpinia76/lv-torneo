@@ -277,9 +277,6 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-partidos/fixture-aplicar', 'ImportPartidosController@fixtureAplicar')->name('import_partidos.fixture_aplicar');
     Route::get('/import-partidos/fixture-aplicar-todas', 'ImportPartidosController@fixtureAplicarTodas')->name('import_partidos.fixture_aplicar_todas');
     Route::get('/import-partidos/fechas', 'ImportPartidosController@fechas')->name('import_partidos.fechas');
-    // Partidos importados del calendario HTML de TM con la hora de España
-    // (antes de aHoraArgentina): los encuentra y los pasa a hora argentina.
-    Route::get('/import-partidos/horas-html', 'HorasTmController@index')->name('import_partidos.horas_html');
 
     // Segunda etapa: el detalle de cada partido (alineaciones, goles, tarjetas,
     // cambios, árbitros). Ver ImportDetallesController.
@@ -301,6 +298,9 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/import-detalles/sembrar', 'ImportDetallesController@sembrar')->name('import_detalles.sembrar');
     Route::get('/import-detalles/revisar', 'ImportDetallesController@revisar')->name('import_detalles.revisar');
     Route::get('/import-detalles/mapeos', 'ImportDetallesController@mapeos')->name('import_detalles.mapeos');
+    // Mapeos atados sólo por el nombre de pila (caso Jesse González → José Gayà, oct-2026).
+    Route::get('/import-detalles/mapeos-dudosos', 'ImportDetallesController@mapeosDudosos')->name('import_detalles.mapeos_dudosos');
+    Route::post('/import-detalles/mapeos-dudosos/desatar', 'ImportDetallesController@mapeosDudososDesatar')->name('import_detalles.mapeos_dudosos_desatar');
     Route::get('/import-detalles/plantillas', 'ImportDetallesController@plantillas')->name('import_detalles.plantillas');
     Route::get('/import-detalles/resultados', 'ImportDetallesController@resultados')->name('import_detalles.resultados');
     Route::get('/import-detalles/arbitro', 'ImportDetallesController@arbitro')->name('import_detalles.arbitro');
