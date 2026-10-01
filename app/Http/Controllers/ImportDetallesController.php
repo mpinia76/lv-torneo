@@ -6313,7 +6313,7 @@ class ImportDetallesController extends Controller
             . '<p class="sub">Que el criterio de hoy no los una <b>no prueba</b> que sean dos personas: un apellido '
             . 'con una letra cambiada (Cagigas / Gagigas) o transliterado (Ahmad / Ahmed) también cae acá. Compará '
             . 'los nombres completos y las fechas: si se ven como dos personas distintas, <b>Separar</b>. Si es la misma '
-            . 'persona escrita distinto, dejalo como está.</p>';
+            . 'persona, <b>Es el mismo</b>: queda confirmado y no vuelve a salir.</p>';
 
         if (!$malos) {
             $cuerpo .= '<div class="ok-box">Ninguno: todos los candidatos comparten algún apellido con su ficha.</div>';
@@ -6345,8 +6345,8 @@ class ImportDetallesController extends Controller
             . '<h2>Mismo apellido escrito distinto (' . count($parecidos) . ')</h2>'
             . '<p class="sub">Parecido ' . $umbral . '% o más (Alesandria / Alessandria, Castillo / Castrillo, '
             . 'transliteraciones). Casi seguro es la <b>misma persona</b> con el apellido mal cargado en algún lado: '
-            . '<b>no separar</b> — se crearía una ficha duplicada. Si querés, '
-            . 'corregí el apellido de la ficha.</p>'
+            . '<b>no separar</b> — se crearía una ficha duplicada. Apretá <b>Es el mismo</b> para sacarlo de la lista (y, si '
+            . 'querés, corregí el apellido de la ficha).</p>'
             . $this->tablaMapeosDudosos($parecidos, $partidos);
 
         return $this->pagina('Mapeos dudosos', $cuerpo);
@@ -6374,12 +6374,48 @@ class ImportDetallesController extends Controller
                 . '<td><form method="post" style="display:inline" action="' . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
                 . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
                 . '<input type="hidden" name="tm_id" value="' . e($f->tm_player_id) . '">'
-                . '<button class="boton" type="submit">Separar</button></form></td>'
+                . '<button class="boton" type="submit">Separar</button></form>'
+                . ' <form method="post" style="display:inline" action="' . e(route('import_detalles.mapeos_dudosos_confirmar')) . '">'
+                . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                . '<input type="hidden" name="tm_id" value="' . e($f->tm_player_id) . '">'
+                . '<button class="boton-sec" type="submit">Es el mismo</button></form></td>'
                 . '</tr>';
         }
         $cuerpo .= '</tbody></table>';
 
         return $cuerpo;
+    }
+
+    /**
+     * «Es el mismo»: confirma el mapeo (TmDetallePartido::confirmarMapeoJugador)
+     * para que no vuelva a aparecer en las próximas verificaciones.
+     */
+    public function mapeosDudososConfirmar(Request $request)
+    {
+        $tmId = trim((string) $request->input('tm_id', ''));
+        if (!preg_match('/^\d{1,20}$/', $tmId)) {
+            return redirect()->route('import_detalles.mapeos_dudosos');
+        }
+        $n = TmDetallePartido::confirmarMapeoJugador($tmId);
+
+        $llave = 'import_detalles.mapeos_dudosos';
+        $guardado = \Illuminate\Support\Facades\Cache::get($llave);
+        $nombre = $tmId;
+        if ($guardado) {
+            foreach ($guardado['filas'] as $x) {
+                if ((string) $x['fila']->tm_player_id === $tmId && !empty($x['tm'])) {
+                    $nombre = trim($x['tm']['apellido'] . ', ' . $x['tm']['nombre']);
+                }
+            }
+            $guardado['filas'] = array_values(array_filter($guardado['filas'], function ($x) use ($tmId) {
+                return (string) $x['fila']->tm_player_id !== $tmId;
+            }));
+            \Illuminate\Support\Facades\Cache::put($llave, $guardado, 86400);
+        }
+
+        return redirect()->route('import_detalles.mapeos_dudosos')->with('ok_desatar', $n
+            ? 'Listo: ' . e($nombre) . ' queda confirmado y no vuelve a aparecer en esta pantalla.'
+            : 'El id ' . e($tmId) . ' ya no tenía mapeo.');
     }
 
     /**

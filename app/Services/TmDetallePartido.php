@@ -5448,6 +5448,19 @@ class TmDetallePartido
             'creado' => !empty($r['creado']), 'descripcion' => $r['descripcion'], 'avisos' => $this->avisos];
     }
 
+    /**
+     * «Es el mismo»: el usuario miró el mapeo y confirmó que la ficha es la
+     * persona de TM (apellido mal escrito, transliterado, apodo como El
+     * Debes). Pasa a origen 'confirmado', que candidatosMapeoDudoso() ya no
+     * levanta (sólo mira 'auto'), así no vuelve a aparecer en cada
+     * verificación. No toca la ficha ni ningún partido.
+     */
+    public static function confirmarMapeoJugador($tmId)
+    {
+        return DB::table('jugador_tm')->where('tm_player_id', (string) $tmId)
+            ->update(['origen' => 'confirmado', 'revisar' => 0, 'updated_at' => now()]);
+    }
+
     public static function desatarMapeoJugador($tmId)
     {
         $fila = DB::table('jugador_tm')->where('tm_player_id', (string) $tmId)->first();
