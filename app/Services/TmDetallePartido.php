@@ -5395,6 +5395,59 @@ class TmDetallePartido
         return (int) round($mejor);
     }
 
+    /**
+     * Desata un mapeo mal hecho y le da al jugador de TM su propia ficha.
+     *
+     * 1 llamada a la API (el perfil). Borra la fila de `jugador_tm` y resuelve
+     * al jugador de nuevo con el criterio actual (resolverJugador): si ya
+     * existe en la base con su nombre real, se ata a esa ficha; si no, se crea
+     * (con foto, marcada para revisar). NO mueve ningún registro: eso lo hace
+     * después MoverRegistros, eligiendo el club (pantalla personas/mover).
+     *
+     * Si algo sale mal, el mapeo viejo se vuelve a dejar como estaba.
+     *
+     * @return array ['ok' => bool, 'mensaje' => string, 'viejo' => int, 'nuevo' => int,
+     *                'creado' => bool, 'descripcion' => string, 'avisos' => string[]]
+     */
+    public function separarMapeoJugador($tmId, array &$informe)
+    {
+        $fila = DB::table('jugador_tm')->where('tm_player_id', (string) $tmId)->first();
+        if (!$fila) return ['ok' => false, 'mensaje' => 'El id ' . $tmId . ' no tiene mapeo: no hay nada que separar.'];
+
+        $perfiles = $this->traerPerfiles([(string) $tmId], $informe);
+        if (empty($perfiles[(string) $tmId])) {
+            return ['ok' => false, 'mensaje' => 'No pude bajar el perfil de TM ' . $tmId . '. No toqué nada.'];
+        }
+
+        $restaurar = function () use ($fila) {
+            DB::table('jugador_tm')->updateOrInsert(['tm_player_id' => $fila->tm_player_id], (array) $fila);
+        };
+
+        DB::table('jugador_tm')->where('id', $fila->id)->delete();
+        $this->mapaJugadores = null;
+
+        try {
+            $r = $this->resolverJugador((string) $tmId, $perfiles[(string) $tmId], true);
+        } catch (\Exception $e) {
+            $restaurar();
+            return ['ok' => false, 'mensaje' => 'Falló al crear la ficha: ' . $e->getMessage() . '. Dejé el mapeo como estaba.'];
+        }
+
+        if (empty($r['jugador_id'])) {
+            $restaurar();
+            return ['ok' => false, 'mensaje' => 'No pude resolver al jugador (' . $r['descripcion'] . '). Dejé el mapeo como estaba.',
+                'avisos' => $this->avisos];
+        }
+        if ((int) $r['jugador_id'] === (int) $fila->jugador_id) {
+            $restaurar();
+            return ['ok' => false, 'mensaje' => 'Con el criterio actual vuelve a caer en la misma ficha #' . $fila->jugador_id
+                . ': no es un caso de nombre de pila. Dejé el mapeo como estaba.', 'avisos' => $this->avisos];
+        }
+
+        return ['ok' => true, 'mensaje' => '', 'viejo' => (int) $fila->jugador_id, 'nuevo' => (int) $r['jugador_id'],
+            'creado' => !empty($r['creado']), 'descripcion' => $r['descripcion'], 'avisos' => $this->avisos];
+    }
+
     public static function desatarMapeoJugador($tmId)
     {
         $fila = DB::table('jugador_tm')->where('tm_player_id', (string) $tmId)->first();

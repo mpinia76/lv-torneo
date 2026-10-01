@@ -6312,7 +6312,7 @@ class ImportDetallesController extends Controller
             . ' bien atados (apodos, apellido abreviado distinto) · ' . $sinPerfil . ' sin perfil en TM.</p>'
             . '<p class="sub">Que el criterio de hoy no los una <b>no prueba</b> que sean dos personas: un apellido '
             . 'con una letra cambiada (Cagigas / Gagigas) o transliterado (Ahmad / Ahmed) también cae acá. Compará '
-            . 'los nombres completos y las fechas: si se ven como dos personas distintas, <b>Desatar</b>. Si es la misma '
+            . 'los nombres completos y las fechas: si se ven como dos personas distintas, <b>Separar</b>. Si es la misma '
             . 'persona escrita distinto, dejalo como está.</p>';
 
         if (!$malos) {
@@ -6339,13 +6339,13 @@ class ImportDetallesController extends Controller
 
         $cuerpo .= '<h2>Apellidos que no se parecen (' . count($distintos) . ')</h2>'
             . '<p class="sub">Acá está el problema de verdad: el caso Gayà / González. Revisá cada una; casi '
-            . 'todas son para <b>Desatar</b>. Pueden colarse apodos (TM con el nombre futbolero, la base con el '
+            . 'todas son para <b>Separar</b>. Pueden colarse apodos (TM con el nombre futbolero, la base con el '
             . 'legal).</p>'
             . $this->tablaMapeosDudosos($distintos, $partidos)
             . '<h2>Mismo apellido escrito distinto (' . count($parecidos) . ')</h2>'
             . '<p class="sub">Parecido ' . $umbral . '% o más (Alesandria / Alessandria, Castillo / Castrillo, '
             . 'transliteraciones). Casi seguro es la <b>misma persona</b> con el apellido mal cargado en algún lado: '
-            . '<b>no desatar</b> — si se desata, el próximo partido le crea una ficha duplicada. Si querés, '
+            . '<b>no separar</b> — se crearía una ficha duplicada. Si querés, '
             . 'corregí el apellido de la ficha.</p>'
             . $this->tablaMapeosDudosos($parecidos, $partidos);
 
@@ -6374,7 +6374,7 @@ class ImportDetallesController extends Controller
                 . '<td><form method="post" style="display:inline" action="' . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
                 . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
                 . '<input type="hidden" name="tm_id" value="' . e($f->tm_player_id) . '">'
-                . '<button class="boton" type="submit">Desatar</button></form></td>'
+                . '<button class="boton" type="submit">Separar</button></form></td>'
                 . '</tr>';
         }
         $cuerpo .= '</tbody></table>';
@@ -6383,77 +6383,93 @@ class ImportDetallesController extends Controller
     }
 
     /**
-     * Borra el mapeo de un id de TM y muestra los partidos de la ficha a la que
-     * apuntaba, para rehacer los que en realidad eran del otro jugador.
+     * «Separar»: desata el mapeo, le da al jugador de TM su propia ficha
+     * (TmDetallePartido::separarMapeoJugador, 1 llamada) y ofrece, por cada
+     * club de la ficha vieja, el link a «Mover registros» (MoverRegistros) ya
+     * cargado con origen y destino. Mover es otro paso, con su vista previa:
+     * los partidos de la ficha vieja incluyen los del dueño verdadero, y qué
+     * club es de quién lo decide el usuario.
      */
     public function mapeosDudososDesatar(Request $request)
     {
+        set_time_limit(0);
         $tmId = trim((string) $request->input('tm_id', ''));
         $volver = '<p class="sub"><a href="' . e(route('import_detalles.mapeos_dudosos')) . '">← Mapeos dudosos</a></p>';
         if (!preg_match('/^\d{1,20}$/', $tmId)) {
-            return $this->pagina('Desatar mapeo', $volver . '<div class="err-box">Falta el id de TM.</div>');
+            return $this->pagina('Separar', $volver . '<div class="err-box">Falta el id de TM.</div>');
         }
 
-        $nombreTm = (string) DB::table('jugador_tm')->where('tm_player_id', $tmId)->value('nombre_tm');
-        $jugadorId = TmDetallePartido::desatarMapeoJugador($tmId);
-        if ($jugadorId === null) {
-            return $this->pagina('Desatar mapeo', $volver
-                . '<div class="ok-box">El id ' . e($tmId) . ' ya no tenía mapeo: no había nada que desatar.</div>');
+        $tm = new TmDetallePartido();
+        $informe = ['llamadas' => 0];
+        $r = $tm->separarMapeoJugador($tmId, $informe);
+
+        $avisos = '';
+        if (!empty($r['avisos'])) {
+            $avisos = '<h2>Avisos</h2><ul>';
+            foreach ($r['avisos'] as $a) $avisos .= '<li>' . e($a) . '</li>';
+            $avisos .= '</ul>';
+        }
+
+        if (!$r['ok']) {
+            return $this->pagina('Separar', $volver . '<div class="err-box">' . e($r['mensaje']) . '</div>' . $avisos);
         }
 
         // Sacarlo de lo verificado, así la lista no lo sigue ofreciendo.
         $llave = 'import_detalles.mapeos_dudosos';
         $guardado = \Illuminate\Support\Facades\Cache::get($llave);
         if ($guardado) {
-            $guardado['filas'] = array_values(array_filter($guardado['filas'], function ($r) use ($tmId) {
-                return (string) $r['fila']->tm_player_id !== $tmId;
+            $guardado['filas'] = array_values(array_filter($guardado['filas'], function ($x) use ($tmId) {
+                return (string) $x['fila']->tm_player_id !== $tmId;
             }));
             \Illuminate\Support\Facades\Cache::put($llave, $guardado, 86400);
         }
 
-        $ficha = DB::table('jugadors')->join('personas', 'personas.id', '=', 'jugadors.persona_id')
-            ->where('jugadors.id', $jugadorId)->first(['personas.apellido', 'personas.nombre']);
-        $fichaTxt = $ficha ? trim($ficha->apellido . ', ' . $ficha->nombre) : '';
+        $fichas = DB::table('jugadors')->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->whereIn('jugadors.id', [$r['viejo'], $r['nuevo']])
+            ->get(['jugadors.id', 'jugadors.persona_id', 'personas.apellido', 'personas.nombre'])->keyBy('id');
+        $viejo = $fichas->get($r['viejo']);
+        $nuevo = $fichas->get($r['nuevo']);
+        if (!$viejo || !$nuevo) {
+            return $this->pagina('Separar', $volver . '<div class="err-box">No encuentro alguna de las dos fichas (#'
+                . $r['viejo'] . ' / #' . $r['nuevo'] . ').</div>' . $avisos);
+        }
 
-        $filas = DB::table('alineacions as a')
+        $clubes = DB::table('alineacions as a')
             ->join('partidos', 'partidos.id', '=', 'a.partido_id')
-            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
-            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
-            ->join('torneos', 'torneos.id', '=', 'grupos.torneo_id')
             ->leftJoin('equipos', 'equipos.id', '=', 'a.equipo_id')
-            ->where('a.jugador_id', $jugadorId)
-            ->orderBy('partidos.dia')
-            ->get(['partidos.id', 'partidos.dia', 'torneos.nombre as torneo', 'torneos.year as anio',
-                'equipos.nombre as equipo']);
+            ->where('a.jugador_id', $r['viejo'])
+            ->groupBy('a.equipo_id', 'equipos.nombre')
+            ->orderBy(DB::raw('MIN(partidos.dia)'))
+            ->get([DB::raw('a.equipo_id'), DB::raw('equipos.nombre'), DB::raw('COUNT(DISTINCT a.partido_id) AS n'),
+                DB::raw('MIN(partidos.dia) AS desde'), DB::raw('MAX(partidos.dia) AS hasta')]);
 
-        $grupos = [];
-        foreach ($filas as $p) {
-            $clave = ($p->equipo ?: '¿sin equipo?') . ' · ' . $p->torneo . ' ' . $p->anio;
-            $grupos[$clave][] = $p;
+        $nomViejo = trim($viejo->apellido . ', ' . $viejo->nombre);
+        $nomNuevo = trim($nuevo->apellido . ', ' . $nuevo->nombre);
+
+        $cuerpo = $volver . '<h1>Separar</h1>'
+            . '<div class="ok-box">El id de TM ' . e($tmId) . ' ya no apunta a #' . (int) $r['viejo'] . ' ' . e($nomViejo)
+            . '. ' . ($r['creado'] ? 'Le creé su ficha: ' : 'Ya estaba en la base: ') . '#' . (int) $r['nuevo'] . ' '
+            . e($nomNuevo) . '. Todavía no moví ningún partido.</div>'
+            . '<p class="sub">Elegí el club donde jugaba <b>' . e($nomNuevo) . '</b> y apretá <b>Mover</b>: se abre '
+            . '«Mover registros» con vista previa, y de ese club pasan a la ficha nueva las alineaciones, los goles, '
+            . 'las tarjetas, los cambios, los penales (también los convertidos) y la plantilla. Los clubes del otro '
+            . '(' . e($nomViejo) . ') no los toques.</p>'
+            . '<table><thead><tr><th>club en la ficha vieja</th><th>partidos</th><th>desde</th><th>hasta</th><th></th></tr></thead><tbody>';
+        foreach ($clubes as $c) {
+            $link = $c->equipo_id
+                ? '<a class="boton" href="' . e(route('personas.mover.form', [
+                    'origen' => (int) $viejo->persona_id, 'destino' => (int) $nuevo->persona_id, 'rol' => 'jugador',
+                    'equipos' => (int) $c->equipo_id,
+                    'etiqueta' => 'Separar TM ' . $tmId . ' (nombre de pila)',
+                ])) . '" target="_blank">Mover</a>'
+                : '—';
+            $cuerpo .= '<tr><td>' . e($c->nombre ?: '¿sin equipo?') . '</td><td>' . (int) $c->n . '</td>'
+                . '<td>' . e(substr((string) $c->desde, 0, 10)) . '</td><td>' . e(substr((string) $c->hasta, 0, 10)) . '</td>'
+                . '<td>' . $link . '</td></tr>';
         }
+        $cuerpo .= '</tbody></table>' . $avisos;
 
-        $cuerpo = $volver . '<h1>Mapeo desatado</h1>'
-            . '<div class="ok-box">Borré el mapeo TM ' . e($tmId) . ' (' . e($nombreTm) . ') → ficha #' . $jugadorId
-            . ' (' . e($fichaTxt) . '). No toqué ningún partido.</div>'
-            . '<p class="sub">Esta ficha tiene <b>' . count($filas) . '</b> partido(s), agrupados abajo por equipo y '
-            . 'torneo. Los que eran del <b>otro</b> jugador (casi siempre se reconocen por el equipo) hay que '
-            . '<b>Rehacerlos</b>: sin el mapeo, el importador vuelve a resolver al jugador con el criterio nuevo y '
-            . 'crea su ficha propia la primera vez. Cada rehacer es una llamada a la API.</p>'
-            . '<p class="sub">Lo que rehacer <b>no</b> arregla: si esta ficha quedó en la plantilla de ese equipo, '
-            . 'sacala a mano desde la plantilla.</p>';
-
-        foreach ($grupos as $titulo => $lista) {
-            $cuerpo .= '<h2>' . e($titulo) . ' (' . count($lista) . ')</h2><table><tbody>';
-            foreach ($lista as $p) {
-                $cuerpo .= '<tr><td>' . e(substr((string) $p->dia, 0, 10)) . '</td><td>#' . (int) $p->id . '</td>'
-                    . '<td><a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $p->id])) . '" target="_blank">Ver</a>'
-                    . ' · <a class="err" href="' . e(route('import_detalles.bajar', ['partido_id' => (int) $p->id, 'forzar' => 1]))
-                    . '" target="_blank">Rehacer</a></td></tr>';
-            }
-            $cuerpo .= '</tbody></table>';
-        }
-
-        return $this->pagina('Mapeo desatado', $cuerpo);
+        return $this->pagina('Separar', $cuerpo);
     }
 
     private function card($n, $label, $tono = '')
