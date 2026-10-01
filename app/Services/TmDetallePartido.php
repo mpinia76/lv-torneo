@@ -5289,6 +5289,90 @@ class TmDetallePartido
         return $out;
     }
 
+    // ═══════ MAPEOS DUDOSOS: atados sólo por el nombre de pila (oct-2026) ═══════
+    //
+    // Hasta oct-2026 buscarJugadorExistente() unía por «misma fecha + 2 palabras
+    // en común» aunque las dos fueran el nombre de pila: Jesse González (TM
+    // 263770, "José Luis | González Gudina") quedó atado a la ficha de José Gayà
+    // ("José Luis | Gayà Peña"), los dos nacidos el 25/05/1995, y los partidos
+    // del arquero de Dallas se le cargaron a Gayà. El criterio ya se corrigió
+    // (ver mejorJugadorPorFecha), pero los mapeos hechos antes siguen en
+    // `jugador_tm` y el importador los usa sin volver a comparar nada.
+
+    /**
+     * Filtro grueso y SIN llamadas a la API: mapeos automáticos donde la última
+     * palabra del nombre que trajo TM ("J. González" → "González") no aparece
+     * en ningún lado del nombre completo de la ficha. Deja pasar apodos,
+     * transliteraciones y errores de tipeo; quién está mal atado de verdad lo
+     * decide verificarMapeosDudosos() contra el perfil de TM.
+     */
+    public static function candidatosMapeoDudoso()
+    {
+        return DB::table('jugador_tm as jt')
+            ->join('jugadors as j', 'j.id', '=', 'jt.jugador_id')
+            ->join('personas as p', 'p.id', '=', 'j.persona_id')
+            ->where('jt.origen', 'auto')
+            ->where('jt.nombre_tm', 'like', '% %')
+            ->where('p.nombre', 'like', '% %')
+            ->whereRaw("REPLACE(CONCAT(p.apellido, ' ', p.nombre), '-', ' ') NOT LIKE "
+                . "CONCAT('%', SUBSTRING_INDEX(REPLACE(jt.nombre_tm, '-', ' '), ' ', -1), '%')")
+            ->orderBy('p.apellido')
+            ->get(['jt.id', 'jt.tm_player_id', 'jt.nombre_tm', 'jt.created_at', 'j.id as jugador_id',
+                'p.apellido', 'p.nombre', 'p.nacimiento'])
+            ->all();
+    }
+
+    /**
+     * Baja el perfil de TM de cada candidato (de a 50) y le pasa el criterio
+     * de HOY: ¿se tocan los apellidos? 'mal' = el importador actual NO los
+     * uniría. No escribe nada.
+     *
+     * 'mal' no es «seguro son dos personas»: un apellido con una letra cambiada
+     * (Cagigas/Gagigas) o transliterado (Ahmad/Ahmed) también da 'mal'. Por eso
+     * la pantalla muestra los dos nombres y las dos fechas, y desatar es fila
+     * por fila.
+     *
+     * @return array [['fila' => obj, 'estado' => 'ok'|'mal'|'sin_perfil', 'tm' => array|null], ...]
+     */
+    public function verificarMapeosDudosos(array $filas, array &$informe)
+    {
+        $ids = [];
+        foreach ($filas as $f) $ids[(string) $f->tm_player_id] = true;
+        $perfiles = $ids ? $this->traerPerfiles(array_keys($ids), $informe) : [];
+
+        $out = [];
+        foreach ($filas as $f) {
+            $r = ['fila' => $f, 'estado' => 'sin_perfil', 'tm' => null];
+            $clave = (string) $f->tm_player_id;
+            if (isset($perfiles[$clave])) {
+                $d = $this->personaDesdePerfil($perfiles[$clave]);
+                $tokensTm   = $this->tokensNombre($d['apellido'] . ' ' . $d['nombre']);
+                $tokensBase = $this->tokensNombre($f->apellido . ' ' . $f->nombre);
+                $seTocan = $this->apellidosSeTocan($this->tokensNombre($d['apellido']), $tokensTm,
+                    $this->tokensNombre($f->apellido), $tokensBase);
+                $r['estado'] = $seTocan ? 'ok' : 'mal';
+                $r['tm'] = ['apellido' => $d['apellido'], 'nombre' => $d['nombre'],
+                    'nacimiento' => $d['nacimiento']];
+            }
+            $out[] = $r;
+        }
+        return $out;
+    }
+
+    /**
+     * Borra el mapeo de un id de TM y devuelve la ficha a la que apuntaba (o
+     * null si no había). No toca alineaciones, goles ni plantillas: eso se
+     * arregla rehaciendo los partidos, que con el mapeo borrado resuelven a la
+     * persona de nuevo con el criterio actual.
+     */
+    public static function desatarMapeoJugador($tmId)
+    {
+        $fila = DB::table('jugador_tm')->where('tm_player_id', (string) $tmId)->first();
+        if (!$fila) return null;
+        DB::table('jugador_tm')->where('id', $fila->id)->delete();
+        return (int) $fila->jugador_id;
+    }
+
     /** Igual que mapaJugadores(): un arbitro_id que ya no existe no es un mapeo. Ver allá el porqué. */
     private function mapaArbitros()
     {
