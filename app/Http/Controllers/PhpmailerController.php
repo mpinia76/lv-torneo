@@ -13,11 +13,10 @@ use Illuminate\Support\Facades\Log;
 
 class PhpmailerController extends Controller {
 
+    /**
+     * Devuelve true si el mail salió, false si no (el motivo queda en laravel.log).
+     */
     public function sendEmail ($data) {
-
-
-
-        //require __DIR__.'/vendor/autoload.php'; // load Composer's autoloader
 
         $mail = new PHPMailer(true); // Passing `true` enables exceptions
 
@@ -25,7 +24,8 @@ class PhpmailerController extends Controller {
 
             // Mail server settings
 
-            $mail->SMTPDebug = 4; // Enable verbose debug output
+            // 0 = sin debug. Con 4 vuelca cada línea enviada al SMTP (adjuntos incluidos).
+            $mail->SMTPDebug = 0;
             $mail->isSMTP(); // Set mailer to use SMTP
             $mail->Host = env('MAIL_HOST'); // Specify main and backup SMTP servers
             $mail->SMTPAuth = true; // Enable SMTP authentication
@@ -33,37 +33,32 @@ class PhpmailerController extends Controller {
             $mail->Password = env('MAIL_PASSWORD'); // SMTP password
             $mail->SMTPSecure = env('MAIL_ENCRYPTION'); // Enable TLS encryption, `ssl` also accepted
             $mail->Port = env('MAIL_PORT'); // TCP port to connect to
+            $mail->CharSet = PHPMailer::CHARSET_UTF8;
 
             $mail->setFrom(env('MAIL_FROM_ADDRESS'));
             $mail->addAddress($data['email']); // Add a recipient, Name is optional
-            /*$mail->addCC($_POST['email-cc']);
-            $mail->addBCC($_POST['email-bcc']);
-            $mail->addReplyTo('your-email@gmail.com', 'Your Name');*/
-            // print_r($_FILES['file']); exit;
 
-            /*for ($i=0; $i < count($_FILES['file']['tmp_name']) ; $i++) {
-                $mail->addAttachment($_FILES['file']['tmp_name'][$i], $_FILES['file']['name'][$i]); // Optional name
-            }*/
-
-            foreach ($data['attachs'] as $attach){
-                $mail->addAttachment($attach); // Optional name
+            if (!empty($data['attachs'])) {
+                foreach ($data['attachs'] as $attach){
+                    $mail->addAttachment($attach); // Optional name
+                }
             }
 
             $mail->isHTML(true); // Set email format to HTML
 
-            $mail->Subject = $data['subject'];//'BackUp lv-torneo'
-            $mail->Body    = $data['body'];//'En el archivo adjunto se encuentra el BackUp de la BBDD lv-torneo realizado el '
-            // $mail->AltBody = plain text version of your message;
+            $mail->Subject = $data['subject'];
+            $mail->Body    = $data['body'];
 
             if( !$mail->send() ) {
-
                 Log::error('Error al enviar mail: '.$mail->ErrorInfo,[]);
-                /*echo 'Message could not be sent.';
-                echo 'Mailer Error: ' . $mail->ErrorInfo;*/
+                return false;
             }
 
+            return true;
+
         } catch (Exception $e) {
-            // return back()->with('error','Message could not be sent.');
+            Log::error('Error al enviar mail: '.$mail->ErrorInfo.' '.$e->getMessage(),[]);
+            return false;
         }
 
     }
