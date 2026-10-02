@@ -28,7 +28,7 @@ class GrupoController extends Controller
     public function __construct()
     {
         //$this->middleware('auth');
-        $this->middleware('auth')->except(['posicionesPublic','goleadoresPublic','tarjetasPublic', 'arqueros', 'metodo','jugadores','tecnicos']);
+        $this->middleware('auth')->except(['posicionesPublic','goleadoresPublic','tarjetasPublic', 'arqueros','jugadores','tecnicos']);
     }
 
     /**

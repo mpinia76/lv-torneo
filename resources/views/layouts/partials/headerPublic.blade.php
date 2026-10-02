@@ -245,9 +245,6 @@
                             @if(Session::has('sessionAcumulado'))
                                 <li><a class="dropdown-item" href="{{ route('torneos.acumulado', ['torneoId' => $tId]) }}">{{ __('Acumulado') }}</a></li>
                             @endif
-                            @if(Session::has('sessionPaenza'))
-                                <li><a class="dropdown-item" href="{{ route('grupos.metodo', ['torneoId' => $tId]) }}">{{ __('Método Paenza') }}</a></li>
-                            @endif
                             <li><a class="dropdown-item" href="{{ route('grupos.arqueros', ['torneoId' => $tId]) }}">{{ __('Arqueros') }}</a></li>
                             <li><a class="dropdown-item" href="{{ route('grupos.jugadores', ['torneoId' => $tId]) }}">{{ __('Jugadores') }}</a></li>
                             <li><a class="dropdown-item" href="{{ route('grupos.tarjetasPublic', ['torneoId' => $tId]) }}">{{ __('Tarjetas') }}</a></li>

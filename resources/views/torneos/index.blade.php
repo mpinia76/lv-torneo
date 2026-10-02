@@ -68,6 +68,7 @@
                             <button class="btn btn-danger m-1">Eliminar</button>
                         </form>
                         <a href="{{route('cruces.index')}}?torneo_id={{$torneo->id}}" class="btn btn-success m-1">Cruces</a>
+                        <a href="{{ route('grupos.metodo', ['torneoId' => $torneo->id]) }}" class="btn btn-secondary m-1">Paenza</a>
 
 
                     </div>

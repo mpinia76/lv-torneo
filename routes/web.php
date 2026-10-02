@@ -34,6 +34,11 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
         return view('/home');
     });
     Route::get('/home', 'TorneoController@index')->name('index');
+
+    // Método Paenza: sólo para el admin (salió del menú público). Vive acá y no
+    // en $rutasPublicas para que no pase por la caché de páginas, que serviría
+    // la copia guardada sin mirar el login.
+    Route::get('metodo', 'GrupoController@metodo')->name('grupos.metodo');
     Route::resource('torneos', 'TorneoController');
 
     Route::get('/plantillas/{id}/reasignar-grupo', 'PlantillaController@reasignarGrupo')
@@ -418,7 +423,6 @@ $rutasPublicas = function () {
     Route::get('descensos', 'TorneoController@promediosPublic')->name('torneos.promediosPublic');
     Route::get('acumulado', 'TorneoController@acumulado')->name('torneos.acumulado');
     Route::get('arqueros', 'GrupoController@arqueros')->name('grupos.arqueros');
-    Route::get('metodo', 'GrupoController@metodo')->name('grupos.metodo');
     Route::get('plantillas', 'TorneoController@plantillas')->name('torneos.plantillas');
 
     Route::get('historiales', 'TorneoController@historiales')->name('torneos.historiales');
