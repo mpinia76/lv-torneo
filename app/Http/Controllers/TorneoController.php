@@ -4308,18 +4308,6 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             $nombre = $request->session()->get('nombre_filtro_jugador');
         }
 
-        $nombreFiltro  = '';
-        $nombreFiltro2 = '';
-        if ($nombre) {
-            // addslashes no es el escapado del driver. quote() si lo es; devuelve
-            // el valor entre comillas y aca hacen falta sin ellas, porque el SQL de
-            // abajo ya las pone. substr saca exactamente una de cada punta (trim no:
-            // se comeria la barra de un valor terminado en comilla escapada).
-            $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
-            $nombreFiltro  = " AND (personas.apellido LIKE '%$nombreEscaped%' OR personas.nombre LIKE '%$nombreEscaped%') ";
-            $nombreFiltro2 = " AND (P2.apellido LIKE '%$nombreEscaped%' OR P2.nombre LIKE '%$nombreEscaped%') ";
-        }
-
         if ($request->query('torneoId')) {
             $torneoId = $request->query('torneoId');
         } else {
@@ -4334,184 +4322,115 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $jugadoresPorId = CachePaginas::datos('hist.jugadores.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
-            // 1) Build the giant UNION query (same as before, no ORDER BY needed)
+        $jugadoresPorId = CachePaginas::datos('hist.jugadores.v2', [$nombre, $actuales, $year], function () use ($nombre, $actuales, $year) {
+            // 1) Totales por jugador.
+            // Cada parte del UNION ya agrupa por jugador_id y devuelve solo números,
+            // así la tabla intermedia tiene una fila por jugador y por parte (y no una
+            // por cada gol/tarjeta/alineación de la base con foto y nombre a cuestas).
+            // Los datos de la persona se unen una sola vez al final.
+            // Los filtros (nombre, "actuales") se aplican como un IN contra una lista
+            // de ids que MySQL arma una vez, en vez del EXISTS correlacionado por fila.
             // ---------------------------------------------------------------
-            $sql = 'SELECT jugador_id, "" escudo, foto, nacionalidad, jugador,
-           sum(jugados) jugados,
-           sum(goles) goles,
-           sum(rojas) rojas,
-           sum(amarillas) amarillas,
-           sum(errados) errados,
-           sum(atajos) atajos,
-           sum(recibidos) recibidos,
-           sum(invictas) invictas, sum(titulos) titulos
-    from
-    (SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "1" as goles, "0" as  amarillas
-    , "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-    FROM gols
-    INNER JOIN jugadors ON gols.jugador_id = jugadors.id
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    INNER JOIN partidos ON gols.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON grupos.id = fechas.grupo_id
-    WHERE gols.tipo <> \'En contra\'' . $nombreFiltro;
+            // '#COL#' se reemplaza por la columna jugador_id de cada parte.
+            $filtros = '';
+            if ($nombre) {
+                $nombreEscaped = substr(DB::connection()->getPdo()->quote($nombre), 1, -1);
+                $filtros .= " AND #COL# IN (
+                    SELECT JN.id FROM jugadors JN INNER JOIN personas PN ON PN.id = JN.persona_id
+                    WHERE PN.apellido LIKE '%$nombreEscaped%' OR PN.nombre LIKE '%$nombreEscaped%')";
+            }
+            if ($actuales) {
+                $filtros .= " AND #COL# IN (
+                    SELECT A1.jugador_id
+                    FROM alineacions A1
+                    INNER JOIN partidos P1 ON A1.partido_id = P1.id
+                    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+                    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+                    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+                    WHERE T1.year LIKE '%" . (int) $year . "%')";
+            }
+            $f = function ($columna) use ($filtros) {
+                return str_replace('#COL#', $columna, $filtros);
+            };
 
-            $sql .= ($actuales) ? " AND EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+            $sql = 'SELECT t.jugador_id, "" escudo, pe.foto, pe.nacionalidad, pe.name AS jugador,
+                SUM(t.jugados) jugados, SUM(t.goles) goles, SUM(t.rojas) rojas, SUM(t.amarillas) amarillas,
+                SUM(t.errados) errados, SUM(t.atajos) atajos, SUM(t.recibidos) recibidos,
+                SUM(t.invictas) invictas, SUM(t.titulos) titulos
+            FROM (
 
-            $sql .= ' UNION ALL
-     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, ( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
-    , ( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-    FROM tarjetas
-    INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    LEFT JOIN partidos ON tarjetas.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON grupos.id = fechas.grupo_id' . $nombreFiltro;
+                SELECT g.jugador_id, 0 jugados, COUNT(*) goles, 0 rojas, 0 amarillas, 0 errados, 0 atajos,
+                       0 recibidos, 0 invictas, 0 titulos
+                FROM gols g
+                INNER JOIN partidos p ON g.partido_id = p.id
+                INNER JOIN fechas fe ON p.fecha_id = fe.id
+                INNER JOIN grupos gr ON gr.id = fe.grupo_id
+                WHERE g.tipo <> \'En contra\'' . $f('g.jugador_id') . '
+                GROUP BY g.jugador_id
 
-            $sql .= ($actuales) ? " WHERE EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+                UNION ALL
 
-            $sql .= ' UNION ALL
-     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas, "0" as  rojas, "0" as  recibidos, "0" as  invictas, "0" AS jugando, "0" AS titulos, ( case when tipo=\'Errado\' or tipo=\'Atajado\' then 1 else NULL end) as  errados, ( case when tipo=\'Atajó\' then 1 else NULL end) as  atajos
-    FROM penals
-    INNER JOIN jugadors ON penals.jugador_id = jugadors.id
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    LEFT JOIN partidos ON penals.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON grupos.id = fechas.grupo_id' . $nombreFiltro;
+                SELECT ta.jugador_id, 0, 0,
+                       COALESCE(SUM(ta.tipo IN (\'Roja\', \'Doble Amarilla\')), 0),
+                       COALESCE(SUM(ta.tipo = \'Amarilla\'), 0),
+                       0, 0, 0, 0, 0
+                FROM tarjetas ta
+                INNER JOIN partidos p ON ta.partido_id = p.id
+                INNER JOIN fechas fe ON p.fecha_id = fe.id
+                INNER JOIN grupos gr ON gr.id = fe.grupo_id
+                WHERE 1=1' . $f('ta.jugador_id') . '
+                GROUP BY ta.jugador_id
 
-            $sql .= ($actuales) ? " WHERE EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+                UNION ALL
 
-            $sql .= ' UNION ALL
-     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
-    , "0" as  rojas, (case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
-    (case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-    FROM alineacions
-    INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    INNER JOIN partidos ON alineacions.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON grupos.id = fechas.grupo_id
-    WHERE  alineacions.tipo = \'Titular\'' . $nombreFiltro;
+                SELECT pn.jugador_id, 0, 0, 0, 0,
+                       COALESCE(SUM(pn.tipo IN (\'Errado\', \'Atajado\')), 0),
+                       COALESCE(SUM(pn.tipo = \'Atajó\'), 0),
+                       0, 0, 0
+                FROM penals pn
+                INNER JOIN partidos p ON pn.partido_id = p.id
+                INNER JOIN fechas fe ON p.fecha_id = fe.id
+                INNER JOIN grupos gr ON gr.id = fe.grupo_id
+                WHERE 1=1' . $f('pn.jugador_id') . '
+                GROUP BY pn.jugador_id
 
-            $sql .= ($actuales) ? " AND EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+                UNION ALL
 
-            $sql .= ' UNION ALL
-     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
-    , "0" as  rojas, "0" AS recibidos,
-    "0" AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-    FROM alineacions
-    INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador != \'Arquero\'
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    INNER JOIN partidos ON alineacions.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON grupos.id = fechas.grupo_id
-    LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-    WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')' . $nombreFiltro;
+                -- Partidos jugados: titular, o suplente que entró. Goles recibidos y
+                -- vallas invictas solo cuentan para el arquero titular.
+                -- (tipoJugador NULL no suma, igual que en la versión anterior.)
+                SELECT a.jugador_id, COUNT(*), 0, 0, 0, 0, 0,
+                       COALESCE(SUM(CASE WHEN j.tipoJugador = \'Arquero\' AND a.tipo = \'Titular\'
+                           THEN (CASE WHEN a.equipo_id = p.equipol_id THEN p.golesv ELSE p.golesl END) ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN j.tipoJugador = \'Arquero\' AND a.tipo = \'Titular\'
+                           AND ((a.equipo_id = p.equipol_id AND p.golesv = 0) OR (a.equipo_id = p.equipov_id AND p.golesl = 0))
+                           THEN 1 ELSE 0 END), 0),
+                       0
+                FROM alineacions a
+                INNER JOIN jugadors j ON a.jugador_id = j.id AND j.tipoJugador IS NOT NULL
+                INNER JOIN partidos p ON a.partido_id = p.id
+                INNER JOIN fechas fe ON p.fecha_id = fe.id
+                INNER JOIN grupos gr ON gr.id = fe.grupo_id
+                WHERE (a.tipo = \'Titular\' OR EXISTS (
+                    SELECT 1 FROM cambios c
+                    WHERE c.partido_id = a.partido_id AND c.jugador_id = a.jugador_id AND c.tipo = \'Entra\'
+                ))' . $f('a.jugador_id') . '
+                GROUP BY a.jugador_id
 
-            $sql .= ($actuales) ? " AND EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
+                UNION ALL
 
-            $sql .= ' UNION ALL
-     SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"1" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as  amarillas
-    , "0" as  rojas, "0" AS recibidos,
-    "0" AS invictas, "0" AS jugando, "0" AS titulos, "0" as  errados, "0" as  atajos
-    FROM alineacions
-    INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    INNER JOIN partidos ON alineacions.partido_id = partidos.id
-    INNER JOIN fechas ON partidos.fecha_id = fechas.id
-    INNER JOIN grupos ON grupos.id = fechas.grupo_id
-    LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-    WHERE  (cambios.tipo = \'Entra\')' . $nombreFiltro;
+                SELECT pj.jugador_id, 0, 0, 0, 0, 0, 0, 0, 0, COUNT(DISTINCT pt.id)
+                FROM plantilla_jugadors pj
+                INNER JOIN plantillas pl ON pj.plantilla_id = pl.id
+                INNER JOIN grupos gr ON gr.id = pl.grupo_id
+                INNER JOIN posicion_torneos pt ON pt.torneo_id = gr.torneo_id AND pt.equipo_id = pl.equipo_id AND pt.posicion = 1
+                WHERE 1=1' . $f('pj.jugador_id') . '
+                GROUP BY pj.jugador_id
 
-            $sql .= ($actuales) ? " AND EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
-
-            $sql .= ' UNION ALL
-    SELECT jugadors.id AS jugador_id, personas.foto, personas.nacionalidad,"0" as jugados, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, "0" AS goles, "0" as amarillas , "0" as rojas, "0" AS recibidos,
-    "0" AS invictas, "0" AS jugando, count(DISTINCT posicion_torneos.id) AS titulos, "0" as  errados, "0" as  atajos
-    FROM plantilla_jugadors
-    INNER JOIN jugadors ON plantilla_jugadors.jugador_id = jugadors.id
-    INNER JOIN personas ON jugadors.persona_id = personas.id
-    INNER JOIN plantillas ON plantilla_jugadors.plantilla_id = plantillas.id
-    INNER JOIN grupos ON grupos.id = plantillas.grupo_id
-    INNER JOIN posicion_torneos ON posicion_torneos.torneo_id=grupos.torneo_id AND posicion_torneos.equipo_id = plantillas.equipo_id AND posicion_torneos.posicion=1
-    WHERE 1=1 ' . $nombreFiltro;
-
-            $sql .= ($actuales) ? " AND EXISTS (
-    SELECT DISTINCT J1.id
-    FROM alineacions
-    INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-    INNER JOIN personas P2 ON J1.persona_id = P2.id
-    INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-    INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-    INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-    INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-    WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-    )" : "";
-
-            $sql .= ' GROUP BY jugadors.id,personas.foto,personas.apellido,personas.nombre,personas.nacionalidad';
-            $sql .= ' ) a
-    group by jugador_id, jugador, foto, nacionalidad';
+            ) t
+            INNER JOIN jugadors j ON j.id = t.jugador_id
+            INNER JOIN personas pe ON pe.id = j.persona_id
+            GROUP BY t.jugador_id, pe.foto, pe.nacionalidad, pe.name';
 
             $jugadores = collect(DB::select(DB::raw($sql)));
 
@@ -4567,12 +4486,14 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             // ---------------------------------------------------------------
             $jugadoresPorId = $jugadores->keyBy('jugador_id');
 
-            foreach ($manuales as $jugadorId => $items) {
-                if ($jugadoresPorId->has($jugadorId)) {
-                    $this->aplicarManualesJugador($jugadoresPorId[$jugadorId], $items, $year);
-                } else {
-                    // Manual-only player: fetch persona data
-                    $persona = DB::table('jugadors')
+            $soloManuales = $manuales->keys()->reject(function ($id) use ($jugadoresPorId) {
+                return $jugadoresPorId->has($id);
+            })->values()->all();
+
+            $personasManuales = collect();
+            foreach (array_chunk($soloManuales, 1000) as $ids) {
+                $personasManuales = $personasManuales->merge(
+                    DB::table('jugadors')
                         ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
                         ->select(
                             'jugadors.id',
@@ -4583,8 +4504,18 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                             'personas.apellido',
                             'personas.nombre'
                         )
-                        ->where('jugadors.id', $jugadorId)
-                        ->first();
+                        ->whereIn('jugadors.id', $ids)
+                        ->get()
+                );
+            }
+            $personasManuales = $personasManuales->keyBy('id');
+
+            foreach ($manuales as $jugadorId => $items) {
+                if ($jugadoresPorId->has($jugadorId)) {
+                    $this->aplicarManualesJugador($jugadoresPorId[$jugadorId], $items, $year);
+                } else {
+                    // Manual-only player: fetch persona data
+                    $persona = $personasManuales->get($jugadorId);
 
                     if (!$persona) {
                         continue;
