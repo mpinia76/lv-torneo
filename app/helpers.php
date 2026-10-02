@@ -185,6 +185,34 @@ if (! function_exists('trad_dato')) {
     }
 }
 
+if (! function_exists('fecha_corta')) {
+    /**
+     * Fecha corta según el idioma del sitio: 03/12/2017 en castellano,
+     * "3 Dec 2017" en inglés (sin la ambigüedad día/mes entre EE.UU. y el
+     * resto). Acepta string, timestamp, DateTime o Carbon. torneos.js
+     * (horasLocales) arma el mismo formato del lado del navegador.
+     */
+    function fecha_corta($fecha)
+    {
+        if ($fecha === null || $fecha === '') {
+            return '';
+        }
+        try {
+            if ($fecha instanceof \DateTimeInterface) {
+                $dt = $fecha;
+            } elseif (is_int($fecha)) {
+                $dt = (new \DateTime())->setTimestamp($fecha);
+            } else {
+                $dt = new \DateTime((string) $fecha);
+            }
+        } catch (\Exception $e) {
+            return (string) $fecha;
+        }
+        // 'M' de date() es siempre el mes en inglés, no depende del locale.
+        return $dt->format(app()->getLocale() === 'en' ? 'j M Y' : 'd/m/Y');
+    }
+}
+
 if (! function_exists('texto_idioma')) {
     /**
      * Texto libre cargado a mano que tiene versión en inglés en otra columna
@@ -282,7 +310,7 @@ if (!function_exists('hora_partido')) {
      * offset histórico de Argentina, que calcula DateTimeZone). torneos.js
      * (horasLocales) lo reescribe con la zona del navegador.
      *
-     * $que: 'fecha' (d/m/Y) · 'hora' (H:i, cuando al lado va la fecha también
+     * $que: 'fecha' (fecha_corta(): d/m/Y o "3 Dec 2017") · 'hora' (H:i, cuando al lado va la fecha también
      * convertida) · 'hora_dia' (H:i en listas agrupadas por día argentino: si
      * en la zona del visitante cae otro día, el JS le agrega +1 / −1).
      *
@@ -299,7 +327,7 @@ if (!function_exists('hora_partido')) {
         } catch (\Exception $e) {
             return e((string) $dia);
         }
-        $txt = $dt->format($que === 'fecha' ? 'd/m/Y' : 'H:i');
+        $txt = $que === 'fecha' ? fecha_corta($dt) : $dt->format('H:i');
         if ($dt->format('H:i:s') === '00:00:00') {
             return e($txt);
         }

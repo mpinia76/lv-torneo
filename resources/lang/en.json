@@ -683,5 +683,10 @@
     "Ámbito": "Scope",
     "Árbitro": "Referee",
     "Árbitros": "Referees",
-    "Horario de tu zona (:zona). En Argentina: :orig": "Your local time (:zona). In Argentina: :orig"
+    "Horario de tu zona (:zona). En Argentina: :orig": "Your local time (:zona). In Argentina: :orig",
+    "País": "Country",
+    "Fundación": "Founded",
+    "Desaparición": "Dissolved",
+    "Estadio": "Stadium",
+    "Socios": "Members"
 }

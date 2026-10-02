@@ -521,6 +521,14 @@
         var zona = '';
         try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* navegador viejo */ }
         var dos = function (n) { return (n < 10 ? '0' : '') + n; };
+        /* mismo formato que fecha_corta() en app/helpers.php */
+        var enIngles = (document.documentElement.lang || '').indexOf('en') === 0;
+        var MESES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var fechaCorta = function (d) {
+            return enIngles
+                ? d.getDate() + ' ' + MESES[d.getMonth()] + ' ' + d.getFullYear()
+                : dos(d.getDate()) + '/' + dos(d.getMonth() + 1) + '/' + d.getFullYear();
+        };
 
         Array.prototype.forEach.call(document.querySelectorAll('time.t-local[datetime]'), function (el) {
             var d = new Date(el.getAttribute('datetime'));
@@ -531,7 +539,7 @@
             var diaAr = el.getAttribute('data-dia');
             var ymd  = d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate());
             var txt  = que === 'fecha'
-                ? dos(d.getDate()) + '/' + dos(d.getMonth() + 1) + '/' + d.getFullYear()
+                ? fechaCorta(d)
                 : dos(d.getHours()) + ':' + dos(d.getMinutes());
 
             if (txt === orig && (que !== 'hora_dia' || ymd === diaAr)) return;

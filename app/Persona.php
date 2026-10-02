@@ -108,11 +108,11 @@ class Persona extends Model
     {
         if (!is_null($this->fallecimiento))
         {
-            return ' ('.date('d/m/Y', strtotime($this->nacimiento)).'-'.date('d/m/Y', strtotime($this->fallecimiento)).')';
+            return ' ('.fecha_corta($this->nacimiento).'-'.fecha_corta($this->fallecimiento).')';
         }
         if (!is_null($this->nacimiento))
         {
-            return __(':n años', ['n' => Carbon::parse($this->nacimiento)->age]).' ('.date('d/m/Y', strtotime($this->nacimiento)).')';
+            return __(':n años', ['n' => Carbon::parse($this->nacimiento)->age]).' ('.fecha_corta($this->nacimiento).')';
         }
 
     }
@@ -121,11 +121,11 @@ class Persona extends Model
     {
         if (!is_null($this->fallecimiento))
         {
-            return __(':n años', ['n' => Carbon::parse($this->nacimiento)->diff(Carbon::parse($this->fallecimiento))->format('%y')]).' ('.date('d/m/Y', strtotime($this->nacimiento)).'-'.date('d/m/Y', strtotime($this->fallecimiento)).')';
+            return __(':n años', ['n' => Carbon::parse($this->nacimiento)->diff(Carbon::parse($this->fallecimiento))->format('%y')]).' ('.fecha_corta($this->nacimiento).'-'.fecha_corta($this->fallecimiento).')';
         }
         if (!is_null($this->nacimiento))
         {
-            return __(':n años', ['n' => Carbon::parse($this->nacimiento)->age]).' ('.date('d/m/Y', strtotime($this->nacimiento)).')';
+            return __(':n años', ['n' => Carbon::parse($this->nacimiento)->age]).' ('.fecha_corta($this->nacimiento).')';
         }
 
     }
@@ -134,7 +134,7 @@ class Persona extends Model
     public function getAgeAtDate($date)
     {
         if (!is_null($this->fallecimiento) && Carbon::parse($this->fallecimiento)->lte(Carbon::parse($date))) {
-            return ' ('.date('d/m/Y', strtotime($this->nacimiento)).'-'.date('d/m/Y', strtotime($this->fallecimiento)).')';
+            return ' ('.fecha_corta($this->nacimiento).'-'.fecha_corta($this->fallecimiento).')';
         }
         if (!is_null($this->nacimiento)) {
             return Carbon::parse($this->nacimiento)->diffInYears(Carbon::parse($date));

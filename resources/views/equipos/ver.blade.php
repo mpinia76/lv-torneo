@@ -85,12 +85,12 @@
                         'País'      => trad_dato($equipo->pais),
                         // Con el club desaparecido la edad de hoy no dice nada: se muestran
                         // los años que existió, en el renglón de la desaparición.
-                        'Fundación' => $veFundado ? $veFundado->format('d/m/Y').($veDesap ? '' : ' · '.trans_choice(':n año|:n años', $veFundado->age, ['n' => $veFundado->age])) : '',
+                        'Fundación' => $veFundado ? fecha_corta($veFundado).($veDesap ? '' : ' · '.trans_choice(':n año|:n años', $veFundado->age, ['n' => $veFundado->age])) : '',
                         'Desaparición' => $veDesap
-                            ? $veDesap->format('d/m/Y').($veFundado && $veFundado->lte($veDesap) ? ' · '.trans_choice(':n año de historia|:n años de historia', $veFundado->diffInYears($veDesap), ['n' => $veFundado->diffInYears($veDesap)]) : '')
+                            ? fecha_corta($veDesap).($veFundado && $veFundado->lte($veDesap) ? ' · '.trans_choice(':n año de historia|:n años de historia', $veFundado->diffInYears($veDesap), ['n' => $veFundado->diffInYears($veDesap)]) : '')
                             : '',
                         'Estadio'   => $equipo->estadio,
-                        'Socios'    => $equipo->socios ? number_format($equipo->socios, 0, ',', '.') : '',
+                        'Socios'    => $equipo->socios ? number_format($equipo->socios, 0, app()->getLocale() === 'en' ? '.' : ',', app()->getLocale() === 'en' ? ',' : '.') : '',
                     ];
                     $veDatos = array_filter($veDatos, function ($v) { return trim((string) $v) !== ''; });
                 @endphp
