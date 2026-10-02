@@ -1232,6 +1232,78 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         )";
     }
 
+    /**
+     * Ids de los técnicos que hoy dirigen a alguien (misma regla que
+     * sqlTecnicoDirigiendo), como subconsulta para un IN. MySQL la arma una
+     * sola vez; el EXISTS correlacionado se evaluaba por cada fila de partido.
+     */
+    private function sqlIdsTecnicosDirigiendo()
+    {
+        $desde = $this->desdeActividad();
+
+        return "SELECT PT1.tecnico_id
+            FROM partido_tecnicos PT1
+            INNER JOIN partidos PA1 ON PA1.id = PT1.partido_id
+            WHERE PA1.dia >= '$desde'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM partido_tecnicos PT2
+                  INNER JOIN partidos PA2 ON PA2.id = PT2.partido_id
+                  WHERE PT2.equipo_id = PT1.equipo_id
+                    AND PT2.tecnico_id <> PT1.tecnico_id
+                    AND (PA2.dia > PA1.dia
+                         OR (PA2.dia = PA1.dia AND PA2.id > PA1.id))
+              )";
+    }
+
+    /**
+     * Filtro "actuales" de los listados históricos de jugadores: los que
+     * tienen alguna alineación en un torneo de este año. Va como IN contra una
+     * lista que MySQL arma una vez (el EXISTS correlacionado que había antes
+     * se corría por cada gol/tarjeta/alineación y tardaba minutos).
+     */
+    private function sqlFiltroJugaronEsteAnio($columnaJugador, $year)
+    {
+        return " AND $columnaJugador IN (
+            SELECT A1.jugador_id
+            FROM alineacions A1
+            INNER JOIN partidos P1 ON A1.partido_id = P1.id
+            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
+            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
+            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
+            WHERE T1.year LIKE '%" . (int) $year . "%')";
+    }
+
+    /**
+     * Datos de persona de varios jugadores en una consulta (para los que solo
+     * tienen estadística manual; antes era una consulta por jugador).
+     * $soloArqueros reproduce el filtro que tenía la página de arqueros.
+     */
+    private function personasDeJugadores(array $ids, $soloArqueros = false)
+    {
+        $personas = collect();
+        foreach (array_chunk(array_values($ids), 1000) as $lote) {
+            $q = DB::table('jugadors')
+                ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
+                ->select(
+                    'jugadors.id',
+                    'personas.name as jugador',
+                    DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
+                    'personas.foto',
+                    'personas.nacionalidad',
+                    'personas.apellido',
+                    'personas.nombre'
+                )
+                ->whereIn('jugadors.id', $lote);
+            if ($soloArqueros) {
+                $q->where('jugadors.tipoJugador', 'Arquero');
+            }
+            $personas = $personas->merge($q->get());
+        }
+
+        return $personas->keyBy('id');
+    }
+
     public function historiales(Request $request)
     {
         $equipo1 = (int) $request->query('equipo1');
@@ -1289,19 +1361,17 @@ ORDER BY partidos.dia ASC';
 from (
        select  DISTINCT equipos.nombre equipo, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
-		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
-		 WHERE golesl is not null AND golesv is not null AND (partidos.equipol_id = '.$equipo1.' and partidos.equipov_id = '.$equipo2.')  OR (partidos.equipov_id = '.$equipo1.' and partidos.equipol_id = '.$equipo2.')
+		 WHERE golesl is not null AND golesv is not null AND ((partidos.equipol_id = '.$equipo1.' and partidos.equipov_id = '.$equipo2.') OR (partidos.equipov_id = '.$equipo1.' and partidos.equipol_id = '.$equipo2.'))
      union all
        select DISTINCT equipos.nombre equipo, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id
 		 from partidos
-		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
-		 WHERE golesl is not null AND golesv is not NULL AND (partidos.equipol_id = '.$equipo1.' and partidos.equipov_id = '.$equipo2.')  OR (partidos.equipov_id = '.$equipo1.' and partidos.equipol_id = '.$equipo2.')
+		 WHERE golesl is not null AND golesv is not null AND ((partidos.equipol_id = '.$equipo1.' and partidos.equipov_id = '.$equipo2.') OR (partidos.equipov_id = '.$equipo1.' and partidos.equipol_id = '.$equipo2.'))
 ) a
 group by equipo, foto, equipo_id
 
@@ -1357,7 +1427,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $goleadoresPorId = CachePaginas::datos('hist.goleadores.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+        $goleadoresPorId = CachePaginas::datos('hist.goleadores.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
             // 1) Real goleadores from gols table (no pagination yet, no ORDER BY needed)
             $sql = "SELECT jugadors.id, personas.name as jugador,
                 CONCAT(personas.apellido,', ',personas.nombre) completo,
@@ -1376,17 +1446,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             INNER JOIN personas ON jugadors.persona_id = personas.id
             WHERE gols.tipo <> 'En contra'" . $nombreFiltro;
 
-            $sql .= ($actuales) ? " AND EXISTS (
-            SELECT DISTINCT J1.id
-            FROM alineacions
-            INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-            INNER JOIN personas P2 ON J1.persona_id = P2.id
-            INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-            WHERE T1.year LIKE '%$year%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-        )" : "";
+            $sql .= ($actuales) ? $this->sqlFiltroJugaronEsteAnio('jugadors.id', $year) : '';
 
             $sql .= " GROUP BY jugadors.id, jugador, foto, nacionalidad";
 
@@ -1439,24 +1499,18 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             // 3) Merge manuals with real goleadores
             $goleadoresPorId = $goleadores->keyBy('id');
 
+            $personasManuales = $this->personasDeJugadores(
+                $manuales->keys()->reject(function ($id) use ($goleadoresPorId) {
+                    return $goleadoresPorId->has($id);
+                })->all()
+            );
+
             foreach ($manuales as $jugadorId => $items) {
                 if ($goleadoresPorId->has($jugadorId)) {
                     $this->aplicarManuales($goleadoresPorId[$jugadorId], $items, $year);
                 } else {
-                    // Player has only manual stats — fetch persona data
-                    $persona = DB::table('jugadors')
-                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-                        ->select(
-                            'jugadors.id',
-                            'personas.name as jugador',
-                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                            'personas.foto',
-                            'personas.nacionalidad',
-                            'personas.apellido',
-                            'personas.nombre'
-                        )
-                        ->where('jugadors.id', $jugadorId)
-                        ->first();
+                    // Player has only manual stats — persona data
+                    $persona = $personasManuales->get($jugadorId);
 
                     if (!$persona) {
                         continue;
@@ -1701,7 +1755,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         // Matches played as substitute (entered)
-        $sql4 = "SELECT cambios.jugador_id, COUNT(cambios.jugador_id) as jugados
+        $sql4 = "SELECT cambios.jugador_id, COUNT(DISTINCT cambios.partido_id) as jugados
         FROM torneos t2
         INNER JOIN grupos g2 ON t2.id = g2.torneo_id
         INNER JOIN fechas ON fechas.grupo_id = g2.id
@@ -1755,7 +1809,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $tarjetasPorId = CachePaginas::datos('hist.tarjetas.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+        $tarjetasPorId = CachePaginas::datos('hist.tarjetas.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
             // 1) Real cards from tarjetas table (no ORDER BY, no pagination yet)
             // ---------------------------------------------------------------
             $sql = 'SELECT jugadors.id, personas.name as jugador,
@@ -1772,17 +1826,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             INNER JOIN grupos ON grupos.id = fechas.grupo_id
             WHERE 1=1' . $nombreFiltro;
 
-            $sql .= ($actuales) ? " AND EXISTS (
-            SELECT DISTINCT J1.id
-            FROM alineacions
-            INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-            INNER JOIN personas P2 ON J1.persona_id = P2.id
-            INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-            WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-        )" : '';
+            $sql .= ($actuales) ? $this->sqlFiltroJugaronEsteAnio('jugadors.id', $year) : '';
 
             $sql .= ' GROUP BY jugadors.id, jugador, foto, nacionalidad';
 
@@ -1821,24 +1865,18 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             // ---------------------------------------------------------------
             $tarjetasPorId = $tarjetas->keyBy('id');
 
+            $personasManuales = $this->personasDeJugadores(
+                $manuales->keys()->reject(function ($id) use ($tarjetasPorId) {
+                    return $tarjetasPorId->has($id);
+                })->all()
+            );
+
             foreach ($manuales as $jugadorId => $items) {
                 if ($tarjetasPorId->has($jugadorId)) {
                     $this->aplicarManualesTarjetas($tarjetasPorId[$jugadorId], $items, $year);
                 } else {
-                    // Manual-only player: fetch persona data
-                    $persona = DB::table('jugadors')
-                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-                        ->select(
-                            'jugadors.id',
-                            'personas.name as jugador',
-                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                            'personas.foto',
-                            'personas.nacionalidad',
-                            'personas.apellido',
-                            'personas.nombre'
-                        )
-                        ->where('jugadors.id', $jugadorId)
-                        ->first();
+                    // Manual-only player: persona data
+                    $persona = $personasManuales->get($jugadorId);
 
                     if (!$persona) {
                         continue;
@@ -2077,7 +2115,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         // Matches played as substitute (entered)
-        $sql4 = "SELECT cambios.jugador_id, COUNT(cambios.jugador_id) as jugados
+        $sql4 = "SELECT cambios.jugador_id, COUNT(DISTINCT cambios.partido_id) as jugados
         FROM torneos t2
         INNER JOIN grupos g2 ON t2.id = g2.torneo_id
         INNER JOIN fechas ON fechas.grupo_id = g2.id
@@ -2186,8 +2224,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 from (
        select  DISTINCT equipos.nombre equipo, equipos.pais pais, golesl, golesv, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id, 0 as puntos
 		 from partidos
-		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
         INNER JOIN torneos ON grupos.torneo_id = torneos.id
@@ -2195,8 +2232,7 @@ from (
         $sql .= ' union all
        select DISTINCT equipos.nombre equipo, equipos.pais pais, golesv, golesl, equipos.escudo foto, fechas.id fecha_id, equipos.id equipo_id, 0 as puntos
 		 from partidos
-		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		 INNER JOIN torneos ON grupos.torneo_id = torneos.id
@@ -2221,7 +2257,11 @@ from (
         $sql .= ' group by equipo, pais, foto, equipo_id
 order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
-        $posiciones = DB::select(DB::raw($sql));
+        // Se guarda mientras no cambien los datos (App\Services\CachePaginas).
+        // El SQL ya trae todos los filtros, así que sirve de clave.
+        $posiciones = CachePaginas::datos('hist.posiciones.v1', [$sql], function () use ($sql) {
+            return DB::select(DB::raw($sql));
+        });
 
         // Países de los equipos de la zona, para el filtro "Equipos de".
         $paisesEquipos = [];
@@ -2750,18 +2790,19 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         /**
          * Dynamic filters
          */
+        // Los dos filtros van como IN contra una lista de técnicos que MySQL arma
+        // una vez. Antes eran EXISTS correlacionados que se corrían por cada
+        // fila de partido (el de "dirigiendo", además, con un NOT EXISTS adentro).
         $filtroActuales = '';
         if ($actuales) {
-            $filtroActuales = ' AND ' . $this->sqlTecnicoDirigiendo('tecnicos.id');
+            $filtroActuales = ' AND tecnicos.id IN (' . $this->sqlIdsTecnicosDirigiendo() . ')';
         }
 
         $filtroCampeones = '';
         if ($campeones) {
-            $filtroCampeones = " AND EXISTS (
-            SELECT PT2.id
+            $filtroCampeones = " AND tecnicos.id IN (
+            SELECT PT2.tecnico_id
             FROM partido_tecnicos PT2
-            INNER JOIN tecnicos T2 ON PT2.tecnico_id = T2.id
-            INNER JOIN personas P3 ON T2.persona_id = P3.id
             INNER JOIN partidos par ON PT2.partido_id = par.id
             INNER JOIN fechas F2 ON par.fecha_id = F2.id
             INNER JOIN grupos G2 ON G2.id = F2.grupo_id
@@ -2769,8 +2810,6 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                 ON posicion_torneos.torneo_id = G2.torneo_id
                 AND posicion_torneos.equipo_id = PT2.equipo_id
                 AND posicion_torneos.posicion = 1
-            WHERE T2.id = tecnicos.id
-            $nombreFiltro3
         )";
         }
 
@@ -2778,17 +2817,13 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
          * Build bindings for ONE half of the UNION ALL.
          * The base query is reused twice (one per UNION half), so bindings
          * must be duplicated to match the placeholder count.
+         * (El filtro de nombre dentro de "campeones" sobraba: ya lo aplica el
+         * de afuera sobre el mismo técnico.)
          */
-        $buildParams = function () use ($nombre, $like, $actuales, $campeones, $year) {
+        $buildParams = function () use ($nombre, $like) {
             $p = [];
             if ($nombre) {
                 array_push($p, $like, $like); // nombreFiltro
-            }
-            // El filtro "Dirigiendo" ya no lleva parámetros: la fecha va inline.
-            if ($campeones) {
-                if ($nombre) {
-                    array_push($p, $like, $like); // nombreFiltro3
-                }
             }
             return $p;
         };
@@ -2811,8 +2846,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             equipos.escudo,
             fechas.id fecha_id
         FROM partidos
-        INNER JOIN equipos ON %s
-        INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+        INNER JOIN equipos ON %s INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
         INNER JOIN fechas ON partidos.fecha_id = fechas.id
         INNER JOIN grupos ON fechas.grupo_id = grupos.id
         INNER JOIN partido_tecnicos
@@ -2909,7 +2943,15 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         ORDER BY $order $tipoOrder, jugados DESC, tecnico ASC
     ";
 
-        $tecnicosFull = DB::select($sql, $params);
+        // Se guarda mientras no cambien los datos (App\Services\CachePaginas),
+        // como los otros históricos: la página 2 no repite la consulta.
+        $tecnicosFull = CachePaginas::datos(
+            'hist.tecnicos.v1',
+            [$nombre, $actuales, $campeones, $order, $tipoOrder, $year],
+            function () use ($sql, $params) {
+                return DB::select($sql, $params);
+            }
+        );
 
         /**
          * Pagination in PHP (already ordered by SQL)
@@ -2935,6 +2977,40 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
         // IDs from current page
         $tecnicoIdsPagina = collect($itemsForCurrentPage)->pluck('tecnico_id')->filter()->toArray();
+
+        // Títulos extra: el último partido del equipo en esos torneos no depende
+        // del técnico, así que se busca una vez por título (antes era una vez
+        // por título y por técnico de la página). Después, en una consulta, qué
+        // técnicos de la página dirigieron esos partidos.
+        $extrasConPartido = [];
+        foreach ($titulosExtras as $tituloExtra) {
+            $equipoId = $tituloExtra->equipo_id;
+            $torneosIds = $tituloExtra->torneos->pluck('id')->toArray();
+            if (empty($torneosIds)) continue;
+
+            $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function ($q) use ($torneosIds) {
+                $q->whereIn('torneo_id', $torneosIds);
+            })
+                ->where(function ($q) use ($equipoId) {
+                    $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
+                })
+                ->orderBy('dia', 'DESC')
+                ->first();
+
+            if (!$ultimoPartidoEquipo) continue;
+
+            $extrasConPartido[] = [$tituloExtra, $ultimoPartidoEquipo->id];
+        }
+
+        $dirigioExtra = [];
+        if ($extrasConPartido && $tecnicoIdsPagina) {
+            $filas = PartidoTecnico::whereIn('partido_id', array_column($extrasConPartido, 1))
+                ->whereIn('tecnico_id', $tecnicoIdsPagina)
+                ->get(['partido_id', 'equipo_id', 'tecnico_id']);
+            foreach ($filas as $f) {
+                $dirigioExtra[$f->tecnico_id . '_' . $f->partido_id . '_' . $f->equipo_id] = true;
+            }
+        }
 
         // Detailed manual stats for current page coaches (for shields and "jugando")
         $manualesDetalle = collect();
@@ -2970,15 +3046,20 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             $titulosTecnicoLigaEquipo = [];
             $titulosTecnicoInternacionalEquipo = [];
 
-            // Tournaments played by this coach
+            // Torneos dirigidos por este técnico con un equipo que salió campeón.
+            // Antes venían todos los torneos dirigidos y por cada uno se hacían
+            // varias consultas solo para descubrir que no había campeón.
             $sqlTorneos = '
             SELECT DISTINCT grupos.torneo_id, partido_tecnicos.equipo_id
             FROM partido_tecnicos
-            INNER JOIN tecnicos ON partido_tecnicos.tecnico_id = tecnicos.id
             INNER JOIN partidos ON partido_tecnicos.partido_id = partidos.id
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON grupos.id = fechas.grupo_id
-            WHERE tecnicos.id = ?
+            INNER JOIN posicion_torneos
+                ON posicion_torneos.torneo_id = grupos.torneo_id
+                AND posicion_torneos.equipo_id = partido_tecnicos.equipo_id
+                AND posicion_torneos.posicion = 1
+            WHERE partido_tecnicos.tecnico_id = ?
         ';
 
             $torneosJugados = DB::select($sqlTorneos, [$goleador->tecnico_id]);
@@ -3026,27 +3107,11 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
                 }
             }
 
-            // Extra titles
-            foreach ($titulosExtras as $tituloExtra) {
+            // Extra titles (último partido ya buscado arriba, una vez por título)
+            foreach ($extrasConPartido as [$tituloExtra, $ultimoPartidoId]) {
                 $equipoId = $tituloExtra->equipo_id;
-                $torneosIds = $tituloExtra->torneos->pluck('id')->toArray();
-                if (empty($torneosIds)) continue;
 
-                $ultimoPartidoEquipo = Partido::whereHas('fecha.grupo', function ($q) use ($torneosIds) {
-                    $q->whereIn('torneo_id', $torneosIds);
-                })
-                    ->where(function ($q) use ($equipoId) {
-                        $q->where('equipol_id', $equipoId)->orWhere('equipov_id', $equipoId);
-                    })
-                    ->orderBy('dia', 'DESC')
-                    ->first();
-
-                if (!$ultimoPartidoEquipo) continue;
-
-                $dirigio = PartidoTecnico::where('partido_id', $ultimoPartidoEquipo->id)
-                    ->where('equipo_id', $equipoId)
-                    ->where('tecnico_id', $goleador->tecnico_id)
-                    ->exists();
+                $dirigio = isset($dirigioExtra[$goleador->tecnico_id . '_' . $ultimoPartidoId . '_' . $equipoId]);
 
                 if ($dirigio) {
                     if ($tituloExtra->ambito == 'Nacional') {
@@ -3943,7 +4008,7 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $arquerosPorId = CachePaginas::datos('hist.arqueros.v1', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $nombreFiltro2, $actuales, $year) {
+        $arquerosPorId = CachePaginas::datos('hist.arqueros.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
             // 1) Real arqueros (no ORDER BY, no pagination yet)
             // ---------------------------------------------------------------
             $sql = 'SELECT
@@ -3965,20 +4030,18 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             INNER JOIN partidos ON alineacions.partido_id = partidos.id
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON grupos.id = fechas.grupo_id
-            LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-            WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')' . $nombreFiltro;
+            WHERE (alineacions.tipo = \'Titular\' OR EXISTS (
+                SELECT 1 FROM cambios
+                WHERE cambios.partido_id = alineacions.partido_id
+                  AND cambios.jugador_id = alineacions.jugador_id
+                  AND cambios.tipo = \'Entra\'
+            ))' . $nombreFiltro;
 
-            $sql .= ($actuales) ? " AND EXISTS (
-            SELECT DISTINCT J1.id
-            FROM alineacions
-            INNER JOIN jugadors J1 ON alineacions.jugador_id = J1.id
-            INNER JOIN personas P2 ON J1.persona_id = P2.id
-            INNER JOIN partidos P1 ON alineacions.partido_id = P1.id
-            INNER JOIN fechas F1 ON P1.fecha_id = F1.id
-            INNER JOIN grupos G1 ON G1.id = F1.grupo_id
-            INNER JOIN torneos T1 ON T1.id = G1.torneo_id
-            WHERE T1.year LIKE '%" . $year . "%' AND J1.id = jugadors.id" . $nombreFiltro2 . "
-        )" : "";
+            // Antes el "entró desde el banco" era un LEFT JOIN cambios: con filas
+            // repetidas en cambios el partido (y sus goles recibidos) se contaba
+            // dos veces. Con EXISTS cuenta una vez por alineación.
+            $filtroActuales = ($actuales) ? $this->sqlFiltroJugaronEsteAnio('jugadors.id', $year) : '';
+            $sql .= $filtroActuales;
 
             $sql .= ' GROUP BY jugadors.id, personas.name, personas.apellido, personas.nombre, personas.foto, personas.nacionalidad ';
             $sql .= ' UNION ALL
@@ -3994,6 +4057,10 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON grupos.id = fechas.grupo_id
             WHERE jugadors.tipoJugador = \'Arquero\'' . $nombreFiltro;
+
+            // "Actuales" también acá: antes esta parte no lo tenía y con la casilla
+            // tildada aparecían arqueros retirados que solo tenían penales atajados.
+            $sql .= $filtroActuales;
 
             $sql .= ' GROUP BY jugadors.id, jugador, completo, foto, nacionalidad
         ) t GROUP BY id, jugador, completo, foto, nacionalidad';
@@ -4037,25 +4104,19 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             // ---------------------------------------------------------------
             $arquerosPorId = $arqueros->keyBy('id');
 
+            $personasManuales = $this->personasDeJugadores(
+                $manuales->keys()->reject(function ($id) use ($arquerosPorId) {
+                    return $arquerosPorId->has($id);
+                })->all(),
+                true
+            );
+
             foreach ($manuales as $jugadorId => $items) {
                 if ($arquerosPorId->has($jugadorId)) {
                     $this->aplicarManualesArqueros($arquerosPorId[$jugadorId], $items, $year);
                 } else {
                     // Manual-only arquero
-                    $persona = DB::table('jugadors')
-                        ->join('personas', 'jugadors.persona_id', '=', 'personas.id')
-                        ->select(
-                            'jugadors.id',
-                            'personas.name as jugador',
-                            DB::raw("CONCAT(personas.apellido, ', ', personas.nombre) as completo"),
-                            'personas.foto',
-                            'personas.nacionalidad',
-                            'personas.apellido',
-                            'personas.nombre'
-                        )
-                        ->where('jugadors.id', $jugadorId)
-                        ->where('jugadors.tipoJugador', 'Arquero')
-                        ->first();
+                    $persona = $personasManuales->get($jugadorId);
 
                     if (!$persona) {
                         continue;
@@ -4245,8 +4306,12 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
         INNER JOIN alineacions ON equipos.id = alineacions.equipo_id
         INNER JOIN partidos ON partidos.id = alineacions.partido_id
         INNER JOIN jugadors ON alineacions.jugador_id = jugadors.id AND jugadors.tipoJugador = \'Arquero\'
-        LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
-        WHERE (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\') AND alineacions.jugador_id = ' . $arquero->id . '
+        WHERE (alineacions.tipo = \'Titular\' OR EXISTS (
+            SELECT 1 FROM cambios
+            WHERE cambios.partido_id = alineacions.partido_id
+              AND cambios.jugador_id = alineacions.jugador_id
+              AND cambios.tipo = \'Entra\'
+        )) AND alineacions.jugador_id = ' . (int) $arquero->id . '
         GROUP BY escudo, equipo_id, equipos.nombre
         ORDER BY ultimo DESC';
 
@@ -5366,8 +5431,7 @@ ORDER BY '.$order.' '.$tipoOrder.',dorsal, jugador ASC';
 from (
        select  DISTINCT personas.name as tecnico, CONCAT(personas.apellido,\', \',personas.nombre) completo, personas.foto fotoTecnico, personas.nacionalidad nacionalidadTecnico, tecnicos.id tecnico_id, golesl, golesv, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
-		 INNER JOIN equipos ON partidos.equipol_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN equipos ON partidos.equipol_id = equipos.id INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
@@ -5379,8 +5443,7 @@ from (
         $sql .=' union all
        select DISTINCT personas.name as tecnico, CONCAT(personas.apellido,\', \',personas.nombre) completo, personas.foto fotoTecnico, personas.nacionalidad nacionalidadTecnico, tecnicos.id tecnico_id, golesv, golesl, equipos.escudo foto, fechas.id fecha_id
 		 from partidos
-		 INNER JOIN equipos ON partidos.equipov_id = equipos.id
-		 INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
+		 INNER JOIN equipos ON partidos.equipov_id = equipos.id INNER JOIN (SELECT DISTINCT equipo_id FROM plantillas) conplantilla ON conplantilla.equipo_id = equipos.id
 		 INNER JOIN fechas ON partidos.fecha_id = fechas.id
 		 INNER JOIN grupos ON fechas.grupo_id = grupos.id
 		 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id AND equipos.id = partido_tecnicos.equipo_id
