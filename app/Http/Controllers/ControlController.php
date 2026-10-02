@@ -182,7 +182,7 @@ class ControlController extends Controller
         // texto único: en "Terna incompleta" lo que falta son los asistentes,
         // no la alineación. `motivoSinDatos()` valida la clave.
         $motivo = $this->controles->motivoSinDatos($request->input('check'));
-        $r      = $this->incidenciaSinDatos((int) $request->input('partido_id'), $motivo['texto']);
+        $r      = $this->incidenciaSinDatos((int) $request->input('partido_id'), $motivo['texto'], $motivo['texto_en'] ?? null);
 
         if ($r['creada']) {
             $this->controles->invalidarConteo($request->input('check'));
@@ -226,7 +226,7 @@ class ControlController extends Controller
         $repetidas = 0;
 
         foreach ($ids as $id) {
-            $r = $this->incidenciaSinDatos($id, $motivo['texto']);
+            $r = $this->incidenciaSinDatos($id, $motivo['texto'], $motivo['texto_en'] ?? null);
 
             if ($r['creada']) {
                 $creadas++;
@@ -274,7 +274,7 @@ class ControlController extends Controller
      * invalida los conteos: eso lo hace quien llama, una sola vez, aunque haya
      * escrito veinte.
      */
-    private function incidenciaSinDatos($partidoId, $motivo)
+    private function incidenciaSinDatos($partidoId, $motivo, $motivoEn = null)
     {
         $partido = DB::table('partidos')
             ->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
@@ -300,6 +300,7 @@ class ControlController extends Controller
             // Sólo el motivo: la observación se ve en el detalle público del
             // partido, y "Marcado desde Controles de carga" es cocina interna.
             'observaciones' => $motivo,
+            'observaciones_en' => $motivoEn,
         ]);
 
         return ['creada' => true, 'ya_tenia' => false,

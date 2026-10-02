@@ -550,6 +550,8 @@ class Controles
      * REGLA: el 'texto' se ve en el sitio público (pestaña Incidencias del
      * detalle del partido). **Nunca nombrar a Transfermarkt ni a TM ahí.**
      * El 'boton' sí puede decir TM: sólo lo ve el admin.
+     * 'texto_en' es la misma observación en inglés: se guarda en
+     * `incidencias.observaciones_en` y es la que ve el sitio en /en.
      */
     public function motivoSinDatos($clave): array
     {
@@ -557,42 +559,52 @@ class Controles
             'arbitros.terna' => [
                 'boton' => 'Terna incompleta en TM',
                 'texto' => 'Terna incompleta: no hay registro de la terna arbitral completa de este partido (falta algún asistente).',
+                'texto_en' => 'Incomplete refereeing team: there is no record of the full refereeing team for this match (an assistant is missing).',
             ],
             'alineaciones.sin_jugadores' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'No hay registro de la alineación de alguno de los dos equipos.',
+                'texto_en' => 'There is no record of the line-up of one of the two teams.',
             ],
             'alineaciones.faltan' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'La alineación registrada para este partido está incompleta.',
+                'texto_en' => 'The line-up recorded for this match is incomplete.',
             ],
             'tecnicos.faltan' => [
                 'boton' => 'Sin técnico en TM',
                 'texto' => 'No hay registro del técnico de alguno de los dos equipos en este partido.',
+                'texto_en' => 'There is no record of the manager of one of the two teams in this match.',
             ],
             'goles.diferencia' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'No hay registro de todos los goles del partido: el detalle no da el resultado.',
+                'texto_en' => 'Not all goals of this match are recorded: the details do not add up to the final score.',
             ],
             'goles.por_equipo' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'No hay registro de qué equipo convirtió cada gol de este partido.',
+                'texto_en' => 'There is no record of which team scored each goal in this match.',
             ],
             'goles.sin_jugar' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'El goleador no figura en la alineación registrada para este partido.',
+                'texto_en' => 'The goalscorer does not appear in the line-up recorded for this match.',
             ],
             'tarjetas.sin_jugar' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'El amonestado no figura en la alineación registrada para este partido.',
+                'texto_en' => 'The booked player does not appear in the line-up recorded for this match.',
             ],
             'cambios.sin_jugar' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'El jugador del cambio no figura en la alineación registrada para este partido.',
+                'texto_en' => 'The substituted player does not appear in the line-up recorded for this match.',
             ],
             'cambios.impares' => [
                 'boton' => 'Sin datos en TM',
                 'texto' => 'No hay registro de quién salió en ese cambio: figura el que entra y no su contraparte.',
+                'texto_en' => 'There is no record of who went off in that substitution: the player coming on is listed, but not the one replaced.',
             ],
             // Acá el dato NO falta: TM lo publica bien y nosotros lo guardamos
             // bien. El que se equivoca es el control, que cuenta cuántos entran
@@ -601,6 +613,7 @@ class Controles
             'cambios.sale_solo' => [
                 'boton' => 'Salida sin reemplazo',
                 'texto' => 'Salida sin reemplazo: el jugador sale y no entra nadie (con los cambios agotados). El dato está bien cargado; el control lo marca porque compara cuántos entran contra cuántos salen.',
+                'texto_en' => 'Departure without replacement: the player goes off and nobody comes on (with all substitutions used). The data is correct; the check flags it because it compares how many players come on against how many go off.',
             ],
             // Tampoco es "sin datos": lo más probable es que el partido no se
             // haya jugado (postergado, suspendido, anulado). Escribir "TM no
@@ -610,12 +623,14 @@ class Controles
                 'boton' => 'No se jugó',
                 'texto' => 'Sin resultado a propósito: el partido no se disputó (postergado, suspendido o '
                     . 'anulado) o no hay ninguna fuente que publique el marcador.',
+                'texto_en' => 'No result on purpose: the match was not played (postponed, suspended or annulled) or no source publishes the score.',
             ],
         ];
 
         return $motivos[$clave] ?? [
             'boton' => 'Sin datos en TM',
             'texto' => 'No hay registro del detalle completo de este partido.',
+            'texto_en' => 'There is no record of the full details of this match.',
         ];
     }
 

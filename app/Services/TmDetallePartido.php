@@ -128,7 +128,14 @@ class TmDetallePartido
         205 => self::GOL_JUGADA,
         206 => self::GOL_ENCONTRA,
         207 => self::GOL_TIROLIBRE,
+        // Eredivisie 13/14 (29-sep), ficha web × JSON: long distance kick,
+        // tap-in, deflected shot y solo run. Ninguno tiene tipo propio en
+        // `gols.tipo` (no se agregan valores al enum), así que van como Jugada.
+        209 => self::GOL_JUGADA,
+        210 => self::GOL_JUGADA,
         211 => self::GOL_OLIMPICO,
+        212 => self::GOL_JUGADA,
+        213 => self::GOL_JUGADA,
     ];
 
     /** Avisos y datos sin reconocer que junta la corrida (se muestran en pantalla). */
@@ -2583,17 +2590,26 @@ class TmDetallePartido
         // (gameId 4889704, "Saved") y sin texto en Liverpool–Stoke 2013
         // (gameId 2350359, Mignolet a Walters). Los otros códigos todavía no
         // los vimos: siguen cayendo abajo como dudosos.
-        if ($txt === '') {
+        // 502 = errado ("Missed", confirmado en Ajax–Roda, gameId 2342571).
+        // También cuando el texto es "Not reported": ahí el código es la pista.
+        $cod = 0;
+        if ($txt === '' || mb_strpos($txt, 'not reported') !== false) {
             $cod = (int) $this->valor($a, ['reasonId', 'actionReasonId']);
             if ($cod === 501) {
                 return ['atajado' => true, 'fuente' => 'atajado (reasonId 501)', 'dudoso' => false];
+            }
+            if ($cod === 502) {
+                return ['atajado' => false, 'fuente' => 'errado (reasonId 502)', 'dudoso' => false];
             }
         }
 
         // Ni una cosa ni la otra: va como Errado —es lo más probable— pero
         // marcado, así el vocabulario nuevo se ve en pantalla y se amplía la
-        // lista de arriba en vez de quedar cargado mal en silencio.
-        return ['atajado' => false, 'fuente' => $txt !== '' ? $txt : 'sin detallar', 'dudoso' => true];
+        // lista de arriba en vez de quedar cargado mal en silencio. Se muestra
+        // el código que haya venido, para poder sumarlo sin abrir el JSON.
+        $fuente = $txt !== '' ? $txt : 'sin detallar';
+        if ($cod) $fuente .= ' (reasonId ' . $cod . ')';
+        return ['atajado' => false, 'fuente' => $fuente, 'dudoso' => true];
     }
 
     private function tipoTarjeta(array $a)

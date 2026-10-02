@@ -83,7 +83,11 @@
                     @endif
                 </td>
                 <td>{{$incidencia->puntos}}</td>
-                <td>{{$incidencia->observaciones}}</td>
+                <td>{{$incidencia->observaciones}}
+                    @if($incidencia->observaciones_en)
+                        <br><small class="text-muted">EN: {{$incidencia->observaciones_en}}</small>
+                    @endif
+                </td>
                 <td>
                     <div class="d-flex">
 

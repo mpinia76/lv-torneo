@@ -59,6 +59,11 @@
                 {{Form::textarea('observaciones', $incidencia->observaciones, ['class' => 'form-control'])}}
 
             </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-6">
+                {{Form::label('observaciones_en', 'Observaciones (inglés)')}}
+                {{Form::textarea('observaciones_en', $incidencia->observaciones_en, ['class' => 'form-control'])}}
+                <small class="text-muted">Lo que se ve en el sitio en inglés. Si queda vacío, se muestra el texto en castellano.</small>
+            </div>
         </div>
 
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}

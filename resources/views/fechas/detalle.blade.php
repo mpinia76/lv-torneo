@@ -1054,7 +1054,7 @@
                         <ul>
                             @foreach($incidencias as $incidencia)
                                 <li>
-                                    {{ $incidencia->observaciones }}
+                                    {{ $incidencia->observacion_idioma }}
                                 </li>
                             @endforeach
                         </ul>

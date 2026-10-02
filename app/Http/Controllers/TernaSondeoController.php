@@ -283,6 +283,7 @@ class TernaSondeoController extends Controller
                 'equipo_id'     => null,
                 'puntos'        => null,
                 'observaciones' => $motivo['texto'],
+                'observaciones_en' => $motivo['texto_en'] ?? null,
             ]);
             $n++;
         }
