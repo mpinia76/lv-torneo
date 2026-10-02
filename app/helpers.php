@@ -185,6 +185,21 @@ if (! function_exists('trad_dato')) {
     }
 }
 
+if (! function_exists('texto_idioma')) {
+    /**
+     * Texto libre cargado a mano que tiene versión en inglés en otra columna
+     * (equipos.historia_en, personas.observaciones_en, incidencias.observaciones_en).
+     * En /en devuelve la versión en inglés; si está vacía, cae al castellano.
+     */
+    function texto_idioma($es, $en = null)
+    {
+        if (app()->getLocale() === 'en' && trim((string) $en) !== '') {
+            return $en;
+        }
+        return $es;
+    }
+}
+
 if (! function_exists('fecha_larga')) {
     /** "sábado 5 de octubre de 2024" / "Saturday, 5 October 2024". */
     function fecha_larga($fecha)

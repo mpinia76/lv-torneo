@@ -195,6 +195,7 @@ class JugadorController extends Controller
         $insert['altura'] = $request->get('altura');
         $insert['peso'] = $request->get('peso');
         $insert['observaciones'] = $request->get('observaciones');
+        $insert['observaciones_en'] = $request->get('observaciones_en');
         $insert['tipoDocumento'] = $request->get('tipoDocumento');
         $insert['documento'] = $request->get('documento');
         $insert['nacimiento'] = $request->get('nacimiento');
@@ -316,6 +317,7 @@ class JugadorController extends Controller
         $update['altura'] = $request->get('altura');
         $update['peso'] = $request->get('peso');
         $update['observaciones'] = $request->get('observaciones');
+        $update['observaciones_en'] = $request->get('observaciones_en');
         $update['tipoDocumento'] = $request->get('tipoDocumento');
         $update['documento'] = $request->get('documento');
         $update['nacimiento'] = $request->get('nacimiento');

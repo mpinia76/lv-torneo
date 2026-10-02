@@ -99,7 +99,7 @@
             <div class="t-panel-cuerpo">
                 <ul class="mb-0 ps-3">
                     @foreach($incidencias as $incidencia)
-                        <li>{{ $incidencia->observaciones }}</li>
+                        <li>{{ texto_idioma($incidencia->observaciones, $incidencia->observaciones_en ?? null) }}</li>
                     @endforeach
                 </ul>
             </div>

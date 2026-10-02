@@ -38,7 +38,7 @@
         {{-- Observaciones --}}
         @if($jugador->persona->observaciones)
             <div class="row mb-4">
-                <div class="col"><dd>{{ $jugador->persona->observaciones }}</dd></div>
+                <div class="col"><dd>{{ texto_idioma($jugador->persona->observaciones, $jugador->persona->observaciones_en) }}</dd></div>
             </div>
         @endif
 

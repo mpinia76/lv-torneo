@@ -9,7 +9,7 @@ use Carbon\Carbon;
 
 class Persona extends Model
 {
-    protected $fillable = ['name','nombre', 'apellido','email','telefono','ciudad','observaciones','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento','nacionalidad','verificado'];
+    protected $fillable = ['name','nombre', 'apellido','email','telefono','ciudad','observaciones','observaciones_en','tipoDocumento','documento','nacimiento','peso','altura','foto','fallecimiento','nacionalidad','verificado'];
 
     /**
      * Mantiene al dia el indice de duplicados (clave_norm, clave_orden y

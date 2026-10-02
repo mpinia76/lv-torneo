@@ -56,8 +56,9 @@
             </div>
         @endif
 
-        @if(trim((string) $persona->observaciones) !== '')
-            <p class="t-ficha-obs">{{ $persona->observaciones }}</p>
+        @php $fpObs = texto_idioma($persona->observaciones, $persona->observaciones_en); @endphp
+        @if(trim((string) $fpObs) !== '')
+            <p class="t-ficha-obs">{{ $fpObs }}</p>
         @endif
 
         {{ $slot }}

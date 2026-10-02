@@ -115,7 +115,7 @@ class FusionPersonas
     /** Campos de `personas` que se completan en el ganador si los tiene vacíos. */
     private static $camposPersona = [
         'name', 'nombre', 'apellido', 'email', 'telefono', 'ciudad', 'observaciones',
-        'nacimiento', 'fallecimiento', 'peso', 'altura', 'foto', 'nacionalidad',
+        'observaciones_en', 'nacimiento', 'fallecimiento', 'peso', 'altura', 'foto', 'nacionalidad',
     ];
 
     /**

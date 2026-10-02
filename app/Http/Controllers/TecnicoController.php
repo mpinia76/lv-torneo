@@ -122,6 +122,7 @@ class TecnicoController extends Controller
         $insert['ciudad'] = $request->get('ciudad');
         $insert['nacionalidad'] = $request->get('nacionalidad');
         $insert['observaciones'] = $request->get('observaciones');
+        $insert['observaciones_en'] = $request->get('observaciones_en');
         /*$insert['tipoDocumento'] = $request->get('tipoDocumento');
         $insert['documento'] = $request->get('documento');*/
         $insert['nacimiento'] = $request->get('nacimiento');
@@ -225,6 +226,7 @@ class TecnicoController extends Controller
         $update['ciudad'] = $request->get('ciudad');
         $update['nacionalidad'] = $request->get('nacionalidad');
         $update['observaciones'] = $request->get('observaciones');
+        $update['observaciones_en'] = $request->get('observaciones_en');
         /*$update['tipoDocumento'] = $request->get('tipoDocumento');
         $update['documento'] = $request->get('documento');*/
         $update['nacimiento'] = $request->get('nacimiento');

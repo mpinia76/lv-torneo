@@ -166,8 +166,9 @@
 
             {{-- Historia --}}
             <div class="tab-pane fade {{ $vePest == 'historia' ? 'show active' : '' }}" id="historia" role="tabpanel">
-                @if(trim((string) $equipo->historia) !== '')
-                    <p class="t-prosa">{!! nl2br(e($equipo->historia)) !!}</p>
+                @php $veHistoria = texto_idioma($equipo->historia, $equipo->historia_en); @endphp
+                @if(trim((string) $veHistoria) !== '')
+                    <p class="t-prosa">{!! nl2br(e($veHistoria)) !!}</p>
                 @else
                     <div class="t-vacio"><i class="bi bi-journal-text"></i>{{ __('Todavía no hay historia cargada para este club.') }}</div>
                 @endif
