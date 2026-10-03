@@ -576,7 +576,13 @@ class ImportPartidosController extends Controller
             $renumeradas = $this->renumerarJornadas($filas, [], $extras);
         }
 
-        $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null);
+        // OTRA COMPETENCIA EN EL MISMO TORNEO (los playoffs, POUS, dentro de la
+        // MLS de MLS1): el emparejador sólo puede mirar el grupo de llaves. Si
+        // no, la segunda pasada (par + torneo, ±120 días) ataba Portland–Seattle
+        // de los cuartos de noviembre al Portland–Seattle de agosto de la
+        // temporada regular, y ofrecía «corregirle» la fecha.
+        $soloLlaves = $torneoElegido && $this->esCompAparte($torneoElegido->id, $comp);
+        $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null, $soloLlaves);
 
         // Qué temporada vino DE VERDAD. Sin esto no hay forma de saber si TM
         // respetó el `seasonId` o te devolvió la edición en curso igual: los
@@ -1651,7 +1657,7 @@ class ImportPartidosController extends Controller
      * estaban guardados con la fecha del domingo y figuraban como nuevos.
      * La segunda pasada los reconoce por par de equipos + número de fecha.
      */
-    private function clasificarFixture(array $filas, $torneoId = null)
+    private function clasificarFixture(array $filas, $torneoId = null, $soloLlaves = false)
     {
         $mapaTm = $this->mapaTm();
         $mapaNombres = $this->mapaNombres();
@@ -1675,10 +1681,13 @@ class ImportPartidosController extends Controller
             $filas[$i]['corrido']  = 0;
 
             $partido = $this->buscarPartido($localId, $visiId, $f['dia']);
+            // El de ±1 día SÍ vale aunque esté fuera del grupo de llaves: el
+            // mismo par el mismo día es el mismo partido (cargado por DT en la
+            // zona), y descartarlo lo dejaba «nuevo» y Aplicar lo duplicaba.
             $porRonda = false;
             if (!$partido) {
                 $partido = $this->buscarPartidoPorRonda($localId, $visiId, $f['dia'],
-                    isset($f['ronda']) ? $f['ronda'] : null, $torneoId);
+                    isset($f['ronda']) ? $f['ronda'] : null, $torneoId, $soloLlaves);
                 $porRonda = (bool) $partido;
             }
 
@@ -6862,7 +6871,7 @@ class ImportPartidosController extends Controller
      * caiga en «nuevo» y lo mire una persona: un emparejado equivocado le pega
      * los datos de un partido a otro y no se nota nunca más.
      */
-    private function buscarPartidoPorRonda($equipoId, $rivalId, $dia, $ronda, $torneoId = null)
+    private function buscarPartidoPorRonda($equipoId, $rivalId, $dia, $ronda, $torneoId = null, $soloLlaves = false)
     {
         if (!$dia) return null;
         $nRonda = preg_replace('/\D/', '', trim((string) $ronda));
@@ -6911,6 +6920,7 @@ class ImportPartidosController extends Controller
         // `comp=` a mano) queda el número de fecha solo, que puede repetirse
         // entre torneos: por eso se exige un único candidato.
         if ($torneoId) $q->where('grupos.torneo_id', (int) $torneoId);
+        if ($soloLlaves) $q->where('grupos.penales', 1);
 
         // COMPARAR COMO NÚMERO, NO COMO TEXTO: tus fechas se llaman «08» o
         // «Fecha 08» y la ronda de TM viene «8». Como cadenas no coinciden
