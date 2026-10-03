@@ -18,7 +18,7 @@
     $torneoEscudo = $val($p, 'escudoTorneo')  ?? optional($torneoRel)->escudo;
     $numero       = $val($p, 'numero')        ?? optional($fechaRel)->numero;
     $numeroTxt    = $numero !== null && $numero !== ''
-                        ? (is_numeric($numero) ? __('Fecha :numero', ['numero' => $numero]) : trad_dato($numero))
+                        ? nombre_fecha($numero)
                         : '';
 
     $equipoL = $val($p, 'equipol');

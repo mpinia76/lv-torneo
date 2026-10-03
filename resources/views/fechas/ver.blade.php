@@ -34,7 +34,7 @@
                 <select id="fechaSelect" class="form-select form-select-sm" style="max-width: 220px" onchange="seleccionarFecha()">
                     @foreach($fechas as $f)
                         <option value="{{ $f->orden }}" {{ $f->orden === $fecha->orden ? 'selected' : '' }}>
-                            {{ is_numeric($f->numero) ? __('Fecha :numero', ['numero' => $f->numero]) : trad_dato($f->numero) }}
+                            {{ nombre_fecha($f->numero) }}
                         </option>
                     @endforeach
                 </select>
@@ -64,7 +64,7 @@
                 @if($partido->fecha->numero != $lastFecha)
                     <div class="t-grupo">
                         <span class="t-grupo-nombre">
-                            {{ is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero) }}
+                            {{ nombre_fecha($partido->fecha->numero) }}
                         </span>
                     </div>
                     @php

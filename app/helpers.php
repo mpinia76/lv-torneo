@@ -185,6 +185,49 @@ if (! function_exists('trad_dato')) {
     }
 }
 
+if (! function_exists('es_fecha_numerada')) {
+    /**
+     * ¿La fecha es una jornada numerada? «4» y también «15b», la que se crea
+     * a mano cuando un partido traído por DT choca con otro de la 15.
+     */
+    function es_fecha_numerada($numero)
+    {
+        return (bool) preg_match('/^\d+[a-z]?$/i', trim((string) $numero));
+    }
+}
+
+if (! function_exists('nombre_fecha')) {
+    /**
+     * Nombre de una fecha en el idioma del sitio: «Fecha 4» / «Matchday 4»
+     * (también «Fecha 15b»), y el resto por el diccionario («Final»,
+     * «Cuartos de final»…) vía trad_dato(). Un nombre que no está en el
+     * diccionario sale tal cual.
+     */
+    function nombre_fecha($numero)
+    {
+        if (es_fecha_numerada($numero)) {
+            return __('Fecha :numero', ['numero' => trim((string) $numero)]);
+        }
+        return trad_dato($numero);
+    }
+}
+
+if (! function_exists('nombres_fecha')) {
+    /** [numero => nombre_fecha()] de una lista de filas (arrays u objetos con `numero`). */
+    function nombres_fecha($filas)
+    {
+        $m = [];
+        foreach ((array) $filas as $f) {
+            $n = is_array($f) ? (isset($f['numero']) ? $f['numero'] : null)
+                : (is_object($f) && isset($f->numero) ? $f->numero : null);
+            if ($n !== null && $n !== '') {
+                $m[(string) $n] = nombre_fecha($n);
+            }
+        }
+        return $m;
+    }
+}
+
 if (! function_exists('fecha_corta')) {
     /**
      * Fecha corta según el idioma del sitio: 03/12/2017 en castellano,

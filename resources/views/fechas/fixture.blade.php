@@ -56,7 +56,7 @@
                         @if($partido->fecha->numero)
                             <span class="t-sep">·</span>
                             <span class="t-eyebrow">
-                                {{ is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero) }}
+                                {{ nombre_fecha($partido->fecha->numero) }}
                             </span>
                         @endif
                     </div>
@@ -68,7 +68,7 @@
                 @elseif ($partido->fecha->numero != $lastFecha)
                     <div class="t-subgrupo">
                         <span class="t-eyebrow">
-                            {{ is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero) }}
+                            {{ nombre_fecha($partido->fecha->numero) }}
                         </span>
                     </div>
                     @php $lastFecha = $partido->fecha->numero; @endphp

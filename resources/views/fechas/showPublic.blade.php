@@ -8,7 +8,7 @@
         <div>
             <span class="t-eyebrow">{{ __('Fecha') }}</span>
             <h1>
-                @if(is_numeric($fecha->numero))
+                @if(es_fecha_numerada($fecha->numero))
                     {{ __('Fecha :numero', ['numero' => $fecha->numero]) }}
                 @else
                     {{ trad_dato($fecha->numero) }}

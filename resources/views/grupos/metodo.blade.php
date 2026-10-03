@@ -11,7 +11,7 @@
             <select class="form-control js-example-basic-single" id="fechaNumero" name="fechaNumero" onchange="this.form.submit()" style="width: 150px">
                 @foreach($fechas as $f)
                     <option value="{{ $f->numero }}" @if($f->numero==$fecha->numero) selected @endif>
-                        @if(is_numeric($f->numero))
+                        @if(es_fecha_numerada($f->numero))
                             {{ __('Fecha :numero', ['numero' => $f->numero]) }}
                         @else
                             {{ trad_dato($f->numero) }}

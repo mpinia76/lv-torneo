@@ -11,7 +11,7 @@
         };
         $etFecha = function ($numero) {
             if ($numero === null || $numero === '') return '';
-            return is_numeric($numero) ? __('Fecha :numero', ['numero' => $numero]) : trad_dato($numero);
+            return nombre_fecha($numero);
         };
         $etK   = $est['kpis'];
         $etLev = $est['lev'];
@@ -363,6 +363,7 @@
                 var porFecha = @json($est['porFecha']);
                 var minutos  = @json($est['golesMinuto'] ? $est['golesMinuto']['franjas'] : null);
                 var rotFecha = @json(__('Fecha :numero', ['numero' => '#']));
+                var nombresFecha = @json((object) nombres_fecha($est['porFecha']));
                 var graficos = [];
 
                 function tokens() {
@@ -374,7 +375,9 @@
                     return Number(x).toLocaleString(@json(app()->getLocale() === 'es' ? 'es-AR' : 'en'), { minimumFractionDigits: dec, maximumFractionDigits: dec });
                 }
                 function etiquetaFecha(n) {
-                    return /^\d+$/.test(String(n)) ? rotFecha.replace('#', n) : String(n);
+                    var k = String(n);
+                    if (Object.prototype.hasOwnProperty.call(nombresFecha, k)) return nombresFecha[k];
+                    return /^\d+[a-z]?$/i.test(k) ? rotFecha.replace('#', k) : k;
                 }
 
                 function barras(id, etiquetas, valores, dec, detalle) {

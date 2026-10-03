@@ -5,7 +5,7 @@
 @section('content')
     @php
         $torneoDet   = $partido->fecha->grupo->torneo;
-        $numeroFecha = is_numeric($partido->fecha->numero) ? __('Fecha :numero', ['numero' => $partido->fecha->numero]) : trad_dato($partido->fecha->numero);
+        $numeroFecha = nombre_fecha($partido->fecha->numero);
         $sinJugar    = is_null($partido->golesl) && is_null($partido->golesv);
     @endphp
 

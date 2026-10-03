@@ -11,7 +11,7 @@
         };
         $esFecha = function ($numero) {
             if ($numero === null || $numero === '') return '';
-            return is_numeric($numero) ? __('Fecha :numero', ['numero' => $numero]) : trad_dato($numero);
+            return nombre_fecha($numero);
         };
         $esHayTarjetas = false;
         foreach ($temporadas as $esT) {

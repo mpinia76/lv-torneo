@@ -18,7 +18,7 @@
                     @if($field === 'index')
                         {{ $i }}
                     @elseif($field === 'numero')
-                        @if(is_numeric($row->numero))
+                        @if(es_fecha_numerada($row->numero))
                             {{ __('Fecha :numero', ['numero' => $row->numero]) }}
                         @else
                             {{ trad_dato($row->numero) }}
