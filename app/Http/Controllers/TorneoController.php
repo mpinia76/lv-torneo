@@ -4949,9 +4949,24 @@ order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DES
             for ($i = 0; $i < count($posiciones); $i++) {
                 $arrPosiciones[$i]=array($posiciones[$i]->equipo_id,$posiciones[$i]->foto);
             }
+            // El resto sale de la tabla general, salteando a los que ya puso la
+            // final. Antes se salteaban las primeras N FILAS de la tabla (N =
+            // equipos de la final), no los finalistas: si un finalista no
+            // estaba entre las N primeras quedaba repetido y se perdía otro
+            // equipo (Intermedio 2018: Torque dos veces y sin Cerro).
             if (count($posiciones2)>0){
-                for ($i = count($posiciones); $i < count($posiciones2); $i++) {
-                    $arrPosiciones[$i]=array($posiciones2[$i]->equipo_id,$posiciones2[$i]->foto);
+                $yaPuestos = array();
+                foreach ($posiciones as $p) {
+                    $yaPuestos[$p->equipo_id] = true;
+                }
+                $i = count($posiciones);
+                foreach ($posiciones2 as $fila) {
+                    if (isset($yaPuestos[$fila->equipo_id])) {
+                        continue;
+                    }
+                    $yaPuestos[$fila->equipo_id] = true;
+                    $arrPosiciones[$i] = array($fila->equipo_id, $fila->foto);
+                    $i++;
                 }
             }
 
