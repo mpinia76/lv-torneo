@@ -446,7 +446,8 @@ class ImportPartidosController extends Controller
                     . e(route('import_partidos.fixture', array_filter([
                         'torneo_id' => $torneoElegido->id, 'season' => $season, 'solo_html' => 1])))
                     . '">Leer el calendario en HTML</a> <span class="sub">para las temporadas cerradas: '
-                    . 'la API siempre contesta la edición en curso. 1 crédito</span></p>' : '');
+                    . 'la API siempre contesta la edición en curso. 1 crédito</span></p>'
+                    . $this->cajaOtraCompetencia($torneoElegido, $compForzado !== '' ? $comp : '', $season) : '');
         }
 
         $html .= '<details' . ($comp === '' ? ' open' : '') . '><summary>No sé el id de competencia de un torneo</summary>'
@@ -550,6 +551,23 @@ class ImportPartidosController extends Controller
         // número de jornada, así que tiene que ver el número ya corregido.
         $jornadasMal = $this->jornadasConChoque($filas);
         $renumeradas = null;
+
+        // REARMADO AUTOMÁTICO EN LAS LIGAS. Antes había que apretar «Rearmar
+        // jornadas por fecha» y después no perder `renumerar=1&extras=1` en
+        // ningún link: un «Guardar en staging» desde una vista sin eso volvía
+        // a dejar las jornadas de TM en el staging y reaparecían los choques
+        // (MLS 2017: «4. Jornada» con New England contra dos rivales). Ahora,
+        // si el torneo es una liga y TM mezcló las jornadas, la vista ya viene
+        // rearmada y con fechas extra. «Volver a las jornadas de TM» lo apaga
+        // con `renumerar=no`, que también viaja en `$base`.
+        $autoRearmado = false;
+        if (!$renumerar && !$request->has('renumerar') && !empty($jornadasMal) && $torneoElegido
+            && $compForzado === '' && strcasecmp((string) $torneoElegido->tipo, 'Liga') === 0) {
+            $renumerar = true;
+            $extras = true;
+            $autoRearmado = true;
+        }
+
         if ($renumerar) {
             // Sin anclar lo ya cargado: si un partido quedó en una fecha
             // equivocada (aplicado con las jornadas mezcladas de TM), anclarlo
@@ -747,7 +765,7 @@ class ImportPartidosController extends Controller
             'tipo'      => $tipoHtml !== '' ? $tipoHtml : null,
             'pais'      => $pais,
             'solo_html' => $fuenteHtml ? 1 : null,
-            'renumerar' => $renumerar ? 1 : null,
+            'renumerar' => $renumerar ? 1 : ($request->has('renumerar') ? 'no' : null),
             'extras'    => $extras ? 1 : null,
         ]));
 
@@ -772,6 +790,10 @@ class ImportPartidosController extends Controller
                 . 'crédito. Si esperás resultados nuevos, <a href="' . e($base . '&fresco=1') . '">volvé a bajarlo</a>.</p>';
         }
 
+        if ($autoRearmado) {
+            $html .= '<p class="sub">Las jornadas se rearmaron solas porque este torneo es una liga y TM las '
+                . 'mezcló. No hace falta tocar nada: «Guardar en staging» y «Aplicar» usan estos números.</p>';
+        }
         $html .= $this->bloqueRenumerar($renumeradas, $jornadasMal, $base, $fuente);
         if ($renumerar) $html .= $this->bloqueMoverFechas($filas, $moverFechas, $base, $fuente,
             array_map('intval', (array) $request->get('mover', [])));
@@ -1439,6 +1461,40 @@ class ImportPartidosController extends Controller
      * « · Ver en TM ↗» a la ficha del partido en Transfermarkt. Es un link
      * común (no gasta crédito); vacío si la fila no tiene gameId.
      */
+    /**
+     * «Otra competencia de TM en este torneo»: los playoffs de la MLS son
+     * otra competencia en TM (POUS) pero en tu base van en el MISMO torneo que
+     * la temporada regular (MLS1), en el grupo de llaves. Antes había que
+     * escribir `comp_forzado` en la URL, porque con `torneo_id` la competencia
+     * sale siempre del torneo. La temporada es la del torneo.
+     */
+    private function cajaOtraCompetencia($torneo, $compActiva, $season)
+    {
+        $propia = trim((string) $torneo->tm_competition_id);
+        $volver = '';
+        if ($compActiva !== '') {
+            $volver = '<p class="ok-box">Estás viendo <b>' . e($compActiva) . '</b> dentro de <b>'
+                . e($torneo->nombre . ' ' . $torneo->year) . '</b>. Al aplicar, cada ronda va al grupo de llaves. '
+                . '<a href="' . e(route('import_partidos.fixture', ['torneo_id' => $torneo->id])) . '">Volver a '
+                . e($propia) . '</a></p>';
+        }
+        return $volver . '<form method="get" class="sub" style="margin:6px 0">'
+            . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
+            . ($season !== '' ? '<input type="hidden" name="season" value="' . e($season) . '">' : '')
+            . '<input type="hidden" name="solo_html" value="1">'
+            . 'Otra competencia de TM en este torneo (playoffs, liguilla…): '
+            . '<input name="comp_forzado" value="' . e($compActiva) . '" placeholder="ej POUS" size="10"> '
+            . '<button>Traer</button> <span class="sub">misma temporada que el torneo · 1 crédito</span></form>';
+    }
+
+    /** ¿`comp` es otra competencia de TM que la del torneo? (ver cajaOtraCompetencia) */
+    private function esCompAparte($torneoId, $comp)
+    {
+        if (!$torneoId || $comp === '') return false;
+        $propia = trim((string) DB::table('torneos')->where('id', (int) $torneoId)->value('tm_competition_id'));
+        return $propia !== '' && strcasecmp($propia, $comp) !== 0;
+    }
+
     private function linkTm($gameId)
     {
         $gameId = trim((string) $gameId);
@@ -2244,7 +2300,8 @@ class ImportPartidosController extends Controller
         // temporada y Transfermarkt manda la edición en curso: ver el comentario
         // de `$base` en fixture().
         $alFixture = route('import_partidos.fixture',
-            array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null]));
+            array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null,
+                'comp_forzado' => $this->esCompAparte($torneoId, $comp) ? $comp : null]));
 
         $volver = '<p class="sub"><a href="' . e($alFixture) . '">← Volver al fixture</a></p>';
 
@@ -2404,8 +2461,22 @@ class ImportPartidosController extends Controller
         // la Libertadores 2026 (fecha 17) — 2 partidos, uno entre dos equipos
         // del mismo grupo de la fase de grupos: 1 cruce sobre 2 no es mayoría,
         // y la semifinal Estudiantes–Flamengo se proponía para la zona A.
+        //
+        // UNA JORNADA NUMERADA DE UNA LIGA NO ES UNA RONDA DE PLAYOFFS, aunque
+        // la mayoría de sus partidos crucen zonas: en la MLS hay semanas
+        // enteras de partidos entre conferencias (2017, fecha 4: 5 de 9). Ahí
+        // la mayoría de cruces no cuenta; sólo la plantilla de llaves.
+        //
+        // Y AL REVÉS: si `comp` es OTRA competencia de TM que la del torneo
+        // (los playoffs de la MLS, POUS, aplicados al torneo de MLS1), toda la
+        // fecha va al grupo de llaves aunque sus cruces sean dentro de una
+        // misma conferencia.
+        $compAparte = $this->esCompAparte($torneo->id, $comp);
+        $jornadaDeLiga = !$compAparte && strcasecmp((string) $torneo->tipo, 'Liga') === 0
+            && preg_match('/^\d+$/', $gameday);
         $proponeLlaves = $playoffId && (
-                ($conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
+                $compAparte
+                || (!$jornadaDeLiga && $conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
                 || $ambosEnLlaves === $filas->count()
             );
 
@@ -2616,11 +2687,15 @@ class ImportPartidosController extends Controller
                         . 'decidir es a qué fecha van.'
                         . ($sinRonda ? ' Transfermarkt no trajo el nombre de la ronda —quedó «' . e($gameday ?: '—') . '»—, '
                             . 'así que tampoco se puede deducir.' : '')
-                        : ($grupoDestino === $playoffId
+                        : ($grupoDestino === $playoffId && $compAparte
+                            ? e($comp) . ' es otra competencia de TM que la del torneo (los playoffs): toda la ronda '
+                            . 'va al grupo de llaves. La fecha se llama por su ronda («Cuartos de final») y la ida y '
+                            . 'la vuelta van juntas en la misma.'
+                            : ($grupoDestino === $playoffId
                             ? 'Los dos equipos de cada partido están en zonas distintas: esto es una ronda de playoffs, '
                             . 'no una fecha con interzonales. En un grupo de llaves la fecha se llama por su ronda '
                             . '(«Octavos de final») y la ida y la vuelta van juntas en la misma.'
-                            : 'Elegido a mano.'))
+                            : 'Elegido a mano.')))
                     . '</div>'
                     . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:10px">'
                     . '<input type="hidden" name="comp" value="' . e($comp) . '">'
@@ -2740,7 +2815,12 @@ class ImportPartidosController extends Controller
                 . '">Crear estos ' . count($plan) . ' partidos'
                 . ($grupoDestino ? ' en ' . e($grupos[$grupoDestino]->nombre) . ' · '
                     . e($fechaDestino ? \App\Fecha::where('id', $fechaDestino)->value('numero') : $fechaNombre) : '')
-                . '</a> <span class="sub">recién acá se escribe</span></p>';
+                . '</a> <span class="sub">recién acá se escribe</span>'
+                . ((!$grupoDestino && $playoffId) ? ' <a class="boton-sec" href="'
+                    . e(route('import_partidos.fixture_aplicar', ['comp' => $comp, 'gameday' => $gameday,
+                        'torneo_id' => $torneo->id, 'grupo_destino' => $playoffId]))
+                    . '">No, toda la fecha a ' . e($grupos[$playoffId]->nombre) . '</a>' : '')
+                . '</p>';
 
             return $this->pagina('Aplicar fecha', $html);
         }
@@ -2925,7 +3005,8 @@ class ImportPartidosController extends Controller
         $confirmar = (string) $request->get('confirmar', '0') === '1';
 
         $alFixture = route('import_partidos.fixture',
-            array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null]));
+            array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null,
+                'comp_forzado' => $this->esCompAparte($torneoId, $comp) ? $comp : null]));
         $html = '<p class="sub"><a href="' . e($alFixture) . '">← Volver al fixture</a></p>'
             . '<h1>Aplicar todas las fechas · ' . e($comp) . '</h1>';
 
@@ -3526,7 +3607,8 @@ class ImportPartidosController extends Controller
                     . '<td class="sub">' . implode(' · ', $antes) . '</td></tr>';
             }
 
-            $sinRenumerar = str_replace(['&renumerar=1', '?renumerar=1&', '?renumerar=1'], ['', '?', ''], $base);
+            // `no` y no vacío: sin el parámetro, una liga se rearma sola.
+            $sinRenumerar = str_replace('renumerar=1', 'renumerar=no', $base);
 
             $sinLugar = '';
             if ($this->sinLugar) {
