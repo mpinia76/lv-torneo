@@ -4922,6 +4922,17 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
                 }
             }
 
+                // EN UNA LIGA SIN LLAVES MANDA EL PROMEDIO, NO LOS PARTIDOS JUGADOS.
+                // `jugados desc` primero sirve en torneos con llaves (el que llegó más
+                // lejos jugó más), pero en una liga cortada antes de terminar mandaba al
+                // fondo a los que tenían un partido menos: Ligue 1 2019/20, PSG campeón
+                // con 27 partidos quedaba 19º. Ahí la LFP definió por puntos por partido.
+                $esLigaSinLlaves = strcasecmp((string) $torneo->tipo, 'Liga') === 0
+                    && !$grupos->contains(function ($g) { return !empty($g->penales); });
+                $ordenTabla = $esLigaSinLlaves
+                    ? 'promedio DESC, puntaje DESC, diferencia DESC, golesl DESC, equipo ASC'
+                    : 'jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
+
                 $posiciones2 = DB::select(
                     "SELECT foto, equipo,
        count(*) jugados,
@@ -4957,7 +4968,7 @@ from (
 ) a
 group by equipo, foto, equipo_id
 
-order by  jugados desc, puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC",
+order by " . $ordenTabla,
                     [
                         $torneo_id,
                         $torneo_id,
