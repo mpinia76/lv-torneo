@@ -1134,11 +1134,6 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     }
 
     /**
-     * Clubes actuales de un JUGADOR: los del ÚLTIMO partido que jugó, y sólo si
-     * ese partido entra en la ventana. Si cambió de equipo, el anterior ya no
-     * aparece.
-     */
-    /**
      * Ordena los clubes de una carrera del ÚLTIMO al primero, que es como se
      * leen: primero dónde está o dónde estuvo recién. Los que sólo vienen de la
      * carga manual no tienen fecha y quedan al final.
@@ -1159,10 +1154,28 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         return $equipos;
     }
 
+    /**
+     * Cuántos partidos (con formación cargada) puede jugar el club después del
+     * último del jugador sin que él figure, antes de dejar de considerarlo
+     * "actual". Con 1 sola ausencia se caería cualquier lesionado o
+     * suspendido; con varias, el que se fue o se retiró desaparece en cuanto
+     * el club arranca la temporada siguiente.
+     */
+    const AUSENCIAS_PARA_DEJAR_CLUB = 5;
+
+    /**
+     * Clubes actuales de un JUGADOR: los del ÚLTIMO partido que jugó, y sólo si
+     * ese partido entra en la ventana. Si cambió de equipo, el anterior ya no
+     * aparece. Y si el club ya jugó AUSENCIAS_PARA_DEJAR_CLUB partidos
+     * después sin él (se retiró, quedó libre, se fue a un club que no
+     * cargamos), tampoco: la ventana de 12 meses sola dejaba "jugando" casi un
+     * año a cualquiera que se retirara al final de una temporada.
+     */
     private function sqlClubActualJugador($jugadorId)
     {
         $jugadorId = (int) $jugadorId;
         $desde     = $this->desdeActividad();
+        $ausencias = (int) self::AUSENCIAS_PARA_DEJAR_CLUB;
 
         return "SELECT DISTINCT equipos.escudo, alineacions.equipo_id, equipos.nombre
             FROM alineacions
@@ -1175,7 +1188,14 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                   FROM alineacions A2
                   INNER JOIN partidos P2 ON P2.id = A2.partido_id
                   WHERE A2.jugador_id = $jugadorId
-              )";
+              )
+              AND (
+                  SELECT COUNT(DISTINCT A3.partido_id)
+                  FROM alineacions A3
+                  INNER JOIN partidos P3 ON P3.id = A3.partido_id
+                  WHERE A3.equipo_id = alineacions.equipo_id
+                    AND P3.dia > partidos.dia
+              ) < $ausencias";
     }
 
     /**
