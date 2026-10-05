@@ -547,6 +547,14 @@ class ImportPartidosController extends Controller
                 . e($comp) . '</code>.</p>');
         }
 
+        // UNA RONDA DE TM QUE SON VARIAS ZONAS Y UN CRUCE. La fase final de
+        // Colombia (COLO) viene entera en «Todos los partidos Fase Final Liga
+        // DIMAYOR II 2021»: los dos cuadrangulares y la final juntos, 26
+        // partidos en una sola ronda. Aplicarla así los mandaba a UNA fecha.
+        // Ver `partirRondasMezcladas()`. Va antes de todo lo demás para que el
+        // staging guarde las rondas ya separadas.
+        $partidas = $this->partirRondasMezcladas($filas);
+
         // Antes de clasificar: la segunda pasada del emparejador compara el
         // número de jornada, así que tiene que ver el número ya corregido.
         $jornadasMal = $this->jornadasConChoque($filas);
@@ -639,6 +647,7 @@ class ImportPartidosController extends Controller
                 $html .= '<p class="warn-box">' . e($a) . '</p>';
             }
         }
+        $html .= $this->bloqueRondasPartidas($partidas);
 
         $cont = ['total' => count($filas), 'nuevo' => 0, 'duplicado' => 0, 'conflicto' => 0,
             'jugados' => 0, 'pendientes' => 0];
@@ -2403,6 +2412,45 @@ class ImportPartidosController extends Controller
         // se llama igual, esos partidos van ahí, repartidos en fechas: el
         // camino normal los mandaba a UNA sola fecha y chocaba con el índice
         // único (fecha, visitante) apenas un equipo era visitante dos veces.
+        // ── ZONA ARMADA POR `partirRondasMezcladas()` («Zona 1 · …») ──────
+        // TM no dice qué zona es cuál y la plantilla tampoco (en Colombia está
+        // en el grupo de la fase regular). Se propone la zona donde ya hay
+        // partidos de estos equipos en estas fechas, y se pregunta siempre.
+        $armada = $this->rondaArmada($gameday);
+        if ($armada === 'zona') {
+            $zonas = $grupos->filter(function ($g) { return empty($g->penales); });
+            $zonaId = (int) $request->get('zona_id', 0);
+            $propuesta = $this->zonaPorLoCargado($filas, $torneo->id);
+            if (!$zonaId || !$zonas->has($zonaId)) $zonaId = $propuesta && $zonas->has($propuesta) ? $propuesta : 0;
+
+            if (!$confirmar) {
+                $equipos = [];
+                foreach ($filas as $r) {
+                    if ($r->equipo_id) $equipos[(int) $r->equipo_id] = $this->nombreEquipo($r->equipo_id);
+                    if ($r->rival_id)  $equipos[(int) $r->rival_id]  = $this->nombreEquipo($r->rival_id);
+                }
+                asort($equipos);
+                $optsZ = '<option value="">— elegí el grupo —</option>';
+                foreach ($zonas as $gid => $g) {
+                    $optsZ .= '<option value="' . (int) $gid . '"' . ((int) $gid === $zonaId ? ' selected' : '') . '>'
+                        . e($g->nombre) . '</option>';
+                }
+                $html .= '<div class="' . ($zonaId ? 'ok-box' : 'warn-box') . '"><div><b>¿A qué grupo va esta zona?</b> '
+                    . 'Sus equipos: ' . e(implode(', ', $equipos)) . '. '
+                    . ($propuesta && $zonaId === $propuesta
+                        ? 'Propongo <b>' . e($zonas[$propuesta]->nombre) . '</b> porque ya tiene partidos de estos equipos en estas fechas.'
+                        : 'No hay partidos de estos equipos cargados en estas fechas, así que no lo puedo deducir: elegilo vos.')
+                    . '</div><form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:8px">'
+                    . '<input type="hidden" name="comp" value="' . e($comp) . '">'
+                    . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
+                    . '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">'
+                    . '<select name="zona_id" class="s2" data-placeholder="grupo…">' . $optsZ . '</select> '
+                    . '<button>Ver con este grupo</button></form></div>';
+            }
+            if (!$zonaId) return $this->pagina('Aplicar fecha', $html);
+            return $this->aplicarZona($filas, $torneo, $zonas[$zonaId], $comp, $gameday, $confirmar, $html, $alFixture);
+        }
+
         $zona = $this->zonaDeLaRonda($gameday, $grupos, $filas);
         if ($zona) {
             return $this->aplicarZona($filas, $torneo, $zona, $comp, $gameday, $confirmar, $html, $alFixture);
@@ -2483,8 +2531,13 @@ class ImportPartidosController extends Controller
         $compAparte = $this->esCompAparte($torneo->id, $comp);
         $jornadaDeLiga = !$compAparte && strcasecmp((string) $torneo->tipo, 'Liga') === 0
             && preg_match('/^\d+$/', $gameday);
+        // Los cruces que separó `partirRondasMezcladas()` (la final de la fase
+        // final de Colombia) son llaves por construcción: los finalistas
+        // vienen de zonas distintas aunque la plantilla de los dos esté en el
+        // mismo grupo de la fase regular.
         $proponeLlaves = $playoffId && (
-                $compAparte
+                $armada === 'cruce'
+                || $compAparte
                 || (!$jornadaDeLiga && $conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
                 || $ambosEnLlaves === $filas->count()
             );
@@ -2672,7 +2725,11 @@ class ImportPartidosController extends Controller
                     // vuelta— son 2 partidos y propondría «Semifinal». Mejor
                     // vacío: la pantalla lo pide y no crea nada hasta tenerlo.
                     // Y adivinar «Octavos» por cantidad sólo tiene sentido en llaves.
-                    if (!$fechaDestino && $fechaNombre === '' && !$sinRonda) {
+                    // La «Final · …» armada son la ida y la vuelta: por cantidad
+                    // (2) saldría «Semifinal». Los «Cruces · …» quedan vacíos.
+                    if (!$fechaDestino && $fechaNombre === '' && $armada === 'cruce') {
+                        $fechaNombre = strpos($gameday, 'Final · ') === 0 ? 'Final' : '';
+                    } elseif (!$fechaDestino && $fechaNombre === '' && !$sinRonda) {
                         $fechaNombre = !empty($grupos[$grupoDestino]->penales)
                             ? $this->nombreDeRonda(count($filas), $gameday) : $gameday;
                     }
@@ -3139,6 +3196,9 @@ class ImportPartidosController extends Controller
             $r = (string) $f['ronda'];
             $l = (string) $f['club_external_id']; $v = (string) $f['rival_external_id'];
             if ($r === '' || $r === '—' || $l === '' || $v === '') continue;
+            // Una zona armada por `partirRondasMezcladas()` tiene a cada equipo
+            // contra varios rivales por definición: no es una jornada mezclada.
+            if ($this->rondaArmada($r) !== null) continue;
             $rivales[$r][$l][$v] = true;
             $rivales[$r][$v][$l] = true;
         }
@@ -3149,6 +3209,217 @@ class ImportPartidosController extends Controller
             }
         }
         return $mal;
+    }
+
+    /**
+     * ¿La ronda la armó `partirRondasMezcladas()`? 'zona', 'cruce' o null.
+     * Llevan la ronda original de TM al final («Zona 1 · Todos los partidos
+     * Fase Final Liga DIMAYOR II 2021»): el staging filtra por competencia y
+     * ronda, no por temporada, y «Zona 1» a secas se mezclaría con la de otro año.
+     */
+    private function rondaArmada($ronda)
+    {
+        if (preg_match('/^Zona \d+ · /u', (string) $ronda)) return 'zona';
+        if (preg_match('/^(?:Final|Cruces) · /u', (string) $ronda)) return 'cruce';
+        return null;
+    }
+
+    /**
+     * Separa una ronda de TM que trae varias zonas y sus cruces juntos.
+     *
+     * Caso real: COLO (fase final de Colombia, Finalización 2021) viene en una
+     * sola ronda, «Todos los partidos Fase Final Liga DIMAYOR II 2021»: dos
+     * cuadrangulares de 4 a ida y vuelta (24 partidos) y la final (2). TM no
+     * dice cuál es cuál, y la PLANTILLA no sirve para deducirlo: en esos
+     * torneos las plantillas están en el grupo de la fase regular, no en
+     * «Fase Final - A / B».
+     *
+     * Se deduce de QUIÉN JUEGA CON QUIÉN. Dentro de una zona, dos equipos
+     * cualquiera tienen rivales en común (los otros dos del cuadrangular). Los
+     * dos finalistas no: cada uno jugó con los de su zona. Así que:
+     *   - un cruce A–B es «interno» si A y B tienen al menos un rival en común;
+     *   - las zonas son los grupos de equipos unidos por cruces internos
+     *     (de 3 equipos o más);
+     *   - el resto de los partidos son los cruces (final, semis).
+     *
+     * Sólo se toca una ronda SIN número de jornada en la que algún equipo
+     * aparece contra más de un rival, y sólo si de verdad se separa en algo
+     * (dos zonas o más, o una zona y cruces). Una ronda «Grupo A» de 4
+     * equipos queda una sola zona sin cruces: no se toca. Una liga numerada,
+     * tampoco: eso es `renumerarJornadas()`.
+     *
+     * Pisa `ronda` en `$filas` («Zona 1 · …», «Zona 2 · …», «Final · …») y
+     * devuelve qué hizo, para mostrarlo.
+     */
+    private function partirRondasMezcladas(array &$filas)
+    {
+        $porRonda = [];
+        foreach ($filas as $i => $f) {
+            $r = (string) $f['ronda'];
+            if ($r === '' || $r === '—' || preg_match('/^\d{1,2}:\d{2}$/', $r)) continue;
+            if ($this->numeroDeJornada($r) !== null || $this->rondaArmada($r) !== null) continue;
+            if ((string) $f['club_external_id'] === '' || (string) $f['rival_external_id'] === '') continue;
+            $porRonda[$r][] = $i;
+        }
+
+        // Las claves con prefijo: un id de TM numérico como clave de array
+        // pasa a int y las comparaciones estrictas fallan.
+        $eq = function ($i, $lado) use ($filas) {
+            return 't' . (string) $filas[$i][$lado === 'l' ? 'club_external_id' : 'rival_external_id'];
+        };
+
+        $hechas = [];
+        foreach ($porRonda as $r => $is) {
+            $vec = []; $nombre = [];
+            foreach ($is as $i) {
+                $l = $eq($i, 'l'); $v = $eq($i, 'v');
+                if ($l === $v) continue;
+                $vec[$l][$v] = true; $vec[$v][$l] = true;
+                $nombre[$l] = (string) $filas[$i]['club_nombre'];
+                $nombre[$v] = (string) $filas[$i]['rival_nombre'];
+            }
+            $choca = false;
+            foreach ($vec as $rs) if (count($rs) > 1) { $choca = true; break; }
+            if (!$choca) continue;
+
+            $padre = [];
+            foreach (array_keys($vec) as $e) $padre[$e] = $e;
+            $raiz = function ($e) use (&$padre) {
+                while ($padre[$e] !== $e) { $padre[$e] = $padre[$padre[$e]]; $e = $padre[$e]; }
+                return $e;
+            };
+            $interno = function ($a, $b) use ($vec) {
+                foreach (array_keys($vec[$a]) as $c) if ($c !== $b && isset($vec[$b][$c])) return true;
+                return false;
+            };
+            foreach ($vec as $a => $rs) {
+                foreach (array_keys($rs) as $b) {
+                    if (strcmp($a, $b) >= 0 || !$interno($a, $b)) continue;
+                    $ra = $raiz($a); $rb = $raiz($b);
+                    if ($ra !== $rb) $padre[$ra] = $rb;
+                }
+            }
+
+            $miembros = [];
+            foreach (array_keys($vec) as $e) $miembros[$raiz($e)][] = $e;
+            $zonaDe = [];
+            foreach ($miembros as $k => $es) {
+                if (count($es) < 3) continue;
+                foreach ($es as $e) $zonaDe[$e] = $k;
+            }
+
+            $enZona = []; $cruces = [];
+            foreach ($is as $i) {
+                $l = $eq($i, 'l'); $v = $eq($i, 'v');
+                if (isset($zonaDe[$l], $zonaDe[$v]) && $zonaDe[$l] === $zonaDe[$v]) $enZona[$zonaDe[$l]][] = $i;
+                else $cruces[] = $i;
+            }
+            if (!(count($enZona) >= 2 || (count($enZona) >= 1 && $cruces))) continue;
+
+            // Zona 1 = la que empezó antes (desempata el id de TM, para que
+            // dos bajadas den siempre los mismos nombres).
+            $orden = [];
+            foreach ($enZona as $k => $lista) {
+                $primero = null;
+                foreach ($lista as $i) {
+                    $d = (string) $filas[$i]['dia'];
+                    if ($primero === null || $d < $primero) $primero = $d;
+                }
+                $orden[$k] = $primero . '|' . $k;
+            }
+            asort($orden);
+
+            $res = ['ronda' => $r, 'zonas' => [], 'cruces' => null];
+            $n = 0;
+            foreach (array_keys($orden) as $k) {
+                $etiqueta = 'Zona ' . (++$n) . ' · ' . $r;
+                foreach ($enZona[$k] as $i) $filas[$i]['ronda'] = $etiqueta;
+                $nombres = [];
+                foreach ($miembros[$k] as $e) $nombres[] = $nombre[$e];
+                sort($nombres);
+                $res['zonas'][] = ['ronda' => $etiqueta, 'n' => count($enZona[$k]), 'equipos' => $nombres];
+            }
+            if ($cruces) {
+                $pares = [];
+                foreach ($cruces as $i) {
+                    $p = [$eq($i, 'l'), $eq($i, 'v')]; sort($p);
+                    $pares[implode('-', $p)] = true;
+                }
+                $etiqueta = (count($pares) === 1 ? 'Final' : 'Cruces') . ' · ' . $r;
+                $lista = [];
+                foreach ($cruces as $i) {
+                    $filas[$i]['ronda'] = $etiqueta;
+                    $lista[] = substr((string) $filas[$i]['dia'], 0, 10) . ' ' . $filas[$i]['club_nombre']
+                        . ' vs ' . $filas[$i]['rival_nombre'];
+                }
+                $res['cruces'] = ['ronda' => $etiqueta, 'n' => count($cruces), 'partidos' => $lista];
+            }
+            $hechas[] = $res;
+        }
+        return $hechas;
+    }
+
+    /** El aviso de lo que hizo `partirRondasMezcladas()`. */
+    private function bloqueRondasPartidas(array $partidas)
+    {
+        $html = '';
+        foreach ($partidas as $p) {
+            $html .= '<div class="warn-box"><b>Separé la ronda «' . e($p['ronda']) . '»</b>: Transfermarkt trae en '
+                . 'una sola ronda partidos de varias zonas y sus cruces. Lo deduje de quién juega con quién (los de '
+                . 'una misma zona tienen rivales en común; los finalistas no), no de las plantillas.<ul style="margin:6px 0">';
+            foreach ($p['zonas'] as $z) {
+                $html .= '<li><b>' . e(strtok($z['ronda'], '·')) . '</b> — ' . $z['n'] . ' partidos: '
+                    . e(implode(', ', $z['equipos'])) . '</li>';
+            }
+            if ($p['cruces']) {
+                $html .= '<li><b>' . e(strtok($p['cruces']['ronda'], '·')) . '</b> — ' . $p['cruces']['n']
+                    . ' partido(s): ' . e(implode(' · ', $p['cruces']['partidos'])) . '</li>';
+            }
+            $html .= '</ul>Al aplicar, cada zona te pregunta a qué grupo va (lo propone solo si ya tenés partidos '
+                . 'de esos equipos cargados en esas fechas) y se reparte en fechas por día, respetando lo ya '
+                . 'cargado. La final va al grupo de llaves. Para que «Aplicar» use esto hay que <b>Guardar en '
+                . 'staging</b> con esta vista.</div>';
+        }
+        return $html;
+    }
+
+    /**
+     * La zona de este torneo donde YA hay partidos entre estos equipos, en
+     * estas mismas fechas. Para las zonas que armó `partirRondasMezcladas()`:
+     * si «Fase Final - A» ya tiene los 6 de Nacional, la zona de Nacional es
+     * ésa. Se mira sólo el período de la ronda (±1 día): en la fase regular
+     * los mismos equipos también se cruzaron, y eso no dice nada.
+     */
+    private function zonaPorLoCargado($filas, $torneoId)
+    {
+        $equipos = []; $desde = null; $hasta = null;
+        foreach ($filas as $r) {
+            if ($r->equipo_id) $equipos[(int) $r->equipo_id] = true;
+            if ($r->rival_id)  $equipos[(int) $r->rival_id]  = true;
+            $d = substr((string) $r->dia, 0, 10);
+            if ($desde === null || $d < $desde) $desde = $d;
+            if ($hasta === null || $d > $hasta) $hasta = $d;
+        }
+        if (count($equipos) < 2 || $desde === null) return null;
+        $ids = array_keys($equipos);
+
+        $rows = DB::table('partidos')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->where('grupos.torneo_id', (int) $torneoId)
+            ->where(function ($q) { $q->whereNull('grupos.penales')->orWhere('grupos.penales', 0); })
+            ->whereIn('partidos.equipol_id', $ids)->whereIn('partidos.equipov_id', $ids)
+            ->whereBetween('partidos.dia', [date('Y-m-d 00:00:00', strtotime($desde . ' -1 day')),
+                date('Y-m-d 23:59:59', strtotime($hasta . ' +1 day'))])
+            ->select('grupos.id AS grupo_id')->get();
+
+        $cuenta = [];
+        foreach ($rows as $x) $cuenta[(int) $x->grupo_id] = (isset($cuenta[(int) $x->grupo_id]) ? $cuenta[(int) $x->grupo_id] : 0) + 1;
+        if (!$cuenta) return null;
+        arsort($cuenta);
+        $k = array_keys($cuenta);
+        if (count($k) > 1 && $cuenta[$k[0]] === $cuenta[$k[1]]) return null;
+        return $k[0];
     }
 
     /**
@@ -3477,6 +3748,12 @@ class ImportPartidosController extends Controller
         $cambios = [];
         foreach ($pids as $pid => $destino) {
             if (!isset($actual[$pid])) continue;
+            // Sólo jornadas con número: el rearmado no toca las rondas sin
+            // número («Todos los partidos Fase Final…», «Octavos»), así que ahí
+            // `ronda` es el texto de TM y no hay ninguna fecha a donde moverlo.
+            // Antes ofrecía llevar los 6 de Nacional, bien cargados en las
+            // fechas 1 a 6 de la fase final, a una fecha con ese nombre.
+            if ($this->numeroDeJornada($destino) === null) continue;
             $num = $this->numeroDeJornada($actual[$pid]->numero);
             if ($num === null || $num === $destino) continue;
             $cambios[$pid] = $destino;
@@ -3818,7 +4095,10 @@ class ImportPartidosController extends Controller
             }
             $html .= '</tbody></table></div>'
                 . '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar', [
-                    'comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id, 'confirmar' => 1]))
+                    'comp' => $comp, 'gameday' => $gameday, 'torneo_id' => $torneo->id,
+                    // Las zonas armadas no se reconocen por nombre: el grupo
+                    // elegido tiene que viajar al confirmar.
+                    'zona_id' => $zona->id, 'confirmar' => 1]))
                 . '">Crear estos ' . $filas->count() . ' partidos en el grupo ' . e($zona->nombre) . '</a> '
                 . '<span class="sub">recién acá se escribe</span></p>';
 
