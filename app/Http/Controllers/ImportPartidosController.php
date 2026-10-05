@@ -963,13 +963,14 @@ class ImportPartidosController extends Controller
         // «Aplicar todas»: sólo con torneo elegido, liga de un grupo y algo nuevo.
         $nuevosTotal = 0;
         foreach ($porFecha as $d) $nuevosTotal += (int) $d['nuevo'];
-        if ($torneoElegido && $nuevosTotal
-            && \App\Grupo::where('torneo_id', $torneoElegido->id)->count() === 1
-            && !\App\Grupo::where('torneo_id', $torneoElegido->id)->where('penales', 1)->exists()) {
+        $grupoTodas = ($torneoElegido && $nuevosTotal) ? $this->grupoParaAplicarTodas($torneoElegido, $comp) : null;
+        if ($grupoTodas) {
+            $varios = \App\Grupo::where('torneo_id', $torneoElegido->id)->count() > 1;
             $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar_todas',
                     ['comp' => $comp, 'torneo_id' => (int) $torneoElegido->id])) . '">Aplicar todas →</a> '
-                . '<span class="sub">cada ronda a su fecha («1. Jornada» → 1). Usa lo guardado en staging; '
-                . 'primero muestra qué va a dónde.</span></p>';
+                . '<span class="sub">cada ronda a su fecha («1. Jornada» → 1)'
+                . ($varios ? ', todas al grupo <b>' . e($grupoTodas->nombre) . '</b> (el que tiene más plantillas)' : '')
+                . '. Usa lo guardado en staging; primero muestra qué va a dónde.</span></p>';
         }
         $html .= '<div class="scroll"><table><thead><tr><th>Fecha nº</th><th>Partidos</th>'
             . '<th>Período</th><th>Ya cargados</th><th>Nuevos</th><th>Conflictos</th><th></th></tr></thead><tbody>';
@@ -3078,6 +3079,36 @@ class ImportPartidosController extends Controller
      *
      * Sin `confirmar` sólo muestra qué va a dónde.
      */
+    /**
+     * El grupo donde van TODAS las jornadas numeradas de la competencia del
+     * torneo, o null si no hay uno claro.
+     *
+     * Con un solo grupo sin llaves, ése. Con varios (Colombia: «Fase regular»
+     * + «Fase Final - A / B» + «Fase Final - Final»), el grupo sin llaves que
+     * tiene MÁS plantillas, siempre que no empate con otro: la fase regular
+     * tiene a los 20 y cada cuadrangular a 4. Si empatan (dos zonas de 15),
+     * null: ahí cada partido va a la zona de su equipo y se aplica de a una.
+     * Nunca para otra competencia de TM que la del torneo (playoffs aparte).
+     */
+    private function grupoParaAplicarTodas($torneo, $comp)
+    {
+        if (!$torneo || $this->esCompAparte($torneo->id, $comp)) return null;
+        $grupos = \App\Grupo::where('torneo_id', $torneo->id)->orderBy('id')->get();
+        $sinLlaves = $grupos->filter(function ($g) { return empty($g->penales); });
+        if ($grupos->count() === 1) return $sinLlaves->first();
+        if ($sinLlaves->isEmpty()) return null;
+
+        $cuenta = [];
+        foreach ($sinLlaves as $g) {
+            $cuenta[$g->id] = \App\Plantilla::where('grupo_id', $g->id)->count();
+        }
+        arsort($cuenta);
+        $ids = array_keys($cuenta);
+        if ($cuenta[$ids[0]] === 0) return null;
+        if (count($ids) > 1 && $cuenta[$ids[0]] === $cuenta[$ids[1]]) return null;
+        return $sinLlaves->first(function ($g) use ($ids) { return (int) $g->id === (int) $ids[0]; });
+    }
+
     public function fixtureAplicarTodas(Request $request)
     {
         set_time_limit(0);
@@ -3097,14 +3128,14 @@ class ImportPartidosController extends Controller
             return $this->pagina('Aplicar todas', $html . '<p class="err-box">Faltan <code>comp</code> y el torneo.</p>');
         }
 
-        $grupos = \App\Grupo::where('torneo_id', $torneo->id)->orderBy('id')->get();
-        if ($grupos->count() !== 1 || !empty($grupos->first()->penales)) {
-            return $this->pagina('Aplicar todas', $html . '<p class="err-box">«Aplicar todas» es sólo para una '
-                . '<b>liga de un grupo</b>. ' . e($torneo->nombre . ' ' . $torneo->year) . ' tiene '
-                . $grupos->count() . ' grupo(s)' . ($grupos->count() === 1 ? ' con llaves' : '')
-                . ': ahí cada ronda necesita que elijas a dónde va, así que se aplica de a una.</p>');
+        $grupo = $this->grupoParaAplicarTodas($torneo, $comp);
+        if (!$grupo) {
+            $grupos = \App\Grupo::where('torneo_id', $torneo->id)->count();
+            return $this->pagina('Aplicar todas', $html . '<p class="err-box">«Aplicar todas» necesita un grupo '
+                . 'claro para las jornadas: el único del torneo, o el grupo sin llaves con más plantillas. '
+                . e($torneo->nombre . ' ' . $torneo->year) . ' tiene ' . $grupos . ' grupo(s) y ninguno se destaca '
+                . '(zonas del mismo tamaño, o sin plantillas): cada ronda se aplica de a una.</p>');
         }
-        $grupo = $grupos->first();
 
         $rondas = DB::table('import_partidos')
             ->whereNull('tecnico_id')
