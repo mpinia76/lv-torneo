@@ -40,6 +40,7 @@
         <thead>
         <th>Nombre</th>
         <th>Año</th>
+        <th>País</th>
         <th>Nro. de equipos</th>
         <th>Nro. de grupos</th>
         <th>Tipo</th>
@@ -53,6 +54,7 @@
                         <img id="original" src="{{ url('images/'.$torneo->escudo) }}" height="25">
                     @endif {{$torneo->nombre}}</td>
                 <td>{{$torneo->year}}</td>
+                <td>{{$torneo->pais}}</td>
                 <td>{{$torneo->equipos}}</td>
                 <td>{{$torneo->grupos}}</td>
                 <td>{{$torneo->tipo}}</td>
