@@ -2420,12 +2420,26 @@ class ImportPartidosController extends Controller
         if ($armada === 'zona') {
             $zonas = $grupos->filter(function ($g) { return empty($g->penales); });
             $zonaId = (int) $request->get('zona_id', 0);
-            $propuesta = $this->zonaPorLoCargado($filas, $torneo->id);
+            // Primero la plantilla (el grupo más chico que tiene a los 4); si
+            // no hay, lo ya cargado en esas fechas.
+            //
+            // OJO: con TODA la zona del staging, no sólo los nuevos. `$filas`
+            // trae los «nuevo», y en la Zona 1 de 2021 los 6 de Nacional ya
+            // estaban cargados: Nacional no aparecía, la zona eran 3 equipos,
+            // y ni la plantilla ni lo cargado (todo con Nacional) la ubicaban.
+            $todaLaZona = DB::table('import_partidos')->whereNull('tecnico_id')
+                ->where('competencia_external_id', $comp)->where('ronda', $gameday)->get();
+            $porQue = 'tiene en su plantilla a todos estos equipos';
+            $propuesta = $this->zonaPorPlantilla($todaLaZona, $torneo->id);
+            if (!$propuesta) {
+                $propuesta = $this->zonaPorLoCargado($todaLaZona, $torneo->id);
+                $porQue = 'ya tiene partidos de estos equipos en estas fechas';
+            }
             if (!$zonaId || !$zonas->has($zonaId)) $zonaId = $propuesta && $zonas->has($propuesta) ? $propuesta : 0;
 
             if (!$confirmar) {
                 $equipos = [];
-                foreach ($filas as $r) {
+                foreach ($todaLaZona as $r) {
                     if ($r->equipo_id) $equipos[(int) $r->equipo_id] = $this->nombreEquipo($r->equipo_id);
                     if ($r->rival_id)  $equipos[(int) $r->rival_id]  = $this->nombreEquipo($r->rival_id);
                 }
@@ -2438,8 +2452,10 @@ class ImportPartidosController extends Controller
                 $html .= '<div class="' . ($zonaId ? 'ok-box' : 'warn-box') . '"><div><b>¿A qué grupo va esta zona?</b> '
                     . 'Sus equipos: ' . e(implode(', ', $equipos)) . '. '
                     . ($propuesta && $zonaId === $propuesta
-                        ? 'Propongo <b>' . e($zonas[$propuesta]->nombre) . '</b> porque ya tiene partidos de estos equipos en estas fechas.'
-                        : 'No hay partidos de estos equipos cargados en estas fechas, así que no lo puedo deducir: elegilo vos.')
+                        ? 'Propongo <b>' . e($zonas[$propuesta]->nombre) . '</b> porque ' . $porQue . '.'
+                        : 'Ningún grupo tiene en su plantilla a estos equipos (fuera del de la fase regular) ni partidos '
+                        . 'de ellos en estas fechas, así que no lo puedo deducir: elegilo vos, o creales las plantillas '
+                        . '(vacías alcanza) en el grupo que corresponde y volvé.')
                     . '</div><form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:8px">'
                     . '<input type="hidden" name="comp" value="' . e($comp) . '">'
                     . '<input type="hidden" name="gameday" value="' . e($gameday) . '">'
@@ -3375,8 +3391,9 @@ class ImportPartidosController extends Controller
                 $html .= '<li><b>' . e(strtok($p['cruces']['ronda'], '·')) . '</b> — ' . $p['cruces']['n']
                     . ' partido(s): ' . e(implode(' · ', $p['cruces']['partidos'])) . '</li>';
             }
-            $html .= '</ul>Al aplicar, cada zona te pregunta a qué grupo va (lo propone solo si ya tenés partidos '
-                . 'de esos equipos cargados en esas fechas) y se reparte en fechas por día, respetando lo ya '
+            $html .= '</ul>Al aplicar, cada zona te pregunta a qué grupo va. Lo propone solo si un grupo tiene a '
+                . 'esos equipos en su plantilla (vacía alcanza; el de la fase regular no cuenta porque tiene a todos) '
+                . 'o si ya tenés partidos de ellos cargados en esas fechas. Después se reparte en fechas por día, respetando lo ya '
                 . 'cargado. La final va al grupo de llaves. Para que «Aplicar» use esto hay que <b>Guardar en '
                 . 'staging</b> con esta vista.</div>';
         }
@@ -3390,6 +3407,37 @@ class ImportPartidosController extends Controller
      * ésa. Se mira sólo el período de la ronda (±1 día): en la fase regular
      * los mismos equipos también se cruzaron, y eso no dice nada.
      */
+    /**
+     * La zona de este torneo cuya PLANTILLA tiene a todos los equipos de la
+     * zona armada. Las plantillas de la fase regular también los tienen a
+     * todos, así que entre los grupos que los cubren gana el más chico: el
+     * de la fase final tiene a esos 4 y el regular a 20. Para que funcione
+     * alcanza con crear las plantillas (vacías) en «Fase Final - A» y «- B».
+     * Sin ningún grupo que los cubra a todos, o con empate, null.
+     */
+    private function zonaPorPlantilla($filas, $torneoId)
+    {
+        $equipos = [];
+        foreach ($filas as $r) {
+            if ($r->equipo_id) $equipos[(int) $r->equipo_id] = true;
+            if ($r->rival_id)  $equipos[(int) $r->rival_id]  = true;
+        }
+        if (count($equipos) < 2) return null;
+
+        $grupos = DB::table('grupos')->where('torneo_id', (int) $torneoId)
+            ->where(function ($q) { $q->whereNull('penales')->orWhere('penales', 0); })->pluck('id');
+        $mejor = null; $tam = null; $empate = false;
+        foreach ($grupos as $gid) {
+            $tiene = DB::table('plantillas')->where('grupo_id', $gid)->pluck('equipo_id')
+                ->map(function ($x) { return (int) $x; })->unique()->all();
+            if (array_diff(array_keys($equipos), $tiene)) continue;     // no los tiene a todos
+            $n = count($tiene);
+            if ($tam === null || $n < $tam) { $mejor = (int) $gid; $tam = $n; $empate = false; }
+            elseif ($n === $tam) $empate = true;
+        }
+        return $empate ? null : $mejor;
+    }
+
     private function zonaPorLoCargado($filas, $torneoId)
     {
         $equipos = []; $desde = null; $hasta = null;
