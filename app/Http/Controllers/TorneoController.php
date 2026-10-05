@@ -4864,64 +4864,36 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC
             $fecha=Fecha::wherein('grupo_id',explode(',', $arrgrupos))->where('numero','=','Final')->first();
             if(!empty($fecha)){
                 //$resto=1;
-                $partidos=Partido::where('fecha_id','=',"$fecha->id")->get();
-                //dd($partidos);
+                // UNA FINAL DE IDA Y VUELTA SE DEFINE POR EL GLOBAL. Antes cada
+                // partido de la fecha «Final» ponía a su ganador y a su perdedor,
+                // así que con ida y vuelta salían 4 puestos con los dos
+                // finalistas repetidos (Colombia Finalización 2021: Tolima, Cali,
+                // Cali, Tolima). Ahora se agrupa por par de equipos: goles
+                // sumados, y si el global empata, los penales del ÚLTIMO partido
+                // (la vuelta). Con un partido solo da lo mismo que antes.
+                $partidos=Partido::where('fecha_id','=',"$fecha->id")
+                    ->whereNotNull('golesl')->whereNotNull('golesv')
+                    ->orderBy('dia')->orderBy('id')->get();
+                $llaves = array();
                 foreach ($partidos as $partido){
-                    if ($partido->golesl>$partido->golesv){
-                        $equipo=Equipo::findOrFail($partido->equipol_id);
-                        $data = [
-                            'equipo_id' => $partido->equipol_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                        $equipo=Equipo::findOrFail($partido->equipov_id);
-                        $data = [
-                            'equipo_id' => $partido->equipov_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                    }
-                    elseif ($partido->golesl<$partido->golesv){
-                        $equipo=Equipo::findOrFail($partido->equipov_id);
-                        $data = [
-                            'equipo_id' => $partido->equipov_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                        $equipo=Equipo::findOrFail($partido->equipol_id);
-                        $data = [
-                            'equipo_id' => $partido->equipol_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                    }
-                    elseif ($partido->penalesl>$partido->penalesv){
-                        $equipo=Equipo::findOrFail($partido->equipol_id);
-                        $data = [
-                            'equipo_id' => $partido->equipol_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                        $equipo=Equipo::findOrFail($partido->equipov_id);
-                        $data = [
-                            'equipo_id' => $partido->equipov_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                    }
-                    else{
-                        $equipo=Equipo::findOrFail($partido->equipov_id);
-                        $data = [
-                            'equipo_id' => $partido->equipov_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
-                        $equipo=Equipo::findOrFail($partido->equipol_id);
-                        $data = [
-                            'equipo_id' => $partido->equipol_id,
-                            'foto' => $equipo->escudo
-                        ];
-                        $posiciones[]=(object) $data;
+                    $a = min((int) $partido->equipol_id, (int) $partido->equipov_id);
+                    $b = max((int) $partido->equipol_id, (int) $partido->equipov_id);
+                    $k = $a.'-'.$b;
+                    if (!isset($llaves[$k])) $llaves[$k] = array('goles' => array($a => 0, $b => 0), 'ultimo' => null);
+                    $llaves[$k]['goles'][(int) $partido->equipol_id] += (int) $partido->golesl;
+                    $llaves[$k]['goles'][(int) $partido->equipov_id] += (int) $partido->golesv;
+                    $llaves[$k]['ultimo'] = $partido;
+                }
+                foreach ($llaves as $llave){
+                    $u = $llave['ultimo'];
+                    $l = (int) $u->equipol_id; $v = (int) $u->equipov_id;
+                    if ($llave['goles'][$l] > $llave['goles'][$v])      { $ganador = $l; $perdedor = $v; }
+                    elseif ($llave['goles'][$l] < $llave['goles'][$v])  { $ganador = $v; $perdedor = $l; }
+                    elseif ($u->penalesl > $u->penalesv)                { $ganador = $l; $perdedor = $v; }
+                    else                                                { $ganador = $v; $perdedor = $l; }
+                    foreach (array($ganador, $perdedor) as $eqId){
+                        $equipo=Equipo::findOrFail($eqId);
+                        $posiciones[]=(object) array('equipo_id' => $eqId, 'foto' => $equipo->escudo);
                     }
                 }
             }
