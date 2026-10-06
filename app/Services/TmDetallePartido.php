@@ -4336,7 +4336,8 @@ class TmDetallePartido
      *   2. si no, el único nacido el día que dice la ficha;
      *   3. si no, el único cuyo nombre de pila no choca con el de la ficha;
      *   4. si no, el único cuyo PRIMER nombre de pila es el de la ficha
-     *      (mellizos Quina: "Nelinho Minzún" / "Minzum Nelinho").
+     *      (mellizos Quina: "Nelinho Minzún" / "Minzum Nelinho");
+     *   5. si no, el único con el nombre completo idéntico al de la ficha.
      *
      * Los pasos 2-4 sólo deciden si están los perfiles de TODOS los ids.
      *
@@ -4382,6 +4383,18 @@ class TmDetallePartido
             }
             if (count($coinciden) === 1) return ['dueno' => $coinciden[0], 'motivo' => 'el único con el primer nombre de la ficha'];
         }
+
+        // 5) El único con el nombre completo IDÉNTICO al de la ficha (mismas
+        // palabras, sin importar el orden ni cómo se partió apellido/nombre).
+        // «Álvarez, Juan Pablo» contra «Mosquera Álvarez, Juan Alberto»: el
+        // «juan» compartido hacía que los dos pasaran el paso 3.
+        $ficha = $tokensBase; sort($ficha);
+        $iguales = [];
+        foreach ($datosDe as $id => $d) {
+            $t = $this->tokensNombre($d['apellido'] . ' ' . $d['nombre']); sort($t);
+            if ($t === $ficha) $iguales[] = (string) $id;
+        }
+        if (count($iguales) === 1) return ['dueno' => $iguales[0], 'motivo' => 'el único con el nombre completo de la ficha'];
 
         return ['dueno' => null, 'motivo' => 'ningún dato distingue cuál es el de la ficha'];
     }
