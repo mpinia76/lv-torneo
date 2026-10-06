@@ -3939,6 +3939,17 @@ class TmDetallePartido
             $libre = $this->personaExistenteSinRol($datos);
             if ($libre) {
                 $persona = Persona::findOrFail($libre['id']);
+                // La persona ya tiene ficha de jugador y esa ficha es de OTRO id
+                // de TM: es otra persona (Raúl / Sergio Domínguez Carral, mismos
+                // apellidos y misma fecha). No se reusa: se crea una nueva.
+                if ($persona->jugador && $this->fichaDeOtroTm((int) $persona->jugador->id, $tmId)) {
+                    $this->aviso('"' . $libre['base'] . '" (persona #' . $libre['id'] . ') se parece a ' . $etiqueta
+                        . ', pero su ficha de jugador ya es de otro id de TM: creo una persona nueva.');
+                    $libre = null;
+                }
+            }
+            if ($libre) {
+                // (persona ya cargada con otro rol)
             } else {
                 $foto = $this->descargarFoto($datos['portrait'], $etiqueta);
                 if ($foto) $datos['persona']['foto'] = $foto;
