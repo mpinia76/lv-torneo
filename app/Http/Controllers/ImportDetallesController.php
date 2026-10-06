@@ -6354,6 +6354,431 @@ class ImportDetallesController extends Controller
         return $this->pagina('Mapeos dudosos', $cuerpo);
     }
 
+    // ═══════ FICHAS MEZCLADAS: más de un id de TM en la misma ficha (oct-2026) ═══════
+    //
+    // Mellizos Quina: Minzum (TM 104415) quedó atado a la ficha de Nelinho
+    // (#15590) y todos sus partidos se cargaron a Nelinho. Hacerlo a mano —
+    // separar, mover club por club, rehacer los partidos donde jugaron juntos —
+    // no escala, y con mellizos que jugaron en el mismo club Mover por club ni
+    // siquiera sirve. Esta pantalla lo hace en lote:
+    //
+    //   1. Clasificar (1 llamada cada 50 ids): misma persona / dos personas
+    //      con dueño claro / dudosa. Ver TmDetallePartido::clasificarFichasMezcladas.
+    //   2. Confirmar las «misma» (origen = confirmado) y separar las «dos».
+    //   3. Rehacer TODOS los partidos de la ficha vieja que tengan gameId: con
+    //      el mapeo ya corregido, cada partido escribe a cada uno en su ficha.
+    //      1 llamada por partido. Al terminar se limpia la plantilla.
+
+    const LLAVE_MEZCLADAS = 'import_detalles.fichas_mezcladas';
+    const LLAVE_MEZCLADAS_SEP = 'import_detalles.fichas_mezcladas_separados';
+
+    /** Filas de jugador_tm de las fichas con 2+ ids, salvo las ya confirmadas. */
+    private function filasFichasMezcladas()
+    {
+        $fichas = DB::table('jugador_tm')
+            ->groupBy('jugador_id')
+            ->havingRaw('COUNT(DISTINCT tm_player_id) > 1')
+            ->havingRaw("SUM(CASE WHEN origen = 'confirmado' THEN 0 ELSE 1 END) > 0")
+            ->pluck('jugador_id')->all();
+        if (!$fichas) return [];
+
+        return DB::table('jugador_tm as jt')
+            ->join('jugadors as j', 'j.id', '=', 'jt.jugador_id')
+            ->join('personas as p', 'p.id', '=', 'j.persona_id')
+            ->whereIn('jt.jugador_id', $fichas)
+            ->orderBy('p.apellido')->orderBy('jt.jugador_id')->orderBy('jt.tm_player_id')
+            ->get(['jt.jugador_id', 'jt.tm_player_id', 'jt.nombre_tm', 'jt.origen', 'j.transfermarkt_url',
+                'p.apellido', 'p.nombre', 'p.nacimiento'])
+            ->all();
+    }
+
+    public function fichasMezcladas(Request $request)
+    {
+        $volver = '<p class="sub"><a href="' . e(route('import_detalles.mapeos_dudosos')) . '">← Mapeos dudosos</a></p>';
+        $filas = $this->filasFichasMezcladas();
+
+        if ((string) $request->get('clasificar', '0') === '1') {
+            set_time_limit(0);
+            $tm = new TmDetallePartido();
+            $informe = ['llamadas' => 0];
+            $res = $tm->clasificarFichasMezcladas($filas, $informe);
+            \Illuminate\Support\Facades\Cache::put(self::LLAVE_MEZCLADAS, [
+                'cuando' => now()->format('d/m/Y H:i'), 'llamadas' => $informe['llamadas'], 'fichas' => $res,
+            ], 86400);
+            return redirect()->route('import_detalles.fichas_mezcladas');
+        }
+
+        $nFichas = count(array_unique(array_map(function ($r) { return (int) $r->jugador_id; }, $filas)));
+        $cuerpo = $volver . '<h1>Fichas mezcladas</h1>'
+            . '<p class="sub">Fichas con <b>más de un id de TM</b>: casi siempre dos personas (mellizos, homónimos '
+            . 'con la misma fecha) cuyos partidos se cargaron en una sola ficha. Hay <b>' . $nFichas . '</b>.</p>'
+            . '<ol class="sub"><li><b>Clasificar</b>: baja los perfiles de TM (' . (int) ceil(max(1, count($filas)) / 50)
+            . ' llamada) y decide cuáles son la misma persona con dos perfiles y, si son dos, quién es el dueño de la ficha.</li>'
+            . '<li><b>Confirmar</b> las que son la misma persona y <b>Separar</b> las que son dos (1 llamada por separado).</li>'
+            . '<li><b>Rehacer los partidos</b> de cada ficha separada: 1 llamada por partido. Reemplaza alineación, goles, '
+            . 'tarjetas, cambios y árbitros de esos partidos con lo de TM (lo editado a mano en ellos se pierde) y '
+            . 'al final arregla la plantilla.</li></ol>'
+            . '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.fichas_mezcladas', ['clasificar' => 1]))
+            . '">Clasificar</a></p>';
+
+        if (session('ok_mezcladas')) $cuerpo .= '<div class="ok-box">' . session('ok_mezcladas') . '</div>';
+        $cuerpo .= $this->seccionMezcladasSeparadas();
+
+        $guardado = \Illuminate\Support\Facades\Cache::get(self::LLAVE_MEZCLADAS);
+        if (!$guardado) {
+            return $this->pagina('Fichas mezcladas', $cuerpo . '<p class="sub">Todavía no se clasificó (o pasó más de un día).</p>');
+        }
+
+        // Sólo las que siguen pendientes (las ya separadas o confirmadas no vuelven).
+        $vigentes = [];
+        foreach ($filas as $r) $vigentes[(int) $r->jugador_id] = true;
+        $grupos = ['dos' => [], 'misma' => [], 'dudosa' => []];
+        foreach ($guardado['fichas'] as $jid => $c) {
+            if (isset($vigentes[(int) $jid])) $grupos[$c['tipo']][(int) $jid] = $c;
+        }
+        $partidos = $vigentes ? DB::table('alineacions')->whereIn('jugador_id', array_keys($vigentes))
+            ->groupBy('jugador_id')->selectRaw('jugador_id, COUNT(DISTINCT partido_id) AS n')
+            ->pluck('n', 'jugador_id')->all() : [];
+
+        $cuerpo .= '<p class="sub">Clasificado el ' . e($guardado['cuando']) . ' (' . (int) $guardado['llamadas']
+            . ' llamada(s)). Esto <b>no verifica carreras</b>: decide por fecha y nombres. Mirá la lista antes de apretar.</p>';
+
+        $form = function ($ruta, $texto, $n) {
+            if (!$n) return '';
+            return '<form method="post" action="' . e(route($ruta)) . '" style="margin:.5em 0">'
+                . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                . '<button class="boton" type="submit">' . e($texto) . '</button></form>';
+        };
+
+        $cuerpo .= '<h2>Dos personas (' . count($grupos['dos']) . ')</h2>'
+            . '<p class="sub">Se queda en la ficha el <b>dueño</b>; los otros ids se sueltan y van a su propia ficha '
+            . '(la que ya exista con su nombre o una nueva).</p>'
+            . $this->tablaMezcladas($grupos['dos'], $partidos)
+            . $form('import_detalles.fichas_mezcladas_separar', 'Separar las ' . count($grupos['dos']), count($grupos['dos']))
+            . '<h2>La misma persona con dos perfiles en TM (' . count($grupos['misma']) . ')</h2>'
+            . '<p class="sub">Misma fecha, mismos nombres de pila y apellido igual o casi igual. Confirmar no toca '
+            . 'ningún partido: sólo las saca de esta lista.</p>'
+            . $this->tablaMezcladas($grupos['misma'], $partidos)
+            . $form('import_detalles.fichas_mezcladas_confirmar', 'Confirmar las ' . count($grupos['misma']), count($grupos['misma']))
+            . '<h2>Dudosas (' . count($grupos['dudosa']) . ')</h2>'
+            . '<p class="sub">No se pudo decidir solo. Se resuelven a mano en Mapeos dudosos (Separar en el id que no '
+            . 'es el dueño) y después se rehacen desde «Separadas» acá arriba.</p>'
+            . $this->tablaMezcladas($grupos['dudosa'], $partidos);
+
+        return $this->pagina('Fichas mezcladas', $cuerpo);
+    }
+
+    private function tablaMezcladas(array $grupo, array $partidos)
+    {
+        if (!$grupo) return '<div class="ok-box">Ninguna.</div>';
+        $h = '<table><thead><tr><th>ficha</th><th>nació (base)</th><th>partidos</th><th>id TM</th><th>según TM</th>'
+            . '<th>nació (TM)</th><th></th></tr></thead><tbody>';
+        foreach ($grupo as $jid => $c) {
+            $f = $c['ficha'];
+            $ids = array_keys($c['tm']);
+            if (!$ids) $ids = ['?'];
+            $primero = true;
+            foreach ($ids as $id) {
+                $id = (string) $id;
+                $t = isset($c['tm'][$id]) ? $c['tm'][$id] : null;
+                $rol = '';
+                if ($c['tipo'] === 'dos') {
+                    $rol = $id === (string) $c['dueno'] ? '<b class="ok">dueño</b>' : '<b class="err">separar</b>';
+                }
+                $h .= '<tr>'
+                    . ($primero ? '<td rowspan="' . count($ids) . '"><a href="' . e(route('jugadores.ver', ['jugadorId' => (int) $jid]))
+                        . '" target="_blank">#' . (int) $jid . ' ' . e(trim($f->apellido . ', ' . $f->nombre)) . '</a>'
+                        . '<br><small>' . e($c['motivo']) . '</small></td>'
+                        . '<td rowspan="' . count($ids) . '">' . e($f->nacimiento ? substr((string) $f->nacimiento, 0, 10) : '—') . '</td>'
+                        . '<td rowspan="' . count($ids) . '">' . (int) ($partidos[(int) $jid] ?? 0) . '</td>' : '')
+                    . '<td><a href="https://www.transfermarkt.es/-/profil/spieler/' . e($id) . '" target="_blank">' . e($id) . '</a></td>'
+                    . '<td>' . e($t ? trim($t['apellido'] . ', ' . $t['nombre']) : '—') . '</td>'
+                    . '<td>' . e($t && $t['nacimiento'] ? $t['nacimiento'] : '—') . '</td>'
+                    . '<td>' . $rol . '</td></tr>';
+                $primero = false;
+            }
+        }
+        return $h . '</tbody></table>';
+    }
+
+    public function fichasMezcladasConfirmar(Request $request)
+    {
+        $guardado = \Illuminate\Support\Facades\Cache::get(self::LLAVE_MEZCLADAS);
+        $n = 0;
+        if ($guardado) {
+            foreach ($guardado['fichas'] as $jid => $c) {
+                if ($c['tipo'] !== 'misma') continue;
+                $n += DB::table('jugador_tm')->where('jugador_id', (int) $jid)
+                    ->whereIn('tm_player_id', array_keys($c['tm']))->update(['origen' => 'confirmado']);
+            }
+        }
+        return redirect()->route('import_detalles.fichas_mezcladas')
+            ->with('ok_mezcladas', 'Confirmé ' . $n . ' mapeo(s) como la misma persona. No toqué ningún partido.');
+    }
+
+    public function fichasMezcladasSeparar(Request $request)
+    {
+        set_time_limit(0);
+        $guardado = \Illuminate\Support\Facades\Cache::get(self::LLAVE_MEZCLADAS);
+        $vigentes = [];
+        foreach ($this->filasFichasMezcladas() as $r) $vigentes[(int) $r->jugador_id][(string) $r->tm_player_id] = true;
+
+        $lineas = [];
+        if ($guardado) {
+            foreach ($guardado['fichas'] as $jid => $c) {
+                if ($c['tipo'] !== 'dos' || !isset($vigentes[(int) $jid])) continue;
+                foreach ($c['separar'] as $tmId) {
+                    $tmId = (string) $tmId;
+                    if (!isset($vigentes[(int) $jid][$tmId])) continue;   // ya no está atado ahí
+                    $tm = new TmDetallePartido();
+                    $informe = ['llamadas' => 0];
+                    $r = $tm->separarMapeoJugador($tmId, $informe);
+                    $quien = isset($c['tm'][$tmId]) ? trim($c['tm'][$tmId]['apellido'] . ', ' . $c['tm'][$tmId]['nombre']) : 'TM ' . $tmId;
+                    if (!$r['ok']) {
+                        $lineas[] = '<li><span class="err">✘</span> ' . e($quien) . ' (TM ' . e($tmId) . '): ' . e($r['mensaje']) . '</li>';
+                        continue;
+                    }
+                    $this->anotarSeparado($tmId, (int) $r['viejo'], (int) $r['nuevo']);
+                    $this->anotarMezcladaSeparada($tmId, (int) $r['viejo'], (int) $r['nuevo']);
+                    $lineas[] = '<li><span class="ok">✔</span> ' . e($quien) . ' (TM ' . e($tmId) . ') → '
+                        . e($r['descripcion']) . '</li>';
+                }
+            }
+        }
+
+        return redirect()->route('import_detalles.fichas_mezcladas')
+            ->with('ok_mezcladas', $lineas ? '<b>Separados:</b><ul>' . implode('', $lineas) . '</ul>Ahora rehacé los '
+                . 'partidos de cada uno en «Separadas».' : 'No había nada para separar (¿clasificaste?).');
+    }
+
+    private function anotarMezcladaSeparada($tmId, $viejo, $nuevo)
+    {
+        $lista = \Illuminate\Support\Facades\Cache::get(self::LLAVE_MEZCLADAS_SEP, []);
+        $lista[(string) $tmId] = ['viejo' => (int) $viejo, 'nuevo' => (int) $nuevo,
+            'cuando' => now()->format('d/m/Y H:i')];
+        \Illuminate\Support\Facades\Cache::put(self::LLAVE_MEZCLADAS_SEP, $lista, 86400 * 90);
+    }
+
+    private function seccionMezcladasSeparadas()
+    {
+        $lista = \Illuminate\Support\Facades\Cache::get(self::LLAVE_MEZCLADAS_SEP, []);
+        if (!$lista) return '';
+
+        $ids = [];
+        foreach ($lista as $s) { $ids[] = $s['viejo']; $ids[] = $s['nuevo']; }
+        $nombres = DB::table('jugadors')->join('personas', 'personas.id', '=', 'jugadors.persona_id')
+            ->whereIn('jugadors.id', $ids)->get(['jugadors.id', 'personas.apellido', 'personas.nombre'])
+            ->keyBy('id');
+        $nom = function ($id) use ($nombres) {
+            $n = $nombres->get($id);
+            return '#' . (int) $id . ($n ? ' ' . trim($n->apellido . ', ' . $n->nombre) : '');
+        };
+
+        $h = '<h2>Separadas: rehacer sus partidos (' . count($lista) . ')</h2>'
+            . '<table><thead><tr><th>id TM</th><th>estaba en</th><th>ahora en</th><th>estado</th><th></th></tr></thead><tbody>';
+        foreach ($lista as $tmId => $s) {
+            $estado = \Illuminate\Support\Facades\Cache::get($this->llaveColaMezclada($s['viejo'], $s['nuevo']));
+            $txt = !$estado ? 'sin empezar'
+                : (empty($estado['cola']) ? 'listo · ' . (int) $estado['ok'] . ' rehechos'
+                    . (count($estado['fallados']) ? ', ' . count($estado['fallados']) . ' con problema' : '')
+                    . (count($estado['sin_game']) ? ', ' . count($estado['sin_game']) . ' sin gameId' : '')
+                  : 'faltan ' . count($estado['cola']) . ' de ' . (int) $estado['total']);
+            $h .= '<tr><td>' . e($tmId) . '</td><td>' . e($nom($s['viejo'])) . '</td><td>' . e($nom($s['nuevo'])) . '</td>'
+                . '<td>' . e($txt) . '</td><td><a class="boton" href="' . e(route('import_detalles.fichas_mezcladas_rehacer',
+                    ['viejo' => $s['viejo'], 'nuevo' => $s['nuevo'], 'seguir' => 1])) . '" target="_blank">'
+                . (!$estado ? 'Rehacer partidos' : (empty($estado['cola']) ? 'Ver' : 'Seguir')) . '</a></td></tr>';
+        }
+        return $h . '</tbody></table>';
+    }
+
+    private function llaveColaMezclada($viejo, $nuevo)
+    {
+        return 'import_detalles.fichas_mezcladas_cola.' . (int) $viejo . '-' . (int) $nuevo;
+    }
+
+    /**
+     * Rehace, en tandas, los partidos donde está la ficha vieja. La lista se
+     * congela la primera vez (la ficha vieja va saliendo de los partidos a
+     * medida que se rehacen, así que recalcularla cada vez saltearía partidos).
+     */
+    public function fichasMezcladasRehacer(Request $request)
+    {
+        set_time_limit(0);
+        $viejo = (int) $request->get('viejo', 0);
+        $nuevo = (int) $request->get('nuevo', 0);
+        $n = max(1, min(30, (int) $request->get('n', 10)));
+        $seguir = (string) $request->get('seguir', '0') === '1';
+        $volver = '<p class="sub"><a href="' . e(route('import_detalles.fichas_mezcladas')) . '">← Fichas mezcladas</a></p>';
+        if (!$viejo || !$nuevo || $viejo === $nuevo) {
+            return $this->pagina('Rehacer', $volver . '<div class="err-box">Faltan las dos fichas.</div>');
+        }
+
+        $llave = $this->llaveColaMezclada($viejo, $nuevo);
+        $estado = \Illuminate\Support\Facades\Cache::get($llave);
+        if (!$estado) {
+            $partidos = DB::table('alineacions')->where('jugador_id', $viejo)
+                ->distinct()->pluck('partido_id')->map(function ($x) { return (int) $x; })->all();
+            $gameDe = [];
+            foreach (array_chunk($partidos, 500) as $trozo) {
+                foreach (DB::table('import_partidos')->whereIn('partido_id', $trozo)->whereNotNull('external_id')
+                             ->whereIn('estado', ['aplicado', 'duplicado'])->orderBy('id')
+                             ->get(['partido_id', 'external_id']) as $f) {
+                    if (!isset($gameDe[(int) $f->partido_id])) $gameDe[(int) $f->partido_id] = (string) $f->external_id;
+                }
+            }
+            $cola = []; $sinGame = [];
+            foreach ($partidos as $pid) {
+                if (isset($gameDe[$pid])) $cola[] = ['partido_id' => $pid, 'game_id' => $gameDe[$pid]];
+                else $sinGame[] = $pid;
+            }
+            $estado = ['cola' => $cola, 'sin_game' => $sinGame, 'ok' => 0, 'fallados' => [],
+                'total' => count($cola), 'plantillas' => null];
+        }
+
+        $tm = new TmDetallePartido();
+        $ok = 0; $fallaron = 0; $llamadas = 0; $detalle = '';
+        $tanda = array_splice($estado['cola'], 0, $n);
+        foreach ($tanda as $item) {
+            $pid = (int) $item['partido_id'];
+            $etiqueta = 'partido #' . $pid . ' · <a href="' . e(route('import_detalles.ver', ['partido_id' => $pid])) . '">ver</a>';
+            $otros = $this->gameIdsDelPartido($pid, (string) $item['game_id']);
+            if ($otros) {
+                $fallaron++;
+                $estado['fallados'][] = $pid;
+                $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — tiene más de un gameId: <a href="'
+                    . e(route('import_detalles.gameids', ['partido_id' => $pid])) . '">resolverlo</a></div>';
+                continue;
+            }
+            $r = $tm->importar($pid, (string) $item['game_id'], ['escribir' => true, 'forzar' => true]);
+            $llamadas += (int) $r['llamadas'];
+            if ($r['escrito']) {
+                $ok++;
+                $estado['ok']++;
+                $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . '</div>';
+            } else {
+                $fallaron++;
+                $estado['fallados'][] = $pid;
+                $detalle .= '<div><span class="err">✘</span> ' . $etiqueta . ' — ' . e((string) $r['error']) . '</div>';
+            }
+            foreach ($r['avisos'] as $a) {
+                $detalle .= '<div class="sub" style="margin-left:18px">• ' . $this->avisoHtml($a) . '</div>';
+            }
+        }
+
+        if (empty($estado['cola']) && $estado['plantillas'] === null) {
+            $estado['plantillas'] = $this->limpiarPlantillasMezcladas($viejo, $nuevo);
+        }
+        \Illuminate\Support\Facades\Cache::put($llave, $estado, 86400 * 90);
+
+        $quedan = count($estado['cola']);
+        $cuerpo = $volver . '<h1>Rehacer partidos de la ficha separada</h1>'
+            . '<p class="sub">Partidos donde estaba la ficha #' . $viejo . '. Con el mapeo corregido, cada uno queda '
+            . 'en su ficha (#' . $viejo . ' o #' . $nuevo . ').</p>'
+            . '<div class="cards">'
+            . $this->card($ok, 'Rehechos en esta tanda', 'ok')
+            . $this->card($fallaron, 'Con problema', $fallaron ? 'err' : '')
+            . $this->card($llamadas, 'Llamadas a la API')
+            . $this->card($quedan, 'Quedan', $quedan ? 'warn' : 'ok')
+            . '</div>';
+
+        if ($quedan && $seguir && $ok > 0) {
+            $urlProx = route('import_detalles.fichas_mezcladas_rehacer', ['viejo' => $viejo, 'nuevo' => $nuevo, 'n' => $n, 'seguir' => 1]);
+            $cuerpo .= '<div class="ok-box" id="seguir-caja"><b>Sigo solo</b> en <b id="seguir-seg">5</b> segundos. '
+                . '<a class="boton-sec" href="#" id="seguir-parar">Parar</a></div>'
+                . '<script>(function(){var s=5,c=document.getElementById("seguir-seg"),p=document.getElementById("seguir-parar"),'
+                . 't=setInterval(function(){s--;if(c){c.textContent=s;}if(s<=0){clearInterval(t);location.href='
+                . json_encode($urlProx) . ';}},1000);if(p){p.addEventListener("click",function(e){e.preventDefault();'
+                . 'clearInterval(t);document.getElementById("seguir-caja").innerHTML="<b>Parado.</b>";});}})();</script>';
+        } elseif ($quedan) {
+            $cuerpo .= ($seguir && $ok === 0 && $tanda ? '<div class="err-box"><b>Corté la cadena:</b> esta tanda no pudo con '
+                . 'ninguno. Mirá los errores.</div>' : '')
+                . '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.fichas_mezcladas_rehacer',
+                    ['viejo' => $viejo, 'nuevo' => $nuevo, 'n' => $n, 'seguir' => 1])) . '">Seguir</a></p>';
+        } else {
+            $cuerpo .= '<div class="ok-box"><b>Listo.</b> ' . (int) $estado['ok'] . ' partidos rehechos de ' . (int) $estado['total'] . '.</div>';
+            if ($estado['plantillas']) {
+                $cuerpo .= '<h2>Plantillas</h2><ul>';
+                foreach ($estado['plantillas'] as $l) $cuerpo .= '<li>' . e($l) . '</li>';
+                $cuerpo .= '</ul>';
+            }
+        }
+
+        if ($estado['fallados']) {
+            $cuerpo .= '<h2>Con problema (' . count($estado['fallados']) . ')</h2><p class="sub">';
+            foreach (array_unique($estado['fallados']) as $pid) {
+                $cuerpo .= '<a href="' . e(route('import_detalles.ver', ['partido_id' => (int) $pid])) . '">#' . (int) $pid . '</a> ';
+            }
+            $cuerpo .= '</p>';
+        }
+        if ($estado['sin_game']) {
+            $cuerpo .= '<h2>Sin gameId (' . count($estado['sin_game']) . ')</h2><p class="sub">Se cargaron por otro '
+                . 'camino y no se pueden rehacer desde TM: si en alguno el que jugó es el otro, corregilo a mano.</p><p class="sub">';
+            foreach ($estado['sin_game'] as $pid) {
+                $cuerpo .= '<a href="' . e(url('admin/alineaciones') . '?partidoId=' . (int) $pid) . '" target="_blank">#'
+                    . (int) $pid . '</a> ';
+            }
+            $cuerpo .= '</p>';
+        }
+
+        return $this->pagina('Rehacer', $cuerpo . ($detalle ? '<div class="diag">' . $detalle . '</div>' : ''));
+    }
+
+    /**
+     * Después de rehacer: en cada torneo+equipo donde ahora juega la ficha
+     * nueva y la vieja no jugó ningún partido, la fila de la vieja en la
+     * plantilla es la del otro (el importador la puso ahí con el mapeo malo).
+     * Si la nueva no está, se le pasa la fila; si está, se borra la de la vieja
+     * y la nueva hereda el dorsal si no tenía (caso N. Quina con el 20 en Ayacucho).
+     */
+    private function limpiarPlantillasMezcladas($viejo, $nuevo)
+    {
+        $jugo = [];
+        foreach (DB::table('alineacions as a')
+                     ->join('partidos as p', 'p.id', '=', 'a.partido_id')
+                     ->join('fechas as f', 'f.id', '=', 'p.fecha_id')
+                     ->join('grupos as g', 'g.id', '=', 'f.grupo_id')
+                     ->whereIn('a.jugador_id', [$viejo, $nuevo])
+                     ->select('a.jugador_id', 'a.equipo_id', 'g.torneo_id')->distinct()->get() as $r) {
+            $jugo[(int) $r->jugador_id][(int) $r->torneo_id . '-' . (int) $r->equipo_id] = true;
+        }
+
+        $lineas = [];
+        foreach (array_keys(isset($jugo[$nuevo]) ? $jugo[$nuevo] : []) as $k) {
+            if (isset($jugo[$viejo][$k])) continue;
+            list($torneoId, $equipoId) = array_map('intval', explode('-', $k));
+            $plantillas = DB::table('plantillas')->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+                ->where('grupos.torneo_id', $torneoId)->where('plantillas.equipo_id', $equipoId)
+                ->pluck('plantillas.id')->all();
+            if (!$plantillas) continue;
+
+            $filaViejo = DB::table('plantilla_jugadors')->whereIn('plantilla_id', $plantillas)->where('jugador_id', $viejo)->first();
+            if (!$filaViejo) continue;
+            $filaNuevo = DB::table('plantilla_jugadors')->whereIn('plantilla_id', $plantillas)->where('jugador_id', $nuevo)->first();
+            $donde = $this->nombreEquipo($equipoId) . ' (torneo #' . $torneoId . ')';
+
+            try {
+                if (!$filaNuevo) {
+                    DB::table('plantilla_jugadors')->where('id', $filaViejo->id)->update(['jugador_id' => $nuevo]);
+                    $lineas[] = $donde . ': la fila de #' . $viejo . ' pasó a #' . $nuevo
+                        . ($filaViejo->dorsal ? ' con el ' . $filaViejo->dorsal : '') . '.';
+                } else {
+                    DB::table('plantilla_jugadors')->where('id', $filaViejo->id)->delete();
+                    $txt = $donde . ': saqué a #' . $viejo;
+                    if (($filaNuevo->dorsal === null || $filaNuevo->dorsal === '' || (int) $filaNuevo->dorsal === 0)
+                        && $filaViejo->dorsal) {
+                        DB::table('plantilla_jugadors')->where('id', $filaNuevo->id)->update(['dorsal' => $filaViejo->dorsal]);
+                        $txt .= ' y #' . $nuevo . ' quedó con el ' . $filaViejo->dorsal;
+                    }
+                    $lineas[] = $txt . '.';
+                }
+            } catch (\Exception $ex) {
+                $lineas[] = $donde . ': no pude arreglarla (' . $ex->getMessage() . '). Revisala a mano.';
+            }
+        }
+        if (!$lineas) $lineas[] = 'No hizo falta tocar ninguna plantilla.';
+        return $lineas;
+    }
+
     /**
      * Fichas con MÁS DE UN id de TM atado (oct-2026). Sin llamadas a la API.
      *
@@ -6368,12 +6793,12 @@ class ImportDetallesController extends Controller
      */
     private function seccionFichasConVariosTm()
     {
-        $fichas = DB::table('jugador_tm')
-            ->groupBy('jugador_id')
-            ->havingRaw('COUNT(DISTINCT tm_player_id) > 1')
-            ->pluck('jugador_id')->all();
+        $fichas = array_values(array_unique(array_map(function ($r) { return (int) $r->jugador_id; },
+            $this->filasFichasMezcladas())));
 
         $cuerpo = '<h2>Fichas con más de un id de TM (' . count($fichas) . ')</h2>'
+            . '<p class="acciones"><a class="boton" href="' . e(route('import_detalles.fichas_mezcladas'))
+            . '">Resolverlas en lote →</a></p>'
             . '<p class="sub">Dos ids de TM en la misma ficha casi siempre son dos personas (mellizos, homónimos '
             . 'con la misma fecha): los partidos de uno se cargaron en la ficha del otro. Abrí los dos perfiles y '
             . 'apretá <b>Separar</b> en el que <b>no</b> es el dueño de la ficha; después movés sus clubes. Si TM '

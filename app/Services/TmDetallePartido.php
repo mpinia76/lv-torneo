@@ -4261,59 +4261,17 @@ class TmDetallePartido
             if (!$f) continue;
             $base = trim($f->apellido . ', ' . $f->nombre);
 
-            // 1) El id que la ficha dice tener.
-            $dueno = null;
-            if ($f->transfermarkt_url && preg_match('~/spieler/(\d+)~', $f->transfermarkt_url, $m)
-                && in_array($m[1], $ids, true)) {
-                $dueno = $m[1];
-            }
-
-            // Los perfiles de TM, para los pasos 2 y 3.
+            // Los perfiles de TM (también hacen falta para resolver a los que se sueltan).
             if ($perfiles === null) {
                 $todos = [];
                 foreach ($porFicha as $lista) foreach ($lista as $x) $todos[] = $x;
                 $perfiles = $this->traerPerfiles($todos, $informe);
             }
-            $tokensBase = $this->tokensNombre($f->apellido . ' ' . $f->nombre);
             $datosDe = [];
             foreach ($ids as $id) {
                 if (isset($perfiles[$id])) $datosDe[$id] = $this->personaDesdePerfil($perfiles[$id]);
             }
-            // 2) El único nacido el día que dice la ficha.
-            $nacFicha = $f->nacimiento ? substr((string) $f->nacimiento, 0, 10) : '';
-            if ($dueno === null && $nacFicha !== '' && $nacFicha !== '0000-00-00' && count($datosDe) === count($ids)) {
-                $mismaFecha = [];
-                foreach ($datosDe as $id => $d) {
-                    if (!empty($d['nacimiento']) && substr((string) $d['nacimiento'], 0, 10) === $nacFicha) $mismaFecha[] = $id;
-                }
-                if (count($mismaFecha) === 1) $dueno = (string) $mismaFecha[0];
-            }
-
-            // 3) El único cuyo nombre de pila cuadra con el de la ficha.
-            if ($dueno === null) {
-                $cuadran = [];
-                foreach ($datosDe as $id => $d) {
-                    $tokensTm = $this->tokensNombre($d['apellido'] . ' ' . $d['nombre']);
-                    if (!$this->nombresDePilaChocan($d['nombre'], $tokensTm, $f->nombre, $tokensBase)) $cuadran[] = $id;
-                }
-                if (count($cuadran) === 1 && count($datosDe) === count($ids)) $dueno = (string) $cuadran[0];
-            }
-
-            // 4) El único cuyo PRIMER nombre de pila es el primero de la ficha.
-            // Mellizos Quina: "Nelinho Minzún" y "Minzum Nelinho" pasan los
-            // pasos 2 y 3 los dos; lo único que los separa es el orden.
-            if ($dueno === null && count($datosDe) === count($ids)) {
-                $pilaFicha = $this->tokensNombre($f->nombre);
-                $primero = $pilaFicha ? reset($pilaFicha) : null;
-                $coinciden = [];
-                if ($primero !== null) {
-                    foreach ($datosDe as $id => $d) {
-                        $pila = $this->tokensNombre($d['nombre']);
-                        if ($pila && reset($pila) === $primero) $coinciden[] = $id;
-                    }
-                }
-                if (count($coinciden) === 1) $dueno = (string) $coinciden[0];
-            }
+            $dueno = $this->duenoDeFicha($f, $ids, $datosDe)['dueno'];
 
             if ($dueno === null) {
                 $this->aviso('Los jugadores TM ' . implode(' y ', $ids) . ' juegan este partido y están atados a la '
@@ -4358,6 +4316,140 @@ class TmDetallePartido
         }
 
         return $mapa;
+    }
+
+    /**
+     * Entre varios ids de TM atados a la misma ficha, ¿cuál es el dueño?
+     *
+     *   1. el id que figura en `jugadors.transfermarkt_url` de la ficha;
+     *   2. si no, el único nacido el día que dice la ficha;
+     *   3. si no, el único cuyo nombre de pila no choca con el de la ficha;
+     *   4. si no, el único cuyo PRIMER nombre de pila es el de la ficha
+     *      (mellizos Quina: "Nelinho Minzún" / "Minzum Nelinho").
+     *
+     * Los pasos 2-4 sólo deciden si están los perfiles de TODOS los ids.
+     *
+     * @param  object $f        fila con transfermarkt_url, apellido, nombre, nacimiento
+     * @param  string[] $ids    ids de TM (string)
+     * @param  array  $datosDe  id => personaDesdePerfil()
+     * @return array ['dueno' => string|null, 'motivo' => string]
+     */
+    private function duenoDeFicha($f, array $ids, array $datosDe)
+    {
+        if ($f->transfermarkt_url && preg_match('~/spieler/(\d+)~', $f->transfermarkt_url, $m)
+            && in_array($m[1], $ids, true)) {
+            return ['dueno' => $m[1], 'motivo' => 'es el id guardado en la ficha'];
+        }
+        if (count($datosDe) !== count($ids)) {
+            return ['dueno' => null, 'motivo' => 'falta el perfil de TM de alguno'];
+        }
+
+        $nacFicha = !empty($f->nacimiento) ? substr((string) $f->nacimiento, 0, 10) : '';
+        if ($nacFicha !== '' && $nacFicha !== '0000-00-00') {
+            $mismaFecha = [];
+            foreach ($datosDe as $id => $d) {
+                if (!empty($d['nacimiento']) && substr((string) $d['nacimiento'], 0, 10) === $nacFicha) $mismaFecha[] = (string) $id;
+            }
+            if (count($mismaFecha) === 1) return ['dueno' => $mismaFecha[0], 'motivo' => 'el único nacido el día de la ficha'];
+        }
+
+        $tokensBase = $this->tokensNombre($f->apellido . ' ' . $f->nombre);
+        $cuadran = [];
+        foreach ($datosDe as $id => $d) {
+            $tokensTm = $this->tokensNombre($d['apellido'] . ' ' . $d['nombre']);
+            if (!$this->nombresDePilaChocan($d['nombre'], $tokensTm, $f->nombre, $tokensBase)) $cuadran[] = (string) $id;
+        }
+        if (count($cuadran) === 1) return ['dueno' => $cuadran[0], 'motivo' => 'el único con el nombre de pila de la ficha'];
+
+        $pilaFicha = $this->tokensNombre($f->nombre);
+        $primero = $pilaFicha ? reset($pilaFicha) : null;
+        if ($primero !== null) {
+            $coinciden = [];
+            foreach ($datosDe as $id => $d) {
+                $pila = $this->tokensNombre($d['nombre']);
+                if ($pila && reset($pila) === $primero) $coinciden[] = (string) $id;
+            }
+            if (count($coinciden) === 1) return ['dueno' => $coinciden[0], 'motivo' => 'el único con el primer nombre de la ficha'];
+        }
+
+        return ['dueno' => null, 'motivo' => 'ningún dato distingue cuál es el de la ficha'];
+    }
+
+    /**
+     * Clasifica las fichas con más de un id de TM (pantalla Fichas mezcladas).
+     * Una llamada cada 50 ids. No escribe nada.
+     *
+     *   'misma'  : los perfiles son la misma persona (TM la tiene duplicada):
+     *              misma fecha, mismos nombres de pila y apellidos parecidos
+     *              (Guruceaga / Guruzeaga, los dos «Yomar Rocha»).
+     *   'dos'    : personas distintas y se sabe cuál es el dueño de la ficha;
+     *              'separar' son los demás ids.
+     *   'dudosa' : no se puede decidir solo.
+     *
+     * @param  object[] $filas  jugador_id, tm_player_id, nombre_tm, transfermarkt_url, apellido, nombre, nacimiento
+     * @return array jugador_id => ['tipo', 'motivo', 'dueno', 'separar' => string[], 'tm' => [id => datos], 'ficha' => obj]
+     */
+    public function clasificarFichasMezcladas(array $filas, array &$informe)
+    {
+        $porFicha = []; $fichas = []; $todos = [];
+        foreach ($filas as $r) {
+            $porFicha[(int) $r->jugador_id][] = (string) $r->tm_player_id;
+            $fichas[(int) $r->jugador_id] = $r;
+            $todos[(string) $r->tm_player_id] = true;
+        }
+        $perfiles = $todos ? $this->traerPerfiles(array_keys($todos), $informe) : [];
+
+        $out = [];
+        foreach ($porFicha as $jid => $ids) {
+            $ids = array_values(array_unique($ids));
+            $f = $fichas[$jid];
+            $datosDe = [];
+            foreach ($ids as $id) {
+                if (isset($perfiles[$id])) $datosDe[$id] = $this->personaDesdePerfil($perfiles[$id]);
+            }
+            $res = ['tipo' => 'dudosa', 'motivo' => '', 'dueno' => null, 'separar' => [], 'tm' => [], 'ficha' => $f];
+            foreach ($datosDe as $id => $d) {
+                $res['tm'][(string) $id] = ['apellido' => $d['apellido'], 'nombre' => $d['nombre'],
+                    'nacimiento' => $d['nacimiento']];
+            }
+
+            if (count($datosDe) !== count($ids)) {
+                $res['motivo'] = 'no pude bajar el perfil de TM de alguno';
+                $out[$jid] = $res;
+                continue;
+            }
+
+            // ¿La misma persona con dos perfiles?
+            $misma = true; $ref = null;
+            foreach ($datosDe as $id => $d) {
+                if ($ref === null) { $ref = $d; continue; }
+                // En ORDEN: los Quina tienen los mismos nombres al revés.
+                $pilaA = $this->tokensNombre($ref['nombre']);
+                $pilaB = $this->tokensNombre($d['nombre']);
+                if (empty($ref['nacimiento']) || $ref['nacimiento'] !== $d['nacimiento']
+                    || $pilaA !== $pilaB
+                    || $this->parecidoApellidos($ref['apellido'], $ref['nombre'], $d['apellido'], $d['nombre']) < 80) {
+                    $misma = false;
+                    break;
+                }
+            }
+            if ($misma) {
+                $res['tipo'] = 'misma';
+                $res['motivo'] = 'misma fecha, mismos nombres de pila y apellido igual o casi igual';
+                $out[$jid] = $res;
+                continue;
+            }
+
+            $d = $this->duenoDeFicha($f, $ids, $datosDe);
+            $res['motivo'] = $d['motivo'];
+            if ($d['dueno'] !== null) {
+                $res['tipo'] = 'dos';
+                $res['dueno'] = $d['dueno'];
+                foreach ($ids as $id) if ($id !== $d['dueno']) $res['separar'][] = $id;
+            }
+            $out[$jid] = $res;
+        }
+        return $out;
     }
 
     /**
