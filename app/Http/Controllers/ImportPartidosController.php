@@ -4457,13 +4457,14 @@ class ImportPartidosController extends Controller
      */
     /**
      * El número de una jornada de liga, si el gameday de TM lo es:
-     * «5», «5. Jornada», «Jornada 5», «5. Spieltag», «Speeldag 5» -> '5'.
+     * «5», «5. Jornada», «5ª jornada», «Jornada 5», «5. Spieltag», «Speeldag 5» -> '5'.
+     * El «5ª jornada» lo arma `fixtureDesdeClubes()` (y es como lo escribe TM en español).
      * Una hora («14:30»), «Grupo A» u «Octavos» -> null.
      */
     private function numeroDeJornada($gameday)
     {
         $pal = '(?:jornada|fecha|spieltag|speeldag|matchday|giornata|journ[ée]e|rodada|round|runde)';
-        if (preg_match('/^\s*(?:' . $pal . '\s*)?(\d{1,3})\s*\.?\s*(?:' . $pal . ')?\s*$/iu', (string) $gameday, $m)) {
+        if (preg_match('/^\s*(?:' . $pal . '\s*)?(\d{1,3})\s*[ªº°]?\s*\.?\s*(?:' . $pal . ')?\s*$/iu', (string) $gameday, $m)) {
             return (string) (int) $m[1];
         }
         return null;
