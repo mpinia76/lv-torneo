@@ -6295,6 +6295,7 @@ class ImportDetallesController extends Controller
             $cuerpo .= '<div class="ok-box">' . session('ok_desatar') . '</div>';
         }
         $cuerpo .= $this->seccionSeparados();
+        $cuerpo .= $this->seccionFichasConVariosTm();
 
         if (!$guardado) {
             $cuerpo .= '<p class="sub">Todavía no se verificó nada (o pasó más de un día).</p>';
@@ -6351,6 +6352,79 @@ class ImportDetallesController extends Controller
             . $this->tablaMapeosDudosos($parecidos, $partidos);
 
         return $this->pagina('Mapeos dudosos', $cuerpo);
+    }
+
+    /**
+     * Fichas con MÁS DE UN id de TM atado (oct-2026). Sin llamadas a la API.
+     *
+     * Un id de TM es una persona: si dos ids caen en la misma ficha, uno está
+     * mal atado y sus partidos se cargaron en la ficha del otro. Caso mellizos
+     * Quina (TM 82584 Nelinho / 104415 Minzum, misma fecha y los nombres al
+     * revés): la pantalla de arriba no los ve porque comparten apellido.
+     * Desde oct-2026 el importador ya no ata un id a una ficha que tiene otro
+     * (fichaDeOtroTm); esto es para los que quedaron de antes.
+     *
+     * Abajo, un formulario para separar cualquier id a mano.
+     */
+    private function seccionFichasConVariosTm()
+    {
+        $fichas = DB::table('jugador_tm')
+            ->groupBy('jugador_id')
+            ->havingRaw('COUNT(DISTINCT tm_player_id) > 1')
+            ->pluck('jugador_id')->all();
+
+        $cuerpo = '<h2>Fichas con más de un id de TM (' . count($fichas) . ')</h2>'
+            . '<p class="sub">Dos ids de TM en la misma ficha casi siempre son dos personas (mellizos, homónimos '
+            . 'con la misma fecha): los partidos de uno se cargaron en la ficha del otro. Abrí los dos perfiles y '
+            . 'apretá <b>Separar</b> en el que <b>no</b> es el dueño de la ficha; después movés sus clubes. Si TM '
+            . 'tiene de verdad dos perfiles de la misma persona, no toques nada.</p>';
+
+        if ($fichas) {
+            $filas = DB::table('jugador_tm as jt')
+                ->join('jugadors as j', 'j.id', '=', 'jt.jugador_id')
+                ->join('personas as p', 'p.id', '=', 'j.persona_id')
+                ->whereIn('jt.jugador_id', $fichas)
+                ->orderBy('p.apellido')->orderBy('jt.jugador_id')->orderBy('jt.tm_player_id')
+                ->get(['jt.jugador_id', 'jt.tm_player_id', 'jt.nombre_tm', 'jt.origen', 'j.transfermarkt_url',
+                    'p.apellido', 'p.nombre', 'p.nacimiento']);
+            $partidos = DB::table('alineacions')->whereIn('jugador_id', $fichas)
+                ->groupBy('jugador_id')->selectRaw('jugador_id, COUNT(DISTINCT partido_id) AS n')
+                ->pluck('n', 'jugador_id')->all();
+
+            $cuerpo .= '<table><thead><tr><th>ficha</th><th>nació (base)</th><th>partidos</th><th>id TM</th>'
+                . '<th>nombre en TM</th><th>origen</th><th></th></tr></thead><tbody>';
+            foreach ($filas as $f) {
+                $urlId = ($f->transfermarkt_url && preg_match('~/spieler/(\d+)~', $f->transfermarkt_url, $m)) ? $m[1] : null;
+                $cuerpo .= '<tr>'
+                    . '<td><a href="' . e(route('jugadores.ver', ['jugadorId' => (int) $f->jugador_id])) . '" target="_blank">#'
+                    . (int) $f->jugador_id . ' ' . e(trim($f->apellido . ', ' . $f->nombre)) . '</a></td>'
+                    . '<td>' . e($f->nacimiento ? substr((string) $f->nacimiento, 0, 10) : '—') . '</td>'
+                    . '<td>' . (int) ($partidos[$f->jugador_id] ?? 0) . '</td>'
+                    . '<td><a href="https://www.transfermarkt.es/-/profil/spieler/' . e($f->tm_player_id) . '" target="_blank">'
+                    . e($f->tm_player_id) . '</a>'
+                    . ((string) $urlId === (string) $f->tm_player_id ? ' <small>(el de la ficha)</small>' : '') . '</td>'
+                    . '<td>' . e((string) $f->nombre_tm) . '</td>'
+                    . '<td>' . e((string) $f->origen) . '</td>'
+                    . '<td><form method="post" style="display:inline" target="_blank" action="'
+                    . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
+                    . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                    . '<input type="hidden" name="tm_id" value="' . e($f->tm_player_id) . '">'
+                    . '<button class="boton" type="submit">Separar</button></form></td>'
+                    . '</tr>';
+            }
+            $cuerpo .= '</tbody></table>';
+        } else {
+            $cuerpo .= '<div class="ok-box">Ninguna.</div>';
+        }
+
+        $cuerpo .= '<p class="sub" style="margin-top:1em">Separar un id de TM a mano (1 llamada a la API): '
+            . '<form method="post" style="display:inline" target="_blank" action="'
+            . e(route('import_detalles.mapeos_dudosos_desatar')) . '">'
+            . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+            . '<input type="text" name="tm_id" placeholder="id de TM" size="10" required> '
+            . '<button class="boton" type="submit">Separar</button></form></p>';
+
+        return $cuerpo;
     }
 
     private function tablaMapeosDudosos(array $malos, array $partidos)

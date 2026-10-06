@@ -3903,7 +3903,7 @@ class TmDetallePartido
         $etiqueta = trim($datos['apellido'] . ', ' . $datos['nombre']) . ' (TM ' . $tmId . ')';
 
         // ¿Ya lo tenemos, aunque sin mapear?
-        $existente = $this->buscarJugadorExistente($datos);
+        $existente = $this->buscarJugadorExistente($datos, $tmId);
         if ($existente) {
             if ($escribir) {
                 $this->guardarMapeoJugador($tmId, $existente['jugador_id'], $datos['name'], 'auto', $existente['revisar']);
@@ -3984,14 +3984,14 @@ class TmDetallePartido
      *
      * Devuelve null si no hay nada parecido: ahí sí se crea.
      */
-    private function buscarJugadorExistente(array $datos)
+    private function buscarJugadorExistente(array $datos, $tmId = null)
     {
         $tokensTm = $this->tokensNombre($datos['apellido'] . ' ' . $datos['nombre']);
         if (count($tokensTm) < 2) return null;
 
         // ── 1) Mismo día de nacimiento ────────────────────────────────────
         if (!empty($datos['nacimiento'])) {
-            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm, $datos['nombre'], $datos['apellido']);
+            $r = $this->mejorJugadorPorFecha($datos['nacimiento'], $tokensTm, $datos['nombre'], $datos['apellido'], $tmId);
             $mejor = $r['mejor']; $puntaje = $r['puntaje']; $empatados = $r['empatados'];
             $this->avisarMellizos($datos, $r['mellizos']);
 
@@ -4033,7 +4033,7 @@ class TmDetallePartido
             // partidos postergados TM también les deja el dato viejo).
             $alReves = $this->fechaDadaVuelta($datos['nacimiento']);
             if ($alReves) {
-                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm, $datos['nombre'], $datos['apellido']);
+                $r = $this->mejorJugadorPorFecha($alReves, $tokensTm, $datos['nombre'], $datos['apellido'], $tmId);
                 $apeTm = $this->tokensNombre($datos['apellido']);
                 if ($r['mejor'] && $r['puntaje'] >= 2 && $r['empatados'] === 1
                     && $this->apellidosSeTocan($apeTm, $tokensTm,
@@ -4056,6 +4056,7 @@ class TmDetallePartido
         // de palabras. Y queda marcado para revisar igual.
         foreach ($this->candidatosPorNombre('jugadors', $datos) as $c) {
             if (!empty($c->nacimiento)) continue;   // si tiene fecha y no matcheó arriba, no es él
+            if ($this->fichaDeOtroTm((int) $c->id, $tmId)) continue;
             $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
             sort($tokensBase);
             $tm = $tokensTm; sort($tm);
@@ -4088,7 +4089,7 @@ class TmDetallePartido
      *
      * @return array ['mejor' => fila|null, 'puntaje' => int, 'empatados' => int, 'mellizos' => fila[]]
      */
-    private function mejorJugadorPorFecha($fecha, array $tokensTm, $nombreTm = null, $apellidoTm = null)
+    private function mejorJugadorPorFecha($fecha, array $tokensTm, $nombreTm = null, $apellidoTm = null, $tmId = null)
     {
         $apeTm = $apellidoTm !== null ? $this->tokensNombre($apellidoTm) : null;
 
@@ -4100,6 +4101,16 @@ class TmDetallePartido
 
         $mejor = null; $puntaje = 0; $empatados = 0; $mellizos = [];
         foreach ($cands as $c) {
+            // La ficha ya es de OTRO jugador de TM: no puede ser éste. Ver
+            // fichaDeOtroTm() (mellizos Quina).
+            if ($this->fichaDeOtroTm((int) $c->id, $tmId)) {
+                $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
+                if (count(array_intersect($tokensTm, $tokensBase)) >= 2) {
+                    $this->aviso('La ficha "' . trim($c->apellido . ', ' . $c->nombre) . '" (#' . $c->id . ') nació el '
+                        . 'mismo día y se parece a TM ' . $tmId . ', pero ya está atada a otro jugador de TM: no la uso.');
+                }
+                continue;
+            }
             $tokensBase = $this->tokensNombre($c->apellido . ' ' . $c->nombre);
             if ($apeTm !== null
                 && !$this->apellidosSeTocan($apeTm, $tokensTm, $this->tokensNombre($c->apellido), $tokensBase)) {
@@ -4149,6 +4160,44 @@ class TmDetallePartido
             && count(array_intersect($pilaBase, $tokensTm)) === 0;
     }
 
+    /**
+     * ¿La ficha ya está atada a OTRO id de Transfermarkt? (oct-2026)
+     *
+     * Un id de TM es una persona y una ficha es una persona: si la ficha ya
+     * tiene su id, otro id no puede caer ahí. Mellizos Quina: Nelinho (TM
+     * 82584, "Nelinho Minzún Quina Asín") y Minzum (TM 104415, "Minzum Nelinho
+     * Quina Asín") nacieron el mismo día, en Lima, y tienen los mismos nombres
+     * al revés. Ningún freno por nombre los separa: por fecha + palabras en
+     * común, Minzum caía en la ficha de Nelinho, y en cada partido de Ayacucho
+     * se cargaba Nelinho con el 20.
+     *
+     * Mira `jugador_tm` y `jugadors.transfermarkt_url`. Sin $tmId (llamadas
+     * viejas) no frena nada. Si TM tuviera dos perfiles de la misma persona,
+     * esto termina en una ficha duplicada: se ve y se fusiona, que es mejor
+     * que pegarle la carrera de uno al otro.
+     */
+    private function fichaDeOtroTm($jugadorId, $tmId)
+    {
+        if ($tmId === null || $tmId === '') return false;
+        $tmId = (string) $tmId;
+
+        if (!isset($this->duenoTmDeFicha[$jugadorId])) {
+            $ids = DB::table('jugador_tm')->where('jugador_id', $jugadorId)
+                ->pluck('tm_player_id')->map(function ($x) { return (string) $x; })->all();
+            $url = DB::table('jugadors')->where('id', $jugadorId)->value('transfermarkt_url');
+            if ($url && preg_match('~/spieler/(\d+)~', $url, $m)) $ids[] = $m[1];
+            $this->duenoTmDeFicha[$jugadorId] = array_values(array_unique($ids));
+        }
+
+        foreach ($this->duenoTmDeFicha[$jugadorId] as $otro) {
+            if ($otro !== $tmId) return true;
+        }
+        return false;
+    }
+
+    /** Cache de fichaDeOtroTm(): jugador_id => ids de TM atados. */
+    private $duenoTmDeFicha = [];
+
     /** Avisa, una vez, que hay un posible mellizo al que NO se aparejó. */
     private function avisarMellizos(array $datos, array $mellizos)
     {
@@ -4170,7 +4219,16 @@ class TmDetallePartido
      * otro. Ahora se decide quién es el dueño de la ficha:
      *
      *   1. el id que figura en `jugadors.transfermarkt_url` de la ficha;
-     *   2. si no, el único cuyo nombre de pila no choca con el de la ficha.
+     *   2. si no, el único nacido el mismo día que dice la ficha;
+     *   3. si no, el único cuyo nombre de pila no choca con el de la ficha;
+     *   4. si no, el único cuyo PRIMER nombre de pila es el de la ficha.
+     *
+     * El 2 se agregó en oct-2026 por los Quina (Universitario–Ayacucho, partido
+     * 52204): la ficha #15590 es "Quina Asín, Nelinho Minzúm" y el otro se
+     * llama "Minzum Quina". Los nombres de pila de los DOS aparecen en la
+     * ficha, así que el paso 3 no podía elegir y el de Ayacucho quedaba afuera.
+     * La fecha sí los separa (Nelinho es de 1987). Con mellizos —misma fecha—
+     * el paso 2 no decide y se sigue con el 3, como antes.
      *
      * Los demás se sueltan de la ficha (se borra su fila de `jugador_tm`) y se
      * aparejan de nuevo desde el perfil — con el freno de mellizos puesto, eso
@@ -4193,7 +4251,8 @@ class TmDetallePartido
         $fichas = DB::table('jugadors')
             ->join('personas', 'personas.id', '=', 'jugadors.persona_id')
             ->whereIn('jugadors.id', array_keys($porFicha))
-            ->select('jugadors.id', 'jugadors.transfermarkt_url', 'personas.apellido', 'personas.nombre')
+            ->select('jugadors.id', 'jugadors.transfermarkt_url', 'personas.apellido', 'personas.nombre',
+                'personas.nacimiento')
             ->get()->keyBy('id');
 
         $perfiles = null;
@@ -4209,7 +4268,7 @@ class TmDetallePartido
                 $dueno = $m[1];
             }
 
-            // 2) El único cuyo nombre de pila cuadra con el de la ficha.
+            // Los perfiles de TM, para los pasos 2 y 3.
             if ($perfiles === null) {
                 $todos = [];
                 foreach ($porFicha as $lista) foreach ($lista as $x) $todos[] = $x;
@@ -4220,13 +4279,40 @@ class TmDetallePartido
             foreach ($ids as $id) {
                 if (isset($perfiles[$id])) $datosDe[$id] = $this->personaDesdePerfil($perfiles[$id]);
             }
+            // 2) El único nacido el día que dice la ficha.
+            $nacFicha = $f->nacimiento ? substr((string) $f->nacimiento, 0, 10) : '';
+            if ($dueno === null && $nacFicha !== '' && $nacFicha !== '0000-00-00' && count($datosDe) === count($ids)) {
+                $mismaFecha = [];
+                foreach ($datosDe as $id => $d) {
+                    if (!empty($d['nacimiento']) && substr((string) $d['nacimiento'], 0, 10) === $nacFicha) $mismaFecha[] = $id;
+                }
+                if (count($mismaFecha) === 1) $dueno = (string) $mismaFecha[0];
+            }
+
+            // 3) El único cuyo nombre de pila cuadra con el de la ficha.
             if ($dueno === null) {
                 $cuadran = [];
                 foreach ($datosDe as $id => $d) {
                     $tokensTm = $this->tokensNombre($d['apellido'] . ' ' . $d['nombre']);
                     if (!$this->nombresDePilaChocan($d['nombre'], $tokensTm, $f->nombre, $tokensBase)) $cuadran[] = $id;
                 }
-                if (count($cuadran) === 1 && count($datosDe) === count($ids)) $dueno = $cuadran[0];
+                if (count($cuadran) === 1 && count($datosDe) === count($ids)) $dueno = (string) $cuadran[0];
+            }
+
+            // 4) El único cuyo PRIMER nombre de pila es el primero de la ficha.
+            // Mellizos Quina: "Nelinho Minzún" y "Minzum Nelinho" pasan los
+            // pasos 2 y 3 los dos; lo único que los separa es el orden.
+            if ($dueno === null && count($datosDe) === count($ids)) {
+                $pilaFicha = $this->tokensNombre($f->nombre);
+                $primero = $pilaFicha ? reset($pilaFicha) : null;
+                $coinciden = [];
+                if ($primero !== null) {
+                    foreach ($datosDe as $id => $d) {
+                        $pila = $this->tokensNombre($d['nombre']);
+                        if ($pila && reset($pila) === $primero) $coinciden[] = $id;
+                    }
+                }
+                if (count($coinciden) === 1) $dueno = (string) $coinciden[0];
             }
 
             if ($dueno === null) {
