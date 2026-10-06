@@ -374,6 +374,10 @@ class ImportPartidosController extends Controller
         if ($tipoHtml !== 'liga' && $tipoHtml !== 'copa') $tipoHtml = '';
         $pais     = trim((string) $request->get('pais', '')) ?: null;
         $soloHtml = (string) $request->get('solo_html', '0') === '1';
+        // `clubes=210,6600,…`: el fixture se arma con los calendarios de esos
+        // clubes en vez del de la competencia. Ver `fixtureDesdeClubes()`.
+        $clubesHtml = $this->listaClubesTm((string) $request->get('clubes', ''));
+        if ($clubesHtml) $soloHtml = true;
         // `fresco=1` es «Volver a bajar de TM»: saltea el calendario en HTML
         // guardado. Ver `TmFixtureCompetenciaHtml::CACHE_MINUTOS`.
         $this->htmlFresco = (string) $request->get('fresco', '0') === '1';
@@ -489,7 +493,9 @@ class ImportPartidosController extends Controller
             // Derecho al calendario en HTML. El nombre de la competencia sale
             // del torneo: pedírselo a la API costaría un crédito para nada.
             $compNombre = $torneoElegido ? (string) $torneoElegido->nombre : $comp;
-            $porHtml = $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml, $pais, $tipoHtml);
+            $porHtml = $clubesHtml
+                ? $this->fixtureDesdeClubes($comp, $season, $torneoElegido, $compNombre, $clubesHtml, $avisosHtml, $pais)
+                : $this->fixtureDesdeHtml($comp, $season, $torneoElegido, $compNombre, $avisosHtml, $pais, $tipoHtml);
 
             if (is_array($porHtml) && !empty($porHtml)) {
                 $filas      = $porHtml;
@@ -497,7 +503,8 @@ class ImportPartidosController extends Controller
             } else {
                 return $this->pagina('Fixture', $html . $this->cajaFixtureHtml(
                         $comp, $season, $torneoElegido, $avisosHtml, $tipoHtml, $pais,
-                        'El calendario en HTML no trajo partidos.'));
+                        $clubesHtml ? 'Los calendarios de esos clubes no trajeron ningún partido de '
+                            . e($comp) . '.' : 'El calendario en HTML no trajo partidos.', $clubesHtml));
             }
         }
 
@@ -780,6 +787,7 @@ class ImportPartidosController extends Controller
             'tipo'      => $tipoHtml !== '' ? $tipoHtml : null,
             'pais'      => $pais,
             'solo_html' => $fuenteHtml ? 1 : null,
+            'clubes'    => $clubesHtml ? implode(',', $clubesHtml) : null,
             'renumerar' => $renumerar ? 1 : ($request->has('renumerar') ? 'no' : null),
             'extras'    => $extras ? 1 : null,
         ]));
@@ -1158,7 +1166,7 @@ class ImportPartidosController extends Controller
      * que adivinar cuál y editar el torneo para probar; ahora se cambia acá y
      * se reintenta, que es lo que hace la pantalla del calendario suelto.
      */
-    private function cajaFixtureHtml($comp, $season, $torneo, array $avisosHtml, $tipoHtml, $pais, $titulo)
+    private function cajaFixtureHtml($comp, $season, $torneo, array $avisosHtml, $tipoHtml, $pais, $titulo, array $clubes = [])
     {
         $esCopa = $tipoHtml === 'copa'
             || ($tipoHtml === '' && $torneo && strcasecmp((string) $torneo->tipo, 'Copa') === 0);
@@ -1208,7 +1216,140 @@ class ImportPartidosController extends Controller
             . '<p class="acciones">'
             . '<a class="boton-sec" href="' . e($aEEUU) . '">Reintentar desde EE.UU.</a> '
             . '<a class="boton-sec" href="' . e($suelto) . '">Abrir el calendario suelto</a> '
-            . '<a class="boton-sec" href="' . e($crudo) . '">Ver qué contestó Transfermarkt</a></p>';
+            . '<a class="boton-sec" href="' . e($crudo) . '">Ver qué contestó Transfermarkt</a></p>'
+            . $this->formClubes($comp, $season, $torneo, $pais, $clubes);
+    }
+
+    /**
+     * El formulario de «armar el fixture con los calendarios de los clubes».
+     * Ver `fixtureDesdeClubes()`.
+     */
+    private function formClubes($comp, $season, $torneo, $pais, array $clubes = [])
+    {
+        $ocultos = '<input type="hidden" name="solo_html" value="1">'
+            . '<input type="hidden" name="comp_forzado" value="' . e((string) $comp) . '">'
+            . '<input type="hidden" name="season" value="' . e((string) $season) . '">'
+            . ($torneo ? '<input type="hidden" name="torneo_id" value="' . (int) $torneo->id . '">' : '')
+            . ($pais ? '<input type="hidden" name="pais" value="' . e((string) $pais) . '">' : '');
+
+        return '<h2>Armarlo con los calendarios de los clubes</h2>'
+            . '<p class="sub">A veces Transfermarkt tiene los partidos pero no armó el calendario de la '
+            . 'competencia (Campeonato Gaúcho 2022: la página de la competencia vacía, y los 11 partidos de '
+            . 'la primera fase en la página de cada club). Poné los ids de TM de los clubes, separados por '
+            . 'coma: se juntan sus calendarios, se queda sólo con los partidos de <code>' . e((string) $comp)
+            . '</code> y se descartan los repetidos. <b>1 crédito por club</b> (guardado ' 
+            . \App\Services\TmFixtureCompetenciaHtml::CACHE_MINUTOS . ' min). En un todos contra todos de '
+            . '<i>N</i> equipos alcanza con <i>N</i>−1 clubes. Los ids salen de la página de cualquier club, '
+            . 'en el link de cada rival.</p>'
+            . '<form method="get" action="' . e(route('import_partidos.fixture')) . '">' . $ocultos
+            . '<input name="clubes" value="' . e(implode(',', $clubes)) . '" size="70" placeholder="ej 210,6600,16869"> '
+            . '<button class="boton">Armar el fixture</button></form>';
+    }
+
+    /** `"210, 6600 ,16869"` → `['210', '6600', '16869']`, sin repetidos ni basura. */
+    private function listaClubesTm($txt)
+    {
+        $out = [];
+        foreach (preg_split('/[^0-9]+/', (string) $txt) as $id) {
+            if ($id !== '' && !in_array($id, $out, true)) $out[] = $id;
+        }
+        return $out;
+    }
+
+    /**
+     * EL FIXTURE ARMADO CON LOS CALENDARIOS DE LOS CLUBES.
+     *
+     * Hay ediciones que Transfermarkt tiene partido por partido pero sin el
+     * calendario de la competencia: el Campeonato Gaúcho 2022 (`BRRS`,
+     * temporada 2021) devuelve 0 partidos por las dos rutas, por la portada y
+     * por cada jornada, y en cambio la página de Grêmio lista sus 11 partidos
+     * de la primera fase con gameId, jornada, día y hora (verificado
+     * 2026-10-06). La fase final es OTRA competencia (`RS2f`) y sus filas no
+     * linkean a ella: el id sale del encabezado de la sección (`comp_seccion`).
+     *
+     * Se juntan los calendarios, se queda con las filas cuya competencia es
+     * `$comp` y se descartan los gameId repetidos (cada partido aparece en las
+     * páginas de los dos clubes). Devuelve filas con el MISMO formato que
+     * `TmFixtureCompetenciaHtml::leerComp()`, así el resto del fixture no se
+     * entera de dónde salieron.
+     *
+     * El resultado del calendario del club va local:visitante, no del lado del
+     * club: Grêmio visitante en el Beira-Rio figura «0:3» y ganó 3-0 (semifinal
+     * de ida 2022). La hora está en hora de España, igual que en el calendario
+     * de la competencia: se pasa por `aHoraArgentina()`.
+     */
+    private function fixtureDesdeClubes($comp, $season, $torneo, $compNombre, array $clubes, array &$avisos = [], $pais = null)
+    {
+        $svc = new \App\Services\TmFixtureClubHtml;
+        $svc->usarCache = !$this->htmlFresco;
+        $this->htmlDeCache = null;
+
+        $leido   = [];
+        $nombres = [];
+        $porClub = [];
+
+        foreach ($clubes as $clubTm) {
+            $filas = $svc->leer($clubTm, $season, false, $pais);
+            if ($svc->deCache && (!$this->htmlDeCache || $svc->deCache < $this->htmlDeCache)) {
+                $this->htmlDeCache = $svc->deCache;
+            }
+            if (!is_array($filas)) {
+                $porClub[] = $clubTm . ': no vino la página';
+                continue;
+            }
+
+            $deComp = 0;
+            foreach ($filas as $f) {
+                if (!empty($f['rival_tm']) && !empty($f['rival_nombre'])) $nombres[(string) $f['rival_tm']] = $f['rival_nombre'];
+
+                $suComp = !empty($f['comp_id']) ? $f['comp_id'] : (isset($f['comp_seccion']) ? $f['comp_seccion'] : null);
+                if ($suComp === null || strcasecmp((string) $suComp, (string) $comp) !== 0) continue;
+                if (empty($f['game_id']) || empty($f['dia']) || empty($f['rival_tm']) || $f['local'] === null) continue;
+
+                $deComp++;
+                $gid = (string) $f['game_id'];
+                if (isset($leido[$gid])) continue;
+
+                $loc = $f['local'] ? (string) $clubTm : (string) $f['rival_tm'];
+                $vis = $f['local'] ? (string) $f['rival_tm'] : (string) $clubTm;
+
+                $fila = [
+                    'game_id'   => $gid,
+                    'dia'       => $f['dia'],
+                    'hora'      => isset($f['hora']) ? $f['hora'] : null,
+                    'dia_crudo' => $f['dia_crudo'],
+                    'local_tm'  => $loc,
+                    'visita_tm' => $vis,
+                    'resultado' => isset($f['resultado']) ? $f['resultado'] : '',
+                    'ronda'     => isset($f['jornada']) && $f['jornada'] !== null && $f['jornada'] !== ''
+                        ? (preg_match('/^\d+$/', (string) $f['jornada']) ? $f['jornada'] . 'ª jornada' : $f['jornada'])
+                        : null,
+                    '_club'     => (string) $clubTm,
+                ];
+                $leido[$gid] = \App\Services\TmFixtureCompetenciaHtml::aHoraArgentina($fila);
+            }
+            $porClub[] = $clubTm . ': ' . count($filas) . ' partidos en la página, ' . $deComp . ' de ' . $comp;
+        }
+
+        // Los nombres: cada club figura como rival en la página de otro.
+        foreach ($leido as $gid => $f) {
+            $leido[$gid]['local_nombre']  = isset($nombres[$f['local_tm']]) ? $nombres[$f['local_tm']] : null;
+            $leido[$gid]['visita_nombre'] = isset($nombres[$f['visita_tm']]) ? $nombres[$f['visita_tm']] : null;
+        }
+
+        $leido = array_values($leido);
+        usort($leido, function ($a, $b) {
+            return strcmp((string) $a['dia'] . ' ' . (string) $a['hora'], (string) $b['dia'] . ' ' . (string) $b['hora']);
+        });
+
+        $avisos[] = 'Fixture armado con los calendarios de ' . count($clubes) . ' club'
+            . (count($clubes) == 1 ? '' : 'es') . ': ' . count($leido) . ' partidos distintos de ' . $comp
+            . '. ' . implode(' · ', $porClub) . '.';
+        if (!empty($svc->avisos)) $avisos = array_merge($avisos, array_unique((array) $svc->avisos));
+
+        if (empty($leido)) return null;
+
+        return $this->filasDesdeLeido($leido, $comp, $compNombre, $season, $torneo ? (string) $torneo->year : '');
     }
 
     /** Ver `fixture()`: `fresco=1` y cuándo se bajó el HTML que se está usando. */
@@ -1296,7 +1437,12 @@ class ImportPartidosController extends Controller
             }
         }
 
-        $anio = $torneo ? (string) $torneo->year : '';
+        return $this->filasDesdeLeido($leido, $comp, $compNombre, $season, $torneo ? (string) $torneo->year : '');
+    }
+
+    /** Filas del calendario en HTML (`leerComp()` o `fixtureDesdeClubes()`) → filas del fixture. */
+    private function filasDesdeLeido(array $leido, $comp, $compNombre, $season, $anio)
+    {
         $filas = [];
 
         foreach ($leido as $r) {

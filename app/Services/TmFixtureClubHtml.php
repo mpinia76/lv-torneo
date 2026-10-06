@@ -53,6 +53,18 @@ class TmFixtureClubHtml
     /** @var string */
     public $crudo = '';
 
+    /**
+     * Guardar la página media hora, como el calendario de la competencia
+     * (`TmFixtureCompetenciaHtml::CACHE_MINUTOS`). Lo prende sólo el fixture
+     * armado con calendarios de clubes: cada botón de esa pantalla la vuelve
+     * a armar, y sin esto cada clic gastaba un crédito POR CLUB. La pantalla
+     * club-html lo deja apagado y lee siempre fresco, como antes.
+     */
+    public $usarCache = false;
+
+    /** Momento de la bajada original cuando se usó la guardada. */
+    public $deCache = null;
+
     public static function url($clubTm, $season)
     {
         return self::BASE . rawurlencode((string) $clubTm) . '/saison_id/' . rawurlencode((string) $season);
@@ -73,18 +85,37 @@ class TmFixtureClubHtml
         $this->crudo       = '';
 
         $url = self::url($clubTm, $season);
+        $this->deCache = null;
+        $clave = 'tm_html_club:' . md5($url . '|' . (string) $pais);
+        $html  = null;
+
+        if ($this->usarCache) {
+            $guardado = \Illuminate\Support\Facades\Cache::get($clave);
+            if (is_array($guardado) && !empty($guardado['html'])) {
+                $html          = $guardado['html'];
+                $this->deCache = (int) $guardado['t'];
+            }
+        }
 
             // `getHtmlTm` es nuevo. Si el deploy subió los servicios pero no
             // HttpHelper, llamarlo tira «Call to undefined method» y la pantalla
             // se cae con un 500 pelado. Se cae con red: se usa el método viejo y
             // se avisa, que es mucho más fácil de diagnosticar que una pantalla
             // en blanco.
-        if (method_exists(HttpHelper::class, 'getHtmlTm')) {
-            $html = HttpHelper::getHtmlTm($url, $pais);
-        } else {
-            $this->avisos[] = 'Este servidor todavía tiene la versión vieja de HttpHelper: no puedo elegir el '
-                . 'país de salida. Falta subir app/Services/HttpHelper.php.';
-            $html = HttpHelper::getHtmlContent($url);
+        if ($html === null) {
+            if (method_exists(HttpHelper::class, 'getHtmlTm')) {
+                $html = HttpHelper::getHtmlTm($url, $pais);
+            } else {
+                $this->avisos[] = 'Este servidor todavía tiene la versión vieja de HttpHelper: no puedo elegir el '
+                    . 'país de salida. Falta subir app/Services/HttpHelper.php.';
+                $html = HttpHelper::getHtmlContent($url);
+            }
+
+            // Sólo una página con partidos: un muro de consentimiento no se recuerda.
+            if ($this->usarCache && $html && strpos($html, '/spielbericht/') !== false) {
+                \Illuminate\Support\Facades\Cache::put($clave, ['html' => $html, 't' => time()],
+                    now()->addMinutes(TmFixtureCompetenciaHtml::CACHE_MINUTOS));
+            }
         }
 
         if (!$html) {
@@ -161,9 +192,31 @@ class TmFixtureClubHtml
     {
         $diaCrudo = null;
         $local    = null;
+        $hora     = null;
+        $jornada  = null;
+        $primera  = true;
 
         foreach ($xp->query('.//td', $tr) as $td) {
             $txt = trim(preg_replace('/\s+/u', ' ', $td->textContent));
+
+            // La PRIMERA celda es la jornada: «1», «11», o el nombre de la
+            // ronda en las fases que no tienen número («Semifinales», «Final»).
+            // Hace falta para armar un fixture con calendarios de clubes
+            // (ver ImportPartidosController::fixtureDesdeClubes()).
+            if ($primera) {
+                $primera = false;
+                if ($txt !== '' && mb_strlen($txt) <= 40 && !preg_match('#\d{1,2}/\d{1,2}/\d{2,4}#', $txt)) {
+                    $jornada = $txt;
+                    continue;
+                }
+            }
+
+            // La hora va en su propia celda, después de la fecha: «23:00».
+            // Minutos con dos cifras: así no se confunde con un resultado («2:1»).
+            if ($hora === null && $diaCrudo !== null && preg_match('/^(\d{1,2}):(\d{2})$/', $txt, $mh)) {
+                $hora = sprintf('%02d:%02d', (int) $mh[1], (int) $mh[2]);
+                continue;
+            }
 
             if ($diaCrudo === null && preg_match('#\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b#', $txt, $m)) {
                 $diaCrudo = $m[0];
@@ -235,6 +288,7 @@ class TmFixtureClubHtml
         // cada partido se quedaba con la jornada del anterior — pasó, y se veía
         // como una competencia llamada «15».
         $competencia = null;
+        $compSeccion = null;
         $previos     = $xp->query('preceding::a[contains(@href, "wettbewerb/")]', $tr);
 
         if ($previos && $previos->length) {
@@ -243,6 +297,13 @@ class TmFixtureClubHtml
 
                 if ($txt !== '' && !preg_match('/^\d+$/', $txt)) {
                     $competencia = $txt;
+                    // El id de la SECCIÓN. Las filas de una fase sin jornadas
+                    // numeradas («Campeonato Gaúcho - Fase Final», `RS2f`) no
+                    // linkean a la competencia: el id sólo está en el encabezado.
+                    if (preg_match('#/(?:pokal)?wettbewerb/([A-Za-z0-9]+)#',
+                        $previos->item($i)->getAttribute('href'), $mc)) {
+                        $compSeccion = $mc[1];
+                    }
                     break;
                 }
             }
@@ -256,6 +317,9 @@ class TmFixtureClubHtml
             'rival_nombre' => $rivalNombre,
             'competencia'  => $competencia,
             'comp_id'      => $compId,
+            'comp_seccion' => $compSeccion,
+            'jornada'      => $jornada,
+            'hora'         => $hora,
             'resultado'    => null,
         ];
     }
