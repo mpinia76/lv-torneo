@@ -4419,6 +4419,22 @@ class TmDetallePartido
                 continue;
             }
 
+            // A uno le falta la fecha en TM y el primer nombre coincide: puede
+            // ser la misma persona con un perfil incompleto (Bautista Fuentes:
+            // «Fuentes, Marco» sin fecha / «Bautista Fuentes, Marco Antonio»).
+            // Ni «misma» ni «dos»: se mira a mano.
+            $sinFecha = false; $primeros = [];
+            foreach ($datosDe as $id => $d) {
+                if (empty($d['nacimiento'])) $sinFecha = true;
+                $pila = $this->tokensNombre($d['nombre']);
+                $primeros[$pila ? reset($pila) : ''] = true;
+            }
+            if ($sinFecha && count($primeros) === 1) {
+                $res['motivo'] = 'a uno le falta la fecha en TM y tienen el mismo nombre: puede ser la misma persona';
+                $out[$jid] = $res;
+                continue;
+            }
+
             // ¿La misma persona con dos perfiles?
             $misma = true; $ref = null;
             foreach ($datosDe as $id => $d) {
