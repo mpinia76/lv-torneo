@@ -6494,7 +6494,14 @@ class ImportDetallesController extends Controller
                     . '<td><a href="https://www.transfermarkt.es/-/profil/spieler/' . e($id) . '" target="_blank">' . e($id) . '</a></td>'
                     . '<td>' . e($t ? trim($t['apellido'] . ', ' . $t['nombre']) : '—') . '</td>'
                     . '<td>' . e($t && $t['nacimiento'] ? $t['nacimiento'] : '—') . '</td>'
-                    . '<td>' . $rol . '</td></tr>';
+                    . '<td>' . $rol
+                    . ($primero && $c['tipo'] === 'dudosa'
+                        ? '<form method="post" style="display:inline" action="' . e(route('import_detalles.fichas_mezcladas_confirmar')) . '">'
+                          . '<input type="hidden" name="_token" value="' . e(csrf_token()) . '">'
+                          . '<input type="hidden" name="jugador_id" value="' . (int) $jid . '">'
+                          . '<button class="boton-sec" type="submit">Es la misma</button></form>'
+                        : '')
+                    . '</td></tr>';
                 $primero = false;
             }
         }
@@ -6505,6 +6512,13 @@ class ImportDetallesController extends Controller
     {
         $guardado = \Illuminate\Support\Facades\Cache::get(self::LLAVE_MEZCLADAS);
         $n = 0;
+        // Con jugador_id: «Es la misma» de una dudosa, revisada a mano.
+        $solo = (int) $request->input('jugador_id', 0);
+        if ($solo) {
+            $n = DB::table('jugador_tm')->where('jugador_id', $solo)->update(['origen' => 'confirmado']);
+            return redirect()->route('import_detalles.fichas_mezcladas')
+                ->with('ok_mezcladas', 'Ficha #' . $solo . ': confirmé ' . $n . ' mapeo(s) como la misma persona. No toqué ningún partido.');
+        }
         if ($guardado) {
             foreach ($guardado['fichas'] as $jid => $c) {
                 if ($c['tipo'] !== 'misma') continue;
