@@ -16,3 +16,12 @@ vendor.zip
 /public/images.zip
 /.idea
 /.settings
+
+# archivos de trabajo, no codigo fuente
+/public/images/
+/public/uploads/
+/scripts/sql/
+/tools/livefutbol/
+/tools/transfermarkt/*.csv
+*.bak
+/_to_delete/
