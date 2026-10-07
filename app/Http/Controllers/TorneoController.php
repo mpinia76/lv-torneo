@@ -28,7 +28,6 @@ use App\Alineacion;
 use App\Cambio;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
-use function GuzzleHttp\Promise\iter_for;
 use Illuminate\Support\Facades\Http;
 use App\Services\HttpHelper;
 use App\Services\MenuTorneos;
