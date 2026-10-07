@@ -4181,8 +4181,8 @@ class ImportPartidosController extends Controller
     /**
      * La zona del torneo que corresponde a una ronda de TM «Grupo 15».
      *
-     * Acepta que la zona se llame «15», «Grupo 15» o «G15», sin importar
-     * mayúsculas. Nunca un grupo de llaves (`penales`), y sólo si hay UNA que
+     * Acepta que la zona se llame «15», «Grupo 15», «G15» o algo que termine
+     * en «15» («Fase Final - 15»), sin importar mayúsculas. Nunca un grupo de llaves (`penales`), y sólo si hay UNA que
      * coincide: con dos, se sigue por el camino de siempre.
      */
     private function zonaDeLaRonda($gameday, $grupos, $filas = null)
@@ -4199,7 +4199,13 @@ class ImportPartidosController extends Controller
             if (!empty($g->penales)) return false;
             $n = mb_strtolower(trim((string) $g->nombre));
             $n = preg_replace('/^(?:(?:grupo|group|zona)\s*|g(?=\d))/u', '', $n);
-            return $n === $clave;
+            if ($n === $clave) return true;
+            // «Fase Final - A», «Cuadrangular B», «2da fase · C»: cuenta la
+            // ÚLTIMA palabra, si el nombre tiene más de una. Colombia
+            // Apertura 2023 (COLF): TM manda «Grupo A» y «Grupo B», y las
+            // zonas se llaman «Fase Final - A» / «Fase Final - B».
+            $partes = preg_split('/[\s\-–·]+/u', $n, -1, PREG_SPLIT_NO_EMPTY);
+            return count($partes) > 1 && end($partes) === $clave;
         });
 
         // DOS FASES DE GRUPOS con los mismos nombres (1ra fase A..H, 2da A..D):
