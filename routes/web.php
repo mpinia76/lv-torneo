@@ -161,8 +161,6 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('/reasignarArbitro/{id}', 'ArbitroController@reasignar')->name('arbitros.reasignar');
     Route::put('saveReasignarArbitro', 'ArbitroController@guardarReasignar');
 
-    Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
-    Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');
 
     Route::get('importgolesfecha', 'FechaController@importgolesfecha')->name('fechas.importgolesfecha');
     Route::get('importpenalesfecha', 'FechaController@importpenalesfecha')->name('fechas.importpenalesfecha');

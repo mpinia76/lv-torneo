@@ -22,7 +22,6 @@ use App\JugadorEstadisticaManual;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Sunra\PhpSimple\HtmlDomParser;
 use DB;
 use GuzzleHttp\Client;
 use Carbon\Carbon;

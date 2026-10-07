@@ -7,7 +7,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use DB;
 use Illuminate\Support\Facades\Log;
-use Sunra\PhpSimple\HtmlDomParser;
 use Excel;
 
 use Response;
