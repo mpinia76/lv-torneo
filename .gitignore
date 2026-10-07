@@ -18,10 +18,26 @@ vendor.zip
 /.settings
 
 # archivos de trabajo, no codigo fuente
-/public/images/
+
 /public/uploads/
 /scripts/sql/
 /tools/livefutbol/
 /tools/transfermarkt/*.csv
 *.bak
 /_to_delete/
+# Imagenes: el contenido descargado no va, los recursos de interfaz si
+/public/images/*
+!/public/images/confederaciones/
+!/public/images/*.gif
+!/public/images/*.svg
+!/public/images/sin_foto*.png
+!/public/images/gol.png
+!/public/images/golpp.png
+!/public/images/icon_ball.png
+!/public/images/tiro-libre.png
+!/public/images/entra.png
+!/public/images/sale.png
+!/public/images/campeon.png
+!/public/images/subcampeon.png
+!/public/images/death.png
+!/public/images/luna.jpg
