@@ -385,7 +385,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
 
 
 
-        $torneosJugador = DB::select(DB::raw($sql));
+        $torneosJugador = DB::select($sql);
         $titulosJugadorCopa=0;
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
@@ -669,7 +669,7 @@ ORDER BY torneos.year DESC';
 
 
 
-        $torneosTecnico = DB::select(DB::raw($sql));
+        $torneosTecnico = DB::select($sql);
 
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
@@ -729,7 +729,7 @@ ORDER BY partidos.dia ASC';
 
 
 
-            $escudos = DB::select(DB::raw($sqlEscudos));
+            $escudos = DB::select($sqlEscudos);
 
 
             foreach ($escudos as $escudo){
@@ -805,7 +805,7 @@ group by tecnico_id
 
             //echo $sql3;
 
-            $jugados = DB::select(DB::raw($sqlJugados));
+            $jugados = DB::select($sqlJugados);
 
 
             foreach ($jugados as $jugado){
@@ -1174,7 +1174,7 @@ group by tecnico_id
         if ($idTorneo) $bindingsPartidos['torneoId'] = $idTorneo;
         if ($tipo) $bindingsPartidos['tipoGol'] = $tipo;
 
-        $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
+        $partidosRaw = DB::select($sqlPartidos, $bindingsPartidos);
 
         // Paginación manual
         $page = $request->query('page', 1);
@@ -1302,7 +1302,7 @@ group by tecnico_id
         if ($idTorneo) $bindingsPartidos['torneoId'] = $idTorneo;
         if ($tipo) $bindingsPartidos['tipoTarjeta'] = $tipo;
 
-        $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
+        $partidosRaw = DB::select($sqlPartidos, $bindingsPartidos);
 
         // Paginación manual
         $page = $request->query('page', 1);
@@ -1462,7 +1462,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
 
         $sqlPartidos .= " ORDER BY pa.dia DESC";
 
-        $partidosRaw = DB::select(DB::raw($sqlPartidos), $bindingsPartidos);
+        $partidosRaw = DB::select($sqlPartidos, $bindingsPartidos);
 
         // Paginación manual
         $page = $request->query('page', 1);

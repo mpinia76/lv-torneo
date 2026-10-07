@@ -138,7 +138,7 @@ group by equipo, foto
 
 order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
-        $posiciones = DB::select(DB::raw($sql));
+        $posiciones = DB::select($sql);
 
 
 
@@ -249,7 +249,7 @@ GROUP BY equipo, pais, foto, equipo_id
 ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
 ';
 
-                $posiciones = DB::select(DB::raw($sql));
+                $posiciones = DB::select($sql);
 
                 // Agregamos la cantidad de clasificados por grupo
                 $numClasificados = $grupo->clasificados ?? 0;
@@ -322,7 +322,7 @@ ORDER BY goles DESC, jugador ASC';
 
 
 
-        $goleadores = DB::select(DB::raw($sql));
+        $goleadores = DB::select($sql);
 
 
 
@@ -350,7 +350,7 @@ WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN (
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
 
             foreach ($escudos as $escudo){
@@ -444,7 +444,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
 
 
-        $goleadores = DB::select(DB::raw($sql));
+        $goleadores = DB::select($sql);
 
 
 
@@ -471,7 +471,7 @@ WHERE alineacions.jugador_id = '.$goleador->id.' AND alineacions.partido_id IN (
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
 
             foreach ($escudos as $escudo){
@@ -489,7 +489,7 @@ WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo_id." AND grupo
 
             //echo $sql3;
 
-            $jugados = DB::select(DB::raw($sql3));
+            $jugados = DB::select($sql3);
 
 
             foreach ($jugados as $jugado){
@@ -507,7 +507,7 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
 
 
 
-            $jugados = DB::select(DB::raw($sql4));
+            $jugados = DB::select($sql4);
 
 
             foreach ($jugados as $jugado){
@@ -576,7 +576,7 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
             $nombreFiltro = " AND (personas.apellido LIKE $nombreLike OR personas.nombre LIKE $nombreLike) ";
 
         }
-        $tarjetas = DB::select(DB::raw('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+        $tarjetas = DB::select('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
 , count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" foto
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
@@ -587,7 +587,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE  grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')
 GROUP BY jugadors.id, jugador
-ORDER BY rojas DESC, amarillas DESC, jugador ASC'));
+ORDER BY rojas DESC, amarillas DESC, jugador ASC');
 
 
         $page = $request->query('page', 1);
@@ -611,7 +611,7 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
 
             foreach ($escudos as $escudo){
@@ -690,7 +690,7 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
 
         }
 
-        $tarjetas = DB::select(DB::raw('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
+        $tarjetas = DB::select('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, count( case when tipo=\'Amarilla\' then 1 else NULL end) as  amarillas
 , count( case when tipo=\'Roja\' or tipo=\'Doble Amarilla\' then 1 else NULL end) as  rojas, "" escudo, personas.foto, personas.nacionalidad, "0" as jugados
 FROM tarjetas
 INNER JOIN jugadors ON tarjetas.jugador_id = jugadors.id
@@ -702,7 +702,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 WHERE  grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
 GROUP BY jugadors.id, jugador, nacionalidad, foto
 
-        ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC'));
+        ORDER BY '.$order.' '.$tipoOrder.', amarillas DESC, jugador ASC');
 
         $page = $request->query('page', 1);
 
@@ -725,7 +725,7 @@ WHERE alineacions.jugador_id = '.$tarjeta->id.' AND alineacions.partido_id IN ('
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
 
             foreach ($escudos as $escudo){
@@ -742,7 +742,7 @@ WHERE alineacions.tipo = 'Titular' AND grupos.torneo_id=".$torneo_id." AND grupo
 
             //echo $sql3;
 
-            $jugados = DB::select(DB::raw($sql3));
+            $jugados = DB::select($sql3);
 
 
             foreach ($jugados as $jugado){
@@ -760,7 +760,7 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
 
 
 
-            $jugados = DB::select(DB::raw($sql4));
+            $jugados = DB::select($sql4);
 
 
             foreach ($jugados as $jugado){
@@ -834,7 +834,7 @@ WHERE cambios.tipo = 'Entra' AND grupos.torneo_id=".$torneo_id." AND grupos.id I
 
         }
 
-        $arqueros = DB::select(DB::raw('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, COUNT(jugadors.id) as jugados,
+        $arqueros = DB::select('SELECT jugadors.id, personas.name as jugador, CONCAT(personas.apellido,\', \',personas.nombre) completo, COUNT(jugadors.id) as jugados,
 sum(case when alineacions.equipo_id=partidos.equipol_id then partidos.golesv else partidos.golesl END) AS recibidos,
 sum(case when alineacions.equipo_id=partidos.equipol_id and partidos.golesv = 0 then 1 else CASE when alineacions.equipo_id=partidos.equipov_id and partidos.golesl = 0 THEN 1 ELSE 0 END END) AS invictas, personas.foto, "" escudo, personas.nacionalidad
 FROM alineacions
@@ -846,7 +846,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 LEFT JOIN cambios ON alineacions.partido_id = cambios.partido_id AND cambios.jugador_id = jugadors.id
 WHERE  (alineacions.tipo = \'Titular\' OR cambios.tipo = \'Entra\')  AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
 GROUP BY jugadors.id, jugador, nacionalidad, foto
-ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC'));
+ORDER BY '.$order.' '.$tipoOrder.', jugados DESC, recibidos ASC');
 
 
         $page = $request->query('page', 1);
@@ -870,7 +870,7 @@ WHERE alineacions.jugador_id = '.$arquero->id.' AND alineacions.partido_id IN ('
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
 
             foreach ($escudos as $escudo){
@@ -963,7 +963,7 @@ group by equipo, foto, equipo_id
 
 order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC";
 
-                $posiciones = DB::select(DB::raw($sql));
+                $posiciones = DB::select($sql);
                 for ($j = 0; $j <= 4; $j++) {
                     //dd($posiciones[$j]);
                     $totalPuntos = 0;
@@ -987,7 +987,7 @@ LEFT JOIN equipos visitantes ON partidos.equipov_id = visitantes.id
 
 WHERE fechas.numero <= '".$fechaNumero."' AND fechas.grupo_id = ".$grupo->id." AND partidos.golesl IS not NULL AND partidos.golesv IS not NULL
 AND partidos.equipol_id = ".$posiciones[$j]->equipo_id.")";
-                    $faltantes = DB::select(DB::raw($sql1));
+                    $faltantes = DB::select($sql1);
                     foreach ($faltantes as $faltante){
                         foreach ($posiciones as $equipo){
                             if($faltante->id == $equipo->equipo_id){
@@ -1174,7 +1174,7 @@ WHERE  (cambios.tipo = \'Entra\') AND grupos.torneo_id='.$torneo_id.' AND grupos
 group by jugador_id,jugador, nacionalidad, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 
-        $jugadores = DB::select(DB::raw($sql));
+        $jugadores = DB::select($sql);
 
 
 
@@ -1201,7 +1201,7 @@ WHERE alineacions.jugador_id = '.$jugador->jugador_id.' AND alineacions.partido_
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
 
             foreach ($escudos as $escudo){
@@ -1322,7 +1322,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
 //echo $sql;
 
-        $goleadores = DB::select(DB::raw($sql));
+        $goleadores = DB::select($sql);
 
 
 
@@ -1394,7 +1394,7 @@ order by puntaje desc, diferencia DESC, golesl DESC';
 
 
 
-            $escudos = DB::select(DB::raw($sql2));
+            $escudos = DB::select($sql2);
 
             foreach ($escudos as $escudo){
 

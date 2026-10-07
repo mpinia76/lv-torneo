@@ -600,7 +600,7 @@ order by promedio desc, puntaje desc, equipo ASC';
 
 
             //echo $sql;
-            $promedios = DB::select(DB::raw($sql));
+            $promedios = DB::select($sql);
         }
 
 
@@ -742,7 +742,7 @@ order by promedio desc, puntaje desc, equipo ASC';
 
 
             //echo $sql;
-            $promedios = DB::select(DB::raw($sql));
+            $promedios = DB::select($sql);
         }
 
 
@@ -835,7 +835,7 @@ order by promedio desc, puntaje desc, equipo ASC';
 
 
                 //echo $sql;
-                $promedios = DB::select(DB::raw($sql));
+                $promedios = DB::select($sql);
                 // Ordenar en PHP por promedio ascendente
                 usort($promedios, function($a, $b) {
                     return $a->promedio <=> $b->promedio; // menor promedio primero
@@ -969,7 +969,7 @@ group by equipo, foto, equipo_id
 
 order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             //echo $sql;
-            $acumulado = DB::select(DB::raw($sql));
+            $acumulado = DB::select($sql);
         }
 
 
@@ -1367,7 +1367,7 @@ ORDER BY partidos.dia ASC';
 
 
             //echo $sql;
-            $partidos = DB::select(DB::raw($sql));
+            $partidos = DB::select($sql);
 
             $sql='SELECT foto, equipo,
        count(*) jugados,
@@ -1402,7 +1402,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
 
             //echo $sql;
-            $posiciones = DB::select(DB::raw($sql));
+            $posiciones = DB::select($sql);
         }
 
 
@@ -1473,7 +1473,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
             $sql .= " GROUP BY jugadors.id, jugador, foto, nacionalidad";
 
-            $goleadores = collect(DB::select(DB::raw($sql)));
+            $goleadores = collect(DB::select($sql));
 
             // Cast numeric fields so additions work correctly
             $goleadores->transform(function ($g) {
@@ -1700,7 +1700,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Club actual = el del último partido jugado (ver sqlClubActualJugador).
         $sqlJugando = $this->sqlClubActualJugador($goleador->id);
 
-        $juega = DB::select(DB::raw($sqlJugando));
+        $juega = DB::select($sqlJugando);
         // Si hay partidos reales mandan ellos: la carga manual no tiene fechas
         // y sólo serviría de respaldo.
         if (count($juega)) {
@@ -1721,7 +1721,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         GROUP BY escudo, equipo_id, equipos.nombre
         ORDER BY ultimo DESC";
 
-        $escudos = DB::select(DB::raw($sql2));
+        $escudos = DB::select($sql2);
 
         // Merge real escudos into the existing string (which may contain manuals)
         $equipos = [];
@@ -1773,7 +1773,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         WHERE alineacions.tipo = 'Titular' AND alineacions.jugador_id = " . $goleador->id . "
         GROUP BY alineacions.jugador_id";
 
-        foreach (DB::select(DB::raw($sql3)) as $jugado) {
+        foreach (DB::select($sql3) as $jugado) {
             $goleador->jugados += $jugado->jugados;
         }
 
@@ -1788,7 +1788,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = " . $goleador->id . "
         GROUP BY cambios.jugador_id";
 
-        foreach (DB::select(DB::raw($sql4)) as $jugado) {
+        foreach (DB::select($sql4) as $jugado) {
             $goleador->jugados += $jugado->jugados;
         }
     }
@@ -1853,7 +1853,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
             $sql .= ' GROUP BY jugadors.id, jugador, foto, nacionalidad';
 
-            $tarjetas = collect(DB::select(DB::raw($sql)));
+            $tarjetas = collect(DB::select($sql));
 
             // Cast numeric fields
             $tarjetas->transform(function ($t) {
@@ -2060,7 +2060,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Club actual = el del último partido jugado (ver sqlClubActualJugador).
         $sqlJugando = $this->sqlClubActualJugador($tarjeta->id);
 
-        $juega = DB::select(DB::raw($sqlJugando));
+        $juega = DB::select($sqlJugando);
         if (count($juega)) {
             $tarjeta->jugando = '';
             foreach ($juega as $e) {
@@ -2097,7 +2097,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        foreach (DB::select(DB::raw($sql2)) as $escudo) {
+        foreach (DB::select($sql2) as $escudo) {
             $eid = $escudo->equipo_id;
             if (!isset($equipos[$eid])) {
                 $equipos[$eid] = [
@@ -2133,7 +2133,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         WHERE alineacions.tipo = 'Titular' AND alineacions.jugador_id = " . $tarjeta->id . "
         GROUP BY alineacions.jugador_id";
 
-        foreach (DB::select(DB::raw($sql3)) as $jugado) {
+        foreach (DB::select($sql3) as $jugado) {
             $tarjeta->jugados += $jugado->jugados;
         }
 
@@ -2148,7 +2148,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         WHERE cambios.tipo = 'Entra' AND cambios.jugador_id = " . $tarjeta->id . "
         GROUP BY cambios.jugador_id";
 
-        foreach (DB::select(DB::raw($sql4)) as $jugado) {
+        foreach (DB::select($sql4) as $jugado) {
             $tarjeta->jugados += $jugado->jugados;
         }
     }
@@ -2283,7 +2283,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         // Se guarda mientras no cambien los datos (App\Services\CachePaginas).
         // El SQL ya trae todos los filtros, así que sirve de clave.
         $posiciones = CachePaginas::datos('hist.posiciones.v1', [$sql], function () use ($sql) {
-            return DB::select(DB::raw($sql));
+            return DB::select($sql);
         });
 
         // Países de los equipos de la zona, para el filtro "Equipos de".
@@ -3192,7 +3192,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
             // Clubes que dirige hoy: es el último técnico registrado del club.
             $jugando = '';
-            $juega = DB::select(DB::raw($this->sqlClubActualTecnico($goleador->tecnico_id)));
+            $juega = DB::select($this->sqlClubActualTecnico($goleador->tecnico_id));
             foreach ($juega as $e) {
                 $jugando .= $e->escudo . '_' . $e->equipo_id . '_' . $e->nombre . ',';
             }
@@ -3481,7 +3481,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             $sql .= ' GROUP BY jugadors.id, jugador, completo, foto, nacionalidad
         ) t GROUP BY id, jugador, completo, foto, nacionalidad';
 
-            $arqueros = collect(DB::select(DB::raw($sql)));
+            $arqueros = collect(DB::select($sql));
 
             // Cast numeric fields
             $arqueros->transform(function ($a) {
@@ -3705,7 +3705,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         // Club actual = el del último partido jugado (ver sqlClubActualJugador).
         $sqlJugando = $this->sqlClubActualJugador($arquero->id);
 
-        $juega = DB::select(DB::raw($sqlJugando));
+        $juega = DB::select($sqlJugando);
         if (count($juega)) {
             $arquero->jugando = '';
             foreach ($juega as $e) {
@@ -3748,7 +3748,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        foreach (DB::select(DB::raw($sql2)) as $escudo) {
+        foreach (DB::select($sql2) as $escudo) {
             $eid = $escudo->equipo_id;
             if (!isset($equipos[$eid])) {
                 $equipos[$eid] = [
@@ -3913,7 +3913,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             INNER JOIN personas pe ON pe.id = j.persona_id
             GROUP BY t.jugador_id, pe.foto, pe.nacionalidad, pe.name';
 
-            $jugadores = collect(DB::select(DB::raw($sql)));
+            $jugadores = collect(DB::select($sql));
 
             // Cast numeric fields to int so additions work cleanly
             $jugadores->transform(function ($j) {
@@ -4163,7 +4163,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        $juega = DB::select(DB::raw($sqlJugando));
+        $juega = DB::select($sqlJugando);
 
         // Con partidos reales alcanza: pisan lo que haya dejado la carga manual,
         // que sólo mira el año dentro del nombre del torneo.
@@ -4204,7 +4204,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             }
         }
 
-        foreach (DB::select(DB::raw($sql2)) as $escudo) {
+        foreach (DB::select($sql2) as $escudo) {
             $eid = $escudo->equipo_id;
             if (!isset($equipos[$eid])) {
                 $equipos[$eid] = [
@@ -4794,7 +4794,7 @@ GROUP BY jugadors.id, personas.foto, personas.nacionalidad, personas.nacimiento,
 group by jugador_id,jugador, foto, nacionalidad, nacimiento, dorsal, tipoJugador
 ORDER BY '.$order.' '.$tipoOrder.',dorsal, jugador ASC';
 
-        $jugadores = DB::select(DB::raw($sql));
+        $jugadores = DB::select($sql);
         //echo $sql;
         $page = $request->query('page', 1);
 
@@ -4872,7 +4872,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
         ORDER BY jugados DESC, tecnico ASC';
 
-        $tecnicosEquipo = DB::select(DB::raw($sql));
+        $tecnicosEquipo = DB::select($sql);
         foreach ($tecnicosEquipo as $tecnico){
             $tecnicoAux = Tecnico::findOrFail($tecnico->tecnico_id);
             $tecnico->edad = $tecnicoAux->persona->getAgeAtDate($fechaPrimerPartido);

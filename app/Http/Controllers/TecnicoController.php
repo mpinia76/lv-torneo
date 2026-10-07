@@ -283,7 +283,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
 
 
 
-        $torneosTecnico = DB::select(DB::raw($sql));
+        $torneosTecnico = DB::select($sql);
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
@@ -602,7 +602,7 @@ ORDER BY torneos.year DESC';
 
 
 
-        $torneosJugador = DB::select(DB::raw($sql));
+        $torneosJugador = DB::select($sql);
 
         foreach ($torneosJugador as $torneo){
             // GRUPOS
@@ -654,7 +654,7 @@ ORDER BY torneos.year DESC';
 
 
 
-            $escudos = DB::select(DB::raw($sqlEscudos));
+            $escudos = DB::select($sqlEscudos);
 
 
             foreach ($escudos as $escudo){
@@ -694,7 +694,7 @@ ORDER BY torneos.year DESC';
 
             //echo $sql3;
 
-            $jugados = DB::select(DB::raw($sqlTitular));
+            $jugados = DB::select($sqlTitular);
 
 
             foreach ($jugados as $jugado){
@@ -713,7 +713,7 @@ ORDER BY torneos.year DESC';
 
 
 
-            $jugados = DB::select(DB::raw($sql4));
+            $jugados = DB::select($sql4);
 
 
             foreach ($jugados as $jugado){
@@ -732,7 +732,7 @@ ORDER BY torneos.year DESC';
 
 
 
-            $goleadores = DB::select(DB::raw($sqlGoles));
+            $goleadores = DB::select($sqlGoles);
 
             foreach ($goleadores as $gol){
 
@@ -750,7 +750,7 @@ ORDER BY torneos.year DESC';
                             WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND jugadors.persona_id = '.$tecnico->persona_id;
 
 
-            $tarjetas = DB::select(DB::raw($sqlTarjetas));
+            $tarjetas = DB::select($sqlTarjetas);
 
             foreach ($tarjetas as $tarjeta){
                 //Log::info('Tarjetas: '.$torneo->amarillas.' -> '.$tarjeta->amarillas);
@@ -769,7 +769,7 @@ INNER JOIN grupos ON grupos.id = fechas.grupo_id
 WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND penals.jugador_id = '.$id;
 
 
-            $penals = DB::select(DB::raw($sqlPenals));
+            $penals = DB::select($sqlPenals);
 
             foreach ($penals as $penal){
                 //Log::info('Penals: '.$torneo->amarillas.' -> '.$penal->amarillas);
@@ -790,7 +790,7 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
                             WHERE  alineacions.tipo = \'Titular\'  AND grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') AND jugadors.persona_id = '.$tecnico->persona_id;
 
 
-            $arqueros = DB::select(DB::raw($sqlArqueros));
+            $arqueros = DB::select($sqlArqueros);
 
             foreach ($arqueros as $arquero){
 
@@ -934,7 +934,7 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
         $sql .=" ) a
 group by tecnico_id";
 
-        $jugados = DB::select(DB::raw($sql));
+        $jugados = DB::select($sql);
 
         foreach ($jugados as $jugado){
             $totalJugados =$jugado->jugados;
@@ -964,7 +964,7 @@ WHERE (tecnicos.id = ".$id.")";
 
 
 //echo $sql;
-        $partidos = DB::select(DB::raw($sql));
+        $partidos = DB::select($sql);
 
 
         $page = $request->query('page', 1);

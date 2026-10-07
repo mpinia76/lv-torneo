@@ -282,7 +282,7 @@ class EquipoController extends Controller
         $titulosCopa=0;
         $titulosInternacional=0;
 
-        $torneosEquipo = DB::select(DB::raw($sql));
+        $torneosEquipo = DB::select($sql);
         // Estadísticas manuales
         $estadisticasManuales = EquipoEstadisticaManual::where('equipo_id', $id)->get();
 
@@ -335,7 +335,7 @@ class EquipoController extends Controller
 
             //echo $sql3;
 
-            $jugados = DB::select(DB::raw($sqlJugados));
+            $jugados = DB::select($sqlJugados);
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('equipo_id', '=',$id)->first();
 
@@ -502,7 +502,7 @@ class EquipoController extends Controller
         group by equipo_id
         ";
                 $tituloExtra->nombreTorneo = $tituloExtra->nombre.' '.$tituloExtra->year;
-                $jugados = DB::select(DB::raw($sqlJugados));
+                $jugados = DB::select($sqlJugados);
 
                 // Construimos un objeto tipo torneo, igual que en tu foreach
                 foreach ($jugados as $jugado) {
@@ -692,7 +692,7 @@ GROUP BY j.id, p.foto, p.apellido, p.nombre
 group by jugador_id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 //dd($sql);
-        $jugadores = DB::select(DB::raw($sql));
+        $jugadores = DB::select($sql);
         //echo $sql;
 
 
@@ -751,7 +751,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
         ORDER BY partidos.dia DESC
     ";
 
-        $partidosRaw = DB::select(DB::raw($sqlPartidos), [
+        $partidosRaw = DB::select($sqlPartidos, [
             'equipoId1' => $id,
             'equipoId2' => $id,
         ]);
@@ -841,7 +841,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
         $sql .=" ) a
 group by equipo_id";
 
-        $jugados = DB::select(DB::raw($sql));
+        $jugados = DB::select($sql);
 
         foreach ($jugados as $jugado){
             $totalJugados =$jugado->jugados;
@@ -870,7 +870,7 @@ WHERE golesl is not null AND golesv is not null AND ((e1.id = ".$id.") OR (e2.id
 
 
 
-        $partidos = DB::select(DB::raw($sql));
+        $partidos = DB::select($sql);
 
 
         $page = $request->query('page', 1);
