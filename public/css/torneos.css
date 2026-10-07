@@ -240,6 +240,22 @@ a:hover { color: var(--t-accent-hover); }
     color: var(--t-ink);
     display: flex; align-items: center; gap: 9px;
 }
+
+/* Marca «La Planilla»: el logo es un SVG en linea, asi que toma currentColor y
+   sigue al tema claro/oscuro sin necesidad de dos archivos. */
+.t-navbar .navbar-brand .t-logo   { flex: 0 0 auto; }
+.t-navbar .navbar-brand .t-marca  { font-size: 1.0625rem; white-space: nowrap; }
+.t-navbar .navbar-brand .t-marca-bajada {
+    font-family: var(--t-fuente-texto);
+    font-weight: 500;
+    font-size: .8125rem;
+    letter-spacing: 0;
+    color: var(--t-muted);
+    white-space: nowrap;
+    padding-left: 10px;
+    border-left: 1px solid var(--t-line);
+}
+
 .t-navbar .navbar-nav { flex-wrap: wrap; }
 .t-navbar .nav-link {
     color: var(--t-ink-2);

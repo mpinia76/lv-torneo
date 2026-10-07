@@ -131,6 +131,20 @@ return [
     |
     */
 
-    'serializable_classes' => false,
+    // Laravel 13 desactivo por defecto la deserializacion de objetos desde la
+    // cache (allowed_classes de unserialize). Esta app cachea colecciones de
+    // Eloquent y resultados de DB::select (stdClass) en varios servicios, asi
+    // que con false todo vuelve como __PHP_Incomplete_Class.
+    //
+    // true restaura el comportamiento de Laravel <= 12. El riesgo que cubre el
+    // default nuevo es la inyeccion de objetos desde un almacen que un atacante
+    // pueda escribir; con el driver de archivos eso exige acceso de escritura
+    // al servidor, o sea que el atacante ya entro.
+    //
+    // ENDURECIMIENTO PENDIENTE: cambiar esto por la lista exacta de clases. Para
+    // descubrirla sin adivinar, poner la lista y registrar en un service provider
+    //   Cache::handleUnserializableClassUsing(fn ($clase) => Log::warning('cache: '.$clase));
+    // navegar el sitio y el admin, y agregar lo que aparezca en el log.
+    'serializable_classes' => true,
 
 ];

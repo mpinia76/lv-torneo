@@ -2,7 +2,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
-<title>@hasSection('pageTitle')@yield('pageTitle') · @endif{{ config('app.name', 'Torneos') }}</title>
+{{-- Paginas internas: «Sujeto — que encuentra | La Planilla». Portada: marca + bajada. --}}
+<title>@hasSection('pageTitle')@yield('pageTitle') | {{ config('app.name', 'La Planilla') }}@else{{ config('app.name', 'La Planilla') }} — {{ __('todo el fútbol del siglo XXI') }}@endif</title>
+<meta name="description" content="@hasSection('pageDescription')@yield('pageDescription')@else{{ __('Fichas completas de jugadores, directores técnicos y equipos: cada partido oficial del siglo XXI, con formaciones, goles, tarjetas, cambios y penales.') }}@endif">
 
 {{-- La misma página en cada idioma, para los buscadores --}}
 @foreach(idiomas_sitio() as $codIdioma => $nomIdioma)
@@ -36,6 +38,6 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
-<link href="{{ asset('css/torneos.css') }}?v=20" rel="stylesheet">
+<link href="{{ asset('css/torneos.css') }}?v=21" rel="stylesheet">
 
-<link rel="shortcut icon" type="image/png" href="{{ url('images/icon_ball.png') }}">
+<link rel="icon" type="image/svg+xml" href="{{ url('favicon.svg') }}?v=2">

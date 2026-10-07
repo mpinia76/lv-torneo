@@ -15,9 +15,17 @@
         <div class="container">
 
             <a class="navbar-brand" href="{{ route('fechas.fixture') }}">
-                <img src="{{ asset('images/icon_ball.png') }}" alt="" height="24">
-                <span class="d-none d-xxl-inline">{{ __('Resultados y estadísticas') }}</span>
-                <span class="d-xxl-none">{{ __('Torneos') }}</span>
+                {{-- SVG en linea, no <img>: asi hereda currentColor y acompana al modo oscuro. --}}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false" class="t-logo">
+                    <g stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+                        <rect x="3.3" y="2.4" width="17.4" height="19.2" rx="2.7"/>
+                        <path d="M7.4 2.4v19.2"/>
+                        <path d="M10.3 8h7.4M10.3 12h7.4M10.3 16h4.6"/>
+                    </g>
+                    <circle cx="17.7" cy="16" r="1.5" fill="currentColor"/>
+                </svg>
+                <span class="t-marca">La Planilla</span>
+                <span class="d-none d-xxl-inline t-marca-bajada">{{ __('todo el fútbol del siglo XXI') }}</span>
             </a>
 
             {{-- Controles siempre a la vista --}}
