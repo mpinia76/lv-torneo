@@ -164,10 +164,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::get('importincidencias', 'FechaController@importincidencias')->name('fechas.importincidencias');
     Route::post('importincidenciasprocess', 'FechaController@importincidenciasprocess');
 
-    Route::get('importincidenciasfecha', 'FechaController@importincidenciasfecha')->name('fechas.importincidenciasfecha');
     Route::get('importgolesfecha', 'FechaController@importgolesfecha')->name('fechas.importgolesfecha');
     Route::get('importpenalesfecha', 'FechaController@importpenalesfecha')->name('fechas.importpenalesfecha');
-    Route::get('controlarbitrosfecha', 'FechaController@controlarbitrosfecha')->name('fechas.controlarbitrosfecha');
 
     Route::redirect('controlarPenales', '/admin/controles?check=penales.faltantes')->name('torneos.controlarPenales');
 

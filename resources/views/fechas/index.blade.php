@@ -29,7 +29,6 @@
            onclick="return confirmarImportacion({{ $grupo->goles_importados ? 'true' : 'false' }}, {{ $grupo->id }})">
             Importar goles
         </a>
-        <!--<a href="{{route('fechas.controlarbitrosfecha',  array('grupoId' => (isset($_GET['grupoId']))?$_GET['grupoId']:'' ))}}" class="btn btn-info m-1">Controlar arbitros</a>-->
         <nav class="navbar navbar-light float-right">
             <form class="form-inline">
                 <input type="hidden" name="grupoId" value="{{ (isset($_GET['grupoId']))?$_GET['grupoId']:'' }}">
@@ -60,8 +59,6 @@
 
                         <a href="{{route('fechas.edit', $fecha->id)}}" class="btn btn-primary m-1">Editar</a>
                         <a href="{{route('fechas.show', $fecha->id)}}" class="btn btn-success m-1">Datos complementarios</a>
-                        <!--<a href="{{route('fechas.importincidenciasfecha', array('fechaId' =>$fecha->id))}}" class="btn btn-info m-1">Importar incidencias</a>
-                        <a href="{{route('fechas.importgolesfecha', array('fechaId' =>$fecha->id))}}" class="btn btn-info m-1">Importar goles</a>-->
                         <a href="{{ route('fechas.importpenalesfecha', ['fechaId' => $fecha->id]) }}"
                            class="btn btn-info m-1"
                            onclick="return confirmarImportacion({{ $fecha->penales_importados ? 'true' : 'false' }}, {{ $fecha->id }})">
