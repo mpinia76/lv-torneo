@@ -2219,6 +2219,10 @@ class TmDetallePartido
             if (!is_array($a)) continue;
             $tipo = strtoupper(trim((string) (isset($a['type']) ? $a['type'] : '')));
             if ($tipo === 'PLACEHOLDER') continue;
+            // Sanción al DT (actionId 701; Liverpool–Defensor 18/10/2023,
+            // coachId en vez de jugador). `tarjetas` es sólo de jugadores y no
+            // hay dónde guardarla, así que se saltea sin avisar.
+            if ($tipo === 'COACH_SANCTION') continue;
             if (!isset($a['clubId']) || (string) $a['clubId'] !== (string) $club) continue;
 
             if (isset($ramas[$tipo])) {

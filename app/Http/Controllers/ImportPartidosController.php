@@ -3392,6 +3392,11 @@ class ImportPartidosController extends Controller
             // Una zona armada por `partirRondasMezcladas()` tiene a cada equipo
             // contra varios rivales por definición: no es una jornada mezclada.
             if ($this->rondaArmada($r) !== null) continue;
+            // Una ronda «Grupo A» es una zona, no una jornada: cada equipo
+            // juega con los otros del grupo y «Aplicar» la reparte en fechas
+            // (ver `zonaDeLaRonda()`). Avisar «rearmá las jornadas» ahí
+            // empujaba a romperla.
+            if (preg_match('/^(?:grupo|group|gruppe|groep)\s+\S+$/iu', trim($r))) continue;
             $rivales[$r][$l][$v] = true;
             $rivales[$r][$v][$l] = true;
         }
