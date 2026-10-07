@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 use DB;
 use App\Routing\UrlIdioma;
+use Illuminate\Pagination\Paginator;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -44,6 +45,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // Laravel 8 cambio la plantilla de paginacion por defecto a Tailwind.
+        // Este sitio usa Bootstrap 5, asi que sin esto los SVG de las flechas
+        // salen a tamano natural (sus clases w-5 h-5 no existen) y los textos
+        // aparecen en ingles.
+        Paginator::useBootstrapFive();
+
         Schema::defaultStringLength(191);
         setlocale(LC_TIME, 'es_ES.utf8');
 
