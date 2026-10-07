@@ -23,7 +23,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => ['CambioController@update', (isset($_GET['partidoId']))?$_GET['partidoId']:''], 'method' => 'put']) }}
+    {{ Form::open(['action' => ['App\Http\Controllers\CambioController@update', (isset($_GET['partidoId']))?$_GET['partidoId']:''], 'method' => 'put']) }}
     <!-- Include the CRSF token -->
     {{Form::token()}}
         {{Form::hidden('partido_id', (isset($_GET['partidoId']))?$_GET['partidoId']:'' )}}

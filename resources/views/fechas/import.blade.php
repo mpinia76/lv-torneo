@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'FechaController@importprocess', 'enctype' => 'multipart/form-data']) }}
+    {{ Form::open(['action' => 'App\Http\Controllers\FechaController@importprocess', 'enctype' => 'multipart/form-data']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}

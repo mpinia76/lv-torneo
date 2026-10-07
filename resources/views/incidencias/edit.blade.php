@@ -19,7 +19,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => ['IncidenciaController@update', $incidencia->id], 'method' => 'put']) }}
+    {{ Form::open(['action' => ['App\Http\Controllers\IncidenciaController@update', $incidencia->id], 'method' => 'put']) }}
     <!-- Include the CRSF token -->
     {{Form::token()}}
         {{Form::hidden('torneo_id', $torneo->id)}}

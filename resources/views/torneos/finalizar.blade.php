@@ -45,7 +45,7 @@
         @endif
 
         <!-- Open the form with the store function route. -->
-        {{ Form::open(['action' => ['TorneoController@guardarFinalizar'], 'method' => 'put']) }}
+        {{ Form::open(['action' => ['App\Http\Controllers\TorneoController@guardarFinalizar'], 'method' => 'put']) }}
         <!-- Include the CRSF token -->
         {{Form::token()}}
         <!-- build our form inputs -->

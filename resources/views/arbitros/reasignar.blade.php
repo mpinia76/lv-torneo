@@ -14,7 +14,7 @@
             </div>
         @endif
         <!-- Open the form with the store function route. -->
-        {{ Form::open(['action' => ['ArbitroController@guardarReasignar'], 'method' => 'put']) }}
+        {{ Form::open(['action' => ['App\Http\Controllers\ArbitroController@guardarReasignar'], 'method' => 'put']) }}
         <!-- Include the CRSF token -->
         {{Form::token()}}
             <!-- build our form inputs -->

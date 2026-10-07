@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'TecnicoController@importarProcess']) }}
+    {{ Form::open(['action' => 'App\Http\Controllers\TecnicoController@importarProcess']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}

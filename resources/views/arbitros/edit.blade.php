@@ -19,7 +19,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => ['ArbitroController@update', $arbitro->id], 'method' => 'put', 'enctype' => 'multipart/form-data']) }}
+    {{ Form::open(['action' => ['App\Http\Controllers\ArbitroController@update', $arbitro->id], 'method' => 'put', 'enctype' => 'multipart/form-data']) }}
     <!-- Include the CRSF token -->
     {{Form::token()}}
     <!-- build our form inputs -->

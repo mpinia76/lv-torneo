@@ -36,7 +36,7 @@
         @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => ['PlantillaController@update', $plantilla->id], 'method' => 'put']) }}
+    {{ Form::open(['action' => ['App\Http\Controllers\PlantillaController@update', $plantilla->id], 'method' => 'put']) }}
     <!-- Include the CRSF token -->
     {{Form::token()}}
     <!-- build our form inputs -->

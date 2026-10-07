@@ -60,7 +60,7 @@
         @endif
 
         <!-- Open the form with the store function route. -->
-        {{ Form::open(['action' => 'FechaController@importarPartidoProcess']) }}
+        {{ Form::open(['action' => 'App\Http\Controllers\FechaController@importarPartidoProcess']) }}
 
         <!-- Include the CRSF token -->
         {{Form::token()}}

@@ -12,7 +12,7 @@
             Algunos equipos de promiedos no coinciden con los de tu base. Elegí a qué equipo tuyo corresponde cada uno (aparecen ordenados por parecido). Cuando estén todos elegidos, se importa la fecha.
         </div>
 
-        {{ Form::open(['action' => 'FechaController@importprocess']) }}
+        {{ Form::open(['action' => 'App\Http\Controllers\FechaController@importprocess']) }}
         {{ Form::token() }}
 
         {{-- Estado para reejecutar el import con lo elegido --}}

@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'PlantillaController@store']) }}
+    {{ Form::open(['action' => 'App\Http\Controllers\PlantillaController@store']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}

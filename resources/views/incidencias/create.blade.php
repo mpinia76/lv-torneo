@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'IncidenciaController@store', 'enctype' => 'multipart/form-data']) }}
+    {{ Form::open(['action' => 'App\Http\Controllers\IncidenciaController@store', 'enctype' => 'multipart/form-data']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}

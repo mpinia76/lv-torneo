@@ -19,7 +19,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => ['CruceController@update', $cruce->id], 'method' => 'put', 'enctype' => 'multipart/form-data']) }}
+    {{ Form::open(['action' => ['App\Http\Controllers\CruceController@update', $cruce->id], 'method' => 'put', 'enctype' => 'multipart/form-data']) }}
     <!-- Include the CRSF token -->
     {{Form::token()}}
     <!-- build our form inputs -->

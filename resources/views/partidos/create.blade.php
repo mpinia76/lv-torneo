@@ -23,7 +23,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'FechaController@store']) }}
+    {{ Form::open(['action' => 'App\Http\Controllers\FechaController@store']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}

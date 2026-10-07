@@ -20,7 +20,7 @@
     @endif
 
     <!-- Open the form with the store function route. -->
-    {{ Form::open(['action' => 'TecnicoController@store', 'enctype' => 'multipart/form-data']) }}
+    {{ Form::open(['action' => 'App\Http\Controllers\TecnicoController@store', 'enctype' => 'multipart/form-data']) }}
 
     <!-- Include the CRSF token -->
     {{Form::token()}}
