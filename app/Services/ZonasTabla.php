@@ -29,6 +29,9 @@ class ZonasTabla
     /** Clases CSS de las zonas de copa, en el orden de las clasificaciones. */
     const CLASES = ['t-zona-1', 't-zona-2', 't-zona-3', 't-zona-4'];
 
+    /** Avisos de la última llamada a marcar() (cupo de campeón sin campeón cargado). */
+    public static $avisos = [];
+
     /**
      * @param Torneo $torneo
      * @return bool
@@ -75,6 +78,7 @@ class ZonasTabla
                 $claseDe[$c->nombre] = 't-desciende';
                 continue;
             }
+            if (isset($claseDe[$c->nombre])) continue;   // misma zona en dos filas (cupo de campeón)
             $claseDe[$c->nombre] = isset(self::CLASES[$n]) ? self::CLASES[$n] : 't-zona-4';
             $n++;
         }
@@ -95,47 +99,77 @@ class ZonasTabla
         }
         $totalPorPuntos = count($posiciones) - $manualesEnTabla;
 
+        // Cupos del campeón de otro torneo (CuposCampeon): resuelve quién ocupa
+        // cada uno y deja las cantidades que quedan por posición.
+        $yaUbicados = [];
+        foreach ($manuales as $eqId => $m) {
+            if ($m->clasificacion) $yaUbicados[(int) $eqId] = $m->clasificacion->nombre;
+        }
+        $orden = [];
+        foreach ($posiciones as $fila) $orden[] = (int) $fila->equipo_id;
+        $res = CuposCampeon::resolver($torneo, $orden, $yaUbicados);
+        $cupos = $res['cupos'];
+        $auto = $res['auto'];
+        self::$avisos = $res['avisos'];
+
         $usadas = [];
-        // Primera pasada: los clasificados a mano van a su zona.
+        // Primera pasada: los clasificados a mano (y los campeones que toman su
+        // cupo) van a su zona.
         foreach ($posiciones as $fila) {
             $fila->zona = null;
             $fila->zonaClase = '';
             $fila->zonaManual = false;
+            $fila->zonaAuto = false;
 
             $manual = isset($manuales[$fila->equipo_id]) ? $manuales[$fila->equipo_id] : null;
+            $nombre = null;
             if ($manual && $manual->clasificacion) {
                 $nombre = $manual->clasificacion->nombre;
+                $fila->zonaManual = true;
+            } elseif (isset($auto[(int) $fila->equipo_id])) {
+                $nombre = $auto[(int) $fila->equipo_id];
+                $fila->zonaAuto = true;
+            }
+            if ($nombre !== null) {
                 $fila->zona = $nombre;
                 $fila->zonaClase = isset($claseDe[$nombre]) ? $claseDe[$nombre] : 't-zona-4';
-                $fila->zonaManual = true;
                 $usadas[$nombre] = $fila->zonaClase;
             }
         }
 
-        // Segunda pasada con la posición efectiva (ignora los manuales ya vistos).
-        $vistos = 0;
+        // Segunda pasada con la posición efectiva. Para las copas no cuentan los
+        // manuales ni los campeones que tomaron su cupo; para el descenso sólo
+        // salen los manuales: el campeón de copa que termina abajo baja igual.
+        $vistos = 0;      // manuales + automáticos
+        $vistosDesc = 0;  // sólo manuales
         $idx = 0;
         foreach ($posiciones as $fila) {
             $idx++;
             if ($fila->zonaManual) {
                 $vistos++;
+                $vistosDesc++;
                 continue;
             }
             $pos = $idx - $vistos;
+            $posDesc = $idx - $vistosDesc;
 
-            $inicio = 1;
-            foreach ($clasificaciones as $c) {
-                $fin = $inicio + (int) $c->cantidad - 1;
-                if ($pos >= $inicio && $pos <= $fin) {
-                    $fila->zona = $c->nombre;
-                    $fila->zonaClase = $claseDe[$c->nombre];
-                    $usadas[$c->nombre] = $fila->zonaClase;
-                    break;
+            if (!$fila->zonaAuto) {
+                $inicio = 1;
+                foreach ($cupos as $nombre => $cant) {
+                    $fin = $inicio + (int) $cant - 1;
+                    if ($pos >= $inicio && $pos <= $fin) {
+                        $fila->zona = $nombre;
+                        $fila->zonaClase = $claseDe[$nombre];
+                        $usadas[$nombre] = $fila->zonaClase;
+                        break;
+                    }
+                    $inicio = $fin + 1;
                 }
-                $inicio = $fin + 1;
+            } else {
+                $vistos++;
             }
 
-            if ($descenso > 0 && $pos > $totalPorPuntos - $descenso) {
+            if ($descenso > 0 && $posDesc > $totalPorPuntos - $descenso) {
                 $fila->zona = 'Descenso';
                 $fila->zonaClase = 't-desciende';
                 $usadas['Descenso'] = 't-desciende';

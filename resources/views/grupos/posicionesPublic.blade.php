@@ -90,6 +90,9 @@
                     <span class="t-referencia"><i style="background: var(--t-win)"></i> {{ __('Clasifica') }}</span>
                 </div>
             @endif
+            @foreach($avisosZonas ?? [] as $avisoZona)
+                <div class="t-panel-pie" style="color:#b45309">{{ $avisoZona }}</div>
+            @endforeach
         </div>
     @endforeach
 

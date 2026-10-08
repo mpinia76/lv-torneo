@@ -292,12 +292,15 @@
         <!-- Clasificaciones a copas -->
         <div class="form-group col-md-12">
             <h1 class="display-6">Clasificaciones a copas</h1>
-            <table class="table" style="width: 50%">
+            <table class="table" style="width: {{ $hayCupoCampeon ? '90%' : '50%' }}">
                 <thead>
                 <tr>
                     <th></th>
                     <th>Nombre</th>
                     <th>Cantidad</th>
+                    @if($hayCupoCampeon)
+                        <th>Cupo del campeón de <span class="text-muted" style="font-weight:normal" title="Dejalo vacío para un cupo por posición. Si elegís un torneo, el cupo es de su campeón (1° de sus posiciones finales): si ese equipo ya clasifica por la tabla a esta zona o a una mejor, el cupo baja al siguiente; si no, va él.">(?)</span></th>
+                    @endif
                     <th><a href="#" class="addRowClasificacion"><i class="glyphicon glyphicon-plus"></i></a></th>
                 </tr>
                 </thead>
@@ -307,11 +310,19 @@
                         <td>{{ Form::hidden('clasificacion_id[]', $clasificacion->id) }}</td>
                         <td>{{ Form::text('nombreClasificacion[]', $clasificacion->nombre, ['class'=>'form-control','style'=>'width:250px']) }}</td>
                         <td>{{ Form::number('cantidadClasificacion[]', $clasificacion->cantidad, ['class'=>'form-control','style'=>'width:60px']) }}</td>
+                        @if($hayCupoCampeon)
+                            <td>{{ Form::select('campeonClasificacion[]', $torneosCampeon, $clasificacion->campeon_torneo_id, ['class' => 'form-control js-example-basic-single', 'style' => 'width: 350px']) }}</td>
+                        @endif
                         <td><a href="#" class="btn btn-danger removeClasificacion"><i class="glyphicon glyphicon-remove"></i></a></td>
                     </tr>
                 @endforeach
                 </tbody>
             </table>
+            @if($hayCupoCampeon)
+                {{-- Molde para las filas nuevas (ver addRowClasificacion en el footer). --}}
+                <template id="tplCampeonClasificacion">{{ Form::select('campeonClasificacion[]', $torneosCampeon, '', ['class' => 'form-control', 'style' => 'width: 350px']) }}</template>
+                <p class="text-muted small">Cargá las cantidades oficiales. Un cupo que da ganar otro torneo (copa nacional, copa internacional) va en su propia fila con ese torneo elegido; si su campeón ya clasifica por la tabla, el cupo baja solo al siguiente.</p>
+            @endif
         </div>
 
     {{Form::submit('Guardar', ['class' => 'btn btn-primary'])}}

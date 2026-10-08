@@ -566,10 +566,11 @@
             '<td></td><td>'+'{{ Form::text('nombreClasificacion[]', '', ['class'=>'form-control','style'=>'width:250px']) }}'+'</td>'+
 
             '<td>'+'{{ Form::number('cantidadClasificacion[]', '', ['class'=>'form-control','style'=>'width:60px']) }}'+'</td>'+
-
+            ($('#tplCampeonClasificacion').length ? '<td>'+$('#tplCampeonClasificacion').html()+'</td>' : '')+
             '<td><a href="#" class="btn btn-danger removeClasificacion"><i class="glyphicon glyphicon-remove"></i></a></td>'+
             '</tr>';
         $('#cuerpoClasificacion').append(tr);
+        if ($.fn.select2) $('#cuerpoClasificacion tr:last select').select2();
 
     };
     $('body').on('click', '.removeClasificacion', function(e){

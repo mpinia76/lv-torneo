@@ -275,7 +275,11 @@ ORDER BY puntaje DESC, diferencia DESC, golesl DESC, equipo ASC;
 
 
 
-        return view('grupos.posicionesPublic', compact('torneo','arrPosiciones','incidencias','leyendaZonas'));
+        // ?debug=1 logueado (no pasa por el caché de páginas): avisos de los
+        // cupos del campeón de otro torneo que no se pudieron resolver.
+        $avisosZonas = (request()->query('debug') && auth()->check()) ? ZonasTabla::$avisos : [];
+
+        return view('grupos.posicionesPublic', compact('torneo','arrPosiciones','incidencias','leyendaZonas','avisosZonas'));
     }
 
     public function goleadores(Request $request)

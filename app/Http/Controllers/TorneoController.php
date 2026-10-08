@@ -264,7 +264,14 @@ class TorneoController extends Controller
 
         $grupos = Grupo::where('torneo_id','=',"$id")->get();
 
-        return view('torneos.edit', compact('torneo','torneosAnteriores','promedioTorneos','grupos','acumuladoTorneos'));
+        // Para «Cupo del campeón de…» en Clasificaciones a copas: cualquier
+        // torneo, los de tipo Copa primero (Copa de Francia, Libertadores...).
+        $torneosCampeon = $torneos->sortBy(function ($t) {
+            return ($t->tipo === 'Copa' ? '0' : '1') . sprintf('%05d', 9999 - (int) $t->year);
+        })->pluck('full_name', 'id')->prepend('— cupo por posición —', '');
+        $hayCupoCampeon = \App\Services\CuposCampeon::hayColumna();
+
+        return view('torneos.edit', compact('torneo','torneosAnteriores','promedioTorneos','grupos','acumuladoTorneos','torneosCampeon','hayCupoCampeon'));
     }
 
     /**
@@ -456,6 +463,10 @@ class TorneoController extends Controller
                         'nombre'    => $nombre,
                         'cantidad'  => $cantidad
                     ];
+                    if (\App\Services\CuposCampeon::hayColumna()) {
+                        $campeonDe = $request->campeonClasificacion[$item] ?? null;
+                        $data['campeon_torneo_id'] = $campeonDe ? (int) $campeonDe : null;
+                    }
                     if (!empty($request->clasificacion_id[$item])) {
                         $clasificacion = TorneoClasificacion::find($request->clasificacion_id[$item]);
                         $clasificacion->update($data);
@@ -1016,6 +1027,24 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $manualsSeen = 0;
         $totalNonManual = count($acumulado) - count($manualIds);
 
+        // Cupos del campeón de otro torneo (Copa Argentina → Libertadores):
+        // ver App\Services\CuposCampeon. Los ya ubicados son los manuales y los
+        // campeones de los torneos del acumulado (van a la primera zona).
+        $yaUbicados = [];
+        foreach ($equiposClasificados as $eqId => $m) {
+            if ($m->clasificacion) $yaUbicados[(int) $eqId] = $m->clasificacion->nombre;
+        }
+        foreach ($campeones as $eqId) {
+            if (!isset($yaUbicados[(int) $eqId]) && $zonaPrimera !== null) $yaUbicados[(int) $eqId] = $zonaPrimera;
+        }
+        $cuposRes = \App\Services\CuposCampeon::resolver($torneo, array_map(function ($e) {
+            return (int) $e->equipo_id;
+        }, $acumulado), $yaUbicados);
+        $clasificaciones = $cuposRes['cupos'];
+        $autoCampeon = $cuposRes['auto'];
+        $avisosCupos = $cuposRes['avisos'];
+        $autoSeen = 0;
+
         foreach ($acumulado as $index => $equipo) {
 
             $rawPos = $index + 1;           // posición en el array tal cual (1-based)
@@ -1038,8 +1067,24 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 continue;
             }
 
+            // 2b) Campeón de copa que toma su cupo: va a esa zona y no ocupa cupo
+            // por posición, pero SÍ cuenta para el descenso (si terminó abajo,
+            // baja igual).
+            if (isset($autoCampeon[(int) $equipo->equipo_id])) {
+                $equipo->zona = $autoCampeon[(int) $equipo->equipo_id];
+                $equipo->motivo = 'campeón de copa';
+                $autoSeen++;
+                if ($rawPos - $manualsSeen > $totalNonManual - $descenso) {
+                    $equipo->zona = 'Descenso';
+                    $equipo->motivo = 'posición (campeón de copa)';
+                    $descendidosAcumulado[$equipo->equipo_id] = $equipo;
+                }
+                continue;
+            }
+
             // 3) POSICIÓN EFECTIVA (ignora manuales que ya aparecieron antes)
-            $pos = $rawPos - $manualsSeen; // ej: si rawPos=12 y ya vimos 1 manual, pos=11
+            $pos = $rawPos - $manualsSeen - $autoSeen; // ej: si rawPos=12 y ya vimos 1 manual, pos=11
+            $posDesc = $rawPos - $manualsSeen;         // el descenso no saltea a los campeones de copa
 
             // 4) Asignar zona según clasificaciones (por posición efectiva)
             $inicio = 1;
@@ -1053,7 +1098,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
             }
 
             // 5) Descenso por posición: usamos $totalNonManual (puestos por puntos)
-            if ($pos > $totalNonManual - $descenso) {
+            if ($posDesc > $totalNonManual - $descenso) {
                 $equipo->zona = 'Descenso';
                 $equipo->motivo = 'posición (pos '.$pos.' > '.$totalNonManual.' - '.$descenso.')';
                 $descendidosAcumulado[$equipo->equipo_id] = $equipo;
@@ -1113,6 +1158,9 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                 'descenso'           => $descenso,
                 'descenso_promedio'  => $torneo->descenso_promedio,
                 'manuales'           => $manualIds,
+                'cupos_campeon'      => $cuposRes['detalle'],
+                'cupos_por_posicion' => $clasificaciones,
+                'avisos_cupos'       => $avisosCupos,
                 'totalNonManual'     => $totalNonManual,
                 'campeones'          => $campeones,
                 'promedios'          => array_map(function ($p) { return $p->equipo.' ('.$p->promedio.')'; }, isset($promedios) ? $promedios : []),
@@ -1121,7 +1169,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         }
 
         $i=1;
-        return view('torneos.acumulado', compact('torneo','acumulado','i','debugZonas'));
+        return view('torneos.acumulado', compact('torneo','acumulado','i','debugZonas','avisosCupos'));
     }
 
 
