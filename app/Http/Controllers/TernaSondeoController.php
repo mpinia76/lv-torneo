@@ -184,10 +184,30 @@ class TernaSondeoController extends Controller
         }
 
         // ── Veredicto del torneo ────────────────────────────────────────────
+        // Los repetidos (TM pone al mismo árbitro en dos roles) no son pérdida:
+        // se muestran como aviso pero no frenan el marcado.
+        $repetidos = array_values(array_filter($faltas, function ($x) { return !empty($x['repetido']); }));
+        $faltas    = array_values(array_filter($faltas, function ($x) { return empty($x['repetido']); }));
+
         if (empty($faltas)) {
             $html .= '<div class="ok-box"><b>Muestra limpia.</b> En los ' . $sondeados . ' partidos sondeados no hay '
-                . 'ni un rol donde Transfermarkt traiga un árbitro y la base esté vacía. Lo que falta, TM no lo tiene.</div>'
-                . '<p class="acciones"><a class="boton" href="'
+                . 'ni un rol donde Transfermarkt traiga un árbitro y la base esté vacía. Lo que falta, TM no lo tiene.</div>';
+
+            if ($repetidos) {
+                $html .= '<p class="sub">' . count($repetidos) . ' rol(es) donde TM repite a un árbitro que ya está '
+                    . 'en el partido con otro rol. Es un error de TM, no se puede cargar y no frena el marcado.</p>'
+                    . '<div class="scroll" style="max-height:200px"><table><thead><tr><th>Partido</th><th>Rol</th>'
+                    . '<th>TM</th><th>Detalle</th></tr></thead><tbody>';
+                foreach ($repetidos as $x) {
+                    $html .= '<tr><td>' . e($x['partido']) . ' <span class="id">#' . $x['partido_id'] . '</span></td>'
+                        . '<td>' . e($x['rol']) . '</td>'
+                        . '<td class="num">' . e($x['tm']) . '</td>'
+                        . '<td class="gris">' . e($x['motivo']) . '</td></tr>';
+                }
+                $html .= '</tbody></table></div>';
+            }
+
+            $html .= '<p class="acciones"><a class="boton" href="'
                 . e(route('import_detalles.terna_barrido', ['accion' => 'marcar', 'torneo_id' => $torneoId, 'muestra' => $muestra]))
                 . '">Marcar los ' . $quedan . ' de este torneo y seguir con el próximo →</a></p>'
                 . '<p class="sub">Escribe una incidencia por partido, igual que el botón "Terna incompleta en TM". '
@@ -234,6 +254,7 @@ class TernaSondeoController extends Controller
 
             $esperado = isset($mapaTm[$tm]) ? (int) $mapaTm[$tm] : null;
             $motivo   = 'mapeado y libre: habría que poder cargarlo';
+            $repetido = false;
 
             if ($esperado === null) {
                 $motivo = 'el árbitro no está en arbitro_tm';
@@ -241,11 +262,15 @@ class TernaSondeoController extends Controller
                 foreach ($base as $rolBase => $aid) {
                     if ((int) $aid === $esperado) {
                         $motivo = 'ese árbitro ya está en el partido como ' . $rolBase;
+                        $repetido = true;
                         break;
                     }
                 }
             }
-            $out[] = ['rol' => $rol, 'tm' => $tm, 'motivo' => $motivo];
+            // `repetido`: TM pone a la misma persona en dos roles. No se puede
+            // cargar (una persona, un rol por partido) y no hay nada que
+            // recuperar, así que no frena el marcado del torneo.
+            $out[] = ['rol' => $rol, 'tm' => $tm, 'motivo' => $motivo, 'repetido' => $repetido];
         }
         return $out;
     }
