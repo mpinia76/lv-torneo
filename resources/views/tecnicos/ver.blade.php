@@ -19,6 +19,9 @@
 @endphp
 @section('pageTitle', __(':nombre — partidos dirigidos y títulos', ['nombre' => $seoNombre]))
 @section('pageDescription', $seoDesc)
+@if($tecnico->persona->foto)
+    @section('pageImage', url_imagen($tecnico->persona->foto))
+@endif
 
 @section('content')
     @php

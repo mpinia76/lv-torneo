@@ -3,8 +3,31 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
 {{-- Paginas internas: «Sujeto — que encuentra | La Planilla». Portada: marca + bajada. --}}
-<title>@hasSection('pageTitle')@yield('pageTitle') | {{ config('app.name', 'La Planilla') }}@else{{ config('app.name', 'La Planilla') }} — {{ __('todo el fútbol del siglo XXI') }}@endif</title>
-<meta name="description" content="@hasSection('pageDescription')@yield('pageDescription')@else{{ __('Fichas completas de jugadores, directores técnicos y equipos: cada partido oficial del siglo XXI, con formaciones, goles, tarjetas, cambios y penales.') }}@endif">
+@php
+    // Título, descripción e imagen de la página. Las vistas los definen con
+    // @section('pageTitle' / 'pageDescription' / 'pageImage'); lo que llega de una
+    // sección ya viene escapado (Blade aplica e() al guardarla), así que todo se
+    // arma como HTML seguro y se imprime con {!! !!}.
+    $mpMarca  = e(config('app.name', 'La Planilla'));
+    $mpTitulo = trim($__env->yieldContent('pageTitle'));
+    $mpTitulo = $mpTitulo !== ''
+        ? $mpTitulo . ' | ' . $mpMarca
+        : $mpMarca . ' — ' . e(__('todo el fútbol del siglo XXI'));
+    $mpDesc = trim($__env->yieldContent('pageDescription'));
+    if ($mpDesc === '') {
+        $mpDesc = e(__('Fichas completas de jugadores, directores técnicos y equipos: cada partido oficial del siglo XXI, con formaciones, goles, tarjetas, cambios y penales.'));
+    }
+    // Imagen para compartir: la foto o el escudo de la ficha, si hay; si no, la
+    // tarjeta de la marca (1200x630, public/og/) en el idioma de la página.
+    $mpImagen  = trim($__env->yieldContent('pageImage'));
+    $mpPropia  = $mpImagen !== '';
+    if (!$mpPropia) {
+        $mpImagen = e(url('og/laplanilla-' . (app()->getLocale() === 'en' ? 'en' : 'es') . '.png'));
+    }
+    $mpLocales = ['es' => 'es_AR', 'en' => 'en_US'];
+@endphp
+<title>{!! $mpTitulo !!}</title>
+<meta name="description" content="{!! $mpDesc !!}">
 
 @hasSection('robots')
 <meta name="robots" content="@yield('robots')">
@@ -12,6 +35,26 @@
 
 {{-- Versión oficial de esta página (sin orden, filtros ni campañas): ver query_canonica() --}}
 <link rel="canonical" href="{{ url_canonica() }}">
+
+{{-- Vista previa al compartir (WhatsApp, Facebook, X, Telegram…) --}}
+<meta property="og:site_name" content="{!! $mpMarca !!}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{!! $mpTitulo !!}">
+<meta property="og:description" content="{!! $mpDesc !!}">
+<meta property="og:url" content="{{ url_canonica() }}">
+<meta property="og:image" content="{!! $mpImagen !!}">
+@unless($mpPropia)
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+@endunless
+<meta property="og:locale" content="{{ $mpLocales[app()->getLocale()] ?? 'es_AR' }}">
+@foreach($mpLocales as $mpCod => $mpLoc)
+@if($mpCod !== app()->getLocale())
+<meta property="og:locale:alternate" content="{{ $mpLoc }}">
+@endif
+@endforeach
+{{-- Foto o escudo (chicos y cuadrados): tarjeta chica. La de la marca: grande. --}}
+<meta name="twitter:card" content="{{ $mpPropia ? 'summary' : 'summary_large_image' }}">
 
 {{-- La misma página en cada idioma, para los buscadores --}}
 @foreach(idiomas_sitio() as $codIdioma => $nomIdioma)

@@ -7,6 +7,9 @@
 @endphp
 @section('pageTitle', $seoTitulo)
 @section('pageDescription', $seoDesc)
+@if($torneo->escudo)
+    @section('pageImage', url_imagen($torneo->escudo))
+@endif
 
 @section('content')
 

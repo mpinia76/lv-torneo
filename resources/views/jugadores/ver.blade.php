@@ -17,6 +17,9 @@
 @endphp
 @section('pageTitle', __(':nombre — partidos, goles y títulos', ['nombre' => $seoNombre]))
 @section('pageDescription', $seoDesc)
+@if($jugador->persona->foto)
+    @section('pageImage', url_imagen($jugador->persona->foto))
+@endif
 
 @section('content')
     @php

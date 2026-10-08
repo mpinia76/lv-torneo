@@ -347,6 +347,20 @@ if (! function_exists('url_canonica')) {
     }
 }
 
+if (! function_exists('url_imagen')) {
+    /**
+     * URL absoluta de un archivo de public/images, con el nombre codificado:
+     * hay escudos y banderas con espacios y acentos ("Nueva Zelanda.gif"), y los
+     * lectores de Open Graph (WhatsApp, Facebook) no siempre los toleran crudos.
+     */
+    function url_imagen($archivo)
+    {
+        $partes = array_map('rawurlencode', explode('/', ltrim((string) $archivo, '/')));
+
+        return url('images/' . implode('/', $partes));
+    }
+}
+
 if (! function_exists('cantidad')) {
     /**
      * "1 partido" / "312 partidos" / "1.204 goles" en el idioma del sitio.

@@ -18,6 +18,9 @@
 @endphp
 @section('pageTitle', __(':nombre — historial, plantel y títulos', ['nombre' => $equipo->nombre]))
 @section('pageDescription', $seoDesc)
+@if($equipo->escudo)
+    @section('pageImage', url_imagen($equipo->escudo))
+@endif
 
 @section('content')
     @php
