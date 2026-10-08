@@ -3,10 +3,6 @@
 use Illuminate\Support\Facades\Route;
 
 use Illuminate\Support\Facades\Soap;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\AlineacionController;
 use App\Http\Controllers\ApellidosPartidosController;
 use App\Http\Controllers\ArbitroController;
@@ -491,22 +487,5 @@ foreach (array_keys(idiomas_sitio()) as $idioma) {
 
 
 Route::get('logout', [LoginController::class, 'logout']);
-
-
-// El token estaba escrito en el codigo y no caduca: alcanza con que la URL
-// aparezca una vez en un log o en el historial para quedar abierta para siempre.
-// Ahora ademas exige sesion iniciada. Si algun cron la llamaba por URL, avisar.
-Route::get('/ejecutar-actualizar-nombres', function (Request $request) {
-    // Token de seguridad
-    $token = $request->query('token');
-
-    if ($token !== 'Zp4rV9kN2qM7LbXy') {
-        abort(403, 'Acceso no autorizado');
-    }
-
-    Artisan::call('personas:actualizar-nombres');
-
-    return '✅ Comando ejecutado correctamente.';
-})->middleware('auth');
 
 
