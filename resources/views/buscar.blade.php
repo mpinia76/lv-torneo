@@ -2,6 +2,9 @@
 
 @section('pageTitle', $q ? __('Buscar: :q', ['q' => $q]) : __('Buscar'))
 
+{{-- Resultados de búsqueda: Google pide no indexarlos (contenido infinito y repetido) --}}
+@section('robots', 'noindex, follow')
+
 @section('content')
 
     <div class="t-cabecera">

@@ -6,6 +6,10 @@
 <title>@hasSection('pageTitle')@yield('pageTitle') | {{ config('app.name', 'La Planilla') }}@else{{ config('app.name', 'La Planilla') }} — {{ __('todo el fútbol del siglo XXI') }}@endif</title>
 <meta name="description" content="@hasSection('pageDescription')@yield('pageDescription')@else{{ __('Fichas completas de jugadores, directores técnicos y equipos: cada partido oficial del siglo XXI, con formaciones, goles, tarjetas, cambios y penales.') }}@endif">
 
+@hasSection('robots')
+<meta name="robots" content="@yield('robots')">
+@endif
+
 {{-- La misma página en cada idioma, para los buscadores --}}
 @foreach(idiomas_sitio() as $codIdioma => $nomIdioma)
 <link rel="alternate" hreflang="{{ $codIdioma }}" href="{{ url_idioma($codIdioma) }}">
@@ -41,3 +45,15 @@
 <link href="{{ asset('css/torneos.css') }}?v=21" rel="stylesheet">
 
 <link rel="icon" type="image/svg+xml" href="{{ url('favicon.svg') }}?v=2">
+
+{{-- Google Analytics 4. Va en el <head>, que sale de la caché de páginas: no
+     depende de quién mira, así que no se puede condicionar por sesión acá. --}}
+@if(config('services.google_analytics.id'))
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ config('services.google_analytics.id') }}"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '{{ config('services.google_analytics.id') }}');
+</script>
+@endif

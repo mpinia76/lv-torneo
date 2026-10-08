@@ -1,2 +1,12 @@
+# La Planilla — https://laplanilla.com.ar
 User-agent: *
-Disallow:
+Disallow: /admin
+Disallow: /login
+Disallow: /logout
+Disallow: /password/
+Disallow: /register
+Disallow: /torneos-menu
+Disallow: /en/torneos-menu
+Disallow: /*?*perf=1
+
+Sitemap: https://laplanilla.com.ar/sitemap.xml

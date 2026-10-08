@@ -42,3 +42,10 @@ vendor.zip
 !/public/images/death.png
 !/public/images/luna.jpg
 .git-commit-msg.txt
+
+# Sitemap: lo genera php artisan sitemap:generar en el servidor
+/public/sitemap.xml
+/public/sitemap.xml.tmp
+/public/sitemaps/
+/public/sitemaps.tmp/
+/public/sitemaps.old/

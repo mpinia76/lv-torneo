@@ -1,6 +1,8 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{{-- Admin y login: fuera de los buscadores --}}
+<meta name="robots" content="noindex, nofollow">
 <meta name="csrf-token" content="<?php echo csrf_token() ?>"/>
 
 <title>{{ config('app.name', 'Torneos') }}</title>
