@@ -104,6 +104,9 @@
         <span class="t-referencia">{!! $ftBarra($ftGanados, $ftEmpatados, $ftPerdidos) !!} {{ __('balance de la carrera') }}</span>
     </div>
 
+    {{-- Los totales salen solo de lo cargado; la base todavía no tiene la historia completa. --}}
+    <p class="t-alcance"><i class="bi bi-info-circle"></i> {{ __('Totales según los torneos cargados en La Planilla.') }}</p>
+
     <div class="t-panel">
         <div class="t-tabla-wrap">
             <table class="t-tabla">

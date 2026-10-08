@@ -1305,6 +1305,18 @@ h5.text-warning, h5.text-success, h5.text-info, h5.text-danger { color: var(--t-
 }
 .t-kpis-pie b { color: var(--t-ink-2); font-weight: 600; }
 
+/* Aclaración debajo de los totales de una ficha: la base no tiene toda la historia. */
+.t-alcance {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: -6px 0 16px;
+    padding: 0 2px;
+    font-size: 12px;
+    color: var(--t-muted);
+}
+.t-alcance i { font-size: 12px; opacity: .8; }
+
 /* ---------- barra G / E / P ---------- */
 
 .t-ge {

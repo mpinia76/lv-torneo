@@ -162,6 +162,9 @@
             <span class="t-referencia">{!! $veBarra($veGanados, $veEmpatados, $vePerdidos) !!} {{ __('balance histórico') }}</span>
         </div>
 
+        {{-- Los totales salen solo de lo cargado; la base todavía no tiene la historia completa. --}}
+        <p class="t-alcance"><i class="bi bi-info-circle"></i> {{ __('Totales según los torneos cargados en La Planilla.') }}</p>
+
         {{-- Pestañas --}}
         <ul class="nav nav-tabs" id="equipoTabs" role="tablist">
             @php
