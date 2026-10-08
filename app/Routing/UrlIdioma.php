@@ -9,8 +9,8 @@ use Illuminate\Routing\UrlGenerator;
  * links a otras páginas públicas salen con /en adelante.
  *
  * Las rutas en inglés tienen los MISMOS nombres que las de español (se
- * registran primero, así el nombre queda apuntando a la de español; ver
- * routes/web.php). Por eso request()->routeIs('fechas.fixture') anda igual en
+ * registran después, así el nombre queda apuntando a la de español: desde
+ * Laravel 11 gana la primera registrada; ver routes/web.php). Por eso request()->routeIs('fechas.fixture') anda igual en
  * los dos idiomas y ninguna vista tuvo que cambiar sus route().
  *
  * Solo se toca lo que tiene el middleware 'idioma' (el sitio público): el

@@ -399,11 +399,16 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
 // ─────────────────────────────────────────────────────────────────────────
 //  Sitio público, en cada idioma de idiomas_sitio() (app/helpers.php)
 //
-//  Las mismas rutas se registran una vez por idioma: primero las de los otros
-//  idiomas con su prefijo (/en/verTorneo…) y al final las de español, sin
-//  prefijo, así las URLs de siempre no cambian. Todas llevan el MISMO nombre:
-//  como gana la última registrada, route('torneos.ver') apunta a la de español
-//  y App\Routing\UrlIdioma le agrega el /en cuando la página está en inglés.
+//  Las mismas rutas se registran una vez por idioma: primero las de español,
+//  sin prefijo (así las URLs de siempre no cambian), y después las de los otros
+//  idiomas con su prefijo (/en/verTorneo…). Todas llevan el MISMO nombre:
+//  route('torneos.ver') apunta a la de español y App\Routing\UrlIdioma le
+//  agrega el /en cuando la página está en inglés.
+//
+//  OJO con el orden: desde Laravel 11 un nombre repetido lo conserva la
+//  PRIMERA ruta registrada (RouteCollection::addLookups usa !inNameLookup);
+//  hasta Laravel 10 ganaba la última. Por eso español va primero. Al revés,
+//  route() da /en/... también en español, y /en/en/... en inglés.
 //  Así ninguna vista tuvo que cambiar sus route() ni sus routeIs().
 // ─────────────────────────────────────────────────────────────────────────
 $rutasPublicas = function () {
@@ -473,7 +478,7 @@ $rutasPublicas = function () {
     Route::get('titulosHistorico', [TorneoController::class, 'titulos'])->name('torneos.titulos');
 };
 
-foreach (array_reverse(array_keys(idiomas_sitio())) as $idioma) {
+foreach (array_keys(idiomas_sitio()) as $idioma) {
     $esLaDeLaCasa = $idioma === array_keys(idiomas_sitio())[0];
     Route::group(
         // 'pagina.cache' va después de 'idioma': la clave de la caché lleva el idioma.
