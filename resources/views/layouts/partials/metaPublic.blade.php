@@ -10,11 +10,14 @@
 <meta name="robots" content="@yield('robots')">
 @endif
 
+{{-- Versión oficial de esta página (sin orden, filtros ni campañas): ver query_canonica() --}}
+<link rel="canonical" href="{{ url_canonica() }}">
+
 {{-- La misma página en cada idioma, para los buscadores --}}
 @foreach(idiomas_sitio() as $codIdioma => $nomIdioma)
-<link rel="alternate" hreflang="{{ $codIdioma }}" href="{{ url_idioma($codIdioma) }}">
+<link rel="alternate" hreflang="{{ $codIdioma }}" href="{{ url_idioma($codIdioma, true) }}">
 @endforeach
-<link rel="alternate" hreflang="x-default" href="{{ url_idioma(array_keys(idiomas_sitio())[0]) }}">
+<link rel="alternate" hreflang="x-default" href="{{ url_idioma(array_keys(idiomas_sitio())[0], true) }}">
 
 {{-- Tema elegido, antes de pintar, para que no parpadee --}}
 <script>

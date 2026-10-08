@@ -1,6 +1,12 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Fixture'))
+@php
+    $seoTorneo = $torneo->nombre . ' ' . $torneo->year;
+    $seoTitulo = __(':torneo — fixture y resultados', ['torneo' => $seoTorneo]);
+    $seoDesc   = __(':torneo: fixture completo con todos los resultados, fecha por fecha. Posiciones, goleadores y tarjetas del torneo.', ['torneo' => $seoTorneo]);
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
 

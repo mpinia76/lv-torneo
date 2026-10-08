@@ -2,6 +2,11 @@
 
 @section('pageTitle', $arbitro->persona->name ?: __('Ver árbitro'))
 
+{{-- La ficha todavía no muestra estadísticas: es una página sin contenido y
+     baja la calidad del sitio para Google. Cuando tenga datos, sacar esto y
+     volver a sumar los árbitros a GenerarSitemap. --}}
+@section('robots', 'noindex, follow')
+
 @section('content')
     @php
         $vaP = $arbitro->persona;

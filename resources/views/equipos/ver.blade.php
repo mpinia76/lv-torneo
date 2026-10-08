@@ -1,6 +1,23 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', $equipo->nombre)
+@php
+    // Título y descripción para los buscadores, con los números de la ficha.
+    $seoE        = collect($torneosEquipo);
+    $seoPartidos = (int) $seoE->sum('jugados');
+    $seoTitulos  = $titulosLiga + $titulosCopa + $titulosInternacional;
+    $seoDesc = $seoPartidos > 0
+        ? $equipo->nombre . ': ' . cantidad($seoPartidos, 'partido', 'partidos')
+            . ' (' . lista_y([
+                cantidad($seoE->sum('ganados'), 'ganado', 'ganados'),
+                cantidad($seoE->sum('empatados'), 'empatado', 'empatados'),
+                cantidad($seoE->sum('perdidos'), 'perdido', 'perdidos'),
+            ]) . ') ' . __('en') . ' ' . cantidad($seoE->count(), 'torneo', 'torneos')
+            . ($seoTitulos > 0 ? ', ' . cantidad($seoTitulos, 'título', 'títulos') : '') . '. '
+            . __('Historial, planteles, goleadores y estadísticas.')
+        : __(':nombre: historial, planteles, goleadores y estadísticas.', ['nombre' => $equipo->nombre]);
+@endphp
+@section('pageTitle', __(':nombre — historial, plantel y títulos', ['nombre' => $equipo->nombre]))
+@section('pageDescription', $seoDesc)
 
 @section('content')
     @php

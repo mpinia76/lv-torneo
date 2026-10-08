@@ -287,7 +287,7 @@ if (! function_exists('url_idioma')) {
      * La página que se está viendo, en otro idioma: saca o pone el /en del
      * principio del path y conserva la query string.
      */
-    function url_idioma($idioma)
+    function url_idioma($idioma, $canonica = false)
     {
         $req   = request();
         $raiz  = rtrim($req->root(), '/');
@@ -303,8 +303,77 @@ if (! function_exists('url_idioma')) {
         }
 
         $url = $raiz . ($partes ? '/' . implode('/', $partes) : '');
-        $qs  = $req->getQueryString();
+        $qs  = $canonica ? query_canonica($req->query()) : $req->getQueryString();
         return $qs ? $url . '?' . $qs : $url;
+    }
+}
+
+if (! function_exists('query_canonica')) {
+    /**
+     * Query string de la versión "oficial" de una página, para los buscadores
+     * (<link rel="canonical"> y los hreflang de metaPublic.blade.php).
+     *
+     * Se sacan los parámetros que NO cambian de qué trata la página: campañas
+     * (utm_*, fbclid…), el filtro por nombre de los listados (buscarpor), el
+     * orden de una tabla y la pestaña abierta. Todo lo demás (jugadorId,
+     * torneoId, fechaId, tipo, page…) se conserva, y se ordena alfabéticamente
+     * para que ?a=1&b=2 y ?b=2&a=1 sean la misma URL.
+     *
+     * Ante la duda un parámetro se conserva: juntar dos páginas distintas en
+     * una es peor que dejar dos casi iguales.
+     */
+    function query_canonica(array $query)
+    {
+        $fuera = ['buscarpor', 'order', 'tipoOrder', 'pestActiva', 'perf', '_',
+                  'fbclid', 'gclid', 'msclkid'];
+
+        foreach (array_keys($query) as $k) {
+            if (in_array($k, $fuera, true) || strpos($k, 'utm_') === 0
+                || $query[$k] === null || $query[$k] === '') {
+                unset($query[$k]);
+            }
+        }
+        ksort($query);
+
+        return http_build_query($query);
+    }
+}
+
+if (! function_exists('url_canonica')) {
+    /** URL canónica de la página actual, en su idioma (ver query_canonica()). */
+    function url_canonica()
+    {
+        return url_idioma(app()->getLocale(), true);
+    }
+}
+
+if (! function_exists('cantidad')) {
+    /**
+     * "1 partido" / "312 partidos" / "1.204 goles" en el idioma del sitio.
+     * Las palabras pasan por __(), así que van en lang/en.json.
+     */
+    function cantidad($n, $singular, $plural)
+    {
+        $n = (int) $n;
+        $num = app()->getLocale() === 'en'
+            ? number_format($n, 0, '.', ',')
+            : number_format($n, 0, ',', '.');
+
+        return $num . ' ' . __($n === 1 ? $singular : $plural);
+    }
+}
+
+if (! function_exists('lista_y')) {
+    /** ['a', 'b', 'c'] -> "a, b y c" ("a, b and c" en inglés). Ignora vacíos. */
+    function lista_y(array $partes)
+    {
+        $partes = array_values(array_filter($partes, function ($p) { return $p !== null && $p !== ''; }));
+        if (count($partes) <= 1) {
+            return $partes[0] ?? '';
+        }
+        $ultima = array_pop($partes);
+
+        return implode(', ', $partes) . ' ' . __('y') . ' ' . $ultima;
     }
 }
 

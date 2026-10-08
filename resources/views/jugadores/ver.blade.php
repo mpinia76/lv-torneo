@@ -1,6 +1,22 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', $jugador->persona->name ?: __('Ver jugador'))
+@php
+    // Título y descripción para los buscadores, con los números de la ficha.
+    $seoNombre   = $jugador->persona->name ?: __('Jugador');
+    $seoJ        = collect($torneosJugador);
+    $seoPartidos = (int) $seoJ->sum('jugados');
+    $seoTitulos  = $titulosJugadorLiga + $titulosJugadorCopa + $titulosJugadorInternacional;
+    $seoDesc = $seoPartidos > 0
+        ? $seoNombre . ': ' . lista_y([
+                cantidad($seoPartidos, 'partido', 'partidos'),
+                cantidad($seoJ->sum('goles'), 'gol', 'goles'),
+                $seoTitulos > 0 ? cantidad($seoTitulos, 'título', 'títulos') : '',
+            ]) . ' ' . __('en') . ' ' . cantidad($seoJ->count(), 'torneo', 'torneos') . '. '
+            . __('Todos sus partidos, goles, tarjetas y clubes.')
+        : __(':nombre: ficha de jugador con sus partidos, goles, tarjetas y clubes.', ['nombre' => $seoNombre]);
+@endphp
+@section('pageTitle', __(':nombre — partidos, goles y títulos', ['nombre' => $seoNombre]))
+@section('pageDescription', $seoDesc)
 
 @section('content')
     @php

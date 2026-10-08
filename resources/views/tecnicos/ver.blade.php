@@ -1,6 +1,24 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', $tecnico->persona->name ?: __('Ver técnico'))
+@php
+    // Título y descripción para los buscadores, con los números de la ficha.
+    $seoNombre   = $tecnico->persona->name ?: __('Técnico');
+    $seoT        = collect($torneosTecnico);
+    $seoPartidos = (int) $seoT->sum('jugados');
+    $seoTitulos  = $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional;
+    $seoDesc = $seoPartidos > 0
+        ? $seoNombre . ': ' . cantidad($seoPartidos, 'partido dirigido', 'partidos dirigidos')
+            . ' (' . lista_y([
+                cantidad($seoT->sum('ganados'), 'ganado', 'ganados'),
+                cantidad($seoT->sum('empatados'), 'empatado', 'empatados'),
+                cantidad($seoT->sum('perdidos'), 'perdido', 'perdidos'),
+            ]) . ') ' . __('en') . ' ' . cantidad($seoT->count(), 'torneo', 'torneos')
+            . ($seoTitulos > 0 ? ', ' . cantidad($seoTitulos, 'título', 'títulos') : '') . '. '
+            . __('Todos sus partidos como entrenador.')
+        : __(':nombre: ficha de director técnico con sus partidos dirigidos y títulos.', ['nombre' => $seoNombre]);
+@endphp
+@section('pageTitle', __(':nombre — partidos dirigidos y títulos', ['nombre' => $seoNombre]))
+@section('pageDescription', $seoDesc)
 
 @section('content')
     @php

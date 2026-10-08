@@ -46,7 +46,9 @@ class GenerarSitemap extends Command
 
         // [nombre del archivo, ruta, parámetro, consulta que devuelve los ids]
         $grupos = [
-            ['torneos',   'torneos.ver',    'torneoId',
+            // La página de un torneo es su fixture (la que usa el menú); torneos.ver
+            // es una página de paso con cinco botones y lleva noindex.
+            ['torneos',   'fechas.ver',     'torneoId',
                 'SELECT id FROM torneos ORDER BY id'],
             ['equipos',   'equipos.ver',    'equipoId',
                 'SELECT e.id FROM equipos e
@@ -56,8 +58,10 @@ class GenerarSitemap extends Command
                 'SELECT DISTINCT jugador_id AS id FROM alineacions ORDER BY jugador_id'],
             ['tecnicos',  'tecnicos.ver',   'tecnicoId',
                 'SELECT DISTINCT tecnico_id AS id FROM partido_tecnicos ORDER BY tecnico_id'],
-            ['arbitros',  'arbitros.ver',   'arbitroId',
-                'SELECT DISTINCT arbitro_id AS id FROM partido_arbitros ORDER BY arbitro_id'],
+            // Árbitros: afuera hasta que la ficha muestre estadísticas (hoy está
+            // vacía y lleva noindex). Para volver a sumarlos:
+            // ['arbitros', 'arbitros.ver', 'arbitroId',
+            //     'SELECT DISTINCT arbitro_id AS id FROM partido_arbitros ORDER BY arbitro_id'],
             ['partidos',  'fechas.detalle', 'partidoId',
                 'SELECT id FROM partidos WHERE golesl IS NOT NULL AND golesv IS NOT NULL ORDER BY id'],
         ];

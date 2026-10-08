@@ -1,6 +1,21 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Detalle Fecha'))
+@php
+    // Título y descripción para los buscadores: «Boca 2-1 River — Liga 2024, Fecha 5».
+    $seoTorneo  = $partido->fecha->grupo->torneo;
+    $seoL       = optional($partido->equipol)->nombre;
+    $seoV       = optional($partido->equipov)->nombre;
+    $seoJugado  = !is_null($partido->golesl) && !is_null($partido->golesv);
+    $seoCruce   = $seoJugado
+        ? $seoL . ' ' . $partido->golesl . '-' . $partido->golesv . ' ' . $seoV
+        : $seoL . ' ' . __('vs') . ' ' . $seoV;
+    $seoDonde   = $seoTorneo->nombre . ' ' . $seoTorneo->year . ', ' . nombre_fecha($partido->fecha->numero);
+    $seoTitulo  = $seoCruce . ' — ' . $seoDonde;
+    $seoDesc    = $seoCruce . ' (' . $seoDonde . ($partido->dia ? ', ' . fecha_corta($partido->dia) : '') . '). '
+        . ($seoJugado ? __('Formaciones, goles, tarjetas, cambios y árbitros del partido.') : __('Ficha del partido.'));
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
     @php

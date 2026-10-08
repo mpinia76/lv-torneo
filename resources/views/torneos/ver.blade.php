@@ -1,6 +1,10 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Ver torneo'))
+@section('pageTitle', $torneo->nombre . ' ' . $torneo->year)
+
+{{-- Página de paso (cinco botones). La página del torneo para los buscadores
+     es el fixture (fechas.ver), que es la que está en el sitemap. --}}
+@section('robots', 'noindex, follow')
 
 @section('content')
     <div class="container">
