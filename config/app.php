@@ -123,4 +123,20 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Class Aliases
+    |--------------------------------------------------------------------------
+    |
+    | Laravel 11 sacó esta clave del esqueleto, pero RegisterFacades la sigue
+    | leyendo y la suma a los alias por defecto y a los de los paquetes.
+    | Carbon lo usan sin import equipos/index y equipo_estadisticas/{index,
+    | create,edit}. Excel no hace falta: lo registra el auto-discovery.
+    |
+    */
+
+    'aliases' => [
+        'Carbon' => Carbon\Carbon::class,
+    ],
+
 ];
