@@ -58,10 +58,9 @@ class GenerarSitemap extends Command
                 'SELECT DISTINCT jugador_id AS id FROM alineacions ORDER BY jugador_id'],
             ['tecnicos',  'tecnicos.ver',   'tecnicoId',
                 'SELECT DISTINCT tecnico_id AS id FROM partido_tecnicos ORDER BY tecnico_id'],
-            // Árbitros: afuera hasta que la ficha muestre estadísticas (hoy está
-            // vacía y lleva noindex). Para volver a sumarlos:
-            // ['arbitros', 'arbitros.ver', 'arbitroId',
-            //     'SELECT DISTINCT arbitro_id AS id FROM partido_arbitros ORDER BY arbitro_id'],
+            // Árbitros: solo los que tienen partidos (la ficha sin partidos lleva noindex).
+            ['arbitros',  'arbitros.ver',   'arbitroId',
+                'SELECT DISTINCT arbitro_id AS id FROM partido_arbitros ORDER BY arbitro_id'],
             ['partidos',  'fechas.detalle', 'partidoId',
                 'SELECT id FROM partidos WHERE golesl IS NOT NULL AND golesv IS NOT NULL ORDER BY id'],
         ];

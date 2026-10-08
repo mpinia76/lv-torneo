@@ -90,7 +90,12 @@
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
 <link href="{{ asset('css/torneos.css') }}?v=21" rel="stylesheet">
 
+{{-- Favicon: el .ico es para lo que no lee SVG (Safari viejo, lectores de
+     feeds, el pedido automático a /favicon.ico); el SVG gana donde se entiende.
+     Los tres salen del mismo dibujo: si cambia el SVG, regenerar los otros dos. --}}
+<link rel="icon" href="{{ url('favicon.ico') }}?v=2" sizes="any">
 <link rel="icon" type="image/svg+xml" href="{{ url('favicon.svg') }}?v=2">
+<link rel="apple-touch-icon" href="{{ url('apple-touch-icon.png') }}?v=2">
 
 {{-- Google Analytics 4. Va en el <head>, que sale de la caché de páginas: no
      depende de quién mira, así que no se puede condicionar por sesión acá. --}}

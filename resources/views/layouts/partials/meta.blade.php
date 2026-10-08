@@ -18,7 +18,10 @@
 {{-- <link href="{{ elixir('css/app.css') }}" rel="stylesheet"> --}}
 <link href="{{ asset('css/app.css') }}" rel="stylesheet">
 <link href="{{asset('css/components.min.css')}}" rel="stylesheet" type="text/css">
-<link rel="shortcut icon" type="image/png" href="{{ url('images/icon_ball.png') }}">
+{{-- Mismo favicon que el sitio público (ver metaPublic.blade.php) --}}
+<link rel="icon" href="{{ url('favicon.ico') }}?v=2" sizes="any">
+<link rel="icon" type="image/svg+xml" href="{{ url('favicon.svg') }}?v=2">
+<link rel="apple-touch-icon" href="{{ url('apple-touch-icon.png') }}?v=2">
 <style>
     body {
         font-family: 'Lato';

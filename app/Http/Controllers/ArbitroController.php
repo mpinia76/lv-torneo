@@ -251,9 +251,123 @@ class ArbitroController extends Controller
      */
     public function ver(Request $request)
     {
-        $id= $request->query('arbitroId');
-        $arbitro=Arbitro::findOrFail($id);
-        return view('arbitros.ver', compact('arbitro'));
+        $id      = (int) $request->query('arbitroId');
+        $arbitro = Arbitro::with('persona')->findOrFail($id);
+
+        // Rol pedido en el filtro de la lista -> valores de partido_arbitros.tipo
+        $roles = [
+            'principal' => ['Principal'],
+            'linea'     => ['Linea 1', 'Linea 2'],
+            'cuarto'    => ['Cuarto'],
+            'var'       => ['VAR'],
+        ];
+
+        // ── Carrera por torneo ──────────────────────────────────────────────
+        // partido_arbitros tiene UNIQUE (partido_id, arbitro_id): una fila por
+        // partido, así que COUNT(*) ya son partidos.
+        //
+        // con_detalle = partidos como principal que tienen alineación cargada.
+        // Es el denominador del promedio de tarjetas: en un partido sin detalle
+        // no hay tarjetas cargadas, y contarlo bajaría el promedio con ceros
+        // que no son ceros.
+        $torneosArbitro = DB::select('SELECT t.id AS idTorneo, CONCAT(t.nombre, " ", t.year) AS nombreTorneo,
+       t.escudo AS escudoTorneo,
+       COUNT(*)                                        AS partidos,
+       SUM(pa.tipo = "Principal")                      AS principal,
+       SUM(pa.tipo IN ("Linea 1", "Linea 2"))          AS linea,
+       SUM(pa.tipo = "Cuarto")                         AS cuarto,
+       SUM(pa.tipo = "VAR")                            AS var,
+       SUM(pa.tipo = "Principal" AND EXISTS (SELECT 1 FROM alineacions a WHERE a.partido_id = p.id)) AS con_detalle,
+       0 AS amarillas, 0 AS rojas
+FROM partido_arbitros pa
+INNER JOIN partidos p ON p.id = pa.partido_id
+INNER JOIN fechas f   ON f.id = p.fecha_id
+INNER JOIN grupos g   ON g.id = f.grupo_id
+INNER JOIN torneos t  ON t.id = g.torneo_id
+WHERE pa.arbitro_id = ?
+GROUP BY t.id, t.nombre, t.year, t.escudo
+ORDER BY t.year DESC, t.id DESC', [$id]);
+
+        // Tarjetas: solo las de los partidos donde fue el principal (las
+        // muestra él). La doble amarilla cuenta como expulsión.
+        $tarjetasPor = [];
+        foreach (DB::select('SELECT g.torneo_id,
+       SUM(ta.tipo = "Amarilla")                     AS amarillas,
+       SUM(ta.tipo IN ("Roja", "Doble Amarilla"))    AS rojas
+FROM partido_arbitros pa
+INNER JOIN tarjetas ta ON ta.partido_id = pa.partido_id
+INNER JOIN partidos p  ON p.id = pa.partido_id
+INNER JOIN fechas f    ON f.id = p.fecha_id
+INNER JOIN grupos g    ON g.id = f.grupo_id
+WHERE pa.arbitro_id = ? AND pa.tipo = "Principal"
+GROUP BY g.torneo_id', [$id]) as $f) {
+            $tarjetasPor[(int) $f->torneo_id] = $f;
+        }
+        foreach ($torneosArbitro as $t) {
+            if (isset($tarjetasPor[(int) $t->idTorneo])) {
+                $t->amarillas = (int) $tarjetasPor[(int) $t->idTorneo]->amarillas;
+                $t->rojas     = (int) $tarjetasPor[(int) $t->idTorneo]->rojas;
+            }
+        }
+
+        // ── Lista de partidos (filtrable por torneo y rol) ──────────────────
+        $idTorneo = (int) $request->query('torneoId');
+        $rol      = (string) $request->query('rol', '');
+        if (!isset($roles[$rol])) {
+            $rol = '';
+        }
+        $torneoFiltro = null;
+        foreach ($torneosArbitro as $t) {
+            if ((int) $t->idTorneo === $idTorneo) {
+                $torneoFiltro = $t;
+            }
+        }
+        if (!$torneoFiltro) {
+            $idTorneo = 0;   // un torneo que no dirigió no filtra nada
+        }
+
+        $q = DB::table('partido_arbitros as pa')
+            ->join('partidos as p', 'p.id', '=', 'pa.partido_id')
+            ->join('fechas as f', 'f.id', '=', 'p.fecha_id')
+            ->join('grupos as g', 'g.id', '=', 'f.grupo_id')
+            ->join('torneos as t', 't.id', '=', 'g.torneo_id')
+            ->join('equipos as e1', 'e1.id', '=', 'p.equipol_id')
+            ->join('equipos as e2', 'e2.id', '=', 'p.equipov_id')
+            ->where('pa.arbitro_id', $id)
+            ->select('t.nombre as nombreTorneo', 't.escudo as escudoTorneo', 't.year', 'f.numero', 'p.dia',
+                'e1.id as equipol_id', 'e1.escudo as fotoLocal', 'e1.nombre as local',
+                'e2.id as equipov_id', 'e2.escudo as fotoVisitante', 'e2.nombre as visitante',
+                'p.golesl', 'p.golesv', 'p.penalesl', 'p.penalesv', 'p.id as partido_id', 'pa.tipo as rol')
+            ->orderBy('p.dia', 'desc')
+            ->orderBy('p.id', 'desc');
+        if ($idTorneo) {
+            $q->where('g.torneo_id', $idTorneo);
+        }
+        if ($rol !== '') {
+            $q->whereIn('pa.tipo', $roles[$rol]);
+        }
+        $partidos = $q->paginate(20)->withQueryString()->fragment('partidos');
+
+        // Tarjetas de cada partido de la página (solo se muestran si fue principal)
+        $idsPagina = [];
+        foreach ($partidos as $p) {
+            if ($p->rol === 'Principal') {
+                $idsPagina[] = (int) $p->partido_id;
+            }
+        }
+        $tarjetasPartido = [];
+        if (!empty($idsPagina)) {
+            foreach (DB::table('tarjetas')
+                         ->whereIn('partido_id', $idsPagina)
+                         ->selectRaw('partido_id, SUM(tipo = "Amarilla") AS amarillas, SUM(tipo IN ("Roja", "Doble Amarilla")) AS rojas')
+                         ->groupBy('partido_id')
+                         ->get() as $f) {
+                $tarjetasPartido[(int) $f->partido_id] = $f;
+            }
+        }
+
+        return view('arbitros.ver', compact('arbitro', 'torneosArbitro', 'partidos', 'tarjetasPartido',
+            'idTorneo', 'rol', 'torneoFiltro'));
     }
 
     public function importar(Request $request)
