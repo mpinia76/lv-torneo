@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Facade;
+
 return [
 
     /*
@@ -128,15 +130,16 @@ return [
     | Class Aliases
     |--------------------------------------------------------------------------
     |
-    | Laravel 11 sacó esta clave del esqueleto, pero RegisterFacades la sigue
-    | leyendo y la suma a los alias por defecto y a los de los paquetes.
+    | Laravel 11 sacó esta clave del esqueleto. Si se define, REEMPLAZA a los
+    | alias por defecto (app.aliases no está en LoadConfiguration::
+    | mergeableOptions), por eso se parte de Facade::defaultAliases().
     | Carbon lo usan sin import equipos/index y equipo_estadisticas/{index,
     | create,edit}. Excel no hace falta: lo registra el auto-discovery.
     |
     */
 
-    'aliases' => [
+    'aliases' => Facade::defaultAliases()->merge([
         'Carbon' => Carbon\Carbon::class,
-    ],
+    ])->toArray(),
 
 ];
