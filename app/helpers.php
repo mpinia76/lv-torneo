@@ -499,3 +499,72 @@ if (!function_exists('url_volver')) {
         return url()->previous();
     }
 }
+
+if (! function_exists('datos_estructurados')) {
+    /**
+     * Datos estructurados (JSON-LD de schema.org) de la página.
+     *
+     * La vista agrega nodos con datos_estructurados([...]) en un @php y
+     * metaPublic los imprime en el <head> con datos_estructurados_html(). Anda
+     * porque Blade arma la vista hija antes que el layout. No se usa una
+     * @section: lo que entra por @section('x', $valor) pasa por e() y rompería
+     * el JSON.
+     *
+     * Las URLs se arman con route(), así que salen con la marca de las URLs
+     * amigables y UrlAmigableSlugs las completa como al resto de la página.
+     */
+    function datos_estructurados(?array $nodo = null)
+    {
+        static $nodos = [];
+        if ($nodo === null) {
+            $todos = $nodos;
+            $nodos = [];
+            return $todos;
+        }
+        $nodos[] = $nodo;
+        return $nodos;
+    }
+
+    function datos_estructurados_html()
+    {
+        $nodos = datos_estructurados();
+        if (!$nodos) {
+            return '';
+        }
+        // Sin nulos ni textos vacíos (un "logo": null es un error para el validador).
+        $limpiar = function ($v) use (&$limpiar) {
+            if (!is_array($v)) {
+                return $v;
+            }
+            $r = [];
+            foreach ($v as $k => $x) {
+                $x = $limpiar($x);
+                if ($x === null || $x === '' || $x === []) {
+                    continue;
+                }
+                $r[$k] = $x;
+            }
+            return $r;
+        };
+        $datos = count($nodos) === 1
+            ? ['@context' => 'https://schema.org'] + $nodos[0]
+            : ['@context' => 'https://schema.org', '@graph' => $nodos];
+
+        // JSON_HEX_TAG: un "</script>" dentro de un nombre no puede cerrar el bloque.
+        return '<script type="application/ld+json">'
+            . json_encode($limpiar($datos), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)
+            . '</script>';
+    }
+}
+
+if (! function_exists('migas_ld')) {
+    /** BreadcrumbList de schema.org: [[nombre, url], …] (la última puede ir sin url). */
+    function migas_ld(array $migas)
+    {
+        $items = [];
+        foreach (array_values($migas) as $i => $m) {
+            $items[] = ['@type' => 'ListItem', 'position' => $i + 1, 'name' => $m[0], 'item' => $m[1] ?? null];
+        }
+        return ['@type' => 'BreadcrumbList', 'itemListElement' => $items];
+    }
+}

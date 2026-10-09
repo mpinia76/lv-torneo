@@ -62,6 +62,9 @@
 @endforeach
 <link rel="alternate" hreflang="x-default" href="{{ url_idioma(array_keys(idiomas_sitio())[0], true) }}">
 
+{{-- Datos estructurados (schema.org) que haya cargado la vista: ver datos_estructurados() --}}
+{!! datos_estructurados_html() !!}
+
 {{-- Tema elegido, antes de pintar, para que no parpadee --}}
 <script>
     (function () {
