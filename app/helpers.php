@@ -303,7 +303,15 @@ if (! function_exists('url_idioma')) {
         }
 
         $url = $raiz . ($partes ? '/' . implode('/', $partes) : '');
-        $qs  = $canonica ? query_canonica($req->query()) : $req->getQueryString();
+        $query = $req->query();
+        // En las URLs amigables (/jugador/250-…) el id va en el path: el
+        // middleware 'url.amigable' lo puso en la query para el controlador,
+        // pero no forma parte de la URL. (getQueryString() lee la query
+        // original del pedido, así que no lo trae.)
+        if ($p = $req->attributes->get('url_amigable_param')) {
+            unset($query[$p]);
+        }
+        $qs  = $canonica ? query_canonica($query) : $req->getQueryString();
         return $qs ? $url . '?' . $qs : $url;
     }
 }

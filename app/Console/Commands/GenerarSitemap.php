@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\UrlAmigable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -38,6 +39,10 @@ class GenerarSitemap extends Command
             $this->error('APP_URL tiene que ser la URL pública con https (hoy: ' . $base . ').');
             return 1;
         }
+
+        // Las URLs del sitemap van en español (sin /en): route() arma el prefijo
+        // según el idioma de la app.
+        app()->setLocale(array_keys(idiomas_sitio())[0]);
 
         $dirFinal = public_path('sitemaps');
         $dirTmp   = public_path('sitemaps.tmp');
@@ -80,16 +85,23 @@ class GenerarSitemap extends Command
 
         foreach ($grupos as [$nombre, $ruta, $param, $sql]) {
             // La URL se arma una sola vez con un marcador y después se reemplaza el
-            // id: route() por cada una de 1,7 M filas sería lento.
-            $molde = $this->url($base, $ruta, $param, '__ID__');
+            // "id-slug" (URL amigable, ver App\Services\UrlAmigable): route() por
+            // cada una de 110.000 filas sería lento. Los slugs se cargan de a
+            // mil ids por consulta.
+            $molde = $this->url($base, $ruta, 'ref', '__REF__');
 
             $ids = array_map(function ($f) { return (int) $f->id; }, DB::select($sql));
             $partes = array_chunk($ids, self::POR_ARCHIVO);
 
             foreach ($partes as $i => $bloque) {
+                UrlAmigable::precargar($ruta, $bloque);
                 $urls = [];
                 foreach ($bloque as $id) {
-                    $urls[] = str_replace('__ID__', $id, $molde);
+                    $slug = UrlAmigable::slug($ruta, $id);
+                    if ($slug === null) {
+                        continue;   // la ficha ya no existe (p. ej. persona borrada)
+                    }
+                    $urls[] = str_replace('__REF__', UrlAmigable::refCon($id, $slug), $molde);
                 }
                 $archivos[] = $this->escribir($dirTmp, $nombre . '-' . ($i + 1) . '.xml.gz', $urls);
             }

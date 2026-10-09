@@ -408,6 +408,23 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
 //  Así ninguna vista tuvo que cambiar sus route() ni sus routeIs().
 // ─────────────────────────────────────────────────────────────────────────
 $rutasPublicas = function () {
+    // Fichas con URL amigable: /jugador/250-gervasio-nunez (ver App\Services\UrlAmigable).
+    // Llevan el nombre de siempre (route('jugadores.ver', ['jugadorId' => …]) no
+    // cambió en ninguna vista) y las de antes (/verJugador?jugadorId=) quedan como
+    // '<nombre>.viejo' y redirigen con 301 (middleware 'url.amigable').
+    foreach ([
+        'jugadores.ver'  => [JugadorController::class, 'ver'],
+        'tecnicos.ver'   => [TecnicoController::class, 'ver'],
+        'arbitros.ver'   => [ArbitroController::class, 'ver'],
+        'equipos.ver'    => [EquipoController::class, 'ver'],
+        'fechas.ver'     => [FechaController::class, 'ver'],
+        'fechas.detalle' => [FechaController::class, 'detalle'],
+    ] as $nombreRuta => $accion) {
+        Route::get(\App\Services\UrlAmigable::RUTAS[$nombreRuta][2] . '/{ref}', $accion)
+            ->where('ref', '[0-9]+(?:-[^/]*)?')
+            ->name($nombreRuta);
+    }
+
     // La raiz sirve el fixture directamente. Antes renderizaba portada.blade.php,
     // que era solo un <script>window.location = '/fixture'</script>: la URL mas
     // importante del sitio devolvia una pagina vacia (mala para buscadores, y un
@@ -436,7 +453,7 @@ $rutasPublicas = function () {
     Route::get('tabla', [GrupoController::class, 'posicionesPublic'])->name('grupos.posicionesPublic');
     Route::get('goleadores', [GrupoController::class, 'goleadoresPublic'])->name('grupos.goleadoresPublic');
     Route::get('tarjetero', [GrupoController::class, 'tarjetasPublic'])->name('grupos.tarjetasPublic');
-    Route::get('verFechas', [FechaController::class, 'ver'])->name('fechas.ver');
+    Route::get('verFechas', [FechaController::class, 'ver'])->name('fechas.ver.viejo');
     Route::get('fixture', [FechaController::class, 'fixture'])->name('fechas.fixture');
     Route::get('buscar', [BuscadorController::class, 'index'])->name('buscar');
 
@@ -445,18 +462,18 @@ $rutasPublicas = function () {
     Route::get('torneos-menu', [MenuTorneosController::class, 'json'])->name('torneos.menuJson');
     Route::get('competiciones', [MenuTorneosController::class, 'explorar'])->name('torneos.explorar');
     Route::get('verFecha', [FechaController::class, 'showPublic'])->name('fechas.showPublic');
-    Route::get('detalleFecha', [FechaController::class, 'detalle'])->name('fechas.detalle');
-    Route::get('verJugador', [JugadorController::class, 'ver'])->name('jugadores.ver');
+    Route::get('detalleFecha', [FechaController::class, 'detalle'])->name('fechas.detalle.viejo');
+    Route::get('verJugador', [JugadorController::class, 'ver'])->name('jugadores.ver.viejo');
     Route::get('jugadorJugados', [JugadorController::class, 'jugados'])->name('jugadores.jugados');
     Route::get('jugadorGoles', [JugadorController::class, 'goles'])->name('jugadores.goles');
     Route::get('jugadorTarjetas', [JugadorController::class, 'tarjetas'])->name('jugadores.tarjetas');
     Route::get('jugadorPenals', [JugadorController::class, 'penals'])->name('jugadores.penals');
     Route::get('jugadorTitulos', [JugadorController::class, 'titulos'])->name('jugadores.titulos');
-    Route::get('verEquipo', [EquipoController::class, 'ver'])->name('equipos.ver');
+    Route::get('verEquipo', [EquipoController::class, 'ver'])->name('equipos.ver.viejo');
     Route::get('equipoJugados', [EquipoController::class, 'jugados'])->name('equipos.jugados');
-    Route::get('verTecnico', [TecnicoController::class, 'ver'])->name('tecnicos.ver');
+    Route::get('verTecnico', [TecnicoController::class, 'ver'])->name('tecnicos.ver.viejo');
     Route::get('tecnicoJugados', [TecnicoController::class, 'jugados'])->name('tecnicos.jugados');
-    Route::get('verArbitro', [ArbitroController::class, 'ver'])->name('arbitros.ver');
+    Route::get('verArbitro', [ArbitroController::class, 'ver'])->name('arbitros.ver.viejo');
     Route::get('descensos', [TorneoController::class, 'promediosPublic'])->name('torneos.promediosPublic');
     Route::get('acumulado', [TorneoController::class, 'acumulado'])->name('torneos.acumulado');
     Route::get('arqueros', [GrupoController::class, 'arqueros'])->name('grupos.arqueros');
@@ -478,9 +495,11 @@ foreach (array_keys(idiomas_sitio()) as $idioma) {
     $esLaDeLaCasa = $idioma === array_keys(idiomas_sitio())[0];
     Route::group(
         // 'pagina.cache' va después de 'idioma': la clave de la caché lleva el idioma.
+        // 'url.amigable' antes de la caché (decide las redirecciones 301) y
+        // 'url.slugs' después (la copia guardada ya lleva los links completos).
         $esLaDeLaCasa
-            ? ['middleware' => ['idioma:' . $idioma, 'pagina.cache']]
-            : ['prefix' => $idioma, 'middleware' => ['idioma:' . $idioma, 'pagina.cache']],
+            ? ['middleware' => ['idioma:' . $idioma, 'url.amigable', 'pagina.cache', 'url.slugs']]
+            : ['prefix' => $idioma, 'middleware' => ['idioma:' . $idioma, 'url.amigable', 'pagina.cache', 'url.slugs']],
         $rutasPublicas
     );
 }

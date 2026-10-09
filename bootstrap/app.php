@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'idioma' => \App\Http\Middleware\Idioma::class,
             // Cache del HTML de las paginas publicas (ver App\Services\CachePaginas).
             'pagina.cache' => \App\Http\Middleware\PaginaEnCache::class,
+            // URLs amigables de las fichas (ver App\Services\UrlAmigable).
+            'url.amigable' => \App\Http\Middleware\UrlAmigable::class,
+            'url.slugs' => \App\Http\Middleware\UrlAmigableSlugs::class,
         ]);
 
         // Los middleware globales y los de los grupos web/api que tenia el

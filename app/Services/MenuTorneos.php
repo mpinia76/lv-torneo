@@ -32,7 +32,7 @@ class MenuTorneos
     const CACHE_TORNEOS = 'torneos.menu';
 
     /** Estructura ya agrupada por zona y competencia. */
-    const CACHE_ZONAS = 'torneos.menu.zonas';
+    const CACHE_ZONAS = 'torneos.menu.zonas.u1';
 
     const CACHE_SEGUNDOS = 3600;
 
@@ -251,7 +251,8 @@ class MenuTorneos
             if (!$comp['escudo'] && $t->escudo) {
                 $comp['escudo'] = $t->escudo;
             }
-            $comp['ediciones'][] = ['id' => (int) $t->id, 'year' => (string) $t->year];
+            $comp['ediciones'][] = ['id' => (int) $t->id, 'year' => (string) $t->year,
+                                    'slug' => UrlAmigable::aSlug($t->nombre . ' ' . $t->year)];
             unset($comp);
 
             $zonas[$clave]['ediciones']++;
@@ -290,7 +291,8 @@ class MenuTorneos
         });
 
         return [
-            'version' => substr(md5(implode('|', $firma)), 0, 10),
+            // 'u1': formato con URL amigable (cambia la versión del JSON cacheado).
+            'version' => substr(md5('u1|' . implode('|', $firma)), 0, 10),
             'zonas'   => $zonas,
         ];
     }
@@ -373,7 +375,8 @@ class MenuTorneos
             foreach ($z['competencias'] as $c) {
                 $ed = [];
                 foreach ($c['ediciones'] as $e) {
-                    $ed[] = [$e['id'], $e['year']];
+                    // [id, año, "id-slug" de la URL amigable]
+                    $ed[] = [$e['id'], $e['year'], UrlAmigable::refCon($e['id'], $e['slug'] ?? '')];
                 }
                 $comps[] = [
                     'n'  => $c['nombre'],
@@ -396,7 +399,8 @@ class MenuTorneos
 
         return [
             'v'      => $datos['version'],
-            'url'    => route('fechas.ver') . '?torneoId=',
+            // Molde: el menú reemplaza __REF__ por el tercer dato de cada edición.
+            'url'    => route('fechas.ver', ['ref' => '__REF__']),
             'grupos' => self::titulosGrupos(),
             'zonas'  => $zonas,
         ];

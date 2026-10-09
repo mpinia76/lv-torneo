@@ -255,9 +255,17 @@
         return crear('span', 'escudo escudo-sm escudo-txt', ini);
     }
 
+    // URL del fixture de una edición. El JSON trae un molde con __REF__ y cada
+    // edición su "id-slug" (URL amigable); un JSON viejo, guardado por el
+    // navegador, trae ".../verFechas?torneoId=" y se le pega el id.
+    function urlEdicion(ed) {
+        var u = mega.datos.url;
+        return u.indexOf('__REF__') !== -1 ? u.replace('__REF__', ed[2] || ed[0]) : u + ed[0];
+    }
+
     function enlaceEdicion(ed, clase) {
         var a = crear('a', clase, ed[1]);
-        a.href = mega.datos.url + ed[0];
+        a.href = urlEdicion(ed);
         if (String(ed[0]) === mega.panel.getAttribute('data-activo')) a.classList.add('activo');
         return a;
     }
@@ -266,7 +274,7 @@
         var fila = crear('div', 't-mega-comp');
 
         var nombre = crear('a', 't-mega-comp-nombre');
-        nombre.href = mega.datos.url + c.ed[0][0];
+        nombre.href = urlEdicion(c.ed[0]);
         nombre.title = c.n + ' ' + c.ed[0][1];
         nombre.appendChild(escudoMini(c));
         var txt = crear('span', 't-mega-comp-txt');

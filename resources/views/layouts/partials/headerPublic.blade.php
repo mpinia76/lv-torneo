@@ -214,7 +214,7 @@
 
                 <ul class="nav">
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('fechas.ver') ? 'active' : '' }}"
+                        <a class="nav-link {{ request()->routeIs('fechas.ver', 'fechas.ver.viejo') ? 'active' : '' }}"
                            href="{{ route('fechas.ver', ['torneoId' => $tId]) }}">{{ __('Fixture') }}</a>
                     </li>
 

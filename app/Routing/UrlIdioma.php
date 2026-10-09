@@ -2,6 +2,7 @@
 
 namespace App\Routing;
 
+use App\Services\UrlAmigable;
 use Illuminate\Routing\UrlGenerator;
 
 /**
@@ -20,6 +21,8 @@ class UrlIdioma extends UrlGenerator
 {
     public function toRoute($route, $parameters, $absolute)
     {
+        [$route, $parameters] = $this->amigable($route, (array) $parameters);
+
         $url = parent::toRoute($route, $parameters, $absolute);
 
         $idioma = app()->getLocale();
@@ -36,6 +39,31 @@ class UrlIdioma extends UrlGenerator
         }
 
         return '/' . $idioma . self::resto($url);
+    }
+
+    /**
+     * URLs amigables (ver App\Services\UrlAmigable): route('jugadores.ver',
+     * ['jugadorId' => 250, 'pestActiva' => 'x']) -> /jugador/250-gervasio-nunez?pestActiva=x.
+     * Sin id (route('fechas.ver') a secas) sale la URL vieja, que sigue
+     * andando sin parámetro. Un 'ref' explícito pasa tal cual (moldes del
+     * sitemap y del menú).
+     */
+    protected function amigable($route, array $parameters)
+    {
+        $nombre = $route->getName();
+        $cfg = $nombre ? UrlAmigable::config($nombre) : null;
+        if (!$cfg || array_key_exists('ref', $parameters)) {
+            return [$route, $parameters];
+        }
+
+        $id = $parameters[$cfg[1]] ?? null;
+        if ((is_int($id) || (is_string($id) && ctype_digit($id))) && (int) $id > 0) {
+            unset($parameters[$cfg[1]]);
+            return [$route, ['ref' => UrlAmigable::ref($nombre, (int) $id)] + $parameters];
+        }
+
+        $viejo = $this->routes->getByName($nombre . '.viejo');
+        return [$viejo ?: $route, $parameters];
     }
 
     /** "" -> "", "/verTorneo?x" -> "/verTorneo?x", "?x" -> "?x". */
