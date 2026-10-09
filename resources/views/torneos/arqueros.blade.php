@@ -1,6 +1,15 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Arqueros'))
+@php
+    // Título y descripción para los buscadores (ranking histórico).
+    $seoTitulo = __('Arqueros — ranking histórico');
+    if (request()->query('actuales')) {
+        $seoTitulo = __(':titulo — :extra', ['titulo' => $seoTitulo, 'extra' => __('en actividad')]);
+    }
+    $seoDesc = __('Ranking histórico de arqueros en los torneos cargados en La Planilla: partidos, vallas invictas, goles recibidos y penales atajados.');
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
 

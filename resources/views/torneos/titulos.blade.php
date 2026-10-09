@@ -1,6 +1,20 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Títulos'))
+@php
+    // Título y descripción para los buscadores, con la zona o competencia elegida:
+    // «Primera División — tabla histórica». Sin filtro, el título de siempre.
+    // Con competencia va también la zona: hay una «Primera División» en cada país.
+    $seoZona = $zonaActual['nombre'] ?? '';
+    $seoCtx  = !empty($competenciaActual['nombre'])
+        ? $competenciaActual['nombre'] . ($seoZona !== '' ? ' (' . $seoZona . ')' : '')
+        : $seoZona;
+    $seoTitulo = $seoCtx !== '' ? __(':ctx — títulos y campeones', ['ctx' => $seoCtx]) : __('Títulos');
+    $seoDesc   = $seoCtx !== '' ? __('Títulos de cada equipo en :ctx, según los torneos cargados en La Planilla.', ['ctx' => $seoCtx]) : null;
+@endphp
+@section('pageTitle', $seoTitulo)
+@if($seoDesc)
+    @section('pageDescription', $seoDesc)
+@endif
 
 @section('content')
 

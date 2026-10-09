@@ -1,6 +1,15 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Técnicos'))
+@php
+    // Título y descripción para los buscadores (ranking histórico).
+    $seoTitulo = __('Técnicos con más partidos dirigidos — ranking histórico');
+    if (request()->query('actuales')) {
+        $seoTitulo = __(':titulo — :extra', ['titulo' => $seoTitulo, 'extra' => __('en actividad')]);
+    }
+    $seoDesc = __('Ranking histórico de técnicos en los torneos cargados en La Planilla: partidos dirigidos, ganados, empatados y perdidos, goles y títulos.');
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
 

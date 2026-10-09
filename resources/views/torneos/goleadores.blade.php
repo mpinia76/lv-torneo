@@ -1,6 +1,15 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Goleadores'))
+@php
+    // Título y descripción para los buscadores (ranking histórico).
+    $seoTitulo = __('Máximos goleadores históricos');
+    if (request()->query('actuales')) {
+        $seoTitulo = __(':titulo — :extra', ['titulo' => $seoTitulo, 'extra' => __('en actividad')]);
+    }
+    $seoDesc = __('Ranking histórico de goleadores en los torneos cargados en La Planilla: goles de jugada, de cabeza, de penal, de tiro libre y olímpicos.');
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
 

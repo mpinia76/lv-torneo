@@ -1,6 +1,15 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Jugadores'))
+@php
+    // Título y descripción para los buscadores (ranking histórico).
+    $seoTitulo = __('Jugadores con más partidos — ranking histórico');
+    if (request()->query('actuales')) {
+        $seoTitulo = __(':titulo — :extra', ['titulo' => $seoTitulo, 'extra' => __('en actividad')]);
+    }
+    $seoDesc = __('Ranking histórico de jugadores en los torneos cargados en La Planilla: partidos, títulos, goles, tarjetas y penales.');
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
 

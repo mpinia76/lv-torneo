@@ -1,6 +1,15 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Tarjetas'))
+@php
+    // Título y descripción para los buscadores (ranking histórico).
+    $seoTitulo = __('Tarjetas — ranking histórico de amarillas y rojas');
+    if (request()->query('actuales')) {
+        $seoTitulo = __(':titulo — :extra', ['titulo' => $seoTitulo, 'extra' => __('en actividad')]);
+    }
+    $seoDesc = __('Los jugadores con más amarillas y rojas en los torneos cargados en La Planilla, con su promedio por partido.');
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
 
 @section('content')
 
