@@ -28,6 +28,49 @@ class UrlAmigable
             return $next($request);
         }
 
+        // ── Historial entre dos equipos (ver Urls::DUELO)
+        [$suelto, $bonita, $p1, $p2] = Urls::DUELO;
+        if ($nombre === $bonita) {
+            $a = $this->partir($route->parameter('ref1'));
+            $b = $this->partir($route->parameter('ref2'));
+            if (!$a || !$b || $a[0] === $b[0]) {
+                abort(404);
+            }
+            $sa = Urls::slug('equipos.ver', $a[0]);
+            $sb = Urls::slug('equipos.ver', $b[0]);
+            if ($sa === null || $sb === null) {
+                abort(404);
+            }
+            if ($a[1] !== $sa || $b[1] !== $sb || $a[2] || $b[2]) {
+                return $this->a($suelto, [$p1 => $a[0], $p2 => $b[0]] + $request->query());
+            }
+
+            $request->query->set($p1, (string) $a[0]);
+            $request->query->set($p2, (string) $b[0]);
+            $request->attributes->set('url_amigable_param', [$p1, $p2]);
+            // Las dos órdenes son la misma página para Google: la canonical (y
+            // los hreflang) van con el id menor primero.
+            if ($a[0] > $b[0]) {
+                $request->attributes->set('url_amigable_path',
+                    route($suelto, [$p1 => $b[0], $p2 => $a[0]], false));
+            }
+            $route->forgetParameter('ref1');
+            $route->forgetParameter('ref2');
+
+            return $next($request);
+        }
+        if ($nombre === $suelto) {
+            $a = $request->query($p1);
+            $b = $request->query($p2);
+            if (is_string($a) && ctype_digit($a) && is_string($b) && ctype_digit($b)
+                && (int) $a > 0 && (int) $b > 0 && $a !== $b
+                && Urls::slug('equipos.ver', (int) $a) !== null
+                && Urls::slug('equipos.ver', (int) $b) !== null) {
+                return $this->a($suelto, $request->query());
+            }
+            return $next($request);
+        }
+
         // ── URL nueva
         if (($cfg = Urls::config($nombre)) && $route->hasParameter('ref')) {
             $param = $cfg[1];
@@ -64,6 +107,15 @@ class UrlAmigable
         }
 
         return $next($request);
+    }
+
+    /** "250-slug" -> [250, 'slug', ceros a la izquierda?]; null si no es un ref. */
+    protected function partir($ref)
+    {
+        if (!preg_match('/^(\d+)(?:-(.*))?$/', (string) $ref, $m)) {
+            return null;
+        }
+        return [(int) $m[1], isset($m[2]) ? $m[2] : '', $m[1] !== (string) (int) $m[1]];
     }
 
     protected function a($nombre, array $query)

@@ -25,7 +25,7 @@ class BarraTorneo
 {
     const GENERALES = [
         'home', 'fechas.fixture', 'buscar', 'torneos.explorar', 'partidos.arbitros',
-        'torneos.historiales', 'torneos.goleadores', 'torneos.jugadores', 'torneos.tarjetas',
+        'torneos.historiales', 'torneos.historial', 'torneos.goleadores', 'torneos.jugadores', 'torneos.tarjetas',
         'torneos.posiciones', 'torneos.estadisticasOtras', 'torneos.tecnicos',
         'torneos.arqueros', 'torneos.titulos',
     ];

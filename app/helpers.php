@@ -302,15 +302,26 @@ if (! function_exists('url_idioma')) {
             array_unshift($partes, $idioma);
         }
 
-        $url = $raiz . ($partes ? '/' . implode('/', $partes) : '');
         $query = $req->query();
         // En las URLs amigables (/jugador/250-…) el id va en el path: el
         // middleware 'url.amigable' lo puso en la query para el controlador,
         // pero no forma parte de la URL. (getQueryString() lee la query
         // original del pedido, así que no lo trae.)
-        if ($p = $req->attributes->get('url_amigable_param')) {
+        foreach ((array) $req->attributes->get('url_amigable_param', []) as $p) {
             unset($query[$p]);
         }
+        // Página con una URL "oficial" distinta de la pedida (historial con los
+        // equipos en el otro orden): la canonical y los hreflang van a esa.
+        if ($canonica && ($otra = $req->attributes->get('url_amigable_path'))) {
+            $partes = explode('/', trim(parse_url($otra, PHP_URL_PATH), '/'));
+            if ($partes && in_array($partes[0], $otros, true)) {
+                array_shift($partes);
+            }
+            if ($idioma !== array_keys(idiomas_sitio())[0]) {
+                array_unshift($partes, $idioma);
+            }
+        }
+        $url = $raiz . ($partes ? '/' . implode('/', $partes) : '');
         $qs  = $canonica ? query_canonica($query) : $req->getQueryString();
         return $qs ? $url . '?' . $qs : $url;
     }

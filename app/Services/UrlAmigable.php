@@ -42,6 +42,15 @@ class UrlAmigable
         'fechas.detalle' => ['p', 'partidoId', 'partido', 'detalleFecha'],
     ];
 
+    /**
+     * Historial entre dos equipos: route('torneos.historiales', ['equipo1' =>
+     * 2, 'equipo2' => 3]) -> /historial/2-racing-club/3-independiente (ruta
+     * 'torneos.historial'). Sin los dos equipos sale /historiales, la página
+     * para elegirlos. Las dos órdenes valen (se muestra a la izquierda el
+     * primero), pero la canonical va siempre con el id menor primero.
+     */
+    const DUELO = ['torneos.historiales', 'torneos.historial', 'equipo1', 'equipo2'];
+
     /** Largo máximo del slug (se corta en un guion). */
     const LARGO = 80;
 

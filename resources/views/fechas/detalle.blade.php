@@ -225,6 +225,10 @@
                     <span>{{ __('Sin fecha confirmada') }}</span>
                 @endif
                 <span>{{ $torneoDet->nombre }} {{ $torneoDet->year }}</span>
+                @if($partido->equipol && $partido->equipov && $partido->equipol->id != $partido->equipov->id)
+                    {{-- Link al historial entre los dos (además, le da a Google un camino a esas páginas) --}}
+                    <a class="ms-auto" href="{{ route('torneos.historiales', ['equipo1' => $partido->equipol->id, 'equipo2' => $partido->equipov->id]) }}">{{ __('Historial entre los dos') }} &rsaquo;</a>
+                @endif
             </div>
         </div>
 

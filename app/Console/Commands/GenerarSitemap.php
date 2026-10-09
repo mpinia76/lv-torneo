@@ -32,6 +32,9 @@ class GenerarSitemap extends Command
 
     const POR_ARCHIVO = 40000;
 
+    /** Partidos jugados entre dos equipos para que su historial entre al sitemap. */
+    const MIN_HISTORIAL = 2;
+
     public function handle()
     {
         $base = rtrim(config('app.url'), '/');
@@ -110,6 +113,33 @@ class GenerarSitemap extends Command
             $total += count($ids);
         }
 
+        // Historial entre dos equipos (/historial/2-racing-club/3-independiente):
+        // los cruces con al menos MIN_HISTORIAL partidos jugados, con el id menor
+        // primero (es la canonical). Con uno solo la página casi no aporta.
+        $molde = $this->url($base, 'torneos.historiales', null, null, ['ref1' => '__A__', 'ref2' => '__B__']);
+        $pares = DB::select('SELECT LEAST(equipol_id, equipov_id) AS a, GREATEST(equipol_id, equipov_id) AS b
+                               FROM partidos
+                              WHERE golesl IS NOT NULL AND golesv IS NOT NULL
+                                AND equipol_id > 0 AND equipov_id > 0 AND equipol_id <> equipov_id
+                              GROUP BY a, b
+                             HAVING COUNT(*) >= ' . self::MIN_HISTORIAL . '
+                              ORDER BY a, b');
+        $urls = [];
+        foreach ($pares as $f) {
+            $sa = UrlAmigable::slug('equipos.ver', $f->a);
+            $sb = UrlAmigable::slug('equipos.ver', $f->b);
+            if ($sa === null || $sb === null) {
+                continue;
+            }
+            $urls[] = str_replace(['__A__', '__B__'],
+                [UrlAmigable::refCon((int) $f->a, $sa), UrlAmigable::refCon((int) $f->b, $sb)], $molde);
+        }
+        foreach (array_chunk($urls, self::POR_ARCHIVO) as $i => $bloque) {
+            $archivos[] = $this->escribir($dirTmp, 'historiales-' . ($i + 1) . '.xml.gz', $bloque);
+        }
+        $this->line(sprintf('%-10s %7d URLs', 'historiales', count($urls)));
+        $total += count($urls);
+
         // Cambio atómico: primero el directorio, después el índice. Si algo falló
         // antes, queda el sitemap del día anterior intacto.
         $this->borrarDir($dirFinal . '.old');
@@ -136,11 +166,11 @@ class GenerarSitemap extends Command
     }
 
     /** URL absoluta en español, con el dominio de APP_URL. */
-    private function url($base, $ruta, $param, $valor)
+    private function url($base, $ruta, $param, $valor, array $extra = [])
     {
         $u = $param === null
-            ? route($ruta, [], false)
-            : route($ruta, [$param => $valor], false);
+            ? route($ruta, $extra, false)
+            : route($ruta, [$param => $valor] + $extra, false);
 
         return $base . ($u === '' ? '/' : $u);
     }

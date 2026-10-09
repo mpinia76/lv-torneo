@@ -425,6 +425,12 @@ $rutasPublicas = function () {
             ->name($nombreRuta);
     }
 
+    // Historial entre dos equipos: /historial/2-racing-club/3-independiente. La
+    // URL con ?equipo1=&equipo2= redirige acá (ver UrlAmigable::DUELO).
+    Route::get('historial/{ref1}/{ref2}', [TorneoController::class, 'historiales'])
+        ->where(['ref1' => '[0-9]+(?:-[^/]*)?', 'ref2' => '[0-9]+(?:-[^/]*)?'])
+        ->name('torneos.historial');
+
     // La raiz sirve el fixture directamente. Antes renderizaba portada.blade.php,
     // que era solo un <script>window.location = '/fixture'</script>: la URL mas
     // importante del sitio devolvia una pagina vacia (mala para buscadores, y un

@@ -1,6 +1,47 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Historiales'))
+@php
+    // Título y descripción para los buscadores cuando hay dos equipos elegidos:
+    // «Racing Club vs Independiente — historial de partidos».
+    $seoDuelo = !empty($e1->id) && !empty($e2->id);
+    if ($seoDuelo) {
+        // Se cuenta sobre $partidos (todos los jugados entre los dos) y no sobre
+        // $posiciones, que deja afuera a los equipos sin plantilla cargada.
+        $seoJ = $seoGa = $seoGb = $seoE = 0;
+        foreach ($partidos as $seoP) {
+            if (is_null($seoP->golesl) || is_null($seoP->golesv)) {
+                continue;
+            }
+            $seoJ++;
+            $seoDif = ($seoP->equipol_id == $e1->id ? 1 : -1) * ($seoP->golesl - $seoP->golesv);
+            if ($seoDif > 0) { $seoGa++; } elseif ($seoDif < 0) { $seoGb++; } else { $seoE++; }
+        }
+        $seoVs    = ['a' => $e1->nombre, 'b' => $e2->nombre];
+        $seoTitulo = __(':a vs :b — historial de partidos', $seoVs);
+        $seoDesc   = $seoJ
+            ? __(':a vs :b: :partidos (:ga de :a, :emp y :gb de :b). Todos los partidos entre los dos y la tabla del historial.', $seoVs + [
+                'partidos' => cantidad($seoJ, 'partido', 'partidos'),
+                'ga'       => cantidad($seoGa, 'victoria', 'victorias'),
+                'emp'      => cantidad($seoE, 'empate', 'empates'),
+                'gb'       => cantidad($seoGb, 'victoria', 'victorias'),
+              ])
+            : __(':a vs :b: historial de partidos entre los dos.', $seoVs);
+        // Sin partidos jugados entre los dos, la página no aporta nada a Google.
+        $seoVacio = $seoJ === 0;
+    }
+@endphp
+@if($seoDuelo)
+    @section('pageTitle', $seoTitulo)
+    @section('pageDescription', $seoDesc)
+    @if(!empty($e1->escudo))
+        @section('pageImage', url_imagen($e1->escudo))
+    @endif
+    @if($seoVacio)
+        @section('robots', 'noindex, follow')
+    @endif
+@else
+    @section('pageTitle', __('Historiales'))
+@endif
 
 @section('content')
 

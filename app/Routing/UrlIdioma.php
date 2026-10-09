@@ -51,19 +51,41 @@ class UrlIdioma extends UrlGenerator
     protected function amigable($route, array $parameters)
     {
         $nombre = $route->getName();
+
+        // Historial entre dos equipos (ver UrlAmigable::DUELO).
+        [$suelto, $bonita, $p1, $p2] = UrlAmigable::DUELO;
+        if ($nombre === $suelto) {
+            if (!array_key_exists('ref1', $parameters)) {
+                $a = $parameters[$p1] ?? null;
+                $b = $parameters[$p2] ?? null;
+                if (!self::esId($a) || !self::esId($b) || (int) $a === (int) $b) {
+                    return [$route, $parameters];
+                }
+                unset($parameters[$p1], $parameters[$p2]);
+                $parameters = ['ref1' => UrlAmigable::ref('equipos.ver', (int) $a),
+                               'ref2' => UrlAmigable::ref('equipos.ver', (int) $b)] + $parameters;
+            }
+            return [$this->routes->getByName($bonita) ?: $route, $parameters];
+        }
+
         $cfg = $nombre ? UrlAmigable::config($nombre) : null;
         if (!$cfg || array_key_exists('ref', $parameters)) {
             return [$route, $parameters];
         }
 
         $id = $parameters[$cfg[1]] ?? null;
-        if ((is_int($id) || (is_string($id) && ctype_digit($id))) && (int) $id > 0) {
+        if (self::esId($id)) {
             unset($parameters[$cfg[1]]);
             return [$route, ['ref' => UrlAmigable::ref($nombre, (int) $id)] + $parameters];
         }
 
         $viejo = $this->routes->getByName($nombre . '.viejo');
         return [$viejo ?: $route, $parameters];
+    }
+
+    protected static function esId($v)
+    {
+        return (is_int($v) || (is_string($v) && ctype_digit($v))) && (int) $v > 0;
     }
 
     /** "" -> "", "/verTorneo?x" -> "/verTorneo?x", "?x" -> "?x". */
