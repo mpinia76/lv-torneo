@@ -88,7 +88,7 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
-<link href="{{ asset('css/torneos.css') }}?v=23" rel="stylesheet">
+<link href="{{ asset('css/torneos.css') }}?v=24" rel="stylesheet">
 
 {{-- Favicon: el .ico es para lo que no lee SVG (Safari viejo, lectores de
      feeds, el pedido automático a /favicon.ico); el SVG gana donde se entiende.

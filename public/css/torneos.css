@@ -405,18 +405,50 @@ a:hover { color: var(--t-accent-hover); }
 .t-partido .t-estado { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
 .t-partido .t-chevron { color: var(--t-line-strong); }
 
+/* Goles dentro de cada .t-equipo: ocultos en escritorio (ahí va el recuadro
+   .t-marcador); en móvil reemplazan al recuadro, uno por renglón. */
+.t-partido .t-gol { display: none; }
+
 @media (max-width: 640px) {
+    /*  20:15 | [esc] Independiente 🇦🇷        1
+              | [esc] Instituto     🇦🇷        4   */
     .t-partido {
-        grid-template-columns: 1fr auto;
-        grid-template-areas: "meta meta" "local marcador" "visita marcador";
-        gap: 4px 10px;
-        padding: 10px 12px;
+        grid-template-columns: 46px minmax(0, 1fr);
+        grid-template-areas: "hora local" "hora visita";
+        gap: 5px 10px;
+        padding: 10px 14px;
     }
-    .t-partido .t-hora { grid-area: meta; display: flex; align-items: center; gap: 8px; }
-    .t-partido .t-equipo.local { grid-area: local; justify-content: flex-start; text-align: left; }
+    .t-partido .t-hora { grid-area: hora; align-self: center; font-size: 11.5px; line-height: 1.3; }
+    .t-partido .t-equipo.local  { grid-area: local; justify-content: flex-start; text-align: left; }
     .t-partido .t-equipo.visita { grid-area: visita; }
-    .t-partido .t-marcador { grid-area: marcador; align-self: center; }
+    .t-partido .t-marcador,
     .t-partido .t-estado { display: none; }
+}
+
+/* Móvil, para cualquier fila de partido (fixture y lista ancha) */
+@media (max-width: 820px) {
+    /* mismo orden en los dos renglones: escudo, nombre, bandera … goles */
+    .t-partido .t-equipo { gap: 7px; }
+    .t-partido .t-equipo > .escudo  { order: 0; }
+    .t-partido .t-equipo > a,
+    .t-partido .t-equipo > span:not(.escudo):not(.t-gol) { order: 1; }
+    .t-partido .t-equipo > .bandera { order: 2; }
+
+    .t-partido .t-gol {
+        display: block;
+        order: 3;
+        margin-left: auto;
+        padding-left: 8px;
+        font-family: var(--t-fuente-titulo);
+        font-weight: 600;
+        font-size: 1rem;
+        line-height: 1.2;
+        text-align: right;
+        white-space: nowrap;
+        color: var(--t-ink-2);
+    }
+    .t-partido .t-equipo.gana .t-gol { color: var(--t-ink); font-weight: 700; }
+    .t-partido .t-gol small { font-size: 11px; font-weight: 500; color: var(--t-muted); margin-left: 3px; }
 }
 
 /* ---------- 7. CHIPS ----------------------------------------------------- */
@@ -573,9 +605,19 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 .t-navdia {
     display: flex; align-items: center; justify-content: center;
-    gap: 8px; flex-wrap: wrap;
+    gap: 8px;
+}
+.t-navdia .form-select { max-width: 220px; }
+.t-navdia .btn .t-navdia-txt { margin-inline: 4px; }
+/* En móvil: [‹] [ selector a todo el ancho ] [›], siempre en una línea */
+@media (max-width: 640px) {
+    .t-navdia .form-select,
+    .t-navdia .form-control { max-width: none; flex: 1 1 auto; min-width: 0; }
+    .t-navdia .t-navdia-txt { display: none; }
+    .t-navdia .btn { flex: none; padding-inline: 10px; }
 }
 .t-navdia .form-control { max-width: 190px; text-align: center; }
+@media (max-width: 640px) { .t-navdia .form-control { max-width: none; } }
 
 /* compatibilidad con clases de Bootstrap 4 que quedaron en algunas vistas */
 .float-right { float: right !important; }
@@ -1014,21 +1056,21 @@ table.t-tabla tr.t-zona-4:hover { background: rgba(122, 90, 184, .14); }
 @media (max-width: 820px) {
     .t-partido-ancho,
     .t-partido-ancho.sin-torneo {
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr);
         grid-template-areas:
-            "comp comp"
-            "cuando cuando"
-            "local marcador"
-            "visita marcador";
-        gap: 3px 10px;
-        padding: 10px 12px;
+            "comp"
+            "cuando"
+            "local"
+            "visita";
+        gap: 4px 10px;
+        padding: 10px 14px;
     }
     .t-partido-ancho .t-competencia { grid-area: comp; }
     .t-partido-ancho .t-competencia-txt { flex-direction: row; gap: 8px; align-items: baseline; }
-    .t-partido-ancho .t-cuando { grid-area: cuando; flex-direction: row; gap: 8px; }
+    .t-partido-ancho .t-cuando { grid-area: cuando; flex-direction: row; gap: 8px; margin-bottom: 2px; }
     .t-partido-ancho .t-equipo.local { grid-area: local; justify-content: flex-start; text-align: left; }
     .t-partido-ancho .t-equipo.visita { grid-area: visita; }
-    .t-partido-ancho .t-marcador { grid-area: marcador; align-self: center; }
+    .t-partido-ancho .t-marcador,
     .t-partido-ancho .t-estado { display: none; }
 }
 
@@ -2095,9 +2137,3 @@ td.t-dif-neg { color: var(--t-loss); }
 .t-barras-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--t-ink); text-align: right; min-width: 64px; }
 .t-barras-val small { font-weight: 500; color: var(--t-muted); }
 table.t-tabla th.t-orden-activo { color: var(--t-accent); }
-
-/* Columna "Equipos" de la tabla de técnicos de un torneo: un escudo por club;
-   el desglose (puntos · %) solo aparece si el DT dirigió a más de uno. */
-.t-dt-equipos { display: flex; flex-direction: column; gap: 4px; }
-.t-dt-equipo  { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.t-dt-equipo small { color: var(--t-muted); font-size: 11px; }

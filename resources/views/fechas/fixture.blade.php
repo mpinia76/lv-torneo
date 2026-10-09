@@ -16,8 +16,9 @@
         {{-- Navegación de días --}}
         <div class="t-panel-cuerpo">
             <form id="formFechas" method="GET" action="" class="t-navdia">
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="actualizarFecha(-1)">
-                    <i class="bi bi-chevron-left"></i> {{ __('Anterior') }}
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="actualizarFecha(-1)"
+                        aria-label="{{ __('Anterior') }}">
+                    <i class="bi bi-chevron-left"></i><span class="t-navdia-txt">{{ __('Anterior') }}</span>
                 </button>
 
                 <input type="date"
@@ -27,8 +28,9 @@
                        value="{{ $dia }}"
                        onchange="enviarFormulario()">
 
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="actualizarFecha(1)">
-                    {{ __('Siguiente') }} <i class="bi bi-chevron-right"></i>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="actualizarFecha(1)"
+                        aria-label="{{ __('Siguiente') }}">
+                    <span class="t-navdia-txt">{{ __('Siguiente') }}</span><i class="bi bi-chevron-right"></i>
                 </button>
             </form>
         </div>
@@ -107,6 +109,7 @@
                         @if($partido->equipol->bandera_url)
                             <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ trad_dato($partido->equipol->pais) }}" title="{{ trad_dato($partido->equipol->pais) }}">
                         @endif
+                        <span class="t-gol t-num" aria-hidden="true">@unless($sinJugar){{ $partido->golesl }}@if($partido->penalesl || $partido->penalesv)<small>({{ $partido->penalesl }})</small>@endif @endunless</span>
                     </span>
 
                     <span class="t-marcador t-num">
@@ -126,6 +129,7 @@
                         @endif
                         <x-escudo :src="$partido->equipov->escudo" :nombre="$partido->equipov->nombre"/>
                         <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">{{ $partido->equipov->nombre }}</a>
+                        <span class="t-gol t-num" aria-hidden="true">@unless($sinJugar){{ $partido->golesv }}@if($partido->penalesl || $partido->penalesv)<small>({{ $partido->penalesv }})</small>@endif @endunless</span>
                     </span>
 
                     <span class="t-estado">

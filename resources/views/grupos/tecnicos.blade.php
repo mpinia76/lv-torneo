@@ -38,7 +38,7 @@
 
     <div class="t-panel">
         <div class="t-tabla-wrap">
-            <table class="t-tabla">
+            <table class="t-tabla t-lista-tabla">
                 <thead>
                 <tr>
                     <th>#</th>
@@ -63,37 +63,25 @@
                 <tbody>
                 @foreach($goleadores as $tecnico)
                     @php
-                        $equiposDt = array_values(array_filter(explode(',', (string) $tecnico->escudo)));
-                        $varios = count($equiposDt) > 1;
+                        // Mismo molde que el histórico (torneos/tecnicos): escudos en la
+                        // celda y el desglose por club en una fila que se despliega.
+                        $dtClubes = clubesDesdeCadena($tecnico->escudo, ['pts', 'pct']);
+                        foreach ($dtClubes as $dtIdx => $dtClub) {
+                            $dtClubes[$dtIdx]['dato'] = __(':n pts', ['n' => $dtClub['pts']]).' · '.rtrim($dtClub['pct'], '%').'%';
+                        }
+                        $dtFilaId = 'dt-eq-' . $tecnico->tecnico_id;
                     @endphp
                     <tr>
                         <td class="t-pos">{{ $loop->iteration + ($goleadores->firstItem() ? $goleadores->firstItem() - 1 : 0) }}</td>
                         <td>
-                            <span class="t-nombre">
-                                <a href="{{ route('tecnicos.ver', ['tecnicoId' => $tecnico->tecnico_id]) }}">
-                                    <img class="imgCircle" src="{{ url('images/'.($tecnico->fotoTecnico ?? 'sin_foto_tecnico.png')) }}" alt="">
-                                </a>
-                                <a href="{{ route('tecnicos.ver', ['tecnicoId' => $tecnico->tecnico_id]) }}">{{ $tecnico->tecnico }}</a>
-                                @if($tecnico->nacionalidadTecnico)
-                                    <img class="bandera" src="{{ url('images/'.removeAccents($tecnico->nacionalidadTecnico).'.gif') }}" alt="{{ trad_dato($tecnico->nacionalidadTecnico) }}" title="{{ trad_dato($tecnico->nacionalidadTecnico) }}">
-                                @endif
-                            </span>
+                            <x-celda-persona :href="route('tecnicos.ver', ['tecnicoId' => $tecnico->tecnico_id])"
+                                             :nombre="$tecnico->tecnico"
+                                             :foto="$tecnico->fotoTecnico"
+                                             fotoDefecto="sin_foto_tecnico.png"
+                                             :nacionalidad="$tecnico->nacionalidadTecnico"/>
                         </td>
                         <td class="t-izq">
-                            <span class="t-dt-equipos">
-                                @foreach($equiposDt as $escudo)
-                                    @php $e = partesEscudo($escudo); @endphp
-                                    <span class="t-dt-equipo">
-                                        <a href="{{ route('equipos.ver', ['equipoId' => $e[1]]) }}">
-                                            <x-escudo :src="$e[0]" :nombre="$e[4] ?? __('Equipo')"/>
-                                        </a>
-                                        {{-- Con un solo equipo el desglose repite las columnas Punt. y %. --}}
-                                        @if($varios)
-                                            <small class="t-mono">{{ $e[2] ?? '' }} · {{ $e[3] ?? '' }}%</small>
-                                        @endif
-                                    </span>
-                                @endforeach
-                            </span>
+                            <x-clubes-celda :clubes="$dtClubes" :id="$dtFilaId"/>
                         </td>
                         <td class="t-pts">{{ $tecnico->puntaje }}</td>
                         <td><a href="{{ route('tecnicos.jugados', ['tecnicoId' => $tecnico->tecnico_id, 'torneoId' => $torneo_id]) }}">{{ $tecnico->jugados }}</a></td>
@@ -105,6 +93,8 @@
                         <td>{{ $tecnico->diferencia }}</td>
                         <td>{{ $tecnico->porcentaje }}</td>
                     </tr>
+
+                    <x-clubes-detalle :clubes="$dtClubes" :id="$dtFilaId" :cols="3 + count($columns)"/>
                 @endforeach
                 </tbody>
             </table>
