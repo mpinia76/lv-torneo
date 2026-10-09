@@ -1,6 +1,16 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Posiciones'))
+@php
+    // Título y descripción para los buscadores: «Superliga 2019/2020 — tabla de posiciones».
+    $seoTorneo = $torneo->nombre . ' ' . $torneo->year;
+    $seoTitulo = __(':torneo — tabla de posiciones', ['torneo' => $seoTorneo]);
+    $seoDesc   = __(':torneo: tabla de posiciones completa, con partidos jugados, ganados, empatados y perdidos, goles y diferencia.', ['torneo' => $seoTorneo]);
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
+@if($torneo->escudo)
+    @section('pageImage', url_imagen($torneo->escudo))
+@endif
 
 @section('content')
 

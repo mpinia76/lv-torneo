@@ -419,8 +419,19 @@ $rutasPublicas = function () {
         'equipos.ver'    => [EquipoController::class, 'ver'],
         'fechas.ver'     => [FechaController::class, 'ver'],
         'fechas.detalle' => [FechaController::class, 'detalle'],
+        // Secciones del torneo (/torneo/20-superliga-2019-2020/posiciones)
+        'grupos.posicionesPublic'    => [GrupoController::class, 'posicionesPublic'],
+        'grupos.goleadoresPublic'    => [GrupoController::class, 'goleadoresPublic'],
+        'grupos.tarjetasPublic'      => [GrupoController::class, 'tarjetasPublic'],
+        'grupos.arqueros'            => [GrupoController::class, 'arqueros'],
+        'grupos.jugadores'           => [GrupoController::class, 'jugadores'],
+        'grupos.tecnicos'            => [GrupoController::class, 'tecnicos'],
+        'torneos.plantillas'         => [TorneoController::class, 'plantillas'],
+        'torneos.promediosPublic'    => [TorneoController::class, 'promediosPublic'],
+        'torneos.acumulado'          => [TorneoController::class, 'acumulado'],
+        'torneos.estadisticasTorneo' => [TorneoController::class, 'estadisticasTorneo'],
     ] as $nombreRuta => $accion) {
-        Route::get(\App\Services\UrlAmigable::RUTAS[$nombreRuta][2] . '/{ref}', $accion)
+        Route::get(\App\Services\UrlAmigable::path($nombreRuta), $accion)
             ->where('ref', '[0-9]+(?:-[^/]*)?')
             ->name($nombreRuta);
     }
@@ -450,15 +461,15 @@ $rutasPublicas = function () {
 
     Route::get('posiciones', [GrupoController::class, 'posiciones'])->name('grupos.posiciones');
     Route::get('tablaGoles', [GrupoController::class, 'goleadores'])->name('grupos.goleadores');
-    Route::get('tablaJugadores', [GrupoController::class, 'jugadores'])->name('grupos.jugadores');
+    Route::get('tablaJugadores', [GrupoController::class, 'jugadores'])->name('grupos.jugadores.viejo');
     Route::get('tablaTarjetas', [GrupoController::class, 'tarjetas'])->name('grupos.tarjetas');
     Route::get('jueces', [PartidoController::class, 'arbitros'])->name('partidos.arbitros');
     Route::get('promedios', [TorneoController::class, 'promedios'])->name('torneos.promedios');
-    Route::get('tecnicos', [GrupoController::class, 'tecnicos'])->name('grupos.tecnicos');
+    Route::get('tecnicos', [GrupoController::class, 'tecnicos'])->name('grupos.tecnicos.viejo');
     Route::get('verTorneo', [TorneoController::class, 'ver'])->name('torneos.ver');
-    Route::get('tabla', [GrupoController::class, 'posicionesPublic'])->name('grupos.posicionesPublic');
-    Route::get('goleadores', [GrupoController::class, 'goleadoresPublic'])->name('grupos.goleadoresPublic');
-    Route::get('tarjetero', [GrupoController::class, 'tarjetasPublic'])->name('grupos.tarjetasPublic');
+    Route::get('tabla', [GrupoController::class, 'posicionesPublic'])->name('grupos.posicionesPublic.viejo');
+    Route::get('goleadores', [GrupoController::class, 'goleadoresPublic'])->name('grupos.goleadoresPublic.viejo');
+    Route::get('tarjetero', [GrupoController::class, 'tarjetasPublic'])->name('grupos.tarjetasPublic.viejo');
     Route::get('verFechas', [FechaController::class, 'ver'])->name('fechas.ver.viejo');
     Route::get('fixture', [FechaController::class, 'fixture'])->name('fechas.fixture');
     Route::get('buscar', [BuscadorController::class, 'index'])->name('buscar');
@@ -480,10 +491,10 @@ $rutasPublicas = function () {
     Route::get('verTecnico', [TecnicoController::class, 'ver'])->name('tecnicos.ver.viejo');
     Route::get('tecnicoJugados', [TecnicoController::class, 'jugados'])->name('tecnicos.jugados');
     Route::get('verArbitro', [ArbitroController::class, 'ver'])->name('arbitros.ver.viejo');
-    Route::get('descensos', [TorneoController::class, 'promediosPublic'])->name('torneos.promediosPublic');
-    Route::get('acumulado', [TorneoController::class, 'acumulado'])->name('torneos.acumulado');
-    Route::get('arqueros', [GrupoController::class, 'arqueros'])->name('grupos.arqueros');
-    Route::get('plantillas', [TorneoController::class, 'plantillas'])->name('torneos.plantillas');
+    Route::get('descensos', [TorneoController::class, 'promediosPublic'])->name('torneos.promediosPublic.viejo');
+    Route::get('acumulado', [TorneoController::class, 'acumulado'])->name('torneos.acumulado.viejo');
+    Route::get('arqueros', [GrupoController::class, 'arqueros'])->name('grupos.arqueros.viejo');
+    Route::get('plantillas', [TorneoController::class, 'plantillas'])->name('torneos.plantillas.viejo');
 
     Route::get('historiales', [TorneoController::class, 'historiales'])->name('torneos.historiales');
     Route::get('goleadoresHistorico', [TorneoController::class, 'goleadores'])->name('torneos.goleadores');
@@ -491,7 +502,7 @@ $rutasPublicas = function () {
     Route::get('tarjetasHistorico', [TorneoController::class, 'tarjetas'])->name('torneos.tarjetas');
     Route::get('posicionesHistorico', [TorneoController::class, 'posiciones'])->name('torneos.posiciones');
     Route::get('otrasEstadisticas', [TorneoController::class, 'estadisticasOtras'])->name('torneos.estadisticasOtras');
-    Route::get('estadisticasTorneo', [TorneoController::class, 'estadisticasTorneo'])->name('torneos.estadisticasTorneo');
+    Route::get('estadisticasTorneo', [TorneoController::class, 'estadisticasTorneo'])->name('torneos.estadisticasTorneo.viejo');
     Route::get('tecnicosHistorico', [TorneoController::class, 'tecnicos'])->name('torneos.tecnicos');
     Route::get('arquerosHistorico', [TorneoController::class, 'arqueros'])->name('torneos.arqueros');
     Route::get('titulosHistorico', [TorneoController::class, 'titulos'])->name('torneos.titulos');

@@ -30,7 +30,7 @@ class UrlAmigable
 {
     /**
      * nombre de la ruta => [letra de la marca, parámetro de la URL vieja,
-     * path nuevo, path viejo]. Las URLs viejas se registran con el nombre
+     * path nuevo, path viejo, (tramo final)]. Las URLs viejas se registran con el nombre
      * '<ruta>.viejo' (ver routes/web.php).
      */
     const RUTAS = [
@@ -40,7 +40,27 @@ class UrlAmigable
         'equipos.ver'    => ['e', 'equipoId',  'equipo',  'verEquipo'],
         'fechas.ver'     => ['o', 'torneoId',  'torneo',  'verFechas'],
         'fechas.detalle' => ['p', 'partidoId', 'partido', 'detalleFecha'],
+
+        // Secciones del torneo: /torneo/20-superliga-2019-2020/posiciones. El
+        // quinto dato es el tramo que va después del ref.
+        'grupos.posicionesPublic'    => ['o', 'torneoId', 'torneo', 'tabla',              'posiciones'],
+        'grupos.goleadoresPublic'    => ['o', 'torneoId', 'torneo', 'goleadores',         'goleadores'],
+        'grupos.tarjetasPublic'      => ['o', 'torneoId', 'torneo', 'tarjetero',          'tarjetas'],
+        'grupos.arqueros'            => ['o', 'torneoId', 'torneo', 'arqueros',           'arqueros'],
+        'grupos.jugadores'           => ['o', 'torneoId', 'torneo', 'tablaJugadores',     'jugadores'],
+        'grupos.tecnicos'            => ['o', 'torneoId', 'torneo', 'tecnicos',           'tecnicos'],
+        'torneos.plantillas'         => ['o', 'torneoId', 'torneo', 'plantillas',         'plantillas'],
+        'torneos.promediosPublic'    => ['o', 'torneoId', 'torneo', 'descensos',          'promedios'],
+        'torneos.acumulado'          => ['o', 'torneoId', 'torneo', 'acumulado',          'acumulado'],
+        'torneos.estadisticasTorneo' => ['o', 'torneoId', 'torneo', 'estadisticasTorneo', 'estadisticas'],
     ];
+
+    /** Path de la ruta nueva: "jugador/{ref}" o "torneo/{ref}/posiciones". */
+    public static function path($ruta)
+    {
+        $c = self::RUTAS[$ruta];
+        return $c[2] . '/{ref}' . (isset($c[4]) ? '/' . $c[4] : '');
+    }
 
     /**
      * Historial entre dos equipos: route('torneos.historiales', ['equipo1' =>

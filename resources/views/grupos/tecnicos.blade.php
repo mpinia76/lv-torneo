@@ -1,6 +1,16 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Técnicos'))
+@php
+    // Título y descripción para los buscadores: «Superliga 2019/2020 — técnicos».
+    $seoTorneo = $torneo->nombre . ' ' . $torneo->year;
+    $seoTitulo = __(':torneo — técnicos', ['torneo' => $seoTorneo]);
+    $seoDesc   = __(':torneo: técnicos del torneo con partidos dirigidos, ganados, empatados y perdidos.', ['torneo' => $seoTorneo]);
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
+@if($torneo->escudo)
+    @section('pageImage', url_imagen($torneo->escudo))
+@endif
 
 @section('content')
 

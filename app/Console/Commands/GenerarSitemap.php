@@ -113,6 +113,36 @@ class GenerarSitemap extends Command
             $total += count($ids);
         }
 
+        // Secciones del torneo (/torneo/20-superliga-2019-2020/posiciones…), solo
+        // las principales y solo de torneos con partidos jugados. Las demás
+        // (arqueros, tarjetas, técnicos…) las encuentra Google desde la barra.
+        $jugados = 'EXISTS (SELECT 1 FROM grupos g JOIN fechas f ON f.grupo_id = g.id JOIN partidos p ON p.fecha_id = f.id
+                            WHERE g.torneo_id = t.id AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL)';
+        $secciones = [
+            ['posiciones',   'grupos.posicionesPublic',
+                'SELECT t.id FROM torneos t WHERE ' . $jugados . ' AND EXISTS (SELECT 1 FROM grupos g WHERE g.torneo_id = t.id AND g.posiciones = 1) ORDER BY t.id'],
+            ['goleadores',   'grupos.goleadoresPublic',    'SELECT t.id FROM torneos t WHERE ' . $jugados . ' ORDER BY t.id'],
+            ['plantillas',   'torneos.plantillas',         'SELECT t.id FROM torneos t WHERE ' . $jugados . ' ORDER BY t.id'],
+            ['estadisticas', 'torneos.estadisticasTorneo', 'SELECT t.id FROM torneos t WHERE ' . $jugados . ' ORDER BY t.id'],
+        ];
+        $urls = [];
+        foreach ($secciones as [$nombre, $ruta, $sql]) {
+            $molde = $this->url($base, $ruta, 'ref', '__REF__');
+            $n = 0;
+            foreach (DB::select($sql) as $f) {
+                $slug = UrlAmigable::slug($ruta, (int) $f->id);
+                if ($slug !== null) {
+                    $urls[] = str_replace('__REF__', UrlAmigable::refCon((int) $f->id, $slug), $molde);
+                    $n++;
+                }
+            }
+            $this->line(sprintf('%-12s %6d URLs', $nombre, $n));
+        }
+        foreach (array_chunk($urls, self::POR_ARCHIVO) as $i => $bloque) {
+            $archivos[] = $this->escribir($dirTmp, 'secciones-' . ($i + 1) . '.xml.gz', $bloque);
+        }
+        $total += count($urls);
+
         // Historial entre dos equipos (/historial/2-racing-club/3-independiente):
         // los cruces con al menos MIN_HISTORIAL partidos jugados, con el id menor
         // primero (es la canonical). Con uno solo la página casi no aporta.

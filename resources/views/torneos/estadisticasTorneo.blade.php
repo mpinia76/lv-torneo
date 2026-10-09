@@ -1,6 +1,16 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Estadísticas') . ' · ' . $torneo->nombre . ' ' . $torneo->year)
+@php
+    // Título y descripción para los buscadores: «Superliga 2019/2020 — estadísticas».
+    $seoTorneo = $torneo->nombre . ' ' . $torneo->year;
+    $seoTitulo = __(':torneo — estadísticas', ['torneo' => $seoTorneo]);
+    $seoDesc   = __(':torneo: goles por partido, local y visitante, marcadores más repetidos, mayores goleadas y tarjetas.', ['torneo' => $seoTorneo]);
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
+@if($torneo->escudo)
+    @section('pageImage', url_imagen($torneo->escudo))
+@endif
 
 @section('content')
 

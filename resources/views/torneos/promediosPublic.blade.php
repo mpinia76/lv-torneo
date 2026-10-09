@@ -1,6 +1,16 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Promedios'))
+@php
+    // Título y descripción para los buscadores: «Superliga 2019/2020 — promedios del descenso».
+    $seoTorneo = $torneo->nombre . ' ' . $torneo->year;
+    $seoTitulo = __(':torneo — promedios del descenso', ['torneo' => $seoTorneo]);
+    $seoDesc   = __(':torneo: tabla de promedios para el descenso.', ['torneo' => $seoTorneo]);
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
+@if($torneo->escudo)
+    @section('pageImage', url_imagen($torneo->escudo))
+@endif
 
 @section('content')
 

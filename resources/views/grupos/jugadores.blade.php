@@ -1,6 +1,16 @@
 @extends('layouts.appPublic')
 
-@section('pageTitle', __('Jugadores'))
+@php
+    // Título y descripción para los buscadores: «Superliga 2019/2020 — jugadores».
+    $seoTorneo = $torneo->nombre . ' ' . $torneo->year;
+    $seoTitulo = __(':torneo — jugadores', ['torneo' => $seoTorneo]);
+    $seoDesc   = __(':torneo: todos los jugadores del torneo con partidos, goles y tarjetas.', ['torneo' => $seoTorneo]);
+@endphp
+@section('pageTitle', $seoTitulo)
+@section('pageDescription', $seoDesc)
+@if($torneo->escudo)
+    @section('pageImage', url_imagen($torneo->escudo))
+@endif
 
 @section('content')
     <div class="container">
