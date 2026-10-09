@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\MenuTorneos;
 use App\Services\UrlAmigable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -141,6 +142,31 @@ class GenerarSitemap extends Command
         foreach (array_chunk($urls, self::POR_ARCHIVO) as $i => $bloque) {
             $archivos[] = $this->escribir($dirTmp, 'secciones-' . ($i + 1) . '.xml.gz', $bloque);
         }
+        $total += count($urls);
+
+        // Listados históricos por zona y por competencia (tabla histórica, títulos,
+        // estadísticas): «Primera División (Argentina) — tabla histórica» es una
+        // búsqueda real. Los parámetros van en el orden de query_canonica()
+        // (alfabético: competencia, zona) para que la URL sea la canonical.
+        // La tabla histórica y las estadísticas sin zona ya muestran la zona
+        // local: esa combinación es la página base (está en las fijas).
+        $zonas = MenuTorneos::zonas()['zonas'];
+        $local = MenuTorneos::zonaLocal();
+        $urls  = [];
+        foreach (['torneos.posiciones', 'torneos.titulos', 'torneos.estadisticasOtras'] as $ruta) {
+            foreach ($zonas as $clave => $z) {
+                if ($ruta === 'torneos.titulos' || $clave !== $local) {
+                    $urls[] = $base . route($ruta, ['zona' => $clave], false);
+                }
+                foreach ($z['competencias'] as $c) {
+                    $urls[] = $base . route($ruta, ['competencia' => $c['clave'], 'zona' => $clave], false);
+                }
+            }
+        }
+        foreach (array_chunk($urls, self::POR_ARCHIVO) as $i => $bloque) {
+            $archivos[] = $this->escribir($dirTmp, 'listados-' . ($i + 1) . '.xml.gz', $bloque);
+        }
+        $this->line(sprintf('%-12s %6d URLs', 'listados', count($urls)));
         $total += count($urls);
 
         // Historial entre dos equipos (/historial/2-racing-club/3-independiente):
