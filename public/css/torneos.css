@@ -2095,3 +2095,9 @@ td.t-dif-neg { color: var(--t-loss); }
 .t-barras-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--t-ink); text-align: right; min-width: 64px; }
 .t-barras-val small { font-weight: 500; color: var(--t-muted); }
 table.t-tabla th.t-orden-activo { color: var(--t-accent); }
+
+/* Columna "Equipos" de la tabla de técnicos de un torneo: un escudo por club;
+   el desglose (puntos · %) solo aparece si el DT dirigió a más de uno. */
+.t-dt-equipos { display: flex; flex-direction: column; gap: 4px; }
+.t-dt-equipo  { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.t-dt-equipo small { color: var(--t-muted); font-size: 11px; }

@@ -1417,6 +1417,6 @@ order by puntaje desc, diferencia DESC, golesl DESC';
         $i=$offSet+1;
 
 
-        return view('grupos.tecnicos', compact('goleadores','i','order','tipoOrder','torneo_id'));
+        return view('grupos.tecnicos', compact('goleadores','i','order','tipoOrder','torneo_id','torneo'));
     }
 }

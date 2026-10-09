@@ -91,6 +91,7 @@
         @if($banderaL)
             <img class="bandera" src="{{ $banderaL }}" alt="{{ trad_dato($localPais) }}" title="{{ trad_dato($localPais) }}">
         @endif
+        <span class="t-gol t-num" aria-hidden="true">@unless($sinJugar){{ $golesl }}@if($penalesl || $penalesv)<small>({{ $penalesl }})</small>@endif @endunless</span>
     </span>
 
     <span class="t-marcador t-num">
@@ -114,6 +115,7 @@
         @else
             <span>{{ $visitaNombre }}</span>
         @endif
+        <span class="t-gol t-num" aria-hidden="true">@unless($sinJugar){{ $golesv }}@if($penalesl || $penalesv)<small>({{ $penalesv }})</small>@endif @endunless</span>
     </span>
 
     <span class="t-estado">

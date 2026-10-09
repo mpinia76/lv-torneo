@@ -137,7 +137,9 @@ class Persona extends Model
             return ' ('.fecha_corta($this->nacimiento).'-'.fecha_corta($this->fallecimiento).')';
         }
         if (!is_null($this->nacimiento)) {
-            return Carbon::parse($this->nacimiento)->diffInYears(Carbon::parse($date));
+            // Carbon 3: diffInYears() devuelve float (29.85…) y con signo; la edad
+            // son los años cumplidos, así que se trunca.
+            return (int) Carbon::parse($this->nacimiento)->diffInYears(Carbon::parse($date), true);
         }
         return null;
     }

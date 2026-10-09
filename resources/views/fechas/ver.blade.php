@@ -36,11 +36,12 @@
         {{-- Navegación de fechas --}}
         <div class="t-panel-cuerpo">
             <form id="formFechas" method="GET" action="" class="t-navdia">
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarFecha(-1)">
-                    <i class="bi bi-chevron-left"></i> {{ __('Anterior') }}
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarFecha(-1)"
+                        aria-label="{{ __('Anterior') }}" @disabled($indiceActual === 0)>
+                    <i class="bi bi-chevron-left"></i><span class="t-navdia-txt">{{ __('Anterior') }}</span>
                 </button>
 
-                <select id="fechaSelect" class="form-select form-select-sm" style="max-width: 220px" onchange="seleccionarFecha()">
+                <select id="fechaSelect" class="form-select form-select-sm" aria-label="{{ __('Fecha') }}" onchange="seleccionarFecha()">
                     @foreach($fechas as $f)
                         <option value="{{ $f->orden }}" {{ $f->orden === $fecha->orden ? 'selected' : '' }}>
                             {{ nombre_fecha($f->numero) }}
@@ -51,14 +52,18 @@
                 <input type="hidden" id="fechaOrden" name="fechaOrden" value="{{ $fecha->orden }}">
                 <input type="hidden" name="torneoId" value="{{ request()->get('torneoId', '') }}">
 
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarFecha(1)">
-                    {{ __('Siguiente') }} <i class="bi bi-chevron-right"></i>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cambiarFecha(1)"
+                        aria-label="{{ __('Siguiente') }}" @disabled($indiceActual === count($fechasArray) - 1)>
+                    <span class="t-navdia-txt">{{ __('Siguiente') }}</span><i class="bi bi-chevron-right"></i>
                 </button>
             </form>
         </div>
 
         {{-- Partidos --}}
-        @php $hayPartidos = false; @endphp
+        @php
+            $hayPartidos = false;
+            $variasFechas = $partidosAgrupados->flatten(1)->pluck('fecha.numero')->unique()->count() > 1;
+        @endphp
 
         @foreach($partidosAgrupados as $partidos)
             @foreach($partidos as $partido)
@@ -71,11 +76,13 @@
 
                 {{-- Número de fecha --}}
                 @if($partido->fecha->numero != $lastFecha)
+                    @if($variasFechas)
                     <div class="t-grupo">
                         <span class="t-grupo-nombre">
                             {{ nombre_fecha($partido->fecha->numero) }}
                         </span>
                     </div>
+                    @endif
                     @php
                         $lastFecha = $partido->fecha->numero;
                         $lastDate = null;
@@ -111,6 +118,7 @@
                                 <img class="bandera" src="{{ $partido->equipol->bandera_url }}" alt="{{ trad_dato($partido->equipol->pais) }}" title="{{ trad_dato($partido->equipol->pais) }}">
                             @endif
                         @endif
+                        <span class="t-gol t-num" aria-hidden="true">@unless($sinJugar){{ $partido->golesl }}@if($partido->penalesl || $partido->penalesv)<small>({{ $partido->penalesl }})</small>@endif @endunless</span>
                     </span>
 
                     <span class="t-marcador t-num">
@@ -132,6 +140,7 @@
                             <x-escudo :src="$partido->equipov->escudo" :nombre="$partido->equipov->nombre"/>
                             <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">{{ $partido->equipov->nombre }}</a>
                         @endif
+                        <span class="t-gol t-num" aria-hidden="true">@unless($sinJugar){{ $partido->golesv }}@if($partido->penalesl || $partido->penalesv)<small>({{ $partido->penalesv }})</small>@endif @endunless</span>
                     </span>
 
                     <span class="t-estado">

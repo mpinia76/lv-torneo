@@ -107,7 +107,7 @@
                         // los años que existió, en el renglón de la desaparición.
                         'Fundación' => $veFundado ? fecha_corta($veFundado).($veDesap ? '' : ' · '.trans_choice(':n año|:n años', $veFundado->age, ['n' => $veFundado->age])) : '',
                         'Desaparición' => $veDesap
-                            ? fecha_corta($veDesap).($veFundado && $veFundado->lte($veDesap) ? ' · '.trans_choice(':n año de historia|:n años de historia', $veFundado->diffInYears($veDesap), ['n' => $veFundado->diffInYears($veDesap)]) : '')
+                            ? fecha_corta($veDesap).($veFundado && $veFundado->lte($veDesap) ? ' · '.trans_choice(':n año de historia|:n años de historia', (int) $veFundado->diffInYears($veDesap, true), ['n' => (int) $veFundado->diffInYears($veDesap, true)]) : '')
                             : '',
                         'Estadio'   => $equipo->estadio,
                         'Socios'    => $equipo->socios ? number_format($equipo->socios, 0, app()->getLocale() === 'en' ? '.' : ',', app()->getLocale() === 'en' ? ',' : '.') : '',
