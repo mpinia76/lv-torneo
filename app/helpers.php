@@ -568,3 +568,46 @@ if (! function_exists('migas_ld')) {
         return ['@type' => 'BreadcrumbList', 'itemListElement' => $items];
     }
 }
+
+if (! function_exists('persona_ld')) {
+    /**
+     * Person de schema.org para la ficha de un jugador, técnico o árbitro.
+     * $rol: texto ya traducido ("Futbolista"…). Fechas solo si están cargadas.
+     */
+    function persona_ld($persona, $url, $rol)
+    {
+        $fecha = function ($v) {
+            $v = substr((string) $v, 0, 10);
+            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) && $v !== '0000-00-00' ? $v : null;
+        };
+        return [
+            '@type'       => 'Person',
+            'name'        => $persona->name,
+            'givenName'   => $persona->nombre,
+            'familyName'  => $persona->apellido,
+            'url'         => $url,
+            'image'       => $persona->foto ? url_imagen($persona->foto) : null,
+            'jobTitle'    => $rol,
+            'birthDate'   => $fecha($persona->nacimiento),
+            'deathDate'   => $fecha($persona->fallecimiento),
+            'nationality' => $persona->nacionalidad ? ['@type' => 'Country', 'name' => trad_dato($persona->nacionalidad)] : null,
+        ];
+    }
+}
+
+if (! function_exists('migas_torneo')) {
+    /** Migas Zona › Torneo (› sección) de schema.org para las páginas de un torneo. */
+    function migas_torneo($torneo, $seccion = null)
+    {
+        $ctx = \App\Services\MenuTorneos::contexto($torneo->id);
+        $migas = [];
+        if ($ctx) {
+            $migas[] = [$ctx['zona']['nombre'], route('torneos.explorar', ['zona' => $ctx['zona']['clave']])];
+        }
+        $migas[] = [$torneo->nombre . ' ' . $torneo->year, route('fechas.ver', ['torneoId' => $torneo->id])];
+        if ($seccion !== null) {
+            $migas[] = [$seccion, url_canonica()];
+        }
+        return migas_ld($migas);
+    }
+}

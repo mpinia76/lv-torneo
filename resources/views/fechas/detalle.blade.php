@@ -17,38 +17,11 @@
 @section('pageTitle', $seoTitulo)
 @section('pageDescription', $seoDesc)
 @php
-    // Datos estructurados (schema.org) del partido: qué equipos, cuándo, en qué
-    // torneo, y las migas Zona › Torneo › Partido. Ver datos_estructurados().
-    $ldEquipo = function ($eq) {
-        return $eq ? [
-            '@type' => 'SportsTeam',
-            'name'  => $eq->nombre,
-            'url'   => route('equipos.ver', ['equipoId' => $eq->id]),
-            'logo'  => $eq->escudo ? url_imagen($eq->escudo) : null,
-        ] : null;
-    };
-    $ldInicio = null;
-    if ($partido->dia) {
-        try {
-            $ldDt = new \DateTime((string) $partido->dia, new \DateTimeZone(config('app.timezone')));
-            // Sin hora cargada (00:00:00) va solo la fecha.
-            $ldInicio = $ldDt->format('H:i:s') === '00:00:00' ? $ldDt->format('Y-m-d') : $ldDt->format('c');
-        } catch (\Exception $e) {
-            $ldInicio = null;
-        }
-    }
+    // Datos estructurados (schema.org) del partido: solo las migas
+    // Zona › Torneo › Partido. Un SportsEvent no va: Google lo toma como evento
+    // y exige el lugar, que no tenemos por partido (09/10: la Prueba de
+    // resultados enriquecidos lo marcaba como evento no válido).
     $ldTorneoUrl = route('fechas.ver', ['torneoId' => $seoTorneo->id]);
-    datos_estructurados([
-        '@type'       => 'SportsEvent',
-        'name'        => $seoCruce,
-        'description' => $seoDesc,
-        'url'         => url_canonica(),
-        'sport'       => 'Soccer',
-        'startDate'   => $ldInicio,
-        'homeTeam'    => $ldEquipo($partido->equipol),
-        'awayTeam'    => $ldEquipo($partido->equipov),
-        'superEvent'  => ['@type' => 'SportsEvent', 'name' => $seoTorneo->nombre . ' ' . $seoTorneo->year, 'url' => $ldTorneoUrl],
-    ]);
     $ldCtx = \App\Services\MenuTorneos::contexto($seoTorneo->id);
     datos_estructurados(migas_ld(array_filter([
         $ldCtx ? [$ldCtx['zona']['nombre'], route('torneos.explorar', ['zona' => $ldCtx['zona']['clave']])] : null,

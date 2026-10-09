@@ -19,6 +19,7 @@
 @endphp
 @section('pageTitle', __(':nombre — partidos dirigidos y títulos', ['nombre' => $seoNombre]))
 @section('pageDescription', $seoDesc)
+@php datos_estructurados(persona_ld($tecnico->persona, url_canonica(), __('Director técnico'))); @endphp
 @if($tecnico->persona->foto)
     @section('pageImage', url_imagen($tecnico->persona->foto))
 @endif

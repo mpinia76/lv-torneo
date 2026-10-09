@@ -17,6 +17,7 @@
 @endphp
 @section('pageTitle', __(':nombre — partidos, goles y títulos', ['nombre' => $seoNombre]))
 @section('pageDescription', $seoDesc)
+@php datos_estructurados(persona_ld($jugador->persona, url_canonica(), __('Futbolista'))); @endphp
 @if($jugador->persona->foto)
     @section('pageImage', url_imagen($jugador->persona->foto))
 @endif

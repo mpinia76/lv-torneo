@@ -7,6 +7,7 @@
 @endphp
 @section('pageTitle', $seoTitulo)
 @section('pageDescription', $seoDesc)
+@php datos_estructurados(migas_torneo($torneo)); @endphp
 @if($torneo->escudo)
     @section('pageImage', url_imagen($torneo->escudo))
 @endif

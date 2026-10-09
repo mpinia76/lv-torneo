@@ -22,6 +22,7 @@
 @endphp
 @section('pageTitle', __(':nombre — partidos dirigidos y tarjetas', ['nombre' => $seoNombre]))
 @section('pageDescription', $seoDesc)
+@php datos_estructurados(persona_ld($arbitro->persona, url_canonica(), __('Árbitro de fútbol'))); @endphp
 @if($arbitro->persona->foto)
     @section('pageImage', url_imagen($arbitro->persona->foto))
 @endif

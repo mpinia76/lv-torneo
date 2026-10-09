@@ -228,6 +228,7 @@
     "Dif.": "GD",
     "Diferencia de gol": "Goal difference",
     "Dinamarca": "Denmark",
+    "Director técnico": "Football manager",
     "Dirige": "Manages",
     "Dirigidos": "Managed",
     "Dirigiendo": "Currently managing",
@@ -328,6 +329,7 @@
     "Foto de :nombre": "Photo of :nombre",
     "Francia": "France",
     "Fundación": "Founded",
+    "Futbolista": "Footballer",
     "G": "W",
     "GC": "GA",
     "GC/PJ": "GA/P",
@@ -828,5 +830,6 @@
     "África · CAF": "Africa · CAF",
     "Ámbito": "Scope",
     "Árbitro": "Referee",
+    "Árbitro de fútbol": "Football referee",
     "Árbitros": "Referees"
 }
