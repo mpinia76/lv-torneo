@@ -5268,7 +5268,13 @@ class FechaController extends Controller
 
         $incidencias=Incidencia::where('partido_id',$partido_id)->paginate();
 
-        //dd($partido->fecha->grupo->torneo->nombre);
+        // La barra de debajo del menú pasa al torneo del partido (si no, queda
+        // el último que se miró). Ver App\Http\Middleware\BarraTorneo.
+        $torneoPartido = optional(optional($partido->fecha)->grupo)->torneo;
+        if ($torneoPartido) {
+            \App\Services\TorneoEnSesion::fijar($request, $torneoPartido);
+        }
+
         return view('fechas.detalle', compact('goles','penales','partido', 'tarjetas','cambios','titularesL','suplentesL','titularesV','suplentesV','tecnicosL','tecnicosV','arbitros','incidencias'));
         //
     }

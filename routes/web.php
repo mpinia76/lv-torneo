@@ -498,8 +498,8 @@ foreach (array_keys(idiomas_sitio()) as $idioma) {
         // 'url.amigable' antes de la caché (decide las redirecciones 301) y
         // 'url.slugs' después (la copia guardada ya lleva los links completos).
         $esLaDeLaCasa
-            ? ['middleware' => ['idioma:' . $idioma, 'url.amigable', 'pagina.cache', 'url.slugs']]
-            : ['prefix' => $idioma, 'middleware' => ['idioma:' . $idioma, 'url.amigable', 'pagina.cache', 'url.slugs']],
+            ? ['middleware' => ['idioma:' . $idioma, 'url.amigable', 'barra.torneo', 'pagina.cache', 'url.slugs']]
+            : ['prefix' => $idioma, 'middleware' => ['idioma:' . $idioma, 'url.amigable', 'barra.torneo', 'pagina.cache', 'url.slugs']],
         $rutasPublicas
     );
 }

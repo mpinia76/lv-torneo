@@ -23,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // URLs amigables de las fichas (ver App\Services\UrlAmigable).
             'url.amigable' => \App\Http\Middleware\UrlAmigable::class,
             'url.slugs' => \App\Http\Middleware\UrlAmigableSlugs::class,
+            // Qué torneo muestra la barra de debajo del menú (ver App\Http\Middleware\BarraTorneo).
+            'barra.torneo' => \App\Http\Middleware\BarraTorneo::class,
         ]);
 
         // Los middleware globales y los de los grupos web/api que tenia el

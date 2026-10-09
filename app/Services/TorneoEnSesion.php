@@ -51,4 +51,17 @@ class TorneoEnSesion
         // Para la caché de páginas: esta página cambia la sesión.
         $request->attributes->set('cp.fijaTorneo', true);
     }
+
+    /** Las claves de la sesión que arman la barra del torneo. */
+    const CLAVES = [
+        'codigoTorneo', 'nombreTorneo', 'escudoTorneo',
+        'sessionAcumulado', 'sessionPosiciones', 'sessionPromedios', 'sessionPaenza',
+    ];
+
+    /** Saca la barra del torneo (páginas del menú general). */
+    public static function olvidar(Request $request)
+    {
+        $request->session()->forget(self::CLAVES);
+        $request->attributes->set('cp.fijaTorneo', true);
+    }
 }
