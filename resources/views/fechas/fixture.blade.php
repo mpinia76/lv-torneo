@@ -24,6 +24,7 @@
                 <input type="date"
                        name="dia"
                        id="dia"
+                       aria-label="{{ __('Elegir el día') }}"
                        class="form-control form-control-sm"
                        value="{{ $dia }}"
                        onchange="enviarFormulario()">
