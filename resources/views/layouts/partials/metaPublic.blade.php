@@ -85,9 +85,9 @@
      entera antes del primer pintado). Las versiones van en el nombre de la carpeta de
      public/vendor/: para actualizar, carpeta nueva. --}}
 
-{{-- Tipografías: las dos que se ven primero se piden ya; el resto, cuando haga falta --}}
-<link rel="preload" href="{{ asset('fonts/instrument-sans-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="{{ asset('fonts/archivo-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+{{-- Tipografías: sin preload a propósito (font-display:swap). Con preload, en 4G lenta
+     competían con bootstrap.min.css y atrasaban el primer pintado; así el texto sale con
+     la fuente del sistema y cambia cuando llegan. --}}
 @include('layouts.partials.fuentes')
 
 {{-- Bootstrap 5.3 (bloquea el pintado a propósito: sin él la página sale desarmada) --}}
