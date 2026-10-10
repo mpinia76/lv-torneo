@@ -94,10 +94,13 @@
 <link href="{{ asset('vendor/bootstrap-5.3.3/bootstrap.min.css') }}" rel="stylesheet">
 
 {{-- Íconos y Select2: no hacen falta para el primer pintado, se cargan sin frenarlo --}}
-<link href="{{ asset('vendor/bootstrap-icons-1.11.1/bootstrap-icons.min.css') }}" rel="stylesheet" media="print" onload="this.media='all'">
+{{-- Íconos: bootstrap-icons-1.11.1-sitio es un recorte (28 íconos, 3 KB en vez de 131 KB) armado
+     con fontTools desde bootstrap-icons-1.11.1/. Si una vista usa un bi-* nuevo, no se va a ver
+     hasta regenerar el recorte (buscar todos los bi-* en resources/views, public/js y app). --}}
+<link href="{{ asset('vendor/bootstrap-icons-1.11.1-sitio/bootstrap-icons.min.css') }}" rel="stylesheet" media="print" onload="this.media='all'">
 <link href="{{ asset('vendor/select2-4.0.6-rc.0/select2.min.css') }}" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript>
-<link href="{{ asset('vendor/bootstrap-icons-1.11.1/bootstrap-icons.min.css') }}" rel="stylesheet">
+<link href="{{ asset('vendor/bootstrap-icons-1.11.1-sitio/bootstrap-icons.min.css') }}" rel="stylesheet">
 <link href="{{ asset('vendor/select2-4.0.6-rc.0/select2.min.css') }}" rel="stylesheet">
 </noscript>
 
