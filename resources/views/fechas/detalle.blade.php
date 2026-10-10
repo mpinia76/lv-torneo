@@ -310,12 +310,12 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $titularl->jugador->id))}}" >
                                     <span style="font-weight: bold">{{$titularl->dorsal}}</span>
                                     @if($titularl->jugador->persona->foto)
-                                        <img id="original" class="imgCircle" src="{{ url('images/'.$titularl->jugador->persona->foto) }}" >
+                                        <img class="imgCircle" src="{{ url('images/'.$titularl->jugador->persona->foto) }}" alt="{{ $titularl->jugador->persona->full_name }}">
                                     @else
-                                        <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                        <img class="imgCircle" src="{{ url('images/sin_foto.png') }}" alt="{{ $titularl->jugador->persona->full_name }}">
                                     @endif
                                             </a>
-                                    <span style="font-weight: bold"> {{ $titularl->jugador->persona->full_name}} <img id="original" src="{{ $titularl->jugador->persona->bandera_url }}" alt="{{ trad_dato($titularl->jugador->persona->nacionalidad) }}"></span>
+                                    <span style="font-weight: bold"> {{ $titularl->jugador->persona->full_name}} <img src="{{ $titularl->jugador->persona->bandera_url }}" alt="{{ trad_dato($titularl->jugador->persona->nacionalidad) }}"></span>
                                     @php
 
 
@@ -444,12 +444,12 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $titularv->jugador->id))}}" >
                                             <span style="font-weight: bold">{{$titularv->dorsal}}</span>
                                             @if($titularv->jugador->persona->foto)
-                                                <img id="original" class="imgCircle" src="{{ url('images/'.$titularv->jugador->persona->foto) }}" >
+                                                <img class="imgCircle" src="{{ url('images/'.$titularv->jugador->persona->foto) }}" alt="{{ $titularv->jugador->persona->full_name }}">
                                             @else
-                                                <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                                <img class="imgCircle" src="{{ url('images/sin_foto.png') }}" alt="{{ $titularv->jugador->persona->full_name }}">
                                             @endif
                                             </a>
-                                            <span style="font-weight: bold"> {{ $titularv->jugador->persona->full_name}} <img id="original" src="{{ $titularv->jugador->persona->bandera_url }}" alt="{{ trad_dato($titularv->jugador->persona->nacionalidad) }}"></span>
+                                            <span style="font-weight: bold"> {{ $titularv->jugador->persona->full_name}} <img src="{{ $titularv->jugador->persona->bandera_url }}" alt="{{ trad_dato($titularv->jugador->persona->nacionalidad) }}"></span>
                                             @php
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
@@ -584,11 +584,11 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $suplentel->jugador->id))}}" >
                                                 <span style="font-weight: bold">{{$suplentel->dorsal}}</span>
                                                 @if($suplentel->jugador->persona->foto)
-                                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentel->jugador->persona->foto) }}" >
+                                                    <img class="imgCircle" src="{{ url('images/'.$suplentel->jugador->persona->foto) }}" alt="{{ $suplentel->jugador->persona->full_name }}">
                                                 @else
-                                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                                    <img class="imgCircle" src="{{ url('images/sin_foto.png') }}" alt="{{ $suplentel->jugador->persona->full_name }}">
                                                 @endif</a>
-                                            <span style="font-weight: bold"> {{ $suplentel->jugador->persona->full_name}} <img id="original" src="{{ $suplentel->jugador->persona->bandera_url }}" alt="{{ trad_dato($suplentel->jugador->persona->nacionalidad) }}"></span>
+                                            <span style="font-weight: bold"> {{ $suplentel->jugador->persona->full_name}} <img src="{{ $suplentel->jugador->persona->bandera_url }}" alt="{{ trad_dato($suplentel->jugador->persona->nacionalidad) }}"></span>
                                             @php
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
@@ -712,12 +712,12 @@
                                             <a href="{{route('jugadores.ver', array('jugadorId' => $suplentev->jugador->id))}}" >
                                                 <span style="font-weight: bold">{{$suplentev->dorsal}}</span>
                                                 @if($suplentev->jugador->persona->foto)
-                                                    <img id="original" class="imgCircle" src="{{ url('images/'.$suplentev->jugador->persona->foto) }}" >
+                                                    <img class="imgCircle" src="{{ url('images/'.$suplentev->jugador->persona->foto) }}" alt="{{ $suplentev->jugador->persona->full_name }}">
                                                 @else
-                                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto.png') }}" >
+                                                    <img class="imgCircle" src="{{ url('images/sin_foto.png') }}" alt="{{ $suplentev->jugador->persona->full_name }}">
                                                 @endif
                                             </a>
-                                            <span style="font-weight: bold"> {{ $suplentev->jugador->persona->full_name}} <img id="original" src="{{ $suplentev->jugador->persona->bandera_url }}" alt="{{ trad_dato($suplentev->jugador->persona->nacionalidad) }}"></span>
+                                            <span style="font-weight: bold"> {{ $suplentev->jugador->persona->full_name}} <img src="{{ $suplentev->jugador->persona->bandera_url }}" alt="{{ trad_dato($suplentev->jugador->persona->nacionalidad) }}"></span>
                                             @php
                                                 $goleador=array();
                                                 foreach ($arrayGoles as &$arrayGol){
@@ -846,11 +846,11 @@
                                     <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnicol->tecnico->id))}}" >
 
                                         @if($tecnicol->tecnico->persona->foto)
-                                            <img id="original" class="imgCircle" src="{{ url('images/'.$tecnicol->tecnico->persona->foto) }}" >
+                                            <img class="imgCircle" src="{{ url('images/'.$tecnicol->tecnico->persona->foto) }}" alt="{{ $tecnicol->tecnico->persona->full_name }}">
                                         @else
-                                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                                            <img class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" alt="{{ $tecnicol->tecnico->persona->full_name }}">
                                         @endif</a>
-                                    <span style="font-weight: bold"> {{ $tecnicol->tecnico->persona->full_name}} <img id="original" src="{{ $tecnicol->tecnico->persona->bandera_url }}" alt="{{ trad_dato($tecnicol->tecnico->persona->nacionalidad) }}"></span>
+                                    <span style="font-weight: bold"> {{ $tecnicol->tecnico->persona->full_name}} <img src="{{ $tecnicol->tecnico->persona->bandera_url }}" alt="{{ trad_dato($tecnicol->tecnico->persona->nacionalidad) }}"></span>
                                 </td>
                             </tr>
                         @endforeach
@@ -866,11 +866,11 @@
                                     <a href="{{route('tecnicos.ver', array('tecnicoId' => $tecnicov->tecnico->id))}}" >
 
                                         @if($tecnicov->tecnico->persona->foto)
-                                            <img id="original" class="imgCircle" src="{{ url('images/'.$tecnicov->tecnico->persona->foto) }}" >
+                                            <img class="imgCircle" src="{{ url('images/'.$tecnicov->tecnico->persona->foto) }}" alt="{{ $tecnicov->tecnico->persona->full_name }}">
                                         @else
-                                            <img id="original" class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" >
+                                            <img class="imgCircle" src="{{ url('images/sin_foto_tecnico.png') }}" alt="{{ $tecnicov->tecnico->persona->full_name }}">
                                         @endif</a>
-                                    <span style="font-weight: bold"> {{ $tecnicov->tecnico->persona->full_name}} <img id="original" src="{{ $tecnicov->tecnico->persona->bandera_url }}" alt="{{ trad_dato($tecnicov->tecnico->persona->nacionalidad) }}"></span>
+                                    <span style="font-weight: bold"> {{ $tecnicov->tecnico->persona->full_name}} <img src="{{ $tecnicov->tecnico->persona->bandera_url }}" alt="{{ trad_dato($tecnicov->tecnico->persona->nacionalidad) }}"></span>
                                 </td>
                             </tr>
                         @endforeach
@@ -945,14 +945,14 @@
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             @if($arrGol['escudo'])
-                                <img id="original" height="20" src="{{ url('images/'.$arrGol['escudo']) }}" >
+                                <img height="20" src="{{ url('images/'.$arrGol['escudo']) }}" alt="">
                             @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrGol['minuto'], $arrGol['adicionado'] ?? null, '') }}'
                                     <a href="{{route('jugadores.ver', array('jugadorId' => $arrGol['jugador_id']))}}" >
 
 
-                                            <img id="original" class="imgCircle" src="{{ url('images/'.$arrGol['foto']) }}" >
+                                            <img class="imgCircle" src="{{ url('images/'.$arrGol['foto']) }}" alt="{{ $arrGol['jugador'] }}">
 
                                            </a>
                                     <span style="font-weight: bold"> {{ $arrGol['jugador']}}</span> {{ trad_dato($arrGol['tipo']) }}
@@ -970,7 +970,7 @@
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             @if($arrTarjeta['escudo'])
-                                <img id="original" height="20" src="{{ url('images/'.$arrTarjeta['escudo']) }}" >
+                                <img height="20" src="{{ url('images/'.$arrTarjeta['escudo']) }}" alt="">
                             @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrTarjeta['minuto'], $arrTarjeta['adicionado'] ?? null, '') }}'
@@ -989,7 +989,7 @@
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrTarjeta['jugador_id']))}}" >
 
 
-                                <img id="original" class="imgCircle" src="{{ url('images/'.$arrTarjeta['foto']) }}" >
+                                <img class="imgCircle" src="{{ url('images/'.$arrTarjeta['foto']) }}" alt="{{ $arrTarjeta['jugador'] }}">
 
                             </a>
                             <span style="font-weight: bold"> {{ $arrTarjeta['jugador']}}</span>
@@ -1007,7 +1007,7 @@
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             @if($arrCambio['escudo'])
-                                <img id="original" height="20" src="{{ url('images/'.$arrCambio['escudo']) }}" >
+                                <img height="20" src="{{ url('images/'.$arrCambio['escudo']) }}" alt="">
                             @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrCambio['minuto'], $arrCambio['adicionado'] ?? null, '') }}'
@@ -1019,7 +1019,7 @@
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrCambio['jugador_id']))}}" >
 
 
-                                <img id="original" class="imgCircle" src="{{ url('images/'.$arrCambio['foto']) }}" >
+                                <img class="imgCircle" src="{{ url('images/'.$arrCambio['foto']) }}" alt="{{ $arrCambio['jugador'] }}">
 
                             </a>
                             <span style="font-weight: bold"> {{ $arrCambio['jugador']}}</span>
@@ -1038,11 +1038,11 @@
                             <a href="{{route('arbitros.ver', array('arbitroId' => $arbitro->arbitro->id))}}" >
 
                                 @if($arbitro->arbitro->persona->foto)
-                                    <img id="original" class="imgCircle" src="{{ url('images/'.$arbitro->arbitro->persona->foto) }}" >
+                                    <img class="imgCircle" src="{{ url('images/'.$arbitro->arbitro->persona->foto) }}" alt="{{ $arbitro->arbitro->persona->full_name }}">
                                 @else
-                                    <img id="original" class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" >
+                                    <img class="imgCircle" src="{{ url('images/sin_foto_arbitro.png') }}" alt="{{ $arbitro->arbitro->persona->full_name }}">
                                 @endif</a>
-                            <span style="font-weight: bold"> {{ $arbitro->arbitro->persona->full_name}} <img id="original" src="{{ $arbitro->arbitro->persona->bandera_url }}" alt="{{ trad_dato($arbitro->arbitro->persona->nacionalidad) }}"></span> {{ trad_dato($arbitro->tipo) }}
+                            <span style="font-weight: bold"> {{ $arbitro->arbitro->persona->full_name}} <img src="{{ $arbitro->arbitro->persona->bandera_url }}" alt="{{ trad_dato($arbitro->arbitro->persona->nacionalidad) }}"></span> {{ trad_dato($arbitro->tipo) }}
                         </div>
 
                     @endforeach
@@ -1057,14 +1057,14 @@
 
                         <div class="form-group col-xs-12 col-sm-6 col-md-12">
                             @if($arrPenal['escudo'])
-                                <img id="original" height="20" src="{{ url('images/'.$arrPenal['escudo']) }}" >
+                                <img height="20" src="{{ url('images/'.$arrPenal['escudo']) }}" alt="">
                             @endif
 
                             {{ \App\Services\MinutoHelper::texto($arrPenal['minuto'], $arrPenal['adicionado'] ?? null, '') }}'
                             <a href="{{route('jugadores.ver', array('jugadorId' => $arrPenal['jugador_id']))}}" >
 
 
-                                <img id="original" class="imgCircle" src="{{ url('images/'.$arrPenal['foto']) }}" >
+                                <img class="imgCircle" src="{{ url('images/'.$arrPenal['foto']) }}" alt="{{ $arrPenal['jugador'] }}">
 
                             </a>
                             <span style="font-weight: bold">{{ $arrPenal['jugador'] }}</span>

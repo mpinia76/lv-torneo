@@ -13,7 +13,8 @@ namespace App\Services;
  *  1. Los <img> del HTML público que apuntan a /images/x.png|jpg pasan a
  *     /img-min/x.png|jpg. nginx sirve la miniatura si existe y, si no (imagen
  *     recién subida, todavía sin procesar), la original: nunca queda un hueco.
- *  2. Los <img> que no dicen nada de carga pasan a loading="lazy": la mayoría
+ *  2. Los <img> sin alt reciben alt="" (decorativa).
+ *  3. Los <img> que no dicen nada de carga pasan a loading="lazy": la mayoría
  *     (formaciones, tablas) quedan fuera de la pantalla al abrir la página.
  *     Los que sí importan al abrir (marcador, foto de la ficha) llevan
  *     fetchpriority="high" en la vista y no se tocan.
@@ -59,7 +60,15 @@ class ImagenesLivianas
                 $tag
             );
 
-            // 2. Carga diferida si la vista no decidió otra cosa.
+            // 2. Sin alt, alt vacío: para un lector de pantalla es "imagen decorativa"
+            //    (la foto o el escudo van siempre al lado del nombre). Lo que no tiene
+            //    texto al lado (una foto sola dentro de un link) tiene que traer su alt
+            //    desde la vista, como en fechas/detalle.
+            if (!preg_match('/\salt\s*=/i', $tag)) {
+                $tag = preg_replace('#\s*/?>$#', ' alt=""$0', $tag, 1);
+            }
+
+            // 3. Carga diferida si la vista no decidió otra cosa.
             if (stripos($tag, 'loading=') === false && stripos($tag, 'fetchpriority=') === false) {
                 $tag = preg_replace('#\s*/?>$#', ' loading="lazy" decoding="async"$0', $tag, 1);
             }
