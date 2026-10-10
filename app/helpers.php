@@ -352,6 +352,17 @@ if (! function_exists('query_canonica')) {
                 unset($query[$k]);
             }
         }
+        // Tabla histórica y estadísticas: sin zona (o con una que no existe)
+        // muestran la zona local, así que ?zona=<local> sola es la misma página
+        // que la base. Títulos no: ahí sin zona es «todo el mundo».
+        if (isset($query['zona']) && empty($query['competencia'])
+            && request()->routeIs('torneos.posiciones', 'torneos.estadisticasOtras')) {
+            $zonas = \App\Services\MenuTorneos::zonas()['zonas'];
+            if ($query['zona'] === \App\Services\MenuTorneos::zonaLocal() || !isset($zonas[$query['zona']])) {
+                unset($query['zona']);
+            }
+        }
+
         ksort($query);
 
         return http_build_query($query);
