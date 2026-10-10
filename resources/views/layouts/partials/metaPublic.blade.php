@@ -102,7 +102,7 @@
 </noscript>
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
-<link href="{{ asset('css/torneos.css') }}?v=24" rel="stylesheet">
+<link href="{{ asset('css/torneos.css') }}?v=25" rel="stylesheet">
 
 {{-- Favicon: el .ico es para lo que no lee SVG (Safari viejo, lectores de
      feeds, el pedido automático a /favicon.ico); el SVG gana donde se entiende.

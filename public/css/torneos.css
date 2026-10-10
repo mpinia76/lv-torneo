@@ -19,7 +19,7 @@
     --t-surface-2:     #F5F7F3;
     --t-ink:           #11171A;
     --t-ink-2:         #3C464A;
-    --t-muted:         #6B7679;
+    --t-muted:         #5E686B;  /* antes #6B7679: no llegaba a 4,5:1 sobre --t-bg ni --t-surface-2 (10/10) */
     --t-line:          #DCE0DA;
     --t-line-strong:   #C4CAC1;
 
