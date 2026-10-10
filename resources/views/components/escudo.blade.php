@@ -1,4 +1,7 @@
-@props(['src' => null, 'nombre' => '', 'tam' => null])
+{{-- prioridad: el escudo es lo principal de la página (el marcador del partido). Va sin
+     carga diferida y con prioridad alta: con loading="lazy" el navegador lo pide tarde y
+     es justo lo que mide el LCP. --}}
+@props(['src' => null, 'nombre' => '', 'tam' => null, 'prioridad' => false])
 
 @php
     $clase = 'escudo' . ($tam ? ' escudo-' . $tam : '');
@@ -20,7 +23,7 @@
          src="{{ url('images/' . $src) }}"
          alt="{{ $nombre }}"
          title="{{ $nombre }}"
-         loading="lazy">
+         @if($prioridad) fetchpriority="high" @else loading="lazy" @endif>
 @else
     <span {{ $attributes->merge(['class' => $clase . ' escudo-txt']) }} title="{{ $nombre }}">{{ $iniciales }}</span>
 @endif

@@ -22,7 +22,8 @@
 @endphp
 
 <div {{ $attributes->merge(['class' => 't-ficha']) }}>
-    <img class="t-ficha-foto" src="{{ $fpFoto }}" alt="{{ $fpCorto }}" loading="lazy">
+    {{-- Es lo principal de la ficha (LCP): sin carga diferida y con prioridad alta --}}
+    <img class="t-ficha-foto" src="{{ $fpFoto }}" alt="{{ $fpCorto }}" width="116" height="116" fetchpriority="high">
 
     <div class="t-ficha-cuerpo">
         @if($rol)

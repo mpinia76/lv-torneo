@@ -94,7 +94,7 @@
         <div class="t-ficha">
             @if($equipo->escudo)
                 <img class="t-ficha-foto t-ficha-escudo" src="{{ url('images/'.$equipo->escudo) }}"
-                     alt="{{ $equipo->nombre }}" loading="lazy">
+                     alt="{{ $equipo->nombre }}" width="116" height="116" fetchpriority="high">
             @else
                 <span class="t-ficha-foto t-ficha-escudo escudo escudo-txt">{{ $equipo->siglas }}</span>
             @endif

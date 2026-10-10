@@ -191,7 +191,7 @@
                 <div class="t-lado">
                     @if($partido->equipol)
                         <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">
-                            <x-escudo :src="$partido->equipol->escudo" :nombre="$partido->equipol->nombre" tam="xl"/>
+                            <x-escudo :src="$partido->equipol->escudo" :nombre="$partido->equipol->nombre" tam="xl" :prioridad="true"/>
                         </a>
                         <b>
                             <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipol->id]) }}">{{ $partido->equipol->nombre }}</a>
@@ -218,7 +218,7 @@
                 <div class="t-lado">
                     @if($partido->equipov)
                         <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">
-                            <x-escudo :src="$partido->equipov->escudo" :nombre="$partido->equipov->nombre" tam="xl"/>
+                            <x-escudo :src="$partido->equipov->escudo" :nombre="$partido->equipov->nombre" tam="xl" :prioridad="true"/>
                         </a>
                         <b>
                             <a href="{{ route('equipos.ver', ['equipoId' => $partido->equipov->id]) }}">{{ $partido->equipov->nombre }}</a>
