@@ -11,9 +11,10 @@
 </footer>
 
 {{-- Librerías --}}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.3/jquery.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
+{{-- Mismo archivo que el de cdnjs (sha384 idéntico), servido desde public/vendor/ --}}
+<script src="{{ asset('vendor/jquery-2.2.3/jquery.min.js') }}"></script>
+<script src="{{ asset('vendor/bootstrap-5.3.3/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ asset('vendor/select2-4.0.6-rc.0/select2.min.js') }}"></script>
 <script src="{{ asset('ini.js') }}"></script>
 <script src="{{ asset('js/dropdownFilter.js') }}"></script>
 {{-- Textos de torneos.js en el idioma de la página (en español no hace falta) --}}

@@ -80,15 +80,26 @@
     })();
 </script>
 
-{{-- Tipografías --}}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+{{-- Todo lo que el navegador necesita para pintar sale de este mismo servidor (antes venía
+     de Google Fonts, jsdelivr y cdnjs: con 4G lenta cada servidor nuevo costaba una conexión
+     entera antes del primer pintado). Las versiones van en el nombre de la carpeta de
+     public/vendor/: para actualizar, carpeta nueva. --}}
 
-{{-- Bootstrap 5.3 + iconos --}}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet">
+{{-- Tipografías: las dos que se ven primero se piden ya; el resto, cuando haga falta --}}
+<link rel="preload" href="{{ asset('fonts/instrument-sans-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ asset('fonts/archivo-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+@include('layouts.partials.fuentes')
+
+{{-- Bootstrap 5.3 (bloquea el pintado a propósito: sin él la página sale desarmada) --}}
+<link href="{{ asset('vendor/bootstrap-5.3.3/bootstrap.min.css') }}" rel="stylesheet">
+
+{{-- Íconos y Select2: no hacen falta para el primer pintado, se cargan sin frenarlo --}}
+<link href="{{ asset('vendor/bootstrap-icons-1.11.1/bootstrap-icons.min.css') }}" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="{{ asset('vendor/select2-4.0.6-rc.0/select2.min.css') }}" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript>
+<link href="{{ asset('vendor/bootstrap-icons-1.11.1/bootstrap-icons.min.css') }}" rel="stylesheet">
+<link href="{{ asset('vendor/select2-4.0.6-rc.0/select2.min.css') }}" rel="stylesheet">
+</noscript>
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
 <link href="{{ asset('css/torneos.css') }}?v=24" rel="stylesheet">
