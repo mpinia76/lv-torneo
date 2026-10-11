@@ -714,6 +714,11 @@ class TmDetallePartido
                     // Primero la plantilla: es lo que hace que el jugador exista
                     // para la pantalla de alineaciones del torneo.
                     $this->grabarPlantillas($plan['plantillas']);
+                    // Y la plantilla del EQUIPO aunque no venga ningún jugador:
+                    // la tabla de posiciones lista a los que tienen plantilla en
+                    // el grupo, y sin alineación en TM (amateurs, partidos
+                    // viejos) el equipo quedaba afuera de la tabla.
+                    $this->asegurarPlantillasEquipos($grupoId, $torneoId, $lados);
 
                     $this->grabarFilas(Alineacion::class,    $plan['alineacions'], 'la alineación');
                     $this->grabarFilas(Gol::class,          $plan['gols'],        'un gol');
@@ -5974,6 +5979,37 @@ class TmDetallePartido
     {
         $e = DB::table('equipos')->where('id', $id)->select('nombre')->first();
         return $e ? $e->nombre : ('equipo #' . $id);
+    }
+
+    /**
+     * Plantilla (vacía si hace falta) para cada equipo del partido.
+     *
+     * Mismo criterio que grabarPlantillas(): UNA plantilla por equipo y
+     * torneo. Si ya tiene en cualquier grupo del torneo, no se toca; si no,
+     * se crea en el grupo de este partido. KNVB Beker 2000/01: TM no tiene
+     * alineaciones de los partidos de amateurs, así que nunca se creaba
+     * ninguna y los grupos salían vacíos en la tabla de posiciones.
+     */
+    private function asegurarPlantillasEquipos($grupoId, $torneoId, array $lados)
+    {
+        if (!$grupoId || !$torneoId) return;
+        foreach ($lados as $lado) {
+            $equipoId = (int) (isset($lado['equipo_id']) ? $lado['equipo_id'] : 0);
+            if (!$equipoId) continue;
+            $existe = DB::table('plantillas')
+                ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+                ->where('grupos.torneo_id', $torneoId)
+                ->where('plantillas.equipo_id', $equipoId)
+                ->exists();
+            if ($existe) continue;
+            $p = \App\Plantilla::firstOrCreate(['grupo_id' => (int) $grupoId, 'equipo_id' => $equipoId]);
+            if (!$this->grupoSuma($grupoId) && $this->torneoTieneTabla($torneoId)) {
+                $this->aviso('Creé la plantilla de ' . $this->nombreEquipo($equipoId)
+                    . ' en el grupo del partido, que no arma tabla de posiciones. Este torneo sí tiene '
+                    . 'grupos con tabla: si el equipo juega ahí, reasignale el grupo a la plantilla o no '
+                    . 'va a aparecer en las posiciones. [[plantilla:' . (int) $p->id . ']]');
+            }
+        }
     }
 
     /** ¿Este grupo arma tabla de posiciones? (`grupos.posiciones`) */
