@@ -2958,6 +2958,14 @@ class TmDetallePartido
             if (is_array($coaches[$k])) {
                 $id = $this->valor($coaches[$k], ['id', 'coachId', 'trainerId']);
                 if ($id !== null) return $id;
+                // Partidos viejos: «coachId» viene null y el DT está en
+                // «headCoachIds» (lista). KNVB Beker 2000/01:
+                // {"home":{"coachId":null,"headCoachIds":["3924"]}, …}.
+                // Lista vacía = TM no sabe quién dirigió ese lado.
+                if (!empty($coaches[$k]['headCoachIds']) && is_array($coaches[$k]['headCoachIds'])) {
+                    $primero = reset($coaches[$k]['headCoachIds']);
+                    if ($primero !== '' && $primero !== null) return $primero;
+                }
             } elseif ($coaches[$k] !== '' && $coaches[$k] !== null) {
                 return $coaches[$k];
             }
