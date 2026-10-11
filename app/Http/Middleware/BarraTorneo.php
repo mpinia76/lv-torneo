@@ -16,7 +16,9 @@ use Closure;
  *  - Páginas de un torneo (DE_TORNEO, con ?torneoId=): la barra pasa a ese
  *    torneo, aunque se llegue por un link directo o desde un buscador.
  *  - El partido la fija en FechaController::detalle (hace falta el partido).
- *  - El resto (fichas de jugador, equipo, técnico, árbitro…) no la toca.
+ *  - Las fichas (jugador, equipo, técnico, árbitro y sus subpáginas) también
+ *    la sacan: son de toda la carrera, no de un torneo.
+ *  - El resto no la toca.
  *
  * Va en el grupo público ANTES de 'pagina.cache', así corre también cuando la
  * página sale de la caché. Solo consulta la base cuando cambia de torneo.
@@ -28,6 +30,10 @@ class BarraTorneo
         'torneos.historiales', 'torneos.historial', 'torneos.goleadores', 'torneos.jugadores', 'torneos.tarjetas',
         'torneos.posiciones', 'torneos.estadisticasOtras', 'torneos.tecnicos',
         'torneos.arqueros', 'torneos.titulos',
+        // Fichas y sus subpáginas: abarcan toda la carrera, no un torneo (11/10).
+        'jugadores.ver', 'jugadores.jugados', 'jugadores.goles', 'jugadores.tarjetas',
+        'jugadores.penals', 'jugadores.titulos',
+        'equipos.ver', 'equipos.jugados', 'tecnicos.ver', 'tecnicos.jugados', 'arbitros.ver',
     ];
 
     const DE_TORNEO = [
