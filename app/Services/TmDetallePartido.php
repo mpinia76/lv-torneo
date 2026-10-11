@@ -718,7 +718,11 @@ class TmDetallePartido
                     // la tabla de posiciones lista a los que tienen plantilla en
                     // el grupo, y sin alineación en TM (amateurs, partidos
                     // viejos) el equipo quedaba afuera de la tabla.
-                    $this->asegurarPlantillasEquipos($grupoId, $torneoId, $lados);
+                    // (Dentro del closure no están $grupoId/$torneoId: salen del partido.)
+                    $this->asegurarPlantillasEquipos(
+                        optional($partido->fecha)->grupo_id,
+                        optional(optional($partido->fecha)->grupo)->torneo_id,
+                        $lados);
 
                     $this->grabarFilas(Alineacion::class,    $plan['alineacions'], 'la alineación');
                     $this->grabarFilas(Gol::class,          $plan['gols'],        'un gol');
