@@ -3448,6 +3448,12 @@ class ImportDetallesController extends Controller
 
         $imp = new TmDetallePartido;
         $ok = 0; $fallaron = 0; $llamadas = 0; $nuevos = 0;
+        // Escritos pero SIN alineación (TM no la tiene: amateurs, partidos
+        // viejos). La cola es «partidos sin alineación», así que siguen en la
+        // cola, adelante de todo: sin contarlos acá, la tanda siguiente de la
+        // cadena volvía a agarrar los mismos 10 y pagaba las mismas llamadas
+        // para siempre (KNVB Beker 2000/01: «quedan 114» sin bajar nunca).
+        $sinAlineacion = 0;
         $detalle = '';
 
         foreach ($filas as $f) {
@@ -3481,6 +3487,7 @@ class ImportDetallesController extends Controller
 
             if ($r['escrito']) {
                 $ok++;
+                if (empty($r['plan']['alineacions'])) $sinAlineacion++;
                 $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . ' — '
                     . count($r['plan']['alineacions']) . ' en la alineación, '
                     . count($r['plan']['gols']) . ' goles, '
@@ -3511,7 +3518,8 @@ class ImportDetallesController extends Controller
             ? (clone $this->sinDetalleQ($tecnicoId, $comp, $ronda))->distinct()->count('partido_id')
             : 0;
         // Tanda común: lo que sigue sin detalle, menos los ya fallidos de la cadena.
-        $saltarProx   = $saltar + $fallaron;
+        // También los que se escribieron sin alineación: siguen en la cola.
+        $saltarProx   = $saltar + $fallaron + ($normal ? $sinAlineacion : 0);
         $quedanNormal = $normal ? max(0, $colaBase->distinct()->count('partido_id') - $saltarProx) : 0;
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index', array_filter(['tecnico_id' => $tecnicoId ?: null,
@@ -3536,7 +3544,7 @@ class ImportDetallesController extends Controller
             . ($sinDetalle ? $this->card($quedanSinDetalle, 'Quedan sin detalle',
                 $quedanSinDetalle ? 'warn' : 'ok') : '')
             . ($normal ? $this->card($quedanNormal, 'Quedan en la cola', $quedanNormal ? 'warn' : 'ok') : '')
-            . ($normal && $saltarProx ? $this->card($saltarProx, 'Salteados por error', 'err') : '')
+            . ($normal && $saltarProx ? $this->card($saltarProx, 'Salteados (error o sin alineación en TM)', 'err') : '')
             . '</div>';
 
         // ── Encadenar, igual que el repaso de tipos de gol ─────────────────
