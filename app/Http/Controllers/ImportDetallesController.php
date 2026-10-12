@@ -3408,6 +3408,10 @@ class ImportDetallesController extends Controller
             // 08/11/2026 de LaLiga y la Ligue 1). Entran solos cuando se jueguen.
             // Margen de 3 h: lo de hoy a la noche todavía no terminó.
             if (!$rehacer) $q->where('dia', '<=', now()->subHours(3));
+            // Los que TM ya contestó SIN alineación (amateurs, partidos viejos)
+            // quedan marcados y no vuelven a la cola: si no, cada tanda nueva
+            // desde cero los pagaba otra vez. «Rehacer» los sigue viendo.
+            if (!$rehacer && $this->columnaTmSinAlineacion()) $q->whereNull('tm_sin_alineacion_at');
             if ($comp !== '')  $q->where('competencia_external_id', $comp);
             if ($ronda !== '') $q->where('ronda', $ronda);
             if ($rehacer) {
@@ -3493,7 +3497,16 @@ class ImportDetallesController extends Controller
 
             if ($r['escrito']) {
                 $ok++;
-                if (empty($r['plan']['alineacions'])) $sinAlineacion++;
+                if (empty($r['plan']['alineacions'])) {
+                    $sinAlineacion++;
+                    // Sólo si el partido tiene más de una semana: lo reciente
+                    // TM lo puede completar en los días siguientes.
+                    if ($this->columnaTmSinAlineacion()
+                        && strtotime((string) $f->dia) < strtotime('-7 days')) {
+                        DB::table('import_partidos')->where('partido_id', (int) $f->partido_id)
+                            ->update(['tm_sin_alineacion_at' => now()]);
+                    }
+                }
                 $detalle .= '<div><span class="ok">✔</span> ' . $etiqueta . ' — '
                     . count($r['plan']['alineacions']) . ' en la alineación, '
                     . count($r['plan']['gols']) . ' goles, '
@@ -4907,6 +4920,18 @@ class ImportDetallesController extends Controller
      * `2026_09_06_100000_add_sin_detalle_a_import_partidos` puede no haber
      * corrido, y eso no tiene que romper la pantalla: sin columna, no hay lista.
      */
+    /**
+     * `import_partidos.tm_sin_alineacion_at` (migración
+     * `2026_10_12_180000_add_tm_sin_alineacion_a_import_partidos`). Sin la
+     * columna la tanda anda como antes: no marca ni filtra.
+     */
+    private function columnaTmSinAlineacion()
+    {
+        static $hay = null;
+        if ($hay === null) $hay = Schema::hasColumn('import_partidos', 'tm_sin_alineacion_at');
+        return $hay;
+    }
+
     private function columnaSinDetalle()
     {
         return Schema::hasColumn('import_partidos', 'sin_detalle_at');
