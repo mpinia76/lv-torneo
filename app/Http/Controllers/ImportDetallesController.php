@@ -3402,6 +3402,12 @@ class ImportDetallesController extends Controller
             $q = DB::table('import_partidos')
                 ->whereNotNull('partido_id')->whereNotNull('external_id')
                 ->whereIn('estado', ['aplicado', 'duplicado']);
+            // Los que todavía no se jugaron no tienen detalle que bajar: TM
+            // contesta vacío, se paga la llamada igual y, como la cola va del
+            // más nuevo al más viejo, encabezaban TODAS las tandas (fecha del
+            // 08/11/2026 de LaLiga y la Ligue 1). Entran solos cuando se jueguen.
+            // Margen de 3 h: lo de hoy a la noche todavía no terminó.
+            if (!$rehacer) $q->where('dia', '<=', now()->subHours(3));
             if ($comp !== '')  $q->where('competencia_external_id', $comp);
             if ($ronda !== '') $q->where('ronda', $ronda);
             if ($rehacer) {
