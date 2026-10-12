@@ -2474,11 +2474,27 @@ class ImportPartidosController extends Controller
             return $this->pagina('Aplicar fecha', $volver . '<p class="err">Faltan <code>comp</code> y <code>gameday</code>.</p>');
         }
 
+        // LA TEMPORADA DEL TORNEO. El staging guarda por competencia y ronda,
+        // no por edición: la «2ª Ronda» de NLP traía mezclados los partidos que
+        // quedaron sin aplicar de la KNVB 2000/01 con los de la 2001/02, y el
+        // freno de «contra dos rivales distintos» paraba a Fortuna y Groningen.
+        // Filas sin temporada (staging viejo) se siguen aceptando.
+        $temporadaTorneo = $torneoId
+            ? trim((string) \App\Torneo::where('id', $torneoId)->value('tm_season_id')) : '';
+        $deEstaTemporada = function ($q) use ($temporadaTorneo) {
+            if ($temporadaTorneo === '') return;
+            $q->where(function ($w) use ($temporadaTorneo) {
+                $w->where('temporada', $temporadaTorneo)
+                  ->orWhereNull('temporada')->orWhere('temporada', '');
+            });
+        };
+
         $filas = DB::table('import_partidos')
             ->whereNull('tecnico_id')
             ->where('competencia_external_id', $comp)
             ->where('ronda', $gameday)
             ->where('estado', 'nuevo')
+            ->where($deEstaTemporada)
             ->orderBy('dia')->get();
 
         if ($filas->isEmpty()) {
@@ -2513,6 +2529,36 @@ class ImportPartidosController extends Controller
         }
 
         $html = $volver . '<h1>Fecha ' . e($gameday) . ' · ' . e($comp) . '</h1>';
+
+        // ── CLUBES SIN MAPEAR: frenar ANTES de rutear ───────────────────────
+        // clasificarFixture() deja esos partidos en estado «conflicto» (motivo
+        // «sin mapear: …»), y `$filas` sólo levanta los «nuevo»: se caían EN
+        // SILENCIO y la ronda se aplicaba incompleta (FA Cup 2022/23, 3ª ronda:
+        // «18 a crear» de 32). Sólo se miran los de ESTA ronda: una copa larga
+        // trae decenas de amateurs de rondas que no vas a cargar.
+        $sinMapear = DB::table('import_partidos')
+            ->whereNull('tecnico_id')
+            ->where('competencia_external_id', $comp)
+            ->where('ronda', $gameday)
+            ->where(function ($q) {
+                $q->where('motivo', 'like', 'sin mapear%')
+                  ->orWhereNull('equipo_id')->orWhere('equipo_id', 0)
+                  ->orWhereNull('rival_id')->orWhere('rival_id', 0);
+            })
+            ->whereNotIn('estado', ['aplicado', 'duplicado'])
+            ->where($deEstaTemporada)
+            ->orderBy('dia')->get();
+        if ($sinMapear->count()) {
+            $lista = '';
+            foreach ($sinMapear as $r) {
+                $lista .= '<li>' . e($r->club_nombre . ' vs ' . $r->rival_nombre)
+                    . ($r->motivo ? ' <span class="sub">— ' . e($r->motivo) . '</span>' : '') . '</li>';
+            }
+            return $this->pagina('Aplicar fecha', $html
+                . '<div class="err-box"><b>No creé nada:</b> ' . $sinMapear->count() . ' partido(s) de esta ronda '
+                . 'tienen un club sin mapear. Mapealos en la pantalla del fixture (guardando) y volvé — los de '
+                . 'otras rondas no hace falta.<ul>' . $lista . '</ul></div>');
+        }
 
         // ── Elegir torneo ───────────────────────────────────────────────────
         if (!$torneoId) {
