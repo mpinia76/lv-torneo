@@ -10,6 +10,7 @@ use App\Partido;
 use App\PosicionTorneo;
 use App\Torneo;
 use App\EquipoEstadisticaManual;
+use App\Services\NotasWiki;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
@@ -138,8 +139,9 @@ class EquipoController extends Controller
             $insert['desaparicion'] = $this->vacioEsNulo($request->get('desaparicion'));
         }
         $insert['estadio'] = $request->get('estadio');
-        $insert['historia'] = $request->get('historia');
-        $insert['historia_en'] = $request->get('historia_en');
+        // Sin las notas de Wikipedia ([1], [cita requerida]...): ver App\Services\NotasWiki.
+        $insert['historia'] = NotasWiki::limpiar($request->get('historia'));
+        $insert['historia_en'] = NotasWiki::limpiar($request->get('historia_en'));
         $insert['pais'] = $request->get('pais');
         $insert['url_nombre'] = $request->get('url_nombre');
         $insert['url_id'] = $request->get('url_id');
@@ -215,8 +217,9 @@ class EquipoController extends Controller
             $update['desaparicion'] = $this->vacioEsNulo($request->get('desaparicion'));
         }
         $update['estadio'] = $request->get('estadio');
-        $update['historia'] = $request->get('historia');
-        $update['historia_en'] = $request->get('historia_en');
+        // Sin las notas de Wikipedia ([1], [cita requerida]...): ver App\Services\NotasWiki.
+        $update['historia'] = NotasWiki::limpiar($request->get('historia'));
+        $update['historia_en'] = NotasWiki::limpiar($request->get('historia_en'));
         $update['pais'] = $request->get('pais');
         $update['url_id'] = $request->get('url_id');
         $update['url_nombre'] = $request->get('url_nombre');
