@@ -11,6 +11,7 @@ use App\PosicionTorneo;
 use App\Torneo;
 use App\EquipoEstadisticaManual;
 use App\Services\NotasWiki;
+use App\Services\Traductor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use DB;
@@ -147,11 +148,14 @@ class EquipoController extends Controller
         $insert['url_id'] = $request->get('url_id');
 
 
+        // Si se cargó la historia en un solo idioma, se traduce la otra.
+        $aviso = Traductor::completarPar($insert, 'historia', 'historia_en');
+
         $equipo = Equipo::create($insert);
 
         //$equipo = Equipo::create($request->all());
 
-        return redirect()->route('equipos.index')->with('success','Registro creado satisfactoriamente');
+        return redirect()->route('equipos.index')->with('success', 'Registro creado satisfactoriamente' . ($aviso ? '. ' . e($aviso) : ''));
     }
 
     /**
@@ -225,10 +229,15 @@ class EquipoController extends Controller
         $update['url_nombre'] = $request->get('url_nombre');
 
 
+        // Si hay historia en un solo idioma, se traduce la otra. Sólo completa
+        // la que está vacía: una traducción ya cargada (o corregida a mano)
+        // no se pisa aunque cambie el texto del otro idioma.
+        $aviso = Traductor::completarPar($update, 'historia', 'historia_en');
+
         $equipo=equipo::find($id);
         $equipo->update($update);
 
-        return redirect()->route('equipos.index')->with('success','Registro actualizado satisfactoriamente');
+        return redirect()->route('equipos.index')->with('success', 'Registro actualizado satisfactoriamente' . ($aviso ? '. ' . e($aviso) : ''));
 
     }
 

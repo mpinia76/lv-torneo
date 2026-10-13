@@ -33,6 +33,12 @@ return [
         'id' => env('GA4_ID'),
     ],
 
+    // Traducción de la historia de los clubes (App\Services\Traductor).
+    // Sin clave se usa el endpoint público de Google Translate.
+    'deepl' => [
+        'key' => env('DEEPL_API_KEY'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
