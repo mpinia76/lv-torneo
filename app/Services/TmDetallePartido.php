@@ -728,7 +728,7 @@ class TmDetallePartido
                     $this->grabarFilas(Gol::class,          $plan['gols'],        'un gol');
                     $this->grabarFilas(Tarjeta::class,      $plan['tarjetas'],    'una tarjeta');
                     $this->grabarFilas(Cambio::class,       $plan['cambios'],     'un cambio');
-                    $this->grabarFilas(PartidoArbitro::class, $plan['arbitros'],  'un árbitro');
+                    $this->grabarArbitros($plan['arbitros']);
                     $this->grabarPenales($plan['penals']);
 
                     // Si el partido no tenía marcador, se lo ponemos. Primero
@@ -4727,6 +4727,61 @@ class TmDetallePartido
         $plan['arbitros'] = $jueces;
 
         return $plan;
+    }
+
+    /**
+     * Graba los árbitros sin chocar contra lo que ya está en `partido_arbitros`.
+     *
+     * El plan ya viene sin repetidos (depurarPlan), pero la base puede tener
+     * al juez cargado de antes: a mano, por otro importador, o con un rol que
+     * este plan no trae —con `forzar` sólo se borran los roles que vienen, así
+     * que un "Desconocido" o un "Línea 1" viejo del mismo juez queda—. Mandarlo
+     * igual daba el SQLSTATE 1062 de `partido_id_arbitro_id`.
+     *
+     * Criterio, el mismo de penals: lo que ya está no se pisa.
+     *   · mismo juez, mismo rol   → ya estaba, se saltea callado.
+     *   · mismo juez, otro rol    → se deja el de la base y se avisa.
+     *   · el rol lo tiene OTRO juez (sólo pasa sin forzar) → no se agrega un
+     *     segundo con ese rol; se avisa para mirarlo a mano.
+     */
+    private function grabarArbitros(array $filas)
+    {
+        if (empty($filas)) return;
+
+        $nuevas = [];
+        foreach ($filas as $r) {
+            $f = $this->limpiar($r);
+            $nombre = isset($r['_nombre']) ? $r['_nombre'] : ('árbitro #' . $f['arbitro_id']);
+
+            $ya = DB::table('partido_arbitros')
+                ->where('partido_id', $f['partido_id'])
+                ->where('arbitro_id', $f['arbitro_id'])
+                ->value('tipo');
+            if ($ya !== null) {
+                if ($ya !== $f['tipo']) {
+                    $this->aviso('"' . $nombre . '" ya estaba cargado en este partido como ' . $ya
+                        . ' y Transfermarkt lo da como ' . $f['tipo'] . '. Lo dejé como estaba; '
+                        . 'si el rol correcto es el de TM, cambialo a mano.');
+                }
+                continue;
+            }
+
+            if ($f['tipo'] !== 'Desconocido') {
+                $otro = DB::table('partido_arbitros')
+                    ->where('partido_id', $f['partido_id'])
+                    ->where('tipo', $f['tipo'])
+                    ->value('arbitro_id');
+                if ($otro !== null) {
+                    $this->aviso('No cargué a "' . $nombre . '" como ' . $f['tipo'] . ': ese rol ya lo tiene '
+                        . 'el árbitro #' . $otro . ' en este partido. Revisá cuál de los dos es.');
+                    continue;
+                }
+            }
+
+            $nuevas[] = $r;
+        }
+
+        $this->grabarFilas(PartidoArbitro::class, $nuevas, 'un árbitro');
     }
 
     private function grabarFilas($clase, array $filas, $que)
