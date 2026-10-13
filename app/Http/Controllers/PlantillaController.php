@@ -449,9 +449,13 @@ class PlantillaController extends Controller
                     if ($urlJugador) {
                         // Obtener el contenido de la URL
 
-                        $htmlContentJugador = $this->htmlTm($urlJugador, null);
-                        if (strpos($htmlContentJugador, 'data-header__headline-wrapper') === false) {
-                            $htmlContentJugador = $this->htmlTm($urlJugador, 'us');
+                        // Cada pedido a ScraperAPI sale por otra IP: a veces vuelve
+                        // una página chica (~2,4 KB) en vez de la ficha. Hasta 3 intentos.
+                        foreach ([null, 'us', null] as $paisFicha) {
+                            $htmlContentJugador = $this->htmlTm($urlJugador, $paisFicha);
+                            if (strpos($htmlContentJugador, 'data-header__headline-wrapper') !== false) {
+                                break;
+                            }
                         }
                         if (strpos($htmlContentJugador, 'data-header__headline-wrapper') === false) {
                             $success .= 'No pude leer la ficha de ' . e($nombreJugador) . ' ('
@@ -470,7 +474,6 @@ class PlantillaController extends Controller
                         } else {
                             // Manejo de error o asignación de valores por defecto
                             //Log::warning('El contenido HTML del jugador está vacío: ' . $urlJugador);
-                            $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
                         }
                     }
                 } catch (\Exception $ex) {
@@ -614,6 +617,7 @@ class PlantillaController extends Controller
                             $tipo = 'Defensor';
                             break;
                         case 'Medio campo':
+                        case 'Centrocampista': // así lo pone hoy transfermarkt.com.ar
                             $tipo = 'Medio';
                             break;
                         case 'Delantero':
