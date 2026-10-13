@@ -15,8 +15,9 @@ use Illuminate\Console\Command;
  *   php artisan equipos:traducir-historias --probar      (cuántos y cuáles)
  *   php artisan equipos:traducir-historias --limite=20   (de a poco)
  *
- * Va despacio a propósito (--pausa, 2 s por defecto): sin DEEPL_API_KEY usa
- * el endpoint público de Google, que corta si se le pide mucho seguido.
+ * Va despacio a propósito (--pausa, 2 s por defecto). Sin DEEPL_API_KEY
+ * termina usando MyMemory, que tiene tope diario (5.000 caracteres anónimo,
+ * 50.000 con MYMEMORY_EMAIL): alcanza para unas pocas historias por día.
  */
 class TraducirHistorias extends Command
 {
@@ -41,7 +42,7 @@ class TraducirHistorias extends Command
             ->orderBy('id');
 
         $total = (clone $pendientes)->count();
-        $this->info("Clubes con historia en un solo idioma: {$total}. Motor: " . Traductor::motor() . '.');
+        $this->info("Clubes con historia en un solo idioma: {$total}.");
 
         $limite = max(1, (int) $this->option('limite'));
         $pausa = max(0, (int) $this->option('pausa'));
@@ -64,7 +65,7 @@ class TraducirHistorias extends Command
             if (Traductor::ultimoError()) {
                 $fallas++;
                 $this->error("#{$equipo->id} {$equipo->nombre}: {$aviso}");
-                // Tres seguidas suele ser que Google cortó: no tiene sentido seguir.
+                // Tres seguidas suele ser la cuota del día agotada: no tiene sentido seguir.
                 if ($fallas >= 3 && $ok === 0) {
                     $this->error('Tres fallas sin ningún acierto: corto acá.');
                     return self::FAILURE;

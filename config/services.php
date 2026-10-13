@@ -34,9 +34,14 @@ return [
     ],
 
     // Traducción de la historia de los clubes (App\Services\Traductor).
-    // Sin clave se usa el endpoint público de Google Translate.
+    // Sin clave de DeepL se prueba Google y después MyMemory (ver el servicio).
     'deepl' => [
         'key' => env('DEEPL_API_KEY'),
+    ],
+
+    // Opcional: con un mail, MyMemory sube el tope de 5.000 a 50.000 caracteres por día.
+    'mymemory' => [
+        'email' => env('MYMEMORY_EMAIL'),
     ],
 
     'slack' => [

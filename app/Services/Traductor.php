@@ -8,32 +8,34 @@ use Illuminate\Support\Facades\Log;
 /**
  * Traduce texto libre entre castellano e inglés (hoy: la historia de los clubes).
  *
- * Dos motores, en este orden:
- *  - DeepL, si hay DEEPL_API_KEY en el .env. Mejor calidad; el plan gratis da
- *    500.000 caracteres por mes (una historia ronda los 1.500-4.000).
- *  - Si no, el endpoint público de Google Translate (translate.googleapis.com,
- *    client=gtx). Anda sin clave, pero NO es una API oficial: Google puede
- *    limitarlo o cortarlo sin aviso. Sirve para el uso de a un club por vez.
+ * Prueba los motores en orden y se queda con el primero que responde:
+ *  1. DeepL, sólo si hay DEEPL_API_KEY en el .env. La mejor calidad; el plan
+ *     gratis da 500.000 caracteres por mes.
+ *  2. Google, por el endpoint público (translate.googleapis.com, client=gtx).
+ *     No es una API oficial y desde la IP de Vultr contesta 429 (lo bloquea por
+ *     ser un datacenter): queda por si algún día responde.
+ *  3. MyMemory (api.mymemory.translated.net). Gratis y sin clave, pero con
+ *     tope: 5.000 caracteres por día anónimo, 50.000 si se le pasa un mail
+ *     (MYMEMORY_EMAIL en el .env). Acepta hasta 500 bytes por pedido, así que
+ *     el texto va de a oraciones.
  *
- * Nunca tira excepción: si algo falla devuelve null y deja el motivo en
+ * Nunca tira excepción: si todos fallan devuelve null y deja los motivos en
  * ultimoError(), para que quien llama guarde igual y avise.
  */
 class Traductor
 {
-    /** Google corta los pedidos largos; se manda por tandas de párrafos. */
-    const MAX_TANDA = 4500;
-
     protected static $ultimoError = null;
+    protected static $ultimoMotor = null;
 
     public static function ultimoError()
     {
         return self::$ultimoError;
     }
 
-    /** Qué motor se va a usar, para mostrarlo en los avisos. */
+    /** El motor que hizo la última traducción que salió bien. */
     public static function motor()
     {
-        return config('services.deepl.key') ? 'DeepL' : 'Google';
+        return self::$ultimoMotor;
     }
 
     /**
@@ -45,28 +47,42 @@ class Traductor
     public static function traducir($texto, $de, $a)
     {
         self::$ultimoError = null;
+        self::$ultimoMotor = null;
         $texto = (string) $texto;
         if (trim($texto) === '') {
             return $texto;
         }
 
-        try {
-            $salida = config('services.deepl.key')
-                ? self::deepl($texto, $de, $a)
-                : self::google($texto, $de, $a);
-        } catch (\Throwable $e) {
-            $salida = null;
-            self::$ultimoError = $e->getMessage();
+        $motores = [];
+        if (config('services.deepl.key')) {
+            $motores['DeepL'] = 'deepl';
+        }
+        $motores['Google'] = 'google';
+        $motores['MyMemory'] = 'mymemory';
+
+        $errores = [];
+        foreach ($motores as $nombre => $metodo) {
+            try {
+                $salida = self::$metodo($texto, $de, $a);
+            } catch (\Throwable $e) {
+                $errores[$nombre] = $e->getMessage();
+                continue;
+            }
+            if (is_string($salida) && trim($salida) !== '') {
+                self::$ultimoMotor = $nombre;
+                return $salida;
+            }
+            $errores[$nombre] = is_array($salida) ? $salida['error'] : 'respuesta vacía';
         }
 
-        if ($salida === null || trim($salida) === '') {
-            self::$ultimoError = self::$ultimoError ?: 'respuesta vacía';
-            Log::warning('Traductor ' . self::motor() . " {$de}->{$a}: " . self::$ultimoError);
-            return null;
-        }
-        return $salida;
+        self::$ultimoError = implode('; ', array_map(
+            fn ($m, $e) => "{$m}: {$e}", array_keys($errores), $errores
+        ));
+        Log::warning("Traductor {$de}->{$a}: " . self::$ultimoError);
+        return null;
     }
 
+    /** Los motores devuelven el texto, o ['error' => motivo]. */
     protected static function deepl($texto, $de, $a)
     {
         $clave = config('services.deepl.key');
@@ -85,8 +101,7 @@ class Traductor
             ]);
 
         if (!$r->successful()) {
-            self::$ultimoError = 'DeepL respondió ' . $r->status();
-            return null;
+            return ['error' => 'respondió ' . $r->status()];
         }
         return $r->json('translations.0.text');
     }
@@ -94,8 +109,8 @@ class Traductor
     protected static function google($texto, $de, $a)
     {
         $salida = '';
-        foreach (self::tandas($texto) as $tanda) {
-            // Los saltos entre tandas se conservan tal cual: no se traducen.
+        foreach (self::tandas($texto, 4500) as $tanda) {
+            // Los saltos entre párrafos se conservan tal cual: no se traducen.
             if (trim($tanda) === '') {
                 $salida .= $tanda;
                 continue;
@@ -106,14 +121,12 @@ class Traductor
                     . '&sl=' . $de . '&tl=' . $a, ['q' => $tanda]);
 
             if (!$r->successful()) {
-                self::$ultimoError = 'Google respondió ' . $r->status();
-                return null;
+                return ['error' => 'respondió ' . $r->status()];
             }
             // Formato: [[["Hello","Hola",...], ["world","mundo",...]], null, "es", ...]
             $partes = $r->json('0');
             if (!is_array($partes)) {
-                self::$ultimoError = 'Google devolvió un formato inesperado';
-                return null;
+                return ['error' => 'formato inesperado'];
             }
             foreach ($partes as $p) {
                 $salida .= is_array($p) && isset($p[0]) ? $p[0] : '';
@@ -122,35 +135,70 @@ class Traductor
         return $salida;
     }
 
-    /**
-     * Parte el texto en tandas de hasta MAX_TANDA caracteres sin cortar
-     * párrafos (salvo uno solo más largo que eso, que va por oraciones).
-     * Los separadores de párrafo van como tandas propias para no perderlos.
-     */
-    protected static function tandas($texto)
+    protected static function mymemory($texto, $de, $a)
     {
-        $piezas = preg_split('/(\R\s*\R?)/u', $texto, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-        $tandas = [];
-        $actual = '';
-        foreach ($piezas as $pieza) {
-            if (mb_strlen($actual . $pieza) > self::MAX_TANDA && $actual !== '') {
-                $tandas[] = $actual;
-                $actual = '';
-            }
-            if (mb_strlen($pieza) > self::MAX_TANDA) {
-                foreach (preg_split('/(?<=[.!?])\s+/u', $pieza) as $oracion) {
-                    if (mb_strlen($actual . ' ' . $oracion) > self::MAX_TANDA && $actual !== '') {
-                        $tandas[] = $actual;
-                        $actual = '';
-                    }
-                    $actual .= ($actual === '' ? '' : ' ') . $oracion;
-                }
+        $mail = config('services.mymemory.email');
+        $salida = '';
+        // 500 bytes por pedido; 450 caracteres deja margen para los acentos.
+        foreach (self::tandas($texto, 450) as $tanda) {
+            if (trim($tanda) === '') {
+                $salida .= $tanda;
                 continue;
             }
-            $actual .= $pieza;
+            // Los espacios del borde no viajan bien: se sacan y se reponen.
+            preg_match('/^(\s*)(.*?)(\s*)$/su', $tanda, $m);
+
+            $r = Http::timeout(30)->get('https://api.mymemory.translated.net/get', array_filter([
+                'q' => $m[2],
+                'langpair' => $de . '|' . $a,
+                'de' => $mail,
+            ]));
+
+            if (!$r->successful()) {
+                return ['error' => 'respondió ' . $r->status()];
+            }
+            // Ojo: cuando se agota la cuota diaria contesta 200 igual, con el
+            // aviso en responseStatus/responseDetails y el aviso como "traducción".
+            $estado = (int) $r->json('responseStatus');
+            $traduccion = $r->json('responseData.translatedText');
+            if ($estado !== 200 || !is_string($traduccion) || $traduccion === '') {
+                return ['error' => trim(($estado ?: '') . ' ' . $r->json('responseDetails'))];
+            }
+            $salida .= $m[1] . html_entity_decode($traduccion, ENT_QUOTES | ENT_HTML5, 'UTF-8') . $m[3];
         }
-        if ($actual !== '') {
-            $tandas[] = $actual;
+        return $salida;
+    }
+
+    /**
+     * Parte el texto en tandas de hasta $max caracteres. Los saltos de párrafo
+     * van como tandas propias (no se traducen, se copian). Un párrafo más largo
+     * que $max se corta por oraciones; una oración más larga, por palabras.
+     */
+    protected static function tandas($texto, $max)
+    {
+        $piezas = preg_split('/(\R\s*)/u', $texto, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        $tandas = [];
+        foreach ($piezas as $pieza) {
+            if (trim($pieza) === '' || mb_strlen($pieza) <= $max) {
+                $tandas[] = $pieza;
+                continue;
+            }
+            $actual = '';
+            foreach (preg_split('/(?<=[.!?;])(?=\s)/u', $pieza) as $oracion) {
+                if ($actual !== '' && mb_strlen($actual . $oracion) > $max) {
+                    $tandas[] = $actual;
+                    $actual = '';
+                }
+                while (mb_strlen($oracion) > $max) {
+                    $corte = mb_strrpos(mb_substr($oracion, 0, $max), ' ') ?: $max;
+                    $tandas[] = mb_substr($oracion, 0, $corte);
+                    $oracion = mb_substr($oracion, $corte);
+                }
+                $actual .= $oracion;
+            }
+            if ($actual !== '') {
+                $tandas[] = $actual;
+            }
         }
         return $tandas;
     }
