@@ -377,32 +377,44 @@ class PlantillaController extends Controller
     {
         //dd($request);
         set_time_limit(0);
-        $url = $request->get('url2');
+        $url = trim((string) $request->get('url2'));
+        // Las fichas se leen con etiquetas en castellano («F. Nacim./Edad:»,
+        // «Posición:»...): da igual qué dominio de TM se pegue, se pide el .com.ar.
+        $url = preg_replace('#^https?://(www\.)?transfermarkt\.[a-z.]+#i', 'https://www.transfermarkt.com.ar', $url);
         $id = $request->get('plantilla_id');
         $ok = 1;
         DB::beginTransaction();
         $success='';
+        $error = '';
         $html = '';
-        try {
-            if ($url) {
-                // Obtener el contenido de la URL
-                //$htmlContent = file_get_contents($url);
-                $htmlContent =  HttpHelper::getHtmlContent($url);
-                // Crear un nuevo DOMDocument
+        $htmlContent = '';
+        $diagnostico = '';
+        $procesados = 0;
+
+        // Saliendo desde Europa (el país del .env) el sitio de TM puede contestar
+        // el muro de consentimiento en vez de la página: sin filas de jugadores
+        // se reintenta saliendo por 'us', igual que el calendario en HTML.
+        if ($url) {
+            foreach ([null, 'us'] as $pais) {
+                $htmlContent = $this->htmlTm($url, $pais);
+                if ($htmlContent !== '' && strpos($htmlContent, 'rueckennummer') !== false) {
+                    break;
+                }
+                $diagnostico .= 'Saliendo por ' . ($pais ?: 'el país del .env') . ': '
+                    . $this->queVinoTm($htmlContent) . '<br>';
+            }
+
+            if ($htmlContent !== '') {
                 $dom = new \DOMDocument();
                 libxml_use_internal_errors(true); // Suprimir errores de análisis HTML
                 $dom->loadHTML($htmlContent);
                 libxml_clear_errors();
-
-                // Crear un nuevo objeto XPath
                 $xpath = new \DOMXPath($dom);
             }
-        } catch (Exception $ex) {
-            $htmlContent = '';
         }
 
 
-        if ($htmlContent) {
+        if ($htmlContent !== '') {
 
 
 
@@ -414,9 +426,20 @@ class PlantillaController extends Controller
 
 // Iterar sobre los dorsales y las URLs de jugadores
             foreach ($dorsales as $index => $dorsal) {
+                // Cada vuelta arranca limpia: antes $insert (pie, foto...) y
+                // $persona quedaban del jugador anterior.
+                $insert = [];
+                $persona = null;
+                $htmlContentJugador = '';
+
+                $linkJugador = $jugadores->item($index);
+                if (!$linkJugador) {
+                    $success .= 'Fila ' . ($index + 1) . ': no encontré el link del jugador.<br>';
+                    continue;
+                }
                 $numeroDorsal = trim($dorsal->textContent);  // Obtener número de dorsal
-                $href = $jugadores->item($index)->getAttribute('href');  // Obtener URL del jugador
-                $nombreJugador = $jugadores->item($index)->textContent;  // Nombre del jugador
+                $href = $linkJugador->getAttribute('href');  // Obtener URL del jugador
+                $nombreJugador = trim($linkJugador->textContent);  // Nombre del jugador
                 $dorsal = $numeroDorsal ? trim($numeroDorsal) : null;
                 $urlJugador = $href ? 'https://www.transfermarkt.com.ar' . $href : null;
 
@@ -426,7 +449,15 @@ class PlantillaController extends Controller
                     if ($urlJugador) {
                         // Obtener el contenido de la URL
 
-                        $htmlContentJugador = HttpHelper::getHtmlContent($urlJugador);
+                        $htmlContentJugador = $this->htmlTm($urlJugador, null);
+                        if (strpos($htmlContentJugador, 'data-header__headline-wrapper') === false) {
+                            $htmlContentJugador = $this->htmlTm($urlJugador, 'us');
+                        }
+                        if (strpos($htmlContentJugador, 'data-header__headline-wrapper') === false) {
+                            $success .= 'No pude leer la ficha de ' . e($nombreJugador) . ' ('
+                                . $this->queVinoTm($htmlContentJugador) . ')<br>';
+                            $htmlContentJugador = '';
+                        }
                         if (!empty($htmlContentJugador)) {
                             // Crear un nuevo DOMDocument
                             $domJugador = new \DOMDocument();
@@ -442,7 +473,7 @@ class PlantillaController extends Controller
                             $success .= 'El contenido HTML del jugador está vacío: ' . $urlJugador.'<br>';
                         }
                     }
-                } catch (Exception $ex) {
+                } catch (\Exception $ex) {
                     $htmlContentJugador = '';
                 }
 
@@ -770,6 +801,11 @@ class PlantillaController extends Controller
                     //$error = 'No se encontró la URL: ' . $urlJugador;
                 }
 
+                if (!$persona || !$persona->jugador) {
+                    $success .= 'No pude cargar a ' . e($nombreJugador) . '.<br>';
+                    continue;
+                }
+
                 $data2=array(
                     'plantilla_id'=>$id,
                     'jugador_id'=>$persona->jugador->id,
@@ -778,6 +814,7 @@ class PlantillaController extends Controller
                 try {
                     Log::info('Contenido de data: ' . json_encode($data2));
                         PlantillaJugador::create($data2);
+                        $procesados++;
 
 
 
@@ -810,7 +847,11 @@ class PlantillaController extends Controller
 
             DB::commit();
             $respuestaID = 'success';
-            $respuestaMSJ = $success;
+            $respuestaMSJ = 'Jugadores agregados: ' . $procesados . '<br>' . $success;
+            if ($procesados === 0) {
+                $respuestaID = 'error';
+                $respuestaMSJ = 'No se importó ningún jugador.<br>' . $diagnostico . $error . '<br>' . $success;
+            }
         } else {
             DB::rollback();
             $respuestaID = 'error';
@@ -820,6 +861,55 @@ class PlantillaController extends Controller
 
             //return redirect()->route('plantillas.edit', array('id' => $id))->with($respuestaID,$respuestaMSJ);
         return redirect()->route('plantillas.edit', ['plantilla' => $id])->with($respuestaID, $respuestaMSJ);
+    }
+
+    /**
+     * HTML de Transfermarkt por ScraperAPI eligiendo el país de salida
+     * (null = el del .env). Devuelve '' si no vino nada.
+     */
+    private function htmlTm($url, $pais)
+    {
+        try {
+            $html = method_exists(HttpHelper::class, 'getHtmlTm')
+                ? HttpHelper::getHtmlTm($url, $pais)
+                : HttpHelper::getHtmlContent($url);
+        } catch (\Exception $ex) {
+            Log::warning('htmlTm: ' . $ex->getMessage() . ' para ' . $url);
+            $html = '';
+        }
+
+        return is_string($html) ? $html : '';
+    }
+
+    /**
+     * Qué contestó TM cuando no vino la página esperada: bytes, título y una
+     * pista (consentimiento, captcha, 404...). Mismo criterio que queVino()
+     * del importador de partidos.
+     */
+    private function queVinoTm($html)
+    {
+        $html = (string) $html;
+        if ($html === '') return 'no vino nada (ScraperAPI falló o sin créditos)';
+
+        $titulo = '';
+        if (preg_match('#<title[^>]*>(.*?)</title>#is', $html, $m)) {
+            $titulo = trim(html_entity_decode(strip_tags($m[1]), ENT_QUOTES, 'UTF-8'));
+        }
+
+        $texto = mb_strtolower($titulo . ' ' . mb_substr(strip_tags($html), 0, 3000));
+        $pista = '';
+        $pistas = ['consent' => 'el muro de consentimiento', 'zustimmung' => 'el muro de consentimiento',
+            'cookie' => 'el muro de cookies', 'captcha' => 'un captcha',
+            'attention required' => 'un bloqueo de Cloudflare', 'access denied' => 'un acceso denegado',
+            'exhausted the api credits' => 'ScraperAPI sin créditos',
+            'no se encontr' => 'un 404 de TM', 'not found' => 'un 404'];
+        foreach ($pistas as $aguja => $que) {
+            if (mb_strpos($texto, $aguja) !== false) { $pista = ', parece ' . $que; break; }
+        }
+
+        return 'vino una página de ' . strlen($html) . ' bytes'
+            . ($titulo !== '' ? ', título «' . e(mb_substr($titulo, 0, 90)) . '»' : ', sin título')
+            . $pista;
     }
 
     public function importarProcess(Request $request)
