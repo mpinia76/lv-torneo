@@ -17,6 +17,11 @@ use App\Http\Controllers\PhpmailerController;
  * - Se adjunta al mail solo si pesa hasta BACKUP_MAX_ATTACH_MB; si no, se manda un aviso
  *   sin adjunto. PHPMailer arma el mensaje en memoria (base64 + MIME + partido en líneas),
  *   así que adjuntar archivos grandes agota el memory_limit, y Gmail además los rechaza.
+ * - Si no entra en el mail y BACKUP_RCLONE_REMOTE está configurado, se sube ahí con rclone
+ *   (p. ej. Google Drive) y, si la subida salió bien, se BORRA la copia local: no queda en el
+ *   servidor. En el remoto se borran los de más de BACKUP_REMOTE_KEEP_DAYS días (30).
+ *   Si la subida falla, la copia local queda (con la rotación de siempre) y el mail lo avisa.
+ *   Mismo esquema que lv-proyectos.
  */
 class DatabaseBackUp extends Command
 {
@@ -66,22 +71,96 @@ class DatabaseBackUp extends Command
         $mb = round($bytes / 1048576, 1);
         $adjuntar = $bytes <= $maxAttachMb * 1048576;
 
+        // Solo lo que no entra en el mail va al remoto.
+        $remoto = $adjuntar ? null : $this->subirRemoto($gzPath);
+        $quedaLocal = true;
+        if ($remoto !== null && $remoto['ok']) {
+            if (@unlink($gzPath)) {
+                $quedaLocal = false;
+            } else {
+                Log::warning('database:backup: subido, pero no se pudo borrar ' . $gzPath);
+            }
+        }
+
         $body = 'Backup de la BBDD lv-torneo realizado el ' . $fecha . ' (' . $mb . ' MB comprimido).<br><br>';
         if ($adjuntar) {
             $body .= 'Va adjunto. ';
         } else {
             $body .= 'Supera el límite de ' . $maxAttachMb . ' MB para adjuntar, así que no va en el mail. ';
         }
-        $body .= 'Queda guardado en el servidor en storage/app/backup/' . basename($gzPath)
-            . ' (se conservan ' . $keepDays . ' días).';
+        if ($remoto !== null) {
+            $body .= '<br><br>' . $remoto['mensaje'] . '<br><br>';
+        }
+        if ($quedaLocal) {
+            $body .= 'Queda guardado en el servidor en storage/app/backup/' . basename($gzPath)
+                . ' (se conservan ' . $keepDays . ' días).';
+        } else {
+            $body .= 'No queda copia en el servidor.';
+        }
         if ($borrados > 0) {
-            $body .= '<br>Se borraron ' . $borrados . ' backup(s) viejo(s).';
+            $body .= '<br>Se borraron ' . $borrados . ' backup(s) viejo(s) del servidor.';
         }
 
-        $this->notificar('BackUp lv-torneo', $body, $adjuntar ? [$gzPath] : []);
-        $this->info('Backup OK: ' . $gzPath . ' (' . $mb . ' MB)');
+        $subject = 'BackUp lv-torneo';
+        if ($remoto !== null && !$remoto['ok']) {
+            $subject = 'ERROR subida BackUp lv-torneo';
+        }
+
+        $this->notificar($subject, $body, $adjuntar ? [$gzPath] : []);
+        $this->info('Backup OK: ' . basename($gzPath) . ' (' . $mb . ' MB)'
+            . ($quedaLocal ? ' en ' . $dir : ' — solo en el remoto'));
 
         return 0;
+    }
+
+    /**
+     * Sube el backup al remoto de rclone y rota los viejos allá.
+     * Devuelve null si no hay remoto configurado, o ['ok' => bool, 'mensaje' => html].
+     */
+    private function subirRemoto($gzPath)
+    {
+        $remote = rtrim((string) env('BACKUP_RCLONE_REMOTE', ''), '/');
+        if ($remote === '') {
+            return null;
+        }
+        $rclone = escapeshellcmd(env('BACKUP_RCLONE_PATH') ?: '/usr/bin/rclone');
+        $destino = $remote . '/' . basename($gzPath);
+
+        $output = [];
+        $code = null;
+        exec($rclone . ' copyto ' . escapeshellarg($gzPath) . ' ' . escapeshellarg($destino)
+            . ' --retries 3 --low-level-retries 10 2>&1', $output, $code);
+
+        if ($code !== 0) {
+            $err = implode("\n", array_slice($output, -15));
+            Log::error('database:backup: falló la subida a ' . $destino . ': ' . $err);
+            $this->warn('Falló la subida a ' . $destino);
+            return [
+                'ok' => false,
+                'mensaje' => '<b>No se pudo subir a ' . e($destino) . '</b> (rclone código ' . $code . '):<br><pre>' . e($err) . '</pre>',
+            ];
+        }
+
+        $this->info('Subido a ' . $destino);
+        $mensaje = 'Copia subida a ' . e($destino) . '.';
+
+        $remoteKeep = (int) env('BACKUP_REMOTE_KEEP_DAYS', 30);
+        if ($remoteKeep > 0) {
+            $out2 = [];
+            $code2 = null;
+            // --drive-use-trash=false: si no, en Drive lo borrado sigue ocupando espacio en la papelera.
+            exec($rclone . ' delete ' . escapeshellarg($remote)
+                . ' --min-age ' . $remoteKeep . 'd --include ' . escapeshellarg('backup-*.sql.gz')
+                . ' --drive-use-trash=false 2>&1', $out2, $code2);
+            if ($code2 !== 0) {
+                Log::warning('database:backup: no se pudieron borrar los viejos en ' . $remote . ': ' . implode("\n", $out2));
+                $mensaje .= ' (No se pudieron borrar los de más de ' . $remoteKeep . ' días allá; ver laravel.log.)';
+            } else {
+                $mensaje .= ' Allá se conservan ' . $remoteKeep . ' días.';
+            }
+        }
+
+        return ['ok' => true, 'mensaje' => $mensaje];
     }
 
     private function dump($sqlPath)
