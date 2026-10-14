@@ -589,6 +589,45 @@ class TmDetallePartido
                                 . ' sin resolver, salteo el "' . $par[0] . '".');
                             continue;
                         }
+                        // Entra uno que TM no puso en la alineación: sin fila en
+                        // `alineacions` el cambio queda colgado (select vacío en
+                        // la pantalla de cambios y el partido cae en "Cambio de
+                        // alguien que no jugó"). Va como suplente, y a la
+                        // plantilla, igual que los de la alineación.
+                        if ($par[0] === 'Entra' && !isset($jugadoresPuestos[$jugadorId])) {
+                            $jugadoresPuestos[$jugadorId] = $par[1];
+                            $dorsalExtra = isset($mapaDorsales[$equipoId . '-' . $jugadorId])
+                                ? (int) $mapaDorsales[$equipoId . '-' . $jugadorId] : null;
+                            if ($dorsalExtra !== null && isset($dorsalesUsados[$equipoId . '-' . $dorsalExtra])) {
+                                $dorsalExtra = null;
+                            }
+                            if ($dorsalExtra !== null) $dorsalesUsados[$equipoId . '-' . $dorsalExtra] = $this->nombreJugador($jugadorId);
+
+                            $plan['alineacions'][] = [
+                                'partido_id' => $partido->id,
+                                'jugador_id' => $jugadorId,
+                                'equipo_id'  => $equipoId,
+                                'dorsal'     => $dorsalExtra,
+                                'tipo'       => 'Suplente',
+                                'orden'      => $this->ordenPorPuesto($jugadorId),
+                                '_nombre'    => $this->nombreJugador($jugadorId),
+                                '_equipo'    => $lado['equipo_nombre'],
+                                '_fuente'    => 'sólo en el cambio (no está en la alineación de TM)',
+                                '_dudoso'    => true,
+                            ];
+                            if ($grupoId) {
+                                $plan['plantillas'][] = [
+                                    'torneo_id'  => (int) $torneoId,
+                                    'grupo_id'   => (int) $grupoId,
+                                    'equipo_id'  => $equipoId,
+                                    'jugador_id' => $jugadorId,
+                                    'dorsal'     => $dorsalExtra,
+                                    '_nombre'    => $this->nombreJugador($jugadorId),
+                                    '_equipo'    => $lado['equipo_nombre'],
+                                ];
+                            }
+                        }
+
                         $plan['cambios'][] = [
                             'partido_id' => $partido->id,
                             'jugador_id' => $jugadorId,
@@ -2391,6 +2430,29 @@ class TmDetallePartido
         if ($aBanco && $bBanco) {
             if (isset($yaEntraron[$a]) && !isset($yaEntraron[$b])) return ['entra' => $b, 'sale' => $a, 'como' => 'los dos del banco: A ya había entrado', 'dudoso' => false];
             if (isset($yaEntraron[$b]) && !isset($yaEntraron[$a])) return ['entra' => $a, 'sale' => $b, 'como' => 'los dos del banco: B ya había entrado', 'dudoso' => false];
+        }
+
+        // 2 bis) Uno está en cancha y el otro no: sale el que está en cancha.
+        // Es el caso de un jugador que entra y NO figura en la alineación de
+        // TM (pasa: Hákon Atli Hallfredsson entra a los 82 en FH – Alemannia
+        // Aachen 2004, pero el banco de TM trae a Emil Hallfredsson, otro id).
+        // Antes caía en la regla 4, "entra el primero", y si el primero era el
+        // titular quedaba al revés: el titular "entraba" y el desconocido
+        // "salía".
+        $enCancha = function ($x) use ($titulares, $yaEntraron, $yaSalieron) {
+            return (isset($titulares[$x]) || isset($yaEntraron[$x])) && !isset($yaSalieron[$x]);
+        };
+        $aCancha = $enCancha($a); $bCancha = $enCancha($b);
+        if ($aCancha !== $bCancha) {
+            $sale  = $aCancha ? $a : $b;
+            $entra = $aCancha ? $b : $a;
+            $fuera = !isset($banco[$entra]) && !isset($titulares[$entra]);
+            if ($fuera) {
+                $this->aviso('Cambio entre TM ' . $a . ' y TM ' . $b . ': entra el jugador TM ' . $entra
+                    . ', que no figura en la alineación de TM. Lo agrego como suplente — revisá que no sea '
+                    . 'otro del banco con el nombre parecido.');
+            }
+            return ['entra' => $entra, 'sale' => $sale, 'como' => $fuera ? 'entra uno fuera de la alineación' : 'uno estaba en cancha', 'dudoso' => $fuera];
         }
 
         // 3) Si uno ya salió de la cancha, no puede ser el que sale de nuevo.
