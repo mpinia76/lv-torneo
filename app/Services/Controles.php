@@ -496,8 +496,11 @@ class Controles
     {
         $filas = collect($filas);
 
+        // El id de livefutbol, si ya se buscó alguna vez (botón "LF").
+        $lf = LivefutbolPartido::guardados($filas->pluck('id')->unique()->values()->all());
         foreach ($filas as $fila) {
-            $fila->tm_game_id = null;
+            $fila->tm_game_id  = null;
+            $fila->lf_match_id = $lf[$fila->id] ?? null;
         }
 
         if ($filas->isEmpty() || !$this->hayStagingDeImport()) {

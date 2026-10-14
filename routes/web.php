@@ -175,6 +175,9 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     Route::post('controles/sin-datos', [ControlController::class, 'marcarSinDatos'])->name('controles.sinDatos');
     Route::post('controles/rehacer', [ControlController::class, 'rehacerSeleccionados'])->name('controles.rehacer');
     Route::post('controles/sin-datos-lote', [ControlController::class, 'marcarSinDatosSeleccionados'])->name('controles.sinDatosLote');
+    // Botón "LF": busca el partido en livefutbol (la primera vez) y redirige.
+    Route::get('controles/livefutbol/{partido}', [ControlController::class, 'livefutbol'])->name('controles.livefutbol');
+    Route::post('controles/livefutbol/{partido}', [ControlController::class, 'livefutbolGuardar'])->name('controles.livefutbol.guardar');
 
     // Las URLs viejas siguen andando (links guardados, favoritos) pero caen en
     // el chequeo equivalente del panel nuevo.

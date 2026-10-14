@@ -16,6 +16,11 @@
                  Si el partido no tiene gameId, la vista previa lo busca sola en
                  TM (fixture de los clubes + partidos de los DTs) y lo deja
                  anotado; recién si no lo encuentra pide la URL a mano.
+      LF       - la ficha DEL PARTIDO en livefutbol. Está en todas las filas:
+                 si ya tenemos el id va directo; si no, pasa por
+                 `controles.livefutbol`, que lo busca en el calendario de los
+                 clubes, lo anota y redirige. Si no lo encuentra, pide la URL
+                 (nunca abre el calendario ni una búsqueda, misma regla que TM).
 
     Los dos abren en otra pestaña: la idea es no perder el lugar en la lista.
 --}}
@@ -62,6 +67,11 @@
     <a href="{{ \App\Services\Controles::TM_PARTIDO . $gameId }}" target="_blank" rel="noopener"
        class="ctrl-b-tm" title="Ver el partido en Transfermarkt (gameId {{ $gameId }})">TM</a>
 @endif
+
+@php $lfId = $fila->lf_match_id ?? null; @endphp
+<a href="{{ $lfId ? \App\Services\LivefutbolPartido::url($lfId) : route('controles.livefutbol', $partido) }}" target="_blank" rel="noopener"
+   class="ctrl-b-lf"
+   title="{{ $lfId ? 'Ver el partido en livefutbol' : 'Ver el partido en livefutbol (la primera vez lo busca en el calendario de los clubes; puede tardar unos segundos)' }}">LF</a>
 
 <a href="{{ route('import_detalles.ver', ['partido_id' => $partido]) }}" target="_blank" rel="noopener"
    class="ctrl-b-rehacer"

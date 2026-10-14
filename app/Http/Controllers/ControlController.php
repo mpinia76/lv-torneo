@@ -6,6 +6,8 @@ use App\Incidencia;
 use App\Services\CambiosPareja;
 use App\Services\ControlPenales;
 use App\Services\Controles;
+use App\Services\LivefutbolPartido;
+use App\Partido;
 use App\Services\TmDetallePartido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -189,6 +191,50 @@ class ControlController extends Controller
         }
 
         return back()->with('success', $r['texto']);
+    }
+
+    /**
+     * Botón "LF" de la fila: abre el partido en livefutbol.
+     *
+     * Si ya tenemos el id, redirige directo. Si no, lo busca en el calendario
+     * de los clubes (ver `LivefutbolPartido`), lo anota y redirige. Si no lo
+     * encuentra, NO manda al calendario ni a una búsqueda —misma regla que el
+     * botón TM—: muestra qué probó y un campo para pegar la URL.
+     */
+    public function livefutbol($partidoId)
+    {
+        $partido = Partido::findOrFail($partidoId);
+
+        if (!LivefutbolPartido::hayTablas()) {
+            abort(500, 'Falta correr la migración de partido_livefutbol / equipo_livefutbol.');
+        }
+
+        $lf      = new LivefutbolPartido();
+        $matchId = $lf->resolver($partido);
+
+        if ($matchId) {
+            return redirect()->away(LivefutbolPartido::url($matchId));
+        }
+
+        return view('controles.livefutbol', [
+            'partido' => $partido->load('equipol', 'equipov'),
+            'pasos'   => $lf->pasos,
+        ]);
+    }
+
+    /** La URL pegada a mano cuando la búsqueda no lo encontró. */
+    public function livefutbolGuardar(Request $request, $partidoId)
+    {
+        $partido = Partido::findOrFail($partidoId);
+        $matchId = LivefutbolPartido::idDeUrl((string) $request->input('url'));
+
+        if (!$matchId) {
+            return back()->with('error', 'Esa URL no tiene el id del partido (tiene que tener /ma123456/).');
+        }
+
+        LivefutbolPartido::anotar($partido->id, $matchId, 'manual');
+
+        return redirect()->away(LivefutbolPartido::url($matchId));
     }
 
     /**
