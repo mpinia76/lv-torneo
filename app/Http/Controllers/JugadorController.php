@@ -983,7 +983,7 @@ group by tecnico_id
         ) a
     ";
 
-        $jugados = DB::selectOne(DB::raw($sql));
+        $jugados = DB::selectOne($sql);
 
         $totalJugados   = $jugados->jugados ?? 0;
         $totalGanados   = $jugados->ganados ?? 0;
@@ -1098,7 +1098,7 @@ group by tecnico_id
         $bindings = ['jugadorId' => $id];
         if ($idTorneo) $bindings['torneoId'] = $idTorneo;
 
-        $golStats = DB::selectOne(DB::raw($sqlStats), $bindings);
+        $golStats = DB::selectOne($sqlStats, $bindings);
 
         $totalTodos     = $golStats->totalTodos     ?? 0;
         $totalJugada    = $golStats->totalJugada    ?? 0;
@@ -1239,7 +1239,7 @@ group by tecnico_id
         $bindingsStats = ['jugadorId' => $id];
         if ($idTorneo) $bindingsStats['torneoId'] = $idTorneo;
 
-        $tarjetaStats = DB::selectOne(DB::raw($sqlStats), $bindingsStats);
+        $tarjetaStats = DB::selectOne($sqlStats, $bindingsStats);
 
         $totalAmarillas = $tarjetaStats->totalAmarillas ?? 0;
         $totalRojas     = $tarjetaStats->totalRojas     ?? 0;
@@ -1379,7 +1379,7 @@ group by tecnico_id
             $bindingsStats['torneoIdGol']   = $idTorneo;
         }
 
-        $penalStats = DB::selectOne(DB::raw($sqlStats), $bindingsStats);
+        $penalStats = DB::selectOne($sqlStats, $bindingsStats);
 
         $totalConvertidos  = $penalStats->totalConvertidos  ?? 0;
         $totalErrados      = $penalStats->totalErrados      ?? 0;
