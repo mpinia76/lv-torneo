@@ -7488,11 +7488,25 @@ class ImportPartidosController extends Controller
         // COMPARAR COMO NÚMERO, NO COMO TEXTO: tus fechas se llaman «08» o
         // «Fecha 08» y la ronda de TM viene «8». Como cadenas no coinciden
         // nunca, y la segunda pasada no encontraría jamás un partido.
+        // UNA RONDA DE LLAVES NUNCA ES UN PARTIDO DE LA ZONA, NI AL REVÉS. Sin
+        // número de fecha la llave es «el par dentro del torneo», y dos equipos
+        // que se cruzan en la fase de grupos y después en una llave tienen
+        // un solo candidato a ±120 días: el del grupo. Caso real, UEFA-Cup
+        // 2004/05: Newcastle–Sporting en el grupo D (16/12) y en cuartos (07/04);
+        // la ida de cuartos quedaba «duplicado, fecha corrida 112 días» del
+        // partido del grupo, no se creaba, y su gameId quedaba atado a ése.
+        // Una ronda «Grupo X» sólo empareja con partidos de zona; cualquier otra,
+        // sólo con los del grupo de llaves. Sin grupo de llaves no cambia nada.
+        $hayLlaves = $nRonda === '' && $torneoId && DB::table('grupos')
+                ->where('torneo_id', (int) $torneoId)->where('penales', 1)->exists();
+        $rondaDeGrupo = (bool) preg_match('/^\s*grupo\b/iu', (string) $ronda);
+
         $todos = [];
         $cands = [];
         foreach ($q->get() as $r) {
             $alReves = (int) $r->equipol_id !== (int) $equipoId;
             if ($alReves && ($esIdaVuelta || $nRonda === '' || (int) $r->penales === 1)) continue;
+            if ($hayLlaves && $rondaDeGrupo === ((int) $r->penales === 1)) continue;
             $todos[] = (int) $r->id;
             $suyo = preg_replace('/\D/', '', (string) $r->numero);
             if ($suyo === '' || $nRonda === '') continue;
