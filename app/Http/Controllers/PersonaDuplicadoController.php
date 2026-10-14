@@ -85,8 +85,10 @@ class PersonaDuplicadoController extends Controller
 
         if ($tab === 'sin-nombre') {
             $datos['sinNombre'] = $this->sinNombreApellido($request);
+            list($datos['peso'], $datos['clubes']) = $this->pesoYClubes($datos['sinNombre']);
         } elseif ($tab === 'nacionalidad') {
             $datos['sinBandera'] = $this->sinBandera($request);
+            list($datos['peso'], $datos['clubes']) = $this->pesoYClubes($datos['sinBandera']);
         } elseif ($tab === 'sin-registros') {
             $datos['sinRegistros'] = $this->sinRegistros($request);
         } elseif ($tab === 'sin-fecha') {
@@ -348,6 +350,20 @@ class PersonaDuplicadoController extends Controller
     // ------------------------------------------------------------------
     // Pestaña 2: sin nombre / apellido
     // ------------------------------------------------------------------
+
+    /**
+     * Registros y clubes de las personas de la página, para el "ver N reg." y
+     * la lista de clubes de `_personaFila` (lo mismo que muestra la pestaña de
+     * repetidos). Pocas consultas para toda la página, no una por fila.
+     */
+    private function pesoYClubes($pagina): array
+    {
+        $ids = collect($pagina->items())->pluck('id')->map('intval')->all();
+
+        return $ids
+            ? [FusionPersonas::peso($ids), RegistrosPersonas::clubes($ids)]
+            : [[], []];
+    }
 
     private function sinNombreApellido(Request $request)
     {

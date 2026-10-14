@@ -2398,6 +2398,7 @@ class TmDetallePartido
      * Prioridad:
      *   1. uno del banco y el otro titular  -> caso normal
      *   2. los dos del banco  -> sale el que ya había entrado
+     *   2 bis. uno en cancha y el otro no -> sale el de la cancha
      *   3. uno de los dos ya salió de la cancha -> el otro es el que entra
      *   4. nada de lo anterior -> activo=entra, marcado como dudoso
      */
@@ -2454,6 +2455,7 @@ class TmDetallePartido
             }
             return ['entra' => $entra, 'sale' => $sale, 'como' => $fuera ? 'entra uno fuera de la alineación' : 'uno estaba en cancha', 'dudoso' => $fuera];
         }
+
 
         // 3) Si uno ya salió de la cancha, no puede ser el que sale de nuevo.
         if (isset($yaSalieron[$a]) && !isset($yaSalieron[$b])) return ['entra' => $a, 'sale' => $b, 'como' => 'el otro ya había salido', 'dudoso' => true];

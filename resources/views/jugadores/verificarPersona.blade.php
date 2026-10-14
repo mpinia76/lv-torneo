@@ -307,12 +307,12 @@
                 <thead>
                     <tr>
                         <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
-                        <th>Nacionalidad</th><th>Edad</th><th>Jugador</th><th>Técnico</th><th>Árbitro</th><th></th>
+                        <th>Nacionalidad</th><th>Edad</th><th>Jugador</th><th>Técnico</th><th>Árbitro</th><th>Registros</th><th></th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach($sinNombre as $p)
-                    @include('jugadores._personaFila', ['p' => $p])
+                    @include('jugadores._personaFila', ['p' => $p, 'info' => $peso[$p->id] ?? null, 'clubes' => $clubes[$p->id] ?? []])
                 @endforeach
                 </tbody>
             </table>
@@ -334,12 +334,12 @@
                 <thead>
                     <tr>
                         <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
-                        <th>Nacionalidad</th><th>Edad</th><th>Jugador</th><th>Técnico</th><th>Árbitro</th><th></th>
+                        <th>Nacionalidad</th><th>Edad</th><th>Jugador</th><th>Técnico</th><th>Árbitro</th><th>Registros</th><th></th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach($sinBandera as $p)
-                    @include('jugadores._personaFila', ['p' => $p])
+                    @include('jugadores._personaFila', ['p' => $p, 'info' => $peso[$p->id] ?? null, 'clubes' => $clubes[$p->id] ?? []])
                 @endforeach
                 </tbody>
             </table>
