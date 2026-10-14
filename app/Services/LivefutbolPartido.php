@@ -81,6 +81,48 @@ class LivefutbolPartido
         return preg_match('~/ma(\d+)(/|$)~', $url, $m) ? (int) $m[1] : null;
     }
 
+    public static function olvidar($partidoId): void
+    {
+        DB::table('partido_livefutbol')->where('partido_id', (int) $partidoId)->delete();
+    }
+
+    /**
+     * Antes de guardar una URL pegada a mano: ¿esa ficha es de este partido?
+     *
+     * Baja la ficha y mira la fecha del <title> ("Alineaciones: FH
+     * Hafnarfjörður - Alemannia Aachen, 16.09.2004 | livefutbol.com"), con
+     * ±1 día por la hora UTC. Devuelve null si está bien, o el motivo por el
+     * que no. Si la página no baja, no la da por mala: devuelve el motivo y la
+     * pantalla deja guardarla igual.
+     *
+     * @return array{ok:bool, motivo:?string, titulo:?string}
+     */
+    public function verificar(Partido $partido, int $matchId): array
+    {
+        $html = HttpHelper::getHtmlContent(self::url($matchId), false);
+
+        if (!$html || !preg_match('~<title>([^<]*)</title>~i', $html, $t)) {
+            return ['ok' => false, 'motivo' => 'No pude abrir esa ficha en livefutbol para controlarla.', 'titulo' => null];
+        }
+
+        $titulo = trim(html_entity_decode($t[1], ENT_QUOTES, 'UTF-8'));
+
+        if (stripos($titulo, '404') !== false || !preg_match('~(\d{2})\.(\d{2})\.(\d{4})~', $titulo, $f)) {
+            return ['ok' => false, 'motivo' => 'Esa URL no abre un partido en livefutbol.', 'titulo' => $titulo];
+        }
+
+        if ($partido->dia) {
+            $suya   = Carbon::createFromDate((int) $f[3], (int) $f[2], (int) $f[1])->startOfDay();
+            $nuestra = Carbon::parse($partido->dia)->startOfDay();
+            if (abs($suya->diffInDays($nuestra, false)) > 1) {
+                return ['ok' => false, 'titulo' => $titulo, 'motivo' => 'Esa ficha es del ' . $suya->format('d/m/Y')
+                    . ' y el partido es del ' . $nuestra->format('d/m/Y') . '.'];
+            }
+        }
+
+        return ['ok' => true, 'motivo' => null, 'titulo' => $titulo];
+    }
+
     /**
      * Devuelve el match_id del partido (buscándolo si hace falta) o null.
      */

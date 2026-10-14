@@ -237,6 +237,9 @@
    selector tiene que ser `.ctrl-botones a.ctrl-b-rehacer`. */
 .ctrl-b-tm      { background: #1a3c5a; }
 .ctrl-b-lf      { background: #c0392b; }
+/* El lápiz de LF: chico y gris, que no compita con los botones. */
+.ctrl-botones a.ctrl-b-lf-fix { background: transparent; color: #6c757d; padding-left: 2px; padding-right: 2px; }
+.ctrl-botones a.ctrl-b-lf-fix:hover { color: #c0392b; }
 .ctrl-b-rehacer { background: #b45309; }
 .ctrl-b-sindatos { background: #0f766e; cursor: pointer; }
 

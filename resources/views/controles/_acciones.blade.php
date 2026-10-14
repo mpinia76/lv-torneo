@@ -72,6 +72,11 @@
 <a href="{{ $lfId ? \App\Services\LivefutbolPartido::url($lfId) : route('controles.livefutbol', $partido) }}" target="_blank" rel="noopener"
    class="ctrl-b-lf"
    title="{{ $lfId ? 'Ver el partido en livefutbol' : 'Ver el partido en livefutbol (la primera vez lo busca en el calendario de los clubes; puede tardar unos segundos)' }}">LF</a>
+@if($lfId)
+    {{-- Si la URL guardada está mal (pegada a mano o encontrada mal), acá se cambia o se borra. --}}
+    <a href="{{ route('controles.livefutbol', ['partido' => $partido, 'corregir' => 1]) }}" target="_blank" rel="noopener"
+       class="ctrl-b-lf-fix" title="Corregir el partido de livefutbol">✎</a>
+@endif
 
 <a href="{{ route('import_detalles.ver', ['partido_id' => $partido]) }}" target="_blank" rel="noopener"
    class="ctrl-b-rehacer"

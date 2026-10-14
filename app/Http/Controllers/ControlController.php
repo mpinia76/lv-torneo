@@ -201,12 +201,24 @@ class ControlController extends Controller
      * encuentra, NO manda al calendario ni a una búsqueda —misma regla que el
      * botón TM—: muestra qué probó y un campo para pegar la URL.
      */
-    public function livefutbol($partidoId)
+    public function livefutbol(Request $request, $partidoId)
     {
         $partido = Partido::findOrFail($partidoId);
 
         if (!LivefutbolPartido::hayTablas()) {
             abort(500, 'Falta correr la migración de partido_livefutbol / equipo_livefutbol.');
+        }
+
+        // "corregir": no redirige aunque haya uno guardado; muestra el
+        // formulario con la URL actual para cambiarla o borrarla.
+        if ($request->boolean('corregir')) {
+            $actual = LivefutbolPartido::guardados([$partido->id])[$partido->id] ?? null;
+
+            return view('controles.livefutbol', [
+                'partido' => $partido->load('equipol', 'equipov'),
+                'pasos'   => [],
+                'actual'  => $actual ? LivefutbolPartido::url($actual) : null,
+            ]);
         }
 
         $lf      = new LivefutbolPartido();
@@ -219,17 +231,38 @@ class ControlController extends Controller
         return view('controles.livefutbol', [
             'partido' => $partido->load('equipol', 'equipov'),
             'pasos'   => $lf->pasos,
+            'actual'  => null,
         ]);
     }
 
-    /** La URL pegada a mano cuando la búsqueda no lo encontró. */
+    /**
+     * La URL pegada a mano. Antes de guardarla se controla que la ficha sea
+     * del mismo día que el partido (una URL equivocada guardada hace que LF
+     * abra SIEMPRE el partido equivocado). Si no coincide, vuelve con el
+     * motivo; tildando "guardar igual" se guarda de todos modos.
+     */
     public function livefutbolGuardar(Request $request, $partidoId)
     {
         $partido = Partido::findOrFail($partidoId);
+
+        if ($request->input('accion') === 'borrar') {
+            LivefutbolPartido::olvidar($partido->id);
+            return back()->with('success', 'Listo: la próxima vez el botón LF lo vuelve a buscar.');
+        }
+
         $matchId = LivefutbolPartido::idDeUrl((string) $request->input('url'));
 
         if (!$matchId) {
-            return back()->with('error', 'Esa URL no tiene el id del partido (tiene que tener /ma123456/).');
+            return back()->withInput()->with('error', 'Esa URL no tiene el id del partido (tiene que tener /ma123456/).');
+        }
+
+        if (!$request->boolean('forzar')) {
+            $check = (new LivefutbolPartido())->verificar($partido, $matchId);
+            if (!$check['ok']) {
+                return back()->withInput()
+                    ->with('error', $check['motivo'] . ($check['titulo'] ? ' (livefutbol: «' . $check['titulo'] . '»)' : ''))
+                    ->with('lf_puede_forzar', true);
+            }
         }
 
         LivefutbolPartido::anotar($partido->id, $matchId, 'manual');
