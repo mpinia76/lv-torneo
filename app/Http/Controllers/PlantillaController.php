@@ -443,6 +443,17 @@ class PlantillaController extends Controller
                 $dorsal = $numeroDorsal ? trim($numeroDorsal) : null;
                 $urlJugador = $href ? 'https://www.transfermarkt.com.ar' . $href : null;
 
+                // ¿Ya lo tenemos? Primero por el id de TM (jugador_tm o
+                // jugadors.transfermarkt_url): no gasta la ficha y no depende de
+                // nombre/apellido/nacimiento, que con un NULL no chocan en el
+                // índice único y duplicaban a los de un solo nombre (Aurelio, Tuni...).
+                $tmId = preg_match('~/spieler/(\d+)~', (string) $href, $mId) ? $mId[1] : null;
+                $existente = $tmId ? $this->jugadorPorTmId($tmId) : null;
+                if ($existente && $existente->persona) {
+                    $persona = $existente->persona;
+                    $urlJugador = null; // no hace falta bajar la ficha
+                }
+
                 // Mostrar la información
 
                 try {
@@ -777,28 +788,27 @@ class PlantillaController extends Controller
                     //Log::info('Contenido de insert: ' . json_encode($insert));
 
 
+                    $insert['transfermarkt_url'] = $urlJugador;
+
                     try {
-                        $persona = Persona::create($insert);
-                        $persona->jugador()->create($insert);
-                    } catch (QueryException $ex) {
-                        try {
-                            $persona = Persona::where('nombre', '=', $insert['nombre'])
-                                ->where('apellido', '=', $insert['apellido'])
-                                ->where('nacimiento', '=', $insert['nacimiento'])
-                                ->first();
-
-                            if (!empty($persona)) {
-                                $persona->update($insert);
+                        $persona = $this->personaPorClave($insert['nombre'], $insert['apellido'], $insert['nacimiento']);
+                        if ($persona) {
+                            // Ya existía: se completa sin pisar con vacíos lo que tenga.
+                            $persona->update(array_filter($insert, function ($v) { return $v !== null && $v !== ''; }));
+                            if (!$persona->jugador) {
                                 $persona->jugador()->create($insert);
+                            } elseif (empty($persona->jugador->transfermarkt_url)) {
+                                $persona->jugador->update(['transfermarkt_url' => $urlJugador]);
                             }
-                        } catch (QueryException $ex) {
-                            //$ok = 0;
-                            $errorCode = $ex->errorInfo[1];
-
-                            if ($errorCode == 1062) {
-                                $success .= 'Jugador repetido: '.$insert['apellido'].', '.$insert['nombre'].'<br>';
-                            }
+                        } else {
+                            $persona = Persona::create($insert);
+                            $persona->jugador()->create($insert);
                         }
+                        $persona->load('jugador');
+                    } catch (QueryException $ex) {
+                        $success .= 'No pude guardar a ' . e($nombreJugador) . ': '
+                            . e($ex->errorInfo[2] ?? $ex->getMessage()) . '<br>';
+                        $persona = null;
                     }
                 } else {
                     Log::info('No se encontró la URL: ' . $urlJugador, []);
@@ -865,6 +875,52 @@ class PlantillaController extends Controller
 
             //return redirect()->route('plantillas.edit', array('id' => $id))->with($respuestaID,$respuestaMSJ);
         return redirect()->route('plantillas.edit', ['plantilla' => $id])->with($respuestaID, $respuestaMSJ);
+    }
+
+    /**
+     * El jugador que ya está atado a ese id de TM, por jugador_tm o por
+     * jugadors.transfermarkt_url. null si no hay.
+     */
+    private function jugadorPorTmId($tmId)
+    {
+        $tmId = (string) $tmId;
+        $jugadorId = null;
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('jugador_tm')) {
+            $jugadorId = DB::table('jugador_tm')->where('tm_player_id', $tmId)->value('jugador_id');
+        }
+        if (!$jugadorId) {
+            $jugadorId = DB::table('jugadors')
+                ->where(function ($q) use ($tmId) {
+                    $q->where('transfermarkt_url', 'like', '%/spieler/' . $tmId)
+                      ->orWhere('transfermarkt_url', 'like', '%/spieler/' . $tmId . '/%')
+                      ->orWhere('transfermarkt_url', 'like', '%/spieler/' . $tmId . '?%');
+                })
+                ->value('id');
+        }
+
+        return $jugadorId ? Jugador::with('persona')->find($jugadorId) : null;
+    }
+
+    /**
+     * Persona por nombre/apellido/nacimiento tratando bien los NULL (el
+     * where('x', null) de antes nunca encontraba nada). Sin fecha de
+     * nacimiento no se busca: «Tom» a secas sin fecha puede ser cualquiera.
+     */
+    private function personaPorClave($nombre, $apellido, $nacimiento)
+    {
+        if (empty($nacimiento)) return null;
+
+        $q = Persona::query()->whereDate('nacimiento', $nacimiento);
+        foreach (['nombre' => $nombre, 'apellido' => $apellido] as $col => $v) {
+            if ($v === null || $v === '') {
+                $q->where(function ($w) use ($col) { $w->whereNull($col)->orWhere($col, ''); });
+            } else {
+                $q->where($col, $v);
+            }
+        }
+
+        return $q->first();
     }
 
     /**
