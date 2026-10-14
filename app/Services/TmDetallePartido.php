@@ -2456,7 +2456,6 @@ class TmDetallePartido
             return ['entra' => $entra, 'sale' => $sale, 'como' => $fuera ? 'entra uno fuera de la alineación' : 'uno estaba en cancha', 'dudoso' => $fuera];
         }
 
-
         // 3) Si uno ya salió de la cancha, no puede ser el que sale de nuevo.
         if (isset($yaSalieron[$a]) && !isset($yaSalieron[$b])) return ['entra' => $a, 'sale' => $b, 'como' => 'el otro ya había salido', 'dudoso' => true];
         if (isset($yaSalieron[$b]) && !isset($yaSalieron[$a])) return ['entra' => $b, 'sale' => $a, 'como' => 'el otro ya había salido', 'dudoso' => true];
