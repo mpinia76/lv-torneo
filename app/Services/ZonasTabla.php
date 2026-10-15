@@ -20,7 +20,8 @@ use App\Torneo;
  * `descenso` viene en 2 por defecto en todos los torneos, y sin ese opt-in
  * cualquier tabla vieja aparecería con los dos últimos en rojo.
  * No se aplica cuando el torneo ya se marca en el Acumulado (algún grupo con
- * acumulado), en copas, en tablas partidas en grupos ni en torneos inconclusos.
+ * acumulado), en tablas partidas en grupos ni en torneos inconclusos. En copas
+ * sólo con una única tabla (fase liga de la Champions) y sin descenso.
  * Si desciende por promedios, la tabla marca las copas pero no el descenso
  * (eso lo dice la pantalla de promedios).
  */
@@ -38,7 +39,9 @@ class ZonasTabla
      */
     public static function aplica(Torneo $torneo)
     {
-        if ($torneo->tipo === 'Copa' || !empty($torneo->inconcluso)) {
+        // Las copas entran sólo con una única tabla (fase liga de la Champions
+        // 2024/25+); las copas con grupos quedan afuera por $conPosiciones.
+        if (!empty($torneo->inconcluso)) {
             return false;
         }
         if ($torneo->clasificaciones->isEmpty()) {
@@ -89,7 +92,9 @@ class ZonasTabla
             ->keyBy('equipo_id');
 
         // Descenso por posición; si baja por promedios no se marca acá.
-        $descenso = ((int) ($torneo->descenso_promedio ?? 0)) > 0 ? 0 : (int) ($torneo->descenso ?? 0);
+        // En una copa no desciende nadie (descenso viene en 2 por defecto).
+        $descenso = ($torneo->tipo === 'Copa' || ((int) ($torneo->descenso_promedio ?? 0)) > 0)
+            ? 0 : (int) ($torneo->descenso ?? 0);
 
         $manualesEnTabla = 0;
         foreach ($posiciones as $fila) {
