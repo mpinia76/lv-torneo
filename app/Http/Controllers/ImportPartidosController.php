@@ -8124,7 +8124,13 @@ class ImportPartidosController extends Controller
         }
         if (empty($pend)) return '<p class="ok-box">No queda ningún club sin mapear.</p>';
 
-        uasort($pend, function ($a, $b) { return $b['n'] <=> $a['n']; });
+        // Alfabético (sin distinguir mayúsculas ni acentos: «Águeda» va con las A).
+        $col = class_exists('\\Collator') ? new \Collator('es_ES') : null;
+        if ($col) $col->setStrength(\Collator::PRIMARY);
+        uasort($pend, function ($a, $b) use ($col) {
+            return $col ? $col->compare($a['nombre'], $b['nombre'])
+                        : strcmp(mb_strtolower($a['nombre']), mb_strtolower($b['nombre']));
+        });
 
         $opciones = '<option value=""></option>';
         foreach (\App\Equipo::select('id', 'nombre', 'pais')->orderBy('nombre')->get() as $e) {
