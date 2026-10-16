@@ -8,5 +8,39 @@ Disallow: /register
 Disallow: /torneos-menu
 Disallow: /en/torneos-menu
 Disallow: /*?*perf=1
+# Subpáginas de las fichas: repiten la ficha y son las consultas más pesadas (16/10)
+Disallow: /jugadorJugados
+Disallow: /jugadorGoles
+Disallow: /jugadorTarjetas
+Disallow: /jugadorPenals
+Disallow: /jugadorTitulos
+Disallow: /equipoJugados
+Disallow: /tecnicoJugados
+Disallow: /en/jugadorJugados
+Disallow: /en/jugadorGoles
+Disallow: /en/jugadorTarjetas
+Disallow: /en/jugadorPenals
+Disallow: /en/jugadorTitulos
+Disallow: /en/equipoJugados
+Disallow: /en/tecnicoJugados
+
+# Rastreadores que no traen visitas y cargaban el servidor (16/10: Amazonbot y
+# ClaudeBot ~14.000 pedidos/día cada uno). Google y Bing siguen permitidos.
+User-agent: Amazonbot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: CCBot
+User-agent: Bytespider
+User-agent: meta-externalagent
+User-agent: PerplexityBot
+User-agent: MJ12bot
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: DotBot
+User-agent: PetalBot
+User-agent: Reflectionbot
+Disallow: /
 
 Sitemap: https://laplanilla.com.ar/sitemap.xml

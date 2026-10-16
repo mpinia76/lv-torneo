@@ -948,6 +948,11 @@ group by tecnico_id
         $tipo = $request->query('tipo') ?? '';
 
         // --- Estadísticas globales (jugados, ganados, empatados, perdidos) ---
+        // alineacions.jugador_id = $id va suelto (16/10): antes estaba solo
+        // dentro del OR con cambios.jugador_id y MariaDB no podía usar el
+        // índice -> recorría todas las alineaciones (consultas de 10 min con
+        // los bots). Es equivalente: el JOIN de cambios ya exige
+        // cambios.jugador_id = alineacions.jugador_id.
         $sql = "
         SELECT
             COUNT(*) as jugados,
@@ -963,8 +968,8 @@ group by tecnico_id
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             WHERE golesl IS NOT NULL AND golesv IS NOT NULL
-              AND ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = $id)
-                OR (cambios.tipo = 'Entra' AND cambios.jugador_id = $id))
+              AND alineacions.jugador_id = $id
+              AND (alineacions.tipo = 'Titular' OR cambios.tipo = 'Entra')
               " . ($idTorneo ? " AND grupos.torneo_id = $idTorneo" : "") . "
 
             UNION ALL
@@ -977,8 +982,8 @@ group by tecnico_id
             INNER JOIN fechas ON partidos.fecha_id = fechas.id
             INNER JOIN grupos ON fechas.grupo_id = grupos.id
             WHERE golesl IS NOT NULL AND golesv IS NOT NULL
-              AND ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = $id)
-                OR (cambios.tipo = 'Entra' AND cambios.jugador_id = $id))
+              AND alineacions.jugador_id = $id
+              AND (alineacions.tipo = 'Titular' OR cambios.tipo = 'Entra')
               " . ($idTorneo ? " AND grupos.torneo_id = $idTorneo" : "") . "
         ) a
     ";
@@ -1018,8 +1023,8 @@ group by tecnico_id
         INNER JOIN torneos ON grupos.torneo_id = torneos.id
         INNER JOIN alineacions ON alineacions.partido_id = partidos.id
         LEFT JOIN cambios ON cambios.partido_id = partidos.id AND cambios.jugador_id = alineacions.jugador_id
-        WHERE ((alineacions.tipo = 'Titular' AND alineacions.jugador_id = $id)
-            OR (cambios.tipo = 'Entra' AND cambios.jugador_id = $id))
+        WHERE alineacions.jugador_id = $id
+            AND (alineacions.tipo = 'Titular' OR cambios.tipo = 'Entra')
             " . ($idTorneo ? " AND grupos.torneo_id = $idTorneo" : "") . "
     ";
 
