@@ -332,6 +332,10 @@ class ImportPartidosController extends Controller
         // Temporada de la competencia. Vacío = la que TM dé por defecto, que es
         // la que está en curso. Ver `traerFixture()`.
         $season  = trim((string) $request->get('season', ''));
+        // `desde_ronda`: la pantalla trabaja desde esa ronda en adelante (las
+        // anteriores ni se muestran, ni se guardan, ni se aplican). `todas` =
+        // sin corte y sin sugerencia. Ver `rondaDondeEntranLosDePrimera()`.
+        $desdeRonda = trim((string) $request->get('desde_ronda', ''));
 
         $avisos = [];
 
@@ -599,6 +603,39 @@ class ImportPartidosController extends Controller
         $soloLlaves = $torneoElegido && $this->esCompAparte($torneoElegido->id, $comp);
         $filas = $this->clasificarFixture($filas, $torneoElegido ? (int) $torneoElegido->id : null, $soloLlaves);
 
+        // CARGAR DESDE UNA RONDA. En las copas nacionales los de primera entran
+        // en una ronda avanzada (la Taça 2005/06, en la 4ª eliminatoria) y las
+        // anteriores son clubes de ascenso que no se cargan. Sin corte, la
+        // pantalla pedía mapear los 198 clubes de todas las rondas. El corte va
+        // por ronda (no por fecha) y se aplica ACÁ, antes de contar, guardar y
+        // auditar: todo lo que sigue trabaja sólo con las rondas que quedan.
+        $rondasOrden = $this->rondasEnOrden($filas);
+        // Se calcula siempre sobre el fixture entero (antes del corte), para
+        // marcar «(sugerida)» en el selector aunque ya hayas elegido otra.
+        $sugerida = $this->rondaDondeEntranLosDePrimera($filas, $rondasOrden, $torneoElegido);
+        $corte = null;   // ['ronda', 'desde', 'rondas' => n afuera, 'partidos' => n afuera]
+        if ($desdeRonda !== '' && $desdeRonda !== 'todas') {
+            if (!isset($rondasOrden[$desdeRonda])) {
+                $html .= '<p class="warn-box">La ronda «' . e($desdeRonda) . '» no está en este fixture: '
+                    . 'se muestran todas.</p>';
+                $desdeRonda = '';
+            } else {
+                $corte = ['ronda' => $desdeRonda, 'desde' => $rondasOrden[$desdeRonda]['desde'],
+                    'rondas' => 0, 'partidos' => 0];
+                $afuera = [];
+                foreach ($rondasOrden as $r => $d) {
+                    // (string): una ronda «1» queda como clave entera del array.
+                    if ((string) $r === $desdeRonda) break;
+                    $afuera[(string) $r] = true;
+                    $corte['rondas']++;
+                    $corte['partidos'] += $d['n'];
+                }
+                $filas = array_values(array_filter($filas, function ($f) use ($afuera) {
+                    return !isset($afuera[(string) $f['ronda']]);
+                }));
+            }
+        }
+
         // Qué temporada vino DE VERDAD. Sin esto no hay forma de saber si TM
         // respetó el `seasonId` o te devolvió la edición en curso igual: los
         // partidos se ven bien y son de otro año.
@@ -655,6 +692,41 @@ class ImportPartidosController extends Controller
             }
         }
         $html .= $this->bloqueRondasPartidas($partidas);
+
+        // EL TORNEO VIAJA EN TODOS LOS BOTONES. Antes `$base` llevaba sólo la
+        // competencia, así que elegías el torneo del desplegable, veías la
+        // temporada correcta, apretabas cualquier botón y el link salía con
+        // `comp=` pelado: sin temporada, Transfermarkt manda la EDICIÓN EN
+        // CURSO. Con `ARCA` —tus cinco Copas Argentina comparten ese id— eso
+        // significa escribir en los partidos de un año mirando el fixture de
+        // otro. El cartel amarillo avisaba, pero lo disparaba el propio botón.
+        // De paso, con el torneo la segunda pasada del emparejador puede filtrar
+        // por `grupos.torneo_id`.
+        //
+        // LAS PERILLAS DEL HTML TAMBIÉN VIAJAN. `$base` perdía `solo_html`,
+        // `season`, `tipo` y `pais`: desde una vista leída del calendario en
+        // HTML, cada botón pedía primero el fixture a la API (1 crédito, que
+        // contesta la edición en curso), veía que no era la temporada y recién
+        // ahí iba al HTML (otro crédito). Y sin `tm_season_id` en el torneo, el
+        // botón directamente bajaba la temporada equivocada. La temporada va
+        // SIEMPRE explícita: el botón tiene que leer la misma que viste.
+        $base = route('import_partidos.fixture', array_filter([
+            'comp' => $comp,
+            'comp_forzado' => $compForzado !== '' ? $comp : null,
+            'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
+            'season'    => $season !== '' ? $season : null,
+            'tipo'      => $tipoHtml !== '' ? $tipoHtml : null,
+            'pais'      => $pais,
+            'solo_html' => $fuenteHtml ? 1 : null,
+            'clubes'    => $clubesHtml ? implode(',', $clubesHtml) : null,
+            'renumerar' => $renumerar ? 1 : ($request->has('renumerar') ? 'no' : null),
+            'extras'    => $extras ? 1 : null,
+            // El corte de rondas viaja igual que el resto: un botón que lo
+            // perdiera guardaría en staging las rondas que no querés.
+            'desde_ronda' => $desdeRonda !== '' ? $desdeRonda : null,
+        ]));
+
+        $html .= $this->bloqueDesdeRonda($rondasOrden, $corte, $sugerida, $base, $torneoElegido, $desdeRonda);
 
         $cont = ['total' => count($filas), 'nuevo' => 0, 'duplicado' => 0, 'conflicto' => 0,
             'jugados' => 0, 'pendientes' => 0];
@@ -762,35 +834,6 @@ class ImportPartidosController extends Controller
                 . 'y recién después guardá.</p>';
         }
 
-        // EL TORNEO VIAJA EN TODOS LOS BOTONES. Antes `$base` llevaba sólo la
-        // competencia, así que elegías el torneo del desplegable, veías la
-        // temporada correcta, apretabas cualquier botón y el link salía con
-        // `comp=` pelado: sin temporada, Transfermarkt manda la EDICIÓN EN
-        // CURSO. Con `ARCA` —tus cinco Copas Argentina comparten ese id— eso
-        // significa escribir en los partidos de un año mirando el fixture de
-        // otro. El cartel amarillo avisaba, pero lo disparaba el propio botón.
-        // De paso, con el torneo la segunda pasada del emparejador puede filtrar
-        // por `grupos.torneo_id`.
-        //
-        // LAS PERILLAS DEL HTML TAMBIÉN VIAJAN. `$base` perdía `solo_html`,
-        // `season`, `tipo` y `pais`: desde una vista leída del calendario en
-        // HTML, cada botón pedía primero el fixture a la API (1 crédito, que
-        // contesta la edición en curso), veía que no era la temporada y recién
-        // ahí iba al HTML (otro crédito). Y sin `tm_season_id` en el torneo, el
-        // botón directamente bajaba la temporada equivocada. La temporada va
-        // SIEMPRE explícita: el botón tiene que leer la misma que viste.
-        $base = route('import_partidos.fixture', array_filter([
-            'comp' => $comp,
-            'comp_forzado' => $compForzado !== '' ? $comp : null,
-            'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
-            'season'    => $season !== '' ? $season : null,
-            'tipo'      => $tipoHtml !== '' ? $tipoHtml : null,
-            'pais'      => $pais,
-            'solo_html' => $fuenteHtml ? 1 : null,
-            'clubes'    => $clubesHtml ? implode(',', $clubesHtml) : null,
-            'renumerar' => $renumerar ? 1 : ($request->has('renumerar') ? 'no' : null),
-            'extras'    => $extras ? 1 : null,
-        ]));
 
         // LOS BOTONES QUE ESCRIBEN TRABAJAN SOBRE LO QUE SE ESTÁ VIENDO.
         // Antes forzaban `cache=1` siempre, así que si venías de una bajada
@@ -975,7 +1018,11 @@ class ImportPartidosController extends Controller
         if ($grupoTodas) {
             $varios = \App\Grupo::where('torneo_id', $torneoElegido->id)->count() > 1;
             $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar_todas',
-                    ['comp' => $comp, 'torneo_id' => (int) $torneoElegido->id])) . '">Aplicar todas →</a> '
+                    array_filter(['comp' => $comp, 'torneo_id' => (int) $torneoElegido->id,
+                        // El staging puede tener las rondas anteriores al corte
+                        // (guardadas antes de elegirlo): `desde` las deja afuera.
+                        'desde_ronda' => $corte ? $corte['ronda'] : null,
+                        'desde' => $corte ? substr((string) $corte['desde'], 0, 10) : null]))) . '">Aplicar todas →</a> '
                 . '<span class="sub">cada ronda a su fecha («1. Jornada» → 1)'
                 . ($varios ? ', todas al grupo <b>' . e($grupoTodas->nombre) . '</b> (el que tiene más plantillas)' : '')
                 . '. Usa lo guardado en staging; primero muestra qué va a dónde.</span></p>';
@@ -994,7 +1041,8 @@ class ImportPartidosController extends Controller
                 . '<td>' . ($d['nuevo']
                     ? '<a class="boton-sec" href="' . e(route('import_partidos.fixture_aplicar',
                         array_filter(['comp' => $comp, 'gameday' => $r,
-                            'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null]))) . '">Aplicar ' . $d['nuevo'] . ' →</a>'
+                            'torneo_id' => $torneoElegido ? (int) $torneoElegido->id : null,
+                            'desde_ronda' => $corte ? $corte['ronda'] : null]))) . '">Aplicar ' . $d['nuevo'] . ' →</a>'
                     : '<span class="sub">nada por crear</span>')
                 . ' <a class="boton-sec" href="' . e(route('import_detalles.index',
                     ['comp' => $comp, 'ronda' => $r])) . '">Detalles →</a>'
@@ -1007,6 +1055,175 @@ class ImportPartidosController extends Controller
         $html .= '<h2>' . $titulo . '</h2>' . $this->tablaFixture($filas, $filtro, $gameday);
 
         return $this->pagina('Fixture por competencia', $html);
+    }
+
+    /**
+     * Las rondas del fixture en orden cronológico: ronda => ['desde', 'n'].
+     *
+     * Por la PRIMERA fecha de cada ronda y no por el nombre: «4ª eliminatoria»,
+     * «Octavos de final» y «Final» no se ordenan alfabéticamente, y una ronda
+     * con partidos postergados (la 4ª de la Taça 2005/06 terminó dos semanas
+     * después) sigue empezando cuando empezó.
+     */
+    private function rondasEnOrden(array $filas)
+    {
+        $rondas = [];
+        foreach ($filas as $f) {
+            $r = (string) $f['ronda'];
+            $d = (string) ($f['dia'] ?? '');
+            if (!isset($rondas[$r])) $rondas[$r] = ['desde' => $d, 'n' => 0];
+            $rondas[$r]['n']++;
+            if ($d !== '' && ($rondas[$r]['desde'] === '' || $d < $rondas[$r]['desde'])) $rondas[$r]['desde'] = $d;
+        }
+        uksort($rondas, function ($a, $b) use ($rondas) {
+            $c = strcmp($rondas[$a]['desde'], $rondas[$b]['desde']);
+            return $c !== 0 ? $c : strnatcasecmp($a, $b);
+        });
+        return $rondas;
+    }
+
+    /**
+     * La ronda donde entran los de primera: la primera (en orden cronológico)
+     * en la que juega algún club que ya tenés en la LIGA del mismo país y el
+     * mismo año que este torneo. En la Taça 2005/06 es la 4ª eliminatoria,
+     * porque ahí aparecen Porto, Benfica y el resto de la Primeira Liga 2005/06.
+     *
+     * Es una sugerencia y nada más: la pantalla la propone y el usuario la
+     * confirma. Devuelve null en las ligas (no hay rondas previas que saltear)
+     * y cuando la liga de ese año todavía no está cargada (no hay con qué
+     * comparar). Mira las plantillas y no los partidos: alcanza con haber
+     * armado la liga, aunque no tenga un solo partido cargado.
+     */
+    private function rondaDondeEntranLosDePrimera(array $filas, array $rondasOrden, $torneo)
+    {
+        if (!$torneo || count($rondasOrden) < 2) return null;
+        if (strcasecmp((string) $torneo->tipo, 'Liga') === 0) return null;
+
+        $ids = [];
+        foreach ($filas as $f) {
+            if (!empty($f['equipo_id'])) $ids[(int) $f['equipo_id']] = true;
+            if (!empty($f['rival_id']))  $ids[(int) $f['rival_id']] = true;
+        }
+        if (empty($ids)) return null;
+
+        $pais = trim((string) $torneo->pais);
+        $enLiga = DB::table('plantillas')
+            ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+            ->join('torneos', 'torneos.id', '=', 'grupos.torneo_id')
+            ->where('torneos.tipo', 'Liga')
+            ->where('torneos.year', $torneo->year)
+            ->where('torneos.id', '!=', $torneo->id)
+            // Sin país en alguno de los dos no se filtra por país: una copa
+            // nacional no tiene clubes de la liga de otro país.
+            ->when($pais !== '', function ($q) use ($pais) {
+                $q->where(function ($w) use ($pais) {
+                    $w->where('torneos.pais', $pais)->orWhereNull('torneos.pais')->orWhere('torneos.pais', '');
+                });
+            })
+            ->whereIn('plantillas.equipo_id', array_keys($ids))
+            ->select('plantillas.equipo_id', 'torneos.nombre', 'torneos.year')
+            ->distinct()->get();
+        if ($enLiga->isEmpty()) return null;
+
+        $deLiga = []; $ligas = [];
+        foreach ($enLiga as $x) {
+            $deLiga[(int) $x->equipo_id] = true;
+            $ligas[trim($x->nombre . ' ' . $x->year)] = true;
+        }
+
+        $porRonda = [];
+        foreach ($filas as $f) {
+            foreach ([$f['equipo_id'], $f['rival_id']] as $id) {
+                if ($id && isset($deLiga[(int) $id])) $porRonda[(string) $f['ronda']][(int) $id] = true;
+            }
+        }
+        foreach (array_keys($rondasOrden) as $r) {
+            if (empty($porRonda[(string) $r])) continue;
+            return ['ronda' => (string) $r, 'equipos' => array_keys($porRonda[(string) $r]),
+                'ligas' => array_keys($ligas)];
+        }
+        return null;
+    }
+
+    /**
+     * El selector «Cargar desde la ronda…», con la sugerencia arriba.
+     *
+     * El formulario repite TODO lo que lleva `$base` (torneo, temporada, perillas
+     * del HTML, rearmado de jornadas): cambiar el corte no puede cambiar qué
+     * fixture se está mirando.
+     */
+    private function bloqueDesdeRonda(array $rondasOrden, $corte, $sugerida, $base, $torneo, $desdeRonda)
+    {
+        if (count($rondasOrden) < 2) return '';
+
+        $q = [];
+        parse_str((string) parse_url($base, PHP_URL_QUERY), $q);
+        unset($q['desde_ronda']);
+        $conRonda = function ($r) use ($q, $base) {
+            return strtok($base, '?') . '?' . http_build_query(array_merge($q, ['desde_ronda' => $r]));
+        };
+
+        $elegida = $corte ? $corte['ronda']
+            : (($sugerida && $desdeRonda !== 'todas') ? $sugerida['ronda'] : '');
+        $primera = array_key_first($rondasOrden);
+
+        $opts = '<option value="todas"' . ($elegida === '' ? ' selected' : '') . '>todas las rondas</option>';
+        foreach ($rondasOrden as $r => $d) {
+            $opts .= '<option value="' . e($r) . '"' . ((string) $r === (string) $elegida ? ' selected' : '') . '>'
+                . e($r . ' · ' . ($d['desde'] !== '' ? date('d/m/Y', strtotime($d['desde'])) : 'sin fecha')
+                    . ' · ' . $d['n'] . ' partido' . ($d['n'] == 1 ? '' : 's'))
+                . ((string) $r === (string) ($sugerida['ronda'] ?? '') ? ' (sugerida)' : '')
+                . '</option>';
+        }
+        $form = '<form method="get" action="' . e(strtok($base, '?')) . '" style="margin:6px 0">';
+        foreach ($q as $k => $v) {
+            if (is_array($v)) continue;
+            $form .= '<input type="hidden" name="' . e($k) . '" value="' . e($v) . '">';
+        }
+        $form .= 'Cargar desde la ronda <select name="desde_ronda">' . $opts . '</select> '
+            . '<button>Aplicar corte</button></form>';
+
+        if ($corte) {
+            return '<div class="ok-box"><b>Desde «' . e($corte['ronda']) . '»</b> ('
+                . e(date('d/m/Y', strtotime($corte['desde']))) . ' en adelante). '
+                . ($corte['rondas']
+                    ? 'Quedan afuera <b>' . $corte['rondas'] . '</b> ronda' . ($corte['rondas'] == 1 ? '' : 's')
+                    . ' anterior' . ($corte['rondas'] == 1 ? '' : 'es') . ' (' . $corte['partidos'] . ' partidos): '
+                    . 'no se muestran, no piden clubes para mapear, no se guardan en staging y no se aplican. '
+                    : 'Es la primera ronda: no queda nada afuera. ')
+                . '<a href="' . e($conRonda('todas')) . '">Ver todas las rondas</a>'
+                . $form . '</div>';
+        }
+
+        if ($sugerida && $desdeRonda !== 'todas' && (string) $sugerida['ronda'] !== (string) $primera) {
+            $antes = 0; $partidosAntes = 0;
+            foreach ($rondasOrden as $r => $d) {
+                if ((string) $r === (string) $sugerida['ronda']) break;
+                $antes++; $partidosAntes += $d['n'];
+            }
+            $nombres = \App\Equipo::whereIn('id', array_slice($sugerida['equipos'], 0, 4))->pluck('nombre')->all();
+            $resto = count($sugerida['equipos']) - count($nombres);
+
+            return '<div class="warn-box"><b>Los de primera entran en «' . e($sugerida['ronda']) . '».</b> '
+                . 'Ahí aparecen ' . e(implode(', ', $nombres)) . ($resto > 0 ? ' y ' . $resto . ' más' : '')
+                . ', que tenés en ' . e(implode(' / ', $sugerida['ligas'])) . '. '
+                . 'Las ' . $antes . ' ronda' . ($antes == 1 ? '' : 's') . ' anteriores (' . $partidosAntes
+                . ' partidos) son de clubes que no están en esa liga. '
+                . '<a class="boton" href="' . e($conRonda($sugerida['ronda'])) . '">Cargar desde «'
+                . e($sugerida['ronda']) . '» →</a>'
+                . '<br><span class="sub">Es una sugerencia: hasta que la confirmes se ve el fixture entero. '
+                . 'Si no es esa, elegí otra:</span>' . $form . '</div>';
+        }
+
+        // Sin sugerencia: el selector igual, plegado, para cortar a mano.
+        $porque = '';
+        if ($desdeRonda !== 'todas' && $torneo && strcasecmp((string) $torneo->tipo, 'Liga') !== 0 && !$sugerida) {
+            $porque = '<p class="sub">No hay sugerencia: no encontré ningún club de este fixture en una liga de '
+                . e(trim((string) $torneo->pais) ?: 'ese país') . ' ' . e((string) $torneo->year)
+                . ' (cargá primero esa liga, alcanza con las plantillas) o ya entran desde la primera ronda.</p>';
+        }
+        return '<details' . ($porque !== '' ? ' open' : '') . '><summary>Cargar desde una ronda</summary>'
+            . $porque . $form . '</details>';
     }
 
     /**
@@ -2466,7 +2683,8 @@ class ImportPartidosController extends Controller
         // de `$base` en fixture().
         $alFixture = route('import_partidos.fixture',
             array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null,
-                'comp_forzado' => $this->esCompAparte($torneoId, $comp) ? $comp : null]));
+                'comp_forzado' => $this->esCompAparte($torneoId, $comp) ? $comp : null,
+                'desde_ronda' => trim((string) $request->get('desde_ronda', '')) ?: null]));
 
         $volver = '<p class="sub"><a href="' . e($alFixture) . '">← Volver al fixture</a></p>';
 
@@ -3308,10 +3526,13 @@ class ImportPartidosController extends Controller
         $comp      = trim((string) $request->get('comp', ''));
         $torneoId  = (int) $request->get('torneo_id');
         $confirmar = (string) $request->get('confirmar', '0') === '1';
+        $desde     = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $request->get('desde', ''))
+            ? (string) $request->get('desde') : '';
 
         $alFixture = route('import_partidos.fixture',
             array_filter(['comp' => $comp, 'cache' => 1, 'torneo_id' => $torneoId ?: null,
-                'comp_forzado' => $this->esCompAparte($torneoId, $comp) ? $comp : null]));
+                'comp_forzado' => $this->esCompAparte($torneoId, $comp) ? $comp : null,
+                'desde_ronda' => trim((string) $request->get('desde_ronda', '')) ?: null]));
         $html = '<p class="sub"><a href="' . e($alFixture) . '">← Volver al fixture</a></p>'
             . '<h1>Aplicar todas las fechas · ' . e($comp) . '</h1>';
 
@@ -3334,7 +3555,11 @@ class ImportPartidosController extends Controller
             ->where('competencia_external_id', $comp)
             ->where('estado', 'nuevo')
             ->select('ronda', DB::raw('count(*) as n'), DB::raw('min(dia) as desde'), DB::raw('max(dia) as hasta'))
-            ->groupBy('ronda')->get()->keyBy('ronda')->all();
+            ->groupBy('ronda')
+            // «Cargar desde la ronda…» del fixture: las rondas que arrancan
+            // antes del corte no se aplican aunque estén en el staging.
+            ->when($desde !== '', function ($q) use ($desde) { $q->havingRaw('min(dia) >= ?', [$desde]); })
+            ->get()->keyBy('ronda')->all();
         uksort($rondas, 'strnatcasecmp');
 
         if (empty($rondas)) {
@@ -3376,7 +3601,9 @@ class ImportPartidosController extends Controller
             $html .= '</tbody></table></div>';
             if (empty($plan)) return $this->pagina('Aplicar todas', $html . '<p class="err-box">No hay nada que crear.</p>');
             $html .= '<p class="acciones"><a class="boton" href="' . e(route('import_partidos.fixture_aplicar_todas',
-                    ['comp' => $comp, 'torneo_id' => $torneo->id, 'confirmar' => 1])) . '">Crear estos ' . $total
+                    array_filter(['comp' => $comp, 'torneo_id' => $torneo->id, 'confirmar' => 1,
+                        'desde_ronda' => trim((string) $request->get('desde_ronda', '')) ?: null,
+                        'desde' => $desde ?: null]))) . '">Crear estos ' . $total
                 . ' partidos en ' . count($plan) . ' fechas</a> <span class="sub">recién acá se escribe; los '
                 . 'controles son los mismos que aplicando de a una</span></p>';
             return $this->pagina('Aplicar todas', $html);
