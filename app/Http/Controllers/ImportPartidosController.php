@@ -4799,9 +4799,14 @@ class ImportPartidosController extends Controller
             return $this->verDatosClubTm($tmId);
         }
 
-        // ¿Ya está mapeado? Entonces no hay nada que crear.
+        // ¿Ya está mapeado? Entonces no hay nada que crear… salvo que vengas
+        // de «Clubes ya mapeados» con `reemplazar=1`: ahí el mapeo está MAL
+        // (Atlético CP apuntando a Sporting) y el club correcto no existe. Se
+        // crea y `guardarMapeo()` pisa el mapeo viejo; el equipo al que
+        // apuntaba antes no se toca.
+        $reemplazar = (string) $request->get('reemplazar', '0') === '1';
         $yaMapeado = DB::table('equipo_tm')->where('tm_club_id', $tmId)->value('equipo_id');
-        if ($yaMapeado && \App\Equipo::where('id', $yaMapeado)->exists()) {
+        if (!$reemplazar && $yaMapeado && \App\Equipo::where('id', $yaMapeado)->exists()) {
             $links = $this->urlsClubTm($tmId, null);
             return redirect()->route('equipos.edit', $yaMapeado)
                 ->with('error', 'El club de TM ' . e($tmId) . ' ya estaba mapeado a este equipo, así que no creé nada '
@@ -8310,7 +8315,7 @@ class ImportPartidosController extends Controller
                     . '<select name="mapear_equipo" class="s2" data-placeholder="buscar equipo…">' . $opciones . '</select> '
                     . '<button>Guardar mapeo</button>'
                     . '<a class="boton-sec" href="' . e($request->url() . '?' . http_build_query($limpia)) . '">cancelar</a>'
-                    . '</form></td>';
+                    . '</form>' . $this->botonCrearReemplazando($tmId, $d, $request, $limpia) . '</td>';
             } else {
                 $q = $limpia; $q['remapear'] = $tmId;
 
@@ -8328,12 +8333,32 @@ class ImportPartidosController extends Controller
                     $q2['mapear_equipo'] = $d['equipo_id'];
                     $out .= '<a class="boton-sec" href="' . e($request->url() . '?' . http_build_query($q2)) . '">Fijar</a>';
                 }
+                // En las filas sanas no se ofrece (serían 40 botones de más);
+                // para cualquier otra, «Cambiar» lo muestra al lado del desplegable.
+                if ($rep || !$d['fijo']) $out .= $this->botonCrearReemplazando($tmId, $d, $request, $limpia);
                 $out .= '</td>';
             }
             $out .= '</tr>';
         }
 
         return $out . '</tbody></table></div></details>';
+    }
+
+    /**
+     * «Crear desde TM» para un club que YA está mapeado, pero mal: el mismo
+     * alta que en «Clubes sin mapear», que además reapunta el mapeo al club
+     * nuevo. En la tabla aparece en los repetidos y en los enganchados por
+     * nombre, que es donde un mapeo equivocado es posible sin que nadie lo haya
+     * elegido (Atlético CP cayó en Sporting CP por el nombre normalizado); en
+     * cualquier otra fila, al apretar «Cambiar».
+     */
+    private function botonCrearReemplazando($tmId, array $d, Request $request, array $limpia)
+    {
+        $volver = $request->url() . '?' . http_build_query($limpia);
+        return '<a class="boton-sec" target="_blank" href="' . e(route('import_partidos.crear_equipo',
+                array_filter(['tm_id' => $tmId, 'volver' => $volver, 'reemplazar' => $d['fijo'] ? 1 : null])))
+            . '" title="Da de alta el club de TM como equipo NUEVO y le pasa el mapeo. '
+            . e($this->nombreEquipo($d['equipo_id'])) . ' queda como está. Cuesta 3 llamadas.">Crear desde TM ↗</a>';
     }
 
     private function bloqueClubesSinResolver(array $filas, Request $request)
