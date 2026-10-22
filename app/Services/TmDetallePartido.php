@@ -6118,12 +6118,27 @@ class TmDetallePartido
         foreach ($lados as $lado) {
             $equipoId = (int) (isset($lado['equipo_id']) ? $lado['equipo_id'] : 0);
             if (!$equipoId) continue;
-            $existe = DB::table('plantillas')
+            $existentes = DB::table('plantillas')
                 ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
                 ->where('grupos.torneo_id', $torneoId)
                 ->where('plantillas.equipo_id', $equipoId)
-                ->exists();
-            if ($existe) continue;
+                ->orderBy('plantillas.id')
+                ->get(['plantillas.id', 'plantillas.grupo_id', 'grupos.posiciones']);
+            if ($existentes->isNotEmpty()) {
+                // Partido de un grupo con tabla y el equipo tiene su plantilla
+                // sólo en grupos sin tabla (Playoffs / primera ronda, porque ese
+                // detalle se importó antes): se muda acá, si no el equipo no
+                // aparece en las posiciones. Los grupos sin tabla no la usan.
+                if ($this->grupoSuma($grupoId)
+                    && !$existentes->contains(function ($e) { return (int) $e->posiciones === 1; })) {
+                    $mover = $existentes->first();
+                    DB::table('plantillas')->where('id', $mover->id)->update(['grupo_id' => (int) $grupoId]);
+                    $this->aviso('Pasé la plantilla de ' . $this->nombreEquipo($equipoId)
+                        . ' al grupo de este partido (estaba en uno sin tabla de posiciones). [[plantilla:'
+                        . (int) $mover->id . ']]');
+                }
+                continue;
+            }
             $p = \App\Plantilla::firstOrCreate(['grupo_id' => (int) $grupoId, 'equipo_id' => $equipoId]);
             if (!$this->grupoSuma($grupoId) && $this->torneoTieneTabla($torneoId)) {
                 $this->aviso('Creé la plantilla de ' . $this->nombreEquipo($equipoId)
