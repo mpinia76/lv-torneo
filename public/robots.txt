@@ -26,7 +26,9 @@ Disallow: /en/tecnicoJugados
 
 # Rastreadores que no traen visitas y cargaban el servidor (16/10: Amazonbot y
 # ClaudeBot ~14.000 pedidos/día cada uno). Google y Bing siguen permitidos.
+# 22/10: Amzn-SearchBot (~4.000/día) usa otro nombre que Amazonbot.
 User-agent: Amazonbot
+User-agent: Amzn-SearchBot
 User-agent: ClaudeBot
 User-agent: anthropic-ai
 User-agent: GPTBot
