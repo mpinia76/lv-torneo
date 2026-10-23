@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
- * Control de torneos: equipos de más, equipos de menos, y los completos que
- * todavía no tienen guardadas las posiciones finales. Solo lee.
+ * Control de torneos: equipos de más, equipos de menos, los completos que
+ * todavía no tienen guardadas las posiciones finales, y los que ya están
+ * cerrados (completos con posiciones, o inconclusos). Solo lee.
  */
 class ControlTorneoController extends Controller
 {
@@ -53,7 +54,7 @@ class ControlTorneoController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        $detalle = in_array($lista, ['sin_posiciones', 'partidos_faltan'], true)
+        $detalle = in_array($lista, ['sin_posiciones', 'partidos_faltan', 'cerrados'], true)
             ? []
             : $servicio->detalle(array_map(function ($t) { return $t->id; }, $filas->items()));
 

@@ -11,6 +11,7 @@
             'faltan'         => 'Tienen menos equipos con plantilla que los que dice el torneo. Abajo de cada uno: los equipos que juegan partidos pero no tienen plantilla, que suelen explicar el faltante.',
             'partidos_faltan' => 'La cantidad de equipos coincide, pero hay fechas con menos partidos que la mitad de los equipos (sumando todas las zonas que tienen esa fecha) (o el torneo no tiene partidos). Suele ser un torneo cargado DT por DT que no quedó marcado como parcial. Las fechas de playoffs no se miran.',
             'sin_posiciones' => 'Equipos y fechas completos, y no hay ninguna posición guardada («Finalizar»). Los que todavía tienen partidos sin resultado salen marcados «en curso».',
+            'cerrados'       => 'Los que no tienen nada pendiente: equipos y fechas completos con las posiciones guardadas, más los marcados inconclusos (sin campeón: suspendidos o fases previas), que no entran en los demás controles.',
         ];
     @endphp
     <link href="{{ asset('css/controles.css').($cssVersion ? '?v='.$cssVersion : '') }}" rel="stylesheet">
@@ -112,7 +113,8 @@
                     </p>
                 @endif
                 <p class="ctrl-sub" style="margin-top:.6em">
-                    Los torneos marcados <b>inconclusos</b> (sin campeón: suspendidos o fases previas) no entran en este control.
+                    Los torneos marcados <b>inconclusos</b> (sin campeón: suspendidos o fases previas) no entran en los controles:
+                    van directo a «{{ $listas['cerrados'] }}».
                 </p>
             </div>
 
@@ -148,6 +150,11 @@
                                     <span class="ctrl-sub">#{{ $filaTorneo->id }} · {{ $filaTorneo->tipo }} · {{ $filaTorneo->ambito }}</span>
                                     @if($filaTorneo->parcial)
                                         <span class="ctrl-chip neutro">parcial</span>
+                                    @endif
+                                    @if($filaTorneo->inconcluso)
+                                        <span class="ctrl-chip neutro" title="Sin campeón: suspendido o fase previa">inconcluso</span>
+                                    @elseif($lista === 'cerrados')
+                                        <span class="ctrl-chip ok">completo</span>
                                     @endif
                                     @if($filaTorneo->fechas_incompletas > 0)
                                         <span class="ctrl-chip mal" title="Números de fecha con menos partidos que la mitad de los equipos, sumando las zonas">{{ $filaTorneo->fechas_incompletas }} de {{ $filaTorneo->fechas_tabla }} fechas a medias</span>

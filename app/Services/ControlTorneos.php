@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
  *                  menos partidos de los que corresponden (o ningún partido).
  *   - sin_posiciones → equipos y fechas completos, y no hay ninguna fila en
  *                  posicion_torneos.
+ *   - cerrados   → los que están bien: completos y con posiciones guardadas,
+ *                  más los marcados inconclusos (que no entran en las demás).
  *
  * "Equipo del torneo" = equipo con plantilla en algún grupo del torneo
  * (COUNT DISTINCT: un club que está en la fase de grupos y en los playoffs
@@ -33,6 +35,7 @@ class ControlTorneos
         'faltan'         => 'Le faltan equipos',
         'partidos_faltan' => 'Equipos bien, faltan partidos',
         'sin_posiciones' => 'Completos sin posiciones',
+        'cerrados'       => 'Completos o inconclusos',
     ];
 
 
@@ -75,10 +78,8 @@ class ControlTorneos
         }
         // Inconcluso = torneo sin campeón: suspendido que nunca terminó (Copa
         // de la Superliga 2020, pandemia) o fase previa que TM lista aparte
-        // (UEFA Champions League Qualifying). No entra en NINGUNA lista.
-        if ($this->hayInconcluso()) {
-            $q->whereRaw('COALESCE(t.inconcluso, 0) = 0');
-        }
+        // (UEFA Champions League Qualifying). No se filtra acá: clasificar()
+        // lo manda directo a «cerrados» y no entra en ninguna otra lista.
 
         $filas = $q->orderByDesc('t.year')->orderBy('t.nombre')->get()->all();
 
@@ -200,7 +201,7 @@ class ControlTorneos
         return $hay;
     }
 
-    /** Reparte las filas en las tres listas. */
+    /** Reparte las filas en las listas de LISTAS (cada torneo cae en una sola). */
     public function clasificar(array $filas): array
     {
         $listas = array_fill_keys(array_keys(self::LISTAS), []);
@@ -210,7 +211,9 @@ class ControlTorneos
             $cargados  = (int) $fila->cargados;
             $fila->diferencia = $cargados - $esperados;
 
-            if ($cargados > $esperados) {
+            if ((int) $fila->inconcluso) {
+                $listas['cerrados'][] = $fila;
+            } elseif ($cargados > $esperados) {
                 $listas['sobran'][] = $fila;
             } elseif ($cargados < $esperados) {
                 $listas['faltan'][] = $fila;
@@ -220,6 +223,8 @@ class ControlTorneos
                 $listas['partidos_faltan'][] = $fila;
             } elseif ((int) $fila->posiciones === 0) {
                 $listas['sin_posiciones'][] = $fila;
+            } else {
+                $listas['cerrados'][] = $fila;
             }
         }
 
