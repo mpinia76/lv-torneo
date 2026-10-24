@@ -14,8 +14,12 @@ use Illuminate\Support\Facades\DB;
  *
  * Regla, decidida el 24/10/2026:
  *
- *  1. Sólo torneos COMPLETOS: con posiciones guardadas (`posicion_torneos`) o
- *     marcados `inconcluso`. Un torneo en curso no tiene goleador todavía.
+ *  1. Sólo torneos COMPLETOS: con posiciones guardadas (`posicion_torneos`),
+ *     de al menos MIN_PARTIDOS partidos, y ni `parcial` (cargado DT por DT:
+ *     sólo están los partidos de un equipo) ni `inconcluso` (suspendidos, y
+ *     también las fases previas que se cargan sólo con los partidos de
+ *     algunos equipos: UEFA Europa League Qualifying 2017 daba 9 goleadores
+ *     con 1 gol). Un torneo en curso no tiene goleador todavía.
  *  2. Los goles se cuentan como en la ficha (`gols.tipo <> 'En contra'`),
  *     SIN los partidos con incidencia de escritorio o no jugado
  *     (`Incidencia::ANULAN_GOLES`): el resultado oficial no es el que se jugó.
@@ -32,6 +36,14 @@ use Illuminate\Support\Facades\DB;
 class GoleadoresTorneo
 {
     /**
+     * Un torneo de uno o dos partidos (Supercopa, Recopa, Trofeo de Campeones)
+     * no tiene goleador: el primer cálculo (24/10/2026) le daba "goleador
+     * compartido" a cualquiera que hubiera hecho un gol (4 en la Supercopa
+     * Argentina 2019). Con 3 entran el Mundial de Clubes y las copas cortas.
+     */
+    public const MIN_PARTIDOS = 3;
+
+    /**
      * Recalcula y guarda. Con $torneoId, sólo ese torneo.
      *
      * @return array resumen: completos, con_goleador, sin_goleador (k alcanza), filas
@@ -46,8 +58,13 @@ class GoleadoresTorneo
         // 1) Torneos completos
         $completos = [];
         $q = 'SELECT t.id, COALESCE(t.inconcluso, 0) AS inconcluso FROM torneos t
-               WHERE (COALESCE(t.inconcluso, 0) = 1
-                      OR EXISTS (SELECT 1 FROM posicion_torneos pt WHERE pt.torneo_id = t.id))'
+               WHERE COALESCE(t.inconcluso, 0) = 0
+                 AND COALESCE(t.parcial, 0) = 0
+                 AND EXISTS (SELECT 1 FROM posicion_torneos pt WHERE pt.torneo_id = t.id)
+                 AND (SELECT COUNT(*) FROM partidos p
+                        JOIN fechas f ON f.id = p.fecha_id
+                        JOIN grupos g ON g.id = f.grupo_id
+                       WHERE g.torneo_id = t.id) >= ' . self::MIN_PARTIDOS
             . ($torneoId ? ' AND t.id = ' . (int) $torneoId : '');
         foreach (DB::select($q) as $t) {
             $completos[(int) $t->id] = (int) $t->inconcluso;
