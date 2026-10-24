@@ -311,6 +311,7 @@ class Controles
                     'columna_jugador' => 'Ejecutor',
                     'detalle'   => 'penal_faltante',
                     'acciones'  => ['penales', 'goles', 'incidencia'],
+                    'sin_datos' => true, // el arquero falta en el origen: ver motivoSinDatos()
                     'metodo'    => 'penalesFaltantes',
                     'aplicar'   => true,
                 ],
@@ -623,6 +624,15 @@ class Controles
             // haya jugado (postergado, suspendido, anulado). Escribir "TM no
             // publica el detalle" sería mentira, y dentro de dos años esa
             // observación no le iba a explicar nada a nadie.
+            // El gol de penal está, pero en la alineación del rival falta el
+            // arquero (Gimnástica Segoviana-Sevilla 2006/07: TM no publica
+            // ningún arquero de la Segoviana), así que no hay a quién
+            // cargarle el penal recibido.
+            'penales.faltantes' => [
+                'boton' => 'Sin arquero en TM',
+                'texto' => 'No hay registro del arquero que recibió el penal: la alineación registrada de su equipo está incompleta.',
+                'texto_en' => 'There is no record of the goalkeeper who faced the penalty: the line-up recorded for his team is incomplete.',
+            ],
             'partidos.sin_resultado' => [
                 'boton' => 'No se jugó',
                 'texto' => 'Sin resultado a propósito: el partido no se disputó (postergado, suspendido o '

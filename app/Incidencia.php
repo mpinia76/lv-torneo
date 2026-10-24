@@ -45,6 +45,7 @@ class Incidencia extends Model
             'cambios.sin_jugar'          => 'El jugador del cambio no figura en la alineación',
             'cambios.impares'            => 'Cambio sin contraparte (entra y no se sabe quién sale)',
             'cambios.sale_solo'          => 'Salida sin reemplazo (dato correcto)',
+            'penales.faltantes'          => 'Sin registro del arquero que recibió el penal',
         ],
     ];
 
@@ -77,6 +78,10 @@ class Incidencia extends Model
             'alineaciones.faltan',
             'goles.sin_jugar', 'tarjetas.sin_jugar',
             'cambios.sin_jugar', 'cambios.titulares_entran',
+            // `penales.faltantes` NO: ahí también caen los penales que recibió
+            // un jugador de campo (arquero expulsado), que se cargan a mano.
+            // Una alineación incompleta no tiene que esconderlos; el que de
+            // verdad no tiene arquero se marca con su propio botón.
             'penales.mal_cargados',
         ],
         'goles.diferencia'   => ['goles.diferencia', 'goles.por_equipo'],
@@ -88,6 +93,7 @@ class Incidencia extends Model
         'cambios.sale_solo'  => ['cambios.sale_solo'],
         'arbitros.terna'     => ['arbitros.terna'],
         'tecnicos.faltan'    => ['tecnicos.faltan'],
+        'penales.faltantes'  => ['penales.faltantes', 'penales.mal_cargados'],
     ];
 
     /**
