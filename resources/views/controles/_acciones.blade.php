@@ -88,7 +88,8 @@
     Hay partidos que no tienen arreglo posible —la ficha de TM dice "no data
     available" para uno de los dos equipos— y Rehacer no cambia nada. Este
     botón carga la incidencia con equipo y puntos vacíos (así no se publica en
-    el front ni toca las posiciones) y el partido sale de todos los controles.
+    el front ni toca las posiciones) con el tipo del control, y el partido sale
+    de ese control y de los que el tipo tape (`Incidencia::TAPA`), no de todos.
 
     Sale solo en los chequeos marcados con `sin_datos` en `definiciones()`:
     marcar la excepción POR FALTA DE DATOS tiene sentido donde el error puede

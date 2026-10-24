@@ -113,7 +113,7 @@
                 @endif
                 @if($loteSinDatos)
                     <br><b>{{ $sinDatos['boton'] }}</b> no gasta llamadas: carga la incidencia en cada tildado y esos
-                    partidos salen de todos los controles. Es para lo que no tiene arreglo posible, no para
+                    partidos salen de este control (y de los que son consecuencia directa). Es para lo que no tiene arreglo posible, no para
                     esconder un error nuestro.
                 @endif
                 @if($clave === 'arbitros.terna')
