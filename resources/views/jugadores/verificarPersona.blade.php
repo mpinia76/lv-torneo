@@ -592,7 +592,7 @@
                         <tr>
                             <th style="width:28px;"></th>
                             <th></th><th>Id</th><th>Mostrar</th><th>Apellido</th><th>Nombre</th>
-                            <th>Nacionalidad</th><th>Roles</th><th>Transfermarkt</th>
+                            <th>Nacionalidad</th><th>Roles</th><th>Equipos</th><th>Transfermarkt</th>
                             @if($verDesc)<th>Marcada</th>@endif
                             <th></th>
                         </tr>
@@ -622,6 +622,42 @@
                                 @if($p->jugador)<span class="badge badge-primary">Jugador {{ $p->jugador->id }}</span>@endif
                                 @if($p->tecnico)<span class="badge badge-success">DT {{ $p->tecnico->id }}</span>@endif
                                 @if($p->arbitro)<span class="badge badge-warning">Árbitro {{ $p->arbitro->id }}</span>@endif
+                            </td>
+                            {{-- Clubes y temporadas, igual que en la pestaña de repetidos:
+                                 es lo que hace falta para buscar la fecha afuera (BDFA,
+                                 Wikipedia...) sin tener que abrir la ficha. --}}
+                            @php
+                                $info   = $peso[$p->id] ?? null;
+                                $clubsP = $clubes[$p->id] ?? [];
+                                $topeC  = \App\Services\RegistrosPersonas::MAX_CLUBES;
+                                $verUrl = $p->jugador ? route('jugadores.ver', ['jugadorId' => $p->jugador->id])
+                                        : ($p->tecnico ? route('tecnicos.ver', ['tecnicoId' => $p->tecnico->id])
+                                        : ($p->arbitro ? route('arbitros.ver', ['arbitroId' => $p->arbitro->id]) : null));
+                            @endphp
+                            <td class="small" style="max-width:420px;">
+                                @if($info !== null)
+                                    @if(($info['registros'] ?? 0) == 0)
+                                        <span class="badge badge-danger" title="No figura en ningún partido, gol, plantel ni planilla">sin registros</span>
+                                    @elseif($verUrl)
+                                        <a href="{{ $verUrl }}" target="_blank" class="badge badge-secondary"
+                                           title="Abrir la ficha completa: torneos, clubes y partidos">ver {{ $info['registros'] }} reg.</a>
+                                    @else
+                                        <span class="badge badge-secondary">{{ $info['registros'] }} reg.</span>
+                                    @endif
+                                @endif
+                                @if($clubsP)
+                                    <div class="dup-clubes mt-1">
+                                        @foreach(array_slice($clubsP, 0, $topeC) as $club)
+                                            <span class="dup-club">{{ $club['equipo'] }}
+                                                <span class="text-muted">{{ $club['desde'] == $club['hasta'] ? $club['desde'] : $club['desde'].'-'.$club['hasta'] }}</span></span>
+                                        @endforeach
+                                        @if(count($clubsP) > $topeC)
+                                            <span class="text-muted">y {{ count($clubsP) - $topeC }} más</span>
+                                        @endif
+                                    </div>
+                                @elseif($info !== null && ($info['registros'] ?? 0) > 0)
+                                    <div class="mt-1 text-muted">registros sin club identificable</div>
+                                @endif
                             </td>
                             <td>
                                 @if($tm && !empty($tm['tm']))

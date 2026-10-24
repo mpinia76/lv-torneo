@@ -93,6 +93,7 @@ class PersonaDuplicadoController extends Controller
             $datos['sinRegistros'] = $this->sinRegistros($request);
         } elseif ($tab === 'sin-fecha') {
             list($datos['sinFecha'], $datos['tmDe']) = $this->sinFecha($request);
+            list($datos['peso'], $datos['clubes']) = $this->pesoYClubes($datos['sinFecha']);
         } elseif ($tab === 'foto') {
             list($datos['fotos'], $datos['fotoDe'], $datos['tmDe']) = $this->fotosRotas($request);
         } else {
