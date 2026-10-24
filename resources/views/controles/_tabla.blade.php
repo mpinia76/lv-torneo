@@ -126,7 +126,8 @@
         </div>
     @endif
 
-    <div style="overflow-x:auto">
+    {{-- Caja con su propio scroll: la barra horizontal queda siempre a la vista (abajo de la pantalla), el encabezado y los botones quedan fijos. --}}
+    <div class="ctrl-scroll">
         <table class="ctrl-tabla">
             <thead>
             <tr>
