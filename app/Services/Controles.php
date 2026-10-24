@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Incidencia;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -630,10 +631,23 @@ class Controles
             ],
         ];
 
-        return $motivos[$clave] ?? [
+        // El tipo de la incidencia es la clave del control: así la incidencia
+        // tapa ESE control y no todos (ver `sinIncidencia()`). Dos excepciones:
+        // "No se jugó" es un hecho del partido, no un dato que falta, y el
+        // genérico es el partido entero sin detalle.
+        if (isset($motivos[$clave])) {
+            $m = $motivos[$clave];
+            $m['tipo'] = $clave === 'partidos.sin_resultado' ? 'no_jugado' : $clave;
+            $m['control'] = $clave;
+            return $m;
+        }
+
+        return [
             'boton' => 'Sin datos en TM',
             'texto' => 'No hay registro del detalle completo de este partido.',
             'texto_en' => 'There is no record of the full details of this match.',
+            'tipo' => 'sin_detalle',
+            'control' => (string) $clave,
         ];
     }
 
@@ -785,14 +799,32 @@ class Controles
 
     /**
      * Una incidencia es la forma de marcar "este partido es una excepción".
-     * Un partido con incidencia no tiene que aparecer más en los controles.
+     *
+     * Hasta el 24/10/2026 CUALQUIER incidencia sacaba al partido de TODOS los
+     * controles, y como el botón "no se puede arreglar" no agregaba una
+     * segunda, marcar la terna incompleta escondía también los goles que
+     * faltaban (Arsenal-Gimnasia 2009: 1-0 sin goleador, nunca apareció en
+     * "Goles"). Más de la mitad de los partidos tenía alguna incidencia, casi
+     * todas de terna, así que la mitad de la base no la miraba ningún control.
+     *
+     * Ahora sólo la tapan las incidencias cuyo tipo explica ESTE control (ver
+     * `Incidencia::TAPA`). Las incidencias viejas sin tipo (NULL) siguen
+     * tapando todo, hasta que se las clasifique.
+     *
+     * @param string|array $claves la clave del control (o varias: lo tapa la
+     *                             incidencia que explique cualquiera)
      */
-    public function sinIncidencia($q)
+    public function sinIncidencia($q, $claves)
     {
-        return $q->whereNotExists(function ($s) {
+        $tipos = Incidencia::tiposQueTapan((array) $claves);
+
+        return $q->whereNotExists(function ($s) use ($tipos) {
             $s->select(DB::raw(1))
                 ->from('incidencias')
-                ->whereColumn('incidencias.partido_id', 'partidos.id');
+                ->whereColumn('incidencias.partido_id', 'partidos.id')
+                ->where(function ($w) use ($tipos) {
+                    $w->whereNull('incidencias.tipo')->orWhereIn('incidencias.tipo', $tipos);
+                });
         });
     }
 
@@ -864,7 +896,7 @@ class Controles
             ->whereRaw($visitante.' > 0')
             ->whereRaw('('.$local.' != 11 OR '.$visitante.' != 11)');
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, 'alineaciones.faltan'));
     }
 
     /**
@@ -897,7 +929,7 @@ class Controles
             ])
             ->whereRaw('('.$local.' = 0 OR '.$visitante.' = 0)');
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, 'alineaciones.sin_jugadores'));
     }
 
     // ------------------------------------------------------------------
@@ -933,7 +965,7 @@ class Controles
                     });
             });
 
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 'gols.jugador_id'));
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'goles.sin_jugar'), 'gols.jugador_id'));
     }
 
     private function golesRepetidos(array $filtros)
@@ -951,8 +983,8 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.cantidad as cantidad', 't1.minuto as minuto', 't1.adicionado as adicionado']);
 
-        // Un partido con incidencia no aparece en ningun control, este incluido.
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 't1.jugador_id'));
+        // Un partido con una incidencia que explica este control no aparece.
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'goles.repetidos'), 't1.jugador_id'));
     }
 
     /**
@@ -975,7 +1007,7 @@ class Controles
             ])
             ->whereRaw('(partidos.golesl + partidos.golesv) != (SELECT COUNT(*) FROM gols WHERE gols.partido_id = partidos.id)');
 
-        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q)));
+        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q, 'goles.diferencia')));
     }
 
     /**
@@ -1026,7 +1058,7 @@ class Controles
             ->whereRaw('(partidos.golesl + partidos.golesv) = (SELECT COUNT(*) FROM gols WHERE gols.partido_id = partidos.id)')
             ->whereRaw('('.$local.' != partidos.golesl OR '.$visit.' != partidos.golesv)');
 
-        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q)));
+        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q, 'goles.por_equipo')));
     }
 
     // ------------------------------------------------------------------
@@ -1045,7 +1077,7 @@ class Controles
                     ->whereColumn('alineacions.jugador_id', 'tarjetas.jugador_id');
             });
 
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 'tarjetas.jugador_id'));
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'tarjetas.sin_jugar'), 'tarjetas.jugador_id'));
     }
 
     private function tarjetasRepetidas(array $filtros)
@@ -1059,8 +1091,8 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.cantidad as cantidad', 't1.tipo as tipo']);
 
-        // Un partido con incidencia no aparece en ningun control, este incluido.
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 't1.jugador_id'));
+        // Un partido con una incidencia que explica este control no aparece.
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'tarjetas.repetidas'), 't1.jugador_id'));
     }
 
     // ------------------------------------------------------------------
@@ -1079,7 +1111,7 @@ class Controles
                     ->whereColumn('alineacions.jugador_id', 'cambios.jugador_id');
             });
 
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 'cambios.jugador_id'));
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'cambios.sin_jugar'), 'cambios.jugador_id'));
     }
 
     private function cambiosRepetidos(array $filtros)
@@ -1093,8 +1125,8 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.cantidad as cantidad', 't1.tipo as tipo']);
 
-        // Un partido con incidencia no aparece en ningun control, este incluido.
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 't1.jugador_id'));
+        // Un partido con una incidencia que explica este control no aparece.
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'cambios.repetidos'), 't1.jugador_id'));
     }
 
     /**
@@ -1149,7 +1181,7 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.minutos as minutos']);
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, ($comparador === '>' ? 'cambios.impares' : 'cambios.sale_solo')));
     }
 
     /** "Entra sin salir": entran más de los que salen. Falta una fila nuestra. */
@@ -1176,7 +1208,7 @@ class Controles
             ->addSelect(['cambios.minuto as minuto', 'cambios.adicionado as adicionado'])
             ->where('alineacions.tipo', 'Titular');
 
-        return $this->ordenar($this->conJugador($this->sinIncidencia($q), 'alineacions.jugador_id'));
+        return $this->ordenar($this->conJugador($this->sinIncidencia($q, 'cambios.titulares_entran'), 'alineacions.jugador_id'));
     }
 
     // ------------------------------------------------------------------
@@ -1218,7 +1250,7 @@ class Controles
             });
         }
 
-        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q)));
+        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q, 'arbitros.terna')));
     }
 
     private function arbitrosRepetidos(array $filtros)
@@ -1236,7 +1268,7 @@ class Controles
             ->select($this->columnas())
             ->addSelect(['t1.roles as roles']);
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, 'arbitros.repetidos'));
     }
 
     // ------------------------------------------------------------------
@@ -1258,7 +1290,7 @@ class Controles
             ])
             ->whereRaw('(NOT '.$existe('equipol_id').' OR NOT '.$existe('equipov_id').')');
 
-        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q)));
+        return $this->ordenar($this->conAlineacion($this->sinIncidencia($q, 'tecnicos.faltan')));
     }
 
     // ------------------------------------------------------------------
@@ -1282,7 +1314,7 @@ class Controles
             })
             ->select($this->columnas());
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, 'partidos.sin_equipo'));
     }
 
     /**
@@ -1326,7 +1358,7 @@ class Controles
                 DB::raw('(SELECT COUNT(*) FROM gols g WHERE g.partido_id = partidos.id) as filas_goles'),
             ]);
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, 'partidos.sin_resultado'));
     }
 
     /**
@@ -1373,7 +1405,7 @@ class Controles
             ->select($this->columnas())
             ->distinct();
 
-        return $this->ordenar($this->sinIncidencia($q));
+        return $this->ordenar($this->sinIncidencia($q, 'partidos.penales_sumados'));
     }
 
     private function penalesFaltantes(array $filtros)

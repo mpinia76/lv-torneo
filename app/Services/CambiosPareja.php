@@ -350,7 +350,7 @@ class CambiosPareja
             ->select('partidos.id')
             ->distinct();
 
-        return $this->controles->sinIncidencia($q)
+        return $this->controles->sinIncidencia($q, ['cambios.impares', 'cambios.sale_solo'])
             ->orderBy('partidos.id')
             ->limit((int) $limite)
             ->pluck('id')->all();

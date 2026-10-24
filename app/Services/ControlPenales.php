@@ -86,10 +86,10 @@ class ControlPenales
                     ->where('penals.tipo', 'Convirtieron');
             });
 
-        // Invariante del panel: un partido con incidencia no aparece en
-        // NINGUN control. Los dos chequeos de penales se lo estaban salteando.
+        // Invariante del panel: un partido con una incidencia que explica
+        // este control no aparece (ver `Controles::sinIncidencia()`).
         return $this->controles->ordenar(
-            $this->controles->conJugador($this->controles->sinIncidencia($q), 'gols.jugador_id')
+            $this->controles->conJugador($this->controles->sinIncidencia($q, 'penales.faltantes'), 'gols.jugador_id')
         );
     }
 
@@ -138,7 +138,7 @@ class ControlPenales
             ])
             ->where('penals.tipo', 'Convirtieron');
 
-        $filas = $this->controles->ordenar($this->controles->sinIncidencia($q))->get();
+        $filas = $this->controles->ordenar($this->controles->sinIncidencia($q, 'penales.mal_cargados'))->get();
         $malas = collect();
 
         foreach ($filas->chunk(self::TANDA) as $tanda) {

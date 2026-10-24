@@ -62,7 +62,10 @@ class ControlTorneos
                             INNER JOIN fechas fe ON fe.id = pa.fecha_id
                             INNER JOIN grupos g ON g.id = fe.grupo_id
                            WHERE g.torneo_id = t.id
-                             AND (pa.golesl IS NULL OR pa.golesv IS NULL)) AS sin_resultado');
+                             AND (pa.golesl IS NULL OR pa.golesv IS NULL)
+                             /* el que no se jugó y está marcado así no es "en curso" */
+                             AND NOT EXISTS (SELECT 1 FROM incidencias i
+                                              WHERE i.partido_id = pa.id AND i.tipo = \'no_jugado\')) AS sin_resultado');
 
         if (!empty($f['year'])) {
             $q->where('t.year', $f['year']);

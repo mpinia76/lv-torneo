@@ -211,7 +211,7 @@ class TernaSondeoController extends Controller
                 . e(route('import_detalles.terna_barrido', ['accion' => 'marcar', 'torneo_id' => $torneoId, 'muestra' => $muestra]))
                 . '">Marcar los ' . $quedan . ' de este torneo y seguir con el próximo →</a></p>'
                 . '<p class="sub">Escribe una incidencia por partido, igual que el botón "Terna incompleta en TM". '
-                . 'Esos partidos salen de todos los controles. No gasta ninguna llamada.</p>';
+                . 'Esos partidos salen del control de terna. No gasta ninguna llamada.</p>';
         } else {
             $html .= '<div class="err-box"><b>Acá sí se está perdiendo algo: ' . count($faltas) . ' árbitro(s) '
                 . 'en ' . $sondeados . ' partidos sondeados.</b><br>'
@@ -300,13 +300,18 @@ class TernaSondeoController extends Controller
             // `partidos()` ya excluye los que tienen incidencia, pero lo
             // re-chequeamos: entre la consulta y el insert puede haber pasado
             // otra cosa, y duplicar incidencias ensucia el detalle público.
-            if (Incidencia::where('partido_id', (int) $f->id)->exists()) continue;
+            $yaTiene = Incidencia::where('partido_id', (int) $f->id)
+                ->where(function ($w) {
+                    $w->whereNull('tipo')->orWhereIn('tipo', Incidencia::tiposQueTapan(['arbitros.terna']));
+                })->exists();
+            if ($yaTiene) continue;
 
             Incidencia::create([
                 'partido_id'    => (int) $f->id,
                 'torneo_id'     => (int) $f->torneo_id,
                 'equipo_id'     => null,
                 'puntos'        => null,
+                'tipo'          => $motivo['tipo'],
                 'observaciones' => $motivo['texto'],
                 'observaciones_en' => $motivo['texto_en'] ?? null,
             ]);
@@ -339,9 +344,15 @@ class TernaSondeoController extends Controller
                 $s->select(DB::raw(1))->from('alineacions')
                     ->whereColumn('alineacions.partido_id', 'partidos.id');
             })
+            // Sólo la tapan las incidencias que explican la terna (o las viejas
+            // sin tipo). Una de goles no dice nada sobre los asistentes.
             ->whereNotExists(function ($s) {
                 $s->select(DB::raw(1))->from('incidencias')
-                    ->whereColumn('incidencias.partido_id', 'partidos.id');
+                    ->whereColumn('incidencias.partido_id', 'partidos.id')
+                    ->where(function ($w) {
+                        $w->whereNull('incidencias.tipo')
+                          ->orWhereIn('incidencias.tipo', Incidencia::tiposQueTapan(['arbitros.terna']));
+                    });
             })
             ->where(function ($w) use ($existe) {
                 $w->whereRaw('NOT ' . $existe('Linea 1'))
@@ -545,9 +556,15 @@ class TernaSondeoController extends Controller
                 $s->select(DB::raw(1))->from('alineacions')
                     ->whereColumn('alineacions.partido_id', 'partidos.id');
             })
+            // Sólo la tapan las incidencias que explican la terna (o las viejas
+            // sin tipo). Una de goles no dice nada sobre los asistentes.
             ->whereNotExists(function ($s) {
                 $s->select(DB::raw(1))->from('incidencias')
-                    ->whereColumn('incidencias.partido_id', 'partidos.id');
+                    ->whereColumn('incidencias.partido_id', 'partidos.id')
+                    ->where(function ($w) {
+                        $w->whereNull('incidencias.tipo')
+                          ->orWhereIn('incidencias.tipo', Incidencia::tiposQueTapan(['arbitros.terna']));
+                    });
             })
             ->select('partidos.id', 'partidos.dia', 'grupo.torneo_id',
                 DB::raw('MAX(ip.external_id) as external_id'),
