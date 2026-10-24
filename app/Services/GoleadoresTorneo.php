@@ -14,8 +14,9 @@ use Illuminate\Support\Facades\DB;
  *
  * Regla, decidida el 24/10/2026:
  *
- *  1. Sólo torneos COMPLETOS: con posiciones guardadas (`posicion_torneos`),
- *     de al menos MIN_PARTIDOS partidos, y ni `parcial` (cargado DT por DT:
+ *  1. Sólo torneos COMPLETOS según el Control de torneos (equipos y fechas
+ *     completos), con posiciones guardadas (`posicion_torneos`), de al menos
+ *     MIN_PARTIDOS partidos, y ni `parcial` (cargado DT por DT:
  *     sólo están los partidos de un equipo) ni `inconcluso` (suspendidos, y
  *     también las fases previas que se cargan sólo con los partidos de
  *     algunos equipos: UEFA Europa League Qualifying 2017 daba 9 goleadores
@@ -55,19 +56,26 @@ class GoleadoresTorneo
                       WHERE i.partido_id IS NOT NULL AND i.tipo IN ($tipos)";
         $soloTorneo = $torneoId ? ' AND g.torneo_id = ' . (int) $torneoId : '';
 
-        // 1) Torneos completos
+        // 1) Torneos completos: los que el Control de torneos pone en
+        //    "Completos o inconclusos" —equipos cargados = declarados, fechas de
+        //    tabla sin partidos faltantes— y además con posiciones guardadas,
+        //    sin `inconcluso` y con MIN_PARTIDOS. Sólo con posiciones no
+        //    alcanzaba: la Champions 2013/14 tiene posiciones pero sólo los
+        //    partidos de los equipos seguidos, y le daba "goleador" a Messi con
+        //    8 goles (fue Cristiano, con 17).
+        $control = app(ControlTorneos::class);
+        $filasTorneos = $control->torneos([]);   // sin filtros: también excluye los `parcial`
+        if ($torneoId) {
+            $filasTorneos = array_values(array_filter($filasTorneos, function ($t) use ($torneoId) {
+                return (int) $t->id === (int) $torneoId;
+            }));
+        }
         $completos = [];
-        $q = 'SELECT t.id, COALESCE(t.inconcluso, 0) AS inconcluso FROM torneos t
-               WHERE COALESCE(t.inconcluso, 0) = 0
-                 AND COALESCE(t.parcial, 0) = 0
-                 AND EXISTS (SELECT 1 FROM posicion_torneos pt WHERE pt.torneo_id = t.id)
-                 AND (SELECT COUNT(*) FROM partidos p
-                        JOIN fechas f ON f.id = p.fecha_id
-                        JOIN grupos g ON g.id = f.grupo_id
-                       WHERE g.torneo_id = t.id) >= ' . self::MIN_PARTIDOS
-            . ($torneoId ? ' AND t.id = ' . (int) $torneoId : '');
-        foreach (DB::select($q) as $t) {
-            $completos[(int) $t->id] = (int) $t->inconcluso;
+        foreach ($control->clasificar($filasTorneos)['cerrados'] as $t) {
+            if ((int) $t->inconcluso) continue;
+            if ((int) $t->posiciones === 0) continue;
+            if ((int) $t->partidos < self::MIN_PARTIDOS) continue;
+            $completos[(int) $t->id] = 0;
         }
 
         // 2) Goles por torneo y jugador, sin los partidos anulados

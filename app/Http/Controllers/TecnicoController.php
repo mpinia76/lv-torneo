@@ -1364,6 +1364,33 @@ WHERE (tecnicos.id = ".$id.")";
 
             $insert = [];
 
+            // ── Nombre completo de los mononímicos ─────────────────────────
+            // La API de DTs (/coach/{id}) NO trae el nombre completo: sólo
+            // `name`, sin shortName, sin displayName y con passportName vacío
+            // (confirmado con Candinho, 83607). Para un DT conocido por una sola
+            // palabra eso dejaba "Candinho" en mostrar, nombre y apellido. La
+            // ficha web sí lo tiene ("Nombre completo: José Cândido Sotto
+            // Maior"), así que en ESE caso —y sólo en ese— se lee la ficha
+            // (1 crédito de ScraperAPI). Si no se puede leer, queda como antes.
+            $avisoNombre = '';
+            $nombreApi   = trim($datos['name'] ?? '');
+            if ($nombreApi !== ''
+                && count(preg_split('/\s+/u', $nombreApi)) < 2
+                && trim($datos['nationalityDetails']['passportName'] ?? '') === ''
+                && trim($datos['displayName'] ?? '') === '') {
+                $completoWeb = $this->nombreCompletoDesdeFichaWeb($coachId, $datos['relativeUrl'] ?? '');
+                if ($completoWeb !== null) {
+                    // displayName es el segundo candidato de separarTM para el
+                    // nombre completo; el mostrado sigue saliendo de `name`.
+                    $datos['displayName'] = $completoWeb;
+                    $avisoNombre = 'Nombre completo tomado de la ficha web de TM: «' . e($completoWeb)
+                        . '». Revisá dónde quedó cortado el apellido.<br>';
+                } else {
+                    $avisoNombre = '⚠️ TM sólo da «' . e($nombreApi) . '» y no se pudo leer el nombre completo '
+                        . 'de la ficha web: quedó igual en mostrar, nombre y apellido. Corregilo a mano.<br>';
+                }
+            }
+
             // ── Nombre / apellido ──────────────────────────────────────────
             // Separación centralizada en NombreHelper (soporta "F. Calvo",
             // "Tomás Uribe", compuestos, partículas y mononímicos).
@@ -1491,6 +1518,8 @@ WHERE (tecnicos.id = ".$id.")";
                 $insert['fallecimiento'] = trim($fallecimiento);
             }
 
+            $success .= $avisoNombre;
+
             $request->session()->put('nombre_filtro_tecnico', $apellido);
 
             if (empty($insert['name']) || empty($insert['apellido'])) {
@@ -1549,6 +1578,60 @@ WHERE (tecnicos.id = ".$id.")";
         }
 
         return redirect()->route('tecnicos.index')->with($respuestaID, $respuestaMSJ);
+    }
+
+
+    /**
+     * "Nombre completo" de la ficha web del DT en Transfermarkt, o null.
+     *
+     * Se usa sólo cuando la API no trae más que una palabra (ver
+     * importarProcess_new). La ficha del DT lo pone en una tabla
+     * (`<th>Nombre completo:</th><td>…</td>`); la de jugador, en spans: se
+     * aceptan las dos. Se lee por la etiqueta, en el sitio en español, y lo que
+     * no tenga al menos dos palabras en alfabeto latino se descarta.
+     */
+    private function nombreCompletoDesdeFichaWeb($coachId, $relativeUrl)
+    {
+        $rel = trim((string) $relativeUrl);
+        $url = 'https://www.transfermarkt.es'
+            . ($rel !== '' && strpos($rel, '/profil/trainer/') !== false
+                ? $rel
+                : '/-/profil/trainer/' . rawurlencode((string) $coachId));
+
+        try {
+            $html = HttpHelper::getHtmlTm($url);
+        } catch (\Throwable $e) {
+            Log::warning('Import TM (DT): no se pudo bajar la ficha web ' . $url . ' - ' . $e->getMessage(), []);
+            return null;
+        }
+        if (!is_string($html) || trim($html) === '') {
+            Log::warning('Import TM (DT): ficha web vacía: ' . $url, []);
+            return null;
+        }
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+        $xp = new \DOMXPath($dom);
+
+        $nodos = $xp->query(
+            '//th[starts-with(normalize-space(.), "Nombre completo")]/following-sibling::td[1]'
+            . ' | //span[starts-with(normalize-space(.), "Nombre completo")]/following-sibling::span[1]'
+        );
+        if ($nodos) {
+            foreach ($nodos as $n) {
+                $v = trim(preg_replace('/\s+/u', ' ', $n->textContent));
+                if ($v !== ''
+                    && count(explode(' ', $v)) >= 2
+                    && preg_match('/^[\p{Latin}\p{M}\s.\'\-]+$/u', $v)) {
+                    return $v;
+                }
+            }
+        }
+
+        Log::info('Import TM (DT): la ficha web no tiene "Nombre completo": ' . $url, []);
+        return null;
     }
 
 
