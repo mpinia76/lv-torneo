@@ -225,7 +225,7 @@ class Controles
                 ],
                 'cambios.titulares_entran' => [
                     'titulo'   => 'Titular que entra',
-                    'ayuda'    => 'Un jugador figura como titular y además tiene un "Entra" en los cambios.',
+                    'ayuda'    => 'Un jugador figura como titular y además tiene un "Entra" en los cambios. Si salió antes y vuelve a entrar, suele ser una reanudación: se marca con la incidencia "Reanudación".',
                     'jugador'  => true,
                     'acciones' => ['alineaciones', 'cambios', 'incidencia'],
                     'metodo'   => 'cambiosTitularesQueEntran',

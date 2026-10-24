@@ -30,7 +30,8 @@ class Incidencia extends Model
             'escritorio'     => 'Resultado de escritorio (se jugó, pero el resultado oficial es otro)',
             'no_jugado'      => 'No se jugó (con resultado dado o sin resultado)',
             'sancion_puntos' => 'Sanción de puntos',
-            'otra'           => 'Otra (suspendido y continuado, error del árbitro, contexto)',
+            'reanudacion'    => 'Reanudación (suspendido y completado otro día)',
+            'otra'           => 'Otra (error del árbitro, contexto)',
         ],
         'Datos que no están en la fuente' => [
             'sin_detalle'                => 'Sin detalle del partido',
@@ -66,6 +67,13 @@ class Incidencia extends Model
         'no_jugado'   => ['*'],
         'sin_detalle' => ['*'],
         'escritorio'  => ['goles.diferencia', 'goles.por_equipo'],
+
+        // Al completarse otro día cada DT rearma el equipo y TM lo carga como
+        // cambios en el minuto de la suspensión: un titular que salió ahí
+        // puede volver a entrar más tarde (Defensa y Justicia–Estudiantes
+        // 18/11/2018, Campi: sale 26', entra 76'). Sólo tapa ese control; el
+        // resto del detalle se sigue controlando.
+        'reanudacion' => ['cambios.titulares_entran'],
 
         'alineaciones.sin_jugadores' => [
             'alineaciones.sin_jugadores', 'alineaciones.faltan', 'tecnicos.faltan',
