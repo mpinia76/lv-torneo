@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "La Planilla",
+  "short_name": "La Planilla",
+  "description": "Fichas completas de jugadores, directores técnicos y equipos: cada partido oficial del siglo XXI, con formaciones, goles, tarjetas, cambios y penales.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EDEFEB",
+  "theme_color": "#1746A2",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
