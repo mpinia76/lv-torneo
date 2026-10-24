@@ -1414,6 +1414,22 @@ h5.text-warning, h5.text-success, h5.text-info, h5.text-danger { color: var(--t-
 .t-ficha-pos img { height: 13px; width: auto; }
 .t-ficha-pos.t-campeon { color: var(--t-accent); font-weight: 600; }
 
+/* "Goleador" en la fila del torneo de la ficha del jugador */
+.t-goleador {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border: 1px solid var(--t-accent);
+    border-radius: 9px;
+    font-family: var(--t-fuente-dato);
+    font-size: 10px;
+    letter-spacing: .04em;
+    color: var(--t-accent);
+    font-weight: 600;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 .t-tabla tfoot td,
 .t-tabla tr.t-totales td { white-space: nowrap;
     border-top: 1px solid var(--t-line-strong);

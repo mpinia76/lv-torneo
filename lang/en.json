@@ -832,5 +832,9 @@
     "Ámbito": "Scope",
     "Árbitro": "Referee",
     "Árbitro de fútbol": "Football referee",
-    "Árbitros": "Referees"
+    "Árbitros": "Referees",
+    "Goleador": "Top scorer",
+    "Goleador del torneo": "Competition top scorer",
+    "Goleador del torneo (compartido)": "Competition top scorer (shared)",
+    "Goleador del torneo al momento de la suspensión": "Competition top scorer when it was suspended"
 }

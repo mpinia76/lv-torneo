@@ -4490,7 +4490,13 @@ order by " . $ordenTabla,
         if ($ok){
             DB::commit();
 
-
+            // Con posiciones guardadas el torneo pasa a "completo": su goleador
+            // se calcula ya, sin esperar al cron de la noche.
+            try {
+                app(\App\Services\GoleadoresTorneo::class)->calcular((int) $request->torneo_id);
+            } catch (\Throwable $e) {
+                \Log::warning('goleador del torneo '.$request->torneo_id.': '.$e->getMessage());
+            }
 
             $respuestaID='success';
             $respuestaMSJ='Registro actualizado satisfactoriamente';

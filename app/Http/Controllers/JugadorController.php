@@ -576,6 +576,18 @@ GROUP BY grupos.torneo_id') as $f) {
             }
         }
 
+        // Goleador del torneo: lo calcula `torneos:goleadores` (ver
+        // App\Services\GoleadoresTorneo) y acá sólo se lee. Una consulta.
+        if (!empty($idsTorneos)) {
+            $goleadorEn = DB::table('torneo_goleadores')
+                ->where('jugador_id', $id)
+                ->whereIn('torneo_id', $idsTorneos)
+                ->get()->keyBy('torneo_id');
+            foreach ($torneosJugador as $torneo) {
+                $torneo->goleador = $goleadorEn->get((int) $torneo->idTorneo);
+            }
+        }
+
         $estadisticasManuales = JugadorEstadisticaManual::where('jugador_id', $id)->get();
 
         foreach ($estadisticasManuales as $manual) {

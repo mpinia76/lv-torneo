@@ -442,6 +442,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
+AND NOT EXISTS (SELECT 1 FROM incidencias i WHERE i.partido_id = gols.partido_id AND i.tipo IN (\'escritorio\', \'no_jugado\'))
 GROUP BY jugadors.id,jugador, nacionalidad, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 

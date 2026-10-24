@@ -12,6 +12,7 @@
     $fjErrados = $fjAtajados = $fjRecibidos = $fjInvictas = 0;
     $fjEquipos = [];
     $fjFilas   = [];
+    $fjGoleador = 0;   // torneos en los que fue goleador (torneo_goleadores)
 
     foreach ($torneosJugador as $fjT) {
         $fjJugados   += $fjT->jugados;
@@ -22,6 +23,7 @@
         $fjAtajados  += $fjT->atajados;
         $fjRecibidos += $fjT->recibidos;
         $fjInvictas  += $fjT->invictas;
+        if (!empty($fjT->goleador)) { $fjGoleador++; }
 
         $fjEquiposFila = [];
         foreach (explode(',', (string) $fjT->escudo) as $fjCadena) {
@@ -91,11 +93,16 @@
         @endif
     </div>
 
-    @if($fjTitulos > 0)
+    @if($fjTitulos > 0 || $fjGoleador > 0)
         <div class="t-kpis-pie">
-            <span>{{ __('Ligas nacionales') }} <b>{{ $titulosJugadorLiga }}</b></span>
-            <span>{{ __('Copas nacionales') }} <b>{{ $titulosJugadorCopa }}</b></span>
-            <span>{{ __('Internacionales') }} <b>{{ $titulosJugadorInternacional }}</b></span>
+            @if($fjTitulos > 0)
+                <span>{{ __('Ligas nacionales') }} <b>{{ $titulosJugadorLiga }}</b></span>
+                <span>{{ __('Copas nacionales') }} <b>{{ $titulosJugadorCopa }}</b></span>
+                <span>{{ __('Internacionales') }} <b>{{ $titulosJugadorInternacional }}</b></span>
+            @endif
+            @if($fjGoleador > 0)
+                <span>{{ __('Goleador del torneo') }} <b>{{ $fjGoleador }}</b></span>
+            @endif
         </div>
     @endif
 
@@ -169,6 +176,14 @@
                                 {!! $fjCero($fjT->goles) !!}
                             @endisset
                             {!! $fjRatio($fjT->goles, $fjT->jugados) !!}
+                            @if(!empty($fjT->goleador))
+                                @php
+                                    $fjGolTit = $fjT->goleador->inconcluso
+                                        ? __('Goleador del torneo al momento de la suspensión')
+                                        : ($fjT->goleador->compartido ? __('Goleador del torneo (compartido)') : __('Goleador del torneo'));
+                                @endphp
+                                <span class="t-goleador" title="{{ $fjGolTit }}">{{ __('Goleador') }}{{ $fjT->goleador->inconcluso || $fjT->goleador->compartido ? '*' : '' }}</span>
+                            @endif
                         </td>
                         <td>{!! $fjCero($fjT->amarillas) !!}</td>
                         <td>{!! $fjCero($fjT->rojas) !!}</td>
