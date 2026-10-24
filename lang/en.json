@@ -836,5 +836,21 @@
     "Goleador": "Top scorer",
     "Goleador del torneo": "Competition top scorer",
     "Goleador del torneo (compartido)": "Competition top scorer (shared)",
-    "Goleador del torneo al momento de la suspensión": "Competition top scorer when it was suspended"
+    "Goleador del torneo al momento de la suspensión": "Competition top scorer when it was suspended",
+    "El resultado oficial no es el que se jugó en la cancha.": "The official result is not the one played on the pitch.",
+    "El partido no se jugó.": "The match was not played.",
+    "El partido se suspendió y se completó otro día.": "The match was suspended and completed on another day.",
+    "No hay registro del detalle completo de este partido.": "There is no record of the full details of this match.",
+    "No hay registro de la alineación de alguno de los dos equipos.": "There is no record of the line-up of one of the two teams.",
+    "La alineación registrada para este partido está incompleta.": "The line-up recorded for this match is incomplete.",
+    "No hay registro del técnico de alguno de los dos equipos en este partido.": "There is no record of the manager of one of the two teams in this match.",
+    "No hay registro de la terna arbitral completa de este partido.": "There is no record of the full refereeing team for this match.",
+    "No hay registro de todos los goles del partido.": "Not all goals of this match are recorded.",
+    "No hay registro de qué equipo convirtió cada gol de este partido.": "There is no record of which team scored each goal in this match.",
+    "El goleador no figura en la alineación registrada para este partido.": "The goalscorer does not appear in the line-up recorded for this match.",
+    "El amonestado no figura en la alineación registrada para este partido.": "The booked player does not appear in the line-up recorded for this match.",
+    "El jugador del cambio no figura en la alineación registrada para este partido.": "The substituted player does not appear in the line-up recorded for this match.",
+    "No hay registro de quién salió en uno de los cambios.": "There is no record of who went off in one of the substitutions.",
+    "Un jugador salió y no entró nadie en su lugar.": "A player went off and nobody came on in his place.",
+    "No hay registro del arquero que recibió el penal.": "There is no record of the goalkeeper who faced the penalty."
 }

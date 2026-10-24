@@ -1085,9 +1085,11 @@
 
                         <ul>
                             @foreach($incidencias as $incidencia)
-                                <li>
-                                    {{ $incidencia->observacion_idioma }}
-                                </li>
+                                @if(trim((string) $incidencia->observacion_idioma) !== '')
+                                    <li>
+                                        {{ $incidencia->observacion_idioma }}
+                                    </li>
+                                @endif
                             @endforeach
                         </ul>
                     </div>

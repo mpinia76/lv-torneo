@@ -143,12 +143,46 @@ class Incidencia extends Model
      * La observación en el idioma del sitio: en /en usa `observaciones_en`
      * y, si está vacía, cae al castellano. Uso: $incidencia->observacion_idioma
      */
+    /**
+     * Lo que se muestra en el sitio cuando la incidencia no tiene texto propio:
+     * así una reanudación o una nota de carga no hace falta escribirla a mano.
+     * Van en castellano y se traducen con lang/en.json. Nunca nombrar la fuente
+     * de los datos acá: se ve en el sitio público.
+     */
+    public const TEXTO_PUBLICO = [
+        'escritorio'                 => 'El resultado oficial no es el que se jugó en la cancha.',
+        'no_jugado'                  => 'El partido no se jugó.',
+        'reanudacion'                => 'El partido se suspendió y se completó otro día.',
+        'sin_detalle'                => 'No hay registro del detalle completo de este partido.',
+        'alineaciones.sin_jugadores' => 'No hay registro de la alineación de alguno de los dos equipos.',
+        'alineaciones.faltan'        => 'La alineación registrada para este partido está incompleta.',
+        'tecnicos.faltan'            => 'No hay registro del técnico de alguno de los dos equipos en este partido.',
+        'arbitros.terna'             => 'No hay registro de la terna arbitral completa de este partido.',
+        'goles.diferencia'           => 'No hay registro de todos los goles del partido.',
+        'goles.por_equipo'           => 'No hay registro de qué equipo convirtió cada gol de este partido.',
+        'goles.sin_jugar'            => 'El goleador no figura en la alineación registrada para este partido.',
+        'tarjetas.sin_jugar'         => 'El amonestado no figura en la alineación registrada para este partido.',
+        'cambios.sin_jugar'          => 'El jugador del cambio no figura en la alineación registrada para este partido.',
+        'cambios.impares'            => 'No hay registro de quién salió en uno de los cambios.',
+        'cambios.sale_solo'          => 'Un jugador salió y no entró nadie en su lugar.',
+        'penales.faltantes'          => 'No hay registro del arquero que recibió el penal.',
+    ];
+
+    /**
+     * La observación en el idioma del sitio: en /en usa `observaciones_en`
+     * y, si está vacía, cae al castellano. Si la incidencia no tiene ningún
+     * texto, usa el genérico de su tipo (TEXTO_PUBLICO). Puede devolver ''
+     * (sanción de puntos u "otra" sin texto): la vista no muestra esas.
+     */
     public function getObservacionIdiomaAttribute()
     {
         if (app()->getLocale() === 'en' && trim((string) $this->observaciones_en) !== '') {
             return $this->observaciones_en;
         }
-        return $this->observaciones;
+        if (trim((string) $this->observaciones) !== '') {
+            return $this->observaciones;
+        }
+        return isset(self::TEXTO_PUBLICO[$this->tipo]) ? __(self::TEXTO_PUBLICO[$this->tipo]) : '';
     }
 
     public function equipo()
