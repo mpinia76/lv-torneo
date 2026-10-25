@@ -131,7 +131,7 @@ class Controles
                 ],
                 'goles.repetidos' => [
                     'titulo'   => 'Goles repetidos',
-                    'ayuda'    => 'El mismo jugador con más de un gol en el mismo minuto: casi siempre es carga duplicada.',
+                    'ayuda'    => 'El mismo jugador con más de un gol en el mismo minuto: casi siempre es carga duplicada. Los goles sin minuto no se comparan (un duplicado ahí lo marca «No coinciden con el resultado»).',
                     'jugador'  => true,
                     'detalle'  => 'cantidad',
                     'acciones' => ['goles', 'incidencia'],
@@ -984,8 +984,16 @@ class Controles
         // 90+6 y a los 90+9 son dos goles, no una carga duplicada. Agrupar sólo
         // por el minuto del reloj los daba por repetidos, que es exactamente lo
         // que pasaba cuando el importador tiraba el `addedTime` de Transfermarkt.
+        //
+        // Sin minuto no hay nada que comparar: GROUP BY junta los NULL en un
+        // solo grupo, así que cualquiera que hizo dos goles en un partido sin
+        // minutos (las copas viejas: AZ 10-1 Meerssen, KNVB Beker 2006/07)
+        // salía como repetido. Esos quedan afuera; si un gol sin minuto está
+        // cargado dos veces, sobra un gol y lo agarra «No coinciden con el
+        // resultado».
         $derivada = 'SELECT partido_id, jugador_id, minuto, adicionado, COUNT(*) AS cantidad
                      FROM gols
+                     WHERE minuto IS NOT NULL
                      GROUP BY partido_id, jugador_id, minuto, adicionado
                      HAVING COUNT(*) > 1';
 
