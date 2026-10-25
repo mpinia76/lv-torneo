@@ -45,7 +45,7 @@ class GolController extends Controller
 
 
 
-        $jugadors = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.name, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrPlantillas))->distinct()->get();
+        $jugadors = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.name, IFNULL(CONCAT(' (',plantilla_jugadors.dorsal,')'),'')) as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrPlantillas))->distinct()->get();
 
         $jugadors = $jugadors->pluck('nombre_dorsal','id')->sortBy('apellido')->prepend('','');
 

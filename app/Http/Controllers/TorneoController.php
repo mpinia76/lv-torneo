@@ -4988,7 +4988,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
         $e1=Equipo::findOrFail($equipo1);
 
-        $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+        $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, IFNULL(CONCAT(' (',plantilla_jugadors.dorsal,')'),'')) as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
 
 
         //dd($jugadorsL);
@@ -5056,7 +5056,7 @@ group by tecnico, fotoTecnico, nacionalidadTecnico, tecnico_id
 
             $e1=Equipo::findOrFail($equipo1);
 
-            $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, ' (',plantilla_jugadors.dorsal,')') as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
+            $jugadorsL = Jugador::SELECT('jugadors.*',DB::raw("CONCAT(personas.apellido, ' ', personas.nombre, IFNULL(CONCAT(' (',plantilla_jugadors.dorsal,')'),'')) as 'nombre_dorsal'"), 'personas.foto')->Join('plantilla_jugadors','plantilla_jugadors.jugador_id','=','jugadors.id')->Join('personas','personas.id','=','jugadors.persona_id')->wherein('plantilla_id',explode(',', $arrplantillals))->distinct()->get();
 
 
             //dd($jugadorsL);
