@@ -985,15 +985,16 @@ class Controles
         // por el minuto del reloj los daba por repetidos, que es exactamente lo
         // que pasaba cuando el importador tiraba el `addedTime` de Transfermarkt.
         //
-        // Sin minuto no hay nada que comparar: GROUP BY junta los NULL en un
-        // solo grupo, así que cualquiera que hizo dos goles en un partido sin
-        // minutos (las copas viejas: AZ 10-1 Meerssen, KNVB Beker 2006/07)
-        // salía como repetido. Esos quedan afuera; si un gol sin minuto está
-        // cargado dos veces, sobra un gol y lo agarra «No coinciden con el
-        // resultado».
+        // Sin minuto no hay nada que comparar: cualquiera que hizo dos goles
+        // en un partido sin minutos (las copas viejas: AZ 10-1 Meerssen,
+        // KNVB Beker 2006/07) salía como repetido. En la base "sin minuto"
+        // está guardado como 0 —no NULL— en esos partidos; ningún gol se hace
+        // en el minuto 0, así que se excluyen los dos. Si un gol sin minuto
+        // está cargado dos veces, sobra un gol y lo agarra «No coinciden con
+        // el resultado».
         $derivada = 'SELECT partido_id, jugador_id, minuto, adicionado, COUNT(*) AS cantidad
                      FROM gols
-                     WHERE minuto IS NOT NULL
+                     WHERE minuto IS NOT NULL AND minuto > 0
                      GROUP BY partido_id, jugador_id, minuto, adicionado
                      HAVING COUNT(*) > 1';
 
