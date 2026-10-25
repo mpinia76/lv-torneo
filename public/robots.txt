@@ -36,6 +36,8 @@ User-agent: OAI-SearchBot
 User-agent: CCBot
 User-agent: Bytespider
 User-agent: meta-externalagent
+# 25/10: meta-webindexer (~1.400/hora) es otro nombre de Meta.
+User-agent: meta-webindexer
 User-agent: PerplexityBot
 User-agent: MJ12bot
 User-agent: AhrefsBot
