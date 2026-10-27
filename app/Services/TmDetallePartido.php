@@ -2065,6 +2065,16 @@ class TmDetallePartido
             }
             $golesTmLocal -= $penTmLocal;
             $golesTmVisit -= $penTmVisit;
+
+            // Control cruzado: a una tanda (que no sea la vuelta de una llave,
+            // descartada arriba) se llega empatado. Si la resta no da un empate
+            // limpio, algo de la tanda se leyó mal y no se carga nada.
+            if ($golesTmLocal < 0 || $golesTmVisit < 0 || $golesTmLocal !== $golesTmVisit) {
+                $this->aviso('El partido se definio por penales pero al restar la tanda ('
+                    . $penTmLocal . '-' . $penTmVisit . ') del ' . (int) $sc['home'] . ':' . (int) $sc['away']
+                    . ' de TM no queda un empate: no le cargue el marcador.');
+                return false;
+            }
         }
 
         // $lados[0] es el equipo que TM pone de local.
@@ -2091,19 +2101,52 @@ class TmDetallePartido
 
     /**
      * Penales convertidos por un lado en la tanda. Devuelve **null** si el JSON
-     * no trae `actions.shootout` (el listado del fixture no lo trae), que no es
-     * lo mismo que cero: null significa "no se puede separar la tanda".
+     * no trae la tanda (el listado del fixture no la trae), que no es lo mismo
+     * que cero: null significa "no se puede separar la tanda".
+     *
+     * Dos formas, igual que el resto de las acciones:
+     *  · anidada: `homeClub.actions.shootout`, con `action: "Scored"`;
+     *  · plana (`data.actions`, ver accionesPlanasDelLado()): `type: "SHOOTOUT"`
+     *    con `clubId`, sin textos. Confirmado con Sunderland–Huddersfield, EFL
+     *    Cup 2025/26 (gameId 4709790, 1:1 y tanda 5-6, TM publica 6:7):
+     *    actionId 601 = convertido, 603 = errado (el `score` acumulado de cada
+     *    fila sólo sube en los 601). Un actionId que no sea ninguno de los dos
+     *    no se adivina: null, y el marcador queda sin cargar.
      */
     private function penalesConvertidos(array $game, $lado)
     {
-        if (!isset($game[$lado]['actions']['shootout'])
-            || !is_array($game[$lado]['actions']['shootout'])) return null;
-
-        $n = 0;
-        foreach ($game[$lado]['actions']['shootout'] as $t) {
-            if (isset($t['action']) && $t['action'] === 'Scored') $n++;
+        if (isset($game[$lado]['actions']['shootout'])
+            && is_array($game[$lado]['actions']['shootout'])) {
+            $n = 0;
+            foreach ($game[$lado]['actions']['shootout'] as $t) {
+                if (isset($t['action']) && $t['action'] === 'Scored') $n++;
+            }
+            return $n;
         }
-        return $n;
+
+        if (!isset($game['actions']) || !is_array($game['actions'])) return null;
+        $club = $this->valor(isset($game[$lado]) ? $game[$lado] : [], ['id', 'clubId']);
+        if ($club === null) return null;
+
+        $hayTanda = false;
+        $n = 0;
+        foreach ($game['actions'] as $a) {
+            if (!is_array($a)) continue;
+            $tipo = strtoupper(trim((string) (isset($a['type']) ? $a['type'] : '')));
+            if ($tipo !== 'SHOOTOUT') continue;
+            $hayTanda = true;   // de cualquiera de los dos: un lado puede no convertir ninguno
+            if (!isset($a['clubId']) || (string) $a['clubId'] !== (string) $club) continue;
+
+            $cod = (int) $this->valor($a, ['actionId']);
+            if ($cod === 601) {
+                $n++;
+            } elseif ($cod !== 603) {
+                $this->aviso('Penal de la tanda con un código que no conozco (' . $cod . '): no separo '
+                    . 'la tanda del marcador. ' . $this->resumenCrudo($a));
+                return null;
+            }
+        }
+        return $hayTanda ? $n : null;
     }
 
     private function orientar(array $game, Partido $partido, $escribir = false)
@@ -2271,6 +2314,9 @@ class TmDetallePartido
             // coachId en vez de jugador). `tarjetas` es sólo de jugadores y no
             // hay dónde guardarla, así que se saltea sin avisar.
             if ($tipo === 'COACH_SANCTION') continue;
+            // La tanda de penales NO va a `penals` (decisión de Piña, 31/08):
+            // sólo la lee penalesConvertidos() para separar el marcador.
+            if ($tipo === 'SHOOTOUT') continue;
             if (!isset($a['clubId']) || (string) $a['clubId'] !== (string) $club) continue;
 
             if (isset($ramas[$tipo])) {
