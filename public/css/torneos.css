@@ -2153,3 +2153,8 @@ td.t-dif-neg { color: var(--t-loss); }
 .t-barras-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--t-ink); text-align: right; min-width: 64px; }
 .t-barras-val small { font-weight: 500; color: var(--t-muted); }
 table.t-tabla th.t-orden-activo { color: var(--t-accent); }
+
+/* Detalle del partido: aviso bajo el marcador (escritorio, no jugado, completado otro día) */
+.t-resultado-nota { color: var(--t-loss); }
+/* Nota de carga ("no hay registro de…") arriba de la pestaña donde falta el dato */
+.t-nota-carga { margin: 0 0 12px; }

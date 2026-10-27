@@ -35,6 +35,37 @@
         $torneoDet   = $partido->fecha->grupo->torneo;
         $numeroFecha = nombre_fecha($partido->fecha->numero);
         $sinJugar    = is_null($partido->golesl) && is_null($partido->golesv);
+
+        // Incidencias repartidas (ver App\Incidencia::TIPOS): los hechos del
+        // partido van a la pestaña Incidencias; cada nota de carga ("no hay
+        // registro de…") va a la pestaña de lo que falta, donde se nota el
+        // hueco. Las viejas sin tipo se tratan como hechos.
+        $incPestana = function ($tipo) {
+            if ($tipo === null || $tipo === '') return null;
+            if ($tipo === 'sin_detalle' || strpos($tipo, 'alineaciones.') === 0 || $tipo === 'tecnicos.faltan') return 'alineaciones';
+            if (strpos($tipo, 'goles.') === 0 || $tipo === 'penales.faltantes') return 'goles';
+            if (strpos($tipo, 'tarjetas.') === 0) return 'tarjetas';
+            if (strpos($tipo, 'cambios.') === 0) return 'cambios';
+            if ($tipo === 'arbitros.terna') return 'arbitros';
+            return null;
+        };
+        $incHechos = [];
+        $incNotas  = ['alineaciones' => [], 'goles' => [], 'tarjetas' => [], 'cambios' => [], 'arbitros' => []];
+        foreach ($incidencias as $incItem) {
+            $incTexto = trim((string) $incItem->observacion_idioma);
+            if ($incTexto === '') continue;
+            $incTab = $incPestana($incItem->tipo);
+            if ($incTab) {
+                $incNotas[$incTab][$incTexto] = $incTexto;   // sin repetir la misma frase
+            } else {
+                $incHechos[] = $incTexto;
+            }
+        }
+        $incTipos = collect($incidencias->items())->pluck('tipo')->all();
+        $incEtiqueta = in_array('escritorio', $incTipos, true) ? __('Resultado de escritorio')
+            : (in_array('no_jugado', $incTipos, true) && !$sinJugar ? __('Resultado dado: el partido no se jugó')
+            : (in_array('reanudacion', $incTipos, true) ? __('Completado otro día') : null));
+        $incHayPestana = count($incHechos) > 0 || (isset($penales) && count($penales) > 0);
     @endphp
 
         {{-- Íconos de eventos: estilos + sprite SVG.
@@ -213,6 +244,9 @@
                     @if($partido->penalesl || $partido->penalesv)
                         <div class="t-eyebrow mt-2">{{ __('Penales') }} {{ $partido->penalesl }}–{{ $partido->penalesv }}</div>
                     @endif
+                    @if($incEtiqueta)
+                        <div class="t-eyebrow mt-2 t-resultado-nota">{{ $incEtiqueta }}</div>
+                    @endif
                 </div>
 
                 <div class="t-lado">
@@ -272,7 +306,7 @@
                     {{ __('Árbitros') }}
                 </button>
             </li>
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" @unless($incHayPestana) style="display:none" @endunless>
                 <button class="nav-link" id="incidencias-tab" data-bs-toggle="tab" data-bs-target="#incidencias" type="button" role="tab" aria-controls="incidencias" aria-selected="false">
                     {{ __('Incidencias') }}
                 </button>
@@ -282,6 +316,9 @@
 
         <div class="tab-content" id="myTabContent">
             <div role="tabpanel" class="tab-pane active" id="alineaciones">
+                @foreach($incNotas['alineaciones'] as $incNota)
+                    <p class="t-alcance t-nota-carga"><i class="bi bi-info-circle"></i> {{ $incNota }}</p>
+                @endforeach
                 <div class="row">
                     <div class="form-group col-xs-12 col-sm-6 col-md-12">
                         <table class="table" style="font-size: 14px;">
@@ -938,6 +975,9 @@
             @endphp
 
             <div role="tabpanel" class="tab-pane" id="goles">
+                @foreach($incNotas['goles'] as $incNota)
+                    <p class="t-alcance t-nota-carga"><i class="bi bi-info-circle"></i> {{ $incNota }}</p>
+                @endforeach
                 <div class="row">
 
 
@@ -963,6 +1003,9 @@
                 </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="tarjetas">
+                @foreach($incNotas['tarjetas'] as $incNota)
+                    <p class="t-alcance t-nota-carga"><i class="bi bi-info-circle"></i> {{ $incNota }}</p>
+                @endforeach
                 <div class="row">
 
 
@@ -1000,6 +1043,9 @@
                 </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="cambios">
+                @foreach($incNotas['cambios'] as $incNota)
+                    <p class="t-alcance t-nota-carga"><i class="bi bi-info-circle"></i> {{ $incNota }}</p>
+                @endforeach
                 <div class="row">
 
 
@@ -1030,6 +1076,9 @@
                 </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="arbitros">
+                @foreach($incNotas['arbitros'] as $incNota)
+                    <p class="t-alcance t-nota-carga"><i class="bi bi-info-circle"></i> {{ $incNota }}</p>
+                @endforeach
                 <div class="row">
 
 
@@ -1084,12 +1133,8 @@
                     <div class="mt-4">
 
                         <ul>
-                            @foreach($incidencias as $incidencia)
-                                @if(trim((string) $incidencia->observacion_idioma) !== '')
-                                    <li>
-                                        {{ $incidencia->observacion_idioma }}
-                                    </li>
-                                @endif
+                            @foreach($incHechos as $incHecho)
+                                <li>{{ $incHecho }}</li>
                             @endforeach
                         </ul>
                     </div>
