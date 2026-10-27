@@ -102,6 +102,14 @@
         @endif
         <span>{!! __('Goles :favor a favor · :contra en contra', ['favor' => '<b>'.e($ftFavor).'</b>', 'contra' => '<b>'.e($ftContra).'</b>']) !!}</span>
         <span class="t-referencia">{!! $ftBarra($ftGanados, $ftEmpatados, $ftPerdidos) !!} {{ __('balance de la carrera') }}</span>
+        @foreach(['invicto' => __('Mayor invicto'), 'victorias' => __('Más victorias seguidas')] as $ftRTipo => $ftRRot)
+            @php $ftR = ($rachasDt ?? [])[$ftRTipo] ?? null; @endphp
+            @if($ftR)
+                <span title="{{ $ftR['club'] }} · {{ date('d/m/Y', strtotime($ftR['desde'])) }} – {{ date('d/m/Y', strtotime($ftR['hasta'])) }}">
+                    {{ $ftRRot }} <b>{{ $ftR['n'] }}</b> <span class="t-referencia">({{ $ftR['club'] }}, {{ substr($ftR['desde'], 0, 4) === substr($ftR['hasta'], 0, 4) ? substr($ftR['desde'], 0, 4) : substr($ftR['desde'], 0, 4).'–'.substr($ftR['hasta'], 0, 4) }})</span>
+                </span>
+            @endif
+        @endforeach
     </div>
 
     {{-- Los totales salen solo de lo cargado; la base todavía no tiene la historia completa. --}}

@@ -934,6 +934,52 @@ GROUP BY j.id, pe.name, pe.foto, pe.nacionalidad
 ORDER BY jugados DESC, pe.name
 LIMIT 10', [$id, $id]);
 
+        // Rachas: mayor invicto y más victorias seguidas, en orden de fecha.
+        // Una racha se corta al cambiar de club: no es la misma racha la del
+        // último partido en un equipo y el primero en otro. Partidos sin día
+        // no tienen orden y quedan afuera.
+        $rachasDt = ['invicto' => null, 'victorias' => null];
+        $actual = ['invicto' => null, 'victorias' => null];
+        $clubAnterior = null;
+        foreach (DB::select('SELECT pt.equipo_id, p.dia, ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc '
+                     . $ladoDt . ' AND p.dia IS NOT NULL ORDER BY p.dia, p.id', [$id]) as $f) {
+            if ($clubAnterior !== null && (int) $f->equipo_id !== $clubAnterior) {
+                $actual = ['invicto' => null, 'victorias' => null];
+            }
+            $clubAnterior = (int) $f->equipo_id;
+            $cumple = ['invicto' => $f->gf >= $f->gc, 'victorias' => $f->gf > $f->gc];
+            foreach ($cumple as $tipo => $ok) {
+                if (!$ok) {
+                    $actual[$tipo] = null;
+                    continue;
+                }
+                if ($actual[$tipo] === null) {
+                    $actual[$tipo] = ['n' => 0, 'desde' => $f->dia, 'hasta' => $f->dia, 'equipo_id' => (int) $f->equipo_id];
+                }
+                $actual[$tipo]['n']++;
+                $actual[$tipo]['hasta'] = $f->dia;
+                if ($rachasDt[$tipo] === null || $actual[$tipo]['n'] > $rachasDt[$tipo]['n']) {
+                    $rachasDt[$tipo] = $actual[$tipo];
+                }
+            }
+        }
+        // Una racha de 1 o 2 no dice nada.
+        foreach ($rachasDt as $tipo => $r) {
+            if ($r !== null && $r['n'] < 3) {
+                $rachasDt[$tipo] = null;
+            }
+        }
+        $nombresClub = [];
+        $idsClub = array_filter(array_map(function ($r) { return $r['equipo_id'] ?? null; }, $rachasDt));
+        if ($idsClub) {
+            $nombresClub = DB::table('equipos')->whereIn('id', $idsClub)->pluck('nombre', 'id')->all();
+        }
+        foreach ($rachasDt as $tipo => $r) {
+            if ($r !== null) {
+                $rachasDt[$tipo]['club'] = $nombresClub[$r['equipo_id']] ?? '';
+            }
+        }
+
         // Debut y último partido como DT. Misma forma de fila que <x-partido>.
         $extremoDt = function ($orden) use ($id) {
             return DB::table('partido_tecnicos as pt')
@@ -959,7 +1005,7 @@ LIMIT 10', [$id, $id]);
         }
 
         return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional',
-            'porClubDt', 'rivalesDt', 'goleadoresDt', 'usadosDt', 'debutDt', 'ultimoDt'));
+            'porClubDt', 'rivalesDt', 'goleadoresDt', 'usadosDt', 'debutDt', 'ultimoDt', 'rachasDt'));
     }
 
     public function jugados(Request $request)
