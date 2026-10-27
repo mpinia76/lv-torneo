@@ -212,7 +212,7 @@ class Controles
                 ],
                 'cambios.sale_solo' => [
                     'titulo'   => 'Sale sin entrar',
-                    'ayuda'    => 'Minutos donde sale alguien y no entra nadie. Suele ser dato bueno: una salida sin reemplazo con los cambios agotados. Mirarlo en TM antes de tocar nada.',
+                    'ayuda'    => 'Minutos donde sale alguien y no entra nadie. Suele ser dato bueno: una salida sin reemplazo con los cambios agotados. Mirarlo en TM antes de tocar nada. Sólo partidos con los dos equipos completos (11 titulares cada uno).',
                     'jugador'  => false,
                     'detalle'  => 'minutos',
                     'acciones' => ['cambios', 'incidencia'],
@@ -1199,6 +1199,27 @@ class Controles
         $q = $this->base($filtros, ['raw' => $derivada, 'alias' => 't1', 'partido' => 't1.partido_id'])
             ->select($this->columnas())
             ->addSelect(['t1.minutos as minutos']);
+
+        // "Sale sin entrar" sólo tiene sentido con los dos equipos completos.
+        // Si a uno le faltan titulares (copas viejas donde la fuente publica
+        // media alineación: Díter Zafra–Mallorca, Copa del Rey 2001/02), el
+        // que entró puede ser justo uno de los que no están, y el descalce no
+        // dice nada. Esa falta ya la marca «Once incompleto».
+        if ($comparador === '<') {
+            $q->whereNotExists(function ($s) {
+                $s->select(DB::raw(1))
+                    ->from('partidos as pc')
+                    ->whereColumn('pc.id', 't1.partido_id')
+                    ->where(function ($w) {
+                        foreach (['pc.equipol_id', 'pc.equipov_id'] as $col) {
+                            $w->orWhereRaw("(SELECT COUNT(*) FROM alineacions ac
+                                              WHERE ac.partido_id = pc.id
+                                                AND ac.equipo_id = {$col}
+                                                AND ac.tipo = 'Titular') < 11");
+                        }
+                    });
+            });
+        }
 
         return $this->ordenar($this->sinIncidencia($q, ($comparador === '>' ? 'cambios.impares' : 'cambios.sale_solo')));
     }

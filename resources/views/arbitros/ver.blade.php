@@ -11,6 +11,9 @@
     $vaConDetalle = (int) $vaT->sum('con_detalle');
     $vaAmarillas  = (int) $vaT->sum('amarillas');
     $vaRojas      = (int) $vaT->sum('rojas');
+    $vaDirectas   = (int) $vaT->sum('directas');
+    $vaDobles     = (int) $vaT->sum('dobles');
+    $vaPenales    = (int) $vaT->sum('penales');
 
     $seoNombre = $arbitro->persona->name ?: __('Árbitro');
     $seoDesc = $vaPartidos > 0
@@ -131,6 +134,10 @@
                     <div class="t-kpi-num t-num-roja">{{ $vaRojas }}</div>
                     <div class="t-kpi-rot">{{ __('Rojas') }}</div>
                 </div>
+                <div class="t-kpi {{ $vaPenales > 0 ? '' : 't-kpi-apagado' }}">
+                    <div class="t-kpi-num">{{ $vaPenales }}</div>
+                    <div class="t-kpi-rot">{{ __('Penales') }}</div>
+                </div>
             </div>
 
             <div class="t-kpis-pie">
@@ -138,6 +145,14 @@
                     <span>{!! __('Por partido: :amarillas amarillas · :rojas rojas', [
                         'amarillas' => '<b>'.e($vaProm($vaAmarillas, $vaConDetalle)).'</b>',
                         'rojas'     => '<b>'.e($vaProm($vaRojas, $vaConDetalle)).'</b>',
+                    ]) !!} · {!! __(':penales penales', [
+                        'penales' => '<b>'.e($vaProm($vaPenales, $vaConDetalle)).'</b>',
+                    ]) !!}</span>
+                @endif
+                @if($vaRojas > 0)
+                    <span>{!! __('Rojas: :directas directas · :dobles por doble amarilla', [
+                        'directas' => '<b>'.e($vaDirectas).'</b>',
+                        'dobles'   => '<b>'.e($vaDobles).'</b>',
                     ]) !!}</span>
                 @endif
                 @if($vaRes && (int) $vaRes->total > 0)
@@ -165,6 +180,7 @@
                             <th title="{{ __('Amarillas') }}"><span class="t-tarjeta-a"></span></th>
                             <th title="{{ __('Rojas') }}"><span class="t-tarjeta-r"></span></th>
                             <th title="{{ __('Amarillas por partido como principal') }}">{{ __('Prom.') }}</th>
+                            <th title="{{ __('Penales cobrados como principal') }}">{{ __('Pen.') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -185,6 +201,7 @@
                                 <td>{!! $vaCero($vaFila->amarillas) !!}</td>
                                 <td>{!! $vaCero($vaFila->rojas) !!}</td>
                                 <td>{{ $vaProm($vaFila->amarillas, $vaFila->con_detalle) }}</td>
+                                <td>{!! $vaCero($vaFila->penales) !!}</td>
                             </tr>
                         @endforeach
                         </tbody>
@@ -200,6 +217,7 @@
                             <td>{{ $vaAmarillas }}</td>
                             <td>{{ $vaRojas }}</td>
                             <td>{{ $vaProm($vaAmarillas, $vaConDetalle) }}</td>
+                            <td>{{ $vaPenales }}</td>
                         </tr>
                         </tfoot>
                     </table>

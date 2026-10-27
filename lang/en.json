@@ -857,5 +857,9 @@
     "Por equipo": "By team",
     "Partidos dirigidos como principal": "Matches as main referee",
     "Amarillas que le mostró": "Yellow cards shown to them",
-    "Rojas que le mostró": "Red cards shown to them"
+    "Rojas que le mostró": "Red cards shown to them",
+    ":penales penales": ":penales penalties",
+    "Rojas: :directas directas · :dobles por doble amarilla": "Red cards: :directas straight · :dobles second yellow",
+    "Penales cobrados como principal": "Penalties awarded as main referee",
+    "Pen.": "Pen."
 }

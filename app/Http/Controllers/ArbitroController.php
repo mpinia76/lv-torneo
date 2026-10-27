@@ -278,7 +278,7 @@ class ArbitroController extends Controller
        SUM(pa.tipo = "Cuarto")                         AS cuarto,
        SUM(pa.tipo = "VAR")                            AS var,
        SUM(pa.tipo = "Principal" AND EXISTS (SELECT 1 FROM alineacions a WHERE a.partido_id = p.id)) AS con_detalle,
-       0 AS amarillas, 0 AS rojas
+       0 AS amarillas, 0 AS rojas, 0 AS directas, 0 AS dobles, 0 AS penales
 FROM partido_arbitros pa
 INNER JOIN partidos p ON p.id = pa.partido_id
 INNER JOIN fechas f   ON f.id = p.fecha_id
@@ -293,7 +293,9 @@ ORDER BY t.year DESC, t.id DESC', [$id]);
         $tarjetasPor = [];
         foreach (DB::select('SELECT g.torneo_id,
        SUM(ta.tipo = "Amarilla")                     AS amarillas,
-       SUM(ta.tipo IN ("Roja", "Doble Amarilla"))    AS rojas
+       SUM(ta.tipo IN ("Roja", "Doble Amarilla"))    AS rojas,
+       SUM(ta.tipo = "Roja")                         AS directas,
+       SUM(ta.tipo = "Doble Amarilla")               AS dobles
 FROM partido_arbitros pa
 INNER JOIN tarjetas ta ON ta.partido_id = pa.partido_id
 INNER JOIN partidos p  ON p.id = pa.partido_id
@@ -307,7 +309,39 @@ GROUP BY g.torneo_id', [$id]) as $f) {
             if (isset($tarjetasPor[(int) $t->idTorneo])) {
                 $t->amarillas = (int) $tarjetasPor[(int) $t->idTorneo]->amarillas;
                 $t->rojas     = (int) $tarjetasPor[(int) $t->idTorneo]->rojas;
+                $t->directas  = (int) $tarjetasPor[(int) $t->idTorneo]->directas;
+                $t->dobles    = (int) $tarjetasPor[(int) $t->idTorneo]->dobles;
             }
+        }
+
+        // Penales cobrados como principal, uno por penal (no por fila de
+        // `penals`, que guarda una por protagonista): los convertidos son los
+        // goles de tipo Penal y los no convertidos, la fila del que pateó
+        // (Errado / Atajado). La tanda no está en ninguna de las dos tablas.
+        $penalesPor = [];
+        foreach (DB::select('SELECT x.torneo_id, SUM(x.n) AS penales FROM (
+    SELECT g.torneo_id, COUNT(*) AS n
+      FROM partido_arbitros pa
+      INNER JOIN gols go   ON go.partido_id = pa.partido_id AND go.tipo = "Penal"
+      INNER JOIN partidos p ON p.id = pa.partido_id
+      INNER JOIN fechas f   ON f.id = p.fecha_id
+      INNER JOIN grupos g   ON g.id = f.grupo_id
+     WHERE pa.arbitro_id = ? AND pa.tipo = "Principal"
+     GROUP BY g.torneo_id
+    UNION ALL
+    SELECT g.torneo_id, COUNT(*)
+      FROM partido_arbitros pa
+      INNER JOIN penals pe  ON pe.partido_id = pa.partido_id AND pe.tipo IN ("Errado", "Atajado")
+      INNER JOIN partidos p ON p.id = pa.partido_id
+      INNER JOIN fechas f   ON f.id = p.fecha_id
+      INNER JOIN grupos g   ON g.id = f.grupo_id
+     WHERE pa.arbitro_id = ? AND pa.tipo = "Principal"
+     GROUP BY g.torneo_id
+) x GROUP BY x.torneo_id', [$id, $id]) as $f) {
+            $penalesPor[(int) $f->torneo_id] = (int) $f->penales;
+        }
+        foreach ($torneosArbitro as $t) {
+            $t->penales = $penalesPor[(int) $t->idTorneo] ?? 0;
         }
 
         // ── Resultados y equipos con él de principal ────────────────────────
