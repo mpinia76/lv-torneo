@@ -310,6 +310,59 @@ GROUP BY g.torneo_id', [$id]) as $f) {
             }
         }
 
+        // ── Resultados y equipos con él de principal ────────────────────────
+        // Sólo partidos con resultado, como principal, y sin los que no se
+        // jugaron (incidencia `no_jugado`): ahí no dirigió nadie. El de
+        // escritorio sí cuenta, con el resultado oficial. Los goles son los de
+        // los 90' (más alargue): la tanda de penales va aparte en
+        // penalesl/penalesv y un partido definido por penales cuenta empate.
+        $basePrincipal = 'FROM partido_arbitros pa
+INNER JOIN partidos p ON p.id = pa.partido_id
+WHERE pa.arbitro_id = ? AND pa.tipo = "Principal"
+  AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM incidencias i WHERE i.partido_id = p.id AND i.tipo = "no_jugado")';
+
+        $resultados = DB::selectOne('SELECT COUNT(*) AS total,
+       COALESCE(SUM(p.golesl > p.golesv), 0) AS local,
+       COALESCE(SUM(p.golesl = p.golesv), 0) AS empate,
+       COALESCE(SUM(p.golesl < p.golesv), 0) AS visitante
+' . $basePrincipal, [$id]);
+
+        // Una fila por equipo: cómo le fue a ese equipo con él (G-E-P desde el
+        // lado del equipo) y cuántas tarjetas le mostró. La tarjeta no guarda
+        // el equipo: sale de la alineación del jugador en ese partido.
+        $porEquipo = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais,
+       COUNT(*) AS pj, SUM(x.gf > x.gc) AS g, SUM(x.gf = x.gc) AS e, SUM(x.gf < x.gc) AS p,
+       SUM(x.gf) AS gf, SUM(x.gc) AS gc, 0 AS amarillas, 0 AS rojas
+FROM (
+    SELECT p.equipol_id AS equipo_id, p.golesl AS gf, p.golesv AS gc ' . $basePrincipal . '
+    UNION ALL
+    SELECT p.equipov_id, p.golesv, p.golesl ' . $basePrincipal . '
+) x
+INNER JOIN equipos e ON e.id = x.equipo_id
+GROUP BY e.id, e.nombre, e.escudo, e.pais
+ORDER BY pj DESC, e.nombre', [$id, $id]);
+
+        if (!empty($porEquipo)) {
+            $tarjetasEquipo = [];
+            foreach (DB::select('SELECT a.equipo_id,
+       SUM(ta.tipo = "Amarilla")                  AS amarillas,
+       SUM(ta.tipo IN ("Roja", "Doble Amarilla")) AS rojas
+FROM partido_arbitros pa
+INNER JOIN tarjetas ta   ON ta.partido_id = pa.partido_id
+INNER JOIN alineacions a ON a.partido_id = ta.partido_id AND a.jugador_id = ta.jugador_id
+WHERE pa.arbitro_id = ? AND pa.tipo = "Principal"
+GROUP BY a.equipo_id', [$id]) as $f) {
+                $tarjetasEquipo[(int) $f->equipo_id] = $f;
+            }
+            foreach ($porEquipo as $fila) {
+                if (isset($tarjetasEquipo[(int) $fila->equipo_id])) {
+                    $fila->amarillas = (int) $tarjetasEquipo[(int) $fila->equipo_id]->amarillas;
+                    $fila->rojas     = (int) $tarjetasEquipo[(int) $fila->equipo_id]->rojas;
+                }
+            }
+        }
+
         // ── Lista de partidos (filtrable por torneo y rol) ──────────────────
         $idTorneo = (int) $request->query('torneoId');
         $rol      = (string) $request->query('rol', '');
@@ -367,7 +420,7 @@ GROUP BY g.torneo_id', [$id]) as $f) {
         }
 
         return view('arbitros.ver', compact('arbitro', 'torneosArbitro', 'partidos', 'tarjetasPartido',
-            'idTorneo', 'rol', 'torneoFiltro'));
+            'idTorneo', 'rol', 'torneoFiltro', 'resultados', 'porEquipo'));
     }
 
     public function importar(Request $request)

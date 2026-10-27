@@ -852,5 +852,10 @@
     "El jugador del cambio no figura en la alineación registrada para este partido.": "The substituted player does not appear in the line-up recorded for this match.",
     "No hay registro de quién salió en uno de los cambios.": "There is no record of who went off in one of the substitutions.",
     "Un jugador salió y no entró nadie en su lugar.": "A player went off and nobody came on in his place.",
-    "No hay registro del arquero que recibió el penal.": "There is no record of the goalkeeper who faced the penalty."
+    "No hay registro del arquero que recibió el penal.": "There is no record of the goalkeeper who faced the penalty.",
+    "Con él: gana el local :local · empate :empate · gana el visitante :visitante": "With him: home win :local · draw :empate · away win :visitante",
+    "Por equipo": "By team",
+    "Partidos dirigidos como principal": "Matches as main referee",
+    "Amarillas que le mostró": "Yellow cards shown to them",
+    "Rojas que le mostró": "Red cards shown to them"
 }
