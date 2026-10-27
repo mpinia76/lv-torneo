@@ -861,5 +861,14 @@
     ":penales penales": ":penales penalties",
     "Rojas: :directas directas · :dobles por doble amarilla": "Red cards: :directas straight · :dobles second yellow",
     "Penales cobrados como principal": "Penalties awarded as main referee",
-    "Pen.": "Pen."
+    "Pen.": "Pen.",
+    "Entró desde el banco": "Came off the bench",
+    ":t titular · :e entró desde el banco": ":t as starter · :e off the bench",
+    "Por club": "By club",
+    "Período": "Period",
+    "Como titular": "As starter",
+    "Tit.": "St.",
+    "Debut y último partido": "Debut and last match",
+    "Debut": "Debut",
+    "Último partido": "Last match"
 }

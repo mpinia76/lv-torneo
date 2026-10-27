@@ -13,6 +13,7 @@
     $fjEquipos = [];
     $fjFilas   = [];
     $fjGoleador = 0;   // torneos en los que fue goleador (torneo_goleadores)
+    $fjTitular = $fjEntro = 0;   // sólo de los torneos cargados partido a partido
 
     foreach ($torneosJugador as $fjT) {
         $fjJugados   += $fjT->jugados;
@@ -24,6 +25,8 @@
         $fjRecibidos += $fjT->recibidos;
         $fjInvictas  += $fjT->invictas;
         if (!empty($fjT->goleador)) { $fjGoleador++; }
+        $fjTitular += (int) ($fjT->titular ?? 0);
+        $fjEntro   += (int) ($fjT->entro ?? 0);
 
         $fjEquiposFila = [];
         foreach (explode(',', (string) $fjT->escudo) as $fjCadena) {
@@ -93,7 +96,7 @@
         @endif
     </div>
 
-    @if($fjTitulos > 0 || $fjGoleador > 0)
+    @if($fjTitulos > 0 || $fjGoleador > 0 || $fjTitular + $fjEntro > 0)
         <div class="t-kpis-pie">
             @if($fjTitulos > 0)
                 <span>{{ __('Ligas nacionales') }} <b>{{ $titulosJugadorLiga }}</b></span>
@@ -102,6 +105,10 @@
             @endif
             @if($fjGoleador > 0)
                 <span>{{ __('Goleador del torneo') }} <b>{{ $fjGoleador }}</b></span>
+            @endif
+            @if($fjTitular + $fjEntro > 0)
+                <span>{{ __('Titular') }} <b>{{ $fjTitular }}</b></span>
+                <span>{{ __('Entró desde el banco') }} <b>{{ $fjEntro }}</b></span>
             @endif
         </div>
     @endif
@@ -162,7 +169,7 @@
                                 @endforeach
                             </span>
                         </td>
-                        <td class="t-pts">
+                        <td class="t-pts" @isset($fjT->titular) title="{{ __(':t titular · :e entró desde el banco', ['t' => $fjT->titular, 'e' => $fjT->entro]) }}" @endisset>
                             @isset($jugador)
                                 <a href="{{ route('jugadores.jugados', ['jugadorId' => $jugador->id, 'torneoId' => $fjT->idTorneo]) }}">{{ $fjT->jugados }}</a>
                             @else
@@ -220,4 +227,57 @@
             </table>
         </div>
     </div>
+
+    {{-- Una fila por club (sólo lo cargado partido a partido). La arma JugadorController@ver; en la ficha del técnico no viene. --}}
+    @if(!empty($porClub ?? []) && count($porClub) > 1)
+        <h2 class="t-seccion">{{ __('Por club') }}</h2>
+        <div class="t-panel">
+            <div class="t-tabla-wrap">
+                <table class="t-tabla">
+                    <thead>
+                    <tr>
+                        <th class="t-izq">{{ __('Equipo') }}</th>
+                        <th>{{ __('Período') }}</th>
+                        <th title="{{ __('Partidos jugados') }}">{{ __('J') }}</th>
+                        <th title="{{ __('Como titular') }}">{{ __('Tit.') }}</th>
+                        <th title="{{ __('Goles') }}">{{ __('Goles') }}</th>
+                        <th title="{{ __('Tarjetas amarillas') }}">{{ __('TA') }}</th>
+                        <th title="{{ __('Tarjetas rojas') }}">{{ __('TR') }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($porClub as $fjClub)
+                        @php
+                            $fjDesde = substr((string) $fjClub->desde, 0, 4);
+                            $fjHasta = substr((string) $fjClub->hasta, 0, 4);
+                        @endphp
+                        <tr>
+                            <td class="t-izq">
+                                <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $fjClub->equipo_id])"
+                                                :nombre="$fjClub->nombre" :escudo="$fjClub->escudo" :pais="$fjClub->pais" tam="sm"/>
+                            </td>
+                            <td>{{ $fjDesde === $fjHasta ? $fjDesde : $fjDesde.'–'.$fjHasta }}</td>
+                            <td class="t-pts">{{ $fjClub->jugados }}</td>
+                            <td>{!! $fjCero($fjClub->titular) !!}</td>
+                            <td>{!! $fjCero($fjClub->goles) !!} {!! $fjRatio($fjClub->goles, $fjClub->jugados) !!}</td>
+                            <td>{!! $fjCero($fjClub->amarillas) !!}</td>
+                            <td>{!! $fjCero($fjClub->rojas) !!}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    {{-- Debut y último partido (sólo en la ficha del jugador) --}}
+    @if(!empty($debut ?? null))
+        <h2 class="t-seccion">{{ !empty($ultimo ?? null) ? __('Debut y último partido') : __('Debut') }}</h2>
+        <div class="t-panel t-lista-partidos">
+            <x-partido :p="$debut"><span class="t-chip">{{ __('Debut') }}</span></x-partido>
+            @if(!empty($ultimo ?? null))
+                <x-partido :p="$ultimo"><span class="t-chip">{{ __('Último partido') }}</span></x-partido>
+            @endif
+        </div>
+    @endif
 @endif
