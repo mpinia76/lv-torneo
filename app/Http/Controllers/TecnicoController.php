@@ -872,7 +872,94 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
         // empataba y el orden salía al azar. Ver App\Services\OrdenTorneos.
         $torneosTecnico = \App\Services\OrdenTorneos::ordenar($torneosTecnico, \App\Services\OrdenTorneos::ultimosComoTecnico($tecnico->persona_id));
         $torneosJugador = \App\Services\OrdenTorneos::ordenar($torneosJugador, \App\Services\OrdenTorneos::ultimosComoJugador($tecnico->persona_id));
-        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
+        // ── Carrera como DT, mirada de otras formas ─────────────────────────
+        // Todo sale de partido_tecnicos (el equipo que dirigió en cada
+        // partido) y sólo de partidos con resultado, igual que la tabla por
+        // torneo. Efectividad: 3 puntos por ganado y 1 por empate.
+        $ladoDt = 'FROM partido_tecnicos pt
+INNER JOIN partidos p ON p.id = pt.partido_id
+WHERE pt.tecnico_id = ? AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL';
+        $golesDt = 'IF(pt.equipo_id = p.equipol_id, p.golesl, p.golesv)';
+        $golesRival = 'IF(pt.equipo_id = p.equipol_id, p.golesv, p.golesl)';
+        $gep = 'COUNT(*) AS pj, SUM(x.gf > x.gc) AS g, SUM(x.gf = x.gc) AS e, SUM(x.gf < x.gc) AS p,
+       SUM(x.gf) AS gf, SUM(x.gc) AS gc, MIN(x.dia) AS desde, MAX(x.dia) AS hasta';
+
+        // Por club que dirigió.
+        $porClubDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
+FROM (SELECT pt.equipo_id, p.dia, ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc ' . $ladoDt . ') x
+INNER JOIN equipos e ON e.id = x.equipo_id
+GROUP BY e.id, e.nombre, e.escudo, e.pais
+ORDER BY hasta DESC', [$id]);
+
+        // Rivales más enfrentados (los 10 primeros).
+        $rivalesDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
+FROM (SELECT IF(pt.equipo_id = p.equipol_id, p.equipov_id, p.equipol_id) AS rival_id, p.dia,
+             ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc ' . $ladoDt . ') x
+INNER JOIN equipos e ON e.id = x.rival_id
+GROUP BY e.id, e.nombre, e.escudo, e.pais
+ORDER BY pj DESC, g DESC, e.nombre
+LIMIT 10', [$id]);
+
+        // Goleadores bajo su mando (los 10 primeros): goles de jugadores de
+        // SU equipo en partidos que dirigió. El equipo sale de la alineación.
+        $goleadoresDt = DB::select('SELECT j.id AS jugador_id, pe.name AS nombre, pe.foto, pe.nacionalidad, COUNT(*) AS goles
+FROM partido_tecnicos pt
+INNER JOIN gols g        ON g.partido_id = pt.partido_id AND g.tipo <> "En contra"
+INNER JOIN alineacions a ON a.partido_id = g.partido_id AND a.jugador_id = g.jugador_id AND a.equipo_id = pt.equipo_id
+INNER JOIN jugadors j    ON j.id = g.jugador_id
+INNER JOIN personas pe   ON pe.id = j.persona_id
+WHERE pt.tecnico_id = ?
+GROUP BY j.id, pe.name, pe.foto, pe.nacionalidad
+ORDER BY goles DESC, pe.name
+LIMIT 10', [$id]);
+
+        // Los que más usó (los 10 primeros): titular o entró.
+        $usadosDt = DB::select('SELECT j.id AS jugador_id, pe.name AS nombre, pe.foto, pe.nacionalidad,
+       COUNT(*) AS jugados, SUM(x.titular) AS titular
+FROM (
+    SELECT a.jugador_id, a.partido_id, 1 AS titular
+      FROM partido_tecnicos pt
+      INNER JOIN alineacions a ON a.partido_id = pt.partido_id AND a.equipo_id = pt.equipo_id AND a.tipo = "Titular"
+     WHERE pt.tecnico_id = ?
+    UNION
+    SELECT a.jugador_id, a.partido_id, 0
+      FROM partido_tecnicos pt
+      INNER JOIN alineacions a ON a.partido_id = pt.partido_id AND a.equipo_id = pt.equipo_id AND a.tipo = "Suplente"
+      INNER JOIN cambios c     ON c.partido_id = a.partido_id AND c.jugador_id = a.jugador_id AND c.tipo = "Entra"
+     WHERE pt.tecnico_id = ?
+) x
+INNER JOIN jugadors j  ON j.id = x.jugador_id
+INNER JOIN personas pe ON pe.id = j.persona_id
+GROUP BY j.id, pe.name, pe.foto, pe.nacionalidad
+ORDER BY jugados DESC, pe.name
+LIMIT 10', [$id, $id]);
+
+        // Debut y último partido como DT. Misma forma de fila que <x-partido>.
+        $extremoDt = function ($orden) use ($id) {
+            return DB::table('partido_tecnicos as pt')
+                ->join('partidos as p', 'p.id', '=', 'pt.partido_id')
+                ->join('fechas as f', 'f.id', '=', 'p.fecha_id')
+                ->join('grupos as g', 'g.id', '=', 'f.grupo_id')
+                ->join('torneos as t', 't.id', '=', 'g.torneo_id')
+                ->join('equipos as e1', 'e1.id', '=', 'p.equipol_id')
+                ->join('equipos as e2', 'e2.id', '=', 'p.equipov_id')
+                ->where('pt.tecnico_id', $id)
+                ->whereNotNull('p.dia')
+                ->select('t.nombre as nombreTorneo', 't.escudo as escudoTorneo', 't.year', 'f.numero', 'p.dia',
+                    'e1.id as equipol_id', 'e1.escudo as fotoLocal', 'e1.nombre as local',
+                    'e2.id as equipov_id', 'e2.escudo as fotoVisitante', 'e2.nombre as visitante',
+                    'p.golesl', 'p.golesv', 'p.penalesl', 'p.penalesv', 'p.id as partido_id')
+                ->orderBy('p.dia', $orden)->orderBy('p.id', $orden)
+                ->first();
+        };
+        $debutDt  = $extremoDt('asc');
+        $ultimoDt = $extremoDt('desc');
+        if ($debutDt && $ultimoDt && (int) $debutDt->partido_id === (int) $ultimoDt->partido_id) {
+            $ultimoDt = null;
+        }
+
+        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional',
+            'porClubDt', 'rivalesDt', 'goleadoresDt', 'usadosDt', 'debutDt', 'ultimoDt'));
     }
 
     public function jugados(Request $request)

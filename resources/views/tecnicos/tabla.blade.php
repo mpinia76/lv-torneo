@@ -244,4 +244,166 @@
             </table>
         </div>
     </div>
+
+    {{-- Lo que sigue lo arma TecnicoController@ver; en la ficha del jugador (pestaña técnico) no viene. --}}
+    @php
+        $ftEfecDe = function ($f) {
+            return $f->pj > 0 ? round(($f->g * 3 + $f->e) * 100 / ($f->pj * 3), 1) . '%' : '–';
+        };
+        $ftPeriodo = function ($f) {
+            $d = substr((string) $f->desde, 0, 4);
+            $h = substr((string) $f->hasta, 0, 4);
+            return $d === $h ? $d : $d . '–' . $h;
+        };
+    @endphp
+
+    @if(!empty($porClubDt ?? []) && count($porClubDt) > 1)
+        <h2 class="t-seccion">{{ __('Por club') }}</h2>
+        <div class="t-panel">
+            <div class="t-tabla-wrap">
+                <table class="t-tabla">
+                    <thead>
+                    <tr>
+                        <th class="t-izq">{{ __('Equipo') }}</th>
+                        <th>{{ __('Período') }}</th>
+                        <th title="{{ __('Partidos dirigidos') }}">{{ __('PJ') }}</th>
+                        <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                        <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                        <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                        <th></th>
+                        <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                        <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                        <th title="{{ __('Efectividad') }}">%</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($porClubDt as $ftClub)
+                        <tr>
+                            <td class="t-izq">
+                                <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $ftClub->equipo_id])"
+                                                :nombre="$ftClub->nombre" :escudo="$ftClub->escudo" :pais="$ftClub->pais" tam="sm"/>
+                            </td>
+                            <td>{{ $ftPeriodo($ftClub) }}</td>
+                            <td class="t-pts">{{ $ftClub->pj }}</td>
+                            <td>{!! $ftCero($ftClub->g) !!}</td>
+                            <td>{!! $ftCero($ftClub->e) !!}</td>
+                            <td>{!! $ftCero($ftClub->p) !!}</td>
+                            <td>{!! $ftBarra((int) $ftClub->g, (int) $ftClub->e, (int) $ftClub->p) !!}</td>
+                            <td>{{ $ftClub->gf }}</td>
+                            <td>{{ $ftClub->gc }}</td>
+                            <td>{{ $ftEfecDe($ftClub) }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    @if(!empty($rivalesDt ?? []))
+        <h2 class="t-seccion">{{ __('Rivales más enfrentados') }}</h2>
+        <div class="t-panel">
+            <div class="t-tabla-wrap">
+                <table class="t-tabla">
+                    <thead>
+                    <tr>
+                        <th class="t-izq">{{ __('Rival') }}</th>
+                        <th title="{{ __('Partidos dirigidos') }}">{{ __('PJ') }}</th>
+                        <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                        <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                        <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                        <th></th>
+                        <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                        <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                        <th title="{{ __('Efectividad') }}">%</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach($rivalesDt as $ftRival)
+                        <tr>
+                            <td class="t-izq">
+                                <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $ftRival->equipo_id])"
+                                                :nombre="$ftRival->nombre" :escudo="$ftRival->escudo" :pais="$ftRival->pais" tam="sm"/>
+                            </td>
+                            <td class="t-pts">{{ $ftRival->pj }}</td>
+                            <td>{!! $ftCero($ftRival->g) !!}</td>
+                            <td>{!! $ftCero($ftRival->e) !!}</td>
+                            <td>{!! $ftCero($ftRival->p) !!}</td>
+                            <td>{!! $ftBarra((int) $ftRival->g, (int) $ftRival->e, (int) $ftRival->p) !!}</td>
+                            <td>{{ $ftRival->gf }}</td>
+                            <td>{{ $ftRival->gc }}</td>
+                            <td>{{ $ftEfecDe($ftRival) }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    @if(!empty($goleadoresDt ?? []) || !empty($usadosDt ?? []))
+        <div class="row">
+            @if(!empty($goleadoresDt ?? []))
+                <div class="col-md-6">
+                    <h2 class="t-seccion">{{ __('Goleadores con él') }}</h2>
+                    <div class="t-panel">
+                        <div class="t-tabla-wrap">
+                            <table class="t-tabla">
+                                <thead><tr><th>#</th><th class="t-izq">{{ __('Jugador') }}</th><th>{{ __('Goles') }}</th></tr></thead>
+                                <tbody>
+                                @foreach($goleadoresDt as $ftI => $ftGol)
+                                    <tr>
+                                        <td class="t-pos">{{ $ftI + 1 }}</td>
+                                        <td class="t-izq">
+                                            <x-celda-persona :href="route('jugadores.ver', ['jugadorId' => $ftGol->jugador_id])"
+                                                             :nombre="$ftGol->nombre" :foto="$ftGol->foto" :nacionalidad="$ftGol->nacionalidad"/>
+                                        </td>
+                                        <td class="t-pts">{{ $ftGol->goles }}</td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
+            @if(!empty($usadosDt ?? []))
+                <div class="col-md-6">
+                    <h2 class="t-seccion">{{ __('Los que más usó') }}</h2>
+                    <div class="t-panel">
+                        <div class="t-tabla-wrap">
+                            <table class="t-tabla">
+                                <thead><tr><th>#</th><th class="t-izq">{{ __('Jugador') }}</th>
+                                    <th title="{{ __('Partidos jugados') }}">{{ __('J') }}</th>
+                                    <th title="{{ __('Como titular') }}">{{ __('Tit.') }}</th></tr></thead>
+                                <tbody>
+                                @foreach($usadosDt as $ftI => $ftUso)
+                                    <tr>
+                                        <td class="t-pos">{{ $ftI + 1 }}</td>
+                                        <td class="t-izq">
+                                            <x-celda-persona :href="route('jugadores.ver', ['jugadorId' => $ftUso->jugador_id])"
+                                                             :nombre="$ftUso->nombre" :foto="$ftUso->foto" :nacionalidad="$ftUso->nacionalidad"/>
+                                        </td>
+                                        <td class="t-pts">{{ $ftUso->jugados }}</td>
+                                        <td>{{ $ftUso->titular }}</td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
+
+    @if(!empty($debutDt ?? null))
+        <h2 class="t-seccion">{{ !empty($ultimoDt ?? null) ? __('Debut y último partido') : __('Debut') }}</h2>
+        <div class="t-panel t-lista-partidos">
+            <x-partido :p="$debutDt"><span class="t-chip">{{ __('Debut') }}</span></x-partido>
+            @if(!empty($ultimoDt ?? null))
+                <x-partido :p="$ultimoDt"><span class="t-chip">{{ __('Último partido') }}</span></x-partido>
+            @endif
+        </div>
+    @endif
 @endif
