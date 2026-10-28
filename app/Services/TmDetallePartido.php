@@ -407,6 +407,7 @@ class TmDetallePartido
             // Transfermarkt los llama "activo" y "pasivo" sin decir la dirección.
             $jugadoresLado = $this->jugadoresDelLado($game, $lado['clave']);
             $banco = []; $titulares = []; $yaEntraron = []; $yaSalieron = [];
+            $paresCambio = [];   // pares de jugadores ya cambiados entre sí (ver abajo)
             foreach ($jugadoresLado as $p) {
                 if ($p['tm_id'] === null) continue;
                 if ($p['tipo'] === 'Suplente') $banco[(string) $p['tm_id']] = true;
@@ -549,6 +550,28 @@ class TmDetallePartido
                         '_fuente'    => $tipo['fuente'],
                     ];
                 } elseif ($accion['clase'] === 'cambio') {
+                    // CAMBIO REPETIDO: TM a veces carga el mismo cambio dos veces
+                    // en minutos seguidos (Al-Wehda, partido 59958: Al-Beshe por
+                    // Al-Rashidi a los 85 y otra vez a los 86, los dos en el mismo
+                    // sentido). Como para el segundo el que "entró" ya está en
+                    // cancha y el que "salió" ya está afuera, direccionCambio()
+                    // lo deducía al revés: Al-Beshe sale y Al-Rashidi vuelve a
+                    // entrar. Un mismo par de jugadores no se cambia dos veces
+                    // (sin reingresos en el fútbol), así que el segundo se saltea.
+                    $idA = $accion['ids'][0] === null ? null : (string) $accion['ids'][0];
+                    $idB = (!isset($accion['ids'][1]) || $accion['ids'][1] === null) ? null : (string) $accion['ids'][1];
+                    $clavePar = null;
+                    if ($idA !== null && $idB !== null) {
+                        $clavePar = strcmp($idA, $idB) < 0 ? $idA . '-' . $idB : $idB . '-' . $idA;
+                        if (isset($paresCambio[$clavePar])) {
+                            $this->aviso('Minuto ' . MinutoHelper::texto($accion['minuto'], $accion['adicionado'])
+                                . ': TM repite el cambio entre TM ' . $idA . ' y TM ' . $idB . ' (ya cargado a los '
+                                . $paresCambio[$clavePar] . '). Lo salteo; si fue una reanudación, cargalo a mano.');
+                            continue;
+                        }
+                        $paresCambio[$clavePar] = MinutoHelper::texto($accion['minuto'], $accion['adicionado']);
+                    }
+
                     $dir = $this->direccionCambio($accion['ids'], $banco, $titulares, $yaEntraron, $yaSalieron);
 
                     // Control de coherencia: nadie sale sin haber estado en cancha,
