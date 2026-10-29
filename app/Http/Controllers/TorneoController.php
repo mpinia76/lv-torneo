@@ -2603,7 +2603,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
             'grupos'            => MenuTorneos::titulosGrupos(),
             'zona'              => $zona,
             'zonaActual'        => $zonaActual,
-            'esInternacional'   => strpos($zona, 'r-') === 0,
+            'esInternacional'   => strpos($zona, 'r-') === 0 || strpos($zona, 's-') === 0,
             'permiteTodas'      => $permiteTodas,
             'competencia'       => $competencia,
             'competenciaActual' => $competenciaActual,

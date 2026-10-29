@@ -44,7 +44,8 @@
         $fjFilas[] = ['t' => $fjT, 'equipos' => $fjEquiposFila];
     }
 
-    $fjTitulos = $titulosJugadorLiga + $titulosJugadorCopa + $titulosJugadorInternacional;
+    $fjSeleccion = $titulosJugadorSeleccion ?? 0;
+    $fjTitulos = $titulosJugadorLiga + $titulosJugadorCopa + $titulosJugadorInternacional + $fjSeleccion;
     $fjProm    = $fjJugados > 0 ? number_format($fjGoles / $fjJugados, 2) : '0.00';
 
     // Columnas de arquero y de penales: sólo si hay algo que mostrar.
@@ -102,6 +103,9 @@
                 <span>{{ __('Ligas nacionales') }} <b>{{ $titulosJugadorLiga }}</b></span>
                 <span>{{ __('Copas nacionales') }} <b>{{ $titulosJugadorCopa }}</b></span>
                 <span>{{ __('Internacionales') }} <b>{{ $titulosJugadorInternacional }}</b></span>
+                @if($fjSeleccion > 0)
+                    <span>{{ __('Con selección') }} <b>{{ $fjSeleccion }}</b></span>
+                @endif
             @endif
             @if($fjGoleador > 0)
                 <span>{{ __('Goleador del torneo') }} <b>{{ $fjGoleador }}</b></span>
@@ -228,9 +232,20 @@
         </div>
     </div>
 
-    {{-- Una fila por club (sólo lo cargado partido a partido). La arma JugadorController@ver; en la ficha del técnico no viene. --}}
-    @if(!empty($porClub ?? []) && count($porClub) > 1)
-        <h2 class="t-seccion">{{ __('Por club') }}</h2>
+    {{-- Una fila por club y, aparte, por selección (como en Transfermarkt; el
+         total de arriba suma las dos). Sólo lo cargado partido a partido. Lo
+         arma JugadorController@ver; en la ficha del técnico no viene. Los
+         clubes se muestran desde dos (con uno solo repetiría el total); la
+         selección, siempre que haya. --}}
+    @php
+        $fjBloques = [
+            ['titulo' => __('Por club'),  'filas' => $porClub ?? [],      'minimo' => 2],
+            ['titulo' => __('Selección'), 'filas' => $porSeleccion ?? [], 'minimo' => 1],
+        ];
+    @endphp
+    @foreach($fjBloques as $fjBloque)
+    @if(count($fjBloque['filas']) >= $fjBloque['minimo'])
+        <h2 class="t-seccion">{{ $fjBloque['titulo'] }}</h2>
         <div class="t-panel">
             <div class="t-tabla-wrap">
                 <table class="t-tabla">
@@ -246,7 +261,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    @foreach($porClub as $fjClub)
+                    @foreach($fjBloque['filas'] as $fjClub)
                         @php
                             $fjDesde = substr((string) $fjClub->desde, 0, 4);
                             $fjHasta = substr((string) $fjClub->hasta, 0, 4);
@@ -269,6 +284,7 @@
             </div>
         </div>
     @endif
+    @endforeach
 
     {{-- Debut y último partido (sólo en la ficha del jugador) --}}
     @if(!empty($debut ?? null))

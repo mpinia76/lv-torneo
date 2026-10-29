@@ -37,7 +37,8 @@
         $ftFilas[] = ['t' => $ftT, 'equipos' => $ftEquiposFila];
     }
 
-    $ftTitulos = $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional;
+    $ftSeleccion = $titulosTecnicoSeleccion ?? 0;
+    $ftTitulos = $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional + $ftSeleccion;
     $ftEfec    = $ftJugados > 0 ? round($ftPuntaje * 100 / ($ftJugados * 3), 1) : 0;
     $ftId      = !empty($tecnico) ? $tecnico->id : null;
 
@@ -99,6 +100,9 @@
             <span>{{ __('Ligas nacionales') }} <b>{{ $titulosTecnicoLiga }}</b></span>
             <span>{{ __('Copas nacionales') }} <b>{{ $titulosTecnicoCopa }}</b></span>
             <span>{{ __('Internacionales') }} <b>{{ $titulosTecnicoInternacional }}</b></span>
+            @if($ftSeleccion > 0)
+                <span>{{ __('Con selección') }} <b>{{ $ftSeleccion }}</b></span>
+            @endif
         @endif
         <span>{!! __('Goles :favor a favor · :contra en contra', ['favor' => '<b>'.e($ftFavor).'</b>', 'contra' => '<b>'.e($ftContra).'</b>']) !!}</span>
         <span class="t-referencia">{!! $ftBarra($ftGanados, $ftEmpatados, $ftPerdidos) !!} {{ __('balance de la carrera') }}</span>
@@ -265,8 +269,18 @@
         };
     @endphp
 
-    @if(!empty($porClubDt ?? []) && count($porClubDt) > 1)
-        <h2 class="t-seccion">{{ __('Por club') }}</h2>
+    {{-- Por club y, aparte, por selección (como en Transfermarkt). Los
+         clubes desde dos (con uno solo repetiría el total); la selección,
+         siempre que haya. --}}
+    @php
+        $ftBloques = [
+            ['titulo' => __('Por club'),  'filas' => $porClubDt ?? [],      'minimo' => 2],
+            ['titulo' => __('Selección'), 'filas' => $porSeleccionDt ?? [], 'minimo' => 1],
+        ];
+    @endphp
+    @foreach($ftBloques as $ftBloque)
+    @if(count($ftBloque['filas']) >= $ftBloque['minimo'])
+        <h2 class="t-seccion">{{ $ftBloque['titulo'] }}</h2>
         <div class="t-panel">
             <div class="t-tabla-wrap">
                 <table class="t-tabla">
@@ -285,7 +299,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    @foreach($porClubDt as $ftClub)
+                    @foreach($ftBloque['filas'] as $ftClub)
                         <tr>
                             <td class="t-izq">
                                 <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $ftClub->equipo_id])"
@@ -307,6 +321,7 @@
             </div>
         </div>
     @endif
+    @endforeach
 
     @if(!empty($rivalesDt ?? []))
         <h2 class="t-seccion">{{ __('Rivales más enfrentados') }}</h2>

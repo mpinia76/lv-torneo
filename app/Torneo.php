@@ -18,7 +18,7 @@ class Torneo extends Model
         static::deleted(function () { MenuTorneos::olvidar(); });
     }
 
-     protected $fillable = ['nombre', 'year', 'equipos','grupos','tipo','ambito', 'url_nombre','escudo','neutral', 'descenso', 'descenso_promedio', 'region','sofa_tournament_id',
+     protected $fillable = ['nombre', 'year', 'equipos','grupos','tipo','ambito','selecciones', 'url_nombre','escudo','neutral', 'descenso', 'descenso_promedio', 'region','sofa_tournament_id',
          'sofa_season_id',
          'sofa_slug',
          'sofa_category_id',

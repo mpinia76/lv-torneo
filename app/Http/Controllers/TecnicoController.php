@@ -271,13 +271,13 @@ class TecnicoController extends Controller
         $id = (int) $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito, torneos.selecciones, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 WHERE partido_tecnicos.tecnico_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito, torneos.selecciones
 ORDER BY torneos.year DESC, torneos.id DESC';
 
 
@@ -287,6 +287,8 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
+        // Con la selección: aparte de los internacionales de clubes.
+        $titulosTecnicoSeleccion=0;
 
         // ── Todos los torneos de una sola vez ────────────────────────────────
         // Mismo tratamiento que la ficha de jugador: lo que se pedia por cada
@@ -442,7 +444,9 @@ ORDER BY partidos.dia DESC') as $f) {
                 $ultimo    = isset($ultimoDe[$tid][$eqCampeon]) ? $ultimoDe[$tid][$eqCampeon] : null;
 
                 if ($ultimo !== null && isset($dirigio[$ultimo][$eqCampeon])) {
-                    if ($torneo->ambito == 'Nacional') {
+                    if (!empty($torneo->selecciones)) {
+                        $titulosTecnicoSeleccion++;
+                    } elseif ($torneo->ambito == 'Nacional') {
                         if ($torneo->tipo == 'Copa') {
                             $titulosTecnicoCopa++;
                         } else {
@@ -493,6 +497,7 @@ ORDER BY partidos.dia DESC') as $f) {
         $titulosJugadorCopa=0;
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
+        $titulosJugadorSeleccion=0;
 
         // --- Inicializa array para no duplicar conteos por mismo torneo ---
         $countedTorneos = []; // guardará ids de torneos ya contados para este técnico
@@ -590,13 +595,13 @@ ORDER BY partidos.dia DESC') as $f) {
         }
 
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" AS errados, "0" AS atajados, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" AS errados, "0" AS atajados, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo, torneos.ambito, torneos.selecciones, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
 INNER JOIN jugadors ON jugadors.id = plantilla_jugadors.jugador_id
 WHERE jugadors.persona_id = '.$tecnico->persona_id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito, torneos.selecciones
 ORDER BY torneos.year DESC';
 
 
@@ -632,7 +637,9 @@ ORDER BY torneos.year DESC';
                 //print_r($partidoTecnico);
                 if(!empty($alineacion)) {
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->ambito == 'Nacional') {
+                    if (!empty($torneo->selecciones)) {
+                        $titulosJugadorSeleccion++;
+                    } elseif ($torneo->ambito == 'Nacional') {
                         if ($torneo->tipo == 'Copa') {
                             $titulosJugadorCopa++;
                         } else {
@@ -884,12 +891,32 @@ WHERE pt.tecnico_id = ? AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL';
         $gep = 'COUNT(*) AS pj, SUM(x.gf > x.gc) AS g, SUM(x.gf = x.gc) AS e, SUM(x.gf < x.gc) AS p,
        SUM(x.gf) AS gf, SUM(x.gc) AS gc, MIN(x.dia) AS desde, MAX(x.dia) AS hasta';
 
-        // Por club que dirigió.
+        // Por club que dirigió. Las selecciones van aparte ($porSeleccionDt),
+        // como en Transfermarkt: lo que dirigió en un torneo marcado
+        // `selecciones` es una selección (un club nunca juega uno).
         $porClubDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
 FROM (SELECT pt.equipo_id, p.dia, ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc ' . $ladoDt . ') x
 INNER JOIN equipos e ON e.id = x.equipo_id
 GROUP BY e.id, e.nombre, e.escudo, e.pais
 ORDER BY hasta DESC', [$id]);
+        $seleccionesDt = [];
+        foreach (DB::select('SELECT DISTINCT pt.equipo_id
+FROM partido_tecnicos pt
+INNER JOIN partidos p ON p.id = pt.partido_id
+INNER JOIN fechas f   ON f.id = p.fecha_id
+INNER JOIN grupos g   ON g.id = f.grupo_id
+INNER JOIN torneos t  ON t.id = g.torneo_id
+WHERE pt.tecnico_id = ? AND t.selecciones = 1', [$id]) as $f) {
+            $seleccionesDt[(int) $f->equipo_id] = true;
+        }
+        $porSeleccionDt = [];
+        foreach ($porClubDt as $i => $f) {
+            if (isset($seleccionesDt[(int) $f->equipo_id])) {
+                $porSeleccionDt[] = $f;
+                unset($porClubDt[$i]);
+            }
+        }
+        $porClubDt = array_values($porClubDt);
 
         // Rivales más enfrentados (los 10 primeros).
         $rivalesDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
@@ -1005,7 +1032,8 @@ LIMIT 10', [$id, $id]);
         }
 
         return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional',
-            'porClubDt', 'rivalesDt', 'goleadoresDt', 'usadosDt', 'debutDt', 'ultimoDt', 'rachasDt'));
+            'titulosJugadorSeleccion','titulosTecnicoSeleccion',
+            'porClubDt', 'porSeleccionDt', 'rivalesDt', 'goleadoresDt', 'usadosDt', 'debutDt', 'ultimoDt', 'rachasDt'));
     }
 
     public function jugados(Request $request)
