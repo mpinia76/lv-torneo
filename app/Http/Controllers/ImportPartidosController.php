@@ -2973,8 +2973,17 @@ class ImportPartidosController extends Controller
         // final de Colombia) son llaves por construcción: los finalistas
         // vienen de zonas distintas aunque la plantilla de los dos esté en el
         // mismo grupo de la fase regular.
+        // Y UNA RONDA QUE SE LLAMA COMO UNA LLAVE («Cuartos de final»,
+        // «Semifinales», «Partido por el tercer puesto», «Final»): va a las
+        // llaves aunque los dos equipos tengan plantilla en la misma zona.
+        // Leagues Cup 2025: LA Galaxy–Seattle (semi) y Galaxy–Orlando (3er
+        // puesto) son los dos de la MLS y se proponían para la tabla «MLS».
+        $nombreDeLlave = !$jornadaDeLiga && $armada !== 'zona'
+            && preg_match('/\b(?:final|finale|finals|semi|cuartos|octavos|dieciseisavos|tercer\s+puesto|3er\s+puesto|'
+                . 'third\s+place|quarter|round\s+of\s+\d+|knockout|play-?offs?|eliminat)/iu', $gameday);
         $proponeLlaves = $playoffId && (
                 $armada === 'cruce'
+                || $nombreDeLlave
                 || $compAparte
                 || (!$jornadaDeLiga && $conDosGrupos > 0 && $cruzan * 2 > $conDosGrupos)
                 || $ambosEnLlaves === $filas->count()

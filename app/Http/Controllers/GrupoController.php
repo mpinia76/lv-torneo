@@ -159,10 +159,12 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         foreach ($grupos as $grupo){
             if ($grupo->posiciones){
-                // Grupo con tabla y «Penales» tildado (fase de grupos de la Leagues
-                // Cup): el empate que se define por penales da 2 puntos al que gana
-                // la tanda y 1 al que la pierde. Sin tanda cargada, empate normal.
-                $pk = !empty($grupo->penales) ? 1 : 0;
+                // Empate con tanda de penales CARGADA (fase de grupos de la Leagues
+                // Cup): 2 puntos al que gana la tanda y 1 al que la pierde. Sin
+                // tanda, empate normal. No depende del tilde «Penales» del grupo:
+                // ese tilde marca el grupo de LLAVES en todo el importador, y
+                // prenderlo en una zona con tabla la confundía con los playoffs.
+                $pk = 1;
                 $sql='SELECT
     foto,
     equipo,
