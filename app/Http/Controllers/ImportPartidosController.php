@@ -565,6 +565,10 @@ class ImportPartidosController extends Controller
         // Ver `partirRondasMezcladas()`. Va antes de todo lo demás para que el
         // staging guarde las rondas ya separadas.
         $partidas = $this->partirRondasMezcladas($filas);
+        // Y una ronda que es una fase de grupos ENTERA en una sola tanda (la
+        // Leagues Cup: «Grupo GP», 54 partidos, 3 por equipo). Ver
+        // `partirRondaEnFechas()`.
+        $enFechas = $this->partirRondaEnFechas($filas);
 
         // Antes de clasificar: la segunda pasada del emparejador compara el
         // número de jornada, así que tiene que ver el número ya corregido.
@@ -692,6 +696,13 @@ class ImportPartidosController extends Controller
             }
         }
         $html .= $this->bloqueRondasPartidas($partidas);
+        foreach ($enFechas as $x) {
+            $html .= '<div class="warn-box"><b>Separé la ronda «' . e($x['ronda']) . '» en ' . $x['fechas']
+                . ' fechas</b>: Transfermarkt trae ' . $x['n'] . ' partidos en una sola ronda y cada equipo juega '
+                . 'varias veces contra rivales distintos (una fase de grupos entera). Los repartí por día: cada partido '
+                . 'va a la primera fecha donde ninguno de sus dos equipos juega todavía. Para que «Aplicar» use esto '
+                . 'hay que <b>Guardar en staging</b> con esta vista.</div>';
+        }
 
         // EL TORNEO VIAJA EN TODOS LOS BOTONES. Antes `$base` llevaba sólo la
         // competencia, así que elegías el torneo del desplegable, veías la
@@ -3826,6 +3837,73 @@ class ImportPartidosController extends Controller
                 $res['cruces'] = ['ronda' => $etiqueta, 'n' => count($cruces), 'partidos' => $lista];
             }
             $hechas[] = $res;
+        }
+        return $hechas;
+    }
+
+    /**
+     * Parte en fechas una ronda de TM que es una fase de grupos ENTERA.
+     *
+     * Caso real: Leagues Cup 2025 (USMX), «Grupo GP»: 54 partidos, cada uno
+     * de los 36 equipos juega 3 veces contra rivales distintos, en tres
+     * tandas de días. Aplicada así iba a UNA fecha, y el freno de «un equipo
+     * contra dos rivales en la misma ronda» (que existe para atajar mapeos
+     * mal hechos, ver `fixtureAplicar()`) no dejaba crear ninguno.
+     *
+     * Sólo se toca una ronda de más de 8 equipos, sin número de jornada, no
+     * armada por `partirRondasMezcladas()`, en la que la MAYORÍA (y al
+     * menos 4) juega contra más de un rival: un club mal mapeado deja uno o
+     * dos equipos así, no la mitad. Los partidos se ordenan por día y cada
+     * uno va a la primera fecha donde no juega ninguno de sus dos equipos.
+     *
+     * Pisa `ronda` con «<ronda> · Fecha N» y devuelve qué hizo.
+     */
+    private function partirRondaEnFechas(array &$filas)
+    {
+        $porRonda = [];
+        foreach ($filas as $i => $f) {
+            $r = (string) $f['ronda'];
+            if ($r === '' || $r === '—' || preg_match('/^\d{1,2}:\d{2}$/', $r)) continue;
+            if ($this->numeroDeJornada($r) !== null || $this->rondaArmada($r) !== null) continue;
+            if (preg_match('/ · Fecha \d+$/u', $r)) continue;
+            if ((string) $f['club_external_id'] === '' || (string) $f['rival_external_id'] === '') continue;
+            if (empty($f['dia'])) continue;
+            $porRonda[$r][] = $i;
+        }
+
+        $hechas = [];
+        foreach ($porRonda as $r => $is) {
+            $rivales = [];
+            foreach ($is as $i) {
+                $l = 't' . $filas[$i]['club_external_id']; $v = 't' . $filas[$i]['rival_external_id'];
+                if ($l === $v) continue;
+                $rivales[$l][$v] = true; $rivales[$v][$l] = true;
+            }
+            $equipos = count($rivales);
+            $multi = 0;
+            foreach ($rivales as $rs) if (count($rs) > 1) $multi++;
+            if ($multi < 4 || $multi * 2 < $equipos) continue;
+            // Una zona de verdad («Grupo 15» de 3 a 6 equipos) la reparte en
+            // fechas el camino de las zonas en «Aplicar», que además la manda a
+            // su grupo por el nombre: si se le cambiara el nombre acá, no la
+            // encontraría. Esto es para rondas con muchos equipos.
+            if ($equipos <= 8) continue;
+
+            usort($is, function ($a, $b) use ($filas) {
+                $c = strcmp((string) $filas[$a]['dia'], (string) $filas[$b]['dia']);
+                return $c !== 0 ? $c : strcmp((string) $filas[$a]['external_id'], (string) $filas[$b]['external_id']);
+            });
+            $ocupado = [];   // fecha => [equipo => true]
+            $maxK = 0;
+            foreach ($is as $i) {
+                $l = 't' . $filas[$i]['club_external_id']; $v = 't' . $filas[$i]['rival_external_id'];
+                $k = 1;
+                while (isset($ocupado[$k][$l]) || isset($ocupado[$k][$v])) $k++;
+                $ocupado[$k][$l] = true; $ocupado[$k][$v] = true;
+                $filas[$i]['ronda'] = $r . ' · Fecha ' . $k;
+                $maxK = max($maxK, $k);
+            }
+            $hechas[] = ['ronda' => $r, 'n' => count($is), 'fechas' => $maxK];
         }
         return $hechas;
     }
