@@ -45,7 +45,7 @@
             <th>GL</th>
             <th>GV</th>
             <th>Visitante</th>
-            @if($grupo->penales)
+            @if($grupo->con_penales)
                 <th>PL</th>
                 <th>PV</th>
             @endif
@@ -65,7 +65,7 @@
                     <td>{{Form::number('golesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                     <td>{{ Form::select('equipov[]',$equipos, '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}</td>
 
-                    @if($grupo->penales)
+                    @if($grupo->con_penales)
                         <td>{{Form::number('penalesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                         <td>{{Form::number('penalesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}</td>
                     @endif

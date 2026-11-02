@@ -662,7 +662,7 @@
             '<td>'+'{{Form::number('golesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>'+
             '<td></td><td>'+'{{ Form::select('equipov[]',$equipos ?? [''=>''], '',['class' => 'form-control js-example-basic-single', 'style' => 'width: 250px']) }}'+'</td>';
 
-        @if((isset($grupo))&&($grupo->penales))
+        @if((isset($grupo))&&($grupo->con_penales))
                 tr=tr+'<td>'+'{{Form::number('penalesl[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>';
                 tr=tr+'<td>'+'{{Form::number('penalesv[]', '', ['class' => 'form-control', 'style' => 'width: 50px'])}}'+'</td>';
                 @endif
