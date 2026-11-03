@@ -320,7 +320,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
             foreach (PosicionTorneo::whereIn('torneo_id', $idsTorneos)->get() as $pos) {
                 $tid = (int) $pos->torneo_id;
                 $posPorTorneo[$tid][(int) $pos->equipo_id] = $pos->posicion;
-                if ($pos->posicion == 1 && !isset($campeonDe[$tid])) {
+                if ($pos->posicion == 1 && !isset($campeonDe[$tid]) && \App\Torneo::daTitulo($tid)) {
                     $campeonDe[$tid] = (int) $pos->equipo_id;
                 }
             }
@@ -626,7 +626,7 @@ ORDER BY torneos.year DESC';
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
 
-            if(!empty($posicionTorneo)){
+            if(!empty($posicionTorneo) && \App\Torneo::daTitulo($torneo->idTorneo)){
                 //if ($posicionTorneo->posicion == 1){
                 $consultarJugador = Jugador::where('persona_id', '=', $tecnico->persona_id)->first();
                 $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$posicionTorneo->equipo_id)->where('jugador_id','=',$consultarJugador->id)->first();

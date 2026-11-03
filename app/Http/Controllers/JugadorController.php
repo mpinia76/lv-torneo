@@ -428,7 +428,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                 $posPorTorneo[$tid][(int) $pos->equipo_id] = $pos->posicion;
                 // Se queda con la primera fila de posicion 1, igual que el
                 // ->first() que habia antes.
-                if ($pos->posicion == 1 && !isset($campeonDe[$tid])) {
+                if ($pos->posicion == 1 && !isset($campeonDe[$tid]) && \App\Torneo::daTitulo($tid)) {
                     $campeonDe[$tid] = (int) $pos->equipo_id;
                 }
             }
@@ -804,7 +804,7 @@ ORDER BY torneos.year DESC';
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
 
-            if(!empty($posicionTorneo)){
+            if(!empty($posicionTorneo) && \App\Torneo::daTitulo($torneo->idTorneo)){
                 //if ($posicionTorneo->posicion == 1){
                 $ultimoPartido = Partido::whereIn('fecha_id', explode(',', $arrfechas))
                     ->where(function ($query) use ($posicionTorneo) {
@@ -2471,6 +2471,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                     ->where('posicion_torneos.posicion', '=', 1);
             })
             ->where('plantilla_jugadors.jugador_id', $id)
+            ->whereNotIn('torneos.id', \App\Torneo::idsSinTitulo())
             ->select(
                 'torneos.id as idTorneo',
                 DB::raw('CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo'),

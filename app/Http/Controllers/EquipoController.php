@@ -352,7 +352,7 @@ class EquipoController extends Controller
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('equipo_id', '=',$id)->first();
 
             if(!empty($posicionTorneo)){
-                if ($posicionTorneo->posicion == 1){
+                if ($posicionTorneo->posicion == 1 && \App\Torneo::daTitulo($torneo->idTorneo)){
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
                     if ($torneo->ambito == 'Nacional'){
                         if ($torneo->tipo == 'Copa') {
@@ -384,7 +384,8 @@ class EquipoController extends Controller
                     '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón') :
                     (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón') : $posicionTorneo->posicion)
                 ) : '';
-                if ((!empty($posicionTorneo))&&($posicionTorneo->posicion == 1)){
+                if ((!empty($posicionTorneo))&&($posicionTorneo->posicion == 1)
+                    && \App\Torneo::daTitulo($torneo->idTorneo)){
                     $torneosTitulos[]=$torneo;
                 }
             }

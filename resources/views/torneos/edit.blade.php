@@ -95,6 +95,15 @@
                 </div>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('sin_titulo', 'No da título', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label title="El primero no suma título (Apertura, Clausura e Intermedio de Uruguay: el título sale de la definición). Se le pueden guardar las posiciones igual: así tiene goleador y queda completo.">
+                        <input type="hidden" name="sin_titulo" value="0">
+                        {{ Form::checkbox('sin_titulo', 1, $torneo->sin_titulo ?? 0) }}
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{Form::label('descenso', 'Descensos Gral.')}}
                 {{Form::number('descenso', $torneo->descenso, ['class' => 'form-control'])}}
             </div>
