@@ -8,6 +8,8 @@ Disallow: /register
 Disallow: /torneos-menu
 Disallow: /en/torneos-menu
 Disallow: /*?*perf=1
+# Plantel histórico de la ficha del equipo: la consulta más pesada (04/11)
+Disallow: /*?*pestActiva=jugadores
 # Subpáginas de las fichas: repiten la ficha y son las consultas más pesadas (16/10)
 Disallow: /jugadorJugados
 Disallow: /jugadorGoles

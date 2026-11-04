@@ -14,6 +14,7 @@ use App\Services\NotasWiki;
 use App\Services\Traductor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use DB;
 use Illuminate\Pagination\LengthAwarePaginator;
 class EquipoController extends Controller
@@ -705,31 +706,39 @@ GROUP BY j.id, p.foto, p.apellido, p.nombre
 group by jugador_id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 //dd($sql);
-        $jugadores = DB::select($sql);
-        //echo $sql;
+        // El plantel histórico es la consulta más cara del sitio (más de un minuto en
+        // equipos grandes, 04/11/2026). Solo se calcula si se pide la pestaña
+        // Jugadores (?pestActiva=jugadores); si no, la pestaña muestra un link.
+        // Se guarda 24 h por equipo y orden en la caché general (no en CachePaginas,
+        // que se vacía con cada import).
+        $jugadores = null;
+        if ($request->query('pestActiva') === 'jugadores') {
+            $todos = Cache::remember('equipo.plantel.' . $id . '.' . $order . '.' . $tipoOrder, 86400, function () use ($sql) {
+                return DB::select($sql);
+            });
 
+            // Paginación jugadores
+            $pageJugadores = max(1, (int) $request->query('pageJugadores', 1));
+            $paginate = 15;
+            $offSet = ($pageJugadores * $paginate) - $paginate;
+            $itemsForCurrentPage = array_slice($todos, $offSet, $paginate, true);
 
-        // Paginación jugadores
-        $pageJugadores = $request->query('pageJugadores', 1);
-        $paginate = 15;
-        $offSet = ($pageJugadores * $paginate) - $paginate;
-        $itemsForCurrentPage = array_slice($jugadores, $offSet, $paginate, true);
-
-        $jugadores = new LengthAwarePaginator(
-            $itemsForCurrentPage,
-            count($jugadores),
-            $paginate,
-            $pageJugadores,
-            [
-                'path' => route('equipos.ver', [
-                    'equipoId' => $id,
-                    'order' => $order,
-                    'tipoOrder' => $tipoOrder,
-                    'pestActiva' => 'jugadores'
-                ]),
-                'pageName' => 'pageJugadores'  // <- importantísimo
-            ]
-        );
+            $jugadores = new LengthAwarePaginator(
+                $itemsForCurrentPage,
+                count($todos),
+                $paginate,
+                $pageJugadores,
+                [
+                    'path' => route('equipos.ver', [
+                        'equipoId' => $id,
+                        'order' => $order,
+                        'tipoOrder' => $tipoOrder,
+                        'pestActiva' => 'jugadores'
+                    ]),
+                    'pageName' => 'pageJugadores'  // <- importantísimo
+                ]
+            );
+        }
 
 
 
