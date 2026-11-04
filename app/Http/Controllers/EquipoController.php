@@ -279,6 +279,11 @@ class EquipoController extends Controller
         $id = (int) $request->query('equipoId');
         $equipo=Equipo::findOrFail($id);
 
+        // Torneos y títulos del equipo: hace varias consultas por cada torneo jugado
+        // (cientos en un club grande). Se guarda 24 h por equipo en la caché general,
+        // aparte de CachePaginas, que se vacía con cada import (04/11/2026).
+        $resumen = Cache::remember('equipo.resumen.' . $id, 86400, function () use ($id, $equipo) {
+
 
 		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos,
        "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo, torneos.ambito,
@@ -542,6 +547,14 @@ class EquipoController extends Controller
         $torneosTitulos = collect($torneosTitulos)->sortByDesc(function ($item) {
             return $item->year;
         })->values()->all();
+
+            return compact('torneosEquipo', 'titulosLiga', 'titulosCopa', 'titulosInternacional', 'torneosTitulos');
+        });
+        $torneosEquipo = $resumen['torneosEquipo'];
+        $titulosLiga = $resumen['titulosLiga'];
+        $titulosCopa = $resumen['titulosCopa'];
+        $titulosInternacional = $resumen['titulosInternacional'];
+        $torneosTitulos = $resumen['torneosTitulos'];
         set_time_limit(0);
         //dd($request);
 
@@ -740,9 +753,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
             );
         }
 
-
-
-        $iterator=$offSet+1;
+        $iterator = isset($offSet) ? $offSet + 1 : 1;
 
         $sqlPartidos = "
         SELECT
