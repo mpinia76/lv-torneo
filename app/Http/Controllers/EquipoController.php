@@ -725,6 +725,7 @@ ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
         // Se guarda 24 h por equipo y orden en la caché general (no en CachePaginas,
         // que se vacía con cada import).
         $jugadores = null;
+        $paginate = 15; // también lo usa la paginación de partidos, más abajo
         if ($request->query('pestActiva') === 'jugadores') {
             $todos = Cache::remember('equipo.plantel.' . $id . '.' . $order . '.' . $tipoOrder, 86400, function () use ($sql) {
                 return DB::select($sql);
