@@ -105,7 +105,7 @@
 </noscript>
 
 {{-- Sistema visual del sitio (siempre después de Bootstrap) --}}
-<link href="{{ asset('css/torneos.css') }}?v=25" rel="stylesheet">
+<link href="{{ asset('css/torneos.css') }}?v=27" rel="stylesheet">
 
 {{-- Favicon: el .ico es para lo que no lee SVG (Safari viejo, lectores de
      feeds, el pedido automático a /favicon.ico); el SVG gana donde se entiende.
@@ -113,6 +113,13 @@
 <link rel="icon" href="{{ url('favicon.ico') }}?v=2" sizes="any">
 <link rel="icon" type="image/svg+xml" href="{{ url('favicon.svg') }}?v=2">
 <link rel="apple-touch-icon" href="{{ url('apple-touch-icon.png') }}?v=2">
+
+{{-- App instalable: con el manifest, Android ofrece "Instalar" y abre a pantalla
+     completa; en iPhone se agrega desde Compartir y usa el apple-touch-icon.
+     Un manifest por idioma: instalada desde una página en inglés, abre en /en.
+     Los íconos salen del dibujo de favicon.svg: si cambia, regenerarlos. --}}
+<link rel="manifest" href="{{ url(app()->getLocale() === 'en' ? 'site-en.webmanifest' : 'site.webmanifest') }}?v=1">
+<meta name="theme-color" content="#1746A2">
 
 {{-- Google Analytics 4. Va en el <head>, que sale de la caché de páginas: no
      depende de quién mira, así que no se puede condicionar por sesión acá. --}}

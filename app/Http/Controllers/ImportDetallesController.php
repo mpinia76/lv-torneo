@@ -5848,7 +5848,7 @@ class ImportDetallesController extends Controller
             ->leftJoin('equipos', 'equipos.id', '=', 'incidencias.equipo_id')
             ->where('incidencias.partido_id', $partidoId)
             ->select('incidencias.id', 'incidencias.puntos', 'incidencias.observaciones',
-                'incidencias.torneo_id', 'equipos.nombre AS equipo')
+                'incidencias.tipo', 'incidencias.torneo_id', 'equipos.nombre AS equipo')
             ->orderBy('incidencias.id')
             ->get();
 
@@ -5883,12 +5883,14 @@ class ImportDetallesController extends Controller
         $out = '<h2>Incidencias <span class="sub">(' . $filas->count() . ')</span></h2>'
             . '<p class="sub">Se cargan a mano y el importador no las toca: rehacer el detalle '
             . 'no las borra.' . $links . '</p>'
-            . '<div class="scroll"><table><thead><tr><th>Equipo</th><th>Puntos</th>'
+            . '<div class="scroll"><table><thead><tr><th>Tipo</th><th>Equipo</th><th>Puntos</th>'
             . '<th>Observaciones</th><th></th></tr></thead><tbody>';
+        $etiquetas = \App\Incidencia::etiquetas();
 
         foreach ($filas as $f) {
             $obs = trim((string) $f->observaciones);
             $out .= '<tr>'
+                . '<td>' . e($f->tipo ? ($etiquetas[$f->tipo] ?? $f->tipo) : 'Sin clasificar') . '</td>'
                 . '<td>' . e($f->equipo !== null && $f->equipo !== '' ? $f->equipo : '—') . '</td>'
                 . '<td class="num">' . e((string) $f->puntos) . '</td>'
                 // La observación es texto libre y puede ser un párrafo: es la

@@ -174,9 +174,10 @@ class ControlController extends Controller
      * La salida es la de siempre, la incidencia, pero de un click. Va con
      * `equipo_id` y `puntos` en NULL a propósito: así no toca la tabla de
      * posiciones (ver `posicionesPublic` y `GrupoController`, que filtran
-     * por `whereNotNull('equipo_id')`), y el partido desaparece de TODOS los
-     * controles. OJO: la observación SÍ se ve en el detalle público del
-     * partido (pestaña Incidencias), por eso el texto nunca nombra a TM.
+     * por `whereNotNull('equipo_id')`), y el partido sale de ESTE control (y
+     * de los que el tipo tape, ver `Incidencia::TAPA`), no de todos. OJO: la
+     * observación SÍ se ve en el detalle público del partido (pestaña
+     * Incidencias), por eso el texto nunca nombra a TM.
      */
     public function marcarSinDatos(Request $request)
     {
@@ -184,7 +185,7 @@ class ControlController extends Controller
         // texto único: en "Terna incompleta" lo que falta son los asistentes,
         // no la alineación. `motivoSinDatos()` valida la clave.
         $motivo = $this->controles->motivoSinDatos($request->input('check'));
-        $r      = $this->incidenciaSinDatos((int) $request->input('partido_id'), $motivo['texto'], $motivo['texto_en'] ?? null);
+        $r      = $this->incidenciaSinDatos((int) $request->input('partido_id'), $motivo);
 
         if ($r['creada']) {
             $this->controles->invalidarConteo($request->input('check'));
@@ -305,7 +306,7 @@ class ControlController extends Controller
         $repetidas = 0;
 
         foreach ($ids as $id) {
-            $r = $this->incidenciaSinDatos($id, $motivo['texto'], $motivo['texto_en'] ?? null);
+            $r = $this->incidenciaSinDatos($id, $motivo);
 
             if ($r['creada']) {
                 $creadas++;
@@ -331,9 +332,9 @@ class ControlController extends Controller
         }
 
         $mensaje = 'Incidencias cargadas: '.$creadas.'.'
-            .($repetidas ? ' '.$repetidas.' ya tenía(n) una y no las dupliqué.' : '')
+            .($repetidas ? ' '.$repetidas.' ya tenía(n) una de este tipo y no las dupliqué.' : '')
             .($sobrantes ? ' Dejé '.$sobrantes.' afuera: por vez entran hasta '.$tope.'.' : '')
-            .($creadas ? ' Esos partidos salen de todos los controles.' : '');
+            .($creadas ? ' Esos partidos salen de este control.' : '');
 
         return back()->with('success', $mensaje)->with('lote_informe', [
             'titulo' => $motivo['boton'].' en los seleccionados',
@@ -346,14 +347,19 @@ class ControlController extends Controller
      *
      * Va con `equipo_id` y `puntos` en NULL a propósito: así no toca la tabla
      * de posiciones (ver `posicionesPublic` y `GrupoController`, que filtran
-     * por `whereNotNull('equipo_id')`), y el partido desaparece de TODOS los
-     * controles. La observación SÍ se ve en el detalle público del partido.
+     * por `whereNotNull('equipo_id')`). Lleva el `tipo` del control desde el
+     * que se apretó, y por eso el partido sale de ese control y de los que el
+     * tipo tape (`Incidencia::TAPA`), no de todos. La observación SÍ se ve en
+     * el detalle público del partido.
+     *
+     * `$motivo` es lo que devuelve `Controles::motivoSinDatos()`: texto,
+     * texto_en y tipo.
      *
      * Devuelve `['creada' => bool, 'ya_tenia' => bool, 'texto' => string]`. No
      * invalida los conteos: eso lo hace quien llama, una sola vez, aunque haya
      * escrito veinte.
      */
-    private function incidenciaSinDatos($partidoId, $motivo, $motivoEn = null)
+    private function incidenciaSinDatos($partidoId, array $motivo)
     {
         $partido = DB::table('partidos')
             ->join('fechas', 'partidos.fecha_id', '=', 'fechas.id')
@@ -365,10 +371,19 @@ class ControlController extends Controller
             return ['creada' => false, 'ya_tenia' => false, 'texto' => 'No encontré ese partido.'];
         }
 
-        // Si ya tenía una incidencia no se agrega otra: con una alcanza para
-        // que el partido no aparezca en ningún control.
-        if (Incidencia::where('partido_id', $partido->id)->exists()) {
-            return ['creada' => false, 'ya_tenia' => true, 'texto' => 'Ya tenía una incidencia cargada.'];
+        // Si ya tiene una incidencia que tapa este control, otra no agrega
+        // nada. Antes alcanzaba con CUALQUIER incidencia, y por eso un partido
+        // con la terna marcada no podía recibir la de goles: ahora cada tipo
+        // tapa lo suyo y pueden convivir.
+        $tipo  = $motivo['tipo'] ?? 'sin_detalle';
+        $tapan = Incidencia::tiposQueTapan([$motivo['control'] ?? $tipo]);
+        $yaTiene = Incidencia::where('partido_id', $partido->id)
+            ->where(function ($w) use ($tipo, $tapan) {
+                $w->whereNull('tipo')->orWhere('tipo', $tipo)->orWhereIn('tipo', $tapan);
+            })
+            ->exists();
+        if ($yaTiene) {
+            return ['creada' => false, 'ya_tenia' => true, 'texto' => 'Ya tenía una incidencia que explica esto.'];
         }
 
         Incidencia::create([
@@ -376,14 +391,15 @@ class ControlController extends Controller
             'torneo_id'     => $partido->torneo_id,
             'equipo_id'     => null,
             'puntos'        => null,
+            'tipo'          => $tipo,
             // Sólo el motivo: la observación se ve en el detalle público del
             // partido, y "Marcado desde Controles de carga" es cocina interna.
-            'observaciones' => $motivo,
-            'observaciones_en' => $motivoEn,
+            'observaciones' => $motivo['texto'],
+            'observaciones_en' => $motivo['texto_en'] ?? null,
         ]);
 
         return ['creada' => true, 'ya_tenia' => false,
-            'texto' => 'Incidencia cargada: sale de todos los controles.'];
+            'texto' => 'Incidencia cargada: sale de este control.'];
     }
 
     /**

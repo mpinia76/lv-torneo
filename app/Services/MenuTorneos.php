@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Cache;
  * después por competencia, y recién ahí por temporada.
  *
  *   Argentina                      <- zona "local", siempre primera
+ *   Selecciones: FIFA, Conmebol…   <- torneos marcados `selecciones`, por
+ *                                     región (claves 's-…')
  *   Mundial:    Torneos FIFA
  *   Sudamérica: Torneos Conmebol,  <- por confederación: primero sus torneos
  *               Brasil, Chile…        internacionales (ambito Internacional,
@@ -32,7 +34,7 @@ class MenuTorneos
     const CACHE_TORNEOS = 'torneos.menu';
 
     /** Estructura ya agrupada por zona y competencia. */
-    const CACHE_ZONAS = 'torneos.menu.zonas.u1';
+    const CACHE_ZONAS = 'torneos.menu.zonas.u2';
 
     const CACHE_SEGUNDOS = 3600;
 
@@ -44,7 +46,8 @@ class MenuTorneos
      * Clave => título de la sección.
      */
     protected static $grupos = [
-        'local'    => '',
+        'local'       => '',
+        'selecciones' => 'Selecciones',
         'fifa'     => 'Mundial',
         'conmebol' => 'Sudamérica · Conmebol',
         'uefa'     => 'Europa · UEFA',
@@ -64,6 +67,17 @@ class MenuTorneos
         'afc'      => 'Torneos AFC',
         'caf'      => 'Torneos CAF',
         'ofc'      => 'Torneos OFC',
+    ];
+
+    /** Zonas del grupo «Selecciones»: una por confederación. */
+    protected static $nombresSelecciones = [
+        'fifa'     => 'FIFA',
+        'conmebol' => 'Conmebol',
+        'uefa'     => 'UEFA',
+        'concacaf' => 'Concacaf',
+        'afc'      => 'AFC',
+        'caf'      => 'CAF',
+        'ofc'      => 'OFC',
     ];
 
     /**
@@ -291,8 +305,9 @@ class MenuTorneos
         });
 
         return [
-            // 'u1': formato con URL amigable (cambia la versión del JSON cacheado).
-            'version' => substr(md5('u1|' . implode('|', $firma)), 0, 10),
+            // 'u1': formato con URL amigable; 'u2': grupo Selecciones
+            // (cambia la versión del JSON cacheado).
+            'version' => substr(md5('u2|' . implode('|', $firma)), 0, 10),
             'zonas'   => $zonas,
         ];
     }
@@ -306,7 +321,15 @@ class MenuTorneos
     {
         $escudos = [];
         foreach ($datos['zonas'] as $clave => $z) {
-            $escudo = strpos($clave, 'r-') === 0 ? self::escudoConfederacion($z['grupo']) : null;
+            if (strpos($clave, 'r-') === 0) {
+                $escudo = self::escudoConfederacion($z['grupo']);
+            } elseif (strpos($clave, 's-') === 0) {
+                // En las de selecciones el grupo es 'selecciones': la
+                // confederación es la clave sin el prefijo.
+                $escudo = self::escudoConfederacion(substr($clave, 2));
+            } else {
+                $escudo = null;
+            }
             $datos['zonas'][$clave]['escudo'] = $escudo;
             if ($escudo) {
                 $escudos[] = $escudo;
@@ -417,6 +440,23 @@ class MenuTorneos
      */
     public static function zonaDe($t)
     {
+        if (!empty($t->selecciones)) {
+            // Torneos de selecciones: su propio grupo, por confederación. La
+            // región decide; sin región (o escrita de otra forma) va a FIFA.
+            $region = self::normalizar($t->region);
+            $conf   = isset(self::$regiones[$region]) ? self::$regiones[$region] : 'fifa';
+
+            return [
+                'clave'   => 's-' . $conf,
+                'nombre'  => self::$nombresSelecciones[$conf],
+                'grupo'   => 'selecciones',
+                'bandera' => null,
+                'escudo'  => self::escudoConfederacion($conf),
+                // FIFA primero, después las confederaciones en el orden de $grupos.
+                'orden'   => array_search($conf, array_keys(self::$nombresSelecciones)),
+            ];
+        }
+
         if ($t->ambito === 'Internacional') {
             $region = self::normalizar($t->region);
 

@@ -188,9 +188,15 @@
             @endphp
             @foreach($vePestanas as $veClave => $veNombre)
                 <li class="nav-item" role="presentation">
+                    @if($veClave === 'jugadores' && is_null($jugadores))
+                        {{-- El plantel se calcula solo al pedirlo: link común, no pestaña. --}}
+                        <a class="nav-link" id="jugadores-tab" rel="nofollow"
+                           href="{{ route('equipos.ver', ['equipoId' => $equipo->id, 'pestActiva' => 'jugadores']) }}">{{ $veNombre }}</a>
+                    @else
                     <a class="nav-link {{ $vePest == $veClave ? 'active' : '' }}"
                        id="{{ $veClave }}-tab" data-bs-toggle="tab"
                        href="#{{ $veClave }}" role="tab">{{ $veNombre }}</a>
+                    @endif
                 </li>
             @endforeach
         </ul>
@@ -381,7 +387,11 @@
                     ];
                 @endphp
 
-                @if($jugadores->total() === 0)
+                @if(is_null($jugadores))
+                    <div class="t-vacio"><i class="bi bi-people"></i>
+                        <a rel="nofollow" href="{{ route('equipos.ver', ['equipoId' => $equipo->id, 'pestActiva' => 'jugadores']) }}">{{ __('Ver el plantel histórico') }}</a>
+                    </div>
+                @elseif($jugadores->total() === 0)
                     <div class="t-vacio"><i class="bi bi-people"></i>{{ __('No hay jugadores cargados para este club.') }}</div>
                 @else
                     <div class="t-tabla-wrap">

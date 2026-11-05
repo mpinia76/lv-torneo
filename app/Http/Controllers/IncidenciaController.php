@@ -112,7 +112,7 @@ class IncidenciaController extends Controller
 
 
         try {
-            $incidencia = Incidencia::create($request->all());
+            $incidencia = Incidencia::create($this->datos($request));
 
             $respuestaID='success';
             $respuestaMSJ='Registro creado satisfactoriamente';
@@ -203,7 +203,7 @@ class IncidenciaController extends Controller
     {
         $incidencia= Incidencia::find($id);
         try {
-            $incidencia->update($request->all());
+            $incidencia->update($this->datos($request));
 
             $respuestaID='success';
             $respuestaMSJ='Registro modificado satisfactoriamente';
@@ -220,6 +220,27 @@ class IncidenciaController extends Controller
         }
 
         return redirect()->route('incidencias.index', array('torneoId' => $incidencia->torneo_id))->with($respuestaID,$respuestaMSJ);
+    }
+
+    /**
+     * Lo que se guarda del formulario.
+     *
+     * El tipo es obligatorio: decide de qué controles de carga sale el partido
+     * (`Incidencia::TAPA`) y si sus goles cuentan para las estadísticas
+     * (`Incidencia::ANULAN_GOLES`). Una incidencia vieja sin tipo se puede
+     * editar, pero al guardarla hay que clasificarla.
+     */
+    private function datos(Request $request): array
+    {
+        $request->validate([
+            'tipo' => 'required|in:' . implode(',', array_keys(Incidencia::etiquetas())),
+        ], [
+            'tipo.required' => 'Elegí el tipo de incidencia.',
+            'tipo.in'       => 'Ese tipo de incidencia no existe.',
+        ]);
+
+        return $request->only(['torneo_id', 'equipo_id', 'partido_id', 'puntos', 'tipo',
+            'observaciones', 'observaciones_en']);
     }
 
     /**

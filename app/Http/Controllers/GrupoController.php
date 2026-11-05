@@ -159,6 +159,12 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
 
         foreach ($grupos as $grupo){
             if ($grupo->posiciones){
+                // Empate con tanda de penales CARGADA (fase de grupos de la Leagues
+                // Cup): 2 puntos al que gana la tanda y 1 al que la pierde. Sin
+                // tanda, empate normal. No depende del tilde «Penales» del grupo:
+                // ese tilde marca el grupo de LLAVES en todo el importador, y
+                // prenderlo en una zona con tabla la confundía con los playoffs.
+                $pk = 1;
                 $sql='SELECT
     foto,
     equipo,
@@ -173,6 +179,8 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
     SUM(
         CASE
             WHEN fecha_id IS NOT NULL AND golesl > golesv AND fecha_id IS NOT NULL THEN 3
+            WHEN fecha_id IS NOT NULL AND golesl = golesv AND '.$pk.' = 1
+                 AND pl IS NOT NULL AND pv IS NOT NULL AND pl > pv THEN 2
             WHEN fecha_id IS NOT NULL AND golesl = golesv AND fecha_id IS NOT NULL THEN 1
             ELSE 0
         END
@@ -187,7 +195,9 @@ FROM (
         equipos.escudo AS foto,
         fechas.id AS fecha_id,
         equipos.id AS equipo_id,
-        0 AS puntos
+        0 AS puntos,
+        partidos.penalesl AS pl,
+        partidos.penalesv AS pv
     FROM partidos
     INNER JOIN equipos ON partidos.equipol_id = equipos.id
     INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
@@ -213,7 +223,9 @@ FROM (
         equipos.escudo AS foto,
         fechas.id AS fecha_id,
         equipos.id AS equipo_id,
-        0 AS puntos
+        0 AS puntos,
+        partidos.penalesv AS pl,
+        partidos.penalesl AS pv
     FROM partidos
     INNER JOIN equipos ON partidos.equipov_id = equipos.id
     INNER JOIN plantillas ON plantillas.equipo_id = equipos.id
@@ -239,7 +251,9 @@ FROM (
         equipos.escudo AS foto,
         NULL AS fecha_id,
         equipos.id AS equipo_id,
-        SUM(puntos) AS puntos
+        SUM(puntos) AS puntos,
+        NULL AS pl,
+        NULL AS pv
     FROM incidencias
     INNER JOIN equipos ON incidencias.equipo_id = equipos.id
     WHERE incidencias.torneo_id = '.$grupo->torneo->id.'
@@ -442,6 +456,7 @@ INNER JOIN fechas ON partidos.fecha_id = fechas.id
 INNER JOIN grupos ON grupos.id = fechas.grupo_id
 
 WHERE gols.tipo <> \'En contra\' AND grupos.torneo_id='.$torneo_id.' AND grupos.id IN ('.$arrgrupos.')'.$nombreFiltro.'
+AND NOT EXISTS (SELECT 1 FROM incidencias i WHERE i.partido_id = gols.partido_id AND i.tipo IN (\'escritorio\', \'no_jugado\'))
 GROUP BY jugadors.id,jugador, nacionalidad, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 

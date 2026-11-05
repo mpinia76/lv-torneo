@@ -94,6 +94,16 @@
                 </div>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('selecciones', 'De selecciones', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label title="Mundial, Copa América, Eliminatorias, Eurocopa… Va con ámbito Internacional y la región cargada (fifa, conmebol, uefa…): la región decide la zona del menú «Selecciones».">
+                        {{-- El hidden va antes: un checkbox destildado no viaja y update($request->all()) no lo pisaría. --}}
+                        <input type="hidden" name="selecciones" value="0">
+                        {{ Form::checkbox('selecciones', 1, false) }}
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{ Form::label('posiciones_grupos', 'Posiciones', ['class' => 'control-label']) }}
                 <div class="checkbox">
                     <label>

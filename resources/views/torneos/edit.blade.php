@@ -75,12 +75,31 @@
                 </div>
             </div>
             <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('selecciones', 'De selecciones', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label title="Mundial, Copa América, Eliminatorias, Eurocopa… Va con ámbito Internacional y la región cargada (fifa, conmebol, uefa…): la región decide la zona del menú «Selecciones».">
+                        {{-- El hidden va antes: un checkbox destildado no viaja y update($request->all()) no lo pisaría. --}}
+                        <input type="hidden" name="selecciones" value="0">
+                        {{ Form::checkbox('selecciones', 1, $torneo->selecciones ?? 0) }}
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
                 {{ Form::label('inconcluso', 'Inconcluso', ['class' => 'control-label']) }}
                 <div class="checkbox">
                     <label title="Se suspendió y nunca terminó (ej. Copa de la Superliga 2020): no tiene posiciones finales ni le faltan partidos.">
                         {{-- El hidden va antes: un checkbox destildado no viaja y update($request->all()) no lo pisaría. --}}
                         <input type="hidden" name="inconcluso" value="0">
                         {{ Form::checkbox('inconcluso', 1, $torneo->inconcluso ?? 0) }}
+                    </label>
+                </div>
+            </div>
+            <div class="form-group col-xs-12 col-sm-6 col-md-2">
+                {{ Form::label('sin_titulo', 'No da título', ['class' => 'control-label']) }}
+                <div class="checkbox">
+                    <label title="El primero no suma título (Apertura, Clausura e Intermedio de Uruguay: el título sale de la definición). Se le pueden guardar las posiciones igual: así tiene goleador y queda completo.">
+                        <input type="hidden" name="sin_titulo" value="0">
+                        {{ Form::checkbox('sin_titulo', 1, $torneo->sin_titulo ?? 0) }}
                     </label>
                 </div>
             </div>

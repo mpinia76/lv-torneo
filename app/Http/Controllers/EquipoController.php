@@ -14,6 +14,7 @@ use App\Services\NotasWiki;
 use App\Services\Traductor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use DB;
 use Illuminate\Pagination\LengthAwarePaginator;
 class EquipoController extends Controller
@@ -278,6 +279,11 @@ class EquipoController extends Controller
         $id = (int) $request->query('equipoId');
         $equipo=Equipo::findOrFail($id);
 
+        // Torneos y títulos del equipo: hace varias consultas por cada torneo jugado
+        // (cientos en un club grande). Se guarda 24 h por equipo en la caché general,
+        // aparte de CachePaginas, que se vacía con cada import (04/11/2026).
+        $resumen = Cache::remember('equipo.resumen.' . $id, 86400, function () use ($id, $equipo) {
+
 
 		$sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "0" AS jugados, "0" AS ganados, "0" AS perdidos,
        "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, "" as posicion, torneos.tipo, torneos.ambito,
@@ -352,7 +358,7 @@ class EquipoController extends Controller
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('equipo_id', '=',$id)->first();
 
             if(!empty($posicionTorneo)){
-                if ($posicionTorneo->posicion == 1){
+                if ($posicionTorneo->posicion == 1 && \App\Torneo::daTitulo($torneo->idTorneo)){
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
                     if ($torneo->ambito == 'Nacional'){
                         if ($torneo->tipo == 'Copa') {
@@ -384,7 +390,8 @@ class EquipoController extends Controller
                     '<img id="original" src="' . asset('images/campeon.png') . '" height="20"> ' . __('Campeón') :
                     (($posicionTorneo->posicion == 2) ? '<img id="original" src="' . asset('images/subcampeon.png') . '" height="20">' . __('Subcampeón') : $posicionTorneo->posicion)
                 ) : '';
-                if ((!empty($posicionTorneo))&&($posicionTorneo->posicion == 1)){
+                if ((!empty($posicionTorneo))&&($posicionTorneo->posicion == 1)
+                    && \App\Torneo::daTitulo($torneo->idTorneo)){
                     $torneosTitulos[]=$torneo;
                 }
             }
@@ -540,6 +547,14 @@ class EquipoController extends Controller
         $torneosTitulos = collect($torneosTitulos)->sortByDesc(function ($item) {
             return $item->year;
         })->values()->all();
+
+            return compact('torneosEquipo', 'titulosLiga', 'titulosCopa', 'titulosInternacional', 'torneosTitulos');
+        });
+        $torneosEquipo = $resumen['torneosEquipo'];
+        $titulosLiga = $resumen['titulosLiga'];
+        $titulosCopa = $resumen['titulosCopa'];
+        $titulosInternacional = $resumen['titulosInternacional'];
+        $torneosTitulos = $resumen['torneosTitulos'];
         set_time_limit(0);
         //dd($request);
 
@@ -704,35 +719,42 @@ GROUP BY j.id, p.foto, p.apellido, p.nombre
 group by jugador_id,jugador, foto
 ORDER BY '.$order.' '.$tipoOrder.', jugador ASC';
 //dd($sql);
-        $jugadores = DB::select($sql);
-        //echo $sql;
+        // El plantel histórico es la consulta más cara del sitio (más de un minuto en
+        // equipos grandes, 04/11/2026). Solo se calcula si se pide la pestaña
+        // Jugadores (?pestActiva=jugadores); si no, la pestaña muestra un link.
+        // Se guarda 24 h por equipo y orden en la caché general (no en CachePaginas,
+        // que se vacía con cada import).
+        $jugadores = null;
+        $paginate = 15; // también lo usa la paginación de partidos, más abajo
+        if ($request->query('pestActiva') === 'jugadores') {
+            $todos = Cache::remember('equipo.plantel.' . $id . '.' . $order . '.' . $tipoOrder, 86400, function () use ($sql) {
+                return DB::select($sql);
+            });
 
+            // Paginación jugadores
+            $pageJugadores = max(1, (int) $request->query('pageJugadores', 1));
+            $paginate = 15;
+            $offSet = ($pageJugadores * $paginate) - $paginate;
+            $itemsForCurrentPage = array_slice($todos, $offSet, $paginate, true);
 
-        // Paginación jugadores
-        $pageJugadores = $request->query('pageJugadores', 1);
-        $paginate = 15;
-        $offSet = ($pageJugadores * $paginate) - $paginate;
-        $itemsForCurrentPage = array_slice($jugadores, $offSet, $paginate, true);
+            $jugadores = new LengthAwarePaginator(
+                $itemsForCurrentPage,
+                count($todos),
+                $paginate,
+                $pageJugadores,
+                [
+                    'path' => route('equipos.ver', [
+                        'equipoId' => $id,
+                        'order' => $order,
+                        'tipoOrder' => $tipoOrder,
+                        'pestActiva' => 'jugadores'
+                    ]),
+                    'pageName' => 'pageJugadores'  // <- importantísimo
+                ]
+            );
+        }
 
-        $jugadores = new LengthAwarePaginator(
-            $itemsForCurrentPage,
-            count($jugadores),
-            $paginate,
-            $pageJugadores,
-            [
-                'path' => route('equipos.ver', [
-                    'equipoId' => $id,
-                    'order' => $order,
-                    'tipoOrder' => $tipoOrder,
-                    'pestActiva' => 'jugadores'
-                ]),
-                'pageName' => 'pageJugadores'  // <- importantísimo
-            ]
-        );
-
-
-
-        $iterator=$offSet+1;
+        $iterator = isset($offSet) ? $offSet + 1 : 1;
 
         $sqlPartidos = "
         SELECT

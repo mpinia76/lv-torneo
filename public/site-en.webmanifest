@@ -1,0 +1,18 @@
+{
+  "id": "/en",
+  "name": "La Planilla",
+  "short_name": "La Planilla",
+  "description": "Complete records of players, coaches and teams: every official match of the 21st century, with lineups, goals, cards, substitutions and penalties.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/en",
+  "scope": "/en",
+  "display": "standalone",
+  "background_color": "#EDEFEB",
+  "theme_color": "#1746A2",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

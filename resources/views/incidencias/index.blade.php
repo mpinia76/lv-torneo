@@ -83,7 +83,8 @@
                     @endif
                 </td>
                 <td>{{$incidencia->puntos}}</td>
-                <td>{{$incidencia->observaciones}}
+                <td><span class="badge {{ $incidencia->tipo ? 'badge-secondary bg-secondary' : 'badge-warning bg-warning text-dark' }}">{{ $incidencia->tipo_etiqueta }}</span><br>
+                    {{$incidencia->observaciones}}
                     @if($incidencia->observaciones_en)
                         <br><small class="text-muted">EN: {{$incidencia->observaciones_en}}</small>
                     @endif

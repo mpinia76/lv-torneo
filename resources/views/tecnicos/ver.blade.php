@@ -5,7 +5,7 @@
     $seoNombre   = $tecnico->persona->name ?: __('Técnico');
     $seoT        = collect($torneosTecnico);
     $seoPartidos = (int) $seoT->sum('jugados');
-    $seoTitulos  = $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional;
+    $seoTitulos  = $titulosTecnicoLiga + $titulosTecnicoCopa + $titulosTecnicoInternacional + ($titulosTecnicoSeleccion ?? 0);
     $seoDesc = $seoPartidos > 0
         ? $seoNombre . ': ' . cantidad($seoPartidos, 'partido dirigido', 'partidos dirigidos')
             . ' (' . lista_y([

@@ -11,6 +11,9 @@
     $vaConDetalle = (int) $vaT->sum('con_detalle');
     $vaAmarillas  = (int) $vaT->sum('amarillas');
     $vaRojas      = (int) $vaT->sum('rojas');
+    $vaDirectas   = (int) $vaT->sum('directas');
+    $vaDobles     = (int) $vaT->sum('dobles');
+    $vaPenales    = (int) $vaT->sum('penales');
 
     $seoNombre = $arbitro->persona->name ?: __('Árbitro');
     $seoDesc = $vaPartidos > 0
@@ -68,6 +71,19 @@
             'cuarto'    => [__('Cuarto árbitro'), (int) $vaBase->cuarto],
             'var'       => [__('VAR'), (int) $vaBase->var],
         ];
+        // Barra G / E / P de cada equipo (igual que en la ficha del técnico).
+        $vaGep = function ($g, $e, $p) {
+            $total = $g + $e + $p;
+            if ($total <= 0) { return ''; }
+            return '<span class="t-ge" title="'.$g.__('G').' · '.$e.__('E').' · '.$p.__('P').'">'
+                .'<i class="g" style="width:'.round($g * 100 / $total, 1).'%"></i>'
+                .'<i class="e" style="width:'.round($e * 100 / $total, 1).'%"></i>'
+                .'<i class="p" style="width:'.round($p * 100 / $total, 1).'%"></i></span>';
+        };
+        $vaPorc = function ($n, $total) {
+            return $total > 0 ? round($n * 100 / $total) . '%' : '–';
+        };
+        $vaRes = $resultados ?? null;
         $vaUrl = function (array $cambios) use ($arbitro, $idTorneo, $rol) {
             $q = array_merge(['arbitroId' => $arbitro->id, 'torneoId' => $idTorneo ?: null, 'rol' => $rol ?: null], $cambios);
             return route('arbitros.ver', array_filter($q, function ($v) { return $v !== null && $v !== ''; })) . '#partidos';
@@ -118,6 +134,10 @@
                     <div class="t-kpi-num t-num-roja">{{ $vaRojas }}</div>
                     <div class="t-kpi-rot">{{ __('Rojas') }}</div>
                 </div>
+                <div class="t-kpi {{ $vaPenales > 0 ? '' : 't-kpi-apagado' }}">
+                    <div class="t-kpi-num">{{ $vaPenales }}</div>
+                    <div class="t-kpi-rot">{{ __('Penales') }}</div>
+                </div>
             </div>
 
             <div class="t-kpis-pie">
@@ -125,6 +145,21 @@
                     <span>{!! __('Por partido: :amarillas amarillas · :rojas rojas', [
                         'amarillas' => '<b>'.e($vaProm($vaAmarillas, $vaConDetalle)).'</b>',
                         'rojas'     => '<b>'.e($vaProm($vaRojas, $vaConDetalle)).'</b>',
+                    ]) !!} · {!! __(':penales penales', [
+                        'penales' => '<b>'.e($vaProm($vaPenales, $vaConDetalle)).'</b>',
+                    ]) !!}</span>
+                @endif
+                @if($vaRojas > 0)
+                    <span>{!! __('Rojas: :directas directas · :dobles por doble amarilla', [
+                        'directas' => '<b>'.e($vaDirectas).'</b>',
+                        'dobles'   => '<b>'.e($vaDobles).'</b>',
+                    ]) !!}</span>
+                @endif
+                @if($vaRes && (int) $vaRes->total > 0)
+                    <span>{!! __('Con él: gana el local :local · empate :empate · gana el visitante :visitante', [
+                        'local'     => '<b>'.e($vaPorc((int) $vaRes->local, (int) $vaRes->total)).'</b>',
+                        'empate'    => '<b>'.e($vaPorc((int) $vaRes->empate, (int) $vaRes->total)).'</b>',
+                        'visitante' => '<b>'.e($vaPorc((int) $vaRes->visitante, (int) $vaRes->total)).'</b>',
                     ]) !!}</span>
                 @endif
                 <span class="t-referencia">{{ __('Tarjetas de los partidos en que fue el árbitro principal; la doble amarilla cuenta como roja.') }}</span>
@@ -145,6 +180,7 @@
                             <th title="{{ __('Amarillas') }}"><span class="t-tarjeta-a"></span></th>
                             <th title="{{ __('Rojas') }}"><span class="t-tarjeta-r"></span></th>
                             <th title="{{ __('Amarillas por partido como principal') }}">{{ __('Prom.') }}</th>
+                            <th title="{{ __('Penales cobrados como principal') }}">{{ __('Pen.') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -165,6 +201,7 @@
                                 <td>{!! $vaCero($vaFila->amarillas) !!}</td>
                                 <td>{!! $vaCero($vaFila->rojas) !!}</td>
                                 <td>{{ $vaProm($vaFila->amarillas, $vaFila->con_detalle) }}</td>
+                                <td>{!! $vaCero($vaFila->penales) !!}</td>
                             </tr>
                         @endforeach
                         </tbody>
@@ -180,11 +217,58 @@
                             <td>{{ $vaAmarillas }}</td>
                             <td>{{ $vaRojas }}</td>
                             <td>{{ $vaProm($vaAmarillas, $vaConDetalle) }}</td>
+                            <td>{{ $vaPenales }}</td>
                         </tr>
                         </tfoot>
                     </table>
                 </div>
             </div>
+
+            {{-- Equipos que dirigió como principal: cómo les fue con él y cuántas tarjetas les mostró --}}
+            @if(!empty($porEquipo))
+                <h2 class="t-seccion" id="equipos">{{ __('Por equipo') }}</h2>
+                <div class="t-panel">
+                    <div class="t-tabla-wrap">
+                        <table class="t-tabla">
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th class="t-izq">{{ __('Equipo') }}</th>
+                                <th title="{{ __('Partidos dirigidos como principal') }}">{{ __('PJ') }}</th>
+                                <th title="{{ __('Ganados') }}">{{ __('G') }}</th>
+                                <th title="{{ __('Empatados') }}">{{ __('E') }}</th>
+                                <th title="{{ __('Perdidos') }}">{{ __('P') }}</th>
+                                <th></th>
+                                <th title="{{ __('Goles a favor') }}">{{ __('GF') }}</th>
+                                <th title="{{ __('Goles en contra') }}">{{ __('GC') }}</th>
+                                <th title="{{ __('Amarillas que le mostró') }}"><span class="t-tarjeta-a"></span></th>
+                                <th title="{{ __('Rojas que le mostró') }}"><span class="t-tarjeta-r"></span></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($porEquipo as $vaEqIndice => $vaEq)
+                                <tr>
+                                    <td class="t-pos">{{ $vaEqIndice + 1 }}</td>
+                                    <td class="t-izq">
+                                        <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $vaEq->equipo_id])"
+                                                        :nombre="$vaEq->nombre" :escudo="$vaEq->escudo" :pais="$vaEq->pais" tam="sm"/>
+                                    </td>
+                                    <td class="t-pts">{{ $vaEq->pj }}</td>
+                                    <td>{!! $vaCero($vaEq->g) !!}</td>
+                                    <td>{!! $vaCero($vaEq->e) !!}</td>
+                                    <td>{!! $vaCero($vaEq->p) !!}</td>
+                                    <td>{!! $vaGep((int) $vaEq->g, (int) $vaEq->e, (int) $vaEq->p) !!}</td>
+                                    <td>{{ $vaEq->gf }}</td>
+                                    <td>{{ $vaEq->gc }}</td>
+                                    <td>{!! $vaCero($vaEq->amarillas) !!}</td>
+                                    <td>{!! $vaCero($vaEq->rojas) !!}</td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
 
             {{-- Partidos, filtrables por torneo (desde la tabla) y por rol --}}
             <h2 class="t-seccion" id="partidos">

@@ -271,13 +271,13 @@ class TecnicoController extends Controller
         $id = (int) $request->query('tecnicoId');
         $tecnico=Tecnico::findOrFail($id);
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, torneos.tipo, torneos.ambito, torneos.selecciones, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 WHERE partido_tecnicos.tecnico_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito, torneos.selecciones
 ORDER BY torneos.year DESC, torneos.id DESC';
 
 
@@ -287,6 +287,8 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
+        // Con la selección: aparte de los internacionales de clubes.
+        $titulosTecnicoSeleccion=0;
 
         // ── Todos los torneos de una sola vez ────────────────────────────────
         // Mismo tratamiento que la ficha de jugador: lo que se pedia por cada
@@ -318,7 +320,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
             foreach (PosicionTorneo::whereIn('torneo_id', $idsTorneos)->get() as $pos) {
                 $tid = (int) $pos->torneo_id;
                 $posPorTorneo[$tid][(int) $pos->equipo_id] = $pos->posicion;
-                if ($pos->posicion == 1 && !isset($campeonDe[$tid])) {
+                if ($pos->posicion == 1 && !isset($campeonDe[$tid]) && \App\Torneo::daTitulo($tid)) {
                     $campeonDe[$tid] = (int) $pos->equipo_id;
                 }
             }
@@ -442,7 +444,9 @@ ORDER BY partidos.dia DESC') as $f) {
                 $ultimo    = isset($ultimoDe[$tid][$eqCampeon]) ? $ultimoDe[$tid][$eqCampeon] : null;
 
                 if ($ultimo !== null && isset($dirigio[$ultimo][$eqCampeon])) {
-                    if ($torneo->ambito == 'Nacional') {
+                    if (!empty($torneo->selecciones)) {
+                        $titulosTecnicoSeleccion++;
+                    } elseif ($torneo->ambito == 'Nacional') {
                         if ($torneo->tipo == 'Copa') {
                             $titulosTecnicoCopa++;
                         } else {
@@ -493,6 +497,7 @@ ORDER BY partidos.dia DESC') as $f) {
         $titulosJugadorCopa=0;
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
+        $titulosJugadorSeleccion=0;
 
         // --- Inicializa array para no duplicar conteos por mismo torneo ---
         $countedTorneos = []; // guardará ids de torneos ya contados para este técnico
@@ -590,13 +595,13 @@ ORDER BY partidos.dia DESC') as $f) {
         }
 
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" AS errados, "0" AS atajados, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" AS errados, "0" AS atajados, "0" recibidos, "0" invictas, "" as idJugador, torneos.tipo, torneos.ambito, torneos.selecciones, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
 INNER JOIN jugadors ON jugadors.id = plantilla_jugadors.jugador_id
 WHERE jugadors.persona_id = '.$tecnico->persona_id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito, torneos.selecciones
 ORDER BY torneos.year DESC';
 
 
@@ -621,7 +626,7 @@ ORDER BY torneos.year DESC';
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
 
-            if(!empty($posicionTorneo)){
+            if(!empty($posicionTorneo) && \App\Torneo::daTitulo($torneo->idTorneo)){
                 //if ($posicionTorneo->posicion == 1){
                 $consultarJugador = Jugador::where('persona_id', '=', $tecnico->persona_id)->first();
                 $alineacion = Alineacion::whereIn('partido_id', explode(',', $arrpartidos))->where('equipo_id','=',$posicionTorneo->equipo_id)->where('jugador_id','=',$consultarJugador->id)->first();
@@ -632,7 +637,9 @@ ORDER BY torneos.year DESC';
                 //print_r($partidoTecnico);
                 if(!empty($alineacion)) {
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->ambito == 'Nacional') {
+                    if (!empty($torneo->selecciones)) {
+                        $titulosJugadorSeleccion++;
+                    } elseif ($torneo->ambito == 'Nacional') {
                         if ($torneo->tipo == 'Copa') {
                             $titulosJugadorCopa++;
                         } else {
@@ -872,7 +879,161 @@ WHERE  grupos.torneo_id='.$torneo->idTorneo.' AND grupos.id IN ('.$arrgrupos.') 
         // empataba y el orden salía al azar. Ver App\Services\OrdenTorneos.
         $torneosTecnico = \App\Services\OrdenTorneos::ordenar($torneosTecnico, \App\Services\OrdenTorneos::ultimosComoTecnico($tecnico->persona_id));
         $torneosJugador = \App\Services\OrdenTorneos::ordenar($torneosJugador, \App\Services\OrdenTorneos::ultimosComoJugador($tecnico->persona_id));
-        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional'));
+        // ── Carrera como DT, mirada de otras formas ─────────────────────────
+        // Todo sale de partido_tecnicos (el equipo que dirigió en cada
+        // partido) y sólo de partidos con resultado, igual que la tabla por
+        // torneo. Efectividad: 3 puntos por ganado y 1 por empate.
+        $ladoDt = 'FROM partido_tecnicos pt
+INNER JOIN partidos p ON p.id = pt.partido_id
+WHERE pt.tecnico_id = ? AND p.golesl IS NOT NULL AND p.golesv IS NOT NULL';
+        $golesDt = 'IF(pt.equipo_id = p.equipol_id, p.golesl, p.golesv)';
+        $golesRival = 'IF(pt.equipo_id = p.equipol_id, p.golesv, p.golesl)';
+        $gep = 'COUNT(*) AS pj, SUM(x.gf > x.gc) AS g, SUM(x.gf = x.gc) AS e, SUM(x.gf < x.gc) AS p,
+       SUM(x.gf) AS gf, SUM(x.gc) AS gc, MIN(x.dia) AS desde, MAX(x.dia) AS hasta';
+
+        // Por club que dirigió. Las selecciones van aparte ($porSeleccionDt),
+        // como en Transfermarkt: lo que dirigió en un torneo marcado
+        // `selecciones` es una selección (un club nunca juega uno).
+        $porClubDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
+FROM (SELECT pt.equipo_id, p.dia, ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc ' . $ladoDt . ') x
+INNER JOIN equipos e ON e.id = x.equipo_id
+GROUP BY e.id, e.nombre, e.escudo, e.pais
+ORDER BY hasta DESC', [$id]);
+        $seleccionesDt = [];
+        foreach (DB::select('SELECT DISTINCT pt.equipo_id
+FROM partido_tecnicos pt
+INNER JOIN partidos p ON p.id = pt.partido_id
+INNER JOIN fechas f   ON f.id = p.fecha_id
+INNER JOIN grupos g   ON g.id = f.grupo_id
+INNER JOIN torneos t  ON t.id = g.torneo_id
+WHERE pt.tecnico_id = ? AND t.selecciones = 1', [$id]) as $f) {
+            $seleccionesDt[(int) $f->equipo_id] = true;
+        }
+        $porSeleccionDt = [];
+        foreach ($porClubDt as $i => $f) {
+            if (isset($seleccionesDt[(int) $f->equipo_id])) {
+                $porSeleccionDt[] = $f;
+                unset($porClubDt[$i]);
+            }
+        }
+        $porClubDt = array_values($porClubDt);
+
+        // Rivales más enfrentados (los 10 primeros).
+        $rivalesDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
+FROM (SELECT IF(pt.equipo_id = p.equipol_id, p.equipov_id, p.equipol_id) AS rival_id, p.dia,
+             ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc ' . $ladoDt . ') x
+INNER JOIN equipos e ON e.id = x.rival_id
+GROUP BY e.id, e.nombre, e.escudo, e.pais
+ORDER BY pj DESC, g DESC, e.nombre
+LIMIT 10', [$id]);
+
+        // Goleadores bajo su mando (los 10 primeros): goles de jugadores de
+        // SU equipo en partidos que dirigió. El equipo sale de la alineación.
+        $goleadoresDt = DB::select('SELECT j.id AS jugador_id, pe.name AS nombre, pe.foto, pe.nacionalidad, COUNT(*) AS goles
+FROM partido_tecnicos pt
+INNER JOIN gols g        ON g.partido_id = pt.partido_id AND g.tipo <> "En contra"
+INNER JOIN alineacions a ON a.partido_id = g.partido_id AND a.jugador_id = g.jugador_id AND a.equipo_id = pt.equipo_id
+INNER JOIN jugadors j    ON j.id = g.jugador_id
+INNER JOIN personas pe   ON pe.id = j.persona_id
+WHERE pt.tecnico_id = ?
+GROUP BY j.id, pe.name, pe.foto, pe.nacionalidad
+ORDER BY goles DESC, pe.name
+LIMIT 10', [$id]);
+
+        // Los que más usó (los 10 primeros): titular o entró.
+        $usadosDt = DB::select('SELECT j.id AS jugador_id, pe.name AS nombre, pe.foto, pe.nacionalidad,
+       COUNT(*) AS jugados, SUM(x.titular) AS titular
+FROM (
+    SELECT a.jugador_id, a.partido_id, 1 AS titular
+      FROM partido_tecnicos pt
+      INNER JOIN alineacions a ON a.partido_id = pt.partido_id AND a.equipo_id = pt.equipo_id AND a.tipo = "Titular"
+     WHERE pt.tecnico_id = ?
+    UNION
+    SELECT a.jugador_id, a.partido_id, 0
+      FROM partido_tecnicos pt
+      INNER JOIN alineacions a ON a.partido_id = pt.partido_id AND a.equipo_id = pt.equipo_id AND a.tipo = "Suplente"
+      INNER JOIN cambios c     ON c.partido_id = a.partido_id AND c.jugador_id = a.jugador_id AND c.tipo = "Entra"
+     WHERE pt.tecnico_id = ?
+) x
+INNER JOIN jugadors j  ON j.id = x.jugador_id
+INNER JOIN personas pe ON pe.id = j.persona_id
+GROUP BY j.id, pe.name, pe.foto, pe.nacionalidad
+ORDER BY jugados DESC, pe.name
+LIMIT 10', [$id, $id]);
+
+        // Rachas: mayor invicto y más victorias seguidas, en orden de fecha.
+        // Una racha se corta al cambiar de club: no es la misma racha la del
+        // último partido en un equipo y el primero en otro. Partidos sin día
+        // no tienen orden y quedan afuera.
+        $rachasDt = ['invicto' => null, 'victorias' => null];
+        $actual = ['invicto' => null, 'victorias' => null];
+        $clubAnterior = null;
+        foreach (DB::select('SELECT pt.equipo_id, p.dia, ' . $golesDt . ' AS gf, ' . $golesRival . ' AS gc '
+                     . $ladoDt . ' AND p.dia IS NOT NULL ORDER BY p.dia, p.id', [$id]) as $f) {
+            if ($clubAnterior !== null && (int) $f->equipo_id !== $clubAnterior) {
+                $actual = ['invicto' => null, 'victorias' => null];
+            }
+            $clubAnterior = (int) $f->equipo_id;
+            $cumple = ['invicto' => $f->gf >= $f->gc, 'victorias' => $f->gf > $f->gc];
+            foreach ($cumple as $tipo => $ok) {
+                if (!$ok) {
+                    $actual[$tipo] = null;
+                    continue;
+                }
+                if ($actual[$tipo] === null) {
+                    $actual[$tipo] = ['n' => 0, 'desde' => $f->dia, 'hasta' => $f->dia, 'equipo_id' => (int) $f->equipo_id];
+                }
+                $actual[$tipo]['n']++;
+                $actual[$tipo]['hasta'] = $f->dia;
+                if ($rachasDt[$tipo] === null || $actual[$tipo]['n'] > $rachasDt[$tipo]['n']) {
+                    $rachasDt[$tipo] = $actual[$tipo];
+                }
+            }
+        }
+        // Una racha de 1 o 2 no dice nada.
+        foreach ($rachasDt as $tipo => $r) {
+            if ($r !== null && $r['n'] < 3) {
+                $rachasDt[$tipo] = null;
+            }
+        }
+        $nombresClub = [];
+        $idsClub = array_filter(array_map(function ($r) { return $r['equipo_id'] ?? null; }, $rachasDt));
+        if ($idsClub) {
+            $nombresClub = DB::table('equipos')->whereIn('id', $idsClub)->pluck('nombre', 'id')->all();
+        }
+        foreach ($rachasDt as $tipo => $r) {
+            if ($r !== null) {
+                $rachasDt[$tipo]['club'] = $nombresClub[$r['equipo_id']] ?? '';
+            }
+        }
+
+        // Debut y último partido como DT. Misma forma de fila que <x-partido>.
+        $extremoDt = function ($orden) use ($id) {
+            return DB::table('partido_tecnicos as pt')
+                ->join('partidos as p', 'p.id', '=', 'pt.partido_id')
+                ->join('fechas as f', 'f.id', '=', 'p.fecha_id')
+                ->join('grupos as g', 'g.id', '=', 'f.grupo_id')
+                ->join('torneos as t', 't.id', '=', 'g.torneo_id')
+                ->join('equipos as e1', 'e1.id', '=', 'p.equipol_id')
+                ->join('equipos as e2', 'e2.id', '=', 'p.equipov_id')
+                ->where('pt.tecnico_id', $id)
+                ->whereNotNull('p.dia')
+                ->select('t.nombre as nombreTorneo', 't.escudo as escudoTorneo', 't.year', 'f.numero', 'p.dia',
+                    'e1.id as equipol_id', 'e1.escudo as fotoLocal', 'e1.nombre as local',
+                    'e2.id as equipov_id', 'e2.escudo as fotoVisitante', 'e2.nombre as visitante',
+                    'p.golesl', 'p.golesv', 'p.penalesl', 'p.penalesv', 'p.id as partido_id')
+                ->orderBy('p.dia', $orden)->orderBy('p.id', $orden)
+                ->first();
+        };
+        $debutDt  = $extremoDt('asc');
+        $ultimoDt = $extremoDt('desc');
+        if ($debutDt && $ultimoDt && (int) $debutDt->partido_id === (int) $ultimoDt->partido_id) {
+            $ultimoDt = null;
+        }
+
+        return view('tecnicos.ver', compact('tecnico', 'torneosTecnico', 'torneosJugador','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional',
+            'titulosJugadorSeleccion','titulosTecnicoSeleccion',
+            'porClubDt', 'porSeleccionDt', 'rivalesDt', 'goleadoresDt', 'usadosDt', 'debutDt', 'ultimoDt', 'rachasDt'));
     }
 
     public function jugados(Request $request)
@@ -1364,6 +1525,33 @@ WHERE (tecnicos.id = ".$id.")";
 
             $insert = [];
 
+            // ── Nombre completo de los mononímicos ─────────────────────────
+            // La API de DTs (/coach/{id}) NO trae el nombre completo: sólo
+            // `name`, sin shortName, sin displayName y con passportName vacío
+            // (confirmado con Candinho, 83607). Para un DT conocido por una sola
+            // palabra eso dejaba "Candinho" en mostrar, nombre y apellido. La
+            // ficha web sí lo tiene ("Nombre completo: José Cândido Sotto
+            // Maior"), así que en ESE caso —y sólo en ese— se lee la ficha
+            // (1 crédito de ScraperAPI). Si no se puede leer, queda como antes.
+            $avisoNombre = '';
+            $nombreApi   = trim($datos['name'] ?? '');
+            if ($nombreApi !== ''
+                && count(preg_split('/\s+/u', $nombreApi)) < 2
+                && trim($datos['nationalityDetails']['passportName'] ?? '') === ''
+                && trim($datos['displayName'] ?? '') === '') {
+                $completoWeb = $this->nombreCompletoDesdeFichaWeb($coachId, $datos['relativeUrl'] ?? '');
+                if ($completoWeb !== null) {
+                    // displayName es el segundo candidato de separarTM para el
+                    // nombre completo; el mostrado sigue saliendo de `name`.
+                    $datos['displayName'] = $completoWeb;
+                    $avisoNombre = 'Nombre completo tomado de la ficha web de TM: «' . e($completoWeb)
+                        . '». Revisá dónde quedó cortado el apellido.<br>';
+                } else {
+                    $avisoNombre = '⚠️ TM sólo da «' . e($nombreApi) . '» y no se pudo leer el nombre completo '
+                        . 'de la ficha web: quedó igual en mostrar, nombre y apellido. Corregilo a mano.<br>';
+                }
+            }
+
             // ── Nombre / apellido ──────────────────────────────────────────
             // Separación centralizada en NombreHelper (soporta "F. Calvo",
             // "Tomás Uribe", compuestos, partículas y mononímicos).
@@ -1491,6 +1679,8 @@ WHERE (tecnicos.id = ".$id.")";
                 $insert['fallecimiento'] = trim($fallecimiento);
             }
 
+            $success .= $avisoNombre;
+
             $request->session()->put('nombre_filtro_tecnico', $apellido);
 
             if (empty($insert['name']) || empty($insert['apellido'])) {
@@ -1549,6 +1739,60 @@ WHERE (tecnicos.id = ".$id.")";
         }
 
         return redirect()->route('tecnicos.index')->with($respuestaID, $respuestaMSJ);
+    }
+
+
+    /**
+     * "Nombre completo" de la ficha web del DT en Transfermarkt, o null.
+     *
+     * Se usa sólo cuando la API no trae más que una palabra (ver
+     * importarProcess_new). La ficha del DT lo pone en una tabla
+     * (`<th>Nombre completo:</th><td>…</td>`); la de jugador, en spans: se
+     * aceptan las dos. Se lee por la etiqueta, en el sitio en español, y lo que
+     * no tenga al menos dos palabras en alfabeto latino se descarta.
+     */
+    private function nombreCompletoDesdeFichaWeb($coachId, $relativeUrl)
+    {
+        $rel = trim((string) $relativeUrl);
+        $url = 'https://www.transfermarkt.es'
+            . ($rel !== '' && strpos($rel, '/profil/trainer/') !== false
+                ? $rel
+                : '/-/profil/trainer/' . rawurlencode((string) $coachId));
+
+        try {
+            $html = HttpHelper::getHtmlTm($url);
+        } catch (\Throwable $e) {
+            Log::warning('Import TM (DT): no se pudo bajar la ficha web ' . $url . ' - ' . $e->getMessage(), []);
+            return null;
+        }
+        if (!is_string($html) || trim($html) === '') {
+            Log::warning('Import TM (DT): ficha web vacía: ' . $url, []);
+            return null;
+        }
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        libxml_clear_errors();
+        $xp = new \DOMXPath($dom);
+
+        $nodos = $xp->query(
+            '//th[starts-with(normalize-space(.), "Nombre completo")]/following-sibling::td[1]'
+            . ' | //span[starts-with(normalize-space(.), "Nombre completo")]/following-sibling::span[1]'
+        );
+        if ($nodos) {
+            foreach ($nodos as $n) {
+                $v = trim(preg_replace('/\s+/u', ' ', $n->textContent));
+                if ($v !== ''
+                    && count(explode(' ', $v)) >= 2
+                    && preg_match('/^[\p{Latin}\p{M}\s.\'\-]+$/u', $v)) {
+                    return $v;
+                }
+            }
+        }
+
+        Log::info('Import TM (DT): la ficha web no tiene "Nombre completo": ' . $url, []);
+        return null;
     }
 
 

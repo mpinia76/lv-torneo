@@ -55,6 +55,15 @@
         </div>
 
         <div class="row">
+            <div class="form-group col-xs-12 col-sm-12 col-md-8">
+                {{Form::label('tipo', 'Tipo')}}
+                {{Form::select('tipo', ['' => '— Elegí el tipo —'] + \App\Incidencia::TIPOS, old('tipo'), ['class' => 'form-control', 'required' => 'required'])}}
+                <small class="text-muted">Decide de qué controles de carga sale el partido y si sus goles cuentan para las estadísticas.
+                    <b>Escritorio</b> y <b>No se jugó</b> anulan los goles del partido. <b>Sanción de puntos</b> va con equipo y puntos.</small>
+            </div>
+        </div>
+
+        <div class="row">
 
 
             <div class="form-group col-xs-12 col-sm-6 col-md-6">

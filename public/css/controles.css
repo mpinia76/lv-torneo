@@ -357,3 +357,31 @@
     .ctrl-equipo { min-width: 7em; }
     .ctrl-menu { margin-bottom: 1em; }
 }
+
+/*
+ * La tabla scrollea dentro de su propia caja, de la altura de la pantalla.
+ * Antes la barra horizontal estaba al pie de la tabla: para mover la tabla a
+ * los costados había que bajar hasta el final de la página. Ahora la barra
+ * queda siempre abajo de la pantalla, el encabezado queda fijo arriba y la
+ * columna de botones fija a la derecha, así casi no hace falta mover nada.
+ */
+.ctrl-scroll {
+    max-height: calc(100vh - 7rem);
+    overflow: auto;
+    border-bottom: 1px solid #e3e6ea;
+}
+.ctrl-scroll .ctrl-tabla thead th {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 2;
+}
+.ctrl-scroll .ctrl-tabla td.ctrl-botones,
+.ctrl-scroll .ctrl-tabla thead th:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    box-shadow: -6px 0 6px -6px rgba(0, 0, 0, .25);
+}
+.ctrl-scroll .ctrl-tabla thead th:last-child { z-index: 3; }
+.ctrl-scroll .ctrl-tabla tbody tr:hover td.ctrl-botones { background: #f8f9fa; }

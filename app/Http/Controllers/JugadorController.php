@@ -374,12 +374,12 @@ class JugadorController extends Controller
 
 
 
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" AS errados, "0" AS atajados, "0" recibidos, "0" invictas, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS goles, "0" AS amarillas, "0" AS rojas, "0" AS errados, "0" AS atajados, "0" recibidos, "0" invictas, torneos.tipo, torneos.ambito, torneos.selecciones, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN plantillas ON grupos.id = plantillas.grupo_id
 INNER JOIN plantilla_jugadors ON plantillas.id = plantilla_jugadors.plantilla_id
 WHERE plantilla_jugadors.jugador_id = '.$id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito
+GROUP BY torneos.id, torneos.nombre,torneos.year, torneos.tipo, torneos.ambito, torneos.selecciones
 ORDER BY torneos.year DESC, torneos.id DESC';
 
 
@@ -389,6 +389,9 @@ ORDER BY torneos.year DESC, torneos.id DESC';
         $titulosJugadorCopa=0;
         $titulosJugadorLiga=0;
         $titulosJugadorInternacional=0;
+        // Con la selección (Mundial, Copa América…): aparte de los
+        // internacionales de clubes, como en Transfermarkt.
+        $titulosJugadorSeleccion=0;
 
         // ── Todos los torneos de una sola vez ────────────────────────────────
         // Antes esto vivia adentro del foreach: por cada torneo se pedian los
@@ -425,7 +428,7 @@ ORDER BY torneos.year DESC, torneos.id DESC';
                 $posPorTorneo[$tid][(int) $pos->equipo_id] = $pos->posicion;
                 // Se queda con la primera fila de posicion 1, igual que el
                 // ->first() que habia antes.
-                if ($pos->posicion == 1 && !isset($campeonDe[$tid])) {
+                if ($pos->posicion == 1 && !isset($campeonDe[$tid]) && \App\Torneo::daTitulo($tid)) {
                     $campeonDe[$tid] = (int) $pos->equipo_id;
                 }
             }
@@ -528,7 +531,9 @@ GROUP BY grupos.torneo_id') as $f) {
 
             // Titulo: estuvo alineado en el equipo que salio campeon del torneo.
             if (isset($campeonDe[$tid]) && isset($alineadoEn[$tid][$campeonDe[$tid]])) {
-                if ($torneo->ambito == 'Nacional') {
+                if (!empty($torneo->selecciones)) {
+                    $titulosJugadorSeleccion++;
+                } elseif ($torneo->ambito == 'Nacional') {
                     if ($torneo->tipo == 'Copa') {
                         $titulosJugadorCopa++;
                     } else {
@@ -558,8 +563,9 @@ GROUP BY grupos.torneo_id') as $f) {
                 $torneo->escudo .= $escudo->escudo.'_'.$escudo->equipo_id.'_'.$strPosicion.'_'.$escudo->nombre.',';
             }
 
-            $torneo->jugados += (isset($titularPor[$tid]) ? $titularPor[$tid] : 0)
-                              + (isset($entraPor[$tid]) ? $entraPor[$tid] : 0);
+            $torneo->titular = isset($titularPor[$tid]) ? $titularPor[$tid] : 0;
+            $torneo->entro   = isset($entraPor[$tid]) ? $entraPor[$tid] : 0;
+            $torneo->jugados += $torneo->titular + $torneo->entro;
             $torneo->goles   += isset($golesPor[$tid]) ? $golesPor[$tid] : 0;
 
             if (isset($tarjetasPor[$tid])) {
@@ -574,6 +580,112 @@ GROUP BY grupos.torneo_id') as $f) {
                 $torneo->recibidos += $arqPor[$tid]->recibidos;
                 $torneo->invictas  += $arqPor[$tid]->invictas;
             }
+        }
+
+        // Goleador del torneo: lo calcula `torneos:goleadores` (ver
+        // App\Services\GoleadoresTorneo) y acá sólo se lee. Una consulta.
+        if (!empty($idsTorneos)) {
+            $goleadorEn = DB::table('torneo_goleadores')
+                ->where('jugador_id', $id)
+                ->whereIn('torneo_id', $idsTorneos)
+                ->get()->keyBy('torneo_id');
+            foreach ($torneosJugador as $torneo) {
+                $torneo->goleador = $goleadorEn->get((int) $torneo->idTorneo);
+            }
+        }
+
+        // ── Resumen por club ─────────────────────────────────────────────────
+        // Mismos criterios que la tabla por torneo (jugado = titular o entró;
+        // goles sin los en contra; doble amarilla cuenta como roja), pero
+        // agrupado por el equipo de la alineación. Ni el gol ni la tarjeta ni
+        // el cambio guardan el equipo: sale de la alineación de ese partido.
+        // Lo jugado en torneos de selecciones va aparte ($porSeleccion), como
+        // en Transfermarkt; el total de la ficha sigue sumando todo.
+        $porClub = [];
+        $porSeleccion = [];
+        if (!empty($idsTorneos)) {
+            $joinAl = 'INNER JOIN alineacions a ON a.partido_id = %1$s.partido_id AND a.jugador_id = %1$s.jugador_id';
+            $club = function ($sql) use ($id) {
+                $out = [];
+                foreach (DB::select($sql, [$id]) as $f) {
+                    $out[(int) $f->equipo_id] = $f;
+                }
+                return $out;
+            };
+            // MAX(t.selecciones): un equipo que jugó un torneo de selecciones
+            // es una selección (un club nunca juega uno).
+            $base = $club('SELECT a.equipo_id, e.nombre, e.escudo, e.pais,
+       SUM(a.tipo = "Titular") AS titular, MIN(p.dia) AS desde, MAX(p.dia) AS hasta,
+       MAX(t.selecciones) AS seleccion
+FROM alineacions a
+INNER JOIN partidos p ON p.id = a.partido_id
+INNER JOIN fechas f   ON f.id = p.fecha_id
+INNER JOIN grupos g   ON g.id = f.grupo_id
+INNER JOIN torneos t  ON t.id = g.torneo_id
+INNER JOIN equipos e  ON e.id = a.equipo_id
+WHERE a.jugador_id = ?
+GROUP BY a.equipo_id, e.nombre, e.escudo, e.pais');
+            $entro = $club('SELECT a.equipo_id, COUNT(*) AS n FROM cambios c '.sprintf($joinAl, 'c').'
+WHERE c.jugador_id = ? AND c.tipo = "Entra" GROUP BY a.equipo_id');
+            $golesClub = $club('SELECT a.equipo_id, COUNT(*) AS n FROM gols g '.sprintf($joinAl, 'g').'
+WHERE g.jugador_id = ? AND g.tipo <> "En contra" GROUP BY a.equipo_id');
+            $tarjClub = $club('SELECT a.equipo_id, SUM(t.tipo = "Amarilla") AS amarillas,
+       SUM(t.tipo IN ("Roja", "Doble Amarilla")) AS rojas FROM tarjetas t '.sprintf($joinAl, 't').'
+WHERE t.jugador_id = ? GROUP BY a.equipo_id');
+
+            foreach ($base as $eid => $f) {
+                $f->entro     = isset($entro[$eid]) ? (int) $entro[$eid]->n : 0;
+                $f->titular   = (int) $f->titular;
+                $f->jugados   = $f->titular + $f->entro;
+                $f->goles     = isset($golesClub[$eid]) ? (int) $golesClub[$eid]->n : 0;
+                $f->amarillas = isset($tarjClub[$eid]) ? (int) $tarjClub[$eid]->amarillas : 0;
+                $f->rojas     = isset($tarjClub[$eid]) ? (int) $tarjClub[$eid]->rojas : 0;
+                if ($f->jugados > 0) {
+                    if ((int) $f->seleccion === 1) {
+                        $porSeleccion[] = $f;
+                    } else {
+                        $porClub[] = $f;
+                    }
+                }
+            }
+            // Del más reciente al más viejo, como la tabla de torneos.
+            $recientePrimero = function ($x, $y) { return strcmp($y->hasta, $x->hasta); };
+            usort($porClub, $recientePrimero);
+            usort($porSeleccion, $recientePrimero);
+        }
+
+        // ── Debut y último partido ───────────────────────────────────────────
+        // Jugado = titular o entró. Misma forma de fila que usa <x-partido>.
+        $extremo = function ($orden) use ($id) {
+            return DB::table('partidos as p')
+                ->join('fechas as f', 'f.id', '=', 'p.fecha_id')
+                ->join('grupos as g', 'g.id', '=', 'f.grupo_id')
+                ->join('torneos as t', 't.id', '=', 'g.torneo_id')
+                ->join('equipos as e1', 'e1.id', '=', 'p.equipol_id')
+                ->join('equipos as e2', 'e2.id', '=', 'p.equipov_id')
+                ->where(function ($w) use ($id) {
+                    $w->whereExists(function ($s) use ($id) {
+                        $s->select(DB::raw(1))->from('alineacions')
+                            ->whereColumn('alineacions.partido_id', 'p.id')
+                            ->where('alineacions.jugador_id', $id)->where('alineacions.tipo', 'Titular');
+                    })->orWhereExists(function ($s) use ($id) {
+                        $s->select(DB::raw(1))->from('cambios')
+                            ->whereColumn('cambios.partido_id', 'p.id')
+                            ->where('cambios.jugador_id', $id)->where('cambios.tipo', 'Entra');
+                    });
+                })
+                ->whereNotNull('p.dia')
+                ->select('t.nombre as nombreTorneo', 't.escudo as escudoTorneo', 't.year', 'f.numero', 'p.dia',
+                    'e1.id as equipol_id', 'e1.escudo as fotoLocal', 'e1.nombre as local',
+                    'e2.id as equipov_id', 'e2.escudo as fotoVisitante', 'e2.nombre as visitante',
+                    'p.golesl', 'p.golesv', 'p.penalesl', 'p.penalesv', 'p.id as partido_id')
+                ->orderBy('p.dia', $orden)->orderBy('p.id', $orden)
+                ->first();
+        };
+        $debut  = $extremo('asc');
+        $ultimo = $extremo('desc');
+        if ($debut && $ultimo && (int) $debut->partido_id === (int) $ultimo->partido_id) {
+            $ultimo = null;   // un solo partido: no repetirlo
         }
 
         $estadisticasManuales = JugadorEstadisticaManual::where('jugador_id', $id)->get();
@@ -656,14 +768,14 @@ GROUP BY grupos.torneo_id') as $f) {
         }
 //dd($torneosJugador);
         $tecnico = Tecnico::where('persona_id', '=', $jugador->persona_id)->first();
-        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, tecnicos.id as idTecnico, torneos.tipo, torneos.ambito, torneos.escudo as escudoTorneo
+        $sql = 'SELECT torneos.id as idTorneo, CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo, "" AS escudo, "0" AS jugados, "0" AS ganados, "0" AS perdidos, "0" AS empatados, "0" AS favor, "0" AS contra, "0" AS puntaje, "0" as porcentaje, tecnicos.id as idTecnico, torneos.tipo, torneos.ambito, torneos.selecciones, torneos.escudo as escudoTorneo
 FROM torneos INNER JOIN grupos ON torneos.id = grupos.torneo_id
 INNER JOIN fechas ON grupos.id = fechas.grupo_id
 INNER JOIN partidos ON fechas.id = partidos.fecha_id
 INNER JOIN partido_tecnicos ON partidos.id = partido_tecnicos.partido_id
 INNER JOIN tecnicos ON tecnicos.id = partido_tecnicos.tecnico_id
 WHERE tecnicos.persona_id = '.$jugador->persona_id.'
-GROUP BY torneos.id, torneos.nombre,torneos.year, tecnicos.id, torneos.tipo, torneos.ambito
+GROUP BY torneos.id, torneos.nombre,torneos.year, tecnicos.id, torneos.tipo, torneos.ambito, torneos.selecciones
 ORDER BY torneos.year DESC';
 
 
@@ -674,6 +786,7 @@ ORDER BY torneos.year DESC';
         $titulosTecnicoCopa=0;
         $titulosTecnicoLiga=0;
         $titulosTecnicoInternacional=0;
+        $titulosTecnicoSeleccion=0;
         foreach ($torneosTecnico as $torneo){
             // GRUPOS
             $arrgrupos = Grupo::where('torneo_id', $torneo->idTorneo)
@@ -691,7 +804,7 @@ ORDER BY torneos.year DESC';
 
             $posicionTorneo = PosicionTorneo::where('torneo_id', '=',$torneo->idTorneo)->where('posicion', '=',1)->first();
 
-            if(!empty($posicionTorneo)){
+            if(!empty($posicionTorneo) && \App\Torneo::daTitulo($torneo->idTorneo)){
                 //if ($posicionTorneo->posicion == 1){
                 $ultimoPartido = Partido::whereIn('fecha_id', explode(',', $arrfechas))
                     ->where(function ($query) use ($posicionTorneo) {
@@ -705,7 +818,9 @@ ORDER BY torneos.year DESC';
                 //print_r($partidoTecnico);
                 if(!empty($partidoTecnico)) {
                     //if ((stripos($torneo->nombreTorneo, 'Copa') !== false)||(stripos($torneo->nombreTorneo, 'Trofeo') !== false)) {
-                    if ($torneo->ambito == 'Nacional'){
+                    if (!empty($torneo->selecciones)) {
+                        $titulosTecnicoSeleccion++;
+                    } elseif ($torneo->ambito == 'Nacional'){
                         if ($torneo->tipo == 'Copa') {
                             $titulosTecnicoCopa++;
                         } else {
@@ -934,7 +1049,7 @@ group by tecnico_id
         $torneosJugador = \App\Services\OrdenTorneos::ordenar($torneosJugador, \App\Services\OrdenTorneos::ultimosComoJugador($jugador->persona_id));
         $torneosTecnico = \App\Services\OrdenTorneos::ordenar($torneosTecnico, \App\Services\OrdenTorneos::ultimosComoTecnico($jugador->persona_id));
 
-        return view('jugadores.ver', compact('jugador','torneosJugador','torneosTecnico','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional','tecnico'));
+        return view('jugadores.ver', compact('jugador','torneosJugador','torneosTecnico','titulosTecnicoLiga','titulosTecnicoCopa','titulosJugadorLiga','titulosJugadorCopa','titulosJugadorInternacional','titulosTecnicoInternacional','titulosJugadorSeleccion','titulosTecnicoSeleccion','tecnico','porClub','porSeleccion','debut','ultimo'));
     }
 
     public function jugados(Request $request)
@@ -2356,6 +2471,7 @@ WHERE (p.id IS NOT NULL OR g.id IS NOT NULL)
                     ->where('posicion_torneos.posicion', '=', 1);
             })
             ->where('plantilla_jugadors.jugador_id', $id)
+            ->whereNotIn('torneos.id', \App\Torneo::idsSinTitulo())
             ->select(
                 'torneos.id as idTorneo',
                 DB::raw('CONCAT(torneos.nombre," ",torneos.year) AS nombreTorneo'),
