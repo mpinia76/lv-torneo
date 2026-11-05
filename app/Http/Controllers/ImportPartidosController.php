@@ -3161,7 +3161,7 @@ class ImportPartidosController extends Controller
                     // En un grupo SIN llaves la fecha es un número: «1. Jornada»
                     // → «1». Si ya existe en el grupo se preselecciona; si no, se
                     // propone como nombre de la nueva.
-                    $numJornada = $this->numeroDeJornada($gameday);
+                    $numJornada = $this->numeroDeFecha($gameday);
                     if (!$fechaDestino && empty($grupos[$grupoDestino]->penales) && $numJornada !== null) {
                         $fechaDestino = (int) \App\Fecha::where('grupo_id', $grupoDestino)
                             ->where('numero', $numJornada)->value('id');
@@ -3329,6 +3329,9 @@ class ImportPartidosController extends Controller
                 . ($grupoDestino ? ' en ' . e($grupos[$grupoDestino]->nombre) . ' · '
                     . e($fechaDestino ? \App\Fecha::where('id', $fechaDestino)->value('numero') : $fechaNombre) : '')
                 . '</a> <span class="sub">recién acá se escribe</span>'
+                // Ruteando por plantilla no hay selector de fecha: que se vea
+                // igual a cuál va, y si ya existe o se crea, ANTES de escribir.
+                . (!$grupoDestino ? $this->avisoFechaPorPlantilla($plan, $sinRonda ? $fechaLibre : $gameday, $sinRonda) : '')
                 . ((!$grupoDestino && $playoffId) ? ' <a class="boton-sec" href="'
                     . e(route('import_partidos.fixture_aplicar', ['comp' => $comp, 'gameday' => $gameday,
                         'torneo_id' => $torneo->id, 'grupo_destino' => $playoffId]))
@@ -3373,7 +3376,7 @@ class ImportPartidosController extends Controller
 
         // EL `numero` DE LA FECHA cuando se rutea por plantilla: el gameday de
         // TM, salvo que TM no haya traído ronda y lo hayas escrito vos.
-        $numeroFecha = $this->numeroDeJornada($gameday);
+        $numeroFecha = $this->numeroDeFecha($gameday);
         if ($numeroFecha === null) $numeroFecha = $gameday;
         if (!$grupoDestino && $sinRonda) {
             $numeroFecha = trim((string) $request->get('fecha_nombre', ''));
@@ -3589,7 +3592,7 @@ class ImportPartidosController extends Controller
 
         $plan = []; $aMano = [];
         foreach ($rondas as $ronda => $d) {
-            $num = $this->numeroDeJornada($ronda);
+            $num = $this->numeroDeFecha($ronda);
             if ($num === null) { $aMano[] = $d; continue; }
             $plan[] = ['ronda' => (string) $ronda, 'num' => $num, 'n' => (int) $d->n,
                 'desde' => $d->desde, 'hasta' => $d->hasta,
@@ -4826,6 +4829,47 @@ class ImportPartidosController extends Controller
      * los cuartos o una tercera ronda previa. TM manda un número de gameday y
      * nada más, así que el nombre lo termina de decidir el usuario.
      */
+    /**
+     * Ruteando por plantilla, a qué fecha va cada grupo del plan: el mismo
+     * nombre que va a usar `fixtureAplicar()` al confirmar, y si ya existe.
+     */
+    private function avisoFechaPorPlantilla(array $plan, $gameday, $literal)
+    {
+        $numero = $literal ? (string) $gameday : $this->numeroDeFecha($gameday);
+        if ($numero === null) $numero = (string) $gameday;
+        $grupos = [];
+        foreach ($plan as $x) $grupos[(int) $x['grupo_id']] = true;
+        $partes = [];
+        foreach (array_keys($grupos) as $gId) {
+            $existe = \App\Fecha::where('grupo_id', $gId)->where('numero', $numero)->exists();
+            $partes[] = e(\App\Grupo::where('id', $gId)->value('nombre')) . ' · fecha «' . e($numero) . '» '
+                . ($existe ? '(ya existe)' : '<b>(se crea nueva)</b>');
+        }
+        return '<p class="sub">Van a: ' . implode(' — ', $partes) . '</p>';
+    }
+
+    /**
+     * El número de fecha que corresponde a un gameday, para buscar o crear la
+     * fecha del grupo. Además de lo que entiende `numeroDeJornada()` («1»,
+     * «1. Jornada», «Matchday 1»), reconoce las rondas que reparte en fechas
+     * `partirRondaEnFechas()`: «Grupo GP · Fecha 1» → «1».
+     *
+     * Sin esto, la fase liga de la Champions y la Europa League 2024/25 (dos
+     * grupos: GP y Playoffs, así que se rutea por plantilla) creaba al lado de
+     * las fechas «1»…«8» del grupo otras llamadas «Grupo GP · Fecha 1»…
+     *
+     * Va aparte de `numeroDeJornada()` a propósito: esa la usan también
+     * `partirRondasMezcladas()` y `partirRondaEnFechas()` para saber qué
+     * rondas NO tocar, y ahí el sufijo armado tiene su propio control.
+     */
+    private function numeroDeFecha($gameday)
+    {
+        $n = $this->numeroDeJornada($gameday);
+        if ($n !== null) return $n;
+        if (preg_match('/ · Fecha (\d{1,3})$/u', (string) $gameday, $m)) return (string) (int) $m[1];
+        return null;
+    }
+
     /**
      * El número de una jornada de liga, si el gameday de TM lo es:
      * «5», «5. Jornada», «5ª jornada», «Jornada 5», «5. Spieltag», «Speeldag 5» -> '5'.
