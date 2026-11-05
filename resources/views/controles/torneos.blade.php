@@ -213,6 +213,15 @@
                                         <a href="{{ route('torneos.show', $filaTorneo->id) }}" class="ctrl-b-azul" target="_blank" rel="noopener">Ver</a>
                                         <a href="{{ route('torneos.edit', $filaTorneo->id) }}" class="ctrl-b-gris" target="_blank" rel="noopener">Editar</a>
                                         <a href="{{ route('torneos.finalizar', ['torneoId' => $filaTorneo->id]) }}" class="ctrl-b-verde" target="_blank" rel="noopener">Posiciones</a>
+                                        {{-- Fixture por competencia con el torneo ya elegido: la pantalla
+                                             saca competencia y temporada de tm_competition_id / tm_season_id.
+                                             Sin id de competencia no hay nada que bajar, así que no va botón.
+                                             Abrirlo baja el fixture de TM (gasta crédito), igual que elegirlo
+                                             a mano en el desplegable. --}}
+                                        @if($lista !== 'cerrados' && trim((string) $filaTorneo->tm_competition_id) !== '')
+                                            <a href="{{ route('import_partidos.fixture', ['torneo_id' => $filaTorneo->id]) }}" class="ctrl-b-tm" target="_blank" rel="noopener"
+                                               title="{{ trim((string) $filaTorneo->tm_season_id) !== '' ? 'Competencia '.$filaTorneo->tm_competition_id.' · temporada '.$filaTorneo->tm_season_id : 'Competencia '.$filaTorneo->tm_competition_id.' · SIN TEMPORADA: va a traer la temporada en curso' }}">Fixture TM</a>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

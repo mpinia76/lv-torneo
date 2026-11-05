@@ -47,7 +47,8 @@ class ControlTorneos
     public function torneos(array $f): array
     {
         $q = DB::table('torneos as t')
-            ->select('t.id', 't.nombre', 't.year', 't.tipo', 't.ambito', 't.equipos as esperados', 't.grupos')
+            ->select('t.id', 't.nombre', 't.year', 't.tipo', 't.ambito', 't.equipos as esperados', 't.grupos',
+                     't.tm_competition_id', 't.tm_season_id')
             ->selectRaw('COALESCE(t.parcial, 0) AS parcial')
             ->selectRaw($this->hayInconcluso() ? 'COALESCE(t.inconcluso, 0) AS inconcluso' : '0 AS inconcluso')
             ->selectRaw('(SELECT COUNT(DISTINCT p.equipo_id) FROM plantillas p
