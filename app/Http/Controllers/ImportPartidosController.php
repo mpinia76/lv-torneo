@@ -8140,7 +8140,18 @@ class ImportPartidosController extends Controller
     {
         if ($tmId !== null && isset($mapaTm[(string) $tmId])) return $mapaTm[(string) $tmId];
         foreach ($this->clavesNombre($nombre) as $k) {
-            if ($k !== '' && isset($mapaNombres[$k]) && $mapaNombres[$k] !== null) return $mapaNombres[$k];
+            if ($k !== '' && isset($mapaNombres[$k]) && $mapaNombres[$k] !== null) {
+                // Homónimo: el equipo ya está atado a OTRO club de TM (caso
+                // «Independiente» de Panamá, 28218, cayendo en Independiente #3,
+                // que es el 1234). Queda sin resolver y sale en «Clubes sin
+                // mapear», donde se crea o se ata a mano.
+                if ($tmId !== null && $tmId !== '') {
+                    foreach ($mapaTm as $tm => $eq) {
+                        if ((int) $eq === (int) $mapaNombres[$k] && (string) $tm !== (string) $tmId) return null;
+                    }
+                }
+                return $mapaNombres[$k];
+            }
         }
         return null;
     }

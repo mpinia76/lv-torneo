@@ -2185,13 +2185,27 @@ class TmDetallePartido
         // 1er rescate: la fila de staging ya sabe a qué equipo corresponde cada
         // club de este partido, aunque el mapeo nunca haya llegado a equipo_tm
         // (el importador de partidos también resuelve por nombre).
+        //
+        // Pero la fila de staging pudo salir de un apareo por NOMBRE, y entonces
+        // no confirma nada: si el equipo ya está atado a otro club de TM, es un
+        // homónimo y no se usa ni se aprende (así entró 28218 → #3 el 06/11).
         if (!$idLocal && $tmLocal !== null && isset($this->mapaStaging[(string) $tmLocal])) {
-            $idLocal = (int) $this->mapaStaging[(string) $tmLocal];
-            $this->aprenderClub($tmLocal, $idLocal, 'staging', $escribir);
+            $cand = (int) $this->mapaStaging[(string) $tmLocal];
+            if ($this->equipoTieneOtroClub($cand, $tmLocal)) {
+                $this->avisoHomonimo($tmLocal, $cand);
+            } else {
+                $idLocal = $cand;
+                $this->aprenderClub($tmLocal, $idLocal, 'staging', $escribir);
+            }
         }
         if (!$idVisit && $tmVisit !== null && isset($this->mapaStaging[(string) $tmVisit])) {
-            $idVisit = (int) $this->mapaStaging[(string) $tmVisit];
-            $this->aprenderClub($tmVisit, $idVisit, 'staging', $escribir);
+            $cand = (int) $this->mapaStaging[(string) $tmVisit];
+            if ($this->equipoTieneOtroClub($cand, $tmVisit)) {
+                $this->avisoHomonimo($tmVisit, $cand);
+            } else {
+                $idVisit = $cand;
+                $this->aprenderClub($tmVisit, $idVisit, 'staging', $escribir);
+            }
         }
 
         // 2do rescate: si un lado quedó resuelto y coincide con uno de los dos
@@ -2208,12 +2222,14 @@ class TmDetallePartido
             $this->aviso('No deduzco a qué equipo tuyo corresponde el club de Transfermarkt que falta: '
                 . 'este gameId todavía no está confirmado como de este partido, y deducirlo haría aparear '
                 . 'cualquier otro partido del mismo club. Atá el club en equipo_tm y volvé a probar.');
-        } elseif ($idLocal && !$idVisit && ($idLocal === $pl0 || $idLocal === $pv0) && $tmVisit !== null) {
+        } elseif ($idLocal && !$idVisit && ($idLocal === $pl0 || $idLocal === $pv0) && $tmVisit !== null
+            && !$this->equipoTieneOtroClub(($idLocal === $pl0) ? $pv0 : $pl0, $tmVisit)) {
             $idVisit = ($idLocal === $pl0) ? $pv0 : $pl0;
             $this->aprenderClub($tmVisit, $idVisit, 'inferido', $escribir);
             $this->aviso('Deduje que el club de Transfermarkt #' . $tmVisit . ' es '
                 . $this->nombreEquipo($idVisit) . ' (era el único que quedaba en el partido).');
-        } elseif ($idVisit && !$idLocal && ($idVisit === $pl0 || $idVisit === $pv0) && $tmLocal !== null) {
+        } elseif ($idVisit && !$idLocal && ($idVisit === $pl0 || $idVisit === $pv0) && $tmLocal !== null
+            && !$this->equipoTieneOtroClub(($idVisit === $pl0) ? $pv0 : $pl0, $tmLocal)) {
             $idLocal = ($idVisit === $pl0) ? $pv0 : $pl0;
             $this->aprenderClub($tmLocal, $idLocal, 'inferido', $escribir);
             $this->aviso('Deduje que el club de Transfermarkt #' . $tmLocal . ' es '
@@ -5940,6 +5956,26 @@ class TmDetallePartido
             $mapa[(string) $r->tm_club_id] = (int) $r->equipo_id;
         }
         return $this->mapaEquipos = $mapa;
+    }
+
+    /**
+     * ¿El equipo ya está atado en `equipo_tm` a un club de TM distinto de éste?
+     * Entonces no puede ser este club: es un homónimo (o el partido se creó con
+     * el rival equivocado) y deducirlo dejaría el error aprendido para siempre.
+     */
+    private function equipoTieneOtroClub($equipoId, $tmClubId)
+    {
+        foreach ($this->mapaEquipos() as $tm => $eq) {
+            if ($eq === (int) $equipoId && (string) $tm !== (string) $tmClubId) return true;
+        }
+        return false;
+    }
+
+    private function avisoHomonimo($tmClubId, $equipoId)
+    {
+        $this->aviso('No até el club de Transfermarkt #' . $tmClubId . ' a ' . $this->nombreEquipo($equipoId)
+            . ' #' . (int) $equipoId . ': ese equipo ya está atado a otro club de TM, así que es un homónimo. '
+            . 'Si el partido se creó con ese equipo, está mal creado: revisalo antes de bajar el detalle.');
     }
 
     /**

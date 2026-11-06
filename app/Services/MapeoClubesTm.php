@@ -87,12 +87,33 @@ class MapeoClubesTm
             $mapa = $this->porNombre();
 
             if ($k !== '' && isset($mapa[$k]) && $mapa[$k] !== null) {
+                // Homónimo de otro país: el equipo ya tiene SU club de TM y
+                // éste es otro id. «Independiente» (Panamá, 28218) caía en
+                // Independiente #3, que es el 1234. Mejor sin resolver —sale
+                // en «Clubes sin mapear» con «Crear desde TM»— que atado mal.
+                if ($this->tieneOtroClub($mapa[$k], $tmId)) return null;
+
                 $comoAparecio = 'nombre';
                 return $mapa[$k];
             }
         }
 
         return null;
+    }
+
+    /**
+     * ¿El equipo ya está atado en `equipo_tm` a un club de TM distinto de éste?
+     * Si es así, un apareo por nombre con este id es un homónimo, no el mismo club.
+     */
+    public function tieneOtroClub($equipoId, $tmId): bool
+    {
+        if ($tmId === null || $tmId === '') return false;
+
+        foreach ($this->porId() as $tm => $eq) {
+            if ($eq === (int) $equipoId && (string) $tm !== (string) $tmId) return true;
+        }
+
+        return false;
     }
 
     /** Deja aprendido el mapeo para que la próxima salga por id. */
