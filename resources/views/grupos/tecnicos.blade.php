@@ -117,8 +117,4 @@
         </div>
     </div>
 
-    <div class="d-flex mt-3">
-        <a href="{{ route('torneos.ver', ['torneoId' => $torneo_id]) }}" class="btn btn-outline-secondary btn-sm">{{ __('Volver al torneo') }}</a>
-    </div>
-
 @endsection

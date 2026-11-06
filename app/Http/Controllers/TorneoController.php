@@ -1254,13 +1254,20 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
      * ventana y donde NINGÚN otro técnico dirigió después. O sea, sigue siendo
      * el último técnico registrado del club. Si al club lo agarró otro, el
      * anterior desaparece solo.
+     *
+     * UNO SOLO: el del partido más reciente. Un técnico no dirige dos clubes a
+     * la vez, pero la regla de arriba puede dar dos cuando del club anterior
+     * no está cargado lo que vino después (nadie lo reemplazó en la base), o
+     * cuando un partido quedó con el mismo DT en los dos equipos (Mourinho:
+     * Benfica y Real Madrid en la Champions 2025/26).
      */
     private function sqlClubActualTecnico($tecnicoId)
     {
         $tecnicoId = (int) $tecnicoId;
         $desde     = $this->desdeActividad();
 
-        return "SELECT DISTINCT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
+        return "SELECT equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre,
+                   MAX(partidos.dia) AS ultimo
             FROM partido_tecnicos
             INNER JOIN partidos ON partidos.id = partido_tecnicos.partido_id
             INNER JOIN equipos ON equipos.id = partido_tecnicos.equipo_id
@@ -1274,7 +1281,10 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
                     AND PT2.tecnico_id <> partido_tecnicos.tecnico_id
                     AND (P2.dia > partidos.dia
                          OR (P2.dia = partidos.dia AND P2.id > partidos.id))
-              )";
+              )
+            GROUP BY equipos.escudo, partido_tecnicos.equipo_id, equipos.nombre
+            ORDER BY ultimo DESC
+            LIMIT 1";
     }
 
     /**
