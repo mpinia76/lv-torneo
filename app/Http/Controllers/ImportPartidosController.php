@@ -2967,6 +2967,55 @@ class ImportPartidosController extends Controller
         $conPenales = $grupos->filter(function ($g) { return !empty($g->penales); });
         $playoffId  = $conPenales->count() === 1 ? (int) $conPenales->keys()->first() : null;
 
+        // VARIOS GRUPOS CON PENALES: el de llaves sale por el nombre. En la
+        // Leagues Cup 2024 los 15 grupos de 3 también definían por penales, así
+        // que los 16 lo tienen prendido y no había «un» grupo de llaves: la
+        // 1ª Ronda (16avos) se ruteaba por plantilla y Tigres–Pachuca iba a la
+        // zona 3. Sólo si UN grupo se llama como una fase de llaves.
+        if (!$playoffId && $conPenales->count() > 1) {
+            $porNombre = $conPenales->filter(function ($g) {
+                return preg_match('/\b(?:play-?offs?|llaves|eliminatorias?|knockout|fase\s+final)\b/iu',
+                    (string) $g->nombre) && !preg_match('/\s[-–·]\s*\S+$/u', trim((string) $g->nombre));
+            });
+            if ($porNombre->count() === 1) $playoffId = (int) $porNombre->keys()->first();
+        }
+
+        // EL GRUPO DE UN EQUIPO SIN PLANTILLA SALE DE SUS PARTIDOS. La
+        // plantilla se crea recién al importar los detalles: una fase de
+        // grupos aplicada por zona («Grupo 1»…«Grupo 15») deja a todos sus
+        // equipos con partidos y sin plantilla, y la ronda siguiente quedaba
+        // «13 sin plantilla». Si el equipo ya jugó en una zona de este torneo
+        // (no en el grupo de llaves), ésa es su zona: la de más partidos.
+        // Vale también para el que sólo tiene plantilla en el de llaves.
+        $faltan = [];
+        foreach ($filas as $r) {
+            foreach ([(int) $r->equipo_id, (int) $r->rival_id] as $eq) {
+                if ($eq && (!isset($grupoDe[$eq]) || ($playoffId && $grupoDe[$eq] === $playoffId))) $faltan[$eq] = true;
+            }
+        }
+        if ($faltan) {
+            $ids = array_keys($faltan);
+            $jugados = DB::table('partidos')
+                ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+                ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+                ->where('grupos.torneo_id', $torneo->id)
+                ->when($playoffId, function ($q) use ($playoffId) { $q->where('grupos.id', '!=', $playoffId); })
+                ->where(function ($q) use ($ids) {
+                    $q->whereIn('partidos.equipol_id', $ids)->orWhereIn('partidos.equipov_id', $ids);
+                })
+                ->select('partidos.equipol_id AS l', 'partidos.equipov_id AS v', 'grupos.id AS g')->get();
+            $cuenta = [];
+            foreach ($jugados as $j) {
+                foreach ([(int) $j->l, (int) $j->v] as $eq) {
+                    if (isset($faltan[$eq])) $cuenta[$eq][(int) $j->g] = ($cuenta[$eq][(int) $j->g] ?? 0) + 1;
+                }
+            }
+            foreach ($cuenta as $eq => $porGrupo) {
+                arsort($porGrupo);
+                $grupoDe[$eq] = (int) key($porGrupo);
+            }
+        }
+
         // Cuántos partidos de ESTA fecha cruzan zonas, y cuántos son entre dos
         // equipos que ya tienen plantilla en el grupo de llaves.
         $cruzan = 0; $conDosGrupos = 0; $ambosEnLlaves = 0;
@@ -3290,6 +3339,9 @@ class ImportPartidosController extends Controller
                 // CONSULTAR EN VEZ DE CALLAR: si el torneo es el correcto, lo
                 // que falta son las plantillas. Se ofrece crearlas (vacías) en
                 // el grupo que elijas, y la pantalla vuelve ruteándolos sola.
+                // Sólo ruteando por plantilla: con un grupo destino elegido
+                // (llaves) la plantilla no decide nada.
+              if (!$grupoDestino) {
                 $equiposSin = [];
                 foreach ($sinPlantilla as $r) {
                     $equiposSin[(int) $r->equipo_id] = $r->club_nombre;
@@ -3313,6 +3365,7 @@ class ImportPartidosController extends Controller
                     . '<button>Crear las plantillas en ese grupo</button> '
                     . '<span class="sub">no crea partidos: después de esto revisás y aplicás como siempre</span>'
                     . '</form></div>';
+              }
             }
 
             if (!$grupoDestino && !empty($inter)) {
