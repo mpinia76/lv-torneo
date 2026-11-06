@@ -2828,6 +2828,39 @@ class ImportPartidosController extends Controller
                 . '<p class="err-box">' . e($torneo->nombre . ' ' . $torneo->year) . ' no tiene grupos cargados.</p>');
         }
 
+        // ── CREAR LAS PLANTILLAS QUE FALTAN (botón del aviso «sin plantilla») ─
+        // `crear_plantillas=<grupo>`: a los equipos de los partidos donde NI EL
+        // LOCAL NI EL VISITANTE tienen plantilla en el torneo se les crea una
+        // plantilla vacía en ese grupo, y se vuelve a la misma pantalla, que ya
+        // los rutea solos. Vacía alcanza: los jugadores los suma después el
+        // importador de detalles. Un equipo que ya tiene plantilla en el
+        // torneo no se toca, aunque sea en otro grupo. El grupo lo elige el
+        // usuario: TM no dice a qué zona tuya va cada equipo.
+        $crearEn = (int) $request->get('crear_plantillas', 0);
+        if ($crearEn && $grupos->has($crearEn)) {
+            $conPlantilla = DB::table('plantillas')
+                ->join('grupos', 'grupos.id', '=', 'plantillas.grupo_id')
+                ->where('grupos.torneo_id', $torneo->id)
+                ->pluck('plantillas.equipo_id')->map(function ($x) { return (int) $x; })->flip()->all();
+            $nuevos = [];
+            foreach ($filas as $r) {
+                $l = (int) $r->equipo_id; $v = (int) $r->rival_id;
+                if (!$l || !$v || isset($conPlantilla[$l]) || isset($conPlantilla[$v])) continue;
+                $nuevos[$l] = true; $nuevos[$v] = true;
+            }
+            foreach (array_keys($nuevos) as $eqId) {
+                \App\Plantilla::firstOrCreate(['grupo_id' => $crearEn, 'equipo_id' => $eqId]);
+            }
+            $params = $request->except(['crear_plantillas', 'plantillas_creadas']);
+            $params['plantillas_creadas'] = count($nuevos) . '-' . $crearEn;
+            return redirect()->to(route('import_partidos.fixture_aplicar', $params));
+        }
+        if (preg_match('/^(\d+)-(\d+)$/', (string) $request->get('plantillas_creadas', ''), $pc)
+            && $grupos->has((int) $pc[2])) {
+            $html .= '<p class="ok-box">Creé <b>' . (int) $pc[1] . '</b> plantilla(s) vacía(s) en el grupo <b>'
+                . e($grupos[(int) $pc[2]]->nombre) . '</b>. Los jugadores los suma el importador de detalles.</p>';
+        }
+
         // ── LA RONDA DE TM ES UNA ZONA: «Grupo 15» ──────────────────────────
         // Fase de grupos de una copa leída del calendario en HTML (KNVB Beker
         // 2000/01: 20 grupos, 117 partidos). Si el torneo tiene una zona que
@@ -3253,6 +3286,33 @@ class ImportPartidosController extends Controller
                     $html .= e($r->club_nombre . ' vs ' . $r->rival_nombre) . ' · ';
                 }
                 $html .= '</span></p>';
+
+                // CONSULTAR EN VEZ DE CALLAR: si el torneo es el correcto, lo
+                // que falta son las plantillas. Se ofrece crearlas (vacías) en
+                // el grupo que elijas, y la pantalla vuelve ruteándolos sola.
+                $equiposSin = [];
+                foreach ($sinPlantilla as $r) {
+                    $equiposSin[(int) $r->equipo_id] = $r->club_nombre;
+                    $equiposSin[(int) $r->rival_id]  = $r->rival_nombre;
+                }
+                asort($equiposSin);
+                $optsP = '<option value="">— elegí el grupo —</option>';
+                foreach ($grupos as $gid => $g) {
+                    $optsP .= '<option value="' . (int) $gid . '"' . ($unico === (int) $gid ? ' selected' : '') . '>'
+                        . e($g->nombre) . '</option>';
+                }
+                $hidden = '';
+                foreach ($request->except(['crear_plantillas', 'plantillas_creadas', 'confirmar']) as $k => $v) {
+                    if (is_scalar($v)) $hidden .= '<input type="hidden" name="' . e($k) . '" value="' . e($v) . '">';
+                }
+                $html .= '<div class="warn-box"><b>¿Es el torneo correcto?</b> Entonces creales la plantilla '
+                    . '(vacía) a estos ' . count($equiposSin) . ' equipos: ' . e(implode(', ', $equiposSin)) . '.'
+                    . '<form method="get" action="' . e(route('import_partidos.fixture_aplicar')) . '" style="margin-top:8px">'
+                    . $hidden
+                    . '<select name="crear_plantillas" class="s2" data-placeholder="grupo…">' . $optsP . '</select> '
+                    . '<button>Crear las plantillas en ese grupo</button> '
+                    . '<span class="sub">no crea partidos: después de esto revisás y aplicás como siempre</span>'
+                    . '</form></div>';
             }
 
             if (!$grupoDestino && !empty($inter)) {
@@ -4563,8 +4623,7 @@ class ImportPartidosController extends Controller
         // «G» le comía el nombre entero: quedaba '' y nunca coincidía con la
         // ronda «Grupo G» (Champions 2002/03: los 12 partidos del G fueron a
         // UNA sola fecha y 10 chocaron con «Ya hay un partido de...»).
-        $hallados = $grupos->filter(function ($g) use ($clave) {
-            if (!empty($g->penales)) return false;
+        $coincide = function ($g) use ($clave) {
             $n = mb_strtolower(trim((string) $g->nombre));
             $n = preg_replace('/^(?:(?:grupo|group|zona)\s*|g(?=\d))/u', '', $n);
             if ($n === $clave) return true;
@@ -4574,7 +4633,20 @@ class ImportPartidosController extends Controller
             // zonas se llaman «Fase Final - A» / «Fase Final - B».
             $partes = preg_split('/[\s\-–·]+/u', $n, -1, PREG_SPLIT_NO_EMPTY);
             return count($partes) > 1 && end($partes) === $clave;
+        };
+
+        // PRIMERO LAS ZONAS SIN PENALES. Si ninguna coincide, también las que
+        // tienen penales: `penales` no siempre quiere decir «grupo de llaves».
+        // Leagues Cup 2024: los 15 grupos de 3 («1»…«15») definían los
+        // empates por penales y los 16 grupos lo tienen prendido. Como antes
+        // se descartaban, «Grupo 1» no encontraba su zona, caía al ruteo por
+        // plantilla y quedaba «3 sin plantilla, no se crean».
+        $hallados = $grupos->filter(function ($g) use ($coincide) {
+            return empty($g->penales) && $coincide($g);
         });
+        if ($hallados->isEmpty()) {
+            $hallados = $grupos->filter($coincide);
+        }
 
         // DOS FASES DE GRUPOS con los mismos nombres (1ra fase A..H, 2da A..D):
         // desempata la plantilla — la zona donde tienen plantilla los equipos
