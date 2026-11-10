@@ -40,6 +40,8 @@ class CachePaginas
 
     const CLAVE_GENERACION = 'cache_paginas.generacion';
     const CLAVE_DIA        = 'cache_paginas.dia';
+    /** Versión de los rankings históricos: la sube solo el botón "vaciar caché" del admin. */
+    const CLAVE_HISTORICO  = 'cache_paginas.historico_v';
 
     /**
      * Tablas cuyas escrituras no cambian nada de lo que muestra el sitio
@@ -114,6 +116,43 @@ class CachePaginas
         // ser una foto a medio cargar.
         if (self::generacion() === $gen) {
             self::guardar($clave, $valor);
+        }
+
+        return $valor;
+    }
+
+    /**
+     * Como datos(), pero para los rankings históricos (goleadores, técnicos,
+     * jugadores…): NO depende de la generación, así que un import no los obliga
+     * a recalcularse en el acto (son consultas sobre todo el histórico y, tras
+     * cada tanda, la primera visita —casi siempre un bot— los recalculaba).
+     * Vive en la caché general; se renueva al cambiar el día (la fecha va en la
+     * clave) o con `php artisan cache:clear`. 10/11/2026.
+     */
+    public static function historico($nombre, array $params, \Closure $calcular)
+    {
+        if (!self::activa()) {
+            return $calcular();
+        }
+
+        $clave = 'historico.' . $nombre . '.' . md5(serialize($params)) . '.' . date('Ymd')
+            . '.v' . (int) Cache::get(self::CLAVE_HISTORICO, 1);
+
+        try {
+            $valor = Cache::get($clave);
+            if ($valor !== null) {
+                return $valor;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('CachePaginas::historico: no se pudo leer: ' . $e->getMessage());
+        }
+
+        $valor = $calcular();
+
+        try {
+            Cache::put($clave, $valor, self::TTL);
+        } catch (\Throwable $e) {
+            Log::warning('CachePaginas::historico: no se pudo guardar: ' . $e->getMessage());
         }
 
         return $valor;
@@ -197,6 +236,16 @@ class CachePaginas
      * Tira todo lo guardado. $menu: también el menú de torneos (solo hace
      * falta si cambió la tabla torneos; App\Torneo ya lo limpia al guardar).
      */
+    /** Para el botón del admin: también descarta los rankings históricos. */
+    public static function vaciarHistoricos()
+    {
+        try {
+            Cache::forever(self::CLAVE_HISTORICO, (int) Cache::get(self::CLAVE_HISTORICO, 1) + 1);
+        } catch (\Throwable $e) {
+            Log::warning('CachePaginas: no se pudieron vaciar los históricos: ' . $e->getMessage());
+        }
+    }
+
     public static function vaciarTodo($menu = true)
     {
         try {

@@ -1508,7 +1508,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $goleadoresPorId = CachePaginas::datos('hist.goleadores.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
+        $goleadoresPorId = CachePaginas::historico('hist.goleadores.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
             // 1) Real goleadores from gols table (no pagination yet, no ORDER BY needed)
             $sql = "SELECT jugadors.id, personas.name as jugador,
                 CONCAT(personas.apellido,', ',personas.nombre) completo,
@@ -1890,7 +1890,7 @@ order by puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $tarjetasPorId = CachePaginas::datos('hist.tarjetas.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
+        $tarjetasPorId = CachePaginas::historico('hist.tarjetas.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
             // 1) Real cards from tarjetas table (no ORDER BY, no pagination yet)
             // ---------------------------------------------------------------
             $sql = 'SELECT jugadors.id, personas.name as jugador,
@@ -2340,7 +2340,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
         // Se guarda mientras no cambien los datos (App\Services\CachePaginas).
         // El SQL ya trae todos los filtros, así que sirve de clave.
-        $posiciones = CachePaginas::datos('hist.posiciones.v1', [$sql], function () use ($sql) {
+        $posiciones = CachePaginas::historico('hist.posiciones.v1', [$sql], function () use ($sql) {
             return DB::select($sql);
         });
 
@@ -2638,7 +2638,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         $competencia = $filtro['competencia'];
 
         // Se guarda mientras no cambien los datos (App\Services\CachePaginas).
-        $datos = CachePaginas::datos(
+        $datos = CachePaginas::historico(
             'estadisticas.totales.v1',
             [$zona, $competencia],
             function () use ($zona, $competencia) {
@@ -3027,7 +3027,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
 
         // Se guarda mientras no cambien los datos (App\Services\CachePaginas),
         // como los otros históricos: la página 2 no repite la consulta.
-        $tecnicosFull = CachePaginas::datos(
+        $tecnicosFull = CachePaginas::historico(
             'hist.tecnicos.v1',
             [$nombre, $actuales, $campeones, $order, $tipoOrder, $year],
             function () use ($sql, $params) {
@@ -3483,7 +3483,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $arquerosPorId = CachePaginas::datos('hist.arqueros.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
+        $arquerosPorId = CachePaginas::historico('hist.arqueros.v2', [$nombre, $actuales, $year], function () use ($nombre, $nombreFiltro, $actuales, $year) {
             // 1) Real arqueros (no ORDER BY, no pagination yet)
             // ---------------------------------------------------------------
             $sql = 'SELECT
@@ -3862,7 +3862,7 @@ order by puntaje desc, promedio DESC, diferencia DESC, golesl DESC, equipo ASC';
         // Pasos 1 a 3 (lo caro: recorre la base entera) se guardan mientras no
         // cambien los datos, así la página 2 o cambiar el orden no los repiten.
         // Dependen solo del filtro de nombre, de "actuales" y del año.
-        $jugadoresPorId = CachePaginas::datos('hist.jugadores.v2', [$nombre, $actuales, $year], function () use ($nombre, $actuales, $year) {
+        $jugadoresPorId = CachePaginas::historico('hist.jugadores.v2', [$nombre, $actuales, $year], function () use ($nombre, $actuales, $year) {
             // 1) Totales por jugador.
             // Cada parte del UNION ya agrupa por jugador_id y devuelve solo números,
             // así la tabla intermedia tiene una fila por jugador y por parte (y no una

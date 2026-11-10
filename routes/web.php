@@ -287,7 +287,8 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     // la app; esto es para los cambios hechos por fuera (phpMyAdmin, SQL a mano).
     Route::post('/cache-paginas/vaciar', function () {
         \App\Services\CachePaginas::vaciarTodo();
-        return back()->with('success', 'Caché del sitio público vaciada.');
+        \App\Services\CachePaginas::vaciarHistoricos();
+        return back()->with('success', 'Caché del sitio público vaciada (incluidos los rankings históricos).');
     })->name('cache_paginas.vaciar');
     Route::get('/scraper/jugador-transfermarkt-goles',
         [App\Http\Controllers\ScraperController::class, 'jugadorTransfermarktGoles'])
