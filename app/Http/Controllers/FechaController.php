@@ -210,13 +210,21 @@ class FechaController extends Controller
                         'equipov_id' => $request->equipov[$item],
                         'golesl' => $request->golesl[$item],
                         'golesv' => $request->golesv[$item],
-                        'orden' => $request->orden[$item],
+                        // El formulario de alta no tiene columna «Orden» (sólo
+                        // el de edición): sin esto, `$request->orden` es null y
+                        // leerle un índice tira 500 en PHP 8 al crear una fecha
+                        // con partidos a mano.
+                        'orden' => (is_array($request->orden) && isset($request->orden[$item]) && $request->orden[$item] !== '')
+                            ? $request->orden[$item] : 0,
                         'neutral' => $esNeutral,
                         'bloqueado' => $bloqueado,
                     ];
 
 // Agregar penales solo si fueron enviados
-                    if (isset($request->penalesl[$item]) && isset($request->penalesv[$item])) {
+                    // Vacíos = sin penales: el formulario los manda como '' y
+                    // una columna entera no acepta '' en modo estricto.
+                    if (isset($request->penalesl[$item]) && isset($request->penalesv[$item])
+                        && $request->penalesl[$item] !== '' && $request->penalesv[$item] !== '') {
                         $data2['penalesl'] = $request->penalesl[$item];
                         $data2['penalesv'] = $request->penalesv[$item];
                     }
