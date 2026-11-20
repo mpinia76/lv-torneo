@@ -21,9 +21,9 @@ use Illuminate\Support\Facades\Log;
  * a ciegas: con la fecha de nacimiento se aparea con el mismo criterio que el
  * de Transfermarkt, y lo que se crea sale completo.
  *
- * Una llamada por persona la primera vez; queda en caché 30 días (la vista
- * previa y el guardar no la piden dos veces). Una ficha que no se pudo leer
- * también se guarda —1 día— para no reintentar en cada recálculo.
+ * La página la lee el BOOKMARKLET en el navegador (public/js/lf-a-laplanilla.js),
+ * no el servidor: «Importar jugador» por URL dejó de andar porque livefutbol
+ * bloquea al servidor. leer() queda por si algún día vuelve a poder bajarse.
  */
 class LivefutbolPersona
 {
@@ -33,52 +33,80 @@ class LivefutbolPersona
     public static $bajadas = 0;
 
     /**
-     * @param int         $lfId  el número de /pe{ID}/
-     * @param string|null $url   la del link de la alineación, si el bookmarklet la trajo
-     * @return array|null  nombre, apellido, name, nacimiento (Y-m-d), fallecimiento,
-     *                     ciudad, nacionalidad, tipo (Arquero/Defensor/Medio/Delantero),
-     *                     altura, peso, foto_url, url
+     * Tope de segundos para bajar fichas en un mismo request. Cada ficha puede
+     * tardar de 1 s a más de un minuto (si livefutbol da 403, HttpHelper
+     * reintenta y termina en ScraperAPI con render), y la página muere a los
+     * 600 s de nginx. Pasado el tope no se piden más: las que faltan se bajan
+     * en el próximo «Recalcular», porque las ya bajadas quedan en caché.
      */
-    public static function datos($lfId, $url = null)
+    const TOPE_SEGUNDOS = 150;   // ya no se baja nada desde el servidor; queda por compatibilidad
+
+    /** Cuántas quedaron sin pedir por el tope en este request. */
+    public static $postergadas = 0;
+
+    private static $inicio = null;
+
+    /**
+     * La ficha de una persona, ya normalizada.
+     *
+     * NO se baja nada desde el servidor: livefutbol (Cloudflare) no lo deja, y
+     * cada intento cuesta reintentos y ScraperAPI. La ficha la lee el
+     * bookmarklet desde el navegador del usuario y viaja en el JSON como
+     * `ficha` de cada persona. Si viene, se guarda en caché (30 días) por si
+     * otro partido trae a la misma persona sin ficha.
+     *
+     * @param int        $lfId
+     * @param array|null $ficha la que trajo el bookmarklet (crudo: dd-mm-aaaa, "178 cm"…)
+     * @return array|null nombre, apellido, name, nacimiento (Y-m-d), fallecimiento,
+     *                    ciudad, nacionalidad, tipo, altura, peso, foto_url
+     */
+    public static function datos($lfId, $ficha = null)
     {
         $lfId = (int) $lfId;
-        if ($lfId <= 0) return null;
-
         $clave = 'lf_persona_' . $lfId;
+
+        if (is_array($ficha) && $ficha) {
+            $d = self::normalizar($ficha);
+            if ($d && $lfId > 0) Cache::put($clave, $d, now()->addDays(30));
+            return $d;
+        }
+        if ($lfId <= 0) return null;
         $guardado = Cache::get($clave);
-        if ($guardado !== null) {
-            return $guardado === 'nada' ? null : $guardado;
-        }
+        return is_array($guardado) ? $guardado : null;
+    }
 
-        $urls = [];
-        if ($url) $urls[] = (strpos($url, 'http') === 0 ? '' : self::BASE) . $url;
-        // Sin el link a mano: el mismo esquema que /match-report/ma{ID}/.
-        $urls[] = self::BASE . '/person/pe' . $lfId . '/';
-        $urls[] = self::BASE . '/players/pe' . $lfId . '/';
-
-        $datos = null;
-        foreach (array_unique($urls) as $u) {
-            try {
-                self::$bajadas++;
-                $html = HttpHelper::getHtmlContent($u);
-            } catch (\Exception $e) {
-                $html = false;
+    /** Lo que manda el bookmarklet → el mismo formato que leer(). */
+    public static function normalizar(array $f)
+    {
+        $fecha = function ($s) {
+            if (!$s) return null;
+            if (preg_match('/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/', (string) $s, $m)) {
+                return checkdate((int) $m[2], (int) $m[1], (int) $m[3])
+                    ? sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]) : null;
             }
-            if (!$html) continue;
-            $datos = self::leer($html);
-            if ($datos) {
-                $datos['url'] = $u;
-                break;
-            }
+            return null;
+        };
+        $d = [
+            'nombre'        => isset($f['nombre']) ? trim($f['nombre']) : null,
+            'apellido'      => isset($f['apellido']) ? trim($f['apellido']) : null,
+            'name'          => isset($f['name']) ? trim($f['name']) : null,
+            'nacimiento'    => $fecha($f['nacimiento'] ?? null),
+            'fallecimiento' => $fecha($f['fallecimiento'] ?? null),
+            'ciudad'        => isset($f['lugar']) ? mb_substr(trim($f['lugar']), 0, 191) : null,
+            'nacionalidad'  => isset($f['nacionalidad']) ? trim($f['nacionalidad']) : null,
+            'tipo'          => ['Portero' => 'Arquero', 'Defensa' => 'Defensor', 'Centrocampista' => 'Medio',
+                                'Delantero' => 'Delantero'][trim((string) ($f['demarcacion'] ?? ''))] ?? null,
+            'altura'        => null,
+            'peso'          => null,
+            'foto_url'      => !empty($f['foto']) && preg_match('#^https?://#', $f['foto']) ? $f['foto'] : null,
+        ];
+        if (!empty($f['altura']) && preg_match('/\d+/', $f['altura'], $m)) {
+            $d['altura'] = number_format($m[0] / 100, 2, '.', '');
         }
+        if (!empty($f['peso']) && preg_match('/\d+/', $f['peso'], $m)) $d['peso'] = $m[0];
 
-        if ($datos) {
-            Cache::put($clave, $datos, now()->addDays(30));
-        } else {
-            Cache::put($clave, 'nada', now()->addDay());
-            Log::info('LivefutbolPersona: no pude leer la ficha de pe' . $lfId);
-        }
-        return $datos;
+        if (!$d['nombre'] && !$d['apellido'] && !$d['nacimiento']) return null;
+        return $d;
     }
 
     /** Los <dt>/<dd> de la ficha. null si la página no es una ficha. */

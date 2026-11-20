@@ -95,11 +95,14 @@ class LivefutbolDetalleController extends Controller
             }
         }
 
-        $r = $servicio->procesar($partidoId, $lf, [
-            'escribir'        => $escribir,
+        $opciones = [
             'forzar'          => (string) $request->input('forzar', '0') === '1',
             'elegir'          => (array) $request->input('elegir', []),
             'confirmar_fecha' => (string) $request->input('confirmar_fecha', '0') === '1',
+        ];
+
+        $r = $servicio->procesar($partidoId, $lf, $opciones + [
+            'escribir'        => $escribir,
         ]);
 
         return $this->pagina('Detalle desde LiveFutbol', $this->pantalla($r, $lf, $texto, $escribir, $request));

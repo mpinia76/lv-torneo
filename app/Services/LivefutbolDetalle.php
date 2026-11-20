@@ -76,8 +76,12 @@ class LivefutbolDetalle
 
     private $escribir = false;
 
-    /** Personas cuya ficha de livefutbol no se pudo leer. */
+    /** Personas sin ficha (el JSON no la trajo ni estaba en caché). */
     private $sinFicha = 0;
+
+    /** lf_id => ficha cruda del JSON / ficha normalizada ya usada. */
+    private $fichasJson = [];
+    private $fichas = [];
 
     /** Mapeos a grabar al final: [rol, lf_id, ref_id, nombre, origen, revisar]. */
     private $mapeos = [];
@@ -174,6 +178,18 @@ class LivefutbolDetalle
         $this->creados = ['jugadores' => [], 'tecnicos' => [], 'arbitros' => []];
         $this->proximoPreview = -1;
         $this->sinFicha = 0;
+        $this->fichas = [];
+        $this->fichasJson = [];
+        foreach (['local', 'visitante'] as $l) {
+            foreach (['titulares', 'suplentes', 'cuerpo_tecnico'] as $k) {
+                foreach (($lf['equipos'][$l][$k] ?? []) as $x) {
+                    if (!empty($x['lf_id']) && !empty($x['ficha'])) $this->fichasJson[(int) $x['lf_id']] = $x['ficha'];
+                }
+            }
+        }
+        foreach (($lf['arbitros'] ?? []) as $x) {
+            if (!empty($x['lf_id']) && !empty($x['ficha'])) $this->fichasJson[(int) $x['lf_id']] = $x['ficha'];
+        }
 
         $informe = [
             'ok' => false, 'escrito' => false, 'error' => null, 'partido_id' => (int) $partidoId,
@@ -400,8 +416,10 @@ class LivefutbolDetalle
         }
 
         if ($this->sinFicha) {
-            $this->aviso('No pude leer la ficha de livefutbol de ' . $this->sinFicha . ' persona(s): para esas se '
-                . 'apareó sólo por nombre, y si se crean salen sin fecha de nacimiento ni nacionalidad.');
+            $this->aviso($this->sinFicha . ' persona(s) sin ficha de livefutbol en lo que pegaste: para esas se apareó '
+                . 'sólo por nombre, y si se crean salen sin fecha de nacimiento ni nacionalidad.'
+                . (empty($lf['fichas_leidas']) && !isset($lf['fichas_leidas'])
+                    ? ' Ese JSON es del favorito viejo: borralo de la barra, arrastrá el nuevo desde esta pantalla y volvé a copiar.' : ''));
         }
 
         // Los goles del resumen tienen que ser los mismos que los de las filas.
@@ -652,7 +670,7 @@ class LivefutbolDetalle
         }
 
         // 4) Con la ficha de livefutbol: criterio de TM por fecha de nacimiento.
-        $ficha = $lfId ? $this->ficha($lfId, $j['url'] ?? null, $info) : null;
+        $ficha = $lfId ? $this->ficha($lfId, $j['ficha'] ?? null, $info) : null;
         if ($ficha && $ficha['nacimiento']) {
             $porFecha = $this->porFecha('jugadors', $nombreLf, $ficha, $info, $opciones);
             if ($porFecha !== null) return $porFecha;
@@ -803,7 +821,7 @@ class LivefutbolDetalle
             }
         }
 
-        $ficha = $lfId ? $this->ficha($lfId, $p['url'] ?? null, $info) : null;
+        $ficha = $lfId ? $this->ficha($lfId, $p['ficha'] ?? null, $info) : null;
         if ($ficha && $ficha['nacimiento']) {
             $porFecha = $this->porFecha($tabla, $nombreLf, $ficha, $info, $opciones);
             if ($porFecha !== null) return $porFecha;
@@ -888,7 +906,7 @@ class LivefutbolDetalle
     {
         $nombreLf = $info['nombre_lf'];
         if (!$ficha && !empty($info['lf_id'])) {
-            $ficha = LivefutbolPersona::datos($info['lf_id']);
+            $ficha = $this->fichas[(int) $info['lf_id']] ?? LivefutbolPersona::datos($info['lf_id'], $this->fichasJson[(int) $info['lf_id']] ?? null);
         }
         $n = NombreHelper::separarTM(['name' => $nombreLf]);
         // La ficha trae nombre y apellidos separados: mejor que adivinar el corte.
@@ -937,10 +955,11 @@ class LivefutbolDetalle
     }
 
     /** Baja (o saca de caché) la ficha de livefutbol y la deja a la vista en $info. */
-    private function ficha($lfId, $url, array &$info)
+    private function ficha($lfId, $cruda, array &$info)
     {
-        $f = LivefutbolPersona::datos($lfId, $url);
-        $info['ficha'] = $f ? $this->resumenFicha($f) : 'no pude leer su ficha de livefutbol';
+        $f = LivefutbolPersona::datos($lfId, $cruda);
+        if ($f) $this->fichas[(int) $lfId] = $f;
+        $info['ficha'] = $f ? $this->resumenFicha($f) : 'sin ficha en el JSON';
         if (!$f) $this->sinFicha++;
         return $f;
     }

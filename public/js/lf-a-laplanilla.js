@@ -3,6 +3,12 @@
 // (/match-report/.../lineup/). Lee la página y copia un JSON al portapapeles.
 // No manda nada a ningún lado: el JSON se pega en /admin/import-detalles/livefutbol.
 // El admin arma el favorito con este archivo (LivefutbolDetalleController::bookmarklet).
+//
+// Además lee la FICHA de cada persona (fecha de nacimiento, nacionalidad,
+// lugar, puesto, altura, foto) pidiéndola desde esta misma pestaña: el servidor
+// de La Planilla no puede bajar livefutbol (Cloudflare), el navegador sí.
+// Como eso tarda unos segundos, al final no copia solo: muestra un recuadro
+// con el botón «Copiar» (el portapapeles necesita un clic del usuario).
 (function () {
   var d = document;
   var txt = function (el) { return el ? el.textContent.trim() : ''; };
@@ -139,18 +145,100 @@
     equipos: { local: lado('home'), visitante: lado('away') }
   };
 
-  var json = JSON.stringify(data);
-  var n = data.equipos.local.titulares.length + '+' + data.equipos.visitante.titulares.length;
-  var ok = function () { alert('Copiado para La Planilla: ' + data.local.nombre + ' – ' + data.visitante.nombre + ' (titulares ' + n + ').'); };
-  var fallback = function () {
-    var t = d.createElement('textarea');
-    t.value = json; d.body.appendChild(t); t.select();
-    try { d.execCommand('copy'); ok(); } catch (e) { prompt('Copiá esto:', json); }
-    d.body.removeChild(t);
+  // ── Fichas ────────────────────────────────────────────────────────────
+  // dd-mm-aaaa tal cual: el admin la normaliza.
+  var leerFicha = function (html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var dts = doc.querySelectorAll('.contentitem dl dt');
+    if (!dts.length) dts = doc.querySelectorAll('dl dt');
+    var f = {}, nombres = [];
+    [].forEach.call(dts, function (dt) {
+      var dd = dt.nextElementSibling;
+      if (!dd || dd.tagName !== 'DD') return;
+      var k = dt.textContent.trim(), v = dd.textContent.replace(/\s+/g, ' ').trim();
+      if (!v) return;
+      if (k === 'Nombre') nombres.push(v);
+      else if (k === 'Apellidos') f.apellido = v;
+      else if (k === 'Fecha de nacimiento') f.nacimiento = v;
+      else if (k === 'Fecha de fallecimiento') f.fallecimiento = v;
+      else if (k === 'Lugar de nacimiento') f.lugar = v;
+      else if (k === 'Nacionalidad') f.nacionalidad = v;
+      else if (k === 'Demarcación') f.demarcacion = v;
+      else if (k === 'Altura') f.altura = v;
+      else if (k === 'Peso') f.peso = v;
+    });
+    if (nombres.length) { f.name = nombres[0]; f.nombre = nombres[nombres.length - 1]; }
+    var img = doc.querySelector('#previewArea img');
+    if (img && img.getAttribute('src') && img.getAttribute('src').indexOf('avatar-player') < 0) {
+      f.foto = new URL(img.getAttribute('src'), location.href).href;
+    }
+    return (f.nombre || f.apellido || f.nacimiento) ? f : null;
   };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(json).then(ok, fallback);
-  } else {
-    fallback();
-  }
+
+  var personas = [];
+  ['local', 'visitante'].forEach(function (l) {
+    var e = data.equipos[l];
+    personas = personas.concat(e.titulares, e.suplentes, e.cuerpo_tecnico);
+  });
+  personas = personas.concat(data.arbitros).filter(function (p) { return p && p.url; });
+
+  var porUrl = {};
+  personas.forEach(function (p) { (porUrl[p.url] = porUrl[p.url] || []).push(p); });
+  var urls = Object.keys(porUrl);
+
+  var caja = d.createElement('div');
+  caja.style.cssText = 'position:fixed;top:20px;right:20px;z-index:2147483647;background:#fff;color:#222;'
+    + 'border:2px solid #15714e;border-radius:8px;padding:14px 16px;width:360px;font:14px/1.4 sans-serif;'
+    + 'box-shadow:0 6px 24px rgba(0,0,0,.25)';
+  caja.innerHTML = '<b>LiveFutbol → La Planilla</b><div class="lfp-estado" style="margin:8px 0">Leyendo fichas… 0/'
+    + urls.length + '</div>';
+  d.body.appendChild(caja);
+  var estado = caja.querySelector('.lfp-estado');
+
+  var hechas = 0, leidas = 0, i = 0;
+  var una = function () {
+    if (i >= urls.length) return Promise.resolve();
+    var u = urls[i++];
+    return fetch(u, { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (html) {
+        var f = html ? leerFicha(html) : null;
+        if (f) { leidas++; porUrl[u].forEach(function (p) { p.ficha = f; }); }
+      })
+      .catch(function () {})
+      .then(function () { hechas++; estado.textContent = 'Leyendo fichas… ' + hechas + '/' + urls.length; return una(); });
+  };
+  var hilos = [];
+  for (var h = 0; h < Math.min(6, urls.length); h++) hilos.push(una());
+
+  Promise.all(hilos).then(function () {
+    data.fichas_leidas = leidas;
+    var json = JSON.stringify(data);
+    var n = data.equipos.local.titulares.length + '+' + data.equipos.visitante.titulares.length;
+    estado.innerHTML = data.local.nombre + ' – ' + data.visitante.nombre + '<br>titulares ' + n
+      + ' · fichas leídas ' + leidas + '/' + urls.length;
+    var b = d.createElement('button');
+    b.textContent = 'Copiar para La Planilla';
+    b.style.cssText = 'background:#15714e;color:#fff;border:0;border-radius:4px;padding:8px 12px;font-weight:600;cursor:pointer';
+    var x = d.createElement('button');
+    x.textContent = 'Cerrar';
+    x.style.cssText = 'margin-left:8px;background:#eee;border:0;border-radius:4px;padding:8px 12px;cursor:pointer';
+    x.onclick = function () { caja.remove(); };
+    b.onclick = function () {
+      var listo = function () { b.textContent = 'Copiado ✓ — pegalo en el admin'; };
+      var aMano = function () {
+        var t = d.createElement('textarea');
+        t.value = json; d.body.appendChild(t); t.select();
+        try { d.execCommand('copy'); listo(); } catch (e) { prompt('Copiá esto:', json); }
+        d.body.removeChild(t);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json).then(listo, aMano);
+      } else {
+        aMano();
+      }
+    };
+    caja.appendChild(b);
+    caja.appendChild(x);
+  });
 })();
