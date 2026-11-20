@@ -22,7 +22,10 @@
                  clubes, lo anota y redirige. Si no lo encuentra, pide la URL
                  (nunca abre el calendario ni una búsqueda, misma regla que TM).
 
-    Los dos abren en otra pestaña: la idea es no perder el lugar en la lista.
+      Rehacer LF - lo mismo que Rehacer pero desde livefutbol (pegando lo
+                 que copia el favorito), para cuando TM viene incompleto.
+
+    Todos abren en otra pestaña: la idea es no perder el lugar en la lista.
 --}}
 @php
     $partido = $fila->id;
@@ -81,6 +84,14 @@
 <a href="{{ route('import_detalles.ver', ['partido_id' => $partido]) }}" target="_blank" rel="noopener"
    class="ctrl-b-rehacer"
    title="Vuelve a bajar alineación, goles, tarjetas, cambios y árbitros desde Transfermarkt. Si el partido no tiene gameId, lo busca solo por los clubes y la fecha. Primero muestra qué va a escribir.">Rehacer</a>
+
+{{-- El mismo Rehacer pero con lo que trae livefutbol, para cuando TM viene
+     incompleto. livefutbol no se puede bajar desde el servidor (Cloudflare):
+     abre la pantalla donde se pega lo que copia el favorito «LF → La Planilla»,
+     ya con este partido elegido. Ver LivefutbolDetalleController. --}}
+<a href="{{ route('import_detalles.livefutbol', ['partido_id' => $partido]) }}" target="_blank" rel="noopener"
+   class="ctrl-b-rehacer-lf"
+   title="Cargar alineación, goles, tarjetas, cambios y árbitros desde livefutbol: abrí el partido con LF, tocá el favorito «LF → La Planilla» y pegalo en la pantalla que abre este botón. Primero muestra qué va a escribir.">Rehacer LF</a>
 
 {{--
     El botón "no se puede arreglar": la incidencia de un click.

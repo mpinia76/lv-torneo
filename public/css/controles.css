@@ -241,6 +241,7 @@
 .ctrl-botones a.ctrl-b-lf-fix { background: transparent; color: #6c757d; padding-left: 2px; padding-right: 2px; }
 .ctrl-botones a.ctrl-b-lf-fix:hover { color: #c0392b; }
 .ctrl-b-rehacer { background: #b45309; }
+.ctrl-b-rehacer-lf { background: #8e2a1f; }
 .ctrl-b-sindatos { background: #0f766e; cursor: pointer; }
 
 .ctrl-vacio {
