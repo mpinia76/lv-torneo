@@ -3467,8 +3467,20 @@ class ImportDetallesController extends Controller
         // para siempre (KNVB Beker 2000/01: «quedan 114» sin bajar nunca).
         $sinAlineacion = 0;
         $detalle = '';
+        // Tope de tiempo por tanda (15/11): con ScraperAPI lento, 10 partidos con
+        // reintentos (getJson hasta ~225 s, cada foto hasta ~215 s) pasaban los 600 s
+        // de nginx/PHP-FPM y la tanda moría a mitad con un 504. Pasados 300 s no se
+        // empieza otro: los que quedan siguen en la cola y la cadena los toma.
+        $inicioTanda = microtime(true);
+        $procesados  = 0;
 
         foreach ($filas as $f) {
+            if ($procesados > 0 && microtime(true) - $inicioTanda > 300) {
+                $detalle .= '<div class="sub">⏱ Corté la tanda a los ' . (int) (microtime(true) - $inicioTanda)
+                    . ' s: los ' . (count($filas) - $procesados) . ' que faltaban quedan para la siguiente.</div>';
+                break;
+            }
+            $procesados++;
             $etiqueta = e($f->club_nombre . ' vs ' . $f->rival_nombre) . ' <span class="id">'
                 . e(substr((string) $f->dia, 0, 10)) . ' · partido #' . (int) $f->partido_id . '</span>';
             $inc = $this->linkIncidencias(isset($fechas[(int) $f->partido_id]) ? $fechas[(int) $f->partido_id] : null);
