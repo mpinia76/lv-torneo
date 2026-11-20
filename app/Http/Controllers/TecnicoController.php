@@ -918,6 +918,15 @@ WHERE pt.tecnico_id = ? AND t.selecciones = 1', [$id]) as $f) {
         }
         $porClubDt = array_values($porClubDt);
 
+        // Período: una etapa por cada paso por el club (el que volvió a un
+        // club tiene dos). Ver App\Services\EtapasClub.
+        $secuenciaDt = ['club' => [], 'seleccion' => []];
+        foreach (DB::select('SELECT pt.equipo_id, p.dia ' . $ladoDt . ' AND p.dia IS NOT NULL ORDER BY p.dia, p.id', [$id]) as $s) {
+            $secuenciaDt[isset($seleccionesDt[(int) $s->equipo_id]) ? 'seleccion' : 'club'][] = $s;
+        }
+        \App\Services\EtapasClub::asignar($porClubDt, \App\Services\EtapasClub::calcular($secuenciaDt['club']));
+        \App\Services\EtapasClub::asignar($porSeleccionDt, \App\Services\EtapasClub::calcular($secuenciaDt['seleccion']));
+
         // Rivales más enfrentados (los 10 primeros).
         $rivalesDt = DB::select('SELECT e.id AS equipo_id, e.nombre, e.escudo, e.pais, ' . $gep . '
 FROM (SELECT IF(pt.equipo_id = p.equipol_id, p.equipov_id, p.equipol_id) AS rival_id, p.dia,

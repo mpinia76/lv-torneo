@@ -652,6 +652,22 @@ WHERE t.jugador_id = ? GROUP BY a.equipo_id');
             $recientePrimero = function ($x, $y) { return strcmp($y->hasta, $x->hasta); };
             usort($porClub, $recientePrimero);
             usort($porSeleccion, $recientePrimero);
+
+            // Período: una etapa por cada paso por el club (el que volvió a
+            // un club tiene dos). Ver App\Services\EtapasClub.
+            $secuencia = ['club' => [], 'seleccion' => []];
+            foreach (DB::select('SELECT a.equipo_id, p.dia, t.selecciones
+FROM alineacions a
+INNER JOIN partidos p ON p.id = a.partido_id
+INNER JOIN fechas f   ON f.id = p.fecha_id
+INNER JOIN grupos g   ON g.id = f.grupo_id
+INNER JOIN torneos t  ON t.id = g.torneo_id
+WHERE a.jugador_id = ? AND p.dia IS NOT NULL
+ORDER BY p.dia, p.id', [$id]) as $s) {
+                $secuencia[(int) $s->selecciones === 1 ? 'seleccion' : 'club'][] = $s;
+            }
+            \App\Services\EtapasClub::asignar($porClub, \App\Services\EtapasClub::calcular($secuencia['club']));
+            \App\Services\EtapasClub::asignar($porSeleccion, \App\Services\EtapasClub::calcular($secuencia['seleccion']));
         }
 
         // ── Debut y último partido ───────────────────────────────────────────

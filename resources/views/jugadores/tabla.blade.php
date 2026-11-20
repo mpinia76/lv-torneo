@@ -271,7 +271,7 @@
                                 <x-celda-equipo :href="route('equipos.ver', ['equipoId' => $fjClub->equipo_id])"
                                                 :nombre="$fjClub->nombre" :escudo="$fjClub->escudo" :pais="$fjClub->pais" tam="sm"/>
                             </td>
-                            <td>{{ $fjDesde === $fjHasta ? $fjDesde : $fjDesde.'–'.$fjHasta }}</td>
+                            <td>{{ $fjClub->periodo ?? ($fjDesde === $fjHasta ? $fjDesde : $fjDesde.'–'.$fjHasta) }}</td>
                             <td class="t-pts">{{ $fjClub->jugados }}</td>
                             <td>{!! $fjCero($fjClub->titular) !!}</td>
                             <td>{!! $fjCero($fjClub->goles) !!} {!! $fjRatio($fjClub->goles, $fjClub->jugados) !!}</td>

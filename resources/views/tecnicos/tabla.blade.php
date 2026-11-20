@@ -263,6 +263,9 @@
             return $f->pj > 0 ? round(($f->g * 3 + $f->e) * 100 / ($f->pj * 3), 1) . '%' : '–';
         };
         $ftPeriodo = function ($f) {
+            if (!empty($f->periodo)) {
+                return $f->periodo;
+            }
             $d = substr((string) $f->desde, 0, 4);
             $h = substr((string) $f->hasta, 0, 4);
             return $d === $h ? $d : $d . '–' . $h;
