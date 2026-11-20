@@ -102,7 +102,9 @@ class LivefutbolPartido
         $html = HttpHelper::getHtmlContent(self::url($matchId), false);
 
         if (!$html || !preg_match('~<title>([^<]*)</title>~i', $html, $t)) {
-            return ['ok' => false, 'motivo' => 'No pude abrir esa ficha en livefutbol para controlarla.', 'titulo' => null];
+            // `sin_ver`: no es que esté mal, es que el servidor no pudo mirarla
+            // (livefutbol lo bloquea seguido). Ver ControlController::livefutbolGuardar.
+            return ['ok' => false, 'sin_ver' => true, 'motivo' => 'No pude abrir esa ficha en livefutbol para controlarla.', 'titulo' => null];
         }
 
         $titulo = trim(html_entity_decode($t[1], ENT_QUOTES, 'UTF-8'));

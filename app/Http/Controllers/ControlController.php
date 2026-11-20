@@ -259,6 +259,14 @@ class ControlController extends Controller
 
         if (!$request->boolean('forzar')) {
             $check = (new LivefutbolPartido())->verificar($partido, $matchId);
+            // Si el servidor no pudo abrir la ficha (livefutbol lo bloquea), no
+            // hay nada que controlar: se guarda igual. El que controla de verdad
+            // es «Rehacer LF», que compara fecha y clubes con lo que copia el
+            // favorito antes de escribir nada.
+            if (!$check['ok'] && !empty($check['sin_ver'])) {
+                LivefutbolPartido::anotar($partido->id, $matchId, 'manual');
+                return redirect()->away(LivefutbolPartido::url($matchId));
+            }
             if (!$check['ok']) {
                 return back()->withInput()
                     ->with('error', $check['motivo'] . ($check['titulo'] ? ' (livefutbol: «' . $check['titulo'] . '»)' : ''))
