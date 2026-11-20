@@ -83,6 +83,13 @@ class LivefutbolDetalle
     private $fichasJson = [];
     private $fichas = [];
 
+    /**
+     * Fotos que se repiten en más de una persona del partido: es la silueta
+     * de «sin foto» de livefutbol (el favorito no la distingue de una foto de
+     * verdad), y no se baja.
+     */
+    private $fotosDeRelleno = [];
+
     /** Mapeos a grabar al final: [rol, lf_id, ref_id, nombre, origen, revisar]. */
     private $mapeos = [];
 
@@ -190,6 +197,11 @@ class LivefutbolDetalle
         foreach (($lf['arbitros'] ?? []) as $x) {
             if (!empty($x['lf_id']) && !empty($x['ficha'])) $this->fichasJson[(int) $x['lf_id']] = $x['ficha'];
         }
+        $cuenta = [];
+        foreach ($this->fichasJson as $f) {
+            if (!empty($f['foto'])) $cuenta[$f['foto']] = ($cuenta[$f['foto']] ?? 0) + 1;
+        }
+        $this->fotosDeRelleno = array_keys(array_filter($cuenta, function ($n) { return $n > 1; }));
 
         $informe = [
             'ok' => false, 'escrito' => false, 'error' => null, 'partido_id' => (int) $partidoId,
@@ -930,7 +942,8 @@ class LivefutbolDetalle
                 foreach (['nacimiento', 'fallecimiento', 'ciudad', 'nacionalidad', 'altura', 'peso'] as $k) {
                     if (!empty($ficha[$k])) $alta[$k] = $ficha[$k];
                 }
-                if (!empty($ficha['foto_url']) && ($foto = LivefutbolPersona::bajarFoto($ficha['foto_url']))) {
+                if (!empty($ficha['foto_url']) && !in_array($ficha['foto_url'], $this->fotosDeRelleno, true)
+                    && ($foto = LivefutbolPersona::bajarFoto($ficha['foto_url']))) {
                     $alta['foto'] = $foto;
                 }
             }
@@ -958,6 +971,7 @@ class LivefutbolDetalle
     private function ficha($lfId, $cruda, array &$info)
     {
         $f = LivefutbolPersona::datos($lfId, $cruda);
+        if ($f && $f['foto_url'] && in_array($f['foto_url'], $this->fotosDeRelleno, true)) $f['foto_url'] = null;
         if ($f) $this->fichas[(int) $lfId] = $f;
         $info['ficha'] = $f ? $this->resumenFicha($f) : 'sin ficha en el JSON';
         if (!$f) $this->sinFicha++;
