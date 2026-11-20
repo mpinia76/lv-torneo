@@ -21,7 +21,8 @@
     return c.length > 1 ? c.slice(1).join(' ') : c[0];
   };
   var persona = function (a) {
-    return a ? { nombre: txt(a), lf_id: idDe(a.getAttribute('href'), 'pe') } : null;
+    // url: el link a su ficha, para que el admin la lea (fecha de nacimiento, nacionalidad…)
+    return a ? { nombre: txt(a), lf_id: idDe(a.getAttribute('href'), 'pe'), url: a.href } : null;
   };
 
   if (!d.querySelector('.hs-lineup')) {
@@ -36,6 +37,7 @@
         dorsal: txt(row.querySelector('.team_person-shirtnumber')) || null,
         nombre: p.nombre || '',
         lf_id: p.lf_id || null,
+        url: p.url || null,
         goles: [], tarjetas: [], entra: null, sale: null
       };
       [].forEach.call(row.querySelectorAll('.match_event-goal > div'), function (e) {

@@ -49,6 +49,16 @@ use Illuminate\Support\Str;
  *
  * «Un apareo equivocado es peor que un duplicado»: en la duda se crea, y el
  * duplicado lo levanta /admin/verificarPersonas.
+ *
+ * FICHA DE LIVEFUTBOL (LivefutbolPersona): para todo el que no esté atado ni
+ * en la plantilla se baja su ficha (una vez; queda en caché), que trae fecha de
+ * nacimiento, nacionalidad, lugar, puesto, altura y foto. Con fecha se aplica
+ * el criterio de Transfermarkt en vez del paso 4:
+ *   · misma fecha + 2 o más palabras (con un apellido) → es él
+ *   · misma fecha + 1 palabra → no se une, se avisa
+ *   · fecha distinta → descartado
+ *   · la base sin fecha + nombre completo → se usa, para revisar
+ * y lo que se crea sale con esos datos (y la foto) en vez de vacío.
  */
 class LivefutbolDetalle
 {
@@ -65,6 +75,9 @@ class LivefutbolDetalle
     private $elegidos = [];
 
     private $escribir = false;
+
+    /** Personas cuya ficha de livefutbol no se pudo leer. */
+    private $sinFicha = 0;
 
     /** Mapeos a grabar al final: [rol, lf_id, ref_id, nombre, origen, revisar]. */
     private $mapeos = [];
@@ -160,6 +173,7 @@ class LivefutbolDetalle
         $this->mapeos = [];
         $this->creados = ['jugadores' => [], 'tecnicos' => [], 'arbitros' => []];
         $this->proximoPreview = -1;
+        $this->sinFicha = 0;
 
         $informe = [
             'ok' => false, 'escrito' => false, 'error' => null, 'partido_id' => (int) $partidoId,
@@ -385,6 +399,11 @@ class LivefutbolDetalle
             return $informe;
         }
 
+        if ($this->sinFicha) {
+            $this->aviso('No pude leer la ficha de livefutbol de ' . $this->sinFicha . ' persona(s): para esas se '
+                . 'apareó sólo por nombre, y si se crean salen sin fecha de nacimiento ni nacionalidad.');
+        }
+
         // Los goles del resumen tienen que ser los mismos que los de las filas.
         $resumen = count($lf['resumen_goles'] ?? []);
         if ($resumen && $resumen !== count($plan['gols'])) {
@@ -593,7 +612,7 @@ class LivefutbolDetalle
         $clave = 'jugador:' . ($lfId ?: Str::slug($nombreLf));
         $info = ['rol' => 'jugador', 'clave' => $clave, 'lf_id' => $lfId, 'nombre_lf' => $nombreLf,
             'equipo' => $lado['equipo_nombre'], 'dorsal' => $dorsalLf, 'id' => null, 'como' => '',
-            'revisar' => false, 'opciones' => []];
+            'revisar' => false, 'opciones' => [], 'ficha' => null];
 
         // 1) Atado
         if ($lfId && ($id = $this->atado('jugador', $lfId, 'jugadors'))) {
@@ -632,7 +651,18 @@ class LivefutbolDetalle
             return $this->registrar($info);
         }
 
-        // 4) Toda la base, estricto
+        // 4) Con la ficha de livefutbol: criterio de TM por fecha de nacimiento.
+        $ficha = $lfId ? $this->ficha($lfId, $j['url'] ?? null, $info) : null;
+        if ($ficha && $ficha['nacimiento']) {
+            $porFecha = $this->porFecha('jugadors', $nombreLf, $ficha, $info, $opciones);
+            if ($porFecha !== null) return $porFecha;
+            $motivo = count($info['opciones']) > 1
+                ? 'hay ' . count($info['opciones']) . ' parecidos y ninguno con su fecha: elegí uno o se crea'
+                : 'no está en la base';
+            return $this->registrar($this->crear('jugador', $info, $motivo, $ficha));
+        }
+
+        // 5) Sin ficha: toda la base, estricto
         $cands = $this->candidatosBase('jugadors', $nombreLf);
         $validos = [];
         foreach ($cands as $c) {
@@ -649,9 +679,9 @@ class LivefutbolDetalle
             return $this->registrar($info);
         }
 
-        // 5) Crear
+        // 6) Crear
         $motivo = count($opciones) > 1 ? 'hay ' . count($opciones) . ' parecidos y no adivino: elegí uno o se crea' : 'no está en la base';
-        return $this->registrar($this->crear('jugador', $info, $motivo));
+        return $this->registrar($this->crear('jugador', $info, $motivo, $ficha));
     }
 
     /** DT del lado: el «Director técnico»/«Entrenador» del cuerpo técnico. */
@@ -748,7 +778,8 @@ class LivefutbolDetalle
         if ($nombreLf === '') return null;
         $clave = $rol . ':' . ($lfId ?: Str::slug($nombreLf));
         $info = ['rol' => $rol, 'clave' => $clave, 'lf_id' => $lfId, 'nombre_lf' => $nombreLf,
-            'equipo' => $donde, 'dorsal' => null, 'id' => null, 'como' => '', 'revisar' => false, 'opciones' => []];
+            'equipo' => $donde, 'dorsal' => null, 'id' => null, 'como' => '', 'revisar' => false, 'opciones' => [],
+            'ficha' => null];
 
         if ($lfId && ($id = $this->atado($rol, $lfId, $tabla))) {
             $info['id'] = $id; $info['como'] = 'ya atado a livefutbol';
@@ -772,6 +803,16 @@ class LivefutbolDetalle
             }
         }
 
+        $ficha = $lfId ? $this->ficha($lfId, $p['url'] ?? null, $info) : null;
+        if ($ficha && $ficha['nacimiento']) {
+            $porFecha = $this->porFecha($tabla, $nombreLf, $ficha, $info, $opciones);
+            if ($porFecha !== null) return $porFecha;
+            $motivo = count($info['opciones']) > 1
+                ? 'hay ' . count($info['opciones']) . ' parecidos y ninguno con su fecha: elegí uno o se crea'
+                : 'no está en la base';
+            return $this->registrar($this->crear($rol, $info, $motivo, $ficha));
+        }
+
         $validos = [];
         foreach ($this->candidatosBase($tabla, $nombreLf) as $c) {
             if ($this->puntaje($nombreLf, $c, true) !== null) {
@@ -789,7 +830,7 @@ class LivefutbolDetalle
         }
 
         $motivo = count($validos) > 1 ? 'hay ' . count($validos) . ' parecidos y no adivino: elegí uno o se crea' : 'no está en la base';
-        return $this->registrar($this->crear($rol, $info, $motivo));
+        return $this->registrar($this->crear($rol, $info, $motivo, $ficha));
     }
 
     /** Fichas de la tabla del rol que comparten alguna palabra larga del nombre. */
@@ -843,30 +884,48 @@ class LivefutbolDetalle
      * Crea la persona con el rol (o le asigna un id ficticio en la vista previa).
      * Sin fecha ni nacionalidad: livefutbol no las da en la alineación.
      */
-    private function crear($rol, array $info, $motivo)
+    private function crear($rol, array $info, $motivo, $ficha = null)
     {
         $nombreLf = $info['nombre_lf'];
+        if (!$ficha && !empty($info['lf_id'])) {
+            $ficha = LivefutbolPersona::datos($info['lf_id']);
+        }
         $n = NombreHelper::separarTM(['name' => $nombreLf]);
+        // La ficha trae nombre y apellidos separados: mejor que adivinar el corte.
+        if ($ficha && $ficha['apellido']) {
+            $n = ['nombre' => (string) $ficha['nombre'], 'apellido' => (string) $ficha['apellido'],
+                'name' => $nombreLf];
+        }
         $grupo = ['jugador' => 'jugadores', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'][$rol];
         $info['como'] = 'NUEVO — ' . $motivo;
         $info['revisar'] = true;
 
         if (!$this->escribir) {
             $info['id'] = $this->proximoPreview--;
-            $this->creados[$grupo][] = $nombreLf . ' (' . $info['equipo'] . ') — SE CREARÍA · sin fecha de nacimiento ni nacionalidad';
+            $this->creados[$grupo][] = $nombreLf . ' (' . $info['equipo'] . ') — SE CREARÍA · ' . $this->resumenFicha($ficha);
             return $info;
         }
 
         try {
-            $persona = Persona::create(['name' => trim($n['name']), 'nombre' => trim($n['nombre']), 'apellido' => trim($n['apellido'])]);
-            if ($rol === 'jugador')      $ref = $persona->jugador()->create([]);
+            $alta = ['name' => trim($n['name']), 'nombre' => trim($n['nombre']), 'apellido' => trim($n['apellido'])];
+            if ($ficha) {
+                foreach (['nacimiento', 'fallecimiento', 'ciudad', 'nacionalidad', 'altura', 'peso'] as $k) {
+                    if (!empty($ficha[$k])) $alta[$k] = $ficha[$k];
+                }
+                if (!empty($ficha['foto_url']) && ($foto = LivefutbolPersona::bajarFoto($ficha['foto_url']))) {
+                    $alta['foto'] = $foto;
+                }
+            }
+            $persona = Persona::create($alta);
+            if ($rol === 'jugador')      $ref = $persona->jugador()->create(!empty($ficha['tipo']) ? ['tipoJugador' => $ficha['tipo']] : []);
             elseif ($rol === 'tecnico')  $ref = $persona->tecnico()->create([]);
             else                         $ref = $persona->arbitro()->create([]);
 
             $info['id'] = (int) $ref->id;
             $this->anotarMapeo($rol, $info['lf_id'], $info['id'], $nombreLf, 'creado', true);
-            $this->creados[$grupo][] = $nombreLf . ' (' . $info['equipo'] . ') — creado #' . $info['id'];
-            foreach ($this->tm->avisosApellidoParecido(['apellido' => $n['apellido'], 'nombre' => $n['nombre'], 'nacimiento' => null],
+            $this->creados[$grupo][] = $nombreLf . ' (' . $info['equipo'] . ') — creado #' . $info['id'] . ' · ' . $this->resumenFicha($ficha);
+            foreach ($this->tm->avisosApellidoParecido(['apellido' => $n['apellido'], 'nombre' => $n['nombre'],
+                         'nacimiento' => $ficha['nacimiento'] ?? null],
                          $rol, (int) $persona->id) as $a) {
                 $this->aviso($a);
             }
@@ -875,6 +934,94 @@ class LivefutbolDetalle
             $info['id'] = null;
         }
         return $info;
+    }
+
+    /** Baja (o saca de caché) la ficha de livefutbol y la deja a la vista en $info. */
+    private function ficha($lfId, $url, array &$info)
+    {
+        $f = LivefutbolPersona::datos($lfId, $url);
+        $info['ficha'] = $f ? $this->resumenFicha($f) : 'no pude leer su ficha de livefutbol';
+        if (!$f) $this->sinFicha++;
+        return $f;
+    }
+
+    private function resumenFicha($f)
+    {
+        if (!$f) return 'sin ficha de livefutbol: sin fecha de nacimiento ni nacionalidad';
+        $p = [];
+        $p[] = $f['nacimiento'] ? 'nac. ' . Carbon::parse($f['nacimiento'])->format('d/m/Y') : 'sin fecha de nacimiento';
+        $p[] = $f['nacionalidad'] ?: 'sin nacionalidad';
+        if (!empty($f['tipo'])) $p[] = $f['tipo'];
+        if (!empty($f['foto_url'])) $p[] = 'con foto';
+        return implode(' · ', $p);
+    }
+
+    /**
+     * El criterio de Transfermarkt, con la fecha de la ficha de livefutbol.
+     * Devuelve el id si lo encontró (ya registrado), o null para que se cree.
+     * Deja los parecidos en $info['opciones'] para el desplegable.
+     */
+    private function porFecha($tabla, $nombreLf, array $ficha, array &$info, array $opciones)
+    {
+        $rol = $info['rol'];
+        $completo = trim($ficha['nombre'] . ' ' . $ficha['apellido']);
+        $nombres = array_values(array_unique(array_filter([$nombreLf, $completo])));
+        $fecha = substr($ficha['nacimiento'], 0, 10);
+
+        $cands = [];
+        foreach ($nombres as $n) {
+            foreach ($this->candidatosBase($tabla, $n) as $c) $cands[(int) $c->id] = $c;
+        }
+
+        $mismaFecha = []; $sinFecha = [];
+        foreach ($cands as $c) {
+            // El mejor puntaje con cualquiera de las dos formas del nombre.
+            $p = null; $estricto = null;
+            foreach ($nombres as $n) {
+                $x = $this->puntaje($n, $c, false);
+                if ($x !== null && ($p === null || $x > $p)) $p = $x;
+                if ($this->puntaje($n, $c, true) !== null) $estricto = true;
+            }
+            if ($p === null) continue;
+
+            if ($c->nacimiento) {
+                if (substr((string) $c->nacimiento, 0, 10) !== $fecha) continue;   // fecha distinta: no es
+                if ($p >= 2 || count($this->tm->palabras($nombreLf)) === 1) {
+                    $mismaFecha[] = $c;
+                } else {
+                    $this->aviso($nombreLf . ': ' . $this->etiqueta($c, 'base') . ' nació el mismo día pero coincide '
+                        . 'una sola palabra del nombre. No los uno; si es él, elegilo.');
+                }
+                $opciones[(int) $c->id] = $this->etiqueta($c, 'misma fecha');
+            } elseif ($estricto) {
+                $sinFecha[] = $c;
+                $opciones[(int) $c->id] = $this->etiqueta($c, 'base, sin fecha');
+            }
+        }
+        $info['opciones'] = $opciones;
+        $lfId = $info['lf_id'];
+
+        if (count($mismaFecha) === 1) {
+            $info['id'] = (int) $mismaFecha[0]->id;
+            $info['como'] = 'misma fecha de nacimiento y nombre';
+            $info['revisar'] = false;
+            $this->anotarMapeo($rol, $lfId, $info['id'], $nombreLf, 'nombre', false);
+            return $this->registrar($info);
+        }
+        if (count($mismaFecha) > 1) {
+            $this->aviso($nombreLf . ': hay ' . count($mismaFecha) . ' fichas con su nombre y su fecha de nacimiento '
+                . '(¿duplicados?). No elijo: se crea, salvo que elijas una.');
+            return null;
+        }
+        if (count($sinFecha) === 1) {
+            $info['id'] = (int) $sinFecha[0]->id;
+            $info['como'] = 'mismo nombre; la base no tiene su fecha (livefutbol: '
+                . Carbon::parse($fecha)->format('d/m/Y') . ')';
+            $info['revisar'] = true;
+            $this->anotarMapeo($rol, $lfId, $info['id'], $nombreLf, 'nombre', true);
+            return $this->registrar($info);
+        }
+        return null;
     }
 
     private function anotarMapeo($rol, $lfId, $refId, $nombre, $origen, $revisar)

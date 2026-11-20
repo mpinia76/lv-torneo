@@ -187,8 +187,8 @@ class LivefutbolDetalleController extends Controller
         foreach (['jugadores' => 'Jugadores', 'tecnicos' => 'Técnicos', 'arbitros' => 'Árbitros'] as $k => $t) {
             if (!empty($r['creados'][$k])) {
                 $c .= '<h2>' . $t . ' que no estaban en la base</h2><div class="diag">'
-                    . '<p class="sub">Se crean sin fecha de nacimiento: livefutbol no la da en la alineación. Quedan en '
-                    . '«Pendientes de revisar», abajo de la pantalla de pegar.</p>';
+                    . '<p class="sub">Se crean con lo que dice su ficha de livefutbol (fecha, nacionalidad, lugar, puesto, '
+                    . 'altura y foto). Quedan en «Pendientes de revisar», abajo de la pantalla de pegar.</p>';
                 foreach ($r['creados'][$k] as $x) $c .= '<div>• ' . e($x) . '</div>';
                 $c .= '</div>';
             }
@@ -247,8 +247,8 @@ class LivefutbolDetalleController extends Controller
 
         $dudosos = count(array_filter($personas, function ($x) { return $x['id'] < 0 || $x['revisar']; }));
         $out = '<h2>¿Quién es quién? <span class="sub">(' . count($personas) . ' personas · ' . $dudosos . ' para mirar)</span></h2>'
-            . '<p class="sub">livefutbol no da la fecha de nacimiento, así que lo que no está atado de antes se aparea por '
-            . 'la plantilla del equipo (y el dorsal) o por el nombre completo. En la duda se crea. Si alguno está mal, '
+            . '<p class="sub">Lo que no está atado de antes se aparea por la plantilla del equipo (y el dorsal); si no, '
+            . 'con la ficha de livefutbol (fecha de nacimiento + nombre, igual que con TM). En la duda se crea. Si alguno está mal, '
             . 'elegí el correcto (o escribí su #id) y tocá <b>Recalcular</b>. Lo que se guarda queda atado para la próxima.</p>'
             . '<div class="scroll"><table><thead><tr><th>Rol</th><th>Equipo</th><th>Dorsal</th><th>En livefutbol</th>'
             . '<th>En la base</th><th>Cómo</th>' . ($editable ? '<th>Cambiar</th>' : '') . '</tr></thead><tbody>';
@@ -258,7 +258,8 @@ class LivefutbolDetalleController extends Controller
             $out .= '<tr' . $clase . '><td>' . e($roles[$x['rol']] ?? $x['rol']) . '</td>'
                 . '<td>' . e($x['equipo']) . '</td>'
                 . '<td class="num">' . e($x['dorsal'] ?? '') . '</td>'
-                . '<td>' . e($x['nombre_lf']) . ($x['lf_id'] ? ' <span class="id">pe' . (int) $x['lf_id'] . '</span>' : '') . '</td>'
+                . '<td>' . e($x['nombre_lf']) . ($x['lf_id'] ? ' <span class="id">pe' . (int) $x['lf_id'] . '</span>' : '')
+                . (!empty($x['ficha']) ? '<br><span class="sub">' . e($x['ficha']) . '</span>' : '') . '</td>'
                 . '<td>' . ($x['id'] > 0 ? e($x['base'] ?? '') . ' <span class="id">#' . (int) $x['id'] . '</span>' : '<b>nuevo</b>') . '</td>'
                 . '<td class="wrap">' . e($x['como']) . '</td>';
 
@@ -355,8 +356,8 @@ class LivefutbolDetalleController extends Controller
         $rutas  = ['jugador' => 'jugadores.edit', 'tecnico' => 'tecnicos.edit', 'arbitro' => 'arbitros.edit'];
 
         $out = '<h2>Pendientes de revisar <span class="sub">(' . $filas->count() . ')</span></h2>'
-            . '<p class="sub">Altas y apareos por nombre que hizo este importador. Las altas salen sin fecha de nacimiento '
-            . 'y con la nacionalidad que la base pone por default: completalas. Si un apareo está mal, editá la ficha y '
+            . '<p class="sub">Altas y apareos por nombre que hizo este importador. Las altas salen sin fecha de nacimiento ni nacionalidad '
+            . 'si no se pudo leer su ficha de livefutbol: completalas. Si un apareo está mal, editá la ficha y '
             . 'después corregí el partido.</p><div class="scroll"><table><thead><tr><th>Rol</th><th>En livefutbol</th>'
             . '<th>En la base</th><th>Cómo</th><th></th></tr></thead><tbody>';
 
