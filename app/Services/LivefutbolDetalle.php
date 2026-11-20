@@ -985,7 +985,8 @@ class LivefutbolDetalle
         $p[] = $f['nacimiento'] ? 'nac. ' . Carbon::parse($f['nacimiento'])->format('d/m/Y') : 'sin fecha de nacimiento';
         $p[] = $f['nacionalidad'] ?: 'sin nacionalidad';
         if (!empty($f['tipo'])) $p[] = $f['tipo'];
-        if (!empty($f['foto_url'])) $p[] = 'con foto';
+        // Si tiene foto o sólo la silueta recién se sabe al bajarla (ver
+        // LivefutbolPersona::bajarFoto): la vista previa no lo promete.
         return implode(' · ', $p);
     }
 

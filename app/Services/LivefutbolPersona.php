@@ -217,24 +217,51 @@ class LivefutbolPersona
     }
 
     /**
-     * Baja la foto (como «Importar jugador»: directo, sin ScraperAPI) y
-     * devuelve el nombre del archivo para `personas.foto`, o null.
+     * Baja la foto y devuelve el nombre del archivo para `personas.foto`, o null.
+     *
+     * Las fotos de livefutbol vienen de s.hs-data.com con `?fallback=male`:
+     * si la persona no tiene foto, ese parámetro hace que devuelva la silueta
+     * gris, con la misma URL de siempre (una por persona, así que no se puede
+     * reconocer por repetida). Se pide SIN el fallback: sin foto da error y no
+     * se guarda nada.
+     *
+     * El archivo va como `lf_{nombre}` para no pisar fotos de otras fuentes
+     * con el mismo número (Transfermarkt también usa ids pelados).
      */
     public static function bajarFoto($url)
     {
+        $url = self::sinFallback($url);
         if (!$url) return null;
         try {
             $r = (new Client())->get($url, ['http_errors' => false, 'timeout' => 10]);
             if ($r->getStatusCode() !== 200) return null;
+            $tipo = strtolower($r->getHeaderLine('Content-Type'));
+            if ($tipo !== '' && strpos($tipo, 'image/') !== 0) return null;
+            $cuerpo = $r->getBody()->getContents();
+            if (strlen($cuerpo) < 200) return null;
+
             $info = pathinfo((string) parse_url($url, PHP_URL_PATH));
             $archivo = rtrim($info['filename'] ?? '', '.');
             if ($archivo === '') return null;
-            $nombre = $archivo . '.' . (($info['extension'] ?? '') ?: 'jpg');
-            file_put_contents(public_path('images/') . $nombre, $r->getBody()->getContents());
+            $nombre = 'lf_' . $archivo . '.' . (($info['extension'] ?? '') ?: 'jpg');
+            file_put_contents(public_path('images/') . $nombre, $cuerpo);
             return $nombre;
         } catch (\Exception $e) {
             Log::info('LivefutbolPersona: sin foto ' . $url . ': ' . $e->getMessage());
             return null;
         }
+    }
+
+    /** La URL sin `fallback=` (ver bajarFoto). */
+    public static function sinFallback($url)
+    {
+        if (!$url) return null;
+        $partes = parse_url($url);
+        if (empty($partes['host'])) return null;
+        $q = [];
+        if (!empty($partes['query'])) parse_str($partes['query'], $q);
+        unset($q['fallback']);
+        return ($partes['scheme'] ?? 'https') . '://' . $partes['host'] . ($partes['path'] ?? '')
+            . ($q ? '?' . http_build_query($q) : '');
     }
 }
