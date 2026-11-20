@@ -112,12 +112,11 @@ class LivefutbolDetalle
     /**
      * Las incidencias que carga el botón «Sin datos en TM» de los controles
      * (ControlController::incidenciaSinDatos: tipo = clave del control, sin
-     * equipo ni puntos) y que livefutbol puede resolver. `cambios.sale_solo`
-     * no está: ahí el dato está bien, no falta nada.
+     * equipo ni puntos) que se rehacen con livefutbol: sólo las de alineación
+     * (sin jugadores de un equipo, o incompleta). Las demás (terna, goles,
+     * cambios…) quedan como están: livefutbol no suele tener más que TM ahí.
      */
-    const TIPOS_SIN_DATOS = ['sin_detalle', 'alineaciones.sin_jugadores', 'alineaciones.faltan', 'tecnicos.faltan',
-        'arbitros.terna', 'goles.diferencia', 'goles.por_equipo', 'goles.sin_jugar', 'tarjetas.sin_jugar',
-        'cambios.sin_jugar', 'cambios.impares', 'penales.faltantes'];
+    const TIPOS_SIN_DATOS = ['alineaciones.sin_jugadores', 'alineaciones.faltan'];
 
     /** Las incidencias «sin datos en TM» del partido. */
     public static function incidenciasSinDatos($partidoId)
