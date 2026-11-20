@@ -147,32 +147,32 @@
 
   // ── Fichas ────────────────────────────────────────────────────────────
   // dd-mm-aaaa tal cual: el admin la normaliza.
+  // Manda TODOS los pares etiqueta → valor de la ficha (`pares`): qué es cada
+  // uno lo decide el admin (LivefutbolPersona::normalizar), así un cambio de
+  // etiqueta en livefutbol se arregla allá sin volver a instalar el favorito.
   var leerFicha = function (html) {
     var doc = new DOMParser().parseFromString(html, 'text/html');
-    var dts = doc.querySelectorAll('.contentitem dl dt');
-    if (!dts.length) dts = doc.querySelectorAll('dl dt');
-    var f = {}, nombres = [];
-    [].forEach.call(dts, function (dt) {
+    var pares = {};
+    var poner = function (k, v) {
+      k = (k || '').replace(/\s+/g, ' ').trim().replace(/:$/, '');
+      v = (v || '').replace(/\s+/g, ' ').trim();
+      if (k && v && !(k in pares)) pares[k] = v;
+      else if (k && v && k === 'Nombre') pares['Nombre 2'] = v;
+    };
+    [].forEach.call(doc.querySelectorAll('dl dt'), function (dt) {
       var dd = dt.nextElementSibling;
-      if (!dd || dd.tagName !== 'DD') return;
-      var k = dt.textContent.trim(), v = dd.textContent.replace(/\s+/g, ' ').trim();
-      if (!v) return;
-      if (k === 'Nombre') nombres.push(v);
-      else if (k === 'Apellidos') f.apellido = v;
-      else if (k === 'Fecha de nacimiento') f.nacimiento = v;
-      else if (k === 'Fecha de fallecimiento') f.fallecimiento = v;
-      else if (k === 'Lugar de nacimiento') f.lugar = v;
-      else if (k === 'Nacionalidad') f.nacionalidad = v;
-      else if (k === 'Demarcación') f.demarcacion = v;
-      else if (k === 'Altura') f.altura = v;
-      else if (k === 'Peso') f.peso = v;
+      if (dd && dd.tagName === 'DD') poner(dt.textContent, dd.textContent);
     });
-    if (nombres.length) { f.name = nombres[0]; f.nombre = nombres[nombres.length - 1]; }
-    var img = doc.querySelector('#previewArea img');
-    if (img && img.getAttribute('src') && img.getAttribute('src').indexOf('avatar-player') < 0) {
+    [].forEach.call(doc.querySelectorAll('tr'), function (tr) {
+      var c = tr.querySelectorAll('th, td');
+      if (c.length === 2) poner(c[0].textContent, c[1].textContent);
+    });
+    var f = { pares: pares };
+    var img = doc.querySelector('#previewArea img') || doc.querySelector('.person-image img, .person img');
+    if (img && img.getAttribute('src') && !/avatar|silhouette|dummy|placeholder/i.test(img.getAttribute('src'))) {
       f.foto = new URL(img.getAttribute('src'), location.href).href;
     }
-    return (f.nombre || f.apellido || f.nacimiento) ? f : null;
+    return Object.keys(pares).length ? f : null;
   };
 
   var personas = [];

@@ -78,11 +78,44 @@ class LivefutbolPersona
     /** Lo que manda el bookmarklet → el mismo formato que leer(). */
     public static function normalizar(array $f)
     {
+        // Favorito nuevo: todos los pares de la ficha en `pares`. Se pasan a
+        // las claves de siempre según la etiqueta. Las etiquetas cambian con
+        // el tiempo («Fecha de nacimiento» pasó a ser «Cumpleaños»): agregar
+        // acá las que aparezcan.
+        if (!empty($f['pares']) && is_array($f['pares'])) {
+            $etiquetas = [
+                'nombre' => 'name', 'nombre 2' => 'nombre', 'nombre completo' => 'nombre',
+                'apellidos' => 'apellido', 'apellido' => 'apellido',
+                'cumpleaños' => 'nacimiento', 'fecha de nacimiento' => 'nacimiento', 'nacimiento' => 'nacimiento',
+                'nacido' => 'nacimiento',
+                'fecha de fallecimiento' => 'fallecimiento', 'fallecimiento' => 'fallecimiento', 'falleció' => 'fallecimiento',
+                'lugar de nacimiento' => 'lugar', 'nacido en' => 'lugar',
+                'nacionalidad' => 'nacionalidad',
+                'posición' => 'demarcacion', 'demarcación' => 'demarcacion', 'puesto' => 'demarcacion',
+                'altura' => 'altura', 'estatura' => 'altura', 'peso' => 'peso',
+            ];
+            foreach ($f['pares'] as $k => $v) {
+                $k = mb_strtolower(trim((string) $k));
+                if (isset($etiquetas[$k]) && !isset($f[$etiquetas[$k]])) $f[$etiquetas[$k]] = $v;
+            }
+            if (empty($f['nombre']) && !empty($f['name'])) $f['nombre'] = $f['name'];
+        }
+
         $fecha = function ($s) {
             if (!$s) return null;
             if (preg_match('/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/', (string) $s, $m)) {
                 return checkdate((int) $m[2], (int) $m[1], (int) $m[3])
                     ? sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]) : null;
+            }
+            // "14 de marzo de 1990", "14. März 1990", "14 March 1990"
+            $meses = ['ene' => 1, 'jan' => 1, 'feb' => 2, 'mar' => 3, 'mär' => 3, 'abr' => 4, 'apr' => 4,
+                'may' => 5, 'mai' => 5, 'jun' => 6, 'jul' => 7, 'ago' => 8, 'aug' => 8, 'sep' => 9, 'set' => 9,
+                'oct' => 10, 'okt' => 10, 'nov' => 11, 'dic' => 12, 'dec' => 12, 'dez' => 12];
+            if (preg_match('/(\d{1,2})\.?\s*(?:de\s+)?([a-zA-Zäé]{3,})\.?\s*(?:de\s+)?(\d{4})/u', mb_strtolower((string) $s), $m)) {
+                $mes = $meses[mb_substr($m[2], 0, 3)] ?? null;
+                if ($mes && checkdate($mes, (int) $m[1], (int) $m[3])) {
+                    return sprintf('%04d-%02d-%02d', $m[3], $mes, $m[1]);
+                }
             }
             return null;
         };
@@ -92,10 +125,11 @@ class LivefutbolPersona
             'name'          => isset($f['name']) ? trim($f['name']) : null,
             'nacimiento'    => $fecha($f['nacimiento'] ?? null),
             'fallecimiento' => $fecha($f['fallecimiento'] ?? null),
-            'ciudad'        => isset($f['lugar']) ? mb_substr(trim($f['lugar']), 0, 191) : null,
+            // «nacido en» a veces es sólo el país: no lo uso de ciudad si es la nacionalidad.
+            'ciudad'        => isset($f['lugar']) && trim($f['lugar']) !== trim((string) ($f['nacionalidad'] ?? ''))
+                ? mb_substr(trim($f['lugar']), 0, 191) : null,
             'nacionalidad'  => isset($f['nacionalidad']) ? trim($f['nacionalidad']) : null,
-            'tipo'          => ['Portero' => 'Arquero', 'Defensa' => 'Defensor', 'Centrocampista' => 'Medio',
-                                'Delantero' => 'Delantero'][trim((string) ($f['demarcacion'] ?? ''))] ?? null,
+            'tipo'          => self::tipoJugador($f['demarcacion'] ?? null),
             'altura'        => null,
             'peso'          => null,
             'foto_url'      => !empty($f['foto']) && preg_match('#^https?://#', $f['foto']) ? $f['foto'] : null,
@@ -107,6 +141,17 @@ class LivefutbolPersona
 
         if (!$d['nombre'] && !$d['apellido'] && !$d['nacimiento']) return null;
         return $d;
+    }
+
+    private static function tipoJugador($txt)
+    {
+        $t = mb_strtolower(trim((string) $txt));
+        if ($t === '') return null;
+        if (preg_match('/porter|arquer|guardameta|goalkeeper|torwart/u', $t)) return 'Arquero';
+        if (preg_match('/defens|lateral|zaguer|central|defender|abwehr/u', $t)) return 'Defensor';
+        if (preg_match('/centrocamp|mediocamp|medio|volante|midfield|mittelfeld/u', $t)) return 'Medio';
+        if (preg_match('/delanter|atacante|extremo|punta|forward|striker|sturm/u', $t)) return 'Delantero';
+        return null;
     }
 
     /** Los <dt>/<dd> de la ficha. null si la página no es una ficha. */
