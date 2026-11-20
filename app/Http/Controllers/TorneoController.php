@@ -1412,7 +1412,7 @@ order by  puntaje desc, diferencia DESC, golesl DESC, equipo ASC';
         $posiciones=array();
 
         if ($equipo1 && $equipo2){
-            $sql='SELECT torneos.nombre AS nombreTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e1.pais AS paisLocal, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, e2.pais AS paisVisitante, partidos.golesl,
+            $sql='SELECT torneos.nombre AS nombreTorneo, torneos.escudo AS escudoTorneo, torneos.year, fechas.numero, partidos.dia, e1.id AS equipol_id, e1.escudo AS fotoLocal, e1.nombre AS local, e1.pais AS paisLocal, e2.id AS equipov_id,e2.escudo AS fotoVisitante, e2.nombre AS visitante, e2.pais AS paisVisitante, partidos.golesl,
 partidos.golesv, partidos.penalesl, partidos.penalesv, partidos.id partido_id, partidos.neutral
 FROM partidos
 INNER JOIN equipos e1 ON partidos.equipol_id = e1.id
