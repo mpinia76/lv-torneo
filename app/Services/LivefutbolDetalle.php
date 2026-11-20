@@ -76,6 +76,9 @@ class LivefutbolDetalle
 
     private $escribir = false;
 
+    /** Altas que fallaron: con alguna, no se guarda el partido (quedaría incompleto). */
+    private $fallasAlta = 0;
+
     /** Personas sin ficha (el JSON no la trajo ni estaba en caché). */
     private $sinFicha = 0;
 
@@ -185,6 +188,7 @@ class LivefutbolDetalle
         $this->creados = ['jugadores' => [], 'tecnicos' => [], 'arbitros' => []];
         $this->proximoPreview = -1;
         $this->sinFicha = 0;
+        $this->fallasAlta = 0;
         $this->fichas = [];
         $this->fichasJson = [];
         foreach (['local', 'visitante'] as $l) {
@@ -470,6 +474,17 @@ class LivefutbolDetalle
                 return $informe;
             }
             $this->aviso($queja);
+        }
+
+        // Una persona que no se pudo crear deja el partido sin ese jugador y sin
+        // sus goles/tarjetas/cambios: no se guarda a medias. Las personas que
+        // sí se crearon quedan (y atadas), así el próximo intento las encuentra.
+        if ($this->escribir && $this->fallasAlta) {
+            $informe['ok'] = false;
+            $informe['error'] = 'No guardé el partido: ' . $this->fallasAlta . ' persona(s) no se pudieron crear (ver avisos). '
+                . 'Guardarlo así lo dejaba sin esos jugadores y sus goles, tarjetas y cambios.';
+            $informe['avisos'] = $this->avisos;
+            return $informe;
         }
 
         if ($this->escribir) {
@@ -927,6 +942,48 @@ class LivefutbolDetalle
                 'name' => $nombreLf];
         }
         $grupo = ['jugador' => 'jugadores', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'][$rol];
+        $tabla = ['jugador' => 'jugadors', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'][$rol];
+
+        // ¿La PERSONA ya existe, con este rol o con otro? (un DT que también
+        // jugó, un árbitro cargado sólo como persona). Pasó con David Vinet y
+        // Marc Paris: estaban en `personas` con la misma clave nombre +
+        // apellido + fecha, el apareo buscaba sólo entre jugadores, y el alta
+        // chocaba contra el índice único. Mismo criterio que TM.
+        if ($ficha && !empty($ficha['nacimiento'])) {
+            $avisosTm = [];
+            $existe = $this->tm->personaExistente(trim($n['nombre']), trim($n['apellido']), $ficha['nacimiento'], $avisosTm);
+            foreach ($avisosTm as $a) $this->aviso($a);
+            if ($existe) {
+                $refId = DB::table($tabla)->where('persona_id', $existe['id'])->value('id');
+                $info['revisar'] = false;
+                if ($refId) {
+                    $info['id'] = (int) $refId;
+                    $info['como'] = 'ya estaba: ' . $existe['base'] . ' (persona #' . $existe['id'] . ', ' . $existe['como'] . ')';
+                    $this->anotarMapeo($rol, $info['lf_id'], $info['id'], $nombreLf, 'nombre', false);
+                    return $info;
+                }
+                $info['como'] = 'la persona ya estaba sin este rol: ' . $existe['base'] . ' (persona #' . $existe['id']
+                    . ', ' . $existe['como'] . ') — se le agrega el rol';
+                if (!$this->escribir) {
+                    $info['id'] = $this->proximoPreview--;
+                    return $info;
+                }
+                try {
+                    $persona = Persona::find($existe['id']);
+                    if ($rol === 'jugador')     $ref = $persona->jugador()->create(!empty($ficha['tipo']) ? ['tipoJugador' => $ficha['tipo']] : []);
+                    elseif ($rol === 'tecnico') $ref = $persona->tecnico()->create([]);
+                    else                        $ref = $persona->arbitro()->create([]);
+                    $info['id'] = (int) $ref->id;
+                    $this->anotarMapeo($rol, $info['lf_id'], $info['id'], $nombreLf, 'nombre', false);
+                } catch (\Exception $e) {
+                    $this->fallasAlta++;
+                    $this->aviso('No pude agregarle el rol a la persona #' . $existe['id'] . ' (' . $nombreLf . '): ' . $e->getMessage());
+                    $info['id'] = null;
+                }
+                return $info;
+            }
+        }
+
         $info['como'] = 'NUEVO — ' . $motivo;
         $info['revisar'] = true;
 
@@ -961,6 +1018,7 @@ class LivefutbolDetalle
                 $this->aviso($a);
             }
         } catch (\Exception $e) {
+            $this->fallasAlta++;
             $this->aviso('No pude crear a ' . $nombreLf . ': ' . $e->getMessage());
             $info['id'] = null;
         }

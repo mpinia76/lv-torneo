@@ -6329,6 +6329,25 @@ class TmDetallePartido
         return $this->rolArbitro($texto);
     }
 
+    /**
+     * Ver personaExistenteSinRol(): la persona que ya está en `personas` con la
+     * misma clave (nombre + apellido + fecha) o la misma fecha y 2 palabras del
+     * nombre, tenga o no el rol. Devuelve los avisos que deje.
+     */
+    public function personaExistente($nombre, $apellido, $nacimiento, array &$avisos = [])
+    {
+        $antes = $this->avisos;
+        $this->avisos = [];
+        $r = $this->personaExistenteSinRol([
+            'nacimiento' => $nacimiento,
+            'persona' => ['nombre' => $nombre, 'apellido' => $apellido],
+            'nombre' => $nombre, 'apellido' => $apellido,
+        ]);
+        $avisos = $this->avisos;
+        $this->avisos = $antes;
+        return $r;
+    }
+
     /** Ver tokensNombre(). */
     public function palabras($texto)
     {
