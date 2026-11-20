@@ -318,6 +318,11 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     // cambios, árbitros). Ver ImportDetallesController.
     Route::get('/import-detalles', [ImportDetallesController::class, 'index'])->name('import_detalles.index');
     Route::get('/import-detalles/ver', [ImportDetallesController::class, 'ver'])->name('import_detalles.ver');
+    // El mismo detalle, desde livefutbol.com (cuando TM viene incompleto). El
+    // JSON lo copia un bookmarklet en el navegador. Ver LivefutbolDetalleController.
+    Route::get('/import-detalles/livefutbol', [App\Http\Controllers\LivefutbolDetalleController::class, 'index'])->name('import_detalles.livefutbol');
+    Route::post('/import-detalles/livefutbol/ver', [App\Http\Controllers\LivefutbolDetalleController::class, 'ver'])->name('import_detalles.livefutbol_ver');
+    Route::post('/import-detalles/livefutbol/guardar', [App\Http\Controllers\LivefutbolDetalleController::class, 'guardar'])->name('import_detalles.livefutbol_guardar');
     Route::get('/import-detalles/bajar', [ImportDetallesController::class, 'bajar'])->name('import_detalles.bajar');
     // Solo el marcador de UN partido, sin tocar el resto: es el único camino
     // para los definidos por penales (el fixture publica 90'+tanda junto).

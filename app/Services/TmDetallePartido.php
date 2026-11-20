@@ -6288,4 +6288,155 @@ class TmDetallePartido
     {
         return empty($this->avisos) ? null : end($this->avisos);
     }
+
+    // ═════════════════ PUENTE PARA OTRAS FUENTES (LiveFutbol) ═════════════════
+    //
+    // El importador de LiveFutbol (App\Services\LivefutbolDetalle) arma el MISMO
+    // plan que `importar()` —alineacions, gols, tarjetas, cambios, penals,
+    // arbitros, tecnicos, plantillas— pero con sus propias personas. Para que
+    // guarde exactamente igual que el de Transfermarkt (plantillas primero,
+    // filas de a una con try/catch, rehacer que no borra la terna ni los
+    // «Convirtieron», el DT que falte sin pisar el que está, los penales
+    // convertidos al final) usa estos métodos en vez de copiar la lógica.
+
+    /** Ver depurarPlan(). */
+    public function depurarPlanAjeno(array $plan)
+    {
+        return $this->depurarPlan($plan);
+    }
+
+    /** Ver ordenPorPuesto(). Para un id de vista previa (negativo) da 3. */
+    public function puestoDe($jugadorId)
+    {
+        return $this->ordenPorPuesto((int) $jugadorId);
+    }
+
+    /** Ver dorsalesDePlantilla(): "equipoId-jugadorId" => dorsal. */
+    public function dorsalesPlantilla(Partido $partido, array $lados)
+    {
+        return $this->dorsalesDePlantilla($partido, $lados);
+    }
+
+    /** Ver ladosQueQuedarianVacios(). */
+    public function ladosVacios(array $plan, Partido $partido, array $lados)
+    {
+        return $this->ladosQueQuedarianVacios($plan, $partido, $lados);
+    }
+
+    /** Ver rolArbitro(): 'Principal' | 'Linea 1' | 'Linea 2' | 'Cuarto' | 'VAR' | null. */
+    public function rolArbitroDe($texto)
+    {
+        return $this->rolArbitro($texto);
+    }
+
+    /** Ver tokensNombre(). */
+    public function palabras($texto)
+    {
+        return $this->tokensNombre($texto);
+    }
+
+    /** Ver apellidosSeTocan(). */
+    public function apellidosCoinciden(array $apeA, array $tokensA, array $apeB, array $tokensB)
+    {
+        return $this->apellidosSeTocan($apeA, $tokensA, $apeB, $tokensB);
+    }
+
+    /** Ver avisarApellidoParecido(). Devuelve los avisos que haya dejado. */
+    public function avisosApellidoParecido(array $datos, $rol, $idNuevo)
+    {
+        $antes = $this->avisos;
+        $this->avisos = [];
+        $this->avisarApellidoParecido($datos, $rol, $idNuevo);
+        $nuevos = $this->avisos;
+        $this->avisos = $antes;
+        return $nuevos;
+    }
+
+    /**
+     * Guarda un plan armado por otra fuente, con el mismo criterio que el paso
+     * 6 de `importar()`.
+     *
+     * `$lados` = [['equipo_id' => …, 'equipo_nombre' => …], …].
+     * `$marcador` se corre DENTRO de la transacción (recibe el Partido), para
+     * que el resultado se escriba junto con el detalle o no se escriba.
+     *
+     * No marca los penales como revisados: eso dice que se leyeron los penales
+     * fallados de Transfermarkt, y otra fuente no los leyó.
+     *
+     * @return array ['escrito' => bool, 'error' => ?string, 'avisos' => [], 'fallidas' => int, 'penales' => ?array]
+     */
+    public function grabarPlanAjeno(Partido $partido, array $plan, array $lados, $forzar, callable $marcador = null)
+    {
+        $this->avisos   = [];
+        $this->fallidas = 0;
+        $out = ['escrito' => false, 'error' => null, 'avisos' => [], 'fallidas' => 0, 'penales' => null];
+
+        try {
+            DB::transaction(function () use ($plan, $partido, $forzar, $lados, $marcador) {
+                $this->avisos   = [];
+                $this->fallidas = 0;
+
+                if ($forzar) {
+                    Alineacion::where('partido_id', $partido->id)->delete();
+                    Gol::where('partido_id', $partido->id)->delete();
+                    Tarjeta::where('partido_id', $partido->id)->delete();
+                    Cambio::where('partido_id', $partido->id)->delete();
+
+                    // Sólo los roles de árbitro que vienen (ver importar()).
+                    $roles = [];
+                    foreach ($plan['arbitros'] as $f) {
+                        if (!empty($f['tipo'])) $roles[] = $f['tipo'];
+                    }
+                    if ($roles) {
+                        PartidoArbitro::where('partido_id', $partido->id)
+                            ->whereIn('tipo', array_values(array_unique($roles)))->delete();
+                    }
+
+                    // Los penales que escribe un importador; los «Convirtieron» quedan.
+                    Penal::where('partido_id', $partido->id)
+                        ->whereIn('tipo', [self::PEN_ERRADO, self::PEN_ATAJADO, self::PEN_ATAJO])
+                        ->delete();
+                }
+
+                $this->grabarPlantillas($plan['plantillas']);
+                $this->asegurarPlantillasEquipos(
+                    optional($partido->fecha)->grupo_id,
+                    optional(optional($partido->fecha)->grupo)->torneo_id,
+                    $lados);
+
+                $this->grabarFilas(Alineacion::class, $plan['alineacions'], 'la alineación');
+                $this->grabarFilas(Gol::class,        $plan['gols'],        'un gol');
+                $this->grabarFilas(Tarjeta::class,    $plan['tarjetas'],    'una tarjeta');
+                $this->grabarFilas(Cambio::class,     $plan['cambios'],     'un cambio');
+                $this->grabarArbitros($plan['arbitros']);
+                $this->grabarPenales($plan['penals']);
+
+                if ($marcador) {
+                    $marcador($partido);
+                }
+
+                // El DT: sólo el que falte, nunca se pisa el que está.
+                foreach ($plan['tecnicos'] as $r) {
+                    $fila = $this->limpiar($r);
+                    $existe = DB::table('partido_tecnicos')
+                        ->where('partido_id', $fila['partido_id'])
+                        ->where('equipo_id', $fila['equipo_id'])->exists();
+                    if (!$existe) \App\PartidoTecnico::create($fila);
+                }
+            }, 3);
+
+            $out['escrito'] = true;
+            self::marcarSinDetalle([(int) $partido->id], false);
+            // Fuera de la transacción, igual que en importar(): el arquero se
+            // deduce leyendo lo recién guardado.
+            $out['penales'] = $this->crearPenales($partido);
+        } catch (\Exception $e) {
+            $out['error'] = 'Error guardando el detalle: ' . $e->getMessage();
+            Log::error('grabarPlanAjeno partido ' . $partido->id . ': ' . $e->getMessage());
+        }
+
+        $out['avisos']   = $this->avisos;
+        $out['fallidas'] = $this->fallidas;
+        return $out;
+    }
 }

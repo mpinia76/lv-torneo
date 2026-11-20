@@ -686,7 +686,9 @@ class ImportDetallesController extends Controller
         }
 
         $cuerpo = '<p class="sub"><a href="' . e(route('import_detalles.index')) . '">← Detalle de los partidos</a></p>'
-            . '<h1>' . ($escribir ? 'Detalle cargado' : 'Vista previa') . ' · partido #' . $partidoId . '</h1>';
+            . '<h1>' . ($escribir ? 'Detalle cargado' : 'Vista previa') . ' · partido #' . $partidoId . '</h1>'
+            . '<p class="sub"><a href="' . e(route('import_detalles.livefutbol', ['partido_id' => $partidoId]))
+            . '">¿Transfermarkt lo trae incompleto? Cargarlo desde LiveFutbol →</a></p>';
 
         // LA FECHA DEL ENCABEZADO SALE DE `partidos`, NO DEL STAGING.
         // `import_partidos.dia` es la que tenía Transfermarkt el día que se bajó
