@@ -44,6 +44,15 @@ class LivefutbolDetalleController extends Controller
 
         $cuerpo .= $this->resumenPartido($partidoId);
 
+        if (!$partidoId) {
+            $n = DB::table('incidencias')->whereIn('tipo', LivefutbolDetalle::TIPOS_SIN_DATOS)
+                ->whereNull('equipo_id')->whereNull('puntos')->distinct()->count('partido_id');
+            if ($n) {
+                $cuerpo .= '<p><a class="boton" href="' . e(route('import_detalles.livefutbol_sin_datos')) . '">'
+                    . 'Partidos marcados «sin datos en TM» (' . (int) $n . ') →</a></p>';
+            }
+        }
+
         $cuerpo .= '<h2>1 · El botón (una sola vez)</h2>'
             . '<p>Arrastrá esto a la barra de favoritos: '
             . '<a class="boton" href="' . e($this->bookmarklet()) . '" onclick="alert(\'Arrastralo a la barra de favoritos y usalo en livefutbol.\');return false;">LF → La Planilla</a></p>'
@@ -99,6 +108,7 @@ class LivefutbolDetalleController extends Controller
             'forzar'          => (string) $request->input('forzar', '0') === '1',
             'elegir'          => (array) $request->input('elegir', []),
             'confirmar_fecha' => (string) $request->input('confirmar_fecha', '0') === '1',
+            'borrar_sin_datos' => (string) $request->input('borrar_sin_datos', '0') === '1',
         ];
 
         $r = $servicio->procesar($partidoId, $lf, $opciones + [
@@ -106,6 +116,114 @@ class LivefutbolDetalleController extends Controller
         ]);
 
         return $this->pagina('Detalle desde LiveFutbol', $this->pantalla($r, $lf, $texto, $escribir, $request));
+    }
+
+    /**
+     * Los partidos que se marcaron «Sin datos en TM» desde los controles, para
+     * rehacerlos desde livefutbol. Al guardar con LF se ofrece borrar esa
+     * incidencia (el partido vuelve a los controles).
+     */
+    public function sinDatos(Request $request)
+    {
+        $year   = trim((string) $request->get('year', ''));
+        $buscar = trim((string) $request->get('buscar', ''));
+        $todos  = $request->boolean('todos');
+        $pagina = max(1, (int) $request->get('page', 1));
+        $porPagina = 50;
+
+        $q = DB::table('incidencias')
+            ->join('partidos', 'partidos.id', '=', 'incidencias.partido_id')
+            ->join('fechas', 'fechas.id', '=', 'partidos.fecha_id')
+            ->join('grupos', 'grupos.id', '=', 'fechas.grupo_id')
+            ->join('torneos', 'torneos.id', '=', 'grupos.torneo_id')
+            ->leftJoin('equipos as el', 'el.id', '=', 'partidos.equipol_id')
+            ->leftJoin('equipos as ev', 'ev.id', '=', 'partidos.equipov_id')
+            ->whereIn('incidencias.tipo', LivefutbolDetalle::TIPOS_SIN_DATOS)
+            ->whereNull('incidencias.equipo_id')->whereNull('incidencias.puntos');
+
+        $hayLf = \App\Services\LivefutbolPartido::hayTablas();
+        if ($hayLf) {
+            $q->leftJoin('partido_livefutbol as pl', 'pl.partido_id', '=', 'partidos.id');
+            // Por defecto, sólo los que todavía no se rehicieron con LF.
+            if (!$todos) {
+                $q->where(function ($w) {
+                    $w->whereNull('pl.origen')->orWhere('pl.origen', '!=', 'detalle');
+                });
+            }
+        }
+        if ($year !== '') $q->where('torneos.year', $year);
+        if ($buscar !== '') {
+            $q->where(function ($w) use ($buscar) {
+                $w->where('torneos.nombre', 'like', '%' . $buscar . '%')
+                  ->orWhere('el.nombre', 'like', '%' . $buscar . '%')
+                  ->orWhere('ev.nombre', 'like', '%' . $buscar . '%');
+            });
+        }
+
+        $total = (clone $q)->distinct()->count('partidos.id');
+        $filas = $q->groupBy('partidos.id', 'partidos.dia', 'partidos.golesl', 'partidos.golesv', 'partidos.penalesl',
+                'partidos.penalesv', 'torneos.nombre', 'torneos.year', 'el.nombre', 'ev.nombre')
+            ->orderBy('torneos.year', 'desc')->orderBy('torneos.nombre')->orderBy('partidos.dia')
+            ->offset(($pagina - 1) * $porPagina)->limit($porPagina)
+            ->select('partidos.id', 'partidos.dia', 'partidos.golesl', 'partidos.golesv', 'partidos.penalesl',
+                'partidos.penalesv', 'torneos.nombre as torneo', 'torneos.year', 'el.nombre as local',
+                'ev.nombre as visitante',
+                DB::raw('GROUP_CONCAT(DISTINCT incidencias.tipo) as tipos'),
+                DB::raw($hayLf ? 'MAX(pl.origen) as lf_origen' : 'NULL as lf_origen'),
+                DB::raw($hayLf ? 'MAX(pl.match_id) as lf_match' : 'NULL as lf_match'))
+            ->get();
+
+        $etq = \App\Incidencia::etiquetas();
+        $base = route('import_detalles.livefutbol_sin_datos');
+
+        $c = '<p class="sub"><a href="' . e(route('import_detalles.livefutbol')) . '">← Detalle desde LiveFutbol</a>'
+            . ' · <a href="' . e(route('controles.index')) . '">Controles de carga</a></p>'
+            . '<h1>Marcados «sin datos en TM» <span class="sub">(' . (int) $total . ')</span></h1>'
+            . '<p class="sub">Partidos a los que se les cargó la incidencia «Sin datos en TM» desde los controles. '
+            . 'Con <b>Rehacer LF</b> se carga el detalle desde livefutbol; al guardar se ofrece borrar la incidencia, '
+            . 'así el partido vuelve a los controles. ' . ($todos ? 'Mostrando todos.' : 'Sólo los que todavía no se '
+            . 'rehicieron con LF.') . '</p>'
+            . '<form method="GET" action="' . e($base) . '" class="acciones">'
+            . '<input type="text" name="year" size="6" placeholder="año" value="' . e($year) . '"> '
+            . '<input type="text" name="buscar" size="24" placeholder="torneo o club" value="' . e($buscar) . '"> '
+            . '<label><input type="checkbox" name="todos" value="1"' . ($todos ? ' checked' : '') . '> incluir los ya rehechos con LF</label> '
+            . '<button type="submit">Filtrar</button></form>';
+
+        if ($filas->isEmpty()) {
+            return $this->pagina('Sin datos en TM → LiveFutbol', $c . '<p class="sub">No hay ninguno.</p>');
+        }
+
+        $c .= '<div class="scroll"><table><thead><tr><th>#</th><th>Torneo</th><th>Día</th><th>Partido</th>'
+            . '<th>Marcado como</th><th>LF</th><th></th></tr></thead><tbody>';
+        foreach ($filas as $f) {
+            $tipos = array_map(function ($t) use ($etq) { return $etq[$t] ?? $t; }, explode(',', (string) $f->tipos));
+            $res = $f->golesl !== null ? $f->golesl . '-' . $f->golesv
+                . ($f->penalesl !== null ? ' (' . $f->penalesl . '-' . $f->penalesv . ')' : '') : 'vs';
+            $lfLink = $f->lf_match ? \App\Services\LivefutbolPartido::url($f->lf_match) : route('controles.livefutbol', $f->id);
+            $c .= '<tr><td class="num">' . (int) $f->id . '</td>'
+                . '<td>' . e($f->torneo . ' ' . $f->year) . '</td>'
+                . '<td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
+                . '<td>' . e($f->local) . ' <b>' . e($res) . '</b> ' . e($f->visitante) . '</td>'
+                . '<td class="wrap">' . e(implode(' · ', $tipos)) . '</td>'
+                . '<td>' . ($f->lf_origen === 'detalle' ? '<span class="ok">ya rehecho</span>' : '') . '</td>'
+                . '<td><a href="' . e($lfLink) . '" target="_blank" rel="noopener">LF ↗</a> · '
+                . '<a href="' . e(route('import_detalles.livefutbol', ['partido_id' => $f->id])) . '" target="_blank" rel="noopener">'
+                . '<b>Rehacer LF</b></a></td></tr>';
+        }
+        $c .= '</tbody></table></div>';
+
+        $paginas = (int) ceil($total / $porPagina);
+        if ($paginas > 1) {
+            $c .= '<p class="acciones">';
+            for ($i = 1; $i <= $paginas; $i++) {
+                $url = $base . '?' . http_build_query(array_filter(['year' => $year, 'buscar' => $buscar,
+                        'todos' => $todos ? 1 : null, 'page' => $i]));
+                $c .= $i === $pagina ? '<b>' . $i . '</b> ' : '<a href="' . e($url) . '">' . $i . '</a> ';
+            }
+            $c .= '</p>';
+        }
+
+        return $this->pagina('Sin datos en TM → LiveFutbol', $c);
     }
 
     // ═══════════════════════════ PANTALLAS ═══════════════════════════
@@ -136,7 +254,10 @@ class LivefutbolDetalleController extends Controller
         } elseif ($escribir && $r['escrito']) {
             $c .= $r['fallidas']
                 ? '<div class="err-box">Guardado, pero la base rechazó <b>' . (int) $r['fallidas'] . '</b> fila(s). Mirá los avisos.</div>'
-                : '<div class="ok-box">Guardado.</div>';
+                : '<div class="ok-box">Guardado.'
+                    . (!empty($r['sin_datos_borradas']) ? ' Borré ' . (int) $r['sin_datos_borradas']
+                        . ' incidencia(s) «sin datos en TM»: el partido vuelve a los controles.' : '')
+                    . '</div>';
         }
 
         $plan = $r['plan'];
@@ -166,6 +287,17 @@ class LivefutbolDetalleController extends Controller
                     . ((string) $request->input('confirmar_fecha', '0') === '1' ? ' checked' : '') . '> '
                     . 'Es este partido aunque livefutbol diga el ' . e($r['fecha_distinta']['lf'])
                     . ' y la base el ' . e($r['fecha_distinta']['base']) . '.</label></div>';
+            }
+
+            if (!empty($r['sin_datos'])) {
+                $etq = \App\Incidencia::etiquetas();
+                $lista = implode(' · ', array_map(function ($i) use ($etq) { return $etq[$i->tipo] ?? $i->tipo; }, $r['sin_datos']));
+                $marcado = !$request->has('json') || !$request->has('sin_datos_visto')
+                    || (string) $request->input('borrar_sin_datos', '0') === '1';
+                $c .= '<div class="warn-box"><input type="hidden" name="sin_datos_visto" value="1">'
+                    . '<label><input type="checkbox" name="borrar_sin_datos" value="1"' . ($marcado ? ' checked' : '') . '> '
+                    . 'Al guardar, borrar la incidencia «sin datos en TM» de este partido (' . e($lista) . '). '
+                    . 'Vuelve a los controles: si lo de livefutbol también está incompleto, aparece de nuevo.</label></div>';
             }
 
             $c .= '<p class="acciones"><button type="submit" class="boton" style="background:#15714e;color:#fff;font-weight:600;border:0;padding:6px 14px">'

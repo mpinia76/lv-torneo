@@ -100,6 +100,9 @@
                     </button>
                 </form>
                 <a href="{{ route('controles.torneos') }}" class="btn btn-info btn-sm">Control de torneos</a>
+                {{-- Los marcados «Sin datos en TM», para rehacerlos desde livefutbol. --}}
+                <a href="{{ route('import_detalles.livefutbol_sin_datos') }}" class="btn btn-default btn-sm"
+                   title="Partidos marcados «Sin datos en TM»: rehacerlos con lo que tenga livefutbol">Sin datos en TM → LF</a>
                 <a href="{{ route('torneos.index') }}" class="btn btn-success btn-sm">Volver a torneos</a>
             </div>
 

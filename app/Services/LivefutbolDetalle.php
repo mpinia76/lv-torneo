@@ -109,6 +109,26 @@ class LivefutbolDetalle
         $this->tm = new TmDetallePartido();
     }
 
+    /**
+     * Las incidencias que carga el botón «Sin datos en TM» de los controles
+     * (ControlController::incidenciaSinDatos: tipo = clave del control, sin
+     * equipo ni puntos) y que livefutbol puede resolver. `cambios.sale_solo`
+     * no está: ahí el dato está bien, no falta nada.
+     */
+    const TIPOS_SIN_DATOS = ['sin_detalle', 'alineaciones.sin_jugadores', 'alineaciones.faltan', 'tecnicos.faltan',
+        'arbitros.terna', 'goles.diferencia', 'goles.por_equipo', 'goles.sin_jugar', 'tarjetas.sin_jugar',
+        'cambios.sin_jugar', 'cambios.impares', 'penales.faltantes'];
+
+    /** Las incidencias «sin datos en TM» del partido. */
+    public static function incidenciasSinDatos($partidoId)
+    {
+        return DB::table('incidencias')
+            ->where('partido_id', (int) $partidoId)
+            ->whereIn('tipo', self::TIPOS_SIN_DATOS)
+            ->whereNull('equipo_id')->whereNull('puntos')
+            ->select('id', 'tipo', 'observaciones')->get()->all();
+    }
+
     public static function hayTabla(): bool
     {
         return Schema::hasTable('livefutbol_personas');
@@ -213,6 +233,7 @@ class LivefutbolDetalle
             'plan' => ['alineacions' => [], 'gols' => [], 'tarjetas' => [], 'cambios' => [],
                 'penals' => [], 'arbitros' => [], 'tecnicos' => [], 'plantillas' => []],
             'creados' => $this->creados, 'personas' => [], 'marcador' => null,
+            'sin_datos' => self::incidenciasSinDatos($partidoId), 'sin_datos_borradas' => 0,
         ];
 
         if (!self::hayTabla()) {
@@ -301,6 +322,22 @@ class LivefutbolDetalle
         $mapaDorsales = $this->tm->dorsalesPlantilla($partido, $lados);
         $plan = $informe['plan'];
 
+        // LOS DORSALES QUE YA ESTÁN MANDAN (los cargó TM, o una persona). De
+        // livefutbol sólo se toma el número que falta, y nunca uno que en la
+        // plantilla ya es de otro jugador (al importador de TM sí se le deja
+        // sacárselo; a livefutbol no).
+        $dorsalPrevio = [];   // "equipo-jugador" => dorsal en la alineación actual de este partido
+        foreach (DB::table('alineacions')->where('partido_id', $partido->id)->whereNotNull('dorsal')
+                     ->get(['equipo_id', 'jugador_id', 'dorsal']) as $a) {
+            if ((int) $a->dorsal !== 0) $dorsalPrevio[$a->equipo_id . '-' . $a->jugador_id] = (int) $a->dorsal;
+        }
+        $duenoDorsal = [];    // "equipo-dorsal" => jugador_id en la plantilla
+        foreach ($mapaDorsales as $k => $d) {
+            if ($d === null || $d === '' || (int) $d === 0) continue;
+            list($eqId, $jugId) = explode('-', $k);
+            $duenoDorsal[$eqId . '-' . (int) $d] = (int) $jugId;
+        }
+
         try {
             foreach ($lados as $iLado => $lado) {
                 $equipoId = $lado['equipo_id'];
@@ -330,25 +367,45 @@ class LivefutbolDetalle
                     $nombre = $this->nombreJugador($jugadorId, $nombreLf);
                     if ($j['_tipo'] === 'Titular') $titulares[$jugadorId] = true;
 
-                    // Dorsal: el de livefutbol es el de ESE partido; si no lo trae
-                    // (amateurs), el de la plantilla.
-                    $dePlanti = isset($mapaDorsales[$equipoId . '-' . $jugadorId]) ? (int) $mapaDorsales[$equipoId . '-' . $jugadorId] : null;
-                    $dorsal = $dorsalLf; $fuente = 'livefutbol';
-                    if ($dorsal === null && $dePlanti !== null) { $dorsal = $dePlanti; $fuente = 'plantilla (LF no lo trajo)'; }
-                    elseif ($dorsal !== null && $dePlanti !== null && $dePlanti !== $dorsal) {
-                        $fuente = 'LF ' . $dorsal . ' ≠ plantilla ' . $dePlanti;
+                    // Dorsal, en este orden: el que ya tenía en la alineación de
+                    // este partido, el de la plantilla, y recién ahí el de
+                    // livefutbol. Si livefutbol dice otro, se avisa y no se toca.
+                    $clave = $equipoId . '-' . $jugadorId;
+                    $dePlanti = isset($mapaDorsales[$clave]) && (int) $mapaDorsales[$clave] !== 0 ? (int) $mapaDorsales[$clave] : null;
+                    $previo = $dorsalPrevio[$clave] ?? null;
+                    if ($previo !== null) {
+                        $dorsal = $previo; $fuente = 'el que ya tenía en el partido';
+                    } elseif ($dePlanti !== null) {
+                        $dorsal = $dePlanti; $fuente = 'plantilla';
+                    } else {
+                        $dorsal = $dorsalLf; $fuente = 'livefutbol';
+                    }
+                    $dudosoDorsal = false;
+                    if ($dorsalLf !== null && $dorsal !== null && $dorsalLf !== $dorsal) {
+                        $fuente .= ' (livefutbol dice ' . $dorsalLf . ': no lo cambio)';
+                        $dudosoDorsal = true;
+                    }
+                    // A la plantilla sólo va un número nuevo, y sólo si no es de otro.
+                    $dorsalPlanti = $dePlanti === null ? $dorsal : null;
+                    if ($dorsalPlanti !== null && isset($duenoDorsal[$equipoId . '-' . $dorsalPlanti])
+                        && $duenoDorsal[$equipoId . '-' . $dorsalPlanti] !== $jugadorId) {
+                        $this->aviso('Dorsal ' . $dorsalPlanti . ' de ' . $nombre . ' (' . $lado['equipo_nombre'] . '): en la '
+                            . 'plantilla ya es de ' . $this->nombreJugador($duenoDorsal[$equipoId . '-' . $dorsalPlanti])
+                            . '. No se lo saco; en la plantilla ' . $nombre . ' queda sin número.');
+                        $dorsalPlanti = null;
+                        $dudosoDorsal = true;
                     }
 
                     $plan['alineacions'][] = [
                         'partido_id' => $partido->id, 'jugador_id' => $jugadorId, 'equipo_id' => $equipoId,
                         'dorsal' => $dorsal, 'tipo' => $j['_tipo'], 'orden' => $this->tm->puestoDe($jugadorId),
                         '_nombre' => $nombre, '_equipo' => $lado['equipo_nombre'], '_fuente' => $fuente,
-                        '_dudoso' => $fuente !== 'livefutbol',
+                        '_dudoso' => $dudosoDorsal,
                     ];
                     if ($grupoId) {
                         $plan['plantillas'][] = [
                             'torneo_id' => (int) $torneoId, 'grupo_id' => (int) $grupoId, 'equipo_id' => $equipoId,
-                            'jugador_id' => $jugadorId, 'dorsal' => $dorsal,
+                            'jugador_id' => $jugadorId, 'dorsal' => $dorsalPlanti,
                             '_nombre' => $nombre, '_equipo' => $lado['equipo_nombre'],
                         ];
                     }
@@ -510,6 +567,21 @@ class LivefutbolDetalle
                     LivefutbolPartido::anotar($partido->id, $matchId, 'detalle');
                 }
                 $this->aprenderClubes($lados);
+
+                // Lo marcado «sin datos en TM» ya no es cierto: ahora hay datos.
+                // Se borra la incidencia y el partido vuelve a los controles;
+                // si lo de livefutbol también está incompleto, aparece de
+                // nuevo y se marca otra vez.
+                if (!empty($opts['borrar_sin_datos']) && $informe['sin_datos']) {
+                    $ids = array_map(function ($i) { return (int) $i->id; }, $informe['sin_datos']);
+                    $informe['sin_datos_borradas'] = DB::table('incidencias')->whereIn('id', $ids)->delete();
+                    try {
+                        app(Controles::class)->invalidarConteos();
+                    } catch (\Exception $e) {
+                        // Los totales se ponen al día solos cuando vence su cache.
+                    }
+                    $informe['sin_datos'] = [];
+                }
             }
         }
 
