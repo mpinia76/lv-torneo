@@ -141,6 +141,14 @@ class LivefutbolDetalleController extends Controller
             ->whereIn('incidencias.tipo', LivefutbolDetalle::TIPOS_SIN_DATOS)
             ->whereNull('incidencias.equipo_id')->whereNull('incidencias.puntos');
 
+        // «LF tampoco tiene»: marcados a mano porque livefutbol no tiene la
+        // alineación. Salen de la lista (salvo «todos»).
+        $hayNoTiene = \Illuminate\Support\Facades\Schema::hasTable('partido_lf_sin_alineacion');
+        if ($hayNoTiene) {
+            $q->leftJoin('partido_lf_sin_alineacion as nt', 'nt.partido_id', '=', 'partidos.id');
+            if (!$todos) $q->whereNull('nt.partido_id');
+        }
+
         $hayLf = \App\Services\LivefutbolPartido::hayTablas();
         if ($hayLf) {
             $q->leftJoin('partido_livefutbol as pl', 'pl.partido_id', '=', 'partidos.id');
@@ -170,7 +178,8 @@ class LivefutbolDetalleController extends Controller
                 'ev.nombre as visitante',
                 DB::raw('GROUP_CONCAT(DISTINCT incidencias.tipo) as tipos'),
                 DB::raw($hayLf ? 'MAX(pl.origen) as lf_origen' : 'NULL as lf_origen'),
-                DB::raw($hayLf ? 'MAX(pl.match_id) as lf_match' : 'NULL as lf_match'))
+                DB::raw($hayLf ? 'MAX(pl.match_id) as lf_match' : 'NULL as lf_match'),
+                DB::raw($hayNoTiene ? 'MAX(nt.partido_id) as lf_no_tiene' : 'NULL as lf_no_tiene'))
             ->get();
 
         $etq = \App\Incidencia::etiquetas();
@@ -181,12 +190,13 @@ class LivefutbolDetalleController extends Controller
             . '<h1>Marcados «sin datos en TM» <span class="sub">(' . (int) $total . ')</span></h1>'
             . '<p class="sub">Partidos a los que se les cargó la incidencia «Sin datos en TM» desde los controles. '
             . 'Con <b>Rehacer LF</b> se carga el detalle desde livefutbol; al guardar se ofrece borrar la incidencia, '
-            . 'así el partido vuelve a los controles. ' . ($todos ? 'Mostrando todos.' : 'Sólo los que todavía no se '
-            . 'rehicieron con LF.') . '</p>'
+            . 'así el partido vuelve a los controles. Si livefutbol tampoco tiene la alineación (la ficha muestra sólo '
+            . '«Historial»), tocá <b>LF tampoco tiene</b> y sale de la lista. '
+            . ($todos ? 'Mostrando todos.' : 'Sólo los que todavía no se rehicieron con LF ni se marcaron.') . '</p>'
             . '<form method="GET" action="' . e($base) . '" class="acciones">'
             . '<input type="text" name="year" size="6" placeholder="año" value="' . e($year) . '"> '
             . '<input type="text" name="buscar" size="24" placeholder="torneo o club" value="' . e($buscar) . '"> '
-            . '<label><input type="checkbox" name="todos" value="1"' . ($todos ? ' checked' : '') . '> incluir los ya rehechos con LF</label> '
+            . '<label><input type="checkbox" name="todos" value="1"' . ($todos ? ' checked' : '') . '> incluir los ya rehechos o marcados</label> '
             . '<button type="submit">Filtrar</button></form>';
 
         if ($filas->isEmpty()) {
@@ -205,10 +215,18 @@ class LivefutbolDetalleController extends Controller
                 . '<td class="num">' . e(substr((string) $f->dia, 0, 10)) . '</td>'
                 . '<td>' . e($f->local) . ' <b>' . e($res) . '</b> ' . e($f->visitante) . '</td>'
                 . '<td class="wrap">' . e(implode(' · ', $tipos)) . '</td>'
-                . '<td>' . ($f->lf_origen === 'detalle' ? '<span class="ok">ya rehecho</span>' : '') . '</td>'
+                . '<td>' . ($f->lf_origen === 'detalle' ? '<span class="ok">ya rehecho</span>'
+                    : ($f->lf_no_tiene ? '<span class="gris">LF tampoco tiene</span>' : '')) . '</td>'
                 . '<td><a href="' . e($lfLink) . '" target="_blank" rel="noopener">LF ↗</a> · '
                 . '<a href="' . e(route('import_detalles.livefutbol', ['partido_id' => $f->id])) . '" target="_blank" rel="noopener">'
-                . '<b>Rehacer LF</b></a></td></tr>';
+                . '<b>Rehacer LF</b></a>'
+                . ($hayNoTiene ? ' · <form method="POST" action="' . e(route('import_detalles.livefutbol_no_tiene')) . '" '
+                    . 'style="display:inline;margin:0">' . csrf_field()
+                    . '<input type="hidden" name="partido_id" value="' . (int) $f->id . '">'
+                    . '<input type="hidden" name="accion" value="' . ($f->lf_no_tiene ? 'desmarcar' : 'marcar') . '">'
+                    . '<button type="submit" style="padding:1px 6px">' . ($f->lf_no_tiene ? 'deshacer' : 'LF tampoco tiene')
+                    . '</button></form>' : '')
+                . '</td></tr>';
         }
         $c .= '</tbody></table></div>';
 
@@ -224,6 +242,21 @@ class LivefutbolDetalleController extends Controller
         }
 
         return $this->pagina('Sin datos en TM → LiveFutbol', $c);
+    }
+
+    /** Botón «LF tampoco tiene» (y su «deshacer») de la lista sin-datos. */
+    public function noTiene(Request $request)
+    {
+        $id = (int) $request->input('partido_id');
+        if ($id && \Illuminate\Support\Facades\Schema::hasTable('partido_lf_sin_alineacion')) {
+            if ($request->input('accion') === 'desmarcar') {
+                DB::table('partido_lf_sin_alineacion')->where('partido_id', $id)->delete();
+            } else {
+                DB::table('partido_lf_sin_alineacion')->updateOrInsert(['partido_id' => $id],
+                    ['updated_at' => now(), 'created_at' => now()]);
+            }
+        }
+        return back();
     }
 
     // ═══════════════════════════ PANTALLAS ═══════════════════════════

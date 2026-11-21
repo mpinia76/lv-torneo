@@ -322,6 +322,7 @@ Route::group(['prefix' => 'admin', 'middleware' => 'auth'], function()
     // JSON lo copia un bookmarklet en el navegador. Ver LivefutbolDetalleController.
     Route::get('/import-detalles/livefutbol', [App\Http\Controllers\LivefutbolDetalleController::class, 'index'])->name('import_detalles.livefutbol');
     Route::get('/import-detalles/livefutbol/sin-datos', [App\Http\Controllers\LivefutbolDetalleController::class, 'sinDatos'])->name('import_detalles.livefutbol_sin_datos');
+    Route::post('/import-detalles/livefutbol/no-tiene', [App\Http\Controllers\LivefutbolDetalleController::class, 'noTiene'])->name('import_detalles.livefutbol_no_tiene');
     Route::post('/import-detalles/livefutbol/ver', [App\Http\Controllers\LivefutbolDetalleController::class, 'ver'])->name('import_detalles.livefutbol_ver');
     Route::post('/import-detalles/livefutbol/guardar', [App\Http\Controllers\LivefutbolDetalleController::class, 'guardar'])->name('import_detalles.livefutbol_guardar');
     Route::get('/import-detalles/bajar', [ImportDetallesController::class, 'bajar'])->name('import_detalles.bajar');
