@@ -141,6 +141,14 @@ class LivefutbolDetalleController extends Controller
             ->whereIn('incidencias.tipo', LivefutbolDetalle::TIPOS_SIN_DATOS)
             ->whereNull('incidencias.equipo_id')->whereNull('incidencias.puntos');
 
+        // Los que ya están explicados como no jugados o de escritorio no tienen
+        // nada que buscar en livefutbol (que los muestra con «resol.»).
+        $q->whereNotExists(function ($w) {
+            $w->select(DB::raw(1))->from('incidencias as i2')
+              ->whereColumn('i2.partido_id', 'partidos.id')
+              ->whereIn('i2.tipo', ['no_jugado', 'escritorio']);
+        });
+
         // «LF tampoco tiene»: marcados a mano porque livefutbol no tiene la
         // alineación. Salen de la lista (salvo «todos»).
         $hayNoTiene = \Illuminate\Support\Facades\Schema::hasTable('partido_lf_sin_alineacion');

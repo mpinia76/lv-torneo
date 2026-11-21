@@ -37,10 +37,18 @@
     var hayPestania = [].some.call(d.querySelectorAll('a'), function (a) {
       return a.textContent.trim() === 'Alineación';
     });
+    // "(resol.)" = resultado por resolución (de escritorio): casi siempre el
+    // partido NO se jugó (Villarreal–Qarabağ 2020, 3:0 por COVID).
+    var inc = d.querySelector('.hs-scoreboard .match-incident');
+    var resol = inc && /resol/i.test(inc.textContent);
     alert(hayPestania
       ? 'LiveFutbol → La Planilla: abrí la pestaña «Alineación» del partido.'
-      : 'LiveFutbol → La Planilla: livefutbol no tiene la alineación de este partido (no hay pestaña «Alineación»). '
-        + 'No hay nada para copiar: en la lista «sin datos en TM» marcalo con «LF tampoco tiene».');
+      : resol
+        ? 'LiveFutbol → La Planilla: resultado por RESOLUCIÓN (resol.) y sin alineación: este partido no se jugó, '
+          + 'el resultado es de escritorio. No hay nada para copiar: cargale la incidencia «No se jugó» '
+          + '(con el resultado dado), no «LF tampoco tiene».'
+        : 'LiveFutbol → La Planilla: livefutbol no tiene la alineación de este partido (no hay pestaña «Alineación»). '
+          + 'No hay nada para copiar: en la lista «sin datos en TM» marcalo con «LF tampoco tiene».');
     return;
   }
 

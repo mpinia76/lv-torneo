@@ -1264,6 +1264,19 @@ class LivefutbolDetalle
             return preg_match('/(\d+)\s*[:\-]\s*(\d+)/', (string) $s, $m) ? [(int) $m[1], (int) $m[2]] : null;
         };
         $incidente = mb_strtolower((string) ($r['incidente'] ?? ''));
+
+        // "(resol.)": resultado por resolución, de escritorio. El marcador que
+        // muestra livefutbol es el OFICIAL, no el que se jugó, y los goles de
+        // la alineación no lo dan (Celta–Estrella Roja: 5-3 jugado, 3-0
+        // oficial). No se escribe nada y se avisa.
+        if (strpos($incidente, 'resol') !== false) {
+            $this->aviso('livefutbol marca el resultado como «resol.» (por resolución, de escritorio): '
+                . ($r['final'] ?? '?') . ' es el oficial, no el del partido jugado. No toco el marcador. Si el partido '
+                . 'se jugó, cargale la incidencia «Resultado de escritorio» (así los goles no cuentan contra el '
+                . 'resultado); si no se jugó, la de «No se jugó» y no guardes este detalle.');
+            return null;
+        }
+
         $porPenales = strpos($incidente, 'pen') !== false || strpos($incidente, 'p.') === 0;
 
         $goles = null; $pen = null;
