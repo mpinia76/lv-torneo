@@ -238,6 +238,22 @@ class LivefutbolDetalleController extends Controller
         }
         $c .= '</tbody></table></div>';
 
+        // «TODOS LF tampoco tiene»: los de ESTA página que no estén marcados
+        // ni rehechos. Para tandas enteras de partidos amateurs viejos que
+        // livefutbol no tiene (revisalos antes: el botón no mira livefutbol).
+        $sinMarcar = [];
+        foreach ($filas as $f) {
+            if (!$f->lf_no_tiene && $f->lf_origen !== 'detalle') $sinMarcar[] = (int) $f->id;
+        }
+        if ($hayNoTiene && $sinMarcar) {
+            $c .= '<form method="POST" action="' . e(route('import_detalles.livefutbol_no_tiene')) . '" class="acciones" '
+                . 'onsubmit="return confirm(\'Marcar los ' . count($sinMarcar) . ' partidos de esta página como «LF tampoco '
+                . 'tiene»? Salen de la lista (se puede deshacer de a uno con «incluir los ya rehechos o marcados»).\')">'
+                . csrf_field()
+                . '<input type="hidden" name="ids" value="' . e(implode(',', $sinMarcar)) . '">'
+                . '<button type="submit">TODOS «LF tampoco tiene» (' . count($sinMarcar) . ' de esta página)</button></form>';
+        }
+
         $paginas = (int) ceil($total / $porPagina);
         if ($paginas > 1) {
             $c .= '<p class="acciones">';
@@ -255,6 +271,16 @@ class LivefutbolDetalleController extends Controller
     /** Botón «LF tampoco tiene» (y su «deshacer») de la lista sin-datos. */
     public function noTiene(Request $request)
     {
+        // Todos los de la página de una vez.
+        if ($request->filled('ids') && \Illuminate\Support\Facades\Schema::hasTable('partido_lf_sin_alineacion')) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', explode(',', (string) $request->input('ids'))))));
+            foreach (array_slice($ids, 0, 500) as $pid) {
+                DB::table('partido_lf_sin_alineacion')->updateOrInsert(['partido_id' => $pid],
+                    ['updated_at' => now(), 'created_at' => now()]);
+            }
+            return back()->with('success', count($ids) . ' partido(s) marcados como «LF tampoco tiene».');
+        }
+
         $id = (int) $request->input('partido_id');
         if ($id && \Illuminate\Support\Facades\Schema::hasTable('partido_lf_sin_alineacion')) {
             if ($request->input('accion') === 'desmarcar') {
