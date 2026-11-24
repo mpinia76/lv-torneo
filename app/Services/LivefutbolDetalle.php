@@ -128,6 +128,36 @@ class LivefutbolDetalle
             ->select('id', 'tipo', 'observaciones')->get()->all();
     }
 
+    /**
+     * ¿Con lo que trae livefutbol los dos equipos quedan con 11 titulares?
+     *
+     * Decide si en la vista previa viene tildado «borrar la incidencia sin
+     * datos en TM». Las dos incidencias que se rehacen con LF
+     * (`TIPOS_SIN_DATOS`: sin jugadores de un equipo / once incompleto) dicen
+     * lo mismo: a algún equipo le faltan titulares. Si LF tampoco los trae,
+     * borrar la incidencia sólo devuelve el partido a los controles para
+     * volver a marcarlo.
+     *
+     * Por equipo cuenta los titulares del plan; si el plan no trae nada de ese
+     * equipo (no se reescribe ese lado), cuenta los que ya están en la base.
+     */
+    private function onceCompleto($partido, array $plan): bool
+    {
+        foreach ([(int) $partido->equipol_id, (int) $partido->equipov_id] as $equipoId) {
+            $enPlan = array_filter($plan['alineacions'], function ($a) use ($equipoId) {
+                return (int) $a['equipo_id'] === $equipoId;
+            });
+            if ($enPlan) {
+                $titulares = count(array_filter($enPlan, function ($a) { return $a['tipo'] === 'Titular'; }));
+            } else {
+                $titulares = DB::table('alineacions')->where('partido_id', $partido->id)
+                    ->where('equipo_id', $equipoId)->where('tipo', 'Titular')->count();
+            }
+            if ($titulares < 11) return false;
+        }
+        return true;
+    }
+
     public static function hayTabla(): bool
     {
         return Schema::hasTable('livefutbol_personas');
@@ -514,6 +544,7 @@ class LivefutbolDetalle
         $plan = $this->tm->depurarPlanAjeno($plan);
 
         $informe['plan'] = $plan;
+        $informe['sin_datos_completa'] = $informe['sin_datos'] ? $this->onceCompleto($partido, $plan) : null;
         $informe['personas'] = $this->personas;
         $informe['creados'] = $this->creados;
         $informe['ok'] = true;
