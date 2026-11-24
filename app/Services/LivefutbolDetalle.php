@@ -754,6 +754,38 @@ class LivefutbolDetalle
 
         if ($apeBase && !array_intersect($comunes, $apeBase)) return null;
 
+        // Mismo apellido pero OTRO nombre de pila: no es él. Juan Hernández no
+        // es «A. Hernández» (Anthony) aunque los dos estén en la plantilla de
+        // Durazno; antes coincidía el apellido y alcanzaba. Como en TM
+        // (nombresDePilaChocan), más las iniciales: «A.» es compatible con
+        // Anthony y no con Juan.
+        $pilaLf   = array_values(array_diff($tLf, $apeBase));
+        $pilaBase = array_values(array_diff(array_unique(array_merge(
+            $this->tm->palabras((string) $c->nombre),
+            array_diff($this->tm->palabras((string) $c->name), $apeBase))), $apeBase));
+        if ($pilaLf && $pilaBase && !array_intersect($pilaLf, $tBase) && !array_intersect($pilaBase, $tLf)) {
+            $inicial = false;
+            foreach ($pilaBase as $b) {
+                foreach ($pilaLf as $l) {
+                    if ((mb_strlen($b) === 1 && mb_substr($l, 0, 1) === $b)
+                        || (mb_strlen($l) === 1 && mb_substr($b, 0, 1) === $l)) {
+                        $inicial = true;
+                    }
+                }
+            }
+            // Una inicial sola no alcanza si la base también tiene el nombre
+            // completo y es otro (Anthony vs Juan: «a» de Anthony ≠ «j»).
+            if (!$inicial) return null;
+        }
+
+        // Ficha sin nombre de pila y mostrada con inicial («A. Hernández»): la
+        // inicial tiene que ser la del nombre de livefutbol (Juan → J).
+        if ($pilaLf && !$pilaBase && preg_match_all('/(?:^|\s)(\p{L})\./u', (string) $c->name, $mm)) {
+            $iniciales = array_map(function ($x) { return mb_strtolower($x); }, $mm[1]);
+            $primeras = array_map(function ($x) { return mb_substr($x, 0, 1); }, $pilaLf);
+            if (!array_intersect($iniciales, $primeras)) return null;
+        }
+
         if ($estricto && array_diff($tLf, $tBase)) return null;
 
         return count($comunes);
