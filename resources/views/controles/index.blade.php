@@ -103,6 +103,9 @@
                 {{-- Los marcados «Sin datos en TM», para rehacerlos desde livefutbol. --}}
                 <a href="{{ route('import_detalles.livefutbol_sin_datos') }}" class="btn btn-default btn-sm"
                    title="Partidos marcados «Sin datos en TM»: rehacerlos con lo que tenga livefutbol">Sin datos en TM → LF</a>
+                {{-- Rehechos con LF que quedaron sin cambios: el favorito viejo perdía los que livefutbol publica sin minuto. --}}
+                <a href="{{ route('import_detalles.livefutbol_sin_cambios') }}" class="btn btn-default btn-sm"
+                   title="Partidos guardados desde livefutbol con suplentes y sin ningún cambio: rehacerlos con el favorito nuevo">LF sin cambios</a>
                 <a href="{{ route('torneos.index') }}" class="btn btn-success btn-sm">Volver a torneos</a>
             </div>
 

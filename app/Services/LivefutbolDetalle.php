@@ -367,6 +367,7 @@ class LivefutbolDetalle
             $duenoDorsal[$eqId . '-' . (int) $d] = (int) $jugId;
         }
 
+        $cambiosSinMinuto = 0;
         try {
             foreach ($lados as $iLado => $lado) {
                 $equipoId = $lado['equipo_id'];
@@ -490,6 +491,7 @@ class LivefutbolDetalle
                             '_fuente' => 'fila del jugador en livefutbol', '_dudoso' => $dudoso,
                         ];
                         if ($tipo === 'Entra') $entraron[$jugadorId] = true; else $salieron[$jugadorId] = true;
+                        if ($m['minuto'] === null) $cambiosSinMinuto++;
                     }
                 }
 
@@ -510,6 +512,11 @@ class LivefutbolDetalle
             }
 
             $plan['arbitros'] = $this->planArbitros($partido, $lf['arbitros'] ?? []);
+
+            if ($cambiosSinMinuto) {
+                $this->aviso('livefutbol no publica el minuto de ' . $cambiosSinMinuto . ' cambio(s) (sólo la flecha): '
+                    . 'se cargan sin minuto, así se sabe quién entró y quién salió.');
+            }
         } catch (\Exception $e) {
             Log::error('LivefutbolDetalle partido ' . $partido->id . ': ' . $e->getMessage() . ' ' . $e->getFile() . ':' . $e->getLine());
             $informe['error'] = 'Error armando el detalle: ' . $e->getMessage();

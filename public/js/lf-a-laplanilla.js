@@ -69,8 +69,12 @@
         j.tarjetas.push(Object.assign({ tipo: tipo(e) }, minuto(txt(e))));
       });
       [].forEach.call(row.querySelectorAll('.match_event-playing > div'), function (e) {
-        if (e.classList.contains('substitute-in')) j.entra = minuto(txt(e));
-        if (e.classList.contains('substitute-out')) j.sale = minuto(txt(e));
+        // En partidos viejos livefutbol muestra sólo la flecha, sin minuto
+        // (Utrecht-AZ, Copa 2006/07). La flecha alcanza para saber que entró
+        // o salió: va igual, con min null, y el importador lo graba sin minuto.
+        var sinMin = { min: null, extra: 0, txt: '' };
+        if (e.classList.contains('substitute-in')) j.entra = minuto(txt(e)) || sinMin;
+        if (e.classList.contains('substitute-out')) j.sale = minuto(txt(e)) || sinMin;
       });
       return j;
     });

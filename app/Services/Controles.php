@@ -1180,6 +1180,10 @@ class Controles
         // los dos únicos valores posibles son '>' y '<'.
         $comparador = $comparador === '<' ? '<' : '>';
 
+        // Los cambios sin minuto (livefutbol viejo publica sólo la flecha)
+        // caen todos en el grupo NULL: si entran tantos como salen no salen
+        // acá; si no, se muestran como «sin minuto».
+        //
         // Se agrupa por minuto Y descuento, y se muestra «90+3»: el que entra y
         // el que sale de un mismo cambio comparten los dos números. Agrupando
         // sólo por el reloj, un cambio del 90+3 y otro del 90 se compensaban
@@ -1187,7 +1191,8 @@ class Controles
         $derivada = "SELECT partido_id, GROUP_CONCAT(etiqueta ORDER BY orden SEPARATOR ', ') AS minutos
                      FROM (
                          SELECT partido_id,
-                                CONCAT(minuto, IF(COALESCE(adicionado,0) > 0, CONCAT('+', adicionado), '')) AS etiqueta,
+                                IF(minuto IS NULL, 'sin minuto',
+                                   CONCAT(minuto, IF(COALESCE(adicionado,0) > 0, CONCAT('+', adicionado), ''))) AS etiqueta,
                                 (minuto * 100 + COALESCE(adicionado, 0)) AS orden
                          FROM cambios
                          GROUP BY partido_id, minuto, adicionado
