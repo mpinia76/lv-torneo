@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\NombreHelper;
+use App\Services\TmDetallePartido;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +53,7 @@ class CompletarNombresLivefutbol extends Command
             )
             ->get();
 
+        $tm = new TmDetallePartido();
         $vistos = [];
         $completa = 0; $dup = 0; $sinCache = 0; $sinDato = 0;
         $listaSinCache = []; $listaSinDato = [];
@@ -74,9 +75,16 @@ class CompletarNombresLivefutbol extends Command
             $ape = trim((string) ($d['apellido'] ?? ''));
             if ($nom !== '' && $ape !== '' && mb_strtolower($nom) !== mb_strtolower($ape)) {
                 $n = ['nombre' => $nom, 'apellido' => $ape];
-            } elseif (!empty($d['completo'])
-                && count(preg_split('/\s+/u', trim($d['completo']), -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
-                $n = NombreHelper::separarTM(['name' => trim($d['completo'])]);
+            } else {
+                // El nombre entero viene en «Nombre completo» o, lo más común en
+                // LF, en el mismo «Nombre» («Juan Manuel Sánchez Falcón»).
+                foreach ([$d['completo'] ?? '', $nom] as $cand) {
+                    $cand = trim((string) $cand);
+                    if (count(preg_split('/\s+/u', $cand, -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
+                        $n = $tm->separarNombreCompleto($cand, $d['nacionalidad'] ?? null);
+                        break;
+                    }
+                }
             }
 
             if (!$n || trim((string) $n['nombre']) === '' || trim((string) $n['apellido']) === '') {

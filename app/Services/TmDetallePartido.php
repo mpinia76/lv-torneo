@@ -6348,6 +6348,25 @@ class TmDetallePartido
         return $r;
     }
 
+    /**
+     * Un nombre completo suelto, sin ancla («Juan Manuel Sánchez Falcón»), partido
+     * con las MISMAS reglas de apellido doble que un perfil de TM sin shortName.
+     * Para LiveFutbol: su ficha trae el nombre entero en «Nombre» y nada en
+     * «Apellidos». Con el fallback pelado de separarTM() quedaría
+     * «Falcón, Juan Manuel Sánchez».
+     */
+    public function separarNombreCompleto($completo, $nacionalidad, array &$avisos = [])
+    {
+        $antes = $this->avisos;
+        $this->avisos = [];
+        $n = NombreHelper::separarTM(['name' => trim((string) $completo)]);
+        $n = $this->rescatarPrimerApellido($n, $nacionalidad);
+        $n = $this->apellidoDobleSinAncla($n, $nacionalidad, []);
+        $avisos = $this->avisos;
+        $this->avisos = $antes;
+        return $n;
+    }
+
     /** Ver tokensNombre(). */
     public function palabras($texto)
     {

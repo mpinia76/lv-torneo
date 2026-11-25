@@ -27,6 +27,10 @@ use Illuminate\Support\Facades\DB;
  * Salvat/Leyenda, Armada/Vacas, Manu/Fernández Cotrofe; y Negral/Vega Díez
  * va a mano.
  *
+ * Tercera tanda (25/11/2026, noche): misma fecha sin club en común, con el
+ * apodo claramente sacado del nombre (Juanra = Juan Ramón Cabrero, Maxi =
+ * Máximo Ovejero, Javi = Francisco Javier Álvarez Peláez).
+ *
  * Gana SIEMPRE la ficha vieja (la que tiene la carrera). Usa la misma fusión
  * que Verificar personas, y además mueve el atado de `livefutbol_personas`,
  * que la fusión no conoce.
@@ -44,11 +48,7 @@ class FusionarDuplicadosLivefutbol extends Command
 
     /** persona nueva (LF) => persona vieja (la que queda). */
     private const PARES = [
-        140875 => 88418,  140878 => 109974, 140879 => 80716,  140880 => 88298,  140919 => 103060,
-        140928 => 112380, 140954 => 109958, 140957 => 84206,  140960 => 109911, 141016 => 110010,
-        141018 => 110012, 141032 => 92493,  141037 => 85244,  141071 => 85717,  141103 => 88007,
-        141116 => 88234,  141119 => 102703, 141126 => 14526,  141146 => 109935, 141004 => 80875,
-        141005 => 88400,
+        141266 => 85560,  141295 => 102771, 141307 => 102722,
     ];
 
     public function handle()

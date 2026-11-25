@@ -1084,12 +1084,21 @@ class LivefutbolDetalle
         //     nombre de pila queda vacío. Antes separarTM() la ponía en los dos
         //     campos y quedaba «Tomàs, Tomàs».
         $completo = $ficha['completo'] ?? null;
+        // LF suele traer el nombre ENTERO en «Nombre» («Juan Manuel Sánchez
+        // Falcón») y «Apellidos» vacío, mientras la alineación dice «Juanma».
+        // Antes eso no se miraba y se creaba sólo con el apodo (25/11/2026).
+        if (!$completo && $ficha && empty($ficha['apellido']) && !empty($ficha['nombre'])
+            && count(preg_split('/\s+/u', trim($ficha['nombre']), -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
+            $completo = trim($ficha['nombre']);
+        }
         $palabras = preg_split('/\s+/u', trim((string) $nombreLf), -1, PREG_SPLIT_NO_EMPTY);
         if ($ficha && !empty($ficha['apellido'])) {
             $n = ['nombre' => (string) $ficha['nombre'], 'apellido' => (string) $ficha['apellido'], 'name' => $nombreLf];
             if ($n['nombre'] === $n['apellido']) $n['nombre'] = '';
         } elseif ($completo && count(preg_split('/\s+/u', $completo, -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
-            $n = NombreHelper::separarTM(['name' => $completo]);
+            $avisosN = [];
+            $n = $this->tm->separarNombreCompleto($completo, $ficha['nacionalidad'] ?? null, $avisosN);
+            foreach ($avisosN as $a) $this->aviso($a);
             $n['name'] = $nombreLf;
         } elseif (count($palabras) >= 2) {
             $n = NombreHelper::separarTM(['name' => $nombreLf]);
