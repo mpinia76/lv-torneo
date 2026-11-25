@@ -20,6 +20,13 @@ use Illuminate\Support\Facades\DB;
  * Juan Martínez / Wálter Martínez, Manolo Pérez / Thierry Pérez y el Ángel del
  * 15/01/1982 (dos candidatos en la base: va a mano).
  *
+ * Segunda tanda (25/11/2026, tarde): apodos de una palabra («Manel», «Juanma»,
+ * «Gurpegi») con la misma fecha Y un club en común con la ficha vieja. Los 61
+ * de la primera tanda ya están fusionados; si se vuelve a correr, los saltea.
+ * Quedaron AFUERA por nombre distinto: Abel/Georgiev, Sérvulo/Barkero,
+ * Salvat/Leyenda, Armada/Vacas, Manu/Fernández Cotrofe; y Negral/Vega Díez
+ * va a mano.
+ *
  * Gana SIEMPRE la ficha vieja (la que tiene la carrera). Usa la misma fusión
  * que Verificar personas, y además mueve el atado de `livefutbol_personas`,
  * que la fusión no conoce.
@@ -37,19 +44,11 @@ class FusionarDuplicadosLivefutbol extends Command
 
     /** persona nueva (LF) => persona vieja (la que queda). */
     private const PARES = [
-        140838 => 139666, 140844 => 80503,  140851 => 134778, 140854 => 92790,  140872 => 95525,
-        140881 => 88305,  140883 => 88301,  140888 => 102910, 140890 => 112351, 140892 => 103034,
-        140902 => 80551,  140903 => 88020,  140905 => 88274,  140907 => 87973,  140908 => 92460,
-        140909 => 88243,  140911 => 112337, 140913 => 88202,  140927 => 102776, 140933 => 110060,
-        140934 => 110061, 140935 => 110179, 140940 => 102833, 140942 => 110142, 140951 => 110081,
-        140963 => 102606, 140964 => 112329, 140966 => 101860, 140981 => 122589, 140982 => 80676,
-        141001 => 89780,  141003 => 87972,  141008 => 102867, 141012 => 98223,  141014 => 80524,
-        141015 => 85625,  141017 => 109782, 141031 => 103023, 141033 => 110011, 141062 => 88093,
-        141076 => 111255, 141079 => 111259, 141081 => 102874, 141089 => 110117, 141094 => 102762,
-        141117 => 104767, 141137 => 88041,  141138 => 83785,  141143 => 109930, 141149 => 81106,
-        141151 => 92659,  141152 => 102948, 141168 => 88765,  141286 => 103039, 141292 => 110044,
-        141297 => 102779, 141301 => 102819, 141303 => 102824, 141312 => 92673,  141327 => 88408,
-        141358 => 95219,
+        140875 => 88418,  140878 => 109974, 140879 => 80716,  140880 => 88298,  140919 => 103060,
+        140928 => 112380, 140954 => 109958, 140957 => 84206,  140960 => 109911, 141016 => 110010,
+        141018 => 110012, 141032 => 92493,  141037 => 85244,  141071 => 85717,  141103 => 88007,
+        141116 => 88234,  141119 => 102703, 141126 => 14526,  141146 => 109935, 141004 => 80875,
+        141005 => 88400,
     ];
 
     public function handle()
