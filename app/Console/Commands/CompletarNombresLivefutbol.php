@@ -81,7 +81,8 @@ class CompletarNombresLivefutbol extends Command
                 foreach ([$d['completo'] ?? '', $nom] as $cand) {
                     $cand = trim((string) $cand);
                     if (count(preg_split('/\s+/u', $cand, -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
-                        $n = $tm->separarNombreCompleto($cand, $d['nacionalidad'] ?? null);
+                        $avisosN = [];
+                        $n = $tm->separarNombreCompleto($cand, $d['nacionalidad'] ?? null, $avisosN, $f->name);
                         break;
                     }
                 }

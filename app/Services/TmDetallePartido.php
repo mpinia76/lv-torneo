@@ -6354,12 +6354,22 @@ class TmDetallePartido
      * Para LiveFutbol: su ficha trae el nombre entero en «Nombre» y nada en
      * «Apellidos». Con el fallback pelado de separarTM() quedaría
      * «Falcón, Juan Manuel Sánchez».
+     *
+     * `$apodo` es el nombre con el que se lo muestra («Aizkorreta», «Pintado»).
+     * Si es UNA palabra que aparece dentro del nombre completo y no es la
+     * primera, ahí arranca el apellido: es el mismo ancla que el shortName de
+     * TM. Sin eso, «Jorge Aizkorreta Jurado» quedaba «Jurado, Jorge Aizkorreta».
+     * Si el apodo es el nombre de pila («Abel») o no está («Juanma»), no ancla
+     * nada y sigue como antes.
      */
-    public function separarNombreCompleto($completo, $nacionalidad, array &$avisos = [])
+    public function separarNombreCompleto($completo, $nacionalidad, array &$avisos = [], $apodo = null)
     {
         $antes = $this->avisos;
         $this->avisos = [];
-        $n = NombreHelper::separarTM(['name' => trim((string) $completo)]);
+        $datos = ['name' => trim((string) $completo)];
+        $apodo = trim((string) $apodo);
+        if ($apodo !== '' && !preg_match('/\s/u', $apodo)) $datos['shortName'] = $apodo;
+        $n = NombreHelper::separarTM($datos);
         $n = $this->rescatarPrimerApellido($n, $nacionalidad);
         $n = $this->apellidoDobleSinAncla($n, $nacionalidad, []);
         $avisos = $this->avisos;

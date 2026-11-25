@@ -1097,7 +1097,7 @@ class LivefutbolDetalle
             if ($n['nombre'] === $n['apellido']) $n['nombre'] = '';
         } elseif ($completo && count(preg_split('/\s+/u', $completo, -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
             $avisosN = [];
-            $n = $this->tm->separarNombreCompleto($completo, $ficha['nacionalidad'] ?? null, $avisosN);
+            $n = $this->tm->separarNombreCompleto($completo, $ficha['nacionalidad'] ?? null, $avisosN, $nombreLf);
             foreach ($avisosN as $a) $this->aviso($a);
             $n['name'] = $nombreLf;
         } elseif (count($palabras) >= 2) {

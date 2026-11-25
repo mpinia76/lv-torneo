@@ -48,7 +48,7 @@ class FusionarDuplicadosLivefutbol extends Command
 
     /** persona nueva (LF) => persona vieja (la que queda). */
     private const PARES = [
-        141266 => 85560,  141295 => 102771, 141307 => 102722,
+        141266 => 85560,  141295 => 102771, 141307 => 102722, 140876 => 88405,  141302 => 102831,
     ];
 
     public function handle()
