@@ -6367,8 +6367,24 @@ class TmDetallePartido
         $antes = $this->avisos;
         $this->avisos = [];
         $datos = ['name' => trim((string) $completo)];
-        $apodo = trim((string) $apodo);
-        if ($apodo !== '' && !preg_match('/\s/u', $apodo)) $datos['shortName'] = $apodo;
+        // Sólo cuando desde el apodo quedan EXACTAMENTE dos apellidos (sin contar
+        // partículas): «Aizkorreta Jurado», «Pintado del Molino». Si quedan tres o
+        // uno, el apodo es un segundo nombre de pila o el último apellido
+        // («Alexandre Ludovic Ribeiro Pereira», «José Miguel Figueira Domínguez»,
+        // «José Manuel Monteiro da Veiga») y anclar ahí lo parte mal.
+        $apodo = mb_strtolower(trim((string) $apodo));
+        if ($apodo !== '' && !preg_match('/\s/u', $apodo)) {
+            $pal = preg_split('/\s+/u', $datos['name'], -1, PREG_SPLIT_NO_EMPTY);
+            $particulas = ['de','da','do','dos','das','del','della','di','la','las','los','van','von','der','den','du','le'];
+            foreach ($pal as $i => $w) {
+                if ($i === 0 || mb_strtolower($w) !== $apodo) continue;
+                $resto = array_filter(array_slice($pal, $i), function ($x) use ($particulas) {
+                    return !in_array(mb_strtolower($x), $particulas, true);
+                });
+                if (count($resto) === 2) $datos['shortName'] = $w;
+                break;
+            }
+        }
         $n = NombreHelper::separarTM($datos);
         $n = $this->rescatarPrimerApellido($n, $nacionalidad);
         $n = $this->apellidoDobleSinAncla($n, $nacionalidad, []);
