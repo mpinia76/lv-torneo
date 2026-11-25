@@ -84,7 +84,7 @@ class LivefutbolPersona
         // acá las que aparezcan.
         if (!empty($f['pares']) && is_array($f['pares'])) {
             $etiquetas = [
-                'nombre' => 'name', 'nombre 2' => 'nombre', 'nombre completo' => 'nombre',
+                'nombre' => 'name', 'nombre 2' => 'completo', 'nombre completo' => 'completo', 'nombre real' => 'completo',
                 'apellidos' => 'apellido', 'apellido' => 'apellido',
                 'cumpleaños' => 'nacimiento', 'fecha de nacimiento' => 'nacimiento', 'nacimiento' => 'nacimiento',
                 'nacido' => 'nacimiento',
@@ -121,6 +121,9 @@ class LivefutbolPersona
         };
         $d = [
             'nombre'        => isset($f['nombre']) ? trim($f['nombre']) : null,
+            // El nombre completo cuando la ficha lo da aparte del mostrado
+            // («Tomàs» / «Tomàs X Y»). Ver LivefutbolDetalle::crear().
+            'completo'      => isset($f['completo']) ? trim($f['completo']) : null,
             'apellido'      => isset($f['apellido']) ? trim($f['apellido']) : null,
             'name'          => isset($f['name']) ? trim($f['name']) : null,
             'nacimiento'    => $fecha($f['nacimiento'] ?? null),

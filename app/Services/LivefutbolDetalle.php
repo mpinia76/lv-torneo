@@ -1076,11 +1076,27 @@ class LivefutbolDetalle
         if (!$ficha && !empty($info['lf_id'])) {
             $ficha = $this->fichas[(int) $info['lf_id']] ?? LivefutbolPersona::datos($info['lf_id'], $this->fichasJson[(int) $info['lf_id']] ?? null);
         }
-        $n = NombreHelper::separarTM(['name' => $nombreLf]);
-        // La ficha trae nombre y apellidos separados: mejor que adivinar el corte.
-        if ($ficha && $ficha['apellido']) {
-            $n = ['nombre' => (string) $ficha['nombre'], 'apellido' => (string) $ficha['apellido'],
-                'name' => $nombreLf];
+        // Cómo se parte el nombre, en orden de confianza:
+        //  1. la ficha trae nombre y apellidos por separado;
+        //  2. la ficha trae el nombre completo (2+ palabras) aparte del mostrado;
+        //  3. el nombre de la alineación, si tiene 2+ palabras;
+        //  4. UNA sola palabra (un apodo: «Tomàs»): va como apellido y el
+        //     nombre de pila queda vacío. Antes separarTM() la ponía en los dos
+        //     campos y quedaba «Tomàs, Tomàs».
+        $completo = $ficha['completo'] ?? null;
+        $palabras = preg_split('/\s+/u', trim((string) $nombreLf), -1, PREG_SPLIT_NO_EMPTY);
+        if ($ficha && !empty($ficha['apellido'])) {
+            $n = ['nombre' => (string) $ficha['nombre'], 'apellido' => (string) $ficha['apellido'], 'name' => $nombreLf];
+            if ($n['nombre'] === $n['apellido']) $n['nombre'] = '';
+        } elseif ($completo && count(preg_split('/\s+/u', $completo, -1, PREG_SPLIT_NO_EMPTY)) >= 2) {
+            $n = NombreHelper::separarTM(['name' => $completo]);
+            $n['name'] = $nombreLf;
+        } elseif (count($palabras) >= 2) {
+            $n = NombreHelper::separarTM(['name' => $nombreLf]);
+        } else {
+            $n = ['nombre' => '', 'apellido' => trim((string) $nombreLf), 'name' => trim((string) $nombreLf)];
+            $this->aviso($nombreLf . ': livefutbol lo nombra sólo con el apodo y su ficha no trae el nombre completo. '
+                . 'Se crea con el apodo como apellido y sin nombre de pila: completalo a mano.');
         }
         $grupo = ['jugador' => 'jugadores', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'][$rol];
         $tabla = ['jugador' => 'jugadors', 'tecnico' => 'tecnicos', 'arbitro' => 'arbitros'][$rol];
