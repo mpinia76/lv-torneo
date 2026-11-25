@@ -449,6 +449,17 @@ class FusionPersonas
             }
         }
 
+        // El atado con LiveFutbol guarda rol + ref_id (no la fk del rol), así
+        // que no entra en `mapeos`. Si no se lo mueve, el importador lo descarta
+        // por huérfano y vuelve a buscar a la persona desde cero.
+        if (self::hayTabla('livefutbol_personas')) {
+            $repuntadas = DB::table('livefutbol_personas')->where('rol', substr($cfg['fk'], 0, -3))
+                ->where('ref_id', $filaPerdedor->id)->update(['ref_id' => $filaGanador->id]);
+            if ($repuntadas) {
+                $detalle[] = "livefutbol_personas: {$repuntadas} repuntadas a #{$filaGanador->id}";
+            }
+        }
+
         // La fila de rol sobrante se borra antes de completar la que queda.
         DB::table($tabla)->where('id', $filaPerdedor->id)->delete();
 
