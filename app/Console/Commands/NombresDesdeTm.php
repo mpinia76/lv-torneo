@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\DB;
  */
 class NombresDesdeTm extends Command
 {
-    protected $signature = 'lf:nombres-desde-tm {--aplicar : Graba y fusiona} {--persona= : Sólo esta persona (id)} {--ver : Muestra los planteles leídos y guarda el HTML en storage/app}';
+    protected $signature = 'lf:nombres-desde-tm {--aplicar : Graba y fusiona} {--persona= : Sólo esta persona (id)} {--ver : Muestra los planteles leídos y guarda el HTML en storage/app} {--refrescar : Vuelve a bajar los planteles aunque estén en caché}';
 
     protected $description = 'Busca en los planteles de Transfermarkt el nombre real de los jugadores que LF creó sólo con el apodo';
 
@@ -206,7 +206,7 @@ class NombresDesdeTm extends Command
     {
         $clave = "tm_plantel_{$club}_{$season}";
         $c = Cache::get($clave);
-        if (is_array($c) && $c) return $c;
+        if (is_array($c) && $c && !$this->option('refrescar')) return $c;
 
         $url = 'https://www.transfermarkt.es/-/kader/verein/' . rawurlencode($club)
             . '/saison_id/' . (int) $season . '/plus/1';
@@ -234,7 +234,15 @@ class NombresDesdeTm extends Command
                 $nac = $this->fecha($td->textContent);
                 if ($nac) break;
             }
-            if ($nac) $out[$tmId] = ['nombre' => trim($a->textContent), 'nac' => $nac];
+            if ($nac) {
+                $out[$tmId] = ['nombre' => trim($a->textContent), 'nac' => $nac];
+            } elseif ($this->option('ver')) {
+                $celdas = [];
+                foreach ($xp->query('./td', $tr) as $td) {
+                    $celdas[] = trim(preg_replace('/\s+/u', ' ', $td->textContent));
+                }
+                $this->line('      SIN FECHA: ' . trim($a->textContent) . ' → [' . implode(' | ', $celdas) . ']');
+            }
         }
 
         if (!$out) {
