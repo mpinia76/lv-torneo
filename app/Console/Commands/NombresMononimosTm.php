@@ -75,17 +75,36 @@ class NombresMononimosTm extends Command
             foreach (array_chunk(array_keys($mapa), 20) as $ids) {
                 $r = ['llamadas' => 0];
                 $perfiles = TmFechas::traerPerfiles($tipo, $ids, $r);
+
+                // El perfil de DT trae sólo el nombre corto («Míchel»), pero si
+                // fue jugador tiene `attributes.playerId`: el perfil de JUGADOR
+                // sí trae passportName / firstName / lastName.
+                $comoJugador = [];
+                if ($tipo !== 'jugador') {
+                    $pids = [];
+                    foreach ($perfiles as $id => $pf) {
+                        if (!empty($pf['attributes']['playerId'])) $pids[(string) $id] = (string) $pf['attributes']['playerId'];
+                    }
+                    if ($pids) {
+                        $pj = TmFechas::traerPerfiles('jugador', array_values(array_unique($pids)), $r);
+                        foreach ($pids as $id => $pid) if (isset($pj[$pid])) $comoJugador[$id] = $pj[$pid];
+                    }
+                }
                 foreach ($ids as $tmId) {
                     $p = $mapa[$tmId];
                     $etq = "#{$p->id} «{$p->name}» (" . substr((string) $p->nacimiento, 0, 10) . ", TM {$tipo} {$tmId})";
                     $perfil = $perfiles[$tmId] ?? null;
                     if (!$perfil) { $igual[] = "{$etq}: tmapi no devolvió el perfil"; continue; }
 
+                    if (isset($comoJugador[(string) $tmId])) $perfil = $comoJugador[(string) $tmId];
                     $n = $tm->nombreDesdePerfil($perfil, $p->nacionalidad);
                     $nom = trim((string) ($n['nombre'] ?? ''));
                     $ape = trim((string) ($n['apellido'] ?? ''));
                     if ($nom === '' || $ape === '' || mb_strtolower($nom) === mb_strtolower($ape)) {
-                        $igual[] = "{$etq}: TM tampoco tiene el nombre completo";
+                        $igual[] = "{$etq}: TM tampoco tiene el nombre completo [name=" . ($perfil['name'] ?? '')
+                            . ' · pasaporte=' . ($perfil['nationalityDetails']['passportName'] ?? '')
+                            . ' · first/last=' . ($perfil['firstName'] ?? '') . '/' . ($perfil['lastName'] ?? '')
+                            . " → «{$ape}, {$nom}»]";
                         continue;
                     }
 
