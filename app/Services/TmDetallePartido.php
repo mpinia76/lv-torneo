@@ -6400,6 +6400,26 @@ class TmDetallePartido
      */
     public function nombreDesdePerfil(array $perfil, $nacionalidad, array &$avisos = [])
     {
+        // 1) Si TM manda firstName + lastName, son el dato más firme. El
+        //    apellido se toma del nombre de pasaporte cuando éste arranca con el
+        //    nombre de pila («Noah Mbamba-Muanda» vs lastName «Mbamba»).
+        $first = trim((string) ($perfil['firstName'] ?? ''));
+        $last  = trim((string) ($perfil['lastName'] ?? ''));
+        if ($first !== '' && $last !== '') {
+            $pas = trim((string) ($perfil['nationalityDetails']['passportName'] ?? ''));
+            $ape = $last;
+            if ($pas !== '' && mb_stripos($pas, $first . ' ') === 0 && preg_match('/\p{Latin}/u', $pas)) {
+                $ape = trim(mb_substr($pas, mb_strlen($first) + 1));
+            }
+            return ['nombre' => $first, 'apellido' => $ape, 'name' => $perfil['shortName'] ?? ($perfil['name'] ?? '')];
+        }
+
+        // 2) Si no, como el alta. Pero un shortName de UNA palabra («Marcelino»,
+        //    «Míchel») no es un ancla: hace que apellidoDobleSinAncla no corra y
+        //    «Marcelino García Toral» quede «Toral, Marcelino García».
+        $sh = trim((string) ($perfil['shortName'] ?? ''));
+        if ($sh !== '' && !preg_match('/\s/u', $sh)) unset($perfil['shortName']);
+
         $antes = $this->avisos;
         $this->avisos = [];
         $n = NombreHelper::separarTM($perfil);
