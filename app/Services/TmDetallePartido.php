@@ -6393,6 +6393,23 @@ class TmDetallePartido
         return $n;
     }
 
+    /**
+     * Nombre y apellido desde un perfil crudo de tmapi, con las mismas reglas
+     * que usa el alta (separarTM + apellido doble hispano). Para corregir
+     * fichas ya creadas sin tener que volver a importar el partido.
+     */
+    public function nombreDesdePerfil(array $perfil, $nacionalidad, array &$avisos = [])
+    {
+        $antes = $this->avisos;
+        $this->avisos = [];
+        $n = NombreHelper::separarTM($perfil);
+        $n = $this->rescatarPrimerApellido($n, $nacionalidad);
+        $n = $this->apellidoDobleSinAncla($n, $nacionalidad, $perfil);
+        $avisos = $this->avisos;
+        $this->avisos = $antes;
+        return $n;
+    }
+
     /** Ver tokensNombre(). */
     public function palabras($texto)
     {
