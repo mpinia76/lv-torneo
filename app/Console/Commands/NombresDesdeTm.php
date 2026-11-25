@@ -41,7 +41,7 @@ use Illuminate\Support\Facades\DB;
  */
 class NombresDesdeTm extends Command
 {
-    protected $signature = 'lf:nombres-desde-tm {--aplicar : Graba y fusiona} {--persona= : Sólo esta persona (id)}';
+    protected $signature = 'lf:nombres-desde-tm {--aplicar : Graba y fusiona} {--persona= : Sólo esta persona (id)} {--ver : Muestra los planteles leídos y guarda el HTML en storage/app}';
 
     protected $description = 'Busca en los planteles de Transfermarkt el nombre real de los jugadores que LF creó sólo con el apodo';
 
@@ -97,7 +97,12 @@ class NombresDesdeTm extends Command
 
             $hallados = [];
             foreach ($buscar as [$club, $season]) {
-                foreach ($this->plantel($club, $season) as $tmId => $j) {
+                $plantel = $this->plantel($club, $season);
+                if ($this->option('ver')) {
+                    $this->line("   plantel TM {$club} temporada {$season}: " . count($plantel) . ' jugadores');
+                    foreach ($plantel as $id => $j) $this->line("      {$j['nac']}  {$j['nombre']} (TM {$id})");
+                }
+                foreach ($plantel as $tmId => $j) {
                     if ($j['nac'] === $fecha) $hallados[$tmId] = $j['nombre'];
                 }
                 if ($hallados) break;   // con un plantel alcanza
@@ -201,12 +206,16 @@ class NombresDesdeTm extends Command
     {
         $clave = "tm_plantel_{$club}_{$season}";
         $c = Cache::get($clave);
-        if (is_array($c)) return $c;
+        if (is_array($c) && $c) return $c;
 
         $url = 'https://www.transfermarkt.es/-/kader/verein/' . rawurlencode($club)
             . '/saison_id/' . (int) $season . '/plus/1';
         $html = HttpHelper::getHtmlTm($url);
         $this->creditos++;
+        if ($html && $this->option('ver')) {
+            file_put_contents(storage_path("app/tm_plantel_{$club}_{$season}.html"), $html);
+            $this->line("   HTML guardado en storage/app/tm_plantel_{$club}_{$season}.html");
+        }
         if (!$html) {
             $this->warn("No pude leer {$url}");
             return [];
@@ -228,9 +237,11 @@ class NombresDesdeTm extends Command
             if ($nac) $out[$tmId] = ['nombre' => trim($a->textContent), 'nac' => $nac];
         }
 
-        if (!$out && strpos($html, '/spieler/') === false) {
-            $this->warn("La página de TM no trajo plantel: {$url}");
-            return [];   // un muro de consentimiento no se cachea
+        if (!$out) {
+            // Ni un muro de consentimiento ni un HTML que no supe leer se
+            // guardan: si se cachea vacío, la próxima vez ni se intenta.
+            $this->warn("No saqué ningún jugador con fecha de: {$url}");
+            return [];
         }
         Cache::put($clave, $out, now()->addDays(30));
         return $out;
