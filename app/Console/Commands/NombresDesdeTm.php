@@ -210,8 +210,7 @@ class NombresDesdeTm extends Command
 
         $url = 'https://www.transfermarkt.es/-/kader/verein/' . rawurlencode($club)
             . '/saison_id/' . (int) $season . '/plus/1';
-        $html = HttpHelper::getHtmlTm($url);
-        $this->creditos++;
+        $html = $this->bajar($url);
         if ($html && $this->option('ver')) {
             file_put_contents(storage_path("app/tm_plantel_{$club}_{$season}.html"), $html);
             $this->line("   HTML guardado en storage/app/tm_plantel_{$club}_{$season}.html");
@@ -253,6 +252,29 @@ class NombresDesdeTm extends Command
         }
         Cache::put($clave, $out, now()->addDays(30));
         return $out;
+    }
+
+    /**
+     * El sitio de TM a veces contesta el desafío de AWS WAF (una página de 2 KB
+     * con `challenge-container` que necesita JavaScript) en vez del plantel.
+     * Primero el modo básico saliendo desde EE.UU. y desde el país de siempre
+     * (1 crédito cada uno); si los dos dan el desafío, el modo con render, que
+     * ejecuta el JS pero gasta bastantes más créditos.
+     */
+    private function bajar($url)
+    {
+        $esDesafio = function ($h) {
+            return !$h || stripos($h, 'challenge-container') !== false || stripos($h, 'awsWaf') !== false;
+        };
+        foreach (['us', null] as $pais) {
+            $html = HttpHelper::getHtmlTm($url, $pais);
+            $this->creditos++;
+            if (!$esDesafio($html)) return $html;
+        }
+        $this->line('   TM contestó el desafío anti-robot: pruebo con render (más créditos)');
+        $html = HttpHelper::getHtmlPremium($url);
+        $this->creditos++;
+        return $esDesafio($html) ? false : $html;
     }
 
     /** «19/08/1980 (24)», «19 ago 1980 (24)», «Aug 19, 1980 (24)» → Y-m-d. */
