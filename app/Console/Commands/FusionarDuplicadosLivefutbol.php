@@ -31,6 +31,11 @@ use Illuminate\Support\Facades\DB;
  * apodo claramente sacado del nombre (Juanra = Juan Ramón Cabrero, Maxi =
  * Máximo Ovejero, Javi = Francisco Javier Álvarez Peláez).
  *
+ * Cuarta tanda (25/11/2026): DTs que el importador de TM creó con el apodo
+ * solo («Xavi», «Guti», «Michu») y que ya estaban como jugadores con el nombre
+ * completo. Misma fecha + el apodo sale del nombre o es conocido. Gana la
+ * ficha del jugador; el rol de DT se le pasa.
+ *
  * Gana SIEMPRE la ficha vieja (la que tiene la carrera). Usa la misma fusión
  * que Verificar personas, y además mueve el atado de `livefutbol_personas`,
  * que la fusión no conoce.
@@ -48,7 +53,10 @@ class FusionarDuplicadosLivefutbol extends Command
 
     /** persona nueva (LF) => persona vieja (la que queda). */
     private const PARES = [
-        141266 => 85560,  141295 => 102771, 141307 => 102722, 140876 => 88405,  141302 => 102831,
+        78146 => 15341,   81005 => 11888,   81929 => 102330,  81939 => 102724,  83986 => 88042,
+        106991 => 15336,  113713 => 87980,  120369 => 80570,  128173 => 11545,  128674 => 17030,
+        129014 => 11064,  130009 => 13972,  130303 => 96078,  134965 => 13043,  135248 => 88204,
+        128038 => 85393,  130474 => 13779,  128018 => 12947,
     ];
 
     public function handle()
