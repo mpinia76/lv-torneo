@@ -1222,6 +1222,20 @@ class LivefutbolDetalle
             foreach ($this->candidatosBase($tabla, $n) as $c) $cands[(int) $c->id] = $c;
         }
 
+        // Además, TODOS los que nacieron ese día. candidatosBase() busca por
+        // nombre con tope de 300, y con un apodo común («Pablo», «Tomás»,
+        // «Vara») el que buscábamos quedaba afuera del tope: se creaba un
+        // duplicado de alguien que ya estaba. Por fecha son muy pocos.
+        $desde = $fecha . ' 00:00:00';
+        $hasta = date('Y-m-d', strtotime($fecha . ' +1 day')) . ' 00:00:00';
+        $porDia = DB::table($tabla)->join('personas', 'personas.id', '=', $tabla . '.persona_id')
+            ->where('personas.nacimiento', '>=', $desde)->where('personas.nacimiento', '<', $hasta)
+            ->select($tabla . '.id', 'personas.apellido', 'personas.nombre', 'personas.name', 'personas.nacimiento')
+            ->limit(200)->get();
+        foreach ($porDia as $c) $cands[(int) $c->id] = $c;
+
+        $soloApodo = count($this->tm->palabras($nombreLf)) === 1;
+
         $mismaFecha = []; $sinFecha = [];
         foreach ($cands as $c) {
             // El mejor puntaje con cualquiera de las dos formas del nombre.
@@ -1230,6 +1244,13 @@ class LivefutbolDetalle
                 $x = $this->puntaje($n, $c, false);
                 if ($x !== null && ($p === null || $x > $p)) $p = $x;
                 if ($this->puntaje($n, $c, true) !== null) $estricto = true;
+            }
+            // Apodo de una palabra + MISMA fecha: alcanza con que el apodo esté
+            // en algún lado de la ficha (nombre, apellido o el mostrado). «Vara»
+            // nacido el 29/08/1973 es el «… Vara» de la base nacido ese día.
+            if ($p === null && $soloApodo && $c->nacimiento && substr((string) $c->nacimiento, 0, 10) === $fecha) {
+                $tokensFicha = array_merge($this->tm->palabras($c->apellido . ' ' . $c->nombre), $this->tm->palabras((string) $c->name));
+                if (array_intersect($this->tm->palabras($nombreLf), $tokensFicha)) $p = 1;
             }
             if ($p === null) continue;
 
