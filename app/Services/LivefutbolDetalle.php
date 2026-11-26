@@ -1048,9 +1048,29 @@ class LivefutbolDetalle
 
     private function atado($rol, $lfId, $tabla)
     {
-        $id = DB::table('livefutbol_personas')->where('rol', $rol)->where('lf_id', $lfId)->value('ref_id');
+        $fila = DB::table('livefutbol_personas')->where('rol', $rol)->where('lf_id', $lfId)->first();
+        if (!$fila || !$fila->ref_id) return null;
+
         // Un atado a una ficha que ya no existe (fusión, borrado) no vale.
-        return ($id && DB::table($tabla)->where('id', $id)->exists()) ? (int) $id : null;
+        $c = DB::table($tabla)->join('personas', 'personas.id', '=', $tabla . '.persona_id')
+            ->where($tabla . '.id', $fila->ref_id)
+            ->first([$tabla . '.id', 'personas.apellido', 'personas.nombre', 'personas.name']);
+        if (!$c) return null;
+
+        // Los atados AUTOMÁTICOS por nombre se vuelven a controlar con las reglas
+        // de hoy. Antes de la regla del nombre de pila, «Jon Diez» se ató a
+        // «Mateos Díez, Rodrigo» por el apellido; como el atado gana siempre, ese
+        // error se repetía en cada rehacer y Jon Diez desaparecía de la
+        // alineación (26/11/2026). Los elegidos a mano y los creados no se tocan.
+        if (in_array($fila->origen, ['plantilla', 'nombre'], true)
+            && $this->puntaje((string) $fila->nombre_lf, $c, false) === null) {
+            $this->aviso('Livefutbol «' . $fila->nombre_lf . '» estaba atado a «' . trim($c->apellido . ', ' . $c->nombre, ', ')
+                . '» (#' . $c->id . '), pero el nombre no cierra: descarto ese atado y lo busco de nuevo.');
+            // No se borra acá (la vista previa no escribe): al guardar, el nuevo
+            // resultado pisa esta fila con anotarMapeo().
+            return null;
+        }
+        return (int) $c->id;
     }
 
     /** 'nuevo', un id que existe, o null. */
