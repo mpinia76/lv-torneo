@@ -101,7 +101,7 @@ class LivefutbolDetalle
 
     /** Palabras que no dicen nada del club ("FC", "Club"...). */
     private static $relleno = ['fc', 'cf', 'club', 'cd', 'sc', 'ac', 'us', 'as', 'sv', 'fk', 'sk', 'cs',
-        'ca', 'ud', 'rc', 'sd', 'afc', 'bk', 'if', 'ik', 'tsv', 'vfb', 'vfl', 'fsv', 'ssc', 'sporting',
+        'ca', 'ud', 'rc', 'sd', 'afc', 'bk', 'if', 'ik', 'tsv', 'vfb', 'vfl', 'fsv', 'ssc', 'sporting', 'athletic', 'athletique', 'athletico',
         'deportivo', 'atletico', 'asociacion', 'futbol', 'football', 'calcio', 'olympique', 'stade', 'real'];
 
     public function __construct()
